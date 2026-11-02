@@ -45,7 +45,10 @@ struct GitRunnerTests {
       let inherited = [
         "HOME": scratch.appending(path: "acme-home").path,
         "PATH": "/usr/bin:/bin", "SSH_AUTH_SOCK": scratch.appending(path: "acme-agent.sock").path,
-        "SILTA_HOME": "must-not-leak", "UNRELATED": "must-not-leak",
+        "SILTA_HOME": "isolated", "UNRELATED": "preserved",
+        "HTTPS_PROXY": "http://proxy.acme.example", "NO_PROXY": "localhost",
+        "XDG_CONFIG_HOME": scratch.appending(path: "config").path, "TMPDIR": scratch.path,
+        "GIT_DIR": "ignored", "GIT_SSH_COMMAND": "ignored",
         "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_COUNT": "1", "GIT_TERMINAL_PROMPT": "1",
         "LC_ALL": "fi_FI.UTF-8",
       ]
@@ -60,13 +63,14 @@ struct GitRunnerTests {
         })
       // macOS may add this variable when launching a process.
       actual.removeValue(forKey: "__CF_USER_TEXT_ENCODING")
-      #expect(
-        actual == [
-          "HOME": inherited["HOME"], "PATH": inherited["PATH"],
-          "SSH_AUTH_SOCK": inherited["SSH_AUTH_SOCK"],
-          "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
-          "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
-        ])
+      var expected = inherited.filter { !$0.key.hasPrefix("GIT_") }
+      expected.merge([
+        "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
+        "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
+      ]) { _, fixed in fixed }
+      withKnownIssue("#3: git drops proxy, XDG, temp and other parent environment") {
+        #expect(actual == expected)
+      }
       #expect(result.stderr.isEmpty)
     }
   }

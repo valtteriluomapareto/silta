@@ -122,7 +122,7 @@ struct DeterminismTests {
         #expect(throws: (any Error).self) {
           try SiltaEnvironment.system(
             environment: [key: bad, "SILTA_HOME": scratch.appending(path: "data").path],
-            userHome: scratch, deterministic: true)
+            userHome: scratch, temporaryRoots: [], deterministic: true)
         }
       }
       let env = try SiltaEnvironment.system(
@@ -130,7 +130,7 @@ struct DeterminismTests {
           "SILTA_HOME": scratch.appending(path: "data").path,
           "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0",
         ],
-        userHome: scratch, deterministic: true)
+        userHome: scratch, temporaryRoots: [], deterministic: true)
       #expect(env.clock.now() == start)
       #expect(env.ids is SeededIDGenerator)
       #expect(throws: (any Error).self) {
@@ -152,7 +152,7 @@ struct DeterminismTests {
         #expect(throws: (any Error).self) {
           try SiltaEnvironment.system(
             environment: ["SILTA_HOME": scratch.appending(path: "data").path, "SILTA_NOW": raw],
-            userHome: scratch, deterministic: true)
+            userHome: scratch, temporaryRoots: [], deterministic: true)
         }
       }
     }
@@ -215,7 +215,7 @@ struct DeterminismTests {
           var values = ["SILTA_NOW": "2023-11-14T22:13:20.123Z", "SILTA_ID_SEED": "0"]
           values["SILTA_HOME"] = path
           let env = try SiltaEnvironment.system(
-            environment: values, userHome: user,
+            environment: values, userHome: user, temporaryRoots: [],
             deterministic: true)
           #expect(env.clock is SystemClock)
           #expect(env.ids is SystemIDGenerator)
@@ -261,10 +261,69 @@ struct DeterminismTests {
               environment: [
                 "SILTA_HOME": scratch.appending(path: "data").path,
                 "SILTA_NOW": raw,
-              ], userHome: scratch, deterministic: true)
+              ], userHome: scratch, temporaryRoots: [], deterministic: true)
           }
         }
       }
+    }
+  }
+
+  @Test func absentCaseAliasOfRealHomeIgnoresOverrides() throws {
+    try withScratchDirectory { scratch in
+      try withKnownIssue("#3: absent real-home case alias permits deterministic overrides") {
+        let env = try SiltaEnvironment.system(
+          environment: ["SILTA_HOME": scratch.appending(path: ".SILTA").path,
+                        "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0"],
+          userHome: scratch, temporaryRoots: [], deterministic: true)
+        #expect(env.clock is SystemClock)
+        #expect(env.ids is SystemIDGenerator)
+      }
+    }
+  }
+
+  @Test(arguments: [false, true]) func validOverrideWorksBesideBrokenDefault(symlink: Bool) throws {
+    try withScratchDirectory { scratch in
+      let broken = scratch.appending(path: ".silta")
+      if symlink {
+        try FileManager.default.createSymbolicLink(
+          at: broken, withDestinationURL: scratch.appending(path: "missing"))
+      } else {
+        try Data().write(to: broken)
+      }
+      try withKnownIssue("#3: unselected broken default prevents valid custom home") {
+        let home = try SiltaHome.resolve(
+          environment: ["SILTA_HOME": scratch.appending(path: "isolated").path],
+          userHome: scratch, temporaryRoots: [])
+        #expect(home.url.lastPathComponent == "isolated")
+      }
+      #expect(throws: SeamError.invalidHome) {
+        try SiltaHome.resolve(environment: ["SILTA_HOME": broken.path], userHome: scratch)
+      }
+    }
+  }
+
+  @Test func preEpochOverrideIsRejectedAtAssembly() throws {
+    try withScratchDirectory { scratch in
+      withKnownIssue("#3: pre-epoch SILTA_NOW is accepted until ID generation") {
+        #expect(throws: SeamError.invalidNow) {
+          try SiltaEnvironment.system(
+            environment: ["SILTA_HOME": scratch.appending(path: "data").path,
+                          "SILTA_NOW": "1969-12-31T23:59:59.000Z"],
+            userHome: scratch, temporaryRoots: [], deterministic: true)
+        }
+      }
+    }
+  }
+
+  @Test func resolverOwnsDefaultTemporaryRoots() throws {
+    try withScratchDirectory { scratch in
+      let home = try SiltaHome.resolve(
+        environment: ["SILTA_HOME": scratch.appending(path: "data").path], userHome: scratch)
+      #expect(home.permitsDeterminism)
+      let root = FileManager.default.temporaryDirectory
+      let sibling = root.deletingLastPathComponent().appending(path: root.lastPathComponent + "-sibling")
+      let other = try SiltaHome.resolve(environment: ["SILTA_HOME": sibling.path], userHome: scratch)
+      #expect(!other.permitsDeterminism)
     }
   }
 
