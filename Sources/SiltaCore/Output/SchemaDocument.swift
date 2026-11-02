@@ -1,15 +1,29 @@
-/// What `silta schema` prints: every command, its arguments and `--json` data shape,
-/// the global flags, and the error-code table (spec §20.1).
+/// What `silta schema` prints: the commands, the global flags and the error-code table
+/// (spec §20.1). With every command's arguments and shape it is the detail; `index`
+/// keeps only names and abstracts.
 package struct SchemaDocument: Encodable, Sendable {
   /// The commands described.
   package var commands: [CommandSchema]
   /// Flags every command accepts.
   package var globalArguments: [ArgumentSchema]
+  private var errors = ErrorCode.allCases.map(ErrorSchema.init)
 
-  /// A document for `commands` and `globalArguments`, with the full error table.
+  /// A detailed document for `commands` and `globalArguments`, with the error table.
   package init(commands: [CommandSchema], globalArguments: [ArgumentSchema]) {
     self.commands = commands
     self.globalArguments = globalArguments
+  }
+
+  /// The same document with only each command's name and abstract.
+  package var index: SchemaDocument {
+    var index = self
+    index.commands = commands.map {
+      var entry = $0
+      entry.arguments = nil
+      entry.data = nil
+      return entry
+    }
+    return index
   }
 
   /// The shape of this document's JSON, which `silta schema` publishes for itself.
@@ -21,9 +35,9 @@ package struct SchemaDocument: Encodable, Sendable {
     return .object([
       "commands": .array(
         .object([
-          "abstract": .string, "arguments": .array(argument), "data": .any, "name": .string,
+          "abstract": .string, "arguments": .optional(.array(argument)),
+          "data": .optional(.any), "name": .string,
         ])),
-      "envelope": .int,
       "errors": .array(
         .object(["agent_should": .string, "code": .string, "exit": .int, "next_by": .string])),
       "global_arguments": .array(argument),
@@ -31,27 +45,26 @@ package struct SchemaDocument: Encodable, Sendable {
   }()
 
   enum CodingKeys: String, CodingKey {
-    case commands, envelope, errors
+    case commands, errors
     case globalArguments = "global_arguments"
   }
 
-  package func encode(to encoder: any Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(commands, forKey: .commands)
-    try container.encode(Envelope.version, forKey: .envelope)
-    try container.encode(ErrorCode.allCases.map(ErrorSchema.init), forKey: .errors)
-    try container.encode(globalArguments, forKey: .globalArguments)
+  /// The index as text (spec §20.1).
+  package var indexText: String {
+    commands.map { "\($0.name)  \($0.abstract)\n" }.joined()
+      + "details: silta schema <command>\n" + tail
   }
 
-  /// The text form (spec §20.1).
-  package var text: String {
-    var out = commands.map(\.text).joined(separator: "\n")
-    out += "\nglobal flags:\n" + globalArguments.map(\.line).joined()
-    out += "\nerror codes:\n"
-    out += ErrorCode.allCases.map {
-      "  \($0.rawValue)  exit \($0.exitCode), next by \($0.nextBy.rawValue): \($0.agentShould)\n"
-    }.joined()
-    return out
+  /// The detail as text (spec §20.1).
+  package var detailText: String {
+    commands.map(\.text).joined(separator: "\n") + tail
+  }
+
+  private var tail: String {
+    "\nglobal flags:\n" + globalArguments.map(\.line).joined() + "\nerror codes:\n"
+      + ErrorCode.allCases.map {
+        "  \($0.rawValue)  exit \($0.exitCode), next by \($0.nextBy.rawValue): \($0.agentShould)\n"
+      }.joined()
   }
 }
 
@@ -61,12 +74,12 @@ package struct CommandSchema: Encodable, Sendable {
   package var name: String
   /// What the command does, in one line.
   package var abstract: String
-  /// Its arguments, without the global flags.
-  package var arguments: [ArgumentSchema]
-  /// The shape of its `--json` data.
-  package var data: Shape
+  /// Its arguments, without the global flags; absent in the index.
+  package var arguments: [ArgumentSchema]?
+  /// The shape of its `--json` data; absent in the index.
+  package var data: Shape?
 
-  /// A command entry.
+  /// A command entry with full detail.
   package init(name: String, abstract: String, arguments: [ArgumentSchema], data: Shape) {
     self.name = name
     self.abstract = abstract
@@ -75,53 +88,14 @@ package struct CommandSchema: Encodable, Sendable {
   }
 
   var text: String {
-    let shape = (try? OutputRouter.json(data)) ?? "?"  // a Shape always encodes
-    return "\(name)\n  \(abstract)\n" + arguments.map(\.line).joined() + "  --json data: \(shape)\n"
-  }
-}
-
-/// One argument of a command.
-package struct ArgumentSchema: Encodable, Sendable {
-  /// `flag`, `option` or `positional`.
-  package var kind: String
-  /// `--json`, `-m`, or `<value_name>` for a positional.
-  package var names: [String]
-  /// Whether the call fails without it.
-  package var required: Bool
-  /// Whether it may be given more than once.
-  package var repeating: Bool
-  /// The value's placeholder, for options and positionals.
-  package var valueName: String?
-  /// What it does.
-  package var help: String?
-
-  /// An argument entry.
-  package init(
-    kind: String, names: [String], required: Bool, repeating: Bool, valueName: String?,
-    help: String?
-  ) {
-    self.kind = kind
-    self.names = names
-    self.required = required
-    self.repeating = repeating
-    self.valueName = valueName
-    self.help = help
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case kind, names, required, repeating, help
-    case valueName = "value_name"
-  }
-
-  var line: String {
-    let value = kind == "option" ? valueName.map { " <\($0)>" } ?? "" : ""
-    let flags = (required ? "required" : "optional") + (repeating ? ", repeating" : "")
-    return "  \(names.joined(separator: ", "))\(value)  \(flags): \(help ?? "")\n"
+    let shape = data.flatMap { try? OutputRouter.json($0) } ?? "?"  // a Shape always encodes
+    return "\(name)\n  \(abstract)\n" + (arguments ?? []).map(\.line).joined()
+      + "  --json data: \(shape)\n"
   }
 }
 
 /// One row of the error-code table.
-struct ErrorSchema: Encodable {
+private struct ErrorSchema: Encodable, Sendable {
   let code: String
   let exit: Int32
   let nextBy: String

@@ -1,13 +1,14 @@
-/// `silta schema <command>` named a command that doesn't exist.
+/// `silta schema <command>` named no command.
 package enum SchemaError: CodedError {
-  /// No command has this full name, e.g. `silta nope`.
-  case unknownCommand(String)
+  /// No command starts with `name`; `known` are the commands that exist.
+  case unknownCommand(String, known: [String])
 
-  package var code: ErrorCode { .notFound }
+  package var code: ErrorCode { .invalid }
 
   package var message: String {
     switch self {
-    case .unknownCommand(let name): "No command '\(name)'"
+    case .unknownCommand(let name, let known):
+      "No command '\(name)'; commands: \(known.joined(separator: ", "))"
     }
   }
 

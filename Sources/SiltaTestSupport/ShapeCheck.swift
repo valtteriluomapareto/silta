@@ -55,6 +55,13 @@ package enum ShapeCheck {
   }
 
   private static func describe(_ value: Any) -> String {
-    String(describing: type(of: value))
+    switch value {
+    case is String: "a string"
+    case let number as NSNumber:
+      CFGetTypeID(number) == CFBooleanGetTypeID() ? "a bool" : "a number"
+    case is [Any]: "an array"
+    case is [String: Any]: "an object"
+    default: "null"
+    }
   }
 }

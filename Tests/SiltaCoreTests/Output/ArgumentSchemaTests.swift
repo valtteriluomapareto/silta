@@ -20,13 +20,17 @@ struct ArgumentSchemaTests {
     #expect(
       arguments == [
         ArgumentSchema(
-          kind: "option", names: ["-a", "--app"], required: true, repeating: false,
+          kind: "option", names: ["--app", "-a"], required: true, repeating: false,
           valueName: "app", help: "The app."),
         ArgumentSchema(
           kind: "option", names: ["--tag"], required: false, repeating: true,
           valueName: "tag", help: "Tags."),
+        // An inversion is two flags sharing one help text.
         ArgumentSchema(
-          kind: "flag", names: ["--color", "--no-color"], required: false, repeating: false,
+          kind: "flag", names: ["--color"], required: false, repeating: false,
+          valueName: nil, help: "Colour."),
+        ArgumentSchema(
+          kind: "flag", names: ["--no-color"], required: false, repeating: false,
           valueName: nil, help: "Colour."),
         ArgumentSchema(
           kind: "flag", names: ["-verbose"], required: false, repeating: false,

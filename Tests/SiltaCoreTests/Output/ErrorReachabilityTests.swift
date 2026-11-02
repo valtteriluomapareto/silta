@@ -25,7 +25,7 @@ extension InternalError: ErrorExamples {
 }
 
 extension SchemaError: ErrorExamples {
-  static var examples: [SchemaError] { [.unknownCommand("silta nope")] }
+  static var examples: [SchemaError] { [.unknownCommand("silta nope", known: ["silta schema"])] }
 }
 
 /// Proves every `ErrorCode` is produced by some error type (spec §16, D22).

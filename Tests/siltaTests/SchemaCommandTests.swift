@@ -86,7 +86,10 @@ struct SchemaCommandTests {
         .max { $0.count < $1.count }
       let name = try #require(owner, "\(file) names no command")
       covered.insert(name)
-      let data = try #require(envelope["data"])
+      guard let data = envelope["data"] else {
+        Issue.record("\(file) has no data")
+        continue
+      }
       #expect(
         ShapeCheck.violations(of: data, against: try #require(commands[name])) == [], "\(file)")
     }
@@ -103,9 +106,14 @@ struct SchemaCommandTests {
     for name in names {
       let words = name.split(separator: " ").dropFirst().map(String.init)
       let detail = try object(Data(try silta(["schema"] + words + ["--json"]).stdout.utf8))
-      let entries = try #require((detail["data"] as? [String: Any])?["commands"] as? [[String: Any]])
+      let entries = try #require(
+        (detail["data"] as? [String: Any])?["commands"] as? [[String: Any]])
       let entry = try #require(entries.first { $0["name"] as? String == name })
-      shapes[words.joined(separator: "-")] = try #require(entry["data"])
+      guard let shape = entry["data"] else {
+        Issue.record("\(name) publishes no data shape")
+        continue
+      }
+      shapes[words.joined(separator: "-")] = shape
     }
     return shapes
   }
