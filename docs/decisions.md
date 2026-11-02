@@ -74,6 +74,9 @@ They're summarised here so every decision has one index.
     CI runs on GitHub's `xcode-27` image, which is a public preview. If that image
     breaks, the fallback is `macos-26` with Xcode 26.6, which reports the same Swift 7
     feature list (D29).
+  - **↳ update 2026-11-02:** Swift package dependencies are pinned with `exact:`, and
+    `Package.resolved` is committed. `scripts/verify.sh` builds only from the resolved
+    file, so a manifest change without a matching resolve fails.
 - **D19: Branch and merge flow.**
   - Branches are `<agent>/<slice>-<slug>`, squash-merged on green CI.
   - Until the first code lands, documentation changes may be committed directly to

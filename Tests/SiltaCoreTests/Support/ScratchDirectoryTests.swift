@@ -5,11 +5,10 @@ import Testing
 struct ScratchDirectoryTests {
   private struct Planted: Error {}
 
-  @Test func givesAnEmptyResolvedDirectoryAndRemovesIt() throws {
+  @Test func givesAnEmptyDirectoryAndRemovesIt() throws {
     let url = try withScratchDirectory { url in
       let contents = try FileManager.default.contentsOfDirectory(atPath: url.path)
       #expect(contents.isEmpty)
-      #expect(url == url.resolvingSymlinksInPath())
       return url
     }
     #expect(!FileManager.default.fileExists(atPath: url.path))

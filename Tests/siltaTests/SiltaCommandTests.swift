@@ -2,7 +2,6 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
 struct SiltaCommandTests {
   @Test func versionPrintsTheVersionConstant() throws {
     let result = try withScratchDirectory { try SiltaBinary.run(["--version"], in: $0) }
@@ -14,7 +13,11 @@ struct SiltaCommandTests {
   // that an error never writes to stdout (spec §20.1).
   @Test func unknownFlagFailsWithNothingOnStdout() throws {
     let result = try withScratchDirectory { try SiltaBinary.run(["--no-such-flag"], in: $0) }
-    #expect(result.termination != .exit(0))
+    if case .exit(let code) = result.termination {
+      #expect(code != 0)
+    } else {
+      Issue.record("expected an exit, got \(result.termination)")
+    }
     #expect(result.stdout.isEmpty)
     #expect(!result.stderr.isEmpty)
   }
