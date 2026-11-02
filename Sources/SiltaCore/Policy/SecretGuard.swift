@@ -25,8 +25,9 @@ package enum SecretGuard {
         if rule == "azure_pat", value.count == 52,
           text.matches(of: /\b(?:doc|app|topic):[A-Za-z0-9_.-]+/)
             .contains(where: {
-              $0.range.lowerBound <= match.range.lowerBound
-                && $0.range.upperBound >= match.range.upperBound
+              let identifier = $0.output.drop(while: { $0 != ":" }).dropFirst()
+              return identifier.startIndex == match.range.lowerBound
+                && identifier.endIndex == match.range.upperBound
             })
         {
           continue
