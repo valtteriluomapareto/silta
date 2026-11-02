@@ -768,10 +768,43 @@ state; the tests check this with golden output.
 **JSON envelope:**
 
 ```json
-{"schema":1,"ok":true,"data":{…},"warnings":[{"code":"ref_stale","message":"…"}]}
-{"schema":1,"ok":false,"error":{"code":"rate_limited","message":"30 comments on AC-12 in 10 min",
-  "retry_after_s":240,"next":["silta comment AC-12 --kind comment -F -   # one summary instead"]}}
+{"data":{…},"ok":true,"schema":1,"warnings":[{"code":"ref_stale","message":"…"}]}
+{"error":{"code":"rate_limited","message":"30 comments on AC-12 in 10 min",
+  "next":["silta comment AC-12 --kind comment -F -   # one summary instead"],"next_by":"agent",
+  "retry_after_s":240},"ok":false,"schema":1,"warnings":[]}
 ```
+
+- One line per output. Keys are sorted at every level, so output is byte-stable.
+- `warnings` is always present. `retry_after_s` is present only when set.
+- `next_by` says who runs the `next` commands: `human` for `human_only`,
+  `read_only_promoted` and `env`, otherwise `agent`.
+- `schema` is the envelope version. Data shapes only gain fields; any other change
+  bumps `schema`.
+
+**Text errors** go to stderr, one line, then the commands:
+
+```
+error: 30 comments on AC-12 in 10 min [rate_limited]
+next: silta comment AC-12 --kind comment -F -   # one summary instead
+retry after: 240s
+```
+
+When `next_by` is `human`, the lines read `ask human: <cmd>` instead of `next: <cmd>`.
+
+**Streams and global flags:**
+- Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on
+  stderr.
+- `--json`: everything on stdout, including errors. stderr stays empty unless debug
+  output was turned on explicitly.
+- `--quiet` hides success text only. Warnings and errors still show; with `--json` it
+  changes nothing.
+- `--json` and `--quiet` may come before or after the subcommand.
+- `--help` and `--version` print plain text to stdout and exit 0, even with `--json`.
+- A parse error is `usage` (exit 1). Its message is one line, and `next` is
+  `silta <command> --help` for the command that was being parsed.
+- An unexpected error (a bug) is `env` (exit 9), with the message
+  `internal error (bug): <description>`, `next_by: human` and `next: silta doctor`. The
+  arguments are never echoed, because they can carry bodies (§18).
 
 **Exit codes and error codes.** Every error message ends with the next command to
 run.

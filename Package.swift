@@ -49,11 +49,13 @@ let package = Package(
     .testTarget(
       name: "SiltaCoreTests",
       dependencies: ["SiltaCore", "SiltaTestSupport"],
+      exclude: ["Golden"],
       swiftSettings: swiftSettings
     ),
     .testTarget(
       name: "siltaTests",
       dependencies: ["SiltaCore", "SiltaTestSupport"],
+      exclude: ["Golden"],
       swiftSettings: swiftSettings
     ),
   ],
