@@ -952,7 +952,9 @@ revision before the write.
 
   There's no entropy check in v1.
 - **Allowlist:** 40- and 64-character hex SHAs, UUIDs, refs (§5.1), and
-  `<placeholder>`-style values.
+  `<placeholder>`-style values. Exemptions cover whole candidate values; a containing
+  reference does not exempt an embedded credential. Explicit credential fields
+  are scanned even when their values resemble SHAs, UUIDs or refs, except for placeholders.
 - **Behaviour:**
   - **Humans** get a rejection showing the rule and a masked preview (`eyJh…[jwt]`),
     and `--allow-secret` overrides.
