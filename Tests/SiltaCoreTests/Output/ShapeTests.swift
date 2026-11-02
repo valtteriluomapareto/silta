@@ -6,7 +6,7 @@ struct ShapeTests {
   private func encoded(_ shape: Shape) throws -> String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
-    return String(decoding: try encoder.encode(shape), as: UTF8.self)
+    return try #require(String(bytes: try encoder.encode(shape), encoding: .utf8))
   }
 
   @Test func encodesTheSpecForm() throws {

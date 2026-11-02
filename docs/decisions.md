@@ -164,4 +164,13 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   need: no options, types or validation without a current caller, and no generality
   for later slices. Pragmatism reviews over-engineering first. Errors that can reach
   the caller are always `CodedError` (guard).
+- **D31: `silta schema` reads ArgumentParser's own definitions.**
+  - It uses two underscored, unstable ArgumentParser APIs: `_dumpHelp()` (the
+    `--experimental-dump-help` JSON) for arguments, and `_commandName` for names. In
+    exchange the schema can't drift from what the parser accepts.
+  - Mitigations:
+    - ArgumentParser is pinned exactly (D18)
+    - only the fields the schema needs are decoded
+    - the `schema` goldens fail on any change
+  - On an ArgumentParser upgrade, check `silta schema` first.
 

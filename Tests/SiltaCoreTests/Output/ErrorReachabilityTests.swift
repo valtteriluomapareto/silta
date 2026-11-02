@@ -34,7 +34,9 @@ extension SchemaError: ErrorExamples {
 /// command raises it at run time; the CLI goldens cover that per command.
 struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
-  static let registry: [any ErrorExamples.Type] = [UsageError.self, InternalError.self, SchemaError.self]
+  static let registry: [any ErrorExamples.Type] = [
+    UsageError.self, InternalError.self, SchemaError.self,
+  ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [

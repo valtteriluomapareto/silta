@@ -7,7 +7,9 @@ struct ShapeCheckTests {
     try JSONSerialization.jsonObject(with: Data(text.utf8), options: .fragmentsAllowed)
   }
 
-  private let shape = #"{"object":{"n":"int","s":"string","b":"bool","a":{"array":"string"},"o":{"optional":"int"},"x":"any"}}"#
+  private let shape =
+    #"{"object":{"n":"int","s":"string","b":"bool","a":{"array":"string"},"#
+    + #""o":{"optional":"int"},"x":"any"}}"#
 
   @Test func matchingValuePasses() throws {
     let value = #"{"n":1,"s":"a","b":true,"a":["x"],"x":{"anything":[1]}}"#
