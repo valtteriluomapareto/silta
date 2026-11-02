@@ -74,3 +74,11 @@ They're summarised here so every decision has one index.
   - Branches are `<agent>/<slice>-<slug>`, squash-merged on green CI.
   - Until the first code lands, documentation changes may be committed directly to
     `main`.
+- **D20: Dogfood from DF0** (spec §22.1).
+  - GitHub issues are the public record, and Silta is the working layer. Tasks link
+    their issue with a `url:` link and are not promoted, so they stay editable.
+  - The binary used on real data is built only from `main`, by
+    `scripts/install-dev.sh`.
+  - From DF0 on, migrations count as shipped.
+  - Dogfooding friction is recorded as Silta tasks with the topic `dogfood`, and
+    triaged once per wave.

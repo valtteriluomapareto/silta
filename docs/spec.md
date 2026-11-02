@@ -1094,9 +1094,38 @@ qwen3-coder fell from 31% to 9%".
 | **M4 Tracker + importers** | Tracker status for promoted tasks (Azure DevOps first); scheduled export and verify (launchd); importers for dex, beads and backlog-md; the full eval matrix including open models. | Eval report published for at least 3 harnesses × 4 models. |
 | **M5 App** | SwiftUI app on SiltaCore: board, task timeline with threads and reviews, inbox, doc diffs, brief preview; change signal and WAL watching; embedded CLI. | You triage the inbox and approve a review without the CLI. |
 
-**First real use after M1:** `silta init --scan <projects dir>`, then fill in the YAML
-(Appendix A shows the shape). Open items from meeting notes become `todo` tasks with
-`source` links.
+### 22.1 Dogfooding
+
+Silta is built with Silta as early as the dependency graph allows (D20). GitHub
+issues stay the public record of slices. Silta is the working layer underneath: plans,
+steps, questions, handoffs and results.
+
+| Stage | Starts after | What Silta is used for |
+|---|---|---|
+| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent working a slice runs `silta task add --start "S7: Location"`, which links the GitHub issue with a `url:` link. It keeps the plan and steps in Silta and closes the task with `done --result`. The issue gets a one-line summary and the result when it closes. |
+| **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
+| **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
+| **DF3: a real second workspace** | M1 done | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
+
+**Rules:**
+- **Tasks link their issue rather than being promoted.** A promoted task becomes
+  read-only, and these tasks have to stay editable.
+- **The dogfood binary is built only from `main`.** `scripts/install-dev.sh` builds a
+  release from a clean checkout of `main` into `~/.local/bin/silta`. Agents change
+  Silta's code in worktrees but always *use* the binary built from `main`. Tests keep
+  using temporary homes.
+- **From DF0 on, migrations count as shipped.** Real data now exists, so migrations
+  are only ever added, never edited.
+- **Friction becomes data.**
+  - Anything awkward while dogfooding becomes a Silta task with the topic
+    `dogfood`.
+  - One review per wave turns these into GitHub issues (label `dogfood`), changes to
+    the `silta guide` text, or nothing.
+  - This is the earliest source of agent-experience findings, before the M4 evals.
+
+**First real use after M1 (DF3):** run `silta init --scan <projects dir>`, then fill
+in the YAML (Appendix A shows the shape). Open items from meeting notes become `todo`
+tasks with `source` links.
 
 ## 23. Open questions
 

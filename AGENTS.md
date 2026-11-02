@@ -85,9 +85,10 @@ through. Fix the change, or propose a decision first.
 
 1. **Pick a slice** from the active plan whose dependencies are done. Each slice is
    independent enough for its own worktree and branch.
-2. **Plan before coding** for anything beyond a small fix. Put the plan in the slice's
-   issue, or in `docs/plans/` if it's larger. Then get it reviewed with
-   `skills/persona-review`.
+2. **Plan before coding** for anything beyond a small fix. Where the plan goes
+   depends on the dogfooding stage (see Dogfooding below): on the slice's issue
+   before DF0, in Silta from DF0 on, or in `docs/plans/` if it's larger. Then get it
+   reviewed with `skills/persona-review`.
 3. **Tests first.** A bug fix includes a test that fails on the base commit.
 4. **Implement, verify, then get a review again** with the same reviewers.
 5. **Commit** in imperative sentence case, under ~72 characters, ending with the
@@ -96,6 +97,26 @@ through. Fix the change, or propose a decision first.
    - Until the first code lands, small documentation changes may go straight to
      `main`.
 6. **Report honestly:** what changed, what you verified, and what remains unverified.
+
+## Dogfooding
+
+Silta is built with Silta as soon as it can be (spec §22.1, D20). **Current stage:
+before DF0.** Update this line when a stage starts.
+
+| Stage | Plans and steps | Questions and handoffs | Session start |
+|---|---|---|---|
+| Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
+| DF0 | `silta task add --start "<slice>: <title>"` (link the issue), `silta task plan`, `--step N --done`, `done --result` | Comment on the slice issue | `silta task show <id>` |
+| DF1 | as DF0 | `silta comment <task> --kind question` / `--kind handoff` | as DF0 |
+| DF2 | as DF0 | as DF1 | The hook runs `silta brief` |
+
+From DF0 on:
+- **Use the dogfood binary.** Always use `~/.local/bin/silta`, built from `main` by
+  `scripts/install-dev.sh`. Never use a binary from your own worktree.
+- **Record friction.** Anything awkward is recorded with
+  `silta task add "<what was awkward>" --topic dogfood`.
+- **Close the issue.** When a slice's task is done, post its result on the GitHub
+  issue and close the issue.
 
 ## Parallel agents and worktrees
 
