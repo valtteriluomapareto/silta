@@ -22,7 +22,7 @@ package enum SecretGuard {
         }
         if rule == "jwt", value.split(separator: ".").contains("signature") { continue }
         if rule == "hetu", !validIdentity(value) { continue }
-        if rule == "azure_pat",
+        if rule == "azure_pat", value.count == 52,
           text.matches(of: /\b(?:doc|app|topic):[A-Za-z0-9_.-]+/)
             .contains(where: {
               $0.range.lowerBound <= match.range.lowerBound
@@ -79,8 +79,8 @@ package enum SecretGuard {
       ("github_pat", /\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82})\b/),
       ("azure_pat", /\b(?:[A-Za-z0-9]{52}|[A-Za-z0-9]{75}AZDO[A-Za-z0-9]{5})\b/),
       ("slack", /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/),
-      ("google", /\bAIza[A-Za-z0-9_-]{35}\b/),
-      ("jwt", /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/),
+      ("google", /\bAIza[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/),
+      ("jwt", /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}(?![A-Za-z0-9_-])/),
       ("hetu", /\b[0-9]{6}[+\-ABCDEFYXWVU][0-9]{3}[0-9A-Y]\b/),
     ]
   }

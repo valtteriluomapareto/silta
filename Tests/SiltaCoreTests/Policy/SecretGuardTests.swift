@@ -101,18 +101,26 @@ struct SecretGuardTests {
   @Test func distinctiveAzureTokenInsideARefIsRejected() {
     let token = String(repeating: "Q", count: 75) + "AZ" + "DO" + "Q1234"
     let input = "doc:" + token
-    withKnownIssue("#8: new-format Azure token was exempted as a ref") {
-      #expect(SecretGuard.redacted(input) == "doc:[REDACTED:azure_pat]")
+    #expect(SecretGuard.redacted(input) == "doc:[REDACTED:azure_pat]")
+  }
+
+  @Test func base64URLTokensCoverAlphabetBoundaries() {
+    for symbol in ["-", "_", "A", "0"] {
+      for body in [symbol + String(repeating: "Q", count: 34), String(repeating: "Q", count: 34) + symbol] {
+        let google = "AI" + "za" + body
+        let jwt = "ey" + "JhY21lIjp0cnVlfQ.eyJhY21lIjoxfQ." + body
+        for (rule, token) in [("google", google), ("jwt", jwt)] {
+          #expect(SecretGuard.redacted(token) == "[REDACTED:\(rule)]")
+        }
+      }
     }
   }
 
-  @Test func base64URLTokensCanEndWithHyphens() {
-    let google = "AI" + "za" + String(repeating: "Q", count: 34) + "-"
-    let jwt = "ey" + "JhY21lIjp0cnVlfQ.eyJhY21lIjoxfQ." + String(repeating: "q", count: 31) + "-"
-    for (rule, token) in [("google", google), ("jwt", jwt)] {
-      withKnownIssue("#8: word boundaries miss or truncate base64url suffix punctuation") {
-        #expect(SecretGuard.redacted(token) == "[REDACTED:\(rule)]")
-      }
+  @Test func embeddedLegacyPATIsNotAWholeRefIdentifier() {
+    let token = String(repeating: "Q", count: 52)
+    let input = "doc:notes." + token + ".draft"
+    withKnownIssue("#8: ref allowlist covered embedded legacy credentials") {
+      #expect(SecretGuard.redacted(input) == "doc:notes.[REDACTED:azure_pat].draft")
     }
   }
 
