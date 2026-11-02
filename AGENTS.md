@@ -62,6 +62,8 @@ through. Fix the change, or propose a decision first.
 
    Enforced by `check_core_hygiene.py`, `check_try_optional.py` and SwiftLint
    (D21, D22, D27).
+   `Package.swift` enables the six Swift 7 upcoming features on every target and no
+   experimental features without a decision; enforced by `check_package_features.py` (D29).
 6. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
 7. **The plans board in `docs/README.md` mirrors `docs/plans/` one-to-one.** Enforced
    by `check_plans_board.py`.

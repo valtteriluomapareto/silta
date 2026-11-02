@@ -23,6 +23,7 @@ import check_core_determinism  # noqa: E402
 import check_core_hygiene  # noqa: E402
 import check_docs_links  # noqa: E402
 import check_no_plan_refs  # noqa: E402
+import check_package_features  # noqa: E402
 import check_plans_board  # noqa: E402
 import check_test_waits  # noqa: E402
 import check_try_optional  # noqa: E402
@@ -232,6 +233,51 @@ class PlansBoardTests(GuardTestCase):
     def test_missing_markers_fail(self) -> None:
         self.tree.write("docs/README.md", "no board here\n")
         self.assertEqual(len(check_plans_board.check(self.tree.root)), 1)
+
+
+class PackageFeaturesTests(GuardTestCase):
+    SETTINGS = (
+        "let settings: [SwiftSetting] = [\n"
+        + "".join(f'  .enableUpcomingFeature("{n}"),\n' for n in check_package_features.REQUIRED)
+        + "]\n"
+    )
+    TARGETS = (
+        "let package = Package(name: \"silta\", swiftLanguageModes: [.v6], targets: [\n"
+        "  .target(name: \"SiltaCore\", swiftSettings: settings),\n"
+        "  .executableTarget(name: \"silta\", dependencies: [.target(name: \"SiltaCore\")], swiftSettings: settings),\n"
+        "  .testTarget(name: \"SiltaCoreTests\", swiftSettings: settings),\n"
+        "])\n"
+    )
+
+    def test_no_package_yet_passes(self) -> None:
+        self.assertEqual(check_package_features.check(self.tree.root), [])
+
+    def test_complete_package_passes(self) -> None:
+        self.tree.write("Package.swift", self.SETTINGS + self.TARGETS)
+        self.assertEqual(check_package_features.check(self.tree.root), [])
+
+    def test_missing_feature_fails(self) -> None:
+        settings = self.SETTINGS.replace('  .enableUpcomingFeature("ExistentialAny"),\n', "")
+        self.tree.write("Package.swift", settings + "// .enableUpcomingFeature(\"ExistentialAny\")\n" + self.TARGETS)
+        self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+
+    def test_target_without_settings_fails(self) -> None:
+        targets = self.TARGETS.replace('.testTarget(name: \"SiltaCoreTests\", swiftSettings: settings)',
+                                       '.testTarget(name: \"SiltaCoreTests\")')
+        self.tree.write("Package.swift", self.SETTINGS + targets)
+        self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+
+    def test_missing_language_mode_fails(self) -> None:
+        self.tree.write("Package.swift", self.SETTINGS + self.TARGETS.replace("swiftLanguageModes: [.v6], ", ""))
+        self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+
+    def test_experimental_feature_needs_a_decision(self) -> None:
+        self.tree.write("Package.swift", self.SETTINGS + self.TARGETS
+                        + 'let x: [SwiftSetting] = [.enableExperimentalFeature("Embedded")]\n')
+        self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+        self.tree.write("Package.swift", self.SETTINGS + self.TARGETS
+                        + 'let x: [SwiftSetting] = [.enableExperimentalFeature("Embedded")]  // guard:allow-experimental D30\n')
+        self.assertEqual(check_package_features.check(self.tree.root), [])
 
 
 class RunnerTests(unittest.TestCase):

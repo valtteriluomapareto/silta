@@ -91,8 +91,7 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - A synchronous, nonisolated core built from `Sendable` value types.
   - `async` only for real I/O waits.
   - No global mutable state, and no actors in the core.
-  - Swift 6 strict concurrency, with `NonisolatedNonsendingByDefault` and
-    `InferIsolatedConformances` enabled.
+  - Swift 6 strict concurrency (the upcoming-feature flags are in D29).
   - Default MainActor isolation only in the app target (M5).
 - **D22: Errors.**
   - Per-area error enums conforming to `CodedError`, mapped to the §16 table and
@@ -128,4 +127,14 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
 - **D28: Doc comments.**
   - Required on public and CLI-facing package API.
   - Elsewhere, only where the reason isn't obvious.
+- **D29: Language level: "future Swift" up to the stable line.**
+  - Swift 6 language mode, plus all six Swift 7 upcoming features on every target:
+    `ExistentialAny`, `InternalImportsByDefault`, `MemberImportVisibility`,
+    `InferIsolatedConformances`, `NonisolatedNonsendingByDefault`,
+    `ImmutableWeakCaptures`.
+  - This is the list the pinned toolchain (Swift 6.4, Xcode 26.6) reports as enabled
+    in Swift 7 mode.
+  - New stable APIs are allowed case by case.
+  - Experimental features need a decision.
+  - Switching language mode is its own planned change.
 

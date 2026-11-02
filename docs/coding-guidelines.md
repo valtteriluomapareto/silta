@@ -1,6 +1,6 @@
 # Coding guidelines
 
-How Swift code in this repo is written. Each rule cites its decision (D21–D28 in
+How Swift code in this repo is written. Each rule cites its decision (D21–D29 in
 [`decisions.md`](decisions.md)) and says how it's enforced:
 - **guard:** checked by `scripts/run-guards.sh`
 - **lint:** checked by SwiftLint
@@ -8,6 +8,32 @@ How Swift code in this repo is written. Each rule cites its decision (D21–D28 
 
 When a rule and the code disagree, fix the code or propose a decision; don't
 quietly diverge.
+
+## 0. Language level (D29)
+
+- **Write "Swift 7 ready" code today.** Every target uses Swift 6 language mode and
+  enables all six upcoming features that become the default in Swift 7 mode (guard:
+  `check_package_features.py`):
+
+  | Feature | What changes in the code you write |
+  |---|---|
+  | `ExistentialAny` | Write `any Clock`, never a bare protocol type. Prefer generics or `some` where they fit. |
+  | `InternalImportsByDefault` | Imports are internal. Re-exporting a type in public API needs `public import X`; keep this rare. |
+  | `MemberImportVisibility` | Import every module whose members you use, even if another import already pulls it in. |
+  | `InferIsolatedConformances` | A conformance of a `@MainActor` type is inferred as isolated, mainly relevant in the app. |
+  | `NonisolatedNonsendingByDefault` | Nonisolated `async` functions run on the caller's actor. Use `@concurrent` when work really must leave it. |
+  | `ImmutableWeakCaptures` | `weak` captures are `let`. Don't reassign a captured weak reference. |
+
+- **When the compiler suggests a fix-it for one of these, apply it.** Don't turn the
+  feature off locally.
+- **New stable APIs are welcome where they clearly help**: typed throws, `sending`,
+  noncopyable types, newer Swift Testing features, Foundation's `Subprocess`. When one
+  shapes the architecture, record it as a decision (D#).
+- **Experimental features (`enableExperimentalFeature`) are not used** without a
+  decision that names the feature and the reason (guard). They can change or
+  disappear, and agents write unreliable code with features they've rarely seen.
+- **When a new language mode ships** (e.g. Swift 7), switching to it is a planned
+  change with its own issue, not a side effect of another slice.
 
 ## 1. Concurrency (D21)
 
@@ -23,9 +49,7 @@ quietly diverge.
 - **No actors in the core** unless a decision adds one. Concurrency between processes
   is handled by SQLite transactions (spec §17), not by actors.
 - **Swift 6 language mode** with strict concurrency checking on every target, plus
-  the upcoming features `NonisolatedNonsendingByDefault` and
-  `InferIsolatedConformances`. Confirm the flag names when S1 creates
-  `Package.swift`.
+  all the Swift 7 upcoming features (§0).
 - **`@MainActor` belongs to the app.** The app target (M5) uses Swift 6.2's
   default MainActor isolation. `SiltaCore`, the CLI and the test support stay
   nonisolated.
