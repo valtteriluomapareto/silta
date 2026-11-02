@@ -50,6 +50,9 @@ guards still run.
 5. **Implementation review** by the same reviewers. Fix or answer every finding.
 6. **Merge** on green CI for the current head. Use squash merges titled
    `<slice or #issue> <type>: summary`, e.g. `S4 feat: JSON envelope and exit codes`.
+   `main` is protected (D19): the branch must be up to date with `main`, so rebase or
+   merge `main` in when GitHub asks. `gh pr merge --auto --squash` queues the merge for
+   when CI passes.
 
 ## Branches and commits
 
