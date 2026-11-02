@@ -193,7 +193,9 @@ written first. The Tester reviewer checks it.
   `debugPrint`, `dump` or `NSLog`, and no `os`/`OSLog` imports in `SiltaCore`
   (guard).
 - **Command output** (stdout data, stderr messages) is produced only by the output
-  layer (spec §16, §20.1), never by services.
+  layer (spec §16, §20.1), never by services. Commands conform to `OutputCommand` and
+  return a `CommandOutput`; `OutputRouter.render` decides streams and exit codes, and
+  `SiltaMain` only writes its result.
 - **Implementations:**
   - the CLI writes the JSONL command log (§19), plus stderr with `--verbose`
   - the app uses `os.Logger` with subsystem `com.valtteriluoma.silta`

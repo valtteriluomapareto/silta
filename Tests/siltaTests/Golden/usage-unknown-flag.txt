@@ -1,0 +1,2 @@
+error: Unknown option '--nope' [usage]
+next: silta --help
