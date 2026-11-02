@@ -40,7 +40,7 @@ struct ErrorReachabilityTests {
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
-    .unregistered, .humanOnly, .readOnlyPromoted, .ambiguousLocation, .busy,
+    .notFound, .unregistered, .humanOnly, .readOnlyPromoted, .ambiguousLocation, .busy,
     .conflict, .claimed, .staleRev, .leaseTaken, .gate, .rateLimited,
   ]
 

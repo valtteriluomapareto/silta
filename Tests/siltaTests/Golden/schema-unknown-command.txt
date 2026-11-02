@@ -1,2 +1,0 @@
-error: No command 'silta nope' [not_found]
-next: silta schema

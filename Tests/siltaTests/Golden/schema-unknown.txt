@@ -1,0 +1,2 @@
+error: No command 'silta nope'; commands: silta schema [invalid]
+next: silta schema
