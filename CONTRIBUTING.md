@@ -41,7 +41,12 @@ guards still run.
    A fourth, Agent experience, joins when the change touches agent-facing output.
    One agent playing several personas doesn't count. If subagents aren't available,
    say so in the PR.
-4. **Tests first.** A bug fix includes a test that fails on the base commit.
+4. **Tests first**, following the
+   [test-first flow](docs/coding-guidelines.md#test-first-flow).
+   - A bug fix starts with a committed reproduction that fails for the reported
+     reason (`withKnownIssue`).
+   - A feature starts from its acceptance tests.
+   - A PR labelled `bug` must change a test; CI checks this.
 5. **Implementation review** by the same reviewers. Fix or answer every finding.
 6. **Merge** on green CI for the current head. Use squash merges titled
    `<slice or #issue> <type>: summary`, e.g. `S4 feat: JSON envelope and exit codes`.
@@ -62,7 +67,8 @@ guards still run.
 
 - [ ] `scripts/verify.sh quick` passes, or `full` for storage, concurrency, location
       and agent-facing changes.
-- [ ] New behaviour has tests, and a bug fix has a test that failed first.
+- [ ] New behaviour has tests written first; a bug fix has a reproduction that failed first
+      (PR field "Test-first evidence").
 - [ ] Spec, decisions and plan board are updated when behaviour or scope changed.
 - [ ] Agent-facing changes have updated goldens and an agent-experience review.
 - [ ] The PR says what remains unverified.

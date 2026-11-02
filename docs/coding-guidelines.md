@@ -141,7 +141,46 @@ quietly diverge.
   - regenerated only with `SILTA_UPDATE_GOLDENS=1`, which `scripts/verify.sh`
     refuses in CI
   - a commit that changes goldens says "Golden update: …"
-- **Bug fixes** come with a test that fails on the base commit.
+- **Bug fixes and new behaviour follow the test-first flow** below.
+
+### Test-first flow
+
+**Fixing a bug: reproduce it before you touch the code.**
+
+1. **Reproduce at the smallest tier that shows the bug.**
+   - a unit test for logic
+   - a fixture-repo test for git and location
+   - a scenario (spec §20.1) when sessions, time, restarts or several processes are
+     involved
+2. **Watch it fail for the right reason.** Run it and read the failure: the message
+   must match the reported symptom, not a setup error or a typo in the test. Paste
+   the failing output into the issue.
+3. **Commit the reproduction first**, wrapped in `withKnownIssue("#<issue>: …") { … }`.
+   CI stays green, and the history shows the test failed before the fix.
+4. **Fix with the smallest change** that makes it pass, and remove the
+   `withKnownIssue` wrapper in the same commit. If the wrapper is left on a test
+   that no longer fails, Swift Testing reports the known issue as missing. So a
+   "reproduction" that never really failed is caught too.
+5. **Refactor while green**, then run the verify ladder for the change.
+6. **If you can't reproduce it, don't fix it blind.**
+   - Write down on the issue what you tried and at which tier.
+   - Add diagnostics if that would help.
+   - Ask, or label the issue `needs-repro`.
+
+**Adding behaviour: acceptance first, then small steps.**
+
+1. **Turn the issue's acceptance list into failing tests or scenarios first.** They
+   describe the behaviour from the outside: CLI output, exit codes, database state.
+2. **Work in small red → green → refactor steps.** Each step adds one failing test,
+   the code to pass it, then cleanup. Don't write code that no test asks for.
+3. **Golden files come from the spec, not from the implementation.** Write the
+   expected output first, or review it line by line against the spec before
+   accepting it. A golden generated from whatever the code prints is just a snapshot
+   of a possible bug, and this matters most for agent-facing output (D10).
+
+**Evidence:** the PR's "Test-first evidence" field names the test, and links the
+failing commit or output. For a feature, it lists the acceptance tests that were
+written first. The Tester reviewer checks it.
 
 ## 7. Logging and output (D27)
 

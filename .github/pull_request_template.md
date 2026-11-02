@@ -3,6 +3,12 @@
 - What changed, and why
 - Slice or issue: <!-- e.g. S4, or #12 -->
 
+## Test-first evidence
+
+<!-- Bug fix: the reproducing test and the commit or output where it failed
+     (withKnownIssue). Feature: the acceptance tests written first.
+     Otherwise: "n/a" plus the reason. -->
+
 ## Verification
 
 - [ ] `scripts/run-guards.sh` (docs-only changes)
