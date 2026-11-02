@@ -16,6 +16,8 @@ enum SiltaMain {
   static func run(_ arguments: [String]) -> Rendered {
     let mode = outputMode(arguments)
     let flags = Set(arguments.prefix { $0 != "--" })
+    let timer = ContinuousClock()
+    let started = timer.now
     do {
       let environment = try SiltaEnvironment.system(
         environment: ProcessInfo.processInfo.environment,
@@ -24,7 +26,8 @@ enum SiltaMain {
       let timestamp = environment.clock.now()
       let rendered = execute(
         arguments, context: CommandContext(mode: mode, environment: environment))
-      let milliseconds = max(0, Int(environment.clock.now().timeIntervalSince(timestamp) * 1000))
+      let elapsed = started.duration(to: timer.now).components
+      let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
       var entry = LogEntry(
         timestamp: timestamp, command: commandPath(arguments),
         actor: "agent:unknown", exitCode: rendered.exitCode, milliseconds: milliseconds)
@@ -35,7 +38,21 @@ enum SiltaMain {
       environment.log.record(entry)
       return rendered
     } catch {
+      if let informational = informationalResult(arguments, mode: mode) { return informational }
       return OutputRouter.render(.failure(error), mode: mode)
+    }
+  }
+
+  /// Configuration failures must not obstruct help or version discovery.
+  static func informationalResult(_ arguments: [String], mode: OutputMode) -> Rendered? {
+    do {
+      var command = try SiltaCommand.parseAsRoot(arguments)
+      guard !(command is any OutputCommand) else { return nil }
+      try command.run()
+      return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+    } catch {
+      guard SiltaCommand.exitCode(for: error) == .success else { return nil }
+      return parseFailure(error, arguments: arguments, mode: mode)
     }
   }
 

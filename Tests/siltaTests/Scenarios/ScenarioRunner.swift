@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 import SiltaTestSupport
 import Yams
@@ -21,14 +22,36 @@ enum ScenarioRunner {
   }
 
   static func workingDirectory(_ relative: String, scratch: URL) throws -> URL {
-    let root = scratch.resolvingSymlinksInPath().standardizedFileURL
-    let target = scratch.appending(path: relative).resolvingSymlinksInPath().standardizedFileURL
+    let root = try resolvedDirectory(scratch)
+    let target = try resolvedDirectory(scratch.appending(path: relative).standardizedFileURL)
     guard !relative.hasPrefix("/"),
       target.path == root.path || target.path.hasPrefix(root.path + "/")
     else {
       throw ScenarioFailure(description: "cwd escapes the scenario scratch directory: \(relative)")
     }
     return target
+  }
+
+  private static func resolvedDirectory(_ url: URL) throws -> URL {
+    var ancestor = url
+    var missing: [String] = []
+    while true {
+      var info = stat()
+      if lstat(ancestor.path, &info) == 0 {
+        guard let path = realpath(ancestor.path, nil) else {
+          throw ScenarioFailure(description: "Cannot resolve scenario directory")
+        }
+        defer { free(path) }
+        return missing.reversed().reduce(URL(filePath: String(cString: path))) {
+          $0.appending(path: $1)
+        }
+      }
+      guard errno == ENOENT, ancestor.path != "/" else {
+        throw ScenarioFailure(description: "Cannot resolve scenario directory")
+      }
+      missing.append(ancestor.lastPathComponent)
+      ancestor.deleteLastPathComponent()
+    }
   }
 
   static func terminationMismatch(_ actual: Termination, expected: Int32) -> String? {
@@ -75,12 +98,14 @@ enum ScenarioRunner {
       let result = try SiltaBinary.runProcess(
         try SiltaBinary.url(), step.args,
         in: scratch, cwd: cwd, environment: env)
-      transcript +=
-        try json([
-          "args": step.args, "cwd": step.cwd ?? ".", "timestamp": env["SILTA_NOW"] ?? "",
-          "stdout": result.stdout, "stderr": result.stderr,
-          "termination": String(describing: result.termination),
-        ]) + Data([10])
+      var record: [String: Any] = [
+        "args": step.args, "cwd": step.cwd ?? ".", "timestamp": env["SILTA_NOW"] ?? "",
+        "stdout": result.stdout, "stderr": result.stderr,
+        "termination": String(describing: result.termination),
+      ]
+      record["actor"] = env["SILTA_ACTOR"]
+      record["session"] = env["SILTA_SESSION"]
+      transcript += try json(record) + Data([10])
       if let mismatch = try mismatch(result, expectation: step.expect) {
         throw ScenarioFailure(description: mismatch)
       }
@@ -110,7 +135,7 @@ enum ScenarioRunner {
     let script = repository.appending(path: "scripts/make-fixtures.sh")
     let result = try SiltaBinary.runProcess(
       URL(filePath: "/bin/bash"),
-      [script.path, scratch.appending(path: "fixtures").path], in: scratch)
+      [script.path, try workingDirectory("fixtures", scratch: scratch).path], in: scratch)
     guard result.termination == .exit(0) else {
       throw ScenarioFailure(
         description: "fixture generation failed: \(result.termination)\n\(result.stderr)")

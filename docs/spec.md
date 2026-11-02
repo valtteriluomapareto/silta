@@ -1061,7 +1061,7 @@ scriptable and deterministic (D13).
   - a sequence of `silta` invocations: `args`, scratch-relative `cwd`, and `env`
     (including `SILTA_ACTOR` and `SILTA_SESSION`)
   - expectations: `exit`, optional `code`, `stdout` golden filename, or `json`
-    dotted paths (numeric components select array indices) equal to scalar values
+    dotted paths (numeric components select array indices) equal to string, integer or boolean values
   - `fixtures: true` builds the fixed Acme suite. Seed-data/file/DB expectations
     join the format when commands need them.
   - Step *n* keeps `SILTA_ID_SEED=0` and uses `SILTA_NOW=base+n seconds`.
@@ -1071,7 +1071,7 @@ scriptable and deterministic (D13).
 - **Evidence:** every run writes `artifacts/scenarios/<run>/<scenario>/` (git-ignored)
   with:
   - `summary.json`: commit, dirty flag, binary version, scenario sha256, pass or fail
-  - `transcript.ndjson`: every invocation with relative cwd, args, stdout, stderr,
+  - `transcript.ndjson`: every invocation with relative cwd, args, explicit actor/session identifiers, stdout, stderr,
     termination and logical step timestamp. Physical scratch paths are excluded.
     Command durations belong to §19 logs; replay smoke excludes verbose diagnostics
     whose real durations need not be byte-identical.
