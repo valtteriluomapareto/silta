@@ -15,7 +15,10 @@ struct ActorIntegrationTests {
         [root.appending(path: "scripts/make-fixtures.sh").path, fixtures.path], in: scratch)
       try #require(setup.termination == .exit(0), "\(setup.stderr)")
       let terminal = TerminalState(stdin: false, stdout: false)
-      let git = SystemGitRunner()
+      let git = SystemGitRunner(environment: [
+        "HOME": scratch.path, "XDG_CONFIG_HOME": scratch.appending(path: "config").path,
+        "PATH": "/usr/bin:/bin",
+      ])
       let repo = fixtures.appending(path: "acme-platform")
       let first = try await Actor.resolve(
         environment: [:], terminal: terminal, git: git, directory: repo)

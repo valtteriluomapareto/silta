@@ -15,6 +15,9 @@ struct ActorTests {
   // OPENCODE_ACME_TEST is synthetic; the real OpenCode marker remains unverified.
   static let rows: [Row] = [
     Row(
+      environment: ["CODEX_THREAD_ID": ""], stdin: true, stdout: true,
+      expected: "agent:codex:acme"),
+    Row(
       environment: ["SILTA_ACTOR": "agent:acme:explicit", "CLAUDECODE": "1"], stdin: true,
       stdout: true, expected: "agent:acme:explicit"),
     Row(

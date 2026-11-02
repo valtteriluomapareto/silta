@@ -43,10 +43,9 @@ struct SessionTests {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
     let result = GitResult(termination: .exit(0), stdout: Data("/Acme/path\r\n".utf8))
     let git = ScriptedGitRunner(script: [(request, .success(result))])
-    let actor = try await Actor.resolve(environment: [:], terminal: terminal, git: git, directory: cwd)
-    withKnownIssue("A root ending in carriage return retains the appended LF") {
-      #expect(actor.value == "agent:unknown:082628")
-    }
+    let actor = try await Actor.resolve(
+      environment: [:], terminal: terminal, git: git, directory: cwd)
+    #expect(actor.value == "agent:unknown:082628")
   }
 
   @Test func outsideRepositoryHashesTheCwd() async throws {

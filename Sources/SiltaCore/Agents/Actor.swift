@@ -45,10 +45,11 @@ package struct Actor: Equatable, Sendable {
       let path: String
       switch result.termination {
       case .exit(0):
-        guard var root = String(data: result.stdout, encoding: .utf8) else {
+        var bytes = result.stdout
+        if bytes.last == 10 { bytes.removeLast() }
+        guard let root = String(data: bytes, encoding: .utf8) else {
           throw SeamError.gitCapture
         }
-        if root.hasSuffix("\n") { root.removeLast() }
         guard root.hasPrefix("/") else { throw SeamError.gitCapture }
         path = root
       case .exit:
