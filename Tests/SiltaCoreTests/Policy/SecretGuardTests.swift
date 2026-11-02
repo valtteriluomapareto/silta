@@ -76,7 +76,8 @@ struct SecretGuardTests {
     let ref = "doc:" + String(repeating: "Q", count: 52)
     let clean = [
       "Acme backlog", sha40, sha64, uuid, ref, "AC-12/3", "app:platform-api",
-      "Password=<placeholder>", "Password= <placeholder>", "Pwd=\"<acme-password>\"", "AccountKey=<key>",
+      "Password=<placeholder>", "Password= <placeholder>", "Pwd=\"<acme-password>\"",
+      "AccountKey=<key>",
       "?sig=<signature>", "eyJheader.eyJpayload.signature", "refs/heads/acme",
     ]
     let falsePositives = clean.filter { !SecretGuard.matches(in: $0).isEmpty }.count
