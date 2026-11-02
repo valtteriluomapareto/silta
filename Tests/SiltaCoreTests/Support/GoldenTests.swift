@@ -43,7 +43,8 @@ struct GoldenTests {
       withKnownIssue {
         Golden(directory: dir, update: true).check("new\n", "x.txt")
       }
-      #expect(try Data(contentsOf: dir.appending(path: "x.txt")) == Data("new\n".utf8))
+      let written = try Data(contentsOf: dir.appending(path: "x.txt"))
+      #expect(written == Data("new\n".utf8))
     }
   }
 

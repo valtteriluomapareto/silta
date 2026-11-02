@@ -37,7 +37,12 @@ plan on the issue and get it reviewed (`skills/persona-review`) before coding.
 **Shared files** need coordination, and their owner is named:
 - `Package.swift`: S1
 - the migrations: S3
-- the error-code table: S4
+- the error-code table (`ErrorCode`) and the `CodedError` registry in
+  `ErrorReachabilityTests`: S4; later slices append their error types and take their
+  codes off `notYetProduced`
+- `GlobalOptions` and `CommandContext`: S4. CP adds `--deterministic` and
+  `--verbose`, puts S2's `SiltaEnvironment` into `CommandContext`, and writes the
+  §19 log line from the runner's `Rendered`.
 
 | Slice | Issue | Depends on | Wave | Dogfooding |
 |---|---|---|---|---|

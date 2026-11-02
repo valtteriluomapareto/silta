@@ -48,8 +48,9 @@ struct OutputRouterTests {
         == "error: it broke ä [rate_limited]\nnext: silta comment AC-1 -F -\nretry after: 240s\n")
     #expect(
       OutputRouter.render(.failure(error), mode: json).stdout
-        == #"{"error":{"code":"rate_limited","message":"it broke ä","next":["silta comment AC-1 -F -"],"#
-        + #""next_by":"agent","retry_after_s":240},"ok":false,"schema":1,"warnings":[]}"# + "\n")
+        == #"{"error":{"code":"rate_limited","message":"it broke ä","#
+        + #""next":["silta comment AC-1 -F -"],"next_by":"agent","retry_after_s":240},"#
+        + #""ok":false,"schema":1,"warnings":[]}"# + "\n")
   }
 
   @Test func successInTextMode() {
@@ -97,13 +98,16 @@ struct OutputRouterTests {
       OutputRouter.render(.failure(Unexpected()), mode: text)
         == Rendered(
           stdout: "",
-          stderr: "error: internal error (bug): index out of range [env]\nask human: silta doctor\n",
+          stderr:
+            "error: internal error (bug): index out of range [env]\nask human: silta doctor\n",
           exitCode: 9, errorCode: .env))
   }
 
   @Test func unexpectedErrorDescriptionIsCapped() {
     let long = Unexpected(description: String(repeating: "x", count: 500))
     let stderr = OutputRouter.render(.failure(long), mode: text).stderr
-    #expect(stderr.hasPrefix("error: internal error (bug): " + String(repeating: "x", count: 200) + " [env]\n"))
+    #expect(
+      stderr.hasPrefix(
+        "error: internal error (bug): " + String(repeating: "x", count: 200) + " [env]\n"))
   }
 }
