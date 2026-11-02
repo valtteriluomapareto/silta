@@ -10,25 +10,31 @@ struct SessionTests {
 
   @Test(arguments: ["acme", ""]) func explicitSessionNeverCallsGit(session: String) async throws {
     let git = ScriptedGitRunner(script: [])
-    let actor = try await Actor.resolve(environment: ["SILTA_SESSION": session], terminal: terminal, git: git, directory: cwd)
+    let actor = try await Actor.resolve(
+      environment: ["SILTA_SESSION": session], terminal: terminal, git: git, directory: cwd)
     #expect(actor.value == "agent:unknown:\(session)")
     #expect(git.requests.isEmpty)
   }
 
   @Test func acceptedExplicitActorNeverNeedsASessionOrGit() async throws {
     let git = ScriptedGitRunner(script: [])
-    let actor = try await Actor.resolve(environment: ["SILTA_ACTOR": "agent:acme:explicit"], terminal: terminal, git: git, directory: cwd)
+    let actor = try await Actor.resolve(
+      environment: ["SILTA_ACTOR": "agent:acme:explicit"], terminal: terminal, git: git,
+      directory: cwd)
     #expect(actor.value == "agent:acme:explicit")
     #expect(git.requests.isEmpty)
   }
 
-  @Test(arguments: [("/Acme/worktree", "8e7b6a"), ("/Acme/other", "bbf159"),
-    ("/Acme/space Ω ", "203fea"), ("/Acme/path\n", "961053")])
+  @Test(arguments: [
+    ("/Acme/worktree", "8e7b6a"), ("/Acme/other", "bbf159"),
+    ("/Acme/space Ω ", "203fea"), ("/Acme/path\n", "961053"),
+  ])
   func independentHashVectorsPreservePathContents(root: String, expected: String) async throws {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
     let result = GitResult(termination: .exit(0), stdout: Data((root + "\n").utf8))
     let git = ScriptedGitRunner(script: [(request, .success(result))])
-    let actor = try await Actor.resolve(environment: [:], terminal: terminal, git: git, directory: cwd)
+    let actor = try await Actor.resolve(
+      environment: [:], terminal: terminal, git: git, directory: cwd)
     #expect(actor.value == "agent:unknown:\(expected)")
     #expect(git.requests == [request])
   }
@@ -37,7 +43,8 @@ struct SessionTests {
     let directory = URL(filePath: "/Acme/worktree")
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
     let git = ScriptedGitRunner(script: [(request, .success(GitResult(termination: .exit(128))))])
-    let actor = try await Actor.resolve(environment: [:], terminal: terminal, git: git, directory: directory)
+    let actor = try await Actor.resolve(
+      environment: [:], terminal: terminal, git: git, directory: directory)
     #expect(actor.value == "agent:unknown:8e7b6a")
   }
 
@@ -53,7 +60,9 @@ struct SessionTests {
   @Test(arguments: [Data(), Data("relative\n".utf8), Data([0xff])])
   func malformedSuccessIsCoded(bytes: Data) async throws {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
-    let git = ScriptedGitRunner(script: [(request, .success(GitResult(termination: .exit(0), stdout: bytes)))])
+    let git = ScriptedGitRunner(script: [
+      (request, .success(GitResult(termination: .exit(0), stdout: bytes)))
+    ])
     await #expect(throws: SeamError.gitCapture) {
       try await Actor.resolve(environment: [:], terminal: terminal, git: git, directory: cwd)
     }

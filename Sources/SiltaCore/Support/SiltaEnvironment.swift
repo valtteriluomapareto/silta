@@ -12,13 +12,15 @@ package struct SiltaEnvironment: Sendable {
   package let home: SiltaHome
   /// Opens the truth database only when a caller explicitly requests storage.
   package let db: DatabaseStore
+  /// Attributes this command and enforces human-only policy.
+  package let actor: Actor
   /// Records best-effort command diagnostics.
   package let log: any Log
 
   /// Assembles supplied seams without reading process globals or doing I/O.
   package init(
     clock: any Clock, ids: any IDGenerator, git: any GitRunner, home: SiltaHome, db: DatabaseStore,
-    log: any Log
+    log: any Log, actor: Actor
   ) {
     self.clock = clock
     self.ids = ids
@@ -26,17 +28,18 @@ package struct SiltaEnvironment: Sendable {
     self.home = home
     self.db = db
     self.log = log
+    self.actor = actor
   }
 
   /// Builds system seams from an environment snapshot. Invalid enabled overrides throw;
-  /// disabled overrides, including those at the real home, are ignored even when malformed. No home files are created.
+  /// disabled overrides, including those at the real home, are ignored even when malformed. Queries git for attribution but creates no home files.
   package static func system(
     environment: [String: String],
     userHome: URL? = nil,
     temporaryRoots: [URL]? = nil,
     deterministic: Bool = false,
     verbose: FileHandle? = nil
-  ) throws -> SiltaEnvironment {
+  ) async throws -> SiltaEnvironment {
     let home = try SiltaHome.resolve(
       environment: environment, userHome: userHome, temporaryRoots: temporaryRoots,
       deterministic: deterministic)
@@ -63,12 +66,16 @@ package struct SiltaEnvironment: Sendable {
         ids = SeededIDGenerator(seed: seed)
       }
     }
+    let git = SystemGitRunner(environment: environment)
+    let actor = try await Actor.resolve(
+      environment: environment, terminal: .system(), git: git,
+      directory: URL(filePath: FileManager.default.currentDirectoryPath))
     let deterministicTime = clock is IncrementingClock
     return SiltaEnvironment(
-      clock: clock, ids: ids, git: SystemGitRunner(environment: environment), home: home,
+      clock: clock, ids: ids, git: git, home: home,
       db: DatabaseStore(
         home: home.url, clock: clock, ids: ids,
         jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) }),
-      log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose))
+      log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose), actor: actor)
   }
 }

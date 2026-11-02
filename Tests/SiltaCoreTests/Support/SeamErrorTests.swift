@@ -6,12 +6,12 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct SeamErrorTests {
   @Test(arguments: ["SILTA_HOME", "SILTA_NOW", "SILTA_ID_SEED"])
-  func invalidOverridesAreCoded(variable: String) throws {
-    try withScratchDirectory { scratch in
+  func invalidOverridesAreCoded(variable: String) async throws {
+    try await withScratchDirectory { scratch in
       do {
         var values = ["SILTA_HOME": scratch.appending(path: "data").path]
         values[variable] = "bad"
-        _ = try SiltaEnvironment.system(
+        _ = try await SiltaEnvironment.system(
           environment: values, userHome: scratch, temporaryRoots: [], deterministic: true)
         Issue.record("Expected an invalid override error")
       } catch {

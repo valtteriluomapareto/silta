@@ -6,20 +6,20 @@ import SiltaCore
 /// or stderr (spec §20.1).
 @main
 enum SiltaMain {
-  static func main() {
-    let rendered = run(Array(CommandLine.arguments.dropFirst()))
+  static func main() async {
+    let rendered = await run(Array(CommandLine.arguments.dropFirst()))
     FileHandle.standardOutput.write(Data(rendered.stdout.utf8))
     FileHandle.standardError.write(Data(rendered.stderr.utf8))
     exit(rendered.exitCode)
   }
 
-  static func run(_ arguments: [String]) -> Rendered {
+  static func run(_ arguments: [String]) async -> Rendered {
     let mode = outputMode(arguments)
     let flags = Set(arguments.prefix { $0 != "--" })
     let timer = ContinuousClock()
     let started = timer.now
     do {
-      let environment = try SiltaEnvironment.system(
+      let environment = try await SiltaEnvironment.system(
         environment: ProcessInfo.processInfo.environment,
         deterministic: flags.contains("--deterministic"),
         verbose: flags.contains("--verbose") ? .standardError : nil)
@@ -30,7 +30,7 @@ enum SiltaMain {
       let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
       var entry = LogEntry(
         timestamp: timestamp, command: commandPath(arguments),
-        actor: "agent:unknown", exitCode: rendered.exitCode, milliseconds: milliseconds)
+        actor: environment.actor.value, exitCode: rendered.exitCode, milliseconds: milliseconds)
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = ["--json", "--quiet", "--deterministic", "--verbose", "--help", "--version"]

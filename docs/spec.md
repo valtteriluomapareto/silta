@@ -604,14 +604,20 @@ silta code ls   <app>[@<ref>] [<dir>]
 |---|---|
 | `SILTA_ACTOR` is set | That value. `human:*` is accepted only when stdin is a TTY. |
 | `CLAUDECODE=1` | `agent:claude:<session>` |
-| Codex marker (env var TBD, verify) | `agent:codex:<session>` |
-| `OPENCODE_*` marker (verify), or set by the eval runner | `agent:opencode:<session>` |
+| `CODEX_THREAD_ID` is present | `agent:codex:<session>` |
+| `OPENCODE_*` marker (provisional; unverified), or set by the eval runner | `agent:opencode:<session>` |
 | stdin or stdout isn't a TTY | `agent:unknown:<session>` |
-| Otherwise | `human:<name from config>` |
+| Otherwise | `human:<USER>`, or `human:unknown` when unset (config name follows in S6) |
 
 - **Session:** `SILTA_SESSION` if set. The Claude SessionStart hook exports it through
   the hook's environment file (`CLAUDE_ENV_FILE`, to verify). Otherwise it's a
-  6-character hash of the worktree path.
+  first six lowercase hexadecimal characters of SHA-256 over the UTF-8 worktree
+  root (`git rev-parse --show-toplevel`), or the current directory outside git.
+  Nested directories share a session; separate worktrees do not. An explicit actor
+  bypasses session resolution.
+- **Codex marker evidence:** `CODEX_THREAD_ID` was present in a Codex desktop
+  command environment on 2026-11-02; its value was not recorded. OpenCode remains
+  unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need a `human:*` actor, which means a TTY, or the app:
   `promote`, `doc accept|reject`, `where --set`, `task triage`, `--steal`,
   `--force`, `--allow-secret`, `ws edit`.
