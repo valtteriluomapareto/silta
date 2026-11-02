@@ -28,10 +28,8 @@ struct StorageDeterminismTests {
         elapsed.append(after.timeIntervalSince(before))
         identifiers.append(try environment.ids.next(at: after))
       }
-      withKnownIssue("#5: contention adds random clock advancement in deterministic assembly") {
-        #expect(elapsed.allSatisfy { abs($0 - 0.001) < 0.000001 })
-        #expect(identifiers[0] == identifiers[1])
-      }
+      #expect(elapsed.allSatisfy { abs($0 - 0.001) < 0.000001 })
+      #expect(identifiers[0] == identifiers[1])
     }
   }
 }

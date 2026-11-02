@@ -62,9 +62,12 @@ package struct SiltaEnvironment: Sendable {
         ids = SeededIDGenerator(seed: seed)
       }
     }
+    let deterministicTime = clock is IncrementingClock
     return SiltaEnvironment(
       clock: clock, ids: ids, git: SystemGitRunner(environment: environment), home: home,
-      db: DatabaseStore(home: home.url, clock: clock, ids: ids),
+      db: DatabaseStore(
+        home: home.url, clock: clock, ids: ids,
+        jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) }),
       log: SystemLog(directory: home.url.appending(path: "log")))
   }
 }

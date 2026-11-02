@@ -18,7 +18,7 @@ package final class DatabaseStore: Sendable {
   /// Configures the fixed database/backup locations without opening or creating files.
   package init(
     home: URL, clock: any Clock, ids: any IDGenerator,
-    jitter: @escaping @Sendable () -> UInt64 = { UInt64.random(in: 10...50) }
+    jitter: @escaping @Sendable () -> UInt64
   ) {
     self.home = home
     self.clock = clock

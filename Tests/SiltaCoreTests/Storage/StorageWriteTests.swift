@@ -49,10 +49,12 @@ struct StorageWriteTests {
 
   @Test func versionIsCheckedAtEveryWriteBeforeBackupOrBody() throws {
     try withScratchDirectory { home in
-      let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
+      let clock = FakeClock(now: StorageSchemaTests.instant)
+      let store = Self.make(home, clock: clock)
       try store.write { _ in () }
       let backups = try FileManager.default.contentsOfDirectory(
         atPath: home.appending(path: "backups").path)
+      clock.advance(milliseconds: 86_400_000)
       let external = try DatabaseQueue(path: store.path)
       try external.write {
         try $0.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
@@ -61,9 +63,11 @@ struct StorageWriteTests {
       #expect(throws: StorageError.schemaTooNew) { try store.write { _ in called = true } }
       #expect(!called)
       #expect(try Self.meta(store, "change_seq") == "0")
+      #expect(try Self.meta(store, "last_backup_day") == "2023-11-14")
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
       #expect(
         try FileManager.default.contentsOfDirectory(atPath: home.appending(path: "backups").path)
-          == backups)
+          .sorted() == backups.sorted())
     }
   }
 

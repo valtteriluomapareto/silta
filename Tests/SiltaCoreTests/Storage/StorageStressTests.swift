@@ -48,6 +48,11 @@ struct StorageStressTests {
         #expect(sequences == Array(1...4000))
         let changeCount = try Int.fetchOne(db, sql: "SELECT count(*) FROM change_log")
         #expect(changeCount == 4000)
+        let loggedIDs = try Int64.fetchAll(db, sql: "SELECT row_id FROM change_log ORDER BY row_id")
+        let taskIDs = try Int64.fetchAll(db, sql: "SELECT id FROM task ORDER BY id")
+        #expect(loggedIDs == taskIDs)
+        let kinds = try String.fetchAll(db, sql: "SELECT DISTINCT kind FROM change_log")
+        #expect(kinds == ["task"])
         let changeSeq = try Int.fetchOne(db, sql: "SELECT value FROM meta WHERE key='change_seq'")
         #expect(changeSeq == 4000)
         let nextSequence = try Int.fetchOne(
@@ -67,7 +72,8 @@ struct StorageStressTests {
           sql: """
             INSERT INTO task(uid,workspace_id,seq,title,status,created_by,
             created_at,updated_at)
-            VALUES(?,1,?,'Acme task','open','agent:unknown:acme','2023-11-14','2023-11-14')
+            VALUES(?,1,?,'Acme task','todo','agent:unknown:acme',
+            '2023-11-14T22:13:20.000Z','2023-11-14T22:13:20.000Z')
             """, arguments: [uid, seq])
         try transaction.recordChange(
           kind: "task", rowID: transaction.database.lastInsertedRowID)
