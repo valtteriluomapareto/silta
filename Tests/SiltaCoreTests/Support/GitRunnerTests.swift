@@ -68,9 +68,7 @@ struct GitRunnerTests {
         "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
         "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
       ]) { _, fixed in fixed }
-      withKnownIssue("#3: git drops proxy, XDG, temp and other parent environment") {
-        #expect(actual == expected)
-      }
+      #expect(actual == expected)
       #expect(result.stderr.isEmpty)
     }
   }
@@ -108,22 +106,13 @@ struct GitRunnerTests {
     }
   }
 
-  @Test func deadlinesAreExplicitAndInvalidInputsAreCoded() async throws {
+  @Test func deadlinesAreExplicitAndSpawnFailuresAreCoded() async throws {
     try await withScratchDirectory { scratch in
       #expect(GitRequest(arguments: ["fetch"], directory: scratch).timeout == 10)
       #expect(GitRequest(arguments: ["fetch"], directory: scratch, timeout: 60).timeout == 60)
       let request = GitRequest(arguments: [], directory: scratch)
       await #expect(throws: SeamError.gitUnavailable) {
         try await SystemGitRunner(executable: "git").run(request)
-      }
-      for timeout in [0.0, -1, .nan, .infinity] {
-        await #expect(throws: SeamError.invalidGitTimeout) {
-          try await SystemGitRunner().run(
-            GitRequest(arguments: [], directory: scratch, timeout: timeout))
-        }
-        await #expect(throws: SeamError.invalidGitTimeout) {
-          try await SystemGitRunner(killAfter: timeout).run(request)
-        }
       }
       let fake = ScriptedGitRunner(script: [(request, .success(GitResult(termination: .exit(0))))])
       await #expect(throws: (any Error).self) {

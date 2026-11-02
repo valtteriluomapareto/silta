@@ -9,21 +9,22 @@ package struct SystemGitRunner: GitRunner {
 
   /// Defaults to Apple's absolute git path; no PATH search is performed.
   /// A timed-out child gets SIGTERM, then SIGKILL after `killAfter` seconds.
-  /// Inherits only HOME, PATH and SSH_AUTH_SOCK from the supplied environment snapshot.
-  /// Git reads the user's configuration and credentials; ambient GIT_* overrides are dropped.
+  /// Inherits the supplied environment except ambient GIT_* overrides.
+  /// Git reads the user's configuration and credentials. The fixed GIT_SSH_COMMAND
+  /// overrides core.sshCommand to disable interactive SSH authentication.
   package init(
     executable: String = "/usr/bin/git", killAfter: TimeInterval = 0.25,
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) {
+    precondition(
+      killAfter.isFinite && killAfter > 0, "Git termination grace must be finite and positive")
     self.executable = executable
     self.killAfter = killAfter
-    var child = [
+    var child = environment.filter { !$0.key.hasPrefix("GIT_") }
+    child.merge([
       "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
       "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
-    ]
-    for key in ["HOME", "PATH", "SSH_AUTH_SOCK"] {
-      child[key] = environment[key]
-    }
+    ]) { _, fixed in fixed }
     self.environment = child
   }
 
@@ -46,9 +47,8 @@ package struct SystemGitRunner: GitRunner {
   /// waits on descriptors inherited by descendants. The runner reaps the direct child;
   /// it does not manage subprocess trees created by external git helpers.
   private func execute(_ request: GitRequest) throws -> GitResult {
-    guard request.timeout.isFinite, request.timeout > 0, killAfter.isFinite, killAfter > 0 else {
-      throw SeamError.invalidGitTimeout
-    }
+    precondition(
+      request.timeout.isFinite && request.timeout > 0, "Git timeout must be finite and positive")
     guard executable.hasPrefix("/") else { throw SeamError.gitUnavailable }
     let fm = FileManager.default
     let token = UUID()  // guard:allow-nondeterminism scratch identity

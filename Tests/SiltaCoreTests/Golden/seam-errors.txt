@@ -5,10 +5,10 @@ next: silta --help
 {"error":{"code":"invalid","message":"SILTA_HOME must be an absolute, resolvable directory path.","next":["printf '%s\\n' \"$SILTA_HOME\"","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 
 ## invalidNow (exit 1)
-error: SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format. [invalid]
+error: SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01. [invalid]
 next: unset SILTA_NOW
 next: silta --help
-{"error":{"code":"invalid","message":"SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format.","next":["unset SILTA_NOW","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01.","next":["unset SILTA_NOW","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 
 ## invalidIDSeed (exit 1)
 error: SILTA_ID_SEED must be an unsigned 64-bit decimal integer. [invalid]
@@ -21,11 +21,6 @@ error: Clock timestamp must fit the unsigned 48-bit ULID millisecond range. [inv
 next: unset SILTA_NOW
 next: silta doctor
 {"error":{"code":"invalid","message":"Clock timestamp must fit the unsigned 48-bit ULID millisecond range.","next":["unset SILTA_NOW","silta doctor"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
-
-## invalidGitTimeout (exit 1)
-error: Git timeouts must be finite and positive. [invalid]
-next: silta --help
-{"error":{"code":"invalid","message":"Git timeouts must be finite and positive.","next":["silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 
 ## gitUnavailable (exit 9)
 error: Git could not be started; check the configured absolute git path. [env]

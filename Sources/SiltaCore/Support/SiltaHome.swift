@@ -15,24 +15,34 @@ package struct SiltaHome: Sendable {
   /// dangling symlinks are rejected; invalid paths throw `SeamError.invalidHome`.
   package static func resolve(
     environment: [String: String],
-    userHome: URL = FileManager.default.homeDirectoryForCurrentUser,
-    temporaryRoots: [URL] = [FileManager.default.temporaryDirectory, URL(filePath: "/tmp")],
+    userHome: URL? = nil,
+    temporaryRoots: [URL]? = nil,
     deterministic: Bool = false
   ) throws -> SiltaHome {
-    let realHome = try canonicalURL(userHome.appending(path: ".silta"))
+    let userHome = userHome ?? FileManager.default.homeDirectoryForCurrentUser
+    let temporaryRoots =
+      temporaryRoots ?? [FileManager.default.temporaryDirectory, URL(filePath: "/tmp")]
     let override = environment["SILTA_HOME"]
+    let defaultHome = userHome.appending(path: ".silta")
+    let realHome: URL
+    do {
+      realHome = try canonicalURL(defaultHome)
+    } catch {
+      guard override != nil else { throw error }
+      // A broken unused default must not prevent an isolated custom home.
+      realHome = try canonicalURL(userHome).appending(path: ".silta")
+    }
     if let override, !override.hasPrefix("/") { throw SeamError.invalidHome }
     let url = override.map { URL(filePath: $0) } ?? realHome
     let canonical = try canonicalURL(url)
     let roots = try temporaryRoots.map { try canonicalURL($0) }
-    let isTemporary =
-      override != nil && canonical != realHome
-      && roots.contains { root in
-        let rootPath = root.path
-        return canonical.path.hasPrefix(rootPath + "/")
-      }
+    let isRealHome = canonical.path.caseInsensitiveCompare(realHome.path) == .orderedSame
+    let isTemporary = roots.contains { root in
+      let rootPath = root.path
+      return canonical.path.hasPrefix(rootPath + "/")
+    }
     return SiltaHome(
-      url: canonical, permitsDeterminism: canonical != realHome && (deterministic || isTemporary))
+      url: canonical, permitsDeterminism: !isRealHome && (deterministic || isTemporary))
   }
 }
 

@@ -28,8 +28,8 @@ package struct SiltaEnvironment: Sendable {
   /// disabled overrides, including those at the real home, are ignored even when malformed. No home files are created.
   package static func system(
     environment: [String: String],
-    userHome: URL = FileManager.default.homeDirectoryForCurrentUser,
-    temporaryRoots: [URL] = [FileManager.default.temporaryDirectory, URL(filePath: "/tmp")],
+    userHome: URL? = nil,
+    temporaryRoots: [URL]? = nil,
     deterministic: Bool = false
   ) throws -> SiltaEnvironment {
     let home = try SiltaHome.resolve(
@@ -46,7 +46,9 @@ package struct SiltaEnvironment: Sendable {
         } catch {
           throw SeamError.invalidNow
         }
-        guard date.formatted(format) == raw else { throw SeamError.invalidNow }
+        guard date.formatted(format) == raw, date.timeIntervalSince1970 >= 0 else {
+          throw SeamError.invalidNow
+        }
         clock = IncrementingClock(start: date)
       }
       if let raw = environment["SILTA_ID_SEED"] {

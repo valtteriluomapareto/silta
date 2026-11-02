@@ -11,7 +11,8 @@ struct SeamErrorTests {
       do {
         var values = ["SILTA_HOME": scratch.appending(path: "data").path]
         values[variable] = "bad"
-        _ = try SiltaEnvironment.system(environment: values, userHome: scratch, temporaryRoots: [], deterministic: true)
+        _ = try SiltaEnvironment.system(
+          environment: values, userHome: scratch, temporaryRoots: [], deterministic: true)
         Issue.record("Expected an invalid override error")
       } catch {
         let coded = try #require(error as? any CodedError)

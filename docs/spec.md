@@ -1042,8 +1042,8 @@ scriptable and deterministic (D13).
   strictly below a temporary root or `--deterministic`. The real home
   (`~/.silta`) and its aliases always ignore overrides, including explicit mode,
   so they can't affect real data.
-  - `SILTA_NOW=<YYYY-MM-DDTHH:mm:ss.SSSZ>` fixes the UTC clock, which advances 1 ms
-    per read.
+  - `SILTA_NOW=<YYYY-MM-DDTHH:mm:ss.SSSZ>` fixes the UTC clock at an instant on or after
+    1970-01-01, advancing 1 ms per read.
   - `SILTA_ID_SEED=<n>` makes ULIDs reproducible. The seed is an unsigned 64-bit
     decimal integer.
   - Disabled overrides are ignored even when malformed; invalid enabled overrides
