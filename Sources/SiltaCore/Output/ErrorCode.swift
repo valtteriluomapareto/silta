@@ -1,5 +1,5 @@
 /// Who should run an error's `next` commands (spec §16).
-public enum NextBy: String, Sendable {
+package enum NextBy: String, Sendable {
   /// The calling agent can run them itself.
   case agent
   /// Only the human can; an agent should stop and ask.
@@ -42,7 +42,7 @@ public enum ErrorCode: String, CaseIterable, Sendable {
   case env
 
   /// The process exit status for this code.
-  public var exitCode: Int32 {
+  package var exitCode: Int32 {
     switch self {
     case .usage, .invalid: 1
     case .notFound, .unregistered: 2
@@ -57,7 +57,7 @@ public enum ErrorCode: String, CaseIterable, Sendable {
   }
 
   /// Who should run the `next` commands of an error with this code.
-  public var nextBy: NextBy {
+  package var nextBy: NextBy {
     switch self {
     case .humanOnly, .readOnlyPromoted, .env: .human
     default: .agent
@@ -65,7 +65,7 @@ public enum ErrorCode: String, CaseIterable, Sendable {
   }
 
   /// What an agent should do on this code: the "Agent should" column of spec §16.
-  public var agentShould: String {
+  package var agentShould: String {
     switch self {
     case .usage, .invalid: "Read `silta <cmd> --help` and fix the call"
     case .notFound, .unregistered: "Check the ref, or carry on without silta"

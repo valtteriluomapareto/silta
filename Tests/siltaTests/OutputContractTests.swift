@@ -46,6 +46,23 @@ struct OutputContractTests {
     #expect(result.stderr.isEmpty)
   }
 
+  @Test(arguments: [[String](), ["--json"]])
+  func bareSiltaPrintsHelp(arguments: [String]) throws {
+    let result = try silta(arguments)
+    #expect(result.termination == .exit(0))
+    #expect(result.stdout.hasPrefix("OVERVIEW: "))
+    #expect(result.stderr.isEmpty)
+  }
+
+  // Arguments can carry bodies, so a parse error never repeats one at length.
+  @Test func longArgumentIsCappedInTheMessage() throws {
+    let result = try silta(["--json", String(repeating: "x", count: 3000) + "\nline two"])
+    #expect(result.termination == .exit(1))
+    let message = try #require(result.stdout.firstMatch(of: /"message":"([^"]*)"/)?.output.1)
+    #expect(message.count <= 200)
+    #expect(!message.contains("line two"))
+  }
+
   // `--json` after `--` is an argument, not the flag.
   @Test func jsonAfterDoubleDashIsNotTheFlag() throws {
     let result = try silta(["--", "--json"])

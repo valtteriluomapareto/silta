@@ -35,8 +35,8 @@ next: silta sample --next
 
 ## busy (exit 5)
 error: sample busy error [busy]
-next: silta sample --next
 retry after: 3s
+next: silta sample --next
 {"error":{"code":"busy","message":"sample busy error","next":["silta sample --next"],"next_by":"agent","retry_after_s":3},"ok":false,"schema":1,"warnings":[]}
 
 ## conflict (exit 6)
@@ -66,8 +66,8 @@ next: silta sample --next
 
 ## rate_limited (exit 8)
 error: sample rate_limited error [rate_limited]
-next: silta sample --next
 retry after: 240s
+next: silta sample --next
 {"error":{"code":"rate_limited","message":"sample rate_limited error","next":["silta sample --next"],"next_by":"agent","retry_after_s":240},"ok":false,"schema":1,"warnings":[]}
 
 ## env (exit 9)

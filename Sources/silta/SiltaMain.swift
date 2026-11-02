@@ -13,8 +13,8 @@ enum SiltaMain {
     exit(rendered.exitCode)
   }
 
-  static func run(_ raw: [String]) -> Rendered {
-    let (arguments, mode) = normalized(raw)
+  static func run(_ arguments: [String]) -> Rendered {
+    let mode = outputMode(arguments)
     var command: any ParsableCommand
     do {
       command = try SiltaCommand.parseAsRoot(arguments)
@@ -34,15 +34,12 @@ enum SiltaMain {
     return OutputRouter.render(Result { try outputCommand.execute(context) }, mode: mode)
   }
 
-  /// Moves the global flags to the end, so they parse wherever they were written, and
-  /// reads the output mode from them. Nothing after `--` is touched.
-  static func normalized(_ raw: [String]) -> ([String], OutputMode) {
-    let end = raw.firstIndex(of: "--") ?? raw.endIndex
-    let head = raw[..<end]
-    let globals = head.filter(GlobalOptions.names.contains)
-    let rest = head.filter { !GlobalOptions.names.contains($0) }
-    let mode = OutputMode(json: globals.contains("--json"), quiet: globals.contains("--quiet"))
-    return (Array(rest) + Array(Set(globals)).sorted() + raw[end...], mode)
+  /// The output mode, read from the raw arguments so a parse error can still answer in
+  /// JSON. ArgumentParser itself accepts the flags before or after the subcommand.
+  /// Nothing after `--` counts.
+  static func outputMode(_ arguments: [String]) -> OutputMode {
+    let flags = arguments.prefix { $0 != "--" }
+    return OutputMode(json: flags.contains("--json"), quiet: flags.contains("--quiet"))
   }
 
   /// Help and version are clean exits; anything else is a `usage` error.
@@ -58,22 +55,27 @@ enum SiltaMain {
     return OutputRouter.render(.failure(usage), mode: mode)
   }
 
-  /// ArgumentParser's message without its "Usage:" and "See …" lines, on one line.
+  /// The longest parse message kept: it can quote arguments, which can carry bodies.
+  static let maxMessage = 200
+
+  /// ArgumentParser's message on one capped line.
   static func oneLine(_ message: String) -> String {
-    message.split(separator: "\n")
+    let line = message.split(separator: "\n")
       .map { $0.trimmingCharacters(in: .whitespaces) }
-      .filter { !$0.isEmpty && !$0.hasPrefix("Usage:") && !$0.hasPrefix("See '") }
+      .filter { !$0.isEmpty }
       .joined(separator: " ")
+    return line.count > maxMessage ? line.prefix(maxMessage - 1) + "…" : line
   }
 
-  /// The command being parsed, e.g. `silta task ls`, from the leading subcommand names.
+  /// The command being parsed, e.g. `silta task ls`: the subcommand names among the
+  /// arguments, skipping flags.
   static func commandPath(_ arguments: [String]) -> String {
     var path = ["silta"]
     var command: any ParsableCommand.Type = SiltaCommand.self
-    for argument in arguments {
+    for argument in arguments.prefix(while: { $0 != "--" }) where !argument.hasPrefix("-") {
       guard
         let sub = command.configuration.subcommands.first(where: {
-          $0._commandName == argument
+          $0.configuration.commandName == argument
         })
       else { break }
       path.append(argument)

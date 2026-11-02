@@ -17,5 +17,5 @@ extension CodedError {
   public var retryAfter: Int? { nil }
 
   /// The process exit status, derived from `code` so the two can't disagree.
-  public var exitCode: Int32 { code.exitCode }
+  package var exitCode: Int32 { code.exitCode }
 }

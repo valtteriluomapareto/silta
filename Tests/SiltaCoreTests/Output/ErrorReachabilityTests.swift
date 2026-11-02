@@ -64,15 +64,56 @@ struct ErrorReachabilityTests {
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
       .appending(path: "Sources")
-    let declaration = /(?:struct|enum|class)\s+(\w+)[^{]*\bCodedError\b/
-    var found: Set<String> = []
+    var text = ""
     let files = try #require(FileManager.default.enumerator(atPath: sources.path))
     for case let path as String in files where path.hasSuffix(".swift") {
-      let text = try String(contentsOf: sources.appending(path: path), encoding: .utf8)
-      for match in text.matches(of: declaration) {
-        found.insert(String(match.output.1))
+      text += try String(contentsOf: sources.appending(path: path), encoding: .utf8) + "\n"
+    }
+    #expect(codedErrorTypes(in: text) == Set(Self.registry.map { String(describing: $0) }))
+  }
+
+  @Test func scanFindsEveryWayToConform() {
+    let planted = """
+      enum A: CodedError {}
+      struct B: Equatable, CodedError {}
+      final class C: CodedError {}
+      actor D: CodedError {}
+      extension E: CodedError {}
+      protocol AreaError: CodedError {}
+      enum F: AreaError {}
+      // enum G: CodedError {}
+      protocol CodedError: Error {}
+      """
+    #expect(codedErrorTypes(in: planted) == ["A", "B", "C", "D", "E", "F"])
+  }
+
+  /// Names of types conforming to `CodedError` in `text`, directly or through a
+  /// protocol that refines it. A regex scan, so conformances it can't see (e.g. in a
+  /// `where` clause) need the registry kept by hand.
+  private func codedErrorTypes(in text: String) -> Set<String> {
+    let code = text.split(separator: "\n").filter {
+      !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")
+    }.joined(separator: "\n")
+    var protocols: Set<String> = ["CodedError"]
+    var types: Set<String> = []
+    var changed = true
+    while changed {
+      changed = false
+      for match in code.matches(
+        of: /(protocol|struct|enum|class|actor|extension)\s+(\w+)\s*:([^{]*)\{/)
+      {
+        let (kind, name, inherited) = (match.output.1, String(match.output.2), match.output.3)
+        let conforms = inherited.split(separator: ",").contains {
+          protocols.contains($0.trimmingCharacters(in: .whitespaces))
+        }
+        guard conforms else { continue }
+        if kind == "protocol" {
+          changed = protocols.insert(name).inserted || changed
+        } else {
+          types.insert(name)
+        }
       }
     }
-    #expect(found == Set(Self.registry.map { String(describing: $0) }))
+    return types
   }
 }

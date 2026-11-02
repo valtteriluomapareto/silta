@@ -7,7 +7,4 @@ struct GlobalOptions: ParsableArguments {
 
   @Flag(help: "Hide success text; warnings and errors still show.")
   var quiet = false
-
-  /// The names `SiltaMain` moves to the end of the arguments before parsing.
-  static let names: Set<String> = ["--json", "--quiet"]
 }

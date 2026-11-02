@@ -774,22 +774,25 @@ state; the tests check this with golden output.
   "retry_after_s":240},"ok":false,"schema":1,"warnings":[]}
 ```
 
-- One line per output. Keys are sorted at every level, so output is byte-stable.
+- One line per output. Keys are sorted by Unicode code point at every level, so output
+  is byte-stable.
 - `warnings` is always present. `retry_after_s` is present only when set.
 - `next_by` says who runs the `next` commands: `human` for `human_only`,
   `read_only_promoted` and `env`, otherwise `agent`.
 - `schema` is the envelope version. Data shapes only gain fields; any other change
   bumps `schema`.
 
-**Text errors** go to stderr, one line, then the commands:
+**Text errors** go to stderr: one line, the wait if there is one, then the commands, so
+the output always ends with what to run:
 
 ```
 error: 30 comments on AC-12 in 10 min [rate_limited]
-next: silta comment AC-12 --kind comment -F -   # one summary instead
 retry after: 240s
+next: silta comment AC-12 --kind comment -F -   # one summary instead
 ```
 
 When `next_by` is `human`, the lines read `ask human: <cmd>` instead of `next: <cmd>`.
+Several `next` commands are alternatives, best first: run one.
 
 **Streams and global flags:**
 - Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on
@@ -800,10 +803,13 @@ When `next_by` is `human`, the lines read `ask human: <cmd>` instead of `next: <
   changes nothing.
 - `--json` and `--quiet` may come before or after the subcommand.
 - `--help` and `--version` print plain text to stdout and exit 0, even with `--json`.
-- A parse error is `usage` (exit 1). Its message is one line, and `next` is
-  `silta <command> --help` for the command that was being parsed.
+- A parse error is `usage` (exit 1). Its message is one line of at most 200
+  characters, and `next` is `silta <command> --help` for the command that was being
+  parsed. Commands check values in `execute` and throw `invalid`; they don't use
+  ArgumentParser's `validate()`.
 - An unexpected error (a bug) is `env` (exit 9), with the message
-  `internal error (bug): <description>`, `next_by: human` and `next: silta doctor`. The
+  `internal error (bug): <description>`, `next_by: human` and `next: silta doctor`
+  (`doctor` arrives in M1). The
   arguments are never echoed, because they can carry bodies (§18).
 
 **Exit codes and error codes.** Every error message ends with the next command to
@@ -904,8 +910,8 @@ Rust would win only if:
 ```
 silta/
   Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
-  Sources/SiltaCore/           # domain, policy, storage (GRDB as extensions), git, brief rendering
-  Sources/silta/               # ArgumentParser commands, renderers, actor detection
+  Sources/SiltaCore/           # domain, policy, storage (GRDB as extensions), git, brief and output rendering
+  Sources/silta/               # ArgumentParser commands, the entry point, actor detection
   Sources/SiltaTestSupport/    # fakes, golden helper, scratch dirs; used by tests and the scenario runner only
   Tests/SiltaCoreTests/        # unit + fixture git repos
   Tests/siltaTests/            # golden CLI output + exit codes

@@ -45,12 +45,36 @@ struct OutputRouterTests {
     let error = Sample(code: .rateLimited, next: ["silta comment AC-1 -F -"], retryAfter: 240)
     #expect(
       OutputRouter.render(.failure(error), mode: text).stderr
-        == "error: it broke ä [rate_limited]\nnext: silta comment AC-1 -F -\nretry after: 240s\n")
+        == "error: it broke ä [rate_limited]\nretry after: 240s\nnext: silta comment AC-1 -F -\n")
     #expect(
       OutputRouter.render(.failure(error), mode: json).stdout
         == #"{"error":{"code":"rate_limited","message":"it broke ä","#
         + #""next":["silta comment AC-1 -F -"],"next_by":"agent","retry_after_s":240},"#
         + #""ok":false,"schema":1,"warnings":[]}"# + "\n")
+  }
+
+  @Test func severalNextCommandsAreAllShown() {
+    let error = Sample(
+      code: .humanOnly, next: ["silta task done AC-1 --force", "silta task show AC-1"])
+    #expect(
+      OutputRouter.render(.failure(error), mode: text).stderr
+        == "error: it broke ä [human_only]\nask human: silta task done AC-1 --force\n"
+        + "ask human: silta task show AC-1\n")
+    #expect(
+      OutputRouter.render(.failure(error), mode: json).stdout.contains(
+        #""next":["silta task done AC-1 --force","silta task show AC-1"],"next_by":"human""#))
+  }
+
+  struct Unencodable: Encodable, Sendable {
+    var value = Double.nan
+  }
+
+  @Test(arguments: [false, true])
+  func dataThatCannotBeEncodedIsAnInternalError(json: Bool) {
+    let output = CommandOutput(text: "done", data: Unencodable())
+    let rendered = OutputRouter.render(.success(output), mode: OutputMode(json: json))
+    #expect(rendered.exitCode == (json ? 9 : 0))
+    #expect(rendered.errorCode == (json ? .env : nil))
   }
 
   @Test func successInTextMode() {
