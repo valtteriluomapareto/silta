@@ -75,6 +75,10 @@ struct OutputRouterTests {
     let rendered = OutputRouter.render(.success(output), mode: OutputMode(json: json))
     #expect(rendered.exitCode == (json ? 9 : 0))
     #expect(rendered.errorCode == (json ? .env : nil))
+    if json {
+      #expect(rendered.stdout.hasPrefix(#"{"error":{"code":"env""#))
+      #expect(rendered.stderr.isEmpty)
+    }
   }
 
   @Test func successInTextMode() {

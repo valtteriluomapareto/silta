@@ -88,8 +88,8 @@ struct ErrorReachabilityTests {
   }
 
   /// Names of types conforming to `CodedError` in `text`, directly or through a
-  /// protocol that refines it. A regex scan, so conformances it can't see (e.g. in a
-  /// `where` clause) need the registry kept by hand.
+  /// protocol that refines it. A regex scan: generic types (`struct G<T>: …`),
+  /// qualified names (`extension A.B: …`) and `where` clauses are invisible to it.
   private func codedErrorTypes(in text: String) -> Set<String> {
     let code = text.split(separator: "\n").filter {
       !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")

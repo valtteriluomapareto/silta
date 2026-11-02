@@ -75,7 +75,8 @@ enum SiltaMain {
     for argument in arguments.prefix(while: { $0 != "--" }) where !argument.hasPrefix("-") {
       guard
         let sub = command.configuration.subcommands.first(where: {
-          $0.configuration.commandName == argument
+          // The name ArgumentParser itself matches, explicit or derived from the type.
+          $0._commandName == argument
         })
       else { break }
       path.append(argument)
