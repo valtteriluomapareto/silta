@@ -193,7 +193,8 @@ bodies. A bare task id is accepted wherever a task is expected.
 ## 6. Data model
 
 Timestamps are ISO-8601 UTC with milliseconds. Ordering ties are broken by `id`.
-Time comes from an injected `Clock`. Every owned row has a `uid` (a ULID) used by
+Time comes from an injected `Clock`; ULID timestamps round to the nearest millisecond.
+Every owned row has a `uid` (a ULID) used by
 export and restore, and kept for a future sync or Postgres move. Owned entities
 reference each other by **foreign keys**; strings appear only for external things
 (notes, code, URLs).
@@ -1040,7 +1041,16 @@ scriptable and deterministic (D13).
 - **Determinism:** these are honoured only when `SILTA_HOME` is a temporary
   directory, or with `--deterministic`, so they can't affect real data.
   - `SILTA_NOW=<ISO-8601>` fixes the clock, which advances 1 ms per read.
-  - `SILTA_ID_SEED=<n>` makes ULIDs reproducible.
+  - `SILTA_ID_SEED=<n>` makes ULIDs reproducible. The seed is an unsigned 64-bit
+    decimal integer; sequences are local to a generator instance.
+  - `SILTA_HOME` must be absolute. Temporary means an explicit home strictly below
+    the OS user temporary directory or `/tmp`, after resolving symlinks and missing
+    path components. The temporary root itself, the default `~/.silta`, and aliases
+    to that default home do not automatically enable overrides. Dot path components
+    (`.` or `..`) and dangling home symlinks are rejected.
+  - Disabled overrides are ignored even when malformed. Enabled overrides reject
+    invalid seeds or timestamps; timestamps must include a date, time and timezone,
+    with optional fractional seconds.
   - Together with a fixed `SILTA_HOME` and the fixture repos, the same commands give
     byte-identical output.
 - **Scenarios:** `Tests/Scenarios/<name>.yaml` files. A runner executes each one in
