@@ -61,9 +61,7 @@ struct SeamErrorTests {
       let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
       blocks.append("## \(error) (exit \(text.exitCode))\n\(text.stderr)\(json.stdout)")
     }
-    withKnownIssue("#3: unset SILTA_HOME recovery can select real data") {
-      Golden.forTests().check(blocks.joined(separator: "\n"), "seam-errors.txt")
-    }
+    Golden.forTests().check(blocks.joined(separator: "\n"), "seam-errors.txt")
   }
   @Test func existingFileAndItsAliasAreInvalidHomes() throws {
     try withScratchDirectory { scratch in
@@ -71,7 +69,7 @@ struct SeamErrorTests {
       let alias = scratch.appending(path: "alias")
       try Data().write(to: file)
       try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: file)
-      withKnownIssue("#3: existing files are accepted as home directories") {
+      do {
         for path in [file, alias] {
           #expect(throws: SeamError.invalidHome) {
             try SiltaHome.resolve(environment: ["SILTA_HOME": path.path], userHome: scratch)

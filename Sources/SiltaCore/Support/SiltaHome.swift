@@ -49,6 +49,10 @@ private func canonicalURL(_ url: URL) throws -> URL {
     if lstat(ancestor.path, &info) == 0 {
       guard let resolved = realpath(ancestor.path, nil) else { throw SeamError.invalidHome }
       defer { free(resolved) }
+      var resolvedInfo = stat()
+      guard stat(resolved, &resolvedInfo) == 0, (resolvedInfo.st_mode & S_IFMT) == S_IFDIR else {
+        throw SeamError.invalidHome
+      }
       return missing.reversed().reduce(URL(filePath: String(cString: resolved))) {
         $0.appending(path: $1)
       }

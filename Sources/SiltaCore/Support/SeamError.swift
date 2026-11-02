@@ -39,7 +39,7 @@ package enum SeamError: CodedError, CaseIterable {
   /// Recovery commands for the caller or human, as selected by the error code.
   package var next: [String] {
     switch self {
-    case .invalidHome: ["unset SILTA_HOME", "silta --help"]
+    case .invalidHome: ["printf '%s\\n' \"$SILTA_HOME\"", "silta --help"]
     case .invalidNow: ["unset SILTA_NOW", "silta --help"]
     case .invalidIDSeed: ["unset SILTA_ID_SEED", "silta --help"]
     case .invalidTimestamp: ["unset SILTA_NOW", "silta doctor"]

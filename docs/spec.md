@@ -1038,8 +1038,8 @@ scriptable and deterministic (D13).
     `--json data: <shape>`, with a blank line between commands. Both then list the
     global flags under `global flags:` and one line per error code under
     `error codes:` (`<code>  exit <n>, next by <agent|human>: <agent should>`).
-- **Determinism:** these are honoured only when `SILTA_HOME` is an absolute path
-  strictly below a temporary root, or with `--deterministic`. The real home
+- **Determinism:** `SILTA_HOME` must be absolute. These overrides require a home
+  strictly below a temporary root or `--deterministic`. The real home
   (`~/.silta`) and its aliases always ignore overrides, including explicit mode,
   so they can't affect real data.
   - `SILTA_NOW=<YYYY-MM-DDTHH:mm:ss.SSSZ>` fixes the UTC clock, which advances 1 ms
