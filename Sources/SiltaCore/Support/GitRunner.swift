@@ -46,6 +46,7 @@ package struct GitResult: Equatable, Sendable {
 
 /// Runs git and returns its status and streams. Spawn and capture failures throw.
 package protocol GitRunner: Sendable {
-  /// Returns git status and streams; invalid inputs and operational failures throw `SeamError`.
+  /// Returns git status and streams; spawn/capture failures throw `SeamError`.
+  /// System runners require finite, positive deadlines as a programmer precondition.
   func run(_ request: GitRequest) async throws -> GitResult
 }
