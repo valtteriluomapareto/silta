@@ -1,0 +1,14 @@
+fixtures: true
+steps:
+  - args: [schema, --json]
+    cwd: fixtures/acme-platform
+    env: {SILTA_ACTOR: 'agent:acme:first', SILTA_SESSION: first}
+    expect: {exit: 0, json: {ok: true}}
+  - args: [schema, --json]
+    cwd: fixtures/acme-platform/api
+    env: {SILTA_ACTOR: 'human:acme', CODEX_THREAD_ID: acme, SILTA_SESSION: handover}
+    expect: {exit: 0, json: {ok: true}}
+  - args: [schema, --json]
+    cwd: fixtures/acme-portal-worktree
+    env: {CLAUDECODE: '1', SILTA_SESSION: review}
+    expect: {exit: 0, json: {ok: true}}

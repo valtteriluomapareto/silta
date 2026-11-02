@@ -34,16 +34,17 @@ struct ScenarioTests {
     }
   }
 
-  @Test func stepEnvironmentsProduceDistinctReplayableFirstIDs() throws {
-    try withScratchDirectory { scratch in
+  @Test func stepEnvironmentsProduceDistinctReplayableFirstIDs() async throws {
+    try await withScratchDirectory { scratch in
       var runs: [[String]] = []
       for _ in 0..<2 {
-        let values = try (0..<2).map { index in
-          let values = ScenarioRunner.environment(step: index, overrides: [:], scratch: scratch)
-          let environment = try SiltaEnvironment.system(
-            environment: values, userHome: scratch,
+        var values: [String] = []
+        for index in 0..<2 {
+          let stepValues = ScenarioRunner.environment(step: index, overrides: [:], scratch: scratch)
+          let environment = try await SiltaEnvironment.system(
+            environment: stepValues, userHome: scratch,
             temporaryRoots: [scratch])
-          return try environment.ids.next(at: environment.clock.now())
+          values.append(try environment.ids.next(at: environment.clock.now()))
         }
         #expect(values[0] != values[1])
         runs.append(values)

@@ -13,8 +13,8 @@ struct StorageSchemaTests {
       home: home, clock: FakeClock(now: instant), ids: SeededIDGenerator(seed: seed), jitter: { 0 })
   }
 
-  @Test func constructionAndMissingReadNeverInitialize() throws {
-    try withScratchDirectory { scratch in
+  @Test func constructionAndMissingReadNeverInitialize() async throws {
+    try await withScratchDirectory { scratch in
       let home = scratch.appending(path: "data")
       let store = Self.store(home)
       #expect(!FileManager.default.fileExists(atPath: home.path))
@@ -22,7 +22,7 @@ struct StorageSchemaTests {
       #expect(!FileManager.default.fileExists(atPath: home.path))
       #expect(throws: StorageError.unavailable) { try Self.store(scratch).read { _ in () } }
       #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "silta.db").path))
-      let environment = try SiltaEnvironment.system(
+      let environment = try await SiltaEnvironment.system(
         environment: ["SILTA_HOME": home.path], userHome: scratch)
       #expect(environment.db.path == home.appending(path: "silta.db").path)
       #expect(!FileManager.default.fileExists(atPath: home.path))

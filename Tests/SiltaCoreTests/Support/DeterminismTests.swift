@@ -53,8 +53,8 @@ struct DeterminismTests {
     #expect(sequence.first != (try third.next(at: start)))
   }
 
-  @Test func defaultHomeAndRealHomeAliasesIgnoreOverrides() throws {
-    try withScratchDirectory { scratch in
+  @Test func defaultHomeAndRealHomeAliasesIgnoreOverrides() async throws {
+    try await withScratchDirectory { scratch in
       let user = scratch.appending(path: "user")
       let realHome = user.appending(path: ".silta")
       try FileManager.default.createDirectory(at: realHome, withIntermediateDirectories: true)
@@ -63,7 +63,7 @@ struct DeterminismTests {
       for path in [nil, realHome.path, alias.path] {
         var environment = ["SILTA_NOW": "bad", "SILTA_ID_SEED": "bad"]
         environment["SILTA_HOME"] = path
-        let env = try SiltaEnvironment.system(
+        let env = try await SiltaEnvironment.system(
           environment: environment, userHome: user, temporaryRoots: [scratch])
         #expect(env.clock is SystemClock)
         #expect(env.ids is SystemIDGenerator)
@@ -72,19 +72,19 @@ struct DeterminismTests {
     }
   }
 
-  @Test func temporaryHomeHonoursOverridesAndReplay() throws {
-    try withScratchDirectory { scratch in
+  @Test func temporaryHomeHonoursOverridesAndReplay() async throws {
+    try await withScratchDirectory { scratch in
       let environment = [
         "SILTA_HOME": scratch.appending(path: "isolated").path,
         "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "18446744073709551615",
       ]
-      func make() throws -> SiltaEnvironment {
-        try SiltaEnvironment.system(
+      func make() async throws -> SiltaEnvironment {
+        try await SiltaEnvironment.system(
           environment: environment, userHome: scratch.appending(path: "user"),
           temporaryRoots: [scratch])
       }
-      let first = try make()
-      let second = try make()
+      let first = try await make()
+      let second = try await make()
       try #require(first.clock is IncrementingClock)
       #expect(first.clock.now() == start)
       #expect(abs(first.clock.now().timeIntervalSince(start) - 0.001) < 0.000001)
@@ -95,8 +95,8 @@ struct DeterminismTests {
     }
   }
 
-  @Test func temporaryGateRejectsEscapesAndSiblingPrefixes() throws {
-    try withScratchDirectory { scratch in
+  @Test func temporaryGateRejectsEscapesAndSiblingPrefixes() async throws {
+    try await withScratchDirectory { scratch in
       let root = scratch.appending(path: "temp")
       let outside = scratch.appending(path: "persistent")
       try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -106,7 +106,7 @@ struct DeterminismTests {
       for path in [
         root, outside, scratch.appending(path: "temp-sibling"), alias.appending(path: "new"),
       ] {
-        let env = try SiltaEnvironment.system(
+        let env = try await SiltaEnvironment.system(
           environment: ["SILTA_HOME": path.path, "SILTA_NOW": "bad", "SILTA_ID_SEED": "bad"],
           userHome: scratch.appending(path: "user"), temporaryRoots: [root])
         #expect(env.clock is SystemClock)
@@ -116,16 +116,16 @@ struct DeterminismTests {
   }
 
   @Test(arguments: ["SILTA_NOW", "SILTA_ID_SEED"])
-  func explicitModeRejectsMalformedOverrides(key: String) throws {
-    try withScratchDirectory { scratch in
+  func explicitModeRejectsMalformedOverrides(key: String) async throws {
+    try await withScratchDirectory { scratch in
       for bad in ["", "bad", "-1", "18446744073709551616"] {
-        #expect(throws: (any Error).self) {
-          try SiltaEnvironment.system(
+        await #expect(throws: (any Error).self) {
+          try await SiltaEnvironment.system(
             environment: [key: bad, "SILTA_HOME": scratch.appending(path: "data").path],
             userHome: scratch, temporaryRoots: [], deterministic: true)
         }
       }
-      let env = try SiltaEnvironment.system(
+      let env = try await SiltaEnvironment.system(
         environment: [
           "SILTA_HOME": scratch.appending(path: "data").path,
           "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0",
@@ -138,8 +138,8 @@ struct DeterminismTests {
       }
     }
   }
-  @Test func danglingHomeSymlinkAndMalformedInstantAreRejected() throws {
-    try withScratchDirectory { scratch in
+  @Test func danglingHomeSymlinkAndMalformedInstantAreRejected() async throws {
+    try await withScratchDirectory { scratch in
       let alias = scratch.appending(path: "dangling")
       try FileManager.default.createSymbolicLink(
         at: alias, withDestinationURL: scratch.appending(path: "missing"))
@@ -149,8 +149,8 @@ struct DeterminismTests {
           userHome: scratch)
       }
       for raw in ["2023-11-14T22:13:20Zjunk", "2023-02-30T22:13:20Z", "2023-11-14"] {
-        #expect(throws: (any Error).self) {
-          try SiltaEnvironment.system(
+        await #expect(throws: (any Error).self) {
+          try await SiltaEnvironment.system(
             environment: ["SILTA_HOME": scratch.appending(path: "data").path, "SILTA_NOW": raw],
             userHome: scratch, temporaryRoots: [], deterministic: true)
         }
@@ -203,8 +203,8 @@ struct DeterminismTests {
         .hasPrefix("0000000001"))
   }
 
-  @Test func explicitModeCannotEnableOverridesAtTheRealHome() throws {
-    try withScratchDirectory { scratch in
+  @Test func explicitModeCannotEnableOverridesAtTheRealHome() async throws {
+    try await withScratchDirectory { scratch in
       let user = scratch.appending(path: "user")
       let real = user.appending(path: ".silta")
       try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
@@ -214,7 +214,7 @@ struct DeterminismTests {
         for path in [nil, real.path, alias.path] {
           var values = ["SILTA_NOW": "2023-11-14T22:13:20.123Z", "SILTA_ID_SEED": "0"]
           values["SILTA_HOME"] = path
-          let env = try SiltaEnvironment.system(
+          let env = try await SiltaEnvironment.system(
             environment: values, userHome: user, temporaryRoots: [],
             deterministic: true)
           #expect(env.clock is SystemClock)
@@ -224,11 +224,11 @@ struct DeterminismTests {
     }
   }
 
-  @Test func defaultTemporaryRootsAreUsedWithoutInjection() throws {
-    try withScratchDirectory { scratch in
+  @Test func defaultTemporaryRootsAreUsedWithoutInjection() async throws {
+    try await withScratchDirectory { scratch in
       let home = scratch.appending(path: "isolated")
       let user = scratch.appending(path: "user")
-      let env = try SiltaEnvironment.system(
+      let env = try await SiltaEnvironment.system(
         environment: [
           "SILTA_HOME": home.path,
           "SILTA_NOW": "2023-11-14T22:13:20.123Z",
@@ -240,7 +240,7 @@ struct DeterminismTests {
       let root = FileManager.default.temporaryDirectory
       let sibling = root.deletingLastPathComponent().appending(
         path: root.lastPathComponent + "-sibling")
-      let other = try SiltaEnvironment.system(
+      let other = try await SiltaEnvironment.system(
         environment: [
           "SILTA_HOME": sibling.path,
           "SILTA_NOW": "2023-11-14T22:13:20.123Z",
@@ -249,15 +249,15 @@ struct DeterminismTests {
     }
   }
 
-  @Test func nonCanonicalUTCOverridesAreRejected() throws {
-    try withScratchDirectory { scratch in
+  @Test func nonCanonicalUTCOverridesAreRejected() async throws {
+    try await withScratchDirectory { scratch in
       do {
         for raw in [
           "2023-11-14T22:13:20Z", "2023-11-14T22:13:20.123+02:00",
           "2023-11-14T22:13:20.123+00:00", "2023-11-14T22:13:20.1234Z",
         ] {
-          #expect(throws: (any Error).self) {
-            try SiltaEnvironment.system(
+          await #expect(throws: (any Error).self) {
+            try await SiltaEnvironment.system(
               environment: [
                 "SILTA_HOME": scratch.appending(path: "data").path,
                 "SILTA_NOW": raw,

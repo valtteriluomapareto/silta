@@ -6,12 +6,12 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct StorageDeterminismTests {
-  @Test func fixedEnvironmentReplaysContentionWithoutRandomClockAdvancement() throws {
-    try withScratchDirectory { scratch in
+  @Test func fixedEnvironmentReplaysContentionWithoutRandomClockAdvancement() async throws {
+    try await withScratchDirectory { scratch in
       var identifiers: [String] = []
       var elapsed: [TimeInterval] = []
       for index in 0..<2 {
-        let environment = try SiltaEnvironment.system(
+        let environment = try await SiltaEnvironment.system(
           environment: [
             "SILTA_HOME": scratch.appending(path: "data-\(index)").path,
             "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0",
@@ -19,7 +19,7 @@ struct StorageDeterminismTests {
         try environment.db.write { try $0.database.execute(sql: "PRAGMA busy_timeout=0") }
         let before = environment.clock.now()
         let external = try DatabaseQueue(path: environment.db.path)
-        try external.write { _ in
+        try await external.write { _ in
           do {
             #expect(throws: StorageError.busy) { try environment.db.write { _ in () } }
           }

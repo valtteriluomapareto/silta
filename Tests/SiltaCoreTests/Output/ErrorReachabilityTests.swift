@@ -42,6 +42,10 @@ extension SecretError: ErrorExamples {
   }
 }
 
+extension ActorError: ErrorExamples {
+  static var examples: [ActorError] { [.humanOnly(command: "silta task triage")] }
+}
+
 /// Proves every `ErrorCode` is produced by some error type (spec §16, D22).
 ///
 /// This shows each code is *mapped* by a registered type's examples, not that a
@@ -50,12 +54,12 @@ struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
-    StorageError.self,
+    StorageError.self, ActorError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
-    .notFound, .unregistered, .humanOnly, .readOnlyPromoted, .ambiguousLocation,
+    .notFound, .unregistered, .readOnlyPromoted, .ambiguousLocation,
     .conflict, .claimed, .staleRev, .leaseTaken, .gate, .rateLimited,
   ]
 

@@ -5,9 +5,9 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct HomeResolutionTests {
-  @Test func absentCaseAliasOfRealHomeIgnoresOverrides() throws {
-    try withScratchDirectory { scratch in
-      let env = try SiltaEnvironment.system(
+  @Test func absentCaseAliasOfRealHomeIgnoresOverrides() async throws {
+    try await withScratchDirectory { scratch in
+      let env = try await SiltaEnvironment.system(
         environment: [
           "SILTA_HOME": scratch.appending(path: ".SILTA").path,
           "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0",
@@ -37,11 +37,11 @@ struct HomeResolutionTests {
     }
   }
 
-  @Test func preEpochOverrideIsRejectedAtAssembly() throws {
-    try withScratchDirectory { scratch in
+  @Test func preEpochOverrideIsRejectedAtAssembly() async throws {
+    try await withScratchDirectory { scratch in
       do {
-        #expect(throws: SeamError.invalidNow) {
-          try SiltaEnvironment.system(
+        await #expect(throws: SeamError.invalidNow) {
+          try await SiltaEnvironment.system(
             environment: [
               "SILTA_HOME": scratch.appending(path: "data").path,
               "SILTA_NOW": "1969-12-31T23:59:59.000Z",
