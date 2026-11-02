@@ -1,6 +1,6 @@
 # M1: daily use
 
-Status: active
+Status: active · tracking issue [#1](https://github.com/valtteriluomapareto/silta/issues/1)
 
 ## Goal
 
@@ -11,7 +11,7 @@ Silta is usable every day:
 
 ## Inputs
 
-- Spec §6–§12, §15–§20 and the M1 row of §22.
+- Spec §6–§12, §15–§20.1 and the M1 row of §22.
 - Decisions D1–D19.
 
 ## Scope
@@ -25,48 +25,50 @@ Silta is usable every day:
 
 ## Slices
 
-The waves show what can run in parallel: every slice in a wave depends only on
-earlier waves. Shared files need coordination, and their owner is named:
+**Where things live:**
+- **The issues** hold each slice's scope, out-of-scope and acceptance.
+- **This plan** holds the dependency graph and the reasoning.
+- **GitHub** records the same dependencies as "blocked by" links, and the slices are
+  sub-issues of #1.
+
+**How to work a slice:** pick any open slice whose blockers are closed. Then post its
+plan on the issue and get it reviewed (`skills/persona-review`) before coding.
+
+**Shared files** need coordination, and their owner is named:
 - `Package.swift`: S1
 - the migrations: S3
 - the error-code table: S4
 
-| Slice | Scope | Depends on | Verify with |
+| Slice | Issue | Depends on | Wave |
 |---|---|---|---|
-| **S1** Package skeleton | `Package.swift` (SiltaCore, silta, test targets; GRDB, ArgumentParser, Yams), `silta --version`, CI build and test steps active | — | `verify.sh quick` |
-| **S2** Determinism seams | `Clock`, `IDGenerator` (ULID), `SiltaHome`, `GitRunner` protocol with a sanitized system implementation and a fake; `SILTA_NOW` / `SILTA_ID_SEED` (§20.1) | S1 | Unit tests; determinism guard |
-| **S3** Storage | GRDB `DatabaseMigrator`, schema v1 (§6), `seq_counter`, `change_log`, `min_writer_version` check per write, daily `VACUUM INTO` backup | S1, S2 | Migration tests; stress test for seq allocation |
-| **S4** Output contract | JSON envelope, error codes and exit codes (§16), stdout/stderr split, `silta schema`, golden-test harness | S1 | Golden tests |
-| **S5** Actors and sessions | Actor detection matrix (§11), session ids, human-only policy | S2, S4 | Actor-matrix unit tests |
-| **S6** Workspace config | `init --scan`, `ws edit` YAML with validation and "did you mean", `repo fetch` | S3, S4 | Golden tests on the fixture tree |
-| **S7** Location | `where` (§7) with all edge cases; `scripts/make-fixtures.sh` builds the fixture repos | S2, S3, S6 | `where` matrix over the fixtures |
-| **S8** Code access | `code show/grep/log/ls` with `@ref`, timeouts, fetch hints | S2, S6 | Fixture tests |
-| **S9** Secret guard | Pinned regex set, allowlist, redact vs reject (§18), corpus | S4 | Corpus test: 0 misses on known secrets |
-| **S10** Tasks | add/start/claim/plan/steps/from-plan/submit/done with result and sha/archive/triage/promote (§8) | S3, S5, S9 | Unit, golden and stress tests (one claimer) |
-| **S11** Comments and inbox | Kinds, threads, batch resolve, accept, inbox query (§8.1) | S10 | Golden tests; inbox state tests |
-| **S12** Brief and hook | `brief` sections 1–7, budgets, `--hook` mode (§12) | S7, S8, S10, S11 | Golden briefs on the fixtures |
-| **S13** Agent integration | `agents install` (skill, CLAUDE/AGENTS blocks, SessionStart hook, Codex writable root), `silta guide` | S4, S12 | Golden install diffs; guide golden |
-| **S14** Export, backup, restore | Manifest, byte-identical export, restore with `--dry-run` (§15) | S3, S10, S11 | Round-trip property test; tampered-tree tests |
-| **S15** Doctor and logs | JSONL command log, `doctor [--fix]` (§19) | S3, S8 | Doctor green on a fresh DB, red on injected corruption |
-| **S16** Scenarios and first evals | Scenario runner with evidence directory (§20.1); four evals: `start-cross-repo`, `plan-not-file`, `handoff-resume`, `done-with-result` (§21) | S12, S13 | The evals pass for Claude Code and Codex |
+| S1 Package skeleton | [#2](https://github.com/valtteriluomapareto/silta/issues/2) | — | 1 |
+| S2 Determinism seams | [#3](https://github.com/valtteriluomapareto/silta/issues/3) | S1 | 2 |
+| S4 Output contract and `silta schema` | [#4](https://github.com/valtteriluomapareto/silta/issues/4) | S1 | 2 |
+| S3 Storage | [#5](https://github.com/valtteriluomapareto/silta/issues/5) | S1, S2 | 3 |
+| CP Control plane: scenario runner and fixtures | [#6](https://github.com/valtteriluomapareto/silta/issues/6) | S2, S4 | 3 |
+| S5 Actors and sessions | [#7](https://github.com/valtteriluomapareto/silta/issues/7) | S2, S4 | 3 |
+| S9 Secret guard | [#8](https://github.com/valtteriluomapareto/silta/issues/8) | S4 | 3 |
+| S6 Workspace config | [#9](https://github.com/valtteriluomapareto/silta/issues/9) | S3, S4 | 4 |
+| S10 Tasks | [#10](https://github.com/valtteriluomapareto/silta/issues/10) | S3, S5, S9 | 4 |
+| S7 Location | [#11](https://github.com/valtteriluomapareto/silta/issues/11) | S2, S3, S6, CP | 5 |
+| S8 Code access | [#12](https://github.com/valtteriluomapareto/silta/issues/12) | S2, S6, CP | 5 |
+| S11 Comments and inbox | [#13](https://github.com/valtteriluomapareto/silta/issues/13) | S10 | 5 |
+| S14 Export, backup, restore | [#14](https://github.com/valtteriluomapareto/silta/issues/14) | S3, S10, S11 | 6 |
+| S15 Doctor and logs | [#15](https://github.com/valtteriluomapareto/silta/issues/15) | S3, S8 | 6 |
+| S12 Brief and hook | [#16](https://github.com/valtteriluomapareto/silta/issues/16) | S7, S8, S10, S11 | 6 |
+| S13 Agent integration | [#17](https://github.com/valtteriluomapareto/silta/issues/17) | S4, S12 | 7 |
+| S16 First agent evals | [#18](https://github.com/valtteriluomapareto/silta/issues/18) | S12, S13, CP | 8 |
 
-**Parallel waves:**
-
-| Wave | Slices |
-|---|---|
-| 1 | S1 |
-| 2 | S2, S4 |
-| 3 | S3, S5, S9 |
-| 4 | S6, S10 |
-| 5 | S7, S8, S11, S14, S15 |
-| 6 | S12 |
-| 7 | S13 |
-| 8 | S16 |
+**Why the control plane (CP) comes early.** CP is the scenario runner and the
+fixture repos. Together with the seams (S2) and the output contract (S4), it lets
+every later slice prove itself from the command line (spec §20.1). So from wave 5
+on, "has scenarios" is part of each slice's acceptance, rather than something added
+at the end. S16 then only adds real agents on top.
 
 ## Validation
 
 - Every slice runs `scripts/verify.sh quick`.
-- S3, S7, S10, S12 and S14 also run `full`.
+- S3, CP, S7, S10, S12 and S14 also run `full`.
 - What M1 still won't prove: behaviour with models other than Claude and Codex, which
   comes in the M4 eval matrix.
 
@@ -75,12 +77,11 @@ earlier waves. Shared files need coordination, and their owner is named:
 - **`where` heuristics misfire on real repos.** The fixtures mirror real promotion
   chains, and low confidence never guesses.
 - **Hook latency.** `--hook` has a 1.5 s budget and never indexes or fetches.
-- **Harness details not yet verified** (spec §23 Q5). Check them in S13 before
-  relying on them.
+- **Harness details not yet verified** (spec §23 Q5). S13 verifies them first.
 
 ## Done when
 
-- The four S16 evals pass for Claude Code and Codex.
+- S16's four evals pass for Claude Code and Codex.
 - The stress, `where` matrix, round-trip, migration and secret-corpus tests are green.
 
-Then move the lasting rules to the spec and decisions, and delete this file.
+Then move the lasting rules to the spec and decisions, delete this file, and close #1.

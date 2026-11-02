@@ -1,0 +1,55 @@
+name: Slice
+description: A unit of work small enough for one agent in one worktree.
+title: "Sn: <title>"
+labels: ["slice", "needs-plan"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What is true when this ships, in one or two sentences.
+    validations:
+      required: true
+  - type: input
+    id: spec
+    attributes:
+      label: Spec and decisions
+      description: Spec sections (§n) and decisions (D#) this implements.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Bullet list of what is in scope.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      description: Issue numbers of slices that must land first (also set them as "blocked by").
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: Which verify step, tests and scenarios prove this (spec §20, §20.1).
+      value: |
+        - [ ] <specific tests / scenarios>
+        - [ ] `scripts/verify.sh quick` (or `full` for storage, concurrency, location, agent-facing output)
+        - [ ] Plan posted on this issue and reviewed with `skills/persona-review`
+        - [ ] Implementation reviewed by the same reviewers
+        - [ ] Scenarios added where §20.1 requires them
+        - [ ] Spec, decisions and plan board updated if behaviour or scope changed
+    validations:
+      required: true
+  - type: checkboxes
+    id: agent-facing
+    attributes:
+      label: Agent-facing
+      options:
+        - label: Changes guide text, `--json`, error codes, exit codes or `brief` (adds the Agent-experience reviewer and the `agent-facing` label)
