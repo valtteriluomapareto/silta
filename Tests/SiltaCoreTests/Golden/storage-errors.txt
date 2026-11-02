@@ -1,0 +1,20 @@
+## busy
+error: Database is busy; retry the original invocation once after retry_after_s. [busy]
+retry after: 5s
+next: silta doctor
+{"error":{"code":"busy","message":"Database is busy; retry the original invocation once after retry_after_s.","next":["silta doctor"],"next_by":"agent","retry_after_s":5},"ok":false,"schema":1,"warnings":[]}
+
+## unavailable
+error: Database is unavailable or read-only. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database is unavailable or read-only.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## schemaTooNew
+error: Database requires a newer version of silta. [env]
+ask human: update silta
+{"error":{"code":"env","message":"Database requires a newer version of silta.","next":["update silta"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## backupFailed
+error: Required database backup could not be completed. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Required database backup could not be completed.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

@@ -38,6 +38,12 @@ They're summarised here so every decision has one index.
   - PostgreSQL is the planned move if Silta is ever shared by several people.
   - Turso is revisited when it reaches 1.0, or when a Swift binding appears.
   - The comparison is in spec Appendix B.
+  - **↳ update 2026-11-02:** a home-local advisory file lock covers database
+    initialization: WAL setup, pending-migration discovery, backup and migration.
+    GRDB discovers pending work before its migration transaction, and simultaneous
+    WAL setup can fail without waiting; SQLite write transactions alone do not
+    serialize the complete initialization section. Ordinary writes still use
+    `BEGIN IMMEDIATE` and reads never take this lock.
 - **D13: Scripting contract.** This is the "control plane" idea applied to a CLI: an
   agent must be able to prove from the command line that a change works.
   - Data goes to stdout; logs and diagnostics go to stderr.

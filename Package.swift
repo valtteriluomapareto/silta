@@ -50,6 +50,7 @@ let package = Package(
       name: "SiltaCoreTests",
       dependencies: [
         "SiltaCore", "SiltaTestSupport",
+        .product(name: "GRDB", package: "GRDB.swift"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       exclude: ["Golden"],

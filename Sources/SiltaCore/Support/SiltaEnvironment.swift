@@ -10,17 +10,21 @@ package struct SiltaEnvironment: Sendable {
   package let git: any GitRunner
   /// Locates every owned data file.
   package let home: SiltaHome
+  /// Opens the truth database only when a caller explicitly requests storage.
+  package let db: DatabaseStore
   /// Records best-effort command diagnostics.
   package let log: any Log
 
   /// Assembles supplied seams without reading process globals or doing I/O.
   package init(
-    clock: any Clock, ids: any IDGenerator, git: any GitRunner, home: SiltaHome, log: any Log
+    clock: any Clock, ids: any IDGenerator, git: any GitRunner, home: SiltaHome, db: DatabaseStore,
+    log: any Log
   ) {
     self.clock = clock
     self.ids = ids
     self.git = git
     self.home = home
+    self.db = db
     self.log = log
   }
 
@@ -60,6 +64,7 @@ package struct SiltaEnvironment: Sendable {
     }
     return SiltaEnvironment(
       clock: clock, ids: ids, git: SystemGitRunner(environment: environment), home: home,
+      db: DatabaseStore(home: home.url, clock: clock, ids: ids),
       log: SystemLog(directory: home.url.appending(path: "log")))
   }
 }

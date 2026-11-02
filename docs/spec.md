@@ -237,6 +237,7 @@ CREATE TABLE app (
   lifecycle TEXT NOT NULL DEFAULT 'active',   -- active | legacy | dead
   UNIQUE (workspace_id, slug)
 );
+CREATE UNIQUE INDEX app_primary_ref ON app(repo_id, ref) WHERE is_primary = 1 AND subpath IS NULL;
 CREATE TABLE environment (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   app_id INTEGER NOT NULL REFERENCES app(id), name TEXT NOT NULL, url TEXT, deploy TEXT, notes TEXT);
 CREATE TABLE service (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -889,8 +890,10 @@ Every CLI call is its own short-lived process, and several agents run at once.
 - **Read commands never write to `silta.db`.** Archiving is computed, and caches are
   best-effort writes to `index.db`.
 - **Migrations:**
-  - GRDB `DatabaseMigrator`, run in an exclusive transaction. Concurrent openers wait,
-    then see the migrated schema.
+  - GRDB `DatabaseMigrator` applies atomic migrations excluding competing writers.
+    Initialization is serialized across processes, including database mode setup,
+    pending-migration discovery and the pre-migration snapshot. Concurrent openers
+    wait, then see the migrated schema.
   - Each migration sets `meta.min_writer_version`. Every write transaction checks it,
     not just at open: an older binary, or an older app that's still running, gets
     exit 9 "update silta" and never writes.

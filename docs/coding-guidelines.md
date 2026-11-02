@@ -47,7 +47,8 @@ quietly diverge.
   concurrency (guard). A deliberate exception carries
   `// guard:allow-global <reason>`.
 - **No actors in the core** unless a decision adds one. Concurrency between processes
-  is handled by SQLite transactions (spec §17), not by actors.
+  uses SQLite transactions for writes (spec §17), not actors. Database initialization
+  uses the advisory lock recorded in D12.
 - **Swift 6 language mode** with strict concurrency checking on every target, plus
   all the Swift 7 upcoming features (§0).
 - **`@MainActor` belongs to the app.** The app target (M5) uses Swift 6.2's
