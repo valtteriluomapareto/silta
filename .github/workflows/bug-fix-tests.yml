@@ -1,0 +1,27 @@
+name: Bug fix has a test
+
+# A PR labelled `bug` must change at least one test (D16, test-first flow).
+# Separate from CI so that adding or removing the label re-runs only this check.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  bug-fix-tests:
+    if: contains(github.event.pull_request.labels.*.name, 'bug')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Require a test change
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: git diff --name-only "$BASE_SHA...$HEAD_SHA" | python3 -B scripts/ci/check_bug_fix_tests.py

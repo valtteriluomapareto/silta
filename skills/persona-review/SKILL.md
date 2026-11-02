@@ -21,7 +21,7 @@ single-agent review as the real thing.
 | Persona | Looks at |
 |---|---|
 | **Architect** | Boundaries (SiltaCore stays UI- and CLI-free), data model and migrations, concurrency (`BEGIN IMMEDIATE`, claims, leases), consistency with the spec and the D# decisions, what will be hard to change later |
-| **Tester** | Requirements that can't be tested, missing edge cases, failure and recovery paths, determinism (injected clock and ids, no wall-clock waits), which test tier covers what, what remains unverified |
+| **Tester** | Requirements that can't be tested, missing edge cases, failure and recovery paths, determinism (injected clock and ids, no wall-clock waits), which test tier covers what, what remains unverified. **Test-first evidence:** plan reviews check that the plan names the reproduction or acceptance tests; implementation reviews check that the reproduction really failed for the reported reason, and that goldens match the spec rather than the code |
 | **Pragmatism** | Scope against the slice, needless complexity, cheaper alternatives, what to cut or defer, whether the change fits in one reviewable PR (about 800 lines or less) |
 | **Agent experience** (only when the change touches `silta guide` text, `--json`, error codes, exit codes or `brief`) | Simulate an agent using the change step by step. Is every error actionable (code + `next` command)? Token cost? Could an agent loop, get stuck, or prefer writing a PLAN.md instead? |
 

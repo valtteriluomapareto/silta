@@ -100,7 +100,11 @@ through. Fix the change, or propose a decision first.
    depends on the dogfooding stage (see Dogfooding below): on the slice's issue
    before DF0, in Silta from DF0 on, or in `docs/plans/` if it's larger. Then get it
    reviewed with `skills/persona-review`.
-3. **Tests first.** A bug fix includes a test that fails on the base commit.
+3. **Tests first** ([test-first flow](docs/coding-guidelines.md#test-first-flow)):
+   - **A bug fix starts with a reproduction.** Write a test that fails for the
+     reported reason and commit it first, wrapped in `withKnownIssue`. Then fix it.
+   - **A feature starts from its acceptance tests**, in red → green → refactor steps.
+   - **Goldens are written from the spec**, not generated from the code.
 4. **Implement, verify, then get a review again** with the same reviewers.
 5. **Commit** in imperative sentence case, under ~72 characters, ending with the
    `Co-Authored-By` trailer the harness gives you.

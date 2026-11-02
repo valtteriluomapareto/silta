@@ -60,6 +60,14 @@ They're summarised here so every decision has one index.
   - Architect, Tester and Pragmatism review every plan and every implementation.
   - An Agent experience reviewer joins for changes to agent-facing output.
   - Tests come first, and a bug fix includes a test that failed first.
+  - **↳ update 2026-11-02:** test-first is a written flow
+    (`coding-guidelines.md`, "Test-first flow").
+    - A bug's reproduction is committed first, wrapped in `withKnownIssue`, and the fix
+      removes the wrapper.
+    - Features start from failing acceptance tests.
+    - Goldens are written from the spec.
+    - PRs give "Test-first evidence".
+    - CI requires a test change on PRs labelled `bug`.
 - **D17: Invariants are enforced by guards, and every guard has a self-test.**
   - Each guard must pass a clean tree and fail a planted violation, because a guard
     that silently stops matching passes forever.
