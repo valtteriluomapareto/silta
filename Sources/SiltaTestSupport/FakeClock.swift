@@ -18,4 +18,8 @@ package final class FakeClock: SiltaCore.Clock {
   package func advance(milliseconds: Int64) {
     instant.withLock { $0.addTimeInterval(Double(milliseconds) / 1000) }
   }
+  /// Advances the fake instant by the requested retry delay without waiting.
+  package func wait(milliseconds: UInt64) {
+    instant.withLock { $0.addTimeInterval(Double(milliseconds) / 1000) }
+  }
 }

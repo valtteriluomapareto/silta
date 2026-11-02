@@ -9,7 +9,8 @@ struct StorageSchemaTests {
   static let instant = Date(timeIntervalSince1970: 1_700_000_000)
 
   static func store(_ home: URL, seed: UInt64 = 0) -> DatabaseStore {
-    DatabaseStore(home: home, clock: FakeClock(now: instant), ids: SeededIDGenerator(seed: seed))
+    DatabaseStore(
+      home: home, clock: FakeClock(now: instant), ids: SeededIDGenerator(seed: seed), jitter: { 0 })
   }
 
   @Test func constructionAndMissingReadNeverInitialize() throws {

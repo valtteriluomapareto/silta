@@ -147,7 +147,8 @@ struct StorageBackupTests {
       let done = DispatchGroup()
       let failures = Mutex<[String]>([])
       let clock = PausingClock(entered: entered, release: release)
-      let store = DatabaseStore(home: scratch, clock: clock, ids: SeededIDGenerator(seed: 0))
+      let store = DatabaseStore(
+        home: scratch, clock: clock, ids: SeededIDGenerator(seed: 0), jitter: { 0 })
       done.enter()
       DispatchQueue.global().async {
         defer {
@@ -183,4 +184,5 @@ private struct PausingClock: SiltaCore.Clock {
     release.wait()
     return StorageSchemaTests.instant
   }
+  func wait(milliseconds: UInt64) {}
 }

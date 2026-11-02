@@ -54,7 +54,7 @@ plan on the issue and get it reviewed (`skills/persona-review`) before coding.
 | S5 Actors and sessions | [#7](https://github.com/valtteriluomapareto/silta/issues/7) | S2, S4 | 3 | |
 | S9 Secret guard | [#8](https://github.com/valtteriluomapareto/silta/issues/8) | S4 | 3 | |
 | S6 Workspace config | [#9](https://github.com/valtteriluomapareto/silta/issues/9) | S3, S4 | 4 | |
-| S10 Tasks | [#10](https://github.com/valtteriluomapareto/silta/issues/10) | S3, S5, S9 | 4 | |
+| S10 Tasks | [#10](https://github.com/valtteriluomapareto/silta/issues/10) | S3, S5, S9 | 4 | Adds binary-driven20 writers ×200 adds; S3 covers20 GRDB connections/threads |
 | S7 Location | [#11](https://github.com/valtteriluomapareto/silta/issues/11) | S2, S3, S6, CP | 5 | built with Silta |
 | S8 Code access | [#12](https://github.com/valtteriluomapareto/silta/issues/12) | S2, S6, CP | 5 | built with Silta |
 | S11 Comments and inbox | [#13](https://github.com/valtteriluomapareto/silta/issues/13) | S10 | 5 | unlocks DF1 |
