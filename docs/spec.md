@@ -873,6 +873,7 @@ silta/
   Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
   Sources/SiltaCore/           # domain, policy, storage (GRDB as extensions), git, brief rendering
   Sources/silta/               # ArgumentParser commands, renderers, actor detection
+  Sources/SiltaTestSupport/    # fakes, golden helper, scratch dirs; used by tests and the scenario runner only
   Tests/SiltaCoreTests/        # unit + fixture git repos
   Tests/siltaTests/            # golden CLI output + exit codes
   Tests/Stress/                # multi-process tests driving the built binary

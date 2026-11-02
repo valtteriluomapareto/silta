@@ -1,4 +1,5 @@
-"""SiltaCore must not import UI or CLI frameworks (AGENTS.md invariant 1, D11)."""
+"""SiltaCore must not import UI or CLI frameworks, or log directly through os/OSLog
+(AGENTS.md invariant 1; D11, D27)."""
 
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from pathlib import Path
 from swift_source import run, split_swift, swift_files
 
 CORE_DIR = "Sources/SiltaCore"
-FORBIDDEN = ("AppKit", "SwiftUI", "UIKit", "Cocoa", "ArgumentParser")
+FORBIDDEN = ("AppKit", "SwiftUI", "UIKit", "Cocoa", "ArgumentParser", "os", "OSLog")
 IMPORT = re.compile(
     r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*import\s+"
     r"(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?"

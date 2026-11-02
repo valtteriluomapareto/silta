@@ -14,6 +14,11 @@ esac
 
 step() { echo; echo "=== $* ==="; }
 
+if [[ -n "${CI:-}" && -n "${SILTA_UPDATE_GOLDENS:-}" ]]; then
+  echo "verify: SILTA_UPDATE_GOLDENS is set in CI; goldens are only regenerated locally, on purpose" >&2
+  exit 1
+fi
+
 step "guards"
 scripts/run-guards.sh
 

@@ -11,6 +11,14 @@ excluded:
 
 reporter: "xcode"
 
+# Crash-free shipped code and documented public API (D22, D28). force_try and
+# force_cast are on by default; these are opt-in.
+opt_in_rules:
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - fatal_error_message
+  - missing_docs
+
 disabled_rules:
   - trailing_comma        # swift-format decides
   - opening_brace         # swift-format decides

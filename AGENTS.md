@@ -18,6 +18,7 @@ first milestone (M1) is broken into slices in
 | Doing this… | Read this |
 |---|---|
 | Understanding the product or a behaviour | [`docs/spec.md`](docs/spec.md); the section numbers (§n) are stable |
+| Writing Swift code (concurrency, errors, seams, tests, logging) | [`docs/coding-guidelines.md`](docs/coding-guidelines.md) |
 | Checking why something is the way it is | [`docs/decisions.md`](docs/decisions.md) (D1, D2, …) |
 | Picking up work | [`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md): take a slice whose dependencies are done |
 | Writing or updating a plan | [`docs/plans/README.md`](docs/plans/README.md) and [`_template.md`](docs/plans/_template.md) |
@@ -53,10 +54,18 @@ through. Fix the change, or propose a decision first.
    `asyncAfter`; use the fake clock. Enforced by `check_test_waits.py`.
 4. **Code comments don't refer to plans, phases, milestones or review rounds.**
    Enforced by `check_no_plan_refs.py`.
-5. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
-6. **The plans board in `docs/README.md` mirrors `docs/plans/` one-to-one.** Enforced
+5. **No crashes or hidden state in shipped code.** That means:
+   - no stored `static var` or top-level `var` in `SiltaCore`
+   - no `print`/`os` logging in `SiltaCore`
+   - `try?` only with a reason on the same line
+   - no `try!`, `as!`, force unwraps or IUOs in `Sources/`
+
+   Enforced by `check_core_hygiene.py`, `check_try_optional.py` and SwiftLint
+   (D21, D22, D27).
+6. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
+7. **The plans board in `docs/README.md` mirrors `docs/plans/` one-to-one.** Enforced
    by `check_plans_board.py`.
-7. **Agent-facing output is a contract.** This covers `silta guide` text, `--json`
+8. **Agent-facing output is a contract.** This covers `silta guide` text, `--json`
    shapes, error codes and exit codes. They change only together with their golden
    tests and an agent-experience review (spec §16, §20, §21; D16).
 

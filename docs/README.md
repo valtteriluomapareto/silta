@@ -6,6 +6,7 @@
 | Contributors (commands, workflow) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | Product and technical design | [`spec.md`](spec.md) |
 | Why things are the way they are | [`decisions.md`](decisions.md) |
+| How Swift code is written | [`coding-guidelines.md`](coding-guidelines.md) |
 | Plans and their lifecycle | [`plans/README.md`](plans/README.md) |
 | Reviewing plans and implementations | [`../skills/persona-review/SKILL.md`](../skills/persona-review/SKILL.md) |
 

@@ -20,10 +20,12 @@ sys.path.insert(0, str(GUARDS_DIR))
 
 import check_core_boundary  # noqa: E402
 import check_core_determinism  # noqa: E402
+import check_core_hygiene  # noqa: E402
 import check_docs_links  # noqa: E402
 import check_no_plan_refs  # noqa: E402
 import check_plans_board  # noqa: E402
 import check_test_waits  # noqa: E402
+import check_try_optional  # noqa: E402
 from swift_source import split_swift  # noqa: E402
 
 
@@ -89,6 +91,59 @@ class CoreBoundaryTests(GuardTestCase):
     def test_cli_target_may_import_argument_parser(self) -> None:
         self.tree.write("Sources/silta/Main.swift", "import ArgumentParser\n")
         self.assertEqual(check_core_boundary.check(self.tree.root), [])
+
+
+    def test_os_logging_import_fails(self) -> None:
+        self.tree.write("Sources/SiltaCore/Log.swift", "import os\nimport OSLog\n")
+        self.assertEqual(len(check_core_boundary.check(self.tree.root)), 2)
+
+    def test_module_names_that_start_with_os_pass(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift", "import OSLogStore\nimport osmium\n")
+        self.assertEqual(check_core_boundary.check(self.tree.root), [])
+
+
+class CoreHygieneTests(GuardTestCase):
+    def test_computed_statics_and_constants_pass(self) -> None:
+        self.tree.write(
+            "Sources/SiltaCore/A.swift",
+            "let limit = 10\nenum E { static let x = 1\n  static var y: Int { 2 }\n}\n"
+            "// print(\"hello\") in a comment\nlet s = \"print(x)\"\nlet f = log.print\n",
+        )
+        self.assertEqual(check_core_hygiene.check(self.tree.root), [])
+
+    def test_global_mutable_state_fails(self) -> None:
+        self.tree.write(
+            "Sources/SiltaCore/A.swift",
+            "var counter = 0\nprivate var cache: [String: Int] = [:]\n"
+            "enum E { static var shared = E()\n  nonisolated(unsafe) static var x: Int = 1\n}\n",
+        )
+        self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 4)
+
+    def test_marker_allows_a_justified_global(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift", "static var hook = 0 // guard:allow-global test seam\n")
+        self.assertEqual(check_core_hygiene.check(self.tree.root), [])
+
+    def test_printing_in_core_fails(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift", "print(1)\ndebugPrint(2)\ndump(3)\nNSLog(\"x\")\n")
+        self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 4)
+
+    def test_cli_may_print(self) -> None:
+        self.tree.write("Sources/silta/Main.swift", "print(1)\nvar x = 0\n")
+        self.assertEqual(check_core_hygiene.check(self.tree.root), [])
+
+
+class TryOptionalTests(GuardTestCase):
+    def test_try_optional_with_reason_passes(self) -> None:
+        self.tree.write("Sources/silta/A.swift", "try? fm.removeItem(at: tmp) // best-effort cleanup\nlet x = try f()\n")
+        self.assertEqual(check_try_optional.check(self.tree.root), [])
+
+    def test_bare_try_optional_fails(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift", "let v = try? load()\nlet w = try? load() //\n")
+        self.assertEqual(len(check_try_optional.check(self.tree.root)), 2)
+
+    def test_tests_may_use_try_optional(self) -> None:
+        self.tree.write("Tests/SiltaCoreTests/A.swift", "let v = try? load()\n")
+        self.assertEqual(check_try_optional.check(self.tree.root), [])
 
 
 class CoreDeterminismTests(GuardTestCase):

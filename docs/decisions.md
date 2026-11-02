@@ -82,3 +82,50 @@ They're summarised here so every decision has one index.
   - From DF0 on, migrations count as shipped.
   - Dogfooding friction is recorded as Silta tasks with the topic `dogfood`, and
     triaged once per wave.
+
+## Code
+
+The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
+
+- **D21: Concurrency.**
+  - A synchronous, nonisolated core built from `Sendable` value types.
+  - `async` only for real I/O waits.
+  - No global mutable state, and no actors in the core.
+  - Swift 6 strict concurrency, with `NonisolatedNonsendingByDefault` and
+    `InferIsolatedConformances` enabled.
+  - Default MainActor isolation only in the app target (M5).
+- **D22: Errors.**
+  - Per-area error enums conforming to `CodedError`, mapped to the §16 table and
+    checked by a golden test.
+  - Plain `throws` by default.
+  - No `try!`, `as!`, force unwraps or IUOs in `Sources/`.
+  - `try?` needs a reason.
+- **D23: Seams.**
+  - One `SiltaEnvironment`, passed explicitly.
+  - Naming: `System…`, `Fake…`, `Scripted…`.
+  - Fakes live in a `SiltaTestSupport` target.
+  - A conformance suite for every seam.
+- **D24: Access control.**
+  - `public` only for the app-facing façade.
+  - `package` for the CLI and test support.
+  - `internal` by default.
+  - `@testable` only in unit tests.
+- **D25: Layout.**
+  - Feature folders.
+  - GRDB records in `Storage/Records/`.
+  - One primary type per file.
+  - Commands named `<Noun><Verb>Command`.
+- **D26: Tests.**
+  - Swift Testing, with `#require` for preconditions.
+  - Parameterized matrices.
+  - The slow tier selected by tag.
+  - Per-test scratch directories.
+  - A home-made golden helper; goldens are never regenerated in CI.
+- **D27: Logging.**
+  - An injected `Log` seam; no `print` or `os` in the core.
+  - Output only from the output layer.
+  - Logs never contain bodies.
+- **D28: Doc comments.**
+  - Required on public and CLI-facing package API.
+  - Elsewhere, only where the reason isn't obvious.
+
