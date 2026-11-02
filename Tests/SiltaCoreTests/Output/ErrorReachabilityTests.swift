@@ -28,6 +28,10 @@ extension SchemaError: ErrorExamples {
   static var examples: [SchemaError] { [.unknownCommand("silta nope", known: ["silta schema"])] }
 }
 
+extension SeamError: ErrorExamples {
+  static var examples: [SeamError] { Array(allCases) }
+}
+
 /// Proves every `ErrorCode` is produced by some error type (spec §16, D22).
 ///
 /// This shows each code is *mapped* by a registered type's examples, not that a
@@ -35,7 +39,7 @@ extension SchemaError: ErrorExamples {
 struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
-    UsageError.self, InternalError.self, SchemaError.self,
+    UsageError.self, InternalError.self, SchemaError.self, SeamError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.

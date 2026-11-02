@@ -1,0 +1,34 @@
+## invalidHome (exit 1)
+error: SILTA_HOME must be an absolute, resolvable directory path. [invalid]
+next: printf '%s\n' "$SILTA_HOME"
+next: silta --help
+{"error":{"code":"invalid","message":"SILTA_HOME must be an absolute, resolvable directory path.","next":["printf '%s\\n' \"$SILTA_HOME\"","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## invalidNow (exit 1)
+error: SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01. [invalid]
+next: unset SILTA_NOW
+next: silta --help
+{"error":{"code":"invalid","message":"SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01.","next":["unset SILTA_NOW","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## invalidIDSeed (exit 1)
+error: SILTA_ID_SEED must be an unsigned 64-bit decimal integer. [invalid]
+next: unset SILTA_ID_SEED
+next: silta --help
+{"error":{"code":"invalid","message":"SILTA_ID_SEED must be an unsigned 64-bit decimal integer.","next":["unset SILTA_ID_SEED","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## invalidTimestamp (exit 1)
+error: Clock timestamp must fit the unsigned 48-bit ULID millisecond range. [invalid]
+next: unset SILTA_NOW
+next: silta doctor
+{"error":{"code":"invalid","message":"Clock timestamp must fit the unsigned 48-bit ULID millisecond range.","next":["unset SILTA_NOW","silta doctor"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## gitUnavailable (exit 9)
+error: Git could not be started; check the configured absolute git path. [env]
+ask human: /usr/bin/git --version
+ask human: silta doctor
+{"error":{"code":"env","message":"Git could not be started; check the configured absolute git path.","next":["/usr/bin/git --version","silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## gitCapture (exit 9)
+error: Git output could not be captured. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Git output could not be captured.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
