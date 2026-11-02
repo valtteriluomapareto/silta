@@ -9,11 +9,18 @@ package struct Rendered: Equatable, Sendable {
   /// The error code, when the command failed.
   package var errorCode: ErrorCode?
 
+  /// Body-free warning identifiers retained for command diagnostics.
+  package var warningCodes: [String]
+
   /// A rendering with both streams, the exit status and the error code.
-  package init(stdout: String, stderr: String, exitCode: Int32, errorCode: ErrorCode?) {
+  package init(
+    stdout: String, stderr: String, exitCode: Int32, errorCode: ErrorCode?,
+    warningCodes: [String] = []
+  ) {
     self.stdout = stdout
     self.stderr = stderr
     self.exitCode = exitCode
     self.errorCode = errorCode
+    self.warningCodes = warningCodes
   }
 }

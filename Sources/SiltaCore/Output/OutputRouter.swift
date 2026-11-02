@@ -27,11 +27,15 @@ package enum OutputRouter {
       let envelope = Envelope(
         ok: true, data: Envelope.AnyData(value: output.data), error: nil,
         warnings: output.warnings)
-      return Rendered(stdout: try line(envelope), stderr: "", exitCode: 0, errorCode: nil)
+      return Rendered(
+        stdout: try line(envelope), stderr: "", exitCode: 0, errorCode: nil,
+        warningCodes: output.warnings.map(\.code))
     }
     let warnings = output.warnings.map { "warning: \($0.message) [\($0.code)]\n" }.joined()
     let text = mode.quiet || output.text.isEmpty ? "" : terminated(output.text)
-    return Rendered(stdout: text, stderr: warnings, exitCode: 0, errorCode: nil)
+    return Rendered(
+      stdout: text, stderr: warnings, exitCode: 0, errorCode: nil,
+      warningCodes: output.warnings.map(\.code))
   }
 
   private static func failure(_ error: any CodedError, mode: OutputMode) -> Rendered {

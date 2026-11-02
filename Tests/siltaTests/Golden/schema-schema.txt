@@ -6,6 +6,8 @@ silta schema
 global flags:
   --json  optional: Print the JSON envelope on stdout instead of text.
   --quiet  optional: Hide success text; warnings and errors still show.
+  --deterministic  optional: Allow deterministic overrides outside temporary homes; never at the real home.
+  --verbose  optional: Mirror command diagnostics to stderr.
 
 error codes:
   usage  exit 1, next by agent: Read `silta <cmd> --help` and fix the call

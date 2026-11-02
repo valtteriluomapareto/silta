@@ -1,0 +1,15 @@
+fixtures: true
+steps:
+  - args: [--version]
+    cwd: fixtures/acme-platform
+    env: {SILTA_ACTOR: 'agent:acme:smoke', SILTA_SESSION: acme}
+    expect: {exit: 0, stdout: version.txt}
+  - args: [schema, --json]
+    cwd: fixtures/acme-portal-worktree
+    expect:
+      exit: 0
+      json: {ok: true, data.commands.0.name: silta schema}
+  - args: [schema]
+    expect: {exit: 0, stdout: schema.txt}
+  - args: [schema, nope, --json]
+    expect: {exit: 1, code: invalid}

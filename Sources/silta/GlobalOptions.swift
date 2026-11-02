@@ -7,4 +7,10 @@ struct GlobalOptions: ParsableArguments {
 
   @Flag(help: "Hide success text; warnings and errors still show.")
   var quiet = false
+
+  @Flag(help: "Allow deterministic overrides outside temporary homes; never at the real home.")
+  var deterministic = false
+
+  @Flag(help: "Mirror command diagnostics to stderr.")
+  var verbose = false
 }
