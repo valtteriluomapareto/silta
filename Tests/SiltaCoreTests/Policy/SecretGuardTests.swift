@@ -14,7 +14,8 @@ struct SecretGuardTests {
     [
       Sample(rule: "private_key", text: keyBlock),
       Sample(rule: "private_key", text: keyBlock.replacingOccurrences(of: "\n", with: "\r\n")),
-      Sample(rule: "azure_key", text: "Account" + "Key=" + String(repeating: "Q", count: 44) + "=="),
+      Sample(
+        rule: "azure_key", text: "Account" + "Key=" + String(repeating: "Q", count: 44) + "=="),
       Sample(rule: "sas", text: "url:https://blob.acme.example/?sv=1&" + "sig=abcd%2Befgh%3D"),
       Sample(rule: "password", text: "Server=acme;Pass" + "word=acme-secret;Database=acme"),
       Sample(rule: "password", text: "PWD='acme secret'"),
@@ -26,10 +27,14 @@ struct SecretGuardTests {
       Sample(rule: "github_pat", text: "github_" + "pat_" + String(repeating: "Q", count: 82)),
       Sample(rule: "azure_pat", text: String(repeating: "Q", count: 52)),
       Sample(rule: "azure_pat", text: String(repeating: "Q", count: 75) + "AZ" + "DO" + "Q1234"),
-      Sample(rule: "slack", text: "xo" + "xb-" + String(repeating: "1", count: 12) + "-"
-        + String(repeating: "2", count: 12) + "-" + String(repeating: "Q", count: 24)),
+      Sample(
+        rule: "slack",
+        text: "xo" + "xb-" + String(repeating: "1", count: 12) + "-"
+          + String(repeating: "2", count: 12) + "-" + String(repeating: "Q", count: 24)),
       Sample(rule: "google", text: "AI" + "za" + String(repeating: "Q", count: 35)),
-      Sample(rule: "jwt", text: "ey" + "JhY21lIjp0cnVlfQ.eyJhY21lIjoxfQ." + String(repeating: "q", count: 32)),
+      Sample(
+        rule: "jwt",
+        text: "ey" + "JhY21lIjp0cnVlfQ.eyJhY21lIjoxfQ." + String(repeating: "q", count: 32)),
       Sample(rule: "hetu", text: identity(number: 2)),
     ]
   }
@@ -71,7 +76,7 @@ struct SecretGuardTests {
     let ref = "doc:" + String(repeating: "Q", count: 52)
     let clean = [
       "Acme backlog", sha40, sha64, uuid, ref, "AC-12/3", "app:platform-api",
-      "Password=<placeholder>", "Pwd=\"<acme-password>\"", "AccountKey=<key>",
+      "Password=<placeholder>", "Password= <placeholder>", "Pwd=\"<acme-password>\"", "AccountKey=<key>",
       "?sig=<signature>", "eyJheader.eyJpayload.signature", "refs/heads/acme",
     ]
     let falsePositives = clean.filter { !SecretGuard.matches(in: $0).isEmpty }.count
@@ -86,9 +91,15 @@ struct SecretGuardTests {
     }
   }
 
+  @Test func vendorTokenInsideARefStillRedacts() {
+    let token = "AK" + "IA" + String(repeating: "Q", count: 16)
+    let input = "doc:" + token
+    #expect(SecretGuard.redacted(input) == "doc:[REDACTED:aws_key]")
+  }
+
   @Test func checksumRejectsPatternOnlyFalsePositives() {
-    for number in [2, 3, 10, 31, 299, 899] {
-      let valid = Self.identity(number: number)
+    for (number, control) in [(2, "S"), (3, "T"), (10, "1"), (31, "P"), (299, "B"), (899, "P")] {
+      let valid = "010101" + "A" + String(format: "%03d", number) + control
       #expect(SecretGuard.matches(in: valid).map(\.rule) == ["hetu"])
       let wrong = valid.dropLast() + (valid.last == "0" ? "1" : "0")
       #expect(SecretGuard.matches(in: String(wrong)).isEmpty)
