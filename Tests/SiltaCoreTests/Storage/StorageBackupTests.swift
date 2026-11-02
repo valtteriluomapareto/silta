@@ -37,12 +37,14 @@ struct StorageBackupTests {
         try $0.execute(
           sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme','Acme','AC')")
       }
-      _ = try backups.snapshot(name: last.lastPathComponent, at: StorageSchemaTests.instant)
+      _ = try backups.snapshot(
+        name: last.lastPathComponent, at: StorageSchemaTests.instant, reuseExisting: true)
       #expect(try Data(contentsOf: last) == previous)
       let collision = folder.appending(path: "silta-2023-12-10.db")
       try FileManager.default.createDirectory(at: collision, withIntermediateDirectories: false)
       #expect(throws: StorageError.backupFailed) {
-        try backups.snapshot(name: collision.lastPathComponent, at: StorageSchemaTests.instant)
+        try backups.snapshot(
+          name: collision.lastPathComponent, at: StorageSchemaTests.instant, reuseExisting: true)
       }
       let remaining = try FileManager.default.contentsOfDirectory(atPath: folder.path)
       #expect(!remaining.contains { $0.hasPrefix("pending-") })
@@ -59,8 +61,8 @@ struct StorageBackupTests {
       let existing = try DatabaseQueue(path: file.path)
       try existing.write { try $0.execute(sql: "CREATE TABLE acme_note(id INTEGER PRIMARY KEY)") }
       let original = try Data(contentsOf: file)
-      withKnownIssue("#5: migration silently reused a colliding snapshot") {
-        #expect(throws: StorageError.backupFailed) { try StorageSchemaTests.store(scratch).initialize() }
+      #expect(throws: StorageError.backupFailed) {
+        try StorageSchemaTests.store(scratch).initialize()
       }
       #expect(try Data(contentsOf: file) == original)
     }
@@ -78,13 +80,12 @@ struct StorageBackupTests {
       try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: note)
       let backup = StorageBackup(home: scratch, ids: SeededIDGenerator(seed: 2))
       for day in 1...8 {
-        _ = try backup.snapshot(name: String(format: "silta-2023-12-%02d.db", day), at: StorageSchemaTests.instant)
+        _ = try backup.snapshot(
+          name: String(format: "silta-2023-12-%02d.db", day), at: StorageSchemaTests.instant)
       }
       try backup.prune()
-      withKnownIssue("#5: retention removed matching directories and symlinks") {
-        #expect(FileManager.default.fileExists(atPath: note.path))
-        #expect(FileManager.default.fileExists(atPath: alias.path))
-      }
+      #expect(FileManager.default.fileExists(atPath: note.path))
+      #expect(FileManager.default.fileExists(atPath: alias.path))
     }
   }
 
@@ -149,7 +150,10 @@ struct StorageBackupTests {
       let store = DatabaseStore(home: scratch, clock: clock, ids: SeededIDGenerator(seed: 0))
       done.enter()
       DispatchQueue.global().async {
-        defer { entered.signal(); done.leave() }
+        defer {
+          entered.signal()
+          done.leave()
+        }
         do { try store.initialize() } catch {
           failures.withLock { $0.append(String(describing: error)) }
         }

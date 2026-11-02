@@ -39,11 +39,6 @@ package final class DatabaseStore: Sendable {
         var config = Configuration()
         config.busyMode = .timeout(5)
         let queue = try DatabaseQueue(path: path, configuration: config)
-        try queue.writeWithoutTransaction { db in
-          guard try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL") == "wal" else {
-            throw StorageError.unavailable
-          }
-        }
         let migrator = StorageSchema.migrator
         let pending = try queue.read { db in
           guard try !migrator.hasBeenSuperseded(db) else { throw StorageError.schemaTooNew }
@@ -54,6 +49,11 @@ package final class DatabaseStore: Sendable {
             guard version <= Self.writerVersion else { throw StorageError.schemaTooNew }
           }
           return try !migrator.hasCompletedMigrations(db)
+        }
+        try queue.writeWithoutTransaction { db in
+          guard try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL") == "wal" else {
+            throw StorageError.unavailable
+          }
         }
         if pending {
           let timestamp = clock.now()
