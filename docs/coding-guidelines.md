@@ -91,7 +91,8 @@ quietly diverge.
   - test doubles are `Fake…` (state you can set) or `Scripted…` (replays recorded
     answers)
 - **Fakes live in the `SiltaTestSupport` target**, so unit tests, CLI tests and the
-  scenario runner share them. Production targets never depend on it.
+  scenario runner share them. Production targets never depend on it (guard:
+  `check_package_graph.py`).
 - **Every seam with a system and a fake implementation has a conformance suite** that
   runs against both (§6), so fakes can't drift from reality.
 
@@ -126,11 +127,15 @@ quietly diverge.
 - **Parameterized tests for matrices:** the actor matrix, the `where` matrix, the
   error-code table, the secret corpus.
 - **Tiers:**
-  - slow tests carry `.tags(.slow)` and `.enabled(if: TestTier.slowEnabled)`, which
-    is driven by `SILTA_SLOW_TESTS=1`
+  - slow tests carry a `.slow` tag and run only when `SILTA_SLOW_TESTS=1`; the
+    first slice with a slow test (CP or S3) adds the tag and the gate to
+    `SiltaTestSupport`
   - the scenario runner is a slow test
 - **Isolation:** each test gets its own scratch directory and `SILTA_HOME`, so tests
   share no state and run in parallel.
+- **CLI tests are black-box.** `siltaTests` runs the built binary through
+  `SiltaBinary.run`, which gives the child a fixed environment (no inherited `SILTA_*`
+  or `HOME`). It doesn't depend on or import the `silta` module.
 - **Time and ids:**
   - use `FakeClock` and seeded ids (D13)
   - never wait on the wall clock (guard)

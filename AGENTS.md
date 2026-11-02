@@ -9,8 +9,8 @@ Don't leave the contradiction in place.
 
 Silta is a local context hub and backlog for coding agents: a Swift core library
 (`SiltaCore`), a CLI (`silta`) that agents call through their shell, and later a
-macOS app. The design is in [`docs/spec.md`](docs/spec.md). **Status: pre-code.** The
-first milestone (M1) is broken into slices in
+macOS app. The design is in [`docs/spec.md`](docs/spec.md). **Status: M1 in
+progress; the package skeleton builds.** The first milestone (M1) is broken into slices in
 [`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md).
 
 ## Where to find what
@@ -46,12 +46,15 @@ Each invariant names the guard that enforces it. Don't weaken a guard to get a c
 through. Fix the change, or propose a decision first.
 
 1. **`SiltaCore` imports no UI or CLI frameworks.** That means no AppKit, SwiftUI,
-   UIKit, Cocoa or ArgumentParser. Enforced by `check_core_boundary.py`.
+   UIKit, Cocoa or ArgumentParser. Enforced by `check_core_boundary.py`, and in
+   `Package.swift` by `check_package_graph.py`: `SiltaCore` depends only on GRDB and
+   Yams.
 2. **Core code gets time and ids from injected seams**, never from `Date()`,
    `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
    exception with `// guard:allow-nondeterminism <reason>`.
 3. **Tests never wait on the wall clock.** That means no `sleep`, `Task.sleep` or
-   `asyncAfter`; use the fake clock. Enforced by `check_test_waits.py`.
+   `asyncAfter`; use the fake clock. This covers `Tests/` and `SiltaTestSupport`.
+   Enforced by `check_test_waits.py`.
 4. **Code comments don't refer to plans, phases, milestones or review rounds.**
    Enforced by `check_no_plan_refs.py`.
 5. **No crashes or hidden state in shipped code.** That means:
@@ -70,6 +73,10 @@ through. Fix the change, or propose a decision first.
 8. **Agent-facing output is a contract.** This covers `silta guide` text, `--json`
    shapes, error codes and exit codes. They change only together with their golden
    tests and an agent-experience review (spec §16, §20, §21; D16).
+9. **Test support stays out of production.** Only test targets depend on
+   `SiltaTestSupport`, no product exposes it, and nothing depends on the `silta`
+   executable: CLI tests run the built binary. Enforced by `check_package_graph.py`
+   (D23).
 
 ## Never
 

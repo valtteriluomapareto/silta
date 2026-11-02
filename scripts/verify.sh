@@ -38,7 +38,8 @@ export SILTA_HOME
 trap 'rm -rf "$SILTA_HOME"' EXIT
 
 step "build (warnings as errors)"
-swift build --build-tests -Xswiftc -warnings-as-errors
+# Dependencies come only from Package.resolved (D18): fail instead of re-resolving.
+swift build --build-tests --only-use-versions-from-resolved-file -Xswiftc -warnings-as-errors
 
 step "test"
 if [[ "$mode" == full ]]; then

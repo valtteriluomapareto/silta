@@ -24,6 +24,7 @@ import check_core_hygiene  # noqa: E402
 import check_docs_links  # noqa: E402
 import check_no_plan_refs  # noqa: E402
 import check_package_features  # noqa: E402
+import check_package_graph  # noqa: E402
 import check_plans_board  # noqa: E402
 import check_test_waits  # noqa: E402
 import check_try_optional  # noqa: E402
@@ -184,6 +185,11 @@ class TestWaitsTests(GuardTestCase):
         self.tree.write("Tests/Stress/A.swift", "usleep(100) // guard:allow-wait real process race\n")
         self.assertEqual(check_test_waits.check(self.tree.root), [])
 
+    def test_test_support_is_covered(self) -> None:
+        self.tree.write("Sources/SiltaTestSupport/Runner.swift", "Thread.sleep(forTimeInterval: 1)\n")
+        self.tree.write("Sources/silta/Main.swift", "Thread.sleep(forTimeInterval: 1)\n")
+        self.assertEqual(len(check_test_waits.check(self.tree.root)), 1)
+
 
 class NoPlanRefsTests(GuardTestCase):
     def test_stable_references_pass(self) -> None:
@@ -278,6 +284,74 @@ class PackageFeaturesTests(GuardTestCase):
         self.tree.write("Package.swift", self.SETTINGS + self.TARGETS
                         + 'let x: [SwiftSetting] = [.enableExperimentalFeature("Embedded")]  // guard:allow-experimental D30\n')
         self.assertEqual(check_package_features.check(self.tree.root), [])
+
+
+class PackageGraphTests(GuardTestCase):
+    PACKAGE = (
+        "let package = Package(\n"
+        "  name: \"silta\",\n"
+        "  products: [.executable(name: \"silta\", targets: [\"silta\"]), .library(name: \"SiltaCore\", targets: [\"SiltaCore\"])],\n"
+        "  dependencies: [.package(url: \"https://example.com/GRDB.swift.git\", exact: \"7.0.0\")],\n"
+        "  targets: [\n"
+        "    .target(name: \"SiltaCore\", dependencies: [\n"
+        "      .product(name: \"GRDB\", package: \"GRDB.swift\"),\n"
+        "      .product(name: \"Yams\", package: \"Yams\"),\n"
+        "    ], swiftSettings: s),\n"
+        "    .executableTarget(name: \"silta\", dependencies: [\"SiltaCore\",\n"
+        "      .product(name: \"ArgumentParser\", package: \"swift-argument-parser\")], swiftSettings: s),\n"
+        "    .target(name: \"SiltaTestSupport\", dependencies: [\"SiltaCore\"], swiftSettings: s),\n"
+        "    .testTarget(name: \"siltaTests\", dependencies: [\"SiltaCore\", \"SiltaTestSupport\"]),\n"
+        "  ]\n"
+        ")\n"
+    )
+
+    def test_no_package_yet_passes(self) -> None:
+        self.assertEqual(check_package_graph.check(self.tree.root), [])
+
+    def test_clean_graph_passes(self) -> None:
+        self.tree.write("Package.swift", self.PACKAGE)
+        self.assertEqual(check_package_graph.check(self.tree.root), [])
+
+    def test_production_target_on_test_support_fails(self) -> None:
+        self.tree.write("Package.swift", self.PACKAGE.replace('[\"SiltaCore\",\n', '[\"SiltaCore\", .target(name: \"SiltaTestSupport\"),\n'))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
+    def test_core_dependency_outside_the_allowlist_fails(self) -> None:
+        cli = '.product(name: \"ArgumentParser\", package: \"swift-argument-parser\"),\n'
+        self.tree.write("Package.swift", self.PACKAGE.replace('    ], swiftSettings: s),\n', "      " + cli + '    ], swiftSettings: s),\n', 1))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
+    def test_dependencies_in_a_variable_fail(self) -> None:
+        self.tree.write("Package.swift", "let coreDeps: [Target.Dependency] = []\n" + self.PACKAGE.replace(
+            '.target(name: \"SiltaCore\", dependencies: [\n', '.target(name: \"SiltaCore\", dependencies: coreDeps + [\n'))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
+    def test_dependencies_extended_after_the_literal_fail(self) -> None:
+        self.tree.write("Package.swift", "let extra: [Target.Dependency] = []\n" + self.PACKAGE.replace(
+            '    ], swiftSettings: s),\n', '    ] + extra, swiftSettings: s),\n', 1))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
+    def test_missing_core_target_fails(self) -> None:
+        self.tree.write("Package.swift", self.PACKAGE.replace('name: \"SiltaCore\", dependencies: [\n', 'name: \"Core\", dependencies: [\n'))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
+    def test_product_exposing_test_support_fails(self) -> None:
+        self.tree.write("Package.swift", self.PACKAGE.replace(
+            '  dependencies: [.package(',
+            '  products: [.library(name: \"Support\", targets: [\"SiltaTestSupport\"])],\n  dependencies: [.package('))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
+    def test_test_target_on_the_cli_fails(self) -> None:
+        self.tree.write("Package.swift", self.PACKAGE.replace(
+            '[\"SiltaCore\", \"SiltaTestSupport\"]', '[\"silta\", \"SiltaCore\", \"SiltaTestSupport\"]'))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
+    def test_commented_out_dependency_passes(self) -> None:
+        self.tree.write("Package.swift", self.PACKAGE.replace(
+            '      .product(name: \"Yams\", package: \"Yams\"),\n',
+            '      .product(name: \"Yams\", package: \"Yams\"),\n      // \"SiltaTestSupport\", \"ArgumentParser\"\n',
+        ))
+        self.assertEqual(check_package_graph.check(self.tree.root), [])
 
 
 class RunnerTests(unittest.TestCase):

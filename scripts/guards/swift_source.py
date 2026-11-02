@@ -15,11 +15,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def split_swift(text: str) -> tuple[str, list[tuple[int, str]]]:
+def split_swift(
+    text: str, strings: list[tuple[int, str]] | None = None
+) -> tuple[str, list[tuple[int, str]]]:
     """Return (code, comments).
 
     `code` has the same length and line breaks as `text`, with comment and string
     contents replaced by spaces. `comments` is a list of (line number, comment text).
+    If `strings` is given, each string literal is appended to it as (offset in `text`,
+    literal including its quotes).
     """
     code: list[str] = []
     comments: list[tuple[int, str]] = []
@@ -74,6 +78,8 @@ def split_swift(text: str) -> tuple[str, list[tuple[int, str]]]:
                     break
                 j += 1
             chunk = text[start:j]
+            if strings is not None:
+                strings.append((start, chunk))
             code.append(blank(chunk))
             line += chunk.count("\n")
             i = j

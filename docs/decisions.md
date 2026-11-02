@@ -78,6 +78,13 @@ They're summarised here so every decision has one index.
   - GitHub Actions are pinned by commit SHA.
   - Builds treat warnings as errors, and lint runs in `--strict` mode.
   - A test run with zero tests fails.
+  - **↳ update 2026-11-02:** Xcode 27.1, the same build (27A9275) locally and in CI.
+    CI runs on GitHub's `xcode-27` image, which is a public preview. If that image
+    breaks, the fallback is `macos-26` with Xcode 26.6, which reports the same Swift 7
+    feature list (D29).
+  - **↳ update 2026-11-02:** Swift package dependencies are pinned with `exact:`, and
+    `Package.resolved` is committed. `scripts/verify.sh` builds only from the resolved
+    file, so a manifest change without a matching resolve fails.
 - **D19: Branch and merge flow.**
   - Branches are `<agent>/<slice>-<slug>`, squash-merged on green CI.
   - Until the first code lands, documentation changes may be committed directly to
@@ -140,8 +147,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     `ExistentialAny`, `InternalImportsByDefault`, `MemberImportVisibility`,
     `InferIsolatedConformances`, `NonisolatedNonsendingByDefault`,
     `ImmutableWeakCaptures`.
-  - This is the list the pinned toolchain (Swift 6.4, Xcode 26.6) reports as enabled
-    in Swift 7 mode.
+  - This is the list the pinned toolchain (Swift 6.4, Xcode 27.1; D18) reports as
+    enabled in Swift 7 mode (`swiftc -print-supported-features`).
   - New stable APIs are allowed case by case.
   - Experimental features need a decision.
   - Switching language mode is its own planned change.
