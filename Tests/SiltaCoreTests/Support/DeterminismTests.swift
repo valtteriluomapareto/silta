@@ -3,6 +3,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.timeLimit(.minutes(1)))
 struct DeterminismTests {
   private let start = Date(timeIntervalSince1970: 1_700_000_000)
 
@@ -194,6 +195,56 @@ struct DeterminismTests {
     #expect(
       try SeededIDGenerator(seed: 0).next(at: Date(timeIntervalSince1970: 0.0006))
         .hasPrefix("0000000001"))
+  }
+
+  @Test func explicitModeCannotEnableOverridesAtTheRealHome() throws {
+    try withScratchDirectory { scratch in
+      let user = scratch.appending(path: "user")
+      let real = user.appending(path: ".silta")
+      try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+      let alias = scratch.appending(path: "alias")
+      try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: real)
+      withKnownIssue("#3: explicit mode enables overrides at the real home") {
+        for path in [nil, real.path, alias.path] {
+          var values = ["SILTA_NOW": "2023-11-14T22:13:20.123Z", "SILTA_ID_SEED": "0"]
+          values["SILTA_HOME"] = path
+          let env = try SiltaEnvironment.system(environment: values, userHome: user,
+            deterministic: true)
+          #expect(env.clock is SystemClock)
+          #expect(env.ids is SystemIDGenerator)
+        }
+      }
+    }
+  }
+
+  @Test func defaultTemporaryRootsAreUsedWithoutInjection() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "isolated")
+      let user = scratch.appending(path: "user")
+      let env = try SiltaEnvironment.system(environment: ["SILTA_HOME": home.path,
+        "SILTA_NOW": "2023-11-14T22:13:20.123Z"], userHome: user)
+      try #require(env.clock is IncrementingClock)
+      #expect(env.clock.now() == start.addingTimeInterval(0.123))
+      let root = FileManager.default.temporaryDirectory
+      let sibling = root.deletingLastPathComponent().appending(path: root.lastPathComponent + "-sibling")
+      let other = try SiltaEnvironment.system(environment: ["SILTA_HOME": sibling.path,
+        "SILTA_NOW": "2023-11-14T22:13:20.123Z"], userHome: user)
+      #expect(other.clock is SystemClock)
+    }
+  }
+
+  @Test func nonCanonicalUTCOverridesAreRejected() throws {
+    try withScratchDirectory { scratch in
+      withKnownIssue("#3: noncanonical and offset timestamps are accepted") {
+        for raw in ["2023-11-14T22:13:20Z", "2023-11-14T22:13:20.123+02:00",
+          "2023-11-14T22:13:20.123+00:00", "2023-11-14T22:13:20.1234Z"] {
+          #expect(throws: (any Error).self) {
+            try SiltaEnvironment.system(environment: ["SILTA_HOME": scratch.appending(path: "data").path,
+              "SILTA_NOW": raw], userHome: scratch, deterministic: true)
+          }
+        }
+      }
+    }
   }
 
 }

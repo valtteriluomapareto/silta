@@ -55,4 +55,20 @@ struct LogTests {
       #expect(throws: (any Error).self) { try SystemLog(directory: output).record(entry) }
     }
   }
+  @Test func failedLogWriteCannotFailASuccessfulCommand() throws {
+    try withScratchDirectory { scratch in
+      let file = scratch.appending(path: "not-a-directory")
+      try Data().write(to: file)
+      let result = CommandOutput(text: "done", data: "done")
+      withKnownIssue("#3: a diagnostic write can fail an already committed command") {
+        do {
+          try SystemLog(directory: file).record(entry)
+        } catch {
+          Issue.record("Log.record must not throw")
+        }
+      }
+      #expect(OutputRouter.render(.success(result), mode: OutputMode(json: false)).exitCode == 0)
+    }
+  }
+
 }

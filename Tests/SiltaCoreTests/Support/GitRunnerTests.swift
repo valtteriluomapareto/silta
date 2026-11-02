@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.timeLimit(.minutes(1)))
 struct GitRunnerTests {
   @Test(arguments: [false, true]) func gitContract(scripted: Bool) async throws {
     try await withScratchDirectory { scratch in
