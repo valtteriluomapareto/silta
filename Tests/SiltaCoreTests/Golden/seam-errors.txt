@@ -1,8 +1,8 @@
 ## invalidHome (exit 1)
 error: SILTA_HOME must be an absolute, resolvable directory path. [invalid]
-next: unset SILTA_HOME
+next: printf '%s\n' "$SILTA_HOME"
 next: silta --help
-{"error":{"code":"invalid","message":"SILTA_HOME must be an absolute, resolvable directory path.","next":["unset SILTA_HOME","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"SILTA_HOME must be an absolute, resolvable directory path.","next":["printf '%s\\n' \"$SILTA_HOME\"","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 
 ## invalidNow (exit 1)
 error: SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format. [invalid]
