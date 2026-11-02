@@ -18,4 +18,8 @@ package final class IncrementingClock: Clock {
       return start.addingTimeInterval(Double(count) / 1000)
     }
   }
+  /// Advances the deterministic timeline without a wall-clock wait.
+  package func wait(milliseconds: UInt64) {
+    reads.withLock { $0 += milliseconds }
+  }
 }

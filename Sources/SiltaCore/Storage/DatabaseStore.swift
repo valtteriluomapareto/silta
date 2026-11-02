@@ -12,13 +12,18 @@ package final class DatabaseStore: Sendable {
   private let home: URL
   private let clock: any Clock
   private let ids: any IDGenerator
+  private let jitter: @Sendable () -> UInt64
   private let writer = Mutex<DatabaseQueue?>(nil)
 
   /// Configures the fixed database/backup locations without opening or creating files.
-  package init(home: URL, clock: any Clock, ids: any IDGenerator) {
+  package init(
+    home: URL, clock: any Clock, ids: any IDGenerator,
+    jitter: @escaping @Sendable () -> UInt64 = { UInt64.random(in: 10...50) }
+  ) {
     self.home = home
     self.clock = clock
     self.ids = ids
+    self.jitter = jitter
     path = home.appending(path: "silta.db").path
   }
 
@@ -66,6 +71,46 @@ package final class DatabaseStore: Sendable {
         }
         cached = queue
       }
+    } catch {
+      throw StorageError.mapped(error)
+    }
+  }
+
+  /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most three times.
+  /// The closure must perform database-only work: a rolled-back attempt can run again.
+  /// Checks writer compatibility and completes the required daily snapshot before calling the body.
+  package func write<T>(_ body: (StorageTransaction) throws -> T) throws -> T {
+    do {
+      try initialize()
+      guard let queue = writer.withLock({ $0 }) else { throw StorageError.unavailable }
+      let backup = StorageBackup(home: home, ids: ids)
+      let result = try withStorageRetry(clock: clock, jitter: jitter) {
+        try queue.write { db in
+          let version = try Int.fetchOne(
+            db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
+          guard let version else { throw StorageError.unavailable }
+          guard version <= Self.writerVersion else { throw StorageError.schemaTooNew }
+          // WAL lock acquisition alone does not prove the main file is writable.
+          guard FileManager.default.isWritableFile(atPath: path) else {
+            throw StorageError.unavailable
+          }
+          let timestamp = clock.now()
+          let day = String(timestamp.formatted(.iso8601).prefix(10))
+          let previous = try String.fetchOne(
+            db, sql: "SELECT value FROM meta WHERE key='last_backup_day'")
+          guard let previous else { throw StorageError.unavailable }
+          if previous != day {
+            _ = try backup.snapshot(name: "silta-\(day).db", at: timestamp, reuseExisting: true)
+            try db.execute(
+              sql: "UPDATE meta SET value=? WHERE key='last_backup_day'", arguments: [day])
+          }
+          return try body(StorageTransaction(database: db))
+        }
+      }
+      try? backup.prune()  // best-effort retention cannot invalidate a committed write
+      return result
+    } catch let error as any CodedError {
+      throw error
     } catch {
       throw StorageError.mapped(error)
     }

@@ -183,4 +183,5 @@ private struct PausingClock: SiltaCore.Clock {
     release.wait()
     return StorageSchemaTests.instant
   }
+  func wait(milliseconds: UInt64) {}
 }

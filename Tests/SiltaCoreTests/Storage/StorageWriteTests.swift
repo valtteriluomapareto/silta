@@ -22,7 +22,9 @@ struct StorageWriteTests {
   }
 
   static func meta(_ store: DatabaseStore, _ key: String) throws -> String? {
-    try store.read { try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key=?", arguments: [key]) }
+    try store.read {
+      try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key=?", arguments: [key])
+    }
   }
 
   @Test func writerUsesImmediateAndRequiredPragmas() throws {
@@ -32,12 +34,16 @@ struct StorageWriteTests {
       let statements = Mutex<[String]>([])
       try store.write { transaction in
         let db = transaction.database
-        #expect(try Int.fetchOne(db, sql: "PRAGMA foreign_keys") == 1)
-        #expect(try Int.fetchOne(db, sql: "PRAGMA busy_timeout") == 5000)
+        let foreignKeys = try Int.fetchOne(db, sql: "PRAGMA foreign_keys")
+        #expect(foreignKeys == 1)
+        let busyTimeout = try Int.fetchOne(db, sql: "PRAGMA busy_timeout")
+        #expect(busyTimeout == 5000)
         db.trace { event in statements.withLock { $0.append(event.description) } }
       }
       try store.write { _ in () }
-      #expect(statements.withLock { $0.contains("BEGIN IMMEDIATE TRANSACTION") })
+      #expect(
+        statements.withLock { $0.filter { $0.hasPrefix("BEGIN ") } }
+          == ["BEGIN IMMEDIATE TRANSACTION"])
     }
   }
 
@@ -45,14 +51,19 @@ struct StorageWriteTests {
     try withScratchDirectory { home in
       let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
       try store.write { _ in () }
-      let backups = try FileManager.default.contentsOfDirectory(atPath: home.appending(path: "backups").path)
+      let backups = try FileManager.default.contentsOfDirectory(
+        atPath: home.appending(path: "backups").path)
       let external = try DatabaseQueue(path: store.path)
-      try external.write { try $0.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'") }
+      try external.write {
+        try $0.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
+      }
       var called = false
       #expect(throws: StorageError.schemaTooNew) { try store.write { _ in called = true } }
       #expect(!called)
       #expect(try Self.meta(store, "change_seq") == "0")
-      #expect(try FileManager.default.contentsOfDirectory(atPath: home.appending(path: "backups").path) == backups)
+      #expect(
+        try FileManager.default.contentsOfDirectory(atPath: home.appending(path: "backups").path)
+          == backups)
     }
   }
 
@@ -81,9 +92,12 @@ struct StorageWriteTests {
       #expect(abs(clock.now().timeIntervalSince(StorageSchemaTests.instant) - 0.021) < 0.000001)
       #expect(try Self.meta(store, "change_seq") == "1")
       try store.read { db in
-        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM workspace") == 1)
-        #expect(try Int.fetchOne(db, sql: "SELECT next FROM seq_counter") == 2)
-        #expect(try Int.fetchOne(db, sql: "SELECT seq FROM change_log") == 1)
+        let workspaceCount = try Int.fetchOne(db, sql: "SELECT count(*) FROM workspace")
+        #expect(workspaceCount == 1)
+        let nextSequence = try Int.fetchOne(db, sql: "SELECT next FROM seq_counter")
+        #expect(nextSequence == 2)
+        let loggedSequence = try Int.fetchOne(db, sql: "SELECT seq FROM change_log")
+        #expect(loggedSequence == 1)
       }
     }
   }
@@ -96,7 +110,9 @@ struct StorageWriteTests {
       let external = try DatabaseQueue(path: store.path)
       var called = false
       try external.write { _ in
-        #expect(throws: StorageError.busy) { try store.write { _ in called = true } }
+        do {
+          #expect(throws: StorageError.busy) { try store.write { _ in called = true } }
+        }
       }
       #expect(!called)
       #expect(abs(clock.now().timeIntervalSince(StorageSchemaTests.instant) - 0.021) < 0.000001)
@@ -122,6 +138,22 @@ struct StorageWriteTests {
     }
   }
 
+  @Test func callerCodedErrorIsPreserved() throws {
+    try withScratchDirectory { home in
+      let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
+      var attempts = 0
+      do {
+        #expect(throws: SeamError.invalidTimestamp) {
+          try store.write { _ in
+            attempts += 1
+            throw SeamError.invalidTimestamp
+          }
+        }
+        #expect(attempts == 1)
+      }
+    }
+  }
+
   @Test func dailySnapshotIsPreWriteOncePerUTCDayAndSurvivesReopen() throws {
     try withScratchDirectory { home in
       let clock = FakeClock(now: StorageSchemaTests.instant)
@@ -130,7 +162,8 @@ struct StorageWriteTests {
       let file = home.appending(path: "backups/silta-2023-11-14.db")
       let original = try Data(contentsOf: file)
       let snapshot = try DatabaseQueue(path: file.path)
-      #expect(try snapshot.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
+      #expect(
+        try snapshot.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
       let reopened = Self.make(home, clock: clock, seed: 1)
       #expect(try reopened.write { try Self.insert($0, uid: "acme-two") } == 2)
       #expect(try Data(contentsOf: file) == original)
@@ -146,7 +179,8 @@ struct StorageWriteTests {
     try withScratchDirectory { home in
       let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
       try store.initialize()
-      try FileManager.default.createDirectory(at: home.appending(path: "backups/silta-2023-11-14.db"), withIntermediateDirectories: false)
+      try FileManager.default.createDirectory(
+        at: home.appending(path: "backups/silta-2023-11-14.db"), withIntermediateDirectories: false)
       var called = false
       #expect(throws: StorageError.backupFailed) { try store.write { _ in called = true } }
       #expect(!called)
@@ -157,15 +191,20 @@ struct StorageWriteTests {
 
   @Test func concurrentStoresShareOnePreWriteSnapshot() throws {
     try withScratchDirectory { home in
-      let stores = (0..<2).map { Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant), seed: UInt64($0)) }
+      let stores = (0..<2).map {
+        Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant), seed: UInt64($0))
+      }
       let failures = Mutex<[String]>([])
       DispatchQueue.concurrentPerform(iterations: 2) { index in
-        do { _ = try stores[index].write { try Self.insert($0, uid: "acme-\(index)") } }
-        catch { failures.withLock { $0.append(String(describing: error)) } }
+        do { _ = try stores[index].write { try Self.insert($0, uid: "acme-\(index)") } } catch {
+          failures.withLock { $0.append(String(describing: error)) }
+        }
       }
       #expect(failures.withLock { $0.isEmpty }, "\(failures.withLock { $0 })")
-      let snapshot = try DatabaseQueue(path: home.appending(path: "backups/silta-2023-11-14.db").path)
-      #expect(try snapshot.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
+      let snapshot = try DatabaseQueue(
+        path: home.appending(path: "backups/silta-2023-11-14.db").path)
+      #expect(
+        try snapshot.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
       #expect(try Self.meta(stores[0], "change_seq") == "2")
       #expect(try Self.meta(stores[0], "last_backup_day") == "2023-11-14")
     }
@@ -175,19 +214,26 @@ struct StorageWriteTests {
     try withScratchDirectory { home in
       let database = home.appending(path: "silta.db")
       do { try StorageSchemaTests.store(home).initialize() }
-      let files = try FileManager.default.contentsOfDirectory(atPath: home.appending(path: "backups").path)
+      let files = try FileManager.default.contentsOfDirectory(
+        atPath: home.appending(path: "backups").path)
       try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: database.path)
       try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: home.path)
       defer {
-        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: home.path) // restores scratch permissions
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: database.path) // restores scratch permissions
+        try? FileManager.default.setAttributes(
+          [.posixPermissions: 0o700], ofItemAtPath: home.path)  // restores scratch permissions
+        try? FileManager.default.setAttributes(
+          [.posixPermissions: 0o600], ofItemAtPath: database.path)  // restores scratch permissions
       }
       let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant), seed: 2)
-      #expect(throws: StorageError.unavailable) { try store.write { try Self.insert($0, uid: "acme-refused") } }
+      #expect(throws: StorageError.unavailable) {
+        try store.write { try Self.insert($0, uid: "acme-refused") }
+      }
       #expect(try Self.meta(store, "change_seq") == "0")
       #expect(try Self.meta(store, "last_backup_day") == "")
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
-      #expect(try FileManager.default.contentsOfDirectory(atPath: home.appending(path: "backups").path) == files)
+      let after = try FileManager.default.contentsOfDirectory(
+        atPath: home.appending(path: "backups").path)
+      #expect(after.sorted() == files.sorted())
     }
   }
 }
