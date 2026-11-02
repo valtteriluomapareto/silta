@@ -18,6 +18,7 @@ from pathlib import Path
 GUARDS_DIR = Path(__file__).resolve().parents[1] / "guards"
 sys.path.insert(0, str(GUARDS_DIR))
 
+import check_coded_errors  # noqa: E402
 import check_core_boundary  # noqa: E402
 import check_core_determinism  # noqa: E402
 import check_core_hygiene  # noqa: E402
@@ -132,6 +133,32 @@ class CoreHygieneTests(GuardTestCase):
     def test_cli_may_print(self) -> None:
         self.tree.write("Sources/silta/Main.swift", "print(1)\nvar x = 0\n")
         self.assertEqual(check_core_hygiene.check(self.tree.root), [])
+
+
+class CodedErrorsTests(GuardTestCase):
+    def test_coded_errors_pass(self) -> None:
+        self.tree.write(
+            "Sources/SiltaCore/A.swift",
+            "enum TaskError: CodedError {}\nstruct B: Equatable, CodedError {}\n"
+            "protocol AreaError: CodedError {}\nenum C: AreaError {}\n// enum D: Error {}\n"
+            "let s = \"enum E: Error {\"\nstruct ErrorBox: Sendable {}\nenum F: MyError {}\n",
+        )
+        self.assertEqual(check_coded_errors.check(self.tree.root), [])
+
+    def test_plain_errors_fail(self) -> None:
+        self.tree.write(
+            "Sources/SiltaCore/A.swift",
+            "private enum HomeError: Error { case bad }\nstruct B: Sendable, Swift.Error {}\n"
+            "final class C: LocalizedError {}\nactor D: Error {}\nextension E: Error {}\n"
+            "protocol AreaError: Error {}\n",
+        )
+        self.tree.write("Sources/silta/Main.swift", "enum CLIError: Error {}\n")
+        self.assertEqual(len(check_coded_errors.check(self.tree.root)), 7)
+
+    def test_marker_and_test_support_pass(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift", "public protocol CodedError: Error {}  // guard:allow-error root\n")
+        self.tree.write("Sources/SiltaTestSupport/A.swift", "struct ScriptError: Error {}\n")
+        self.assertEqual(check_coded_errors.check(self.tree.root), [])
 
 
 class TryOptionalTests(GuardTestCase):

@@ -1,6 +1,6 @@
 # Coding guidelines
 
-How Swift code in this repo is written. Each rule cites its decision (D21–D29 in
+How Swift code in this repo is written. Each rule cites its decision (D21–D30 in
 [`decisions.md`](decisions.md)) and says how it's enforced:
 - **guard:** checked by `scripts/run-guards.sh`
 - **lint:** checked by SwiftLint
@@ -61,6 +61,12 @@ quietly diverge.
 - **Per-area error enums** (`StorageError`, `LocationError`, `TaskError`, …)
   conform to `CodedError`, which provides `code`, `exitCode`, `message`, `next` and
   optionally `retryAfter`, matching the §16 table.
+  - In `SiltaCore` and `silta`, no type conforms to `Error` directly: it conforms to
+    `CodedError`, so every error that can reach the caller has a code, a message and
+    a `next` command (guard: `check_coded_errors.py`). An error that never leaves its
+    file carries `// guard:allow-error <reason>`.
+  - Register each new type in `ErrorReachabilityTests` and take its codes off
+    `notYetProduced`.
   - A golden test proves every case maps to a code in the table, and that every code
     in the table is reachable.
 - **Plain `throws` by default.** Use typed throws (`throws(StorageError)`) only in
@@ -213,3 +219,28 @@ written first. The Tester reviewer checks it.
   that restate the code.
 - References to `spec §n` and `D#` are welcome. History, plans and review rounds are
   not (guard, AGENTS.md).
+
+## 9. Simplicity (D30)
+
+Write the smallest code the acceptance tests and the spec need. Generality costs
+review time now and blocks change later, and a later slice knows its needs better
+than a guess made today (review: Pragmatism checks this first).
+
+- **No parameter, option, protocol or type without a caller or test that needs it
+  now.** "A later slice might" isn't a caller. Name the slice in the PR instead.
+- **No validation of cases that can't happen.** Check what callers or the
+  environment can actually send. Don't range-check a constant, or make an `init`
+  throw to guard values only tests pass.
+- **Parse exactly the format the spec defines**, and check it by round-trip (parse,
+  format, compare) rather than with a regex plus a second parser.
+- **No wrapper types that only forward.** Use the wrapped type. A `Fake…` holds
+  state a test sets; if it doesn't, it isn't needed.
+- **One initializer per concept.** Default arguments over overloads.
+- **No magic defaults inferred from arguments** (e.g. a timeout guessed from the
+  first word). Make the caller say it.
+- **Prefer the platform** (Foundation, Synchronization, ArgumentParser) over a
+  hand-rolled mechanism, unless a test shows the platform falls short.
+- **Spec edits state the contract,** not the implementation: what a caller can rely
+  on, not how the code gets there.
+- **When a choice isn't covered by the spec or the issue, pick the simplest option**
+  and say so in the PR, rather than building in options for both.
