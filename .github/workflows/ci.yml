@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: macos-26
+    runs-on: xcode-27   # GitHub public-preview image with Xcode 27.1 (D18)
     timeout-minutes: 45
     steps:
       - name: Check out repository

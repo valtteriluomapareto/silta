@@ -7,7 +7,7 @@ This covers setup, commands and the merge workflow. Agents should start with
 
 | Tool | Version | Where it's pinned |
 |---|---|---|
-| Xcode / Swift | Xcode 26.6 (Swift 6.x) | [`.xcode-version`](.xcode-version) |
+| Xcode / Swift | Xcode 27.1 (Swift 6.4) | [`.xcode-version`](.xcode-version) |
 | SwiftLint | 0.65.1 | [`scripts/ci/install-swift-tools.sh`](scripts/ci/install-swift-tools.sh) |
 | swift-format | 603.0.0 | same |
 | Python | system `python3` | used only by the guard scripts |
