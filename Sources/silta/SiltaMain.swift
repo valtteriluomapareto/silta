@@ -15,6 +15,33 @@ enum SiltaMain {
 
   static func run(_ arguments: [String]) -> Rendered {
     let mode = outputMode(arguments)
+    let flags = Set(arguments.prefix { $0 != "--" })
+    do {
+      let environment = try SiltaEnvironment.system(
+        environment: ProcessInfo.processInfo.environment,
+        deterministic: flags.contains("--deterministic"),
+        verbose: flags.contains("--verbose") ? .standardError : nil)
+      let timestamp = environment.clock.now()
+      let rendered = execute(
+        arguments, context: CommandContext(mode: mode, environment: environment))
+      let milliseconds = max(0, Int(environment.clock.now().timeIntervalSince(timestamp) * 1000))
+      var entry = LogEntry(
+        timestamp: timestamp, command: commandPath(arguments),
+        actor: "agent:unknown", exitCode: rendered.exitCode, milliseconds: milliseconds)
+      entry.errorCode = rendered.errorCode
+      entry.warnings = rendered.warningCodes
+      entry.flags = ["--json", "--quiet", "--deterministic", "--verbose", "--help", "--version"]
+        .filter { flags.contains($0) }
+      environment.log.record(entry)
+      return rendered
+    } catch {
+      return OutputRouter.render(.failure(error), mode: mode)
+    }
+  }
+
+  /// Parses and executes using the environment already assembled by the command boundary.
+  static func execute(_ arguments: [String], context: CommandContext) -> Rendered {
+    let mode = context.mode
     var command: any ParsableCommand
     do {
       command = try SiltaCommand.parseAsRoot(arguments)
@@ -30,7 +57,6 @@ enum SiltaMain {
         return parseFailure(error, arguments: arguments, mode: mode)
       }
     }
-    let context = CommandContext(mode: mode)
     return OutputRouter.render(Result { try outputCommand.execute(context) }, mode: mode)
   }
 

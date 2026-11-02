@@ -34,7 +34,8 @@ package struct SiltaEnvironment: Sendable {
     environment: [String: String],
     userHome: URL? = nil,
     temporaryRoots: [URL]? = nil,
-    deterministic: Bool = false
+    deterministic: Bool = false,
+    verbose: FileHandle? = nil
   ) throws -> SiltaEnvironment {
     let home = try SiltaHome.resolve(
       environment: environment, userHome: userHome, temporaryRoots: temporaryRoots,
@@ -68,6 +69,6 @@ package struct SiltaEnvironment: Sendable {
       db: DatabaseStore(
         home: home.url, clock: clock, ids: ids,
         jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) }),
-      log: SystemLog(directory: home.url.appending(path: "log")))
+      log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose))
   }
 }

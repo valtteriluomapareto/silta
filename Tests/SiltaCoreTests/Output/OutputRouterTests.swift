@@ -89,7 +89,7 @@ struct OutputRouterTests {
       OutputRouter.render(.success(output), mode: text)
         == Rendered(
           stdout: "done\n", stderr: "warning: origin/x is behind [ref_stale]\n", exitCode: 0,
-          errorCode: nil))
+          errorCode: nil, warningCodes: ["ref_stale"]))
   }
 
   @Test func quietHidesSuccessTextButNotWarnings() {
@@ -97,7 +97,9 @@ struct OutputRouterTests {
       text: "done\n", data: Payload(), warnings: [OutputWarning(code: "w", message: "careful")])
     #expect(
       OutputRouter.render(.success(output), mode: OutputMode(json: false, quiet: true))
-        == Rendered(stdout: "", stderr: "warning: careful [w]\n", exitCode: 0, errorCode: nil))
+        == Rendered(
+          stdout: "", stderr: "warning: careful [w]\n", exitCode: 0, errorCode: nil,
+          warningCodes: ["w"]))
   }
 
   @Test(arguments: [false, true])
@@ -109,7 +111,7 @@ struct OutputRouterTests {
         == Rendered(
           stdout: #"{"data":{"count":2,"name":"ä/b"},"ok":true,"schema":1,"#
             + #""warnings":[{"code":"w","message":"careful"}]}"# + "\n",
-          stderr: "", exitCode: 0, errorCode: nil))
+          stderr: "", exitCode: 0, errorCode: nil, warningCodes: ["w"]))
   }
 
   @Test func emptySuccessTextPrintsNothing() {

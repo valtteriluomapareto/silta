@@ -9,3 +9,7 @@ steps:
     expect:
       exit: 0
       json: {ok: true, data.commands.0.name: silta schema}
+  - args: [schema]
+    expect: {exit: 0, stdout: schema.txt}
+  - args: [schema, nope, --json]
+    expect: {exit: 1, code: invalid}

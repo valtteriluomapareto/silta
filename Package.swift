@@ -58,7 +58,9 @@ let package = Package(
     ),
     .testTarget(
       name: "siltaTests",
-      dependencies: ["SiltaCore", "SiltaTestSupport"],
+      dependencies: [
+        "SiltaCore", "SiltaTestSupport", .product(name: "Yams", package: "Yams"),
+      ],
       exclude: ["Golden"],
       swiftSettings: swiftSettings
     ),

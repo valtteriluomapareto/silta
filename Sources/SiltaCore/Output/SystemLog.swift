@@ -3,7 +3,7 @@ package import Foundation
 import Synchronization
 
 /// File sink selected by the CLI: daily JSONL and optional verbose mirroring.
-/// Retention and command lifecycle aggregation belong to the command boundary.
+/// Keeps fourteen UTC days using the command timestamp.
 package final class SystemLog: Log {
   private let directory: URL
   private let verbose: FileHandle?
@@ -39,6 +39,22 @@ package final class SystemLog: Log {
       let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
       try handle.write(contentsOf: data)
       try verbose?.write(contentsOf: data)
+      try prune(at: entry.timestamp)
     }
   }
+  private func prune(at timestamp: Date) throws {
+    let oldest = String(timestamp.addingTimeInterval(-13 * 86400).formatted(.iso8601).prefix(10))
+    let files = try FileManager.default.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+    for file in files where file.lastPathComponent < oldest + ".jsonl" {
+      guard file.lastPathComponent.wholeMatch(of: /[0-9]{4}-[0-9]{2}-[0-9]{2}\.jsonl/) != nil else {
+        continue
+      }
+      let values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+      if values.isRegularFile == true && values.isSymbolicLink != true {
+        try FileManager.default.removeItem(at: file)
+      }
+    }
+  }
+
 }
