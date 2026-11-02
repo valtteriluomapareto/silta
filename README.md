@@ -16,7 +16,13 @@ repos.
 
 ## Status
 
-Design phase. The draft spec is in [`docs/spec.md`](docs/spec.md).
+Design phase. The draft spec is in [`docs/spec.md`](docs/spec.md), and the first
+milestone is planned in [`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md).
+
+## Contributing
+
+Agents start at [`AGENTS.md`](AGENTS.md); humans at [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Everything runs through `scripts/verify.sh`.
 
 ## License
 

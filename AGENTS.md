@@ -1,0 +1,106 @@
+# AGENTS.md
+
+Guidance for AI coding agents (Claude Code, Codex, OpenCode, …) working in this
+repository. This file is the single source of truth; `CLAUDE.md` only points here.
+When this file and a linked document disagree, fix one of them in the same change.
+Don't leave the contradiction in place.
+
+## What this repo is
+
+Silta is a local context hub and backlog for coding agents: a Swift core library
+(`SiltaCore`), a CLI (`silta`) that agents call through their shell, and later a
+macOS app. The design is in [`docs/spec.md`](docs/spec.md). **Status: pre-code.** The
+first milestone (M1) is broken into slices in
+[`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md).
+
+## Where to find what
+
+| Doing this… | Read this |
+|---|---|
+| Understanding the product or a behaviour | [`docs/spec.md`](docs/spec.md); the section numbers (§n) are stable |
+| Checking why something is the way it is | [`docs/decisions.md`](docs/decisions.md) (D1, D2, …) |
+| Picking up work | [`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md): take a slice whose dependencies are done |
+| Writing or updating a plan | [`docs/plans/README.md`](docs/plans/README.md) and [`_template.md`](docs/plans/_template.md) |
+| Building, testing, linting, merging | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| Reviewing a plan or an implementation | [`skills/persona-review/SKILL.md`](skills/persona-review/SKILL.md) |
+| Finding any other doc | [`docs/README.md`](docs/README.md) |
+
+## Verify ladder
+
+Run the cheapest step that covers your change, and go by the exit code. Don't parse
+verbose output.
+
+| Change | Run |
+|---|---|
+| Markdown only | `scripts/run-guards.sh` (link check, plans board) |
+| Swift code | `scripts/verify.sh quick` (guards, lint, build with warnings as errors, tests) |
+| Storage, concurrency, location, agent-facing output | `scripts/verify.sh full` (adds stress and scenario tiers) |
+| A guard script | `python3 -B -m unittest discover -s scripts/tests` (self-tests) |
+
+Before saying something works, state which step you ran and what it doesn't prove.
+
+## Hard invariants
+
+Each invariant names the guard that enforces it. Don't weaken a guard to get a change
+through. Fix the change, or propose a decision first.
+
+1. **`SiltaCore` imports no UI or CLI frameworks.** That means no AppKit, SwiftUI,
+   UIKit, Cocoa or ArgumentParser. Enforced by `check_core_boundary.py`.
+2. **Core code gets time and ids from injected seams**, never from `Date()`,
+   `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
+   exception with `// guard:allow-nondeterminism <reason>`.
+3. **Tests never wait on the wall clock.** That means no `sleep`, `Task.sleep` or
+   `asyncAfter`; use the fake clock. Enforced by `check_test_waits.py`.
+4. **Code comments don't refer to plans, phases, milestones or review rounds.**
+   Enforced by `check_no_plan_refs.py`.
+5. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
+6. **The plans board in `docs/README.md` mirrors `docs/plans/` one-to-one.** Enforced
+   by `check_plans_board.py`.
+7. **Agent-facing output is a contract.** This covers `silta guide` text, `--json`
+   shapes, error codes and exit codes. They change only together with their golden
+   tests and an agent-experience review (spec §16, §20, §21; D16).
+
+## Never
+
+- Run anything against your real `~/.silta`. Tests and scripts set `SILTA_HOME` to a
+  temporary directory.
+- Edit a migration that has shipped. Add a new one.
+- Regenerate golden files to make a failing test pass without understanding why.
+  Golden updates are deliberate and called out in the commit.
+- Add fixtures, fake knobs or JSON fields only to make a scenario pass.
+- Commit customer or employer data: real repo names, hosts, people or notes. Examples
+  use the fictional Acme workspace.
+- Push, force-push, change GitHub settings or create issues and releases unless the
+  user asks.
+
+## Writing code comments and docs
+
+- Describe what the code must do and why, as it is now. Don't narrate how it got
+  there ("previously", "now uses", "after the refactor").
+- No plan or review references in code ("phase 2", "review item 4", "per M1").
+  Stable ids like `D12` or `spec §7` are fine in docs.
+- Prefer one place for each fact. Link instead of copying.
+
+## Workflow
+
+1. **Pick a slice** from the active plan whose dependencies are done. Each slice is
+   independent enough for its own worktree and branch.
+2. **Plan before coding** for anything beyond a small fix. Put the plan in the slice's
+   issue, or in `docs/plans/` if it's larger. Then get it reviewed with
+   `skills/persona-review`.
+3. **Tests first.** A bug fix includes a test that fails on the base commit.
+4. **Implement, verify, then get a review again** with the same reviewers.
+5. **Commit** in imperative sentence case, under ~72 characters, ending with the
+   `Co-Authored-By` trailer the harness gives you.
+   - Branches are `<agent>/<slice>-<slug>`, e.g. `claude/s4-output-contract`.
+   - Until the first code lands, small documentation changes may go straight to
+     `main`.
+6. **Report honestly:** what changed, what you verified, and what remains unverified.
+
+## Parallel agents and worktrees
+
+- Claude worktrees live in `.claude/worktrees/` (git-ignored). Codex worktrees live
+  outside the repo.
+- Two agents never work on the same slice. Shared files are `Package.swift`, the
+  migrations and the error-code table, so coordinate through the plan before
+  touching them.

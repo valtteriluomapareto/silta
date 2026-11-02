@@ -37,7 +37,7 @@ models act most reliably on ordinary words.
 | Bundle id, OSLog subsystem | `com.valtteriluoma.silta` |
 | Change notification | `com.valtteriluoma.silta.changed` |
 | Data directory | `~/.silta` (override: `SILTA_HOME`) |
-| Environment variables | `SILTA_HOME`, `SILTA_ACTOR`, `SILTA_SESSION` |
+| Environment variables | `SILTA_HOME`, `SILTA_ACTOR`, `SILTA_SESSION`; for tests and scenarios: `SILTA_NOW`, `SILTA_ID_SEED`, `SILTA_SLOW_TESTS` (§20.1) |
 | Copyright | Valtteri Luoma |
 
 Silta is a personal project. The data of the projects you use it on stays in your
@@ -103,6 +103,9 @@ in product repos.
 | D8 | **Truth and derived data in separate files.** `silta.db` holds plain tables only, including every human decision. `index.db` holds search, caches and verify results, and can be deleted at any time. | The search engine and indexes can change without risk to data people wrote. |
 | D9 | **Every write has an actor with a session.** Unknown callers count as agents, never as humans (§11). | Claims, inboxes, rate limits and human-only rules depend on it. |
 | D10 | **Agent-facing contracts are tested like an API**: the guide, `--json` shapes, exit codes and error hints, across harnesses and models (§21). | Agents are the main users. Regressions in wording are real bugs. |
+
+Later decisions (D11 onward: technology, the scripting contract, and process) and any
+updates to these ten are in [`decisions.md`](decisions.md).
 
 ## 4.1 Architecture
 
@@ -872,9 +875,10 @@ silta/
   Sources/silta/               # ArgumentParser commands, renderers, actor detection
   Tests/SiltaCoreTests/        # unit + fixture git repos
   Tests/siltaTests/            # golden CLI output + exit codes
-  Tests/Stress/              # multi-process tests driving the built binary
-  Evals/                     # agent evaluation suite (§21)
-  Scripts/check-core-boundary.sh, Scripts/make-fixtures.sh
+  Tests/Stress/                # multi-process tests driving the built binary
+  Tests/Scenarios/             # scenario files run in a temporary SILTA_HOME (§20.1)
+  Evals/                       # agent evaluation suite (§21)
+  scripts/                     # run-guards.sh, verify.sh, lint-*.sh, make-fixtures.sh, guards/, ci/
   App/SiltaApp.xcodeproj       # M5
 ```
 
@@ -948,13 +952,54 @@ revision before the write.
 | Tier | What | Notes |
 |---|---|---|
 | Unit | Ref parser, actor matrix, secret corpus, brief budgeting, plan parser, `where` scoring | Fake `Clock` and fake `GitRunner` |
-| Fixture git | `Scripts/make-fixtures.sh` builds repos | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
+| Fixture git | `scripts/make-fixtures.sh` builds repos | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
 | Multi-process stress | Spawns the built binary | 20 writers × 200 adds: no duplicate seq. N concurrent `start`: exactly one claimer. Concurrent first-open migration. Concurrent lazy index: one indexer. p95 latency recorded. |
 | Golden CLI | Text, `--json` and exit codes for every command | Includes every error code's message and `next` hint |
 | Round-trip | Property test | `export(restore(export(db))) == export(db)`, byte-identical. Tampered and partial trees are rejected with nothing written. |
 | Migration | From a checked-in DB of every previous schema | Plus an older binary meeting a newer schema → exit 9 |
+| Scenarios | §20.1 | Run in `scripts/verify.sh full` and weekly in CI |
 | Agent evals | §21 | Run on demand and before releases, not in every CI run |
-| CI guards | Boundary script, golden diff, no network in tests | — |
+| Repository guards | `scripts/run-guards.sh`: core boundary, core determinism, test waits, plan references in comments, docs links, plans board | Each guard has a self-test that plants a violation (D17) |
+
+### 20.1 Scripting contract and scenario runs
+
+The question this answers: **can an agent prove from the command line that a change
+works?** The CLI already is the control interface, so this is about making it
+scriptable and deterministic (D13).
+
+- **Streams:** data goes to stdout, either text or the `--json` envelope (§16).
+  Progress, logs and warnings meant for humans go to stderr. A command never mixes
+  the two.
+- **Discovery:** `silta schema [--json]` prints every command, its flags, its
+  `--json` data shape, and the error-code table. It's generated from code, so it
+  can't drift. Its output is a golden test.
+- **Determinism:** these are honoured only when `SILTA_HOME` is a temporary
+  directory, or with `--deterministic`, so they can't affect real data.
+  - `SILTA_NOW=<ISO-8601>` fixes the clock, which advances 1 ms per read.
+  - `SILTA_ID_SEED=<n>` makes ULIDs reproducible.
+  - Together with a fixed `SILTA_HOME` and the fixture repos, the same commands give
+    byte-identical output.
+- **Scenarios:** `Tests/Scenarios/<name>.yaml` files. A runner executes each one in
+  a fresh temporary `SILTA_HOME`. A scenario lists:
+  - the fixture repos and seed data
+  - a sequence of `silta` invocations with actor, session and cwd
+  - expectations: exit code, error code, JSON paths, and file and database state
+    afterwards
+- **Evidence:** every run writes `artifacts/scenarios/<run>/<scenario>/` (git-ignored)
+  with:
+  - `summary.json`: commit, dirty flag, binary version, scenario sha256, pass or fail
+  - `transcript.ndjson`: every invocation with stdout, stderr, exit code and timing
+  - `failure.md` first when something failed: the first failing expectation, the
+    command, and the diff
+
+  CI keeps the directory as an artifact on failure.
+- **Rules:**
+  - A scenario that has never been seen to fail is not evidence. When adding one,
+    break the code once and watch it fail.
+  - A bug fix comes with a scenario or test that fails on the base commit.
+  - Never add fixtures, fake knobs or JSON fields just to make a scenario pass.
+  - Scenarios are required when a change involves at least two of: concurrency,
+    time, a restart, a git fault, or an agent session handover.
 
 ## 21. Agent evaluation across harnesses and models
 

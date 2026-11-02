@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(swift build:*)",
+      "Bash(swift test:*)",
+      "Bash(swift package describe:*)",
+      "Bash(swift package resolve:*)",
+      "Bash(swift package show-dependencies:*)",
+      "Bash(scripts/run-guards.sh:*)",
+      "Bash(scripts/verify.sh:*)",
+      "Bash(scripts/lint-check.sh:*)",
+      "Bash(scripts/lint-fix.sh:*)",
+      "Bash(python3 -B -m unittest discover:*)",
+      "Bash(python3 -B scripts/guards/:*)",
+      "Bash(swift-format lint:*)",
+      "Bash(swiftlint lint:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -rf ~/.silta:*)"
+    ]
+  }
+}

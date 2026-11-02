@@ -1,0 +1,37 @@
+# SwiftLint: a small, deliberate rule set. CI runs with --strict, so every warning
+# fails the build. Formatting is swift-format's job (.swift-format.json); rules that
+# fight it are disabled here.
+
+included:
+  - Sources
+  - Tests
+excluded:
+  - .build
+  - .swiftpm
+
+reporter: "xcode"
+
+disabled_rules:
+  - trailing_comma        # swift-format decides
+  - opening_brace         # swift-format decides
+  - todo                  # TODOs are allowed; plan references are caught by scripts/guards
+
+line_length:
+  warning: 100            # matches swift-format's lineLength
+  error: 140
+  ignores_comments: true
+  ignores_urls: true
+  ignores_interpolated_strings: true
+
+identifier_name:
+  min_length:
+    warning: 1            # short names such as id, db, i are fine in context
+
+type_name:
+  max_length:
+    warning: 60
+    error: 80
+
+file_length:
+  warning: 600
+  error: 1000

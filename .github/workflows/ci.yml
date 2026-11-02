@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"   # weekly full run (slow tiers) on main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select Xcode
+        run: bash scripts/ci/select-xcode.sh
+
+      - name: Install pinned Swift tools
+        run: bash scripts/ci/install-swift-tools.sh
+
+      - name: Verify
+        run: |
+          mode=quick
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then mode=full; fi
+          scripts/verify.sh "$mode"
