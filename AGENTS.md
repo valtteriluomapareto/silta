@@ -46,12 +46,15 @@ Each invariant names the guard that enforces it. Don't weaken a guard to get a c
 through. Fix the change, or propose a decision first.
 
 1. **`SiltaCore` imports no UI or CLI frameworks.** That means no AppKit, SwiftUI,
-   UIKit, Cocoa or ArgumentParser. Enforced by `check_core_boundary.py`.
+   UIKit, Cocoa or ArgumentParser. Enforced by `check_core_boundary.py`, and in
+   `Package.swift` by `check_package_graph.py`: `SiltaCore` depends only on GRDB and
+   Yams, and only test targets depend on `SiltaTestSupport` (D23).
 2. **Core code gets time and ids from injected seams**, never from `Date()`,
    `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
    exception with `// guard:allow-nondeterminism <reason>`.
 3. **Tests never wait on the wall clock.** That means no `sleep`, `Task.sleep` or
-   `asyncAfter`; use the fake clock. Enforced by `check_test_waits.py`.
+   `asyncAfter`; use the fake clock. This covers `Tests/` and `SiltaTestSupport`.
+   Enforced by `check_test_waits.py`.
 4. **Code comments don't refer to plans, phases, milestones or review rounds.**
    Enforced by `check_no_plan_refs.py`.
 5. **No crashes or hidden state in shipped code.** That means:
