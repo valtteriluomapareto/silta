@@ -98,6 +98,24 @@ struct SecretGuardTests {
     #expect(SecretGuard.redacted(input) == "doc:[REDACTED:aws_key]")
   }
 
+  @Test func distinctiveAzureTokenInsideARefIsRejected() {
+    let token = String(repeating: "Q", count: 75) + "AZ" + "DO" + "Q1234"
+    let input = "doc:" + token
+    withKnownIssue("#8: new-format Azure token was exempted as a ref") {
+      #expect(SecretGuard.redacted(input) == "doc:[REDACTED:azure_pat]")
+    }
+  }
+
+  @Test func base64URLTokensCanEndWithHyphens() {
+    let google = "AI" + "za" + String(repeating: "Q", count: 34) + "-"
+    let jwt = "ey" + "JhY21lIjp0cnVlfQ.eyJhY21lIjoxfQ." + String(repeating: "q", count: 31) + "-"
+    for (rule, token) in [("google", google), ("jwt", jwt)] {
+      withKnownIssue("#8: word boundaries miss or truncate base64url suffix punctuation") {
+        #expect(SecretGuard.redacted(token) == "[REDACTED:\(rule)]")
+      }
+    }
+  }
+
   @Test func checksumRejectsPatternOnlyFalsePositives() {
     for (number, control) in [(2, "S"), (3, "T"), (10, "1"), (31, "P"), (299, "B"), (899, "P")] {
       let valid = "010101" + "A" + String(format: "%03d", number) + control
