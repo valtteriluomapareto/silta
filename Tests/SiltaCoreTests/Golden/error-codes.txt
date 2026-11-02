@@ -1,0 +1,77 @@
+## usage (exit 1)
+error: sample usage error [usage]
+next: silta sample --next
+{"error":{"code":"usage","message":"sample usage error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## invalid (exit 1)
+error: sample invalid error [invalid]
+next: silta sample --next
+{"error":{"code":"invalid","message":"sample invalid error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## not_found (exit 2)
+error: sample not_found error [not_found]
+next: silta sample --next
+{"error":{"code":"not_found","message":"sample not_found error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## unregistered (exit 2)
+error: sample unregistered error [unregistered]
+next: silta sample --next
+{"error":{"code":"unregistered","message":"sample unregistered error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## human_only (exit 3)
+error: sample human_only error [human_only]
+ask human: silta sample --next
+{"error":{"code":"human_only","message":"sample human_only error","next":["silta sample --next"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## read_only_promoted (exit 3)
+error: sample read_only_promoted error [read_only_promoted]
+ask human: silta sample --next
+{"error":{"code":"read_only_promoted","message":"sample read_only_promoted error","next":["silta sample --next"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## ambiguous_location (exit 4)
+error: sample ambiguous_location error [ambiguous_location]
+next: silta sample --next
+{"error":{"code":"ambiguous_location","message":"sample ambiguous_location error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## busy (exit 5)
+error: sample busy error [busy]
+retry after: 3s
+next: silta sample --next
+{"error":{"code":"busy","message":"sample busy error","next":["silta sample --next"],"next_by":"agent","retry_after_s":3},"ok":false,"schema":1,"warnings":[]}
+
+## conflict (exit 6)
+error: sample conflict error [conflict]
+next: silta sample --next
+{"error":{"code":"conflict","message":"sample conflict error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## claimed (exit 6)
+error: sample claimed error [claimed]
+next: silta sample --next
+{"error":{"code":"claimed","message":"sample claimed error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## stale_rev (exit 6)
+error: sample stale_rev error [stale_rev]
+next: silta sample --next
+{"error":{"code":"stale_rev","message":"sample stale_rev error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## lease_taken (exit 6)
+error: sample lease_taken error [lease_taken]
+next: silta sample --next
+{"error":{"code":"lease_taken","message":"sample lease_taken error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## gate (exit 7)
+error: sample gate error [gate]
+next: silta sample --next
+{"error":{"code":"gate","message":"sample gate error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## rate_limited (exit 8)
+error: sample rate_limited error [rate_limited]
+retry after: 240s
+next: silta sample --next
+{"error":{"code":"rate_limited","message":"sample rate_limited error","next":["silta sample --next"],"next_by":"agent","retry_after_s":240},"ok":false,"schema":1,"warnings":[]}
+
+## env (exit 9)
+error: sample env error [env]
+ask human: silta sample --next
+{"error":{"code":"env","message":"sample env error","next":["silta sample --next"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
