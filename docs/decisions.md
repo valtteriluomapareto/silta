@@ -89,6 +89,14 @@ They're summarised here so every decision has one index.
   - Branches are `<agent>/<slice>-<slug>`, squash-merged on green CI.
   - Until the first code lands, documentation changes may be committed directly to
     `main`.
+  - **↳ update 2026-11-02:** code has landed, so every change goes through a pull
+    request. A ruleset on `main` enforces this:
+    - no direct pushes, force pushes or deletion
+    - squash merges only, with linear history
+    - the `verify` check must pass on a branch that is up to date with `main`
+    - no approvals are required and nobody bypasses the rules
+
+    Auto-merge is on, so a PR can be queued to merge when CI passes.
 - **D20: Dogfood from DF0** (spec §22.1).
   - GitHub issues are the public record, and Silta is the working layer. Tasks link
     their issue with a `url:` link and are not promoted, so they stay editable.
