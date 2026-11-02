@@ -1010,9 +1010,25 @@ scriptable and deterministic (D13).
 - **Streams:** data goes to stdout, either text or the `--json` envelope (§16).
   Progress, logs and warnings meant for humans go to stderr. A command never mixes
   the two.
-- **Discovery:** `silta schema [--json]` prints every command, its flags, its
-  `--json` data shape, and the error-code table. It's generated from code, so it
+- **Discovery:** `silta schema [<command>…] [--json]` prints every command, its flags,
+  its `--json` data shape, and the error-code table. It's generated from code, so it
   can't drift. Its output is a golden test.
+  - With a command name (`silta schema task ls`), only that command; an unknown name
+    is `not_found` with `next: silta schema`.
+  - `--json` data:
+    `{"commands":[{"abstract","arguments":[A],"data":S,"name"}],"envelope":1,"errors":[{"agent_should","code","exit","next_by"}],"global_arguments":[A]}`.
+    An argument `A` is `{"help"?,"kind":"flag"|"option"|"positional","names":[…],"repeating","required","value_name"?}`;
+    a positional's name is `<value_name>`. `--help` and `--version` aren't listed.
+  - A shape `S` is `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`,
+    `{"optional":S}` or `{"object":{"<field>":S,…}}`. An object has exactly its
+    fields; an `optional` field may be absent. Every command's `--json` data matches
+    the shape `schema` publishes for it, and the golden CLI tests check that.
+  - Text: per command, its name, its abstract, one line per argument
+    (`<names>[ <value_name>]  required|optional[, repeating]: <help>`) and
+    `--json data: <shape>`, with a blank line between commands; then the global flags
+    in the same form under `global flags:`; then one line per error code under
+    `error codes:` (`<code>  exit <n>, next by <agent|human>: <agent should>`). An
+    option's line adds ` <value_name>` after its names.
 - **Determinism:** these are honoured only when `SILTA_HOME` is a temporary
   directory, or with `--deterministic`, so they can't affect real data.
   - `SILTA_NOW=<ISO-8601>` fixes the clock, which advances 1 ms per read.

@@ -24,17 +24,21 @@ extension InternalError: ErrorExamples {
   static var examples: [InternalError] { [InternalError(Sample())] }
 }
 
+extension SchemaError: ErrorExamples {
+  static var examples: [SchemaError] { [.unknownCommand("silta nope")] }
+}
+
 /// Proves every `ErrorCode` is produced by some error type (spec §16, D22).
 ///
 /// This shows each code is *mapped* by a registered type's examples, not that a
 /// command raises it at run time; the CLI goldens cover that per command.
 struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
-  static let registry: [any ErrorExamples.Type] = [UsageError.self, InternalError.self]
+  static let registry: [any ErrorExamples.Type] = [UsageError.self, InternalError.self, SchemaError.self]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
-    .notFound, .unregistered, .humanOnly, .readOnlyPromoted, .ambiguousLocation, .busy,
+    .unregistered, .humanOnly, .readOnlyPromoted, .ambiguousLocation, .busy,
     .conflict, .claimed, .staleRev, .leaseTaken, .gate, .rateLimited,
   ]
 
