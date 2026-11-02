@@ -25,6 +25,7 @@ run_guard test-waits python3 -B scripts/guards/check_test_waits.py
 run_guard no-plan-refs python3 -B scripts/guards/check_no_plan_refs.py
 run_guard core-hygiene python3 -B scripts/guards/check_core_hygiene.py
 run_guard try-optional python3 -B scripts/guards/check_try_optional.py
+run_guard coded-errors python3 -B scripts/guards/check_coded_errors.py
 run_guard package-features python3 -B scripts/guards/check_package_features.py
 run_guard package-graph python3 -B scripts/guards/check_package_graph.py
 run_guard docs-links python3 -B scripts/guards/check_docs_links.py

@@ -160,4 +160,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - New stable APIs are allowed case by case.
   - Experimental features need a decision.
   - Switching language mode is its own planned change.
+- **D30: Simplicity.** Write the smallest code the acceptance tests and the spec
+  need: no options, types or validation without a current caller, and no generality
+  for later slices. Pragmatism reviews over-engineering first. Errors that can reach
+  the caller are always `CodedError` (guard).
 

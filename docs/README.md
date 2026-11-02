@@ -9,6 +9,7 @@
 | How Swift code is written | [`coding-guidelines.md`](coding-guidelines.md) |
 | Plans and their lifecycle | [`plans/README.md`](plans/README.md) |
 | Reviewing plans and implementations | [`../skills/persona-review/SKILL.md`](../skills/persona-review/SKILL.md) |
+| Briefing another agent on a slice | [`agent-brief.md`](agent-brief.md) |
 
 ## What to update when behaviour changes
 

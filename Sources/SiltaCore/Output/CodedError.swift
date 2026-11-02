@@ -1,7 +1,7 @@
 /// An error Silta reports to its caller: a code from the spec §16 table, a one-line
 /// message, and the commands to run next. Each area defines its own conforming enum
 /// (D22).
-public protocol CodedError: Error, Sendable {
+public protocol CodedError: Error, Sendable {  // guard:allow-error the root error type
   /// The table code; it decides the exit status.
   var code: ErrorCode { get }
   /// What happened, on one line, written for an agent.

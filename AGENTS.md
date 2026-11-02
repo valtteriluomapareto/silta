@@ -24,6 +24,7 @@ progress; the package skeleton builds.** The first milestone (M1) is broken into
 | Writing or updating a plan | [`docs/plans/README.md`](docs/plans/README.md) and [`_template.md`](docs/plans/_template.md) |
 | Building, testing, linting, merging | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | Reviewing a plan or an implementation | [`skills/persona-review/SKILL.md`](skills/persona-review/SKILL.md) |
+| Handing a slice to another agent | [`docs/agent-brief.md`](docs/agent-brief.md) |
 | Finding any other doc | [`docs/README.md`](docs/README.md) |
 
 ## Verify ladder
@@ -65,6 +66,8 @@ through. Fix the change, or propose a decision first.
 
    Enforced by `check_core_hygiene.py`, `check_try_optional.py` and SwiftLint
    (D21, D22, D27).
+   Errors in `SiltaCore` and the CLI conform to `CodedError`, never to `Error`
+   directly; enforced by `check_coded_errors.py` (D22, D30).
    `Package.swift` enables the six Swift 7 upcoming features on every target and no
    experimental features without a decision; enforced by `check_package_features.py` (D29).
 6. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
