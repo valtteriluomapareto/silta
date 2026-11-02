@@ -8,7 +8,7 @@ package enum NextBy: String, Sendable {
 
 /// The error-code table (spec §16): every error Silta reports carries one of these
 /// codes, and the code alone decides the process exit status.
-public enum ErrorCode: String, CaseIterable, Sendable {
+public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
   /// The call doesn't parse.
   case usage
   /// The call parses, but a value is out of range or inconsistent.

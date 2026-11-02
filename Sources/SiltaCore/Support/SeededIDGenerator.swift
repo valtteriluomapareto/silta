@@ -7,8 +7,12 @@ import Synchronization
 package final class SeededIDGenerator: IDGenerator {
   private let state: Mutex<UInt64>
 
-  package init(seed: UInt64) { state = Mutex(seed) }
+  /// Starts the reproducible entropy sequence at `seed`.
+  package init(seed: UInt64) {
+    state = Mutex(seed)
+  }
 
+  /// Creates the next ULID, using the supplied instant.
   package func next(at timestamp: Date) throws -> String {
     try state.withLock { state in
       var entropy: [UInt8] = []

@@ -1038,19 +1038,16 @@ scriptable and deterministic (D13).
     `--json data: <shape>`, with a blank line between commands. Both then list the
     global flags under `global flags:` and one line per error code under
     `error codes:` (`<code>  exit <n>, next by <agent|human>: <agent should>`).
-- **Determinism:** these are honoured only when `SILTA_HOME` is a temporary
-  directory, or with `--deterministic`, so they can't affect real data.
-  - `SILTA_NOW=<ISO-8601>` fixes the clock, which advances 1 ms per read.
+- **Determinism:** these are honoured only when `SILTA_HOME` is an absolute path
+  strictly below a temporary root, or with `--deterministic`. The real home
+  (`~/.silta`) and its aliases always ignore overrides, including explicit mode,
+  so they can't affect real data.
+  - `SILTA_NOW=<YYYY-MM-DDTHH:mm:ss.SSSZ>` fixes the UTC clock, which advances 1 ms
+    per read.
   - `SILTA_ID_SEED=<n>` makes ULIDs reproducible. The seed is an unsigned 64-bit
-    decimal integer; sequences are local to a generator instance.
-  - `SILTA_HOME` must be absolute. Temporary means an explicit home strictly below
-    the OS user temporary directory or `/tmp`, after resolving symlinks and missing
-    path components. The temporary root itself, the default `~/.silta`, and aliases
-    to that default home do not automatically enable overrides. Dot path components
-    (`.` or `..`) and dangling home symlinks are rejected.
-  - Disabled overrides are ignored even when malformed. Enabled overrides reject
-    invalid seeds or timestamps; timestamps must include a date, time and timezone,
-    with optional fractional seconds.
+    decimal integer.
+  - Disabled overrides are ignored even when malformed; invalid enabled overrides
+    are rejected.
   - Together with a fixed `SILTA_HOME` and the fixture repos, the same commands give
     byte-identical output.
 - **Scenarios:** `Tests/Scenarios/<name>.yaml` files. A runner executes each one in

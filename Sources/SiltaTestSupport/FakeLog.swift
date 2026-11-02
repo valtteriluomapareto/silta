@@ -5,7 +5,14 @@ import Synchronization
 package final class FakeLog: Log {
   private let captured = Mutex<[LogEntry]>([])
 
+  /// Starts an empty log capture.
   package init() {}
-  package var entries: [LogEntry] { captured.withLock { $0 } }
-  package func record(_ entry: LogEntry) { captured.withLock { $0.append(entry) } }
+  /// Entries in recording order.
+  package var entries: [LogEntry] {
+    captured.withLock { $0 }
+  }
+  /// Captures the entry without performing I/O.
+  package func record(_ entry: LogEntry) {
+    captured.withLock { $0.append(entry) }
+  }
 }

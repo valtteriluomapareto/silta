@@ -8,8 +8,10 @@ package protocol Clock: Sendable {
 
 /// Reads the host's wall clock.
 package struct SystemClock: Clock {
+  /// Creates a system-backed provider.
   package init() {}
 
+  /// Returns the current host instant.
   package func now() -> Date {
     Date()  // guard:allow-nondeterminism the system clock is the time boundary
   }

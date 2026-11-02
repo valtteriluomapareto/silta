@@ -7,14 +7,12 @@ package protocol IDGenerator: Sendable {
   func next(at timestamp: Date) throws -> String
 }
 
-enum IDGeneratorError: Error { case invalidTimestamp }
-
 enum ULID {
   static func encode(_ timestamp: Date, entropy: [UInt8]) throws -> String {
     let seconds = timestamp.timeIntervalSince1970
     let milliseconds = (seconds * 1000).rounded()
     guard seconds.isFinite, seconds >= 0, milliseconds < 281_474_976_710_656 else {
-      throw IDGeneratorError.invalidTimestamp
+      throw SeamError.invalidTimestamp
     }
     let time = UInt64(milliseconds)
     let alphabet = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ".utf8)

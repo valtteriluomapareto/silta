@@ -6,8 +6,12 @@ package final class IncrementingClock: Clock {
   private let start: Date
   private let reads = Mutex<UInt64>(0)
 
-  package init(start: Date) { self.start = start }
+  /// Starts the sequence at the supplied instant.
+  package init(start: Date) {
+    self.start = start
+  }
 
+  /// Returns the next millisecond tick without waiting.
   package func now() -> Date {
     reads.withLock { count in
       defer { count += 1 }

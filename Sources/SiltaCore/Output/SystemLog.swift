@@ -2,7 +2,7 @@ import Darwin
 package import Foundation
 import Synchronization
 
-/// Foundation-only sink selected by the CLI: daily JSONL and optional verbose mirroring.
+/// File sink selected by the CLI: daily JSONL and optional verbose mirroring.
 /// Retention and command lifecycle aggregation belong to the command boundary.
 package final class SystemLog: Log {
   private let directory: URL
@@ -15,10 +15,16 @@ package final class SystemLog: Log {
     self.verbose = verbose
   }
 
-  package func record(_ entry: LogEntry) throws {
+  /// Appends diagnostics best effort, without changing a completed command's result.
+  package func record(_ entry: LogEntry) {
+    try? write(entry)  // best-effort diagnostics must never fail a command
+  }
+
+  private func write(_ entry: LogEntry) throws {
     try lock.withLock { _ in
       let formatter = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
       let encoder = JSONEncoder()
+      encoder.keyEncodingStrategy = .convertToSnakeCase
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
       encoder.dateEncodingStrategy = .custom { date, encoder in
         var container = encoder.singleValueContainer()

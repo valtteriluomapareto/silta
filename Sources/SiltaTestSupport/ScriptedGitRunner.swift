@@ -9,17 +9,20 @@ package final class ScriptedGitRunner: GitRunner {
   }
   private let state: Mutex<State>
 
-  package init(steps: [(GitRequest, GitResult)]) {
-    state = Mutex(State(steps: steps.map { ($0.0, .success($0.1)) }))
-  }
-
   /// Scripts spawn/capture failures as well as completed invocations.
   package init(script: [(GitRequest, Result<GitResult, any Error>)]) {
     state = Mutex(State(steps: script))
   }
-  package var requests: [GitRequest] { state.withLock { $0.requests } }
-  package var isExhausted: Bool { state.withLock { $0.steps.isEmpty } }
+  /// Every attempted request, including mismatches and scripted failures.
+  package var requests: [GitRequest] {
+    state.withLock { $0.requests }
+  }
+  /// Whether every scripted response has been consumed.
+  package var isExhausted: Bool {
+    state.withLock { $0.steps.isEmpty }
+  }
 
+  /// Consumes the next matching response or throws without consuming a mismatched step.
   package func run(_ request: GitRequest) async throws -> GitResult {
     try state.withLock { state in
       state.requests.append(request)
@@ -32,4 +35,6 @@ package final class ScriptedGitRunner: GitRunner {
   }
 }
 
-private enum ScriptError: Error { case unexpectedRequest }
+private enum ScriptError: Error {
+  case unexpectedRequest
+}

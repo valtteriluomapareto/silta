@@ -1,27 +1,42 @@
 import Darwin
 package import Foundation
 
-/// Executes an absolute git binary with isolated configuration and bounded direct-child lifetime.
+/// Executes an absolute git binary with noninteractive authentication and bounded direct-child lifetime.
 package struct SystemGitRunner: GitRunner {
   private let executable: String
+  private let environment: [String: String]
   private let killAfter: TimeInterval
 
   /// Defaults to Apple's absolute git path; no PATH search is performed.
   /// A timed-out child gets SIGTERM, then SIGKILL after `killAfter` seconds.
-  package init(executable: String = "/usr/bin/git", killAfter: TimeInterval = 0.25) throws {
-    guard executable.hasPrefix("/"), killAfter.isFinite, killAfter >= 0, killAfter <= 60 else {
-      throw GitRunnerError.invalidConfiguration
-    }
+  /// Inherits only HOME, PATH and SSH_AUTH_SOCK from the supplied environment snapshot.
+  /// Git reads the user's configuration and credentials; ambient GIT_* overrides are dropped.
+  package init(
+    executable: String = "/usr/bin/git", killAfter: TimeInterval = 0.25,
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) {
     self.executable = executable
     self.killAfter = killAfter
+    var child = [
+      "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
+      "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
+    ]
+    for key in ["HOME", "PATH", "SSH_AUTH_SOCK"] {
+      child[key] = environment[key]
+    }
+    self.environment = child
   }
 
   /// Waits on a dispatch worker, without blocking the caller's actor or cooperative executor.
   package func run(_ request: GitRequest) async throws -> GitResult {
     try await withCheckedThrowingContinuation { continuation in
       DispatchQueue.global(qos: .utility).async {
-        do { continuation.resume(returning: try execute(request)) } catch {
+        do {
+          continuation.resume(returning: try execute(request))
+        } catch let error as SeamError {
           continuation.resume(throwing: error)
+        } catch {
+          continuation.resume(throwing: SeamError.gitCapture)
         }
       }
     }
@@ -31,9 +46,10 @@ package struct SystemGitRunner: GitRunner {
   /// waits on descriptors inherited by descendants. The runner reaps the direct child;
   /// it does not manage subprocess trees created by external git helpers.
   private func execute(_ request: GitRequest) throws -> GitResult {
-    guard request.timeout.isFinite, request.timeout > 0, request.timeout <= 86_400 else {
-      throw GitRunnerError.invalidConfiguration
+    guard request.timeout.isFinite, request.timeout > 0, killAfter.isFinite, killAfter > 0 else {
+      throw SeamError.invalidGitTimeout
     }
+    guard executable.hasPrefix("/") else { throw SeamError.gitUnavailable }
     let fm = FileManager.default
     let token = UUID()  // guard:allow-nondeterminism scratch identity
     let capture = fm.temporaryDirectory.appending(path: "silta-git-\(token.uuidString)")
@@ -43,7 +59,7 @@ package struct SystemGitRunner: GitRunner {
     let errURL = capture.appending(path: "stderr")
     guard fm.createFile(atPath: outURL.path, contents: nil),
       fm.createFile(atPath: errURL.path, contents: nil)
-    else { throw GitRunnerError.captureCreationFailed }
+    else { throw SeamError.gitCapture }
     let stdout = try FileHandle(forWritingTo: outURL)
     defer { try? stdout.close() }  // best-effort close of an already captured stream
     let stderr = try FileHandle(forWritingTo: errURL)
@@ -52,18 +68,17 @@ package struct SystemGitRunner: GitRunner {
     process.executableURL = URL(filePath: executable)
     process.arguments = request.arguments
     process.currentDirectoryURL = request.directory
-    process.environment = [
-      "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "HOME": "/var/empty",
-      "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
-      "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
-      "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
-    ]
+    process.environment = environment
     process.standardInput = FileHandle.nullDevice
     process.standardOutput = stdout
     process.standardError = stderr
     let exited = DispatchSemaphore(value: 0)
     process.terminationHandler = { _ in exited.signal() }
-    try process.run()
+    do {
+      try process.run()
+    } catch {
+      throw SeamError.gitUnavailable
+    }
     let termination: GitTermination
     if exited.wait(timeout: .now() + request.timeout) == .timedOut {
       process.terminate()
@@ -82,5 +97,3 @@ package struct SystemGitRunner: GitRunner {
       termination: termination, stdout: Data(contentsOf: outURL), stderr: Data(contentsOf: errURL))
   }
 }
-
-private enum GitRunnerError: Error { case invalidConfiguration, captureCreationFailed }

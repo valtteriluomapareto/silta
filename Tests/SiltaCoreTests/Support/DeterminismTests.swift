@@ -26,7 +26,7 @@ struct DeterminismTests {
   }
 
   @Test(arguments: [false, true]) func idContract(fake: Bool) throws {
-    let ids: any IDGenerator = fake ? FakeIDGenerator(seed: 42) : SystemIDGenerator()
+    let ids: any IDGenerator = fake ? SeededIDGenerator(seed: 42) : SystemIDGenerator()
     let values = try (0..<1000).map { _ in try ids.next(at: start) }
     #expect(Set(values).count == values.count)
     #expect(values.allSatisfy { $0.wholeMatch(of: /[0-7][0-9A-HJKMNP-TV-Z]{25}/) != nil })
@@ -35,7 +35,7 @@ struct DeterminismTests {
     let maximum = Date(timeIntervalSince1970: Double(0xFFFF_FFFF_FFFF as UInt64) / 1000)
     #expect(try ids.next(at: maximum).hasPrefix("7ZZZZZZZZZ"))
     for seconds in [-1.0, -0.0001, .infinity, .nan, Double(0x1_0000_0000_0000 as UInt64) / 1000] {
-      #expect(throws: (any Error).self) {
+      #expect(throws: SeamError.invalidTimestamp) {
         try ids.next(at: Date(timeIntervalSince1970: seconds))
       }
     }
@@ -88,7 +88,9 @@ struct DeterminismTests {
       try #require(first.clock is IncrementingClock)
       #expect(first.clock.now() == start)
       #expect(abs(first.clock.now().timeIntervalSince(start) - 0.001) < 0.000001)
-      #expect(try first.ids.next(at: start) == second.ids.next(at: start))
+      let expected = try SeededIDGenerator(seed: .max).next(at: start)
+      #expect(try first.ids.next(at: start) == expected)
+      #expect(try second.ids.next(at: start) == expected)
       #expect(!FileManager.default.fileExists(atPath: first.home.url.path))
     }
   }
@@ -119,11 +121,15 @@ struct DeterminismTests {
       for bad in ["", "bad", "-1", "18446744073709551616"] {
         #expect(throws: (any Error).self) {
           try SiltaEnvironment.system(
-            environment: [key: bad], userHome: scratch, deterministic: true)
+            environment: [key: bad, "SILTA_HOME": scratch.appending(path: "data").path],
+            userHome: scratch, deterministic: true)
         }
       }
       let env = try SiltaEnvironment.system(
-        environment: ["SILTA_NOW": "2023-11-14T22:13:20Z", "SILTA_ID_SEED": "0"],
+        environment: [
+          "SILTA_HOME": scratch.appending(path: "data").path,
+          "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0",
+        ],
         userHome: scratch, deterministic: true)
       #expect(env.clock.now() == start)
       #expect(env.ids is SeededIDGenerator)
@@ -145,7 +151,7 @@ struct DeterminismTests {
       for raw in ["2023-11-14T22:13:20Zjunk", "2023-02-30T22:13:20Z", "2023-11-14"] {
         #expect(throws: (any Error).self) {
           try SiltaEnvironment.system(
-            environment: ["SILTA_NOW": raw],
+            environment: ["SILTA_HOME": scratch.appending(path: "data").path, "SILTA_NOW": raw],
             userHome: scratch, deterministic: true)
         }
       }
@@ -204,11 +210,12 @@ struct DeterminismTests {
       try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
       let alias = scratch.appending(path: "alias")
       try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: real)
-      withKnownIssue("#3: explicit mode enables overrides at the real home") {
+      do {
         for path in [nil, real.path, alias.path] {
           var values = ["SILTA_NOW": "2023-11-14T22:13:20.123Z", "SILTA_ID_SEED": "0"]
           values["SILTA_HOME"] = path
-          let env = try SiltaEnvironment.system(environment: values, userHome: user,
+          let env = try SiltaEnvironment.system(
+            environment: values, userHome: user,
             deterministic: true)
           #expect(env.clock is SystemClock)
           #expect(env.ids is SystemIDGenerator)
@@ -221,26 +228,40 @@ struct DeterminismTests {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "isolated")
       let user = scratch.appending(path: "user")
-      let env = try SiltaEnvironment.system(environment: ["SILTA_HOME": home.path,
-        "SILTA_NOW": "2023-11-14T22:13:20.123Z"], userHome: user)
+      let env = try SiltaEnvironment.system(
+        environment: [
+          "SILTA_HOME": home.path,
+          "SILTA_NOW": "2023-11-14T22:13:20.123Z",
+        ], userHome: user)
       try #require(env.clock is IncrementingClock)
-      #expect(env.clock.now() == start.addingTimeInterval(0.123))
+      let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+      #expect(env.clock.now().formatted(format) == "2023-11-14T22:13:20.123Z")
+      #expect(env.clock.now().formatted(format) == "2023-11-14T22:13:20.124Z")
       let root = FileManager.default.temporaryDirectory
-      let sibling = root.deletingLastPathComponent().appending(path: root.lastPathComponent + "-sibling")
-      let other = try SiltaEnvironment.system(environment: ["SILTA_HOME": sibling.path,
-        "SILTA_NOW": "2023-11-14T22:13:20.123Z"], userHome: user)
+      let sibling = root.deletingLastPathComponent().appending(
+        path: root.lastPathComponent + "-sibling")
+      let other = try SiltaEnvironment.system(
+        environment: [
+          "SILTA_HOME": sibling.path,
+          "SILTA_NOW": "2023-11-14T22:13:20.123Z",
+        ], userHome: user)
       #expect(other.clock is SystemClock)
     }
   }
 
   @Test func nonCanonicalUTCOverridesAreRejected() throws {
     try withScratchDirectory { scratch in
-      withKnownIssue("#3: noncanonical and offset timestamps are accepted") {
-        for raw in ["2023-11-14T22:13:20Z", "2023-11-14T22:13:20.123+02:00",
-          "2023-11-14T22:13:20.123+00:00", "2023-11-14T22:13:20.1234Z"] {
+      do {
+        for raw in [
+          "2023-11-14T22:13:20Z", "2023-11-14T22:13:20.123+02:00",
+          "2023-11-14T22:13:20.123+00:00", "2023-11-14T22:13:20.1234Z",
+        ] {
           #expect(throws: (any Error).self) {
-            try SiltaEnvironment.system(environment: ["SILTA_HOME": scratch.appending(path: "data").path,
-              "SILTA_NOW": raw], userHome: scratch, deterministic: true)
+            try SiltaEnvironment.system(
+              environment: [
+                "SILTA_HOME": scratch.appending(path: "data").path,
+                "SILTA_NOW": raw,
+              ], userHome: scratch, deterministic: true)
           }
         }
       }

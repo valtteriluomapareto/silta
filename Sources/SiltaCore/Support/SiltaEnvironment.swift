@@ -2,10 +2,15 @@ package import Foundation
 
 /// Dependencies built once per command and explicitly passed to services.
 package struct SiltaEnvironment: Sendable {
+  /// Supplies command time.
   package let clock: any Clock
+  /// Creates persistent entity identifiers.
   package let ids: any IDGenerator
+  /// Runs git with bounded subprocess waits.
   package let git: any GitRunner
+  /// Locates every owned data file.
   package let home: SiltaHome
+  /// Records best-effort command diagnostics.
   package let log: any Log
 
   /// Assembles supplied seams without reading process globals or doing I/O.
@@ -20,7 +25,7 @@ package struct SiltaEnvironment: Sendable {
   }
 
   /// Builds system seams from an environment snapshot. Invalid enabled overrides throw;
-  /// disabled overrides are ignored, including malformed ones. No home files are created.
+  /// disabled overrides, including those at the real home, are ignored even when malformed. No home files are created.
   package static func system(
     environment: [String: String],
     userHome: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -34,44 +39,25 @@ package struct SiltaEnvironment: Sendable {
     var ids: any IDGenerator = SystemIDGenerator()
     if home.permitsDeterminism {
       if let raw = environment["SILTA_NOW"] {
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard validInstant(raw),
-          let date = fractional.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
-        else {
-          throw EnvironmentError.invalidNow
+        let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        let date: Date
+        do {
+          date = try format.parse(raw)
+        } catch {
+          throw SeamError.invalidNow
         }
+        guard date.formatted(format) == raw else { throw SeamError.invalidNow }
         clock = IncrementingClock(start: date)
       }
       if let raw = environment["SILTA_ID_SEED"] {
         guard !raw.isEmpty, raw.utf8.allSatisfy({ (48...57).contains($0) }),
           let seed = UInt64(raw)
-        else { throw EnvironmentError.invalidSeed }
+        else { throw SeamError.invalidIDSeed }
         ids = SeededIDGenerator(seed: seed)
       }
     }
-    return try SiltaEnvironment(
-      clock: clock, ids: ids, git: SystemGitRunner(), home: home,
+    return SiltaEnvironment(
+      clock: clock, ids: ids, git: SystemGitRunner(environment: environment), home: home,
       log: SystemLog(directory: home.url.appending(path: "log")))
   }
-}
-
-private enum EnvironmentError: Error { case invalidNow, invalidSeed }
-
-// Foundation accepts trailing text and normalizes impossible calendar dates.
-private func validInstant(_ raw: String) -> Bool {
-  let pattern =
-    #/
-    (\d{4})-(\d{2})-(\d{2})T
-    ([01]\d|2[0-3]):([0-5]\d):([0-5]\d)
-    (?:\.\d{1,9})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)
-    /#
-  guard let match = raw.wholeMatch(of: pattern), let year = Int(match.1),
-    let month = Int(match.2), let day = Int(match.3)
-  else { return false }
-  var calendar = Calendar(identifier: .gregorian)
-  calendar.timeZone = .gmt
-  let components = DateComponents(year: year, month: month, day: day)
-  guard let date = calendar.date(from: components) else { return false }
-  return calendar.dateComponents([.year, .month, .day], from: date) == components
 }

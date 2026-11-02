@@ -3,12 +3,16 @@ package import Foundation
 
 /// Canonical data-directory configuration. Resolution never creates or writes files.
 package struct SiltaHome: Sendable {
+  /// Canonical absolute path; resolving configuration never creates it.
   package let url: URL
+  /// Whether deterministic overrides may be used at this home.
   package let permitsDeterminism: Bool
 
   /// Resolves an absolute SILTA_HOME, defaulting to the user's `.silta` directory.
-  /// Overrides are safe only below an OS temporary root, or in explicit deterministic mode.
-  /// The default home and aliases to it are never automatically considered temporary.
+  /// Overrides require a path below an OS temporary root, or explicit deterministic mode.
+  /// The default home and aliases to it always disable overrides, including explicit mode.
+  /// Temporary roots are the OS user temp directory and `/tmp`. Dot components and
+  /// dangling symlinks are rejected; invalid paths throw `SeamError.invalidHome`.
   package static func resolve(
     environment: [String: String],
     userHome: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -17,7 +21,7 @@ package struct SiltaHome: Sendable {
   ) throws -> SiltaHome {
     let realHome = try canonicalURL(userHome.appending(path: ".silta"))
     let override = environment["SILTA_HOME"]
-    if let override, !override.hasPrefix("/") { throw HomeError.invalidPath }
+    if let override, !override.hasPrefix("/") { throw SeamError.invalidHome }
     let url = override.map { URL(filePath: $0) } ?? realHome
     let canonical = try canonicalURL(url)
     let roots = try temporaryRoots.map { try canonicalURL($0) }
@@ -27,7 +31,8 @@ package struct SiltaHome: Sendable {
         let rootPath = root.path
         return canonical.path.hasPrefix(rootPath + "/")
       }
-    return SiltaHome(url: canonical, permitsDeterminism: deterministic || isTemporary)
+    return SiltaHome(
+      url: canonical, permitsDeterminism: canonical != realHome && (deterministic || isTemporary))
   }
 }
 
@@ -35,25 +40,23 @@ package struct SiltaHome: Sendable {
 // symlink normalization treats nonexistent /private/var descendants inconsistently.
 private func canonicalURL(_ url: URL) throws -> URL {
   guard !url.path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
-    throw HomeError.invalidPath
+    throw SeamError.invalidHome
   }
   var ancestor = url
   var missing: [String] = []
   while true {
     var info = stat()
     if lstat(ancestor.path, &info) == 0 {
-      guard let resolved = realpath(ancestor.path, nil) else { throw HomeError.invalidPath }
+      guard let resolved = realpath(ancestor.path, nil) else { throw SeamError.invalidHome }
       defer { free(resolved) }
       return missing.reversed().reduce(URL(filePath: String(cString: resolved))) {
         $0.appending(path: $1)
       }
     }
-    guard errno == ENOENT, ancestor.path != "/" else { throw HomeError.invalidPath }
+    guard errno == ENOENT, ancestor.path != "/" else { throw SeamError.invalidHome }
     missing.append(ancestor.lastPathComponent)
     let parent = ancestor.deletingLastPathComponent()
-    guard parent.path != ancestor.path else { throw HomeError.invalidPath }
+    guard parent.path != ancestor.path else { throw SeamError.invalidHome }
     ancestor = parent
   }
 }
-
-private enum HomeError: Error { case invalidPath }
