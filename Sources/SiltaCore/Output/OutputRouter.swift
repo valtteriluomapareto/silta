@@ -72,13 +72,18 @@ package enum OutputRouter {
   }
 
   private static func line(_ envelope: Envelope) throws -> String {
+    try json(envelope) + "\n"
+  }
+
+  /// `value` as one line of JSON with sorted keys, the form all output uses.
+  static func json(_ value: some Encodable) throws -> String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let json = String(bytes: try encoder.encode(envelope), encoding: .utf8) else {
+    guard let json = String(bytes: try encoder.encode(value), encoding: .utf8) else {
       throw EncodingError.invalidValue(
-        envelope, .init(codingPath: [], debugDescription: "JSONEncoder produced invalid UTF-8"))
+        value, .init(codingPath: [], debugDescription: "JSONEncoder produced invalid UTF-8"))
     }
-    return json + "\n"
+    return json
   }
 
   private static func terminated(_ text: String) -> String {

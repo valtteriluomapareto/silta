@@ -1010,9 +1010,33 @@ scriptable and deterministic (D13).
 - **Streams:** data goes to stdout, either text or the `--json` envelope (§16).
   Progress, logs and warnings meant for humans go to stderr. A command never mixes
   the two.
-- **Discovery:** `silta schema [--json]` prints every command, its flags, its
-  `--json` data shape, and the error-code table. It's generated from code, so it
-  can't drift. Its output is a golden test.
+- **Discovery:** `silta schema [<command>…] [--json]` describes the commands, the
+  global flags and the error-code table. It's generated from code, so it can't drift.
+  Its output is a golden test.
+  - Without a name it's an index: each command's name and abstract only.
+  - With a name (`silta schema task ls`, a leading `silta` is optional) it gives full
+    detail for every command whose name starts with those words, so a group name
+    lists the group. A name that matches nothing is `invalid`; the message lists
+    the commands and `next` is `silta schema`.
+  - Hidden commands and arguments, `--help` and `--version` aren't listed.
+  - `--json` data:
+    `{"commands":[{"abstract","arguments"?:[A],"data"?:S,"name"}],"errors":[{"agent_should","code","exit","next_by"}],"global_arguments":[A]}`;
+    `arguments` and `data` are present only with a name. An argument `A` is
+    `{"help"?,"kind":"flag"|"option"|"positional","names":[…],"repeating","required","value_name"?}`;
+    a positional's name is `<value_name>`.
+  - A shape `S` is `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`,
+    `{"object":{"<field>":S,…}}`, or, as an object field only, `{"optional":S}`. An
+    object has exactly its fields. An optional field is absent or has its shape; it's
+    never `null`. Every command's `--json` data matches the shape `schema` publishes
+    for it: each command has a success golden, and a test checks every success
+    golden against its command's shape.
+  - Text, index: one line per command (`<name>  <abstract>`), then
+    `details: silta schema <command>`. Text, with a name: per command its name, its
+    abstract, one line per argument (`<names>[ <value_name>]  required|optional[,
+    repeating][: <help>]`, the value name for options only) and
+    `--json data: <shape>`, with a blank line between commands. Both then list the
+    global flags under `global flags:` and one line per error code under
+    `error codes:` (`<code>  exit <n>, next by <agent|human>: <agent should>`).
 - **Determinism:** these are honoured only when `SILTA_HOME` is a temporary
   directory, or with `--deterministic`, so they can't affect real data.
   - `SILTA_NOW=<ISO-8601>` fixes the clock, which advances 1 ms per read.

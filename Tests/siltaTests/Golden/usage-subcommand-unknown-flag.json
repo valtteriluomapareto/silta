@@ -1,0 +1,1 @@
+{"error":{"code":"usage","message":"Unknown option '--nope'","next":["silta schema --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

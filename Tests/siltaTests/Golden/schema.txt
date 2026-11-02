@@ -1,0 +1,23 @@
+silta schema  Describe the commands, their flags, their --json data and the error codes.
+details: silta schema <command>
+
+global flags:
+  --json  optional: Print the JSON envelope on stdout instead of text.
+  --quiet  optional: Hide success text; warnings and errors still show.
+
+error codes:
+  usage  exit 1, next by agent: Read `silta <cmd> --help` and fix the call
+  invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call
+  not_found  exit 2, next by agent: Check the ref, or carry on without silta
+  unregistered  exit 2, next by agent: Check the ref, or carry on without silta
+  human_only  exit 3, next by human: Stop; ask the human to run the printed command
+  read_only_promoted  exit 3, next by human: Stop; ask the human to run the printed command
+  ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates
+  busy  exit 5, next by agent: Retry once after a few seconds
+  conflict  exit 6, next by agent: Re-read, then decide; don't steal
+  claimed  exit 6, next by agent: Re-read, then decide; don't steal
+  stale_rev  exit 6, next by agent: Re-read, then decide; don't steal
+  lease_taken  exit 6, next by agent: Re-read, then decide; don't steal
+  gate  exit 7, next by agent: Request a review or ask the human
+  rate_limited  exit 8, next by agent: Wait for `retry_after_s`, or summarise
+  env  exit 9, next by human: Report the printed fix to the human

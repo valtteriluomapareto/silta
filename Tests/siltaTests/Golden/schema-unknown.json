@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"No command 'silta nope'; commands: silta schema","next":["silta schema"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

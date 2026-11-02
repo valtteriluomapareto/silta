@@ -48,7 +48,10 @@ let package = Package(
     ),
     .testTarget(
       name: "SiltaCoreTests",
-      dependencies: ["SiltaCore", "SiltaTestSupport"],
+      dependencies: [
+        "SiltaCore", "SiltaTestSupport",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
       exclude: ["Golden"],
       swiftSettings: swiftSettings
     ),
