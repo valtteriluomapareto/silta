@@ -175,6 +175,21 @@ struct StorageSchemaTests {
     }
   }
 
+  @Test func futureSchemaRefusalPreservesJournalMode() throws {
+    try withScratchDirectory { scratch in
+      let queue = try DatabaseQueue(path: scratch.appending(path: "silta.db").path)
+      try StorageSchema.migrator.migrate(queue)
+      try queue.write { try $0.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'") }
+      #expect(try queue.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") } == "delete")
+      #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch).initialize() }
+      try withKnownIssue("#5: refused future schema had its journal mode changed") {
+        let fresh = try DatabaseQueue(path: scratch.appending(path: "silta.db").path)
+        let mode = try fresh.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") }
+        #expect(mode == "delete")
+      }
+    }
+  }
+
   @Test func storageErrorGoldenAndPrivacy() {
     var blocks: [String] = []
     for error in StorageError.allCases {

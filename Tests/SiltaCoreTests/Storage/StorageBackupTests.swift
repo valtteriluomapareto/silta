@@ -50,6 +50,44 @@ struct StorageBackupTests {
     }
   }
 
+  @Test func migrationSnapshotCollisionIsRefused() throws {
+    try withScratchDirectory { scratch in
+      let folder = scratch.appending(path: "backups")
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+      let uid = try SeededIDGenerator(seed: 0).next(at: StorageSchemaTests.instant)
+      let file = folder.appending(path: "silta-2023-11-14-before-v1-\(uid).db")
+      let existing = try DatabaseQueue(path: file.path)
+      try existing.write { try $0.execute(sql: "CREATE TABLE acme_note(id INTEGER PRIMARY KEY)") }
+      let original = try Data(contentsOf: file)
+      withKnownIssue("#5: migration silently reused a colliding snapshot") {
+        #expect(throws: StorageError.backupFailed) { try StorageSchemaTests.store(scratch).initialize() }
+      }
+      #expect(try Data(contentsOf: file) == original)
+    }
+  }
+
+  @Test func retentionPreservesMatchingDirectoriesAndSymlinks() throws {
+    try withScratchDirectory { scratch in
+      try StorageSchemaTests.store(scratch).initialize()
+      let folder = scratch.appending(path: "backups")
+      let directory = folder.appending(path: "silta-2000-01-01.db")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+      let note = directory.appending(path: "Acme.txt")
+      try Data("Acme".utf8).write(to: note)
+      let alias = folder.appending(path: "silta-2001-01-01.db")
+      try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: note)
+      let backup = StorageBackup(home: scratch, ids: SeededIDGenerator(seed: 2))
+      for day in 1...8 {
+        _ = try backup.snapshot(name: String(format: "silta-2023-12-%02d.db", day), at: StorageSchemaTests.instant)
+      }
+      try backup.prune()
+      withKnownIssue("#5: retention removed matching directories and symlinks") {
+        #expect(FileManager.default.fileExists(atPath: note.path))
+        #expect(FileManager.default.fileExists(atPath: alias.path))
+      }
+    }
+  }
+
   @Test func requiredBackupFailurePreventsMigration() throws {
     try withScratchDirectory { scratch in
       try Data("Acme".utf8).write(to: scratch.appending(path: "backups"))
@@ -111,7 +149,7 @@ struct StorageBackupTests {
       let store = DatabaseStore(home: scratch, clock: clock, ids: SeededIDGenerator(seed: 0))
       done.enter()
       DispatchQueue.global().async {
-        defer { done.leave() }
+        defer { entered.signal(); done.leave() }
         do { try store.initialize() } catch {
           failures.withLock { $0.append(String(describing: error)) }
         }
