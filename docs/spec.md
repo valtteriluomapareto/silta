@@ -1,0 +1,1231 @@
+# Silta — local project context & backlog for agents
+
+Status: **draft v0.3** · 2026-11-02 · personal project by Valtteri Luoma · changes in Appendix C
+
+## Name
+
+*Silta* is Finnish for **bridge**. It means four things here:
+
+1. ***Komentosilta*, a ship's command bridge.**
+   - It's where the watch stands, the log is kept, the charts are read and the
+     captain signs off.
+   - Each agent session "comes onto the bridge", gets the picture, works its watch
+     and hands over.
+   - You're the captain, and the macOS app is your view of the bridge.
+2. **A bridge across space.** It connects repos and branch-apps: a mobile app ↔
+   the API branch of a platform repo ↔ a sales portal. The agent sees across without
+   leaving its side.
+3. **A bridge across time.** It connects sessions that never meet. This is
+   *vahdinvaihto*, the change of watch: handoffs, results and decisions carry the
+   work forward.
+4. **A bridge between worlds.** It connects:
+   - Finnish meeting talk and English code
+   - humans and agents
+   - Claude, Codex and OpenCode
+   - what's in your head and what's written down
+
+In documentation, the ship vocabulary is welcome: "come onto the bridge", "change of
+watch", "the log". CLI commands stay plain (`silta brief`, `silta task add`), because
+models act most reliably on ordinary words.
+
+**Identifiers** follow the personal-app scheme used by Poimi and Photo Export:
+
+| Thing | Value |
+|---|---|
+| Product / app | Silta, `Silta.app` |
+| CLI | `silta` |
+| Bundle id, OSLog subsystem | `com.valtteriluoma.silta` |
+| Change notification | `com.valtteriluoma.silta.changed` |
+| Data directory | `~/.silta` (override: `SILTA_HOME`) |
+| Environment variables | `SILTA_HOME`, `SILTA_ACTOR`, `SILTA_SESSION` |
+| Copyright | Valtteri Luoma |
+
+Silta is a personal project. The data of the projects you use it on stays in your
+local database and in exports you control. It never goes into the Silta repo, its
+fixtures or its evals. Examples in this spec use a fictional workspace, **Acme**.
+
+## 1. Problem
+
+Real project work often spans:
+- several repos, and sometimes one repo holds several *apps* on different long-lived
+  branches
+- meeting notes in a separate repo
+- knowledge about external services and release flows that lives mostly in one
+  person's head
+
+A new agent session starts blind. An agent in the Flutter app doesn't know which
+backend branch serves it, what was decided in last week's meeting, or what work is
+already planned. Today's workarounds are copy-pasting context, filling the team's tracker
+(Azure DevOps, Jira, GitHub Issues) with agent-created work items, or leaving plan files
+in product repos.
+
+## 2. Goals
+
+1. **One command gives any agent the picture** for where it's working: the task it's
+   on, the app, neighbouring apps, open work and recent decisions, within a small
+   token budget.
+2. **Docs live in the app**, not in per-project repos. One tool, many workspaces
+   (one per project or engagement).
+3. **Local backlog** that agents read and write instead of the team tracker or plan files.
+   Plans are stored *on the task*.
+4. **Read other apps' code safely**, including branch-as-app repos, without checkouts.
+5. **Link meeting notes to apps and topics**, so decisions can be found from code.
+6. Works for **Claude Code and Codex** through a plain CLI, and is **measurably
+   usable by other harnesses and models** (§21).
+7. **Tasks are discussable, like a small GitHub issue**: questions, answers, decisions,
+   handoffs, and (M2) reviews with verdicts.
+8. **Useful within 15 minutes of install**, and cheap enough to keep using.
+
+## 3. Non-goals
+
+- Not a replacement for the team's tracker. The tracker stays the record of committed
+  work; `silta` is the working layer underneath it (§8).
+- Not a general wiki or a copy of code. Docs point at code. They don't restate DTOs,
+  routes, config keys or folder layouts.
+- Never stores secrets. It stores *where* a secret lives (§18).
+- No server, no sync in v1. Single user, local machine.
+- No MCP server and no daemon (D4).
+- No reactions or social features. Discussion is for getting work done.
+- Doesn't replace repo-local `AGENTS.md`/`CLAUDE.md`. Facts about one repo stay in
+  that repo; `silta` holds what spans repos or lives outside them.
+
+## 4. Core design decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | **SQLite is the source of truth** for everything `silta` owns. Humans edit configuration as YAML (`silta ws edit`), which is validated and applied to the DB. | Relations and queries are first-class; YAML is just an editing view. |
+| D2 | **External sources are indexed, never owned.** Meeting-note folders and repo docs are read-only and re-indexed on change. | Notes stay the output of whatever produces them; repo docs stay in repos. |
+| D3 | **Deterministic export** to a text tree for backup and diff. `silta restore` replaces a workspace from it. | A `.db` file can't be diffed or reviewed; the export can. |
+| D4 | **CLI only, `--json` everywhere. No MCP server, no daemon.** | Every target harness has a shell tool. If shell-less clients ever matter, it would be a `silta mcp` stdio subcommand, never hosted in the app. |
+| D5 | **Agent writes are gated.** Unsolicited agent tasks start as `proposed`. Agent doc edits are proposed revisions. Human-only commands exist. | Prevents spam and rot by default, without blocking work the human asked for in chat (§8). |
+| D6 | **`silta` resolves "where am I"** from cwd, git branch, upstream and claimed task (§7). | Agents shouldn't need to know which branch is which app. |
+| D7 | **Code access is read-only** via `git show`/`grep`/`log` on configured refs. | No checkout means you can't edit the wrong branch. |
+| D8 | **Truth and derived data in separate files.** `silta.db` holds plain tables only, including every human decision. `index.db` holds search, caches and verify results, and can be deleted at any time. | The search engine and indexes can change without risk to data people wrote. |
+| D9 | **Every write has an actor with a session.** Unknown callers count as agents, never as humans (§11). | Claims, inboxes, rate limits and human-only rules depend on it. |
+| D10 | **Agent-facing contracts are tested like an API**: the guide, `--json` shapes, exit codes and error hints, across harnesses and models (§21). | Agents are the main users. Regressions in wording are real bugs. |
+
+## 4.1 Architecture
+
+```
+  Agent sessions (Claude Code, Codex, OpenCode…)             You
+        │ shell tool                                          │
+        ▼                                                     ▼
+  ┌────────────┐  short-lived, one process          ┌──────────────────┐
+  │  silta …     │  per command                       │  Silta.app (M5)    │
+  │  (CLI)     │  actor: agent:<tool>:<session>     │  actor: human    │
+  └─────┬──────┘                                    └────────┬─────────┘
+        └──────────────────────┬─────────────────────────────┘
+                               ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │ SiltaCore (Swift package, no UI/CLI imports)                             │
+  │  Services  Tasks · Comments/Reviews · Docs · Brief (+ rendering)       │
+  │            Search · Index · Verify · Export/Restore · Location         │
+  │  Policy    actor rules · secret guard · gates · rate limits            │
+  │  Storage   GRDB records (extensions) · DatabaseMigrator · leases       │
+  │  Adapters  GitRunner (read-only, sanitized) · NotesParser · Notifier   │
+  └──────────────┬─────────────────────────────────────┬──────────────────┘
+                 │ SQLite (WAL)                         │ git show/grep/log
+                 ▼                                      ▼
+       ~/.silta/silta.db (truth)                  ~/work/acme/* repos + worktrees
+       ~/.silta/index.db (derived)              ~/notes (indexed)
+
+  every write (from M5) → notify_post("com.valtteriluoma.silta.changed") → Silta.app refreshes
+```
+
+- **One core, thin front-ends.** All rules live in `SiltaCore`, including brief
+  rendering (text and JSON), because the hook, the CLI and the app all use it. The
+  front-ends parse input, call a service with an actor, and render the result.
+- **Engine-free domain.** Domain types don't import GRDB. Record conformances live in
+  the storage layer as extensions, which keeps a later Postgres port possible.
+- **The database is the integration point.** The CLI and the app never talk to each
+  other, and agents don't need the app running.
+- **One version.** From M5 the CLI ships inside the app bundle
+  (`Silta.app/Contents/Helpers/silta`). Every write transaction checks
+  `min_writer_version` (§17).
+- **Data directory.** `SILTA_HOME` (default `~/.silta`) relocates everything. Tests and
+  evals use it, and the real data is never touched.
+
+## 5. Concepts
+
+- **Workspace**: one project or engagement, with a task prefix (`AC`).
+- **Repo**: a local clone. Worktrees resolve to their main repo.
+- **App**: something deployable: `repo + ref (+ optional subpath)`, with an optional
+  prod ref. One repo can hold several apps. For each ref, one app is **primary**;
+  subpath apps (e.g. `crm-ui`) share a ref with a primary app.
+- **Environment, Service, Edge**:
+  - an environment is where an app is deployed (test or prod)
+  - a service is an external system
+  - an edge says which app calls which app or service
+
+  All three are edited only as YAML sections (`silta ws edit`).
+- **Topic**: a stable theme slug with aliases in any language (the glossary).
+- **Task**: a backlog item with plan, result, comments and links.
+- **Comment**: a post on a task or a doc revision. Its kind is one of `comment`,
+  `question`, `answer`, `decision` or `handoff`. Threads can be resolved.
+- **Review** (M2): a comment with a verdict on a subject (the task's diff, a plan
+  revision, or a doc revision), with line comments.
+- **Doc** (M2): a versioned markdown document owned by `silta`.
+- **Source**: a folder that is indexed: meeting notes or repo docs.
+- **Actor**: `human:<name>`, `agent:<tool>:<session>` or `agent:unknown:<session>`.
+
+### 5.1 Reference grammar
+
+One grammar everywhere: in arguments, in `--json`, and in `[[…]]` links inside
+bodies. A bare task id is accepted wherever a task is expected.
+
+| Ref | Example | Notes |
+|---|---|---|
+| Task | `AC-12` | `task:AC-12` is also accepted |
+| Comment | `AC-12/3` | the 3rd comment on AC-12 |
+| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | |
+| App, topic | `app:platform-api`, `topic:messaging` | |
+| Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
+| Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
+| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
+| Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
+| URL | `url:https://dev.azure.com/…` | |
+
+`silta help refs` prints this table. The parser has golden tests (§20).
+
+## 6. Data model
+
+Timestamps are ISO-8601 UTC with milliseconds. Ordering ties are broken by `id`.
+Time comes from an injected `Clock`. Every owned row has a `uid` (a ULID) used by
+export and restore, and kept for a future sync or Postgres move. Owned entities
+reference each other by **foreign keys**; strings appear only for external things
+(notes, code, URLs).
+
+### `silta.db` (truth)
+
+```sql
+CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  -- 'min_writer_version', 'change_seq', 'last_backup_day'
+
+CREATE TABLE workspace (
+  id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,                  -- 'acme'
+  name TEXT NOT NULL,
+  task_prefix TEXT NOT NULL UNIQUE,           -- 'AC'
+  settings TEXT NOT NULL DEFAULT '{}'         -- JSON: review_gate, archive_after_days, stale_days, rate_limit…
+);
+
+CREATE TABLE repo (
+  id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  slug TEXT NOT NULL, remote_url TEXT, default_ref TEXT,
+  UNIQUE (workspace_id, slug)
+);
+CREATE TABLE repo_path (                      -- machine-local; not exported
+  repo_id INTEGER PRIMARY KEY REFERENCES repo(id),
+  path TEXT NOT NULL UNIQUE,                  -- canonical (realpath, case-folded on case-insensitive volumes)
+  fetched_at TEXT
+);
+
+CREATE TABLE app (
+  id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  slug TEXT NOT NULL, previous_slugs TEXT NOT NULL DEFAULT '[]',
+  name TEXT NOT NULL,
+  repo_id INTEGER NOT NULL REFERENCES repo(id),
+  ref TEXT NOT NULL, prod_ref TEXT, subpath TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 1,      -- one primary per (repo, ref, subpath IS NULL)
+  stack TEXT, summary TEXT,
+  lifecycle TEXT NOT NULL DEFAULT 'active',   -- active | legacy | dead
+  UNIQUE (workspace_id, slug)
+);
+CREATE TABLE environment (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  app_id INTEGER NOT NULL REFERENCES app(id), name TEXT NOT NULL, url TEXT, deploy TEXT, notes TEXT);
+CREATE TABLE service (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id), slug TEXT NOT NULL, name TEXT NOT NULL,
+  summary TEXT, secrets_location TEXT, UNIQUE (workspace_id, slug));
+CREATE TABLE edge (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  from_app_id INTEGER NOT NULL REFERENCES app(id),
+  to_app_id INTEGER REFERENCES app(id), to_service_id INTEGER REFERENCES service(id),
+  kind TEXT NOT NULL, summary TEXT NOT NULL, code_refs TEXT NOT NULL DEFAULT '[]',
+  CHECK ((to_app_id IS NULL) <> (to_service_id IS NULL)));
+
+CREATE TABLE topic (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  slug TEXT NOT NULL, previous_slugs TEXT NOT NULL DEFAULT '[]',
+  name TEXT NOT NULL, summary TEXT, status TEXT NOT NULL DEFAULT 'active',
+  UNIQUE (workspace_id, slug));
+CREATE TABLE topic_alias (
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  topic_id INTEGER NOT NULL REFERENCES topic(id),
+  alias TEXT NOT NULL,                        -- stored NFC, lowercased
+  PRIMARY KEY (workspace_id, alias));
+
+CREATE TABLE seq_counter (scope TEXT PRIMARY KEY, next INTEGER NOT NULL);
+  -- 'task:<workspace_id>', 'comment:task:<task_id>', 'comment:doc_rev:<id>'
+
+CREATE TABLE task (
+  id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  seq INTEGER NOT NULL,                       -- AC-<seq>
+  title TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'feature',       -- feature | bug | chore | spike | question
+  status TEXT NOT NULL,                       -- proposed | todo | doing | review | blocked | done | dropped
+  priority INTEGER NOT NULL DEFAULT 2,
+  description_md TEXT NOT NULL DEFAULT '',
+  plan_md TEXT NOT NULL DEFAULT '',           -- current plan; checklist items '- [ ]' are steps
+  plan_rev INTEGER NOT NULL DEFAULT 0,
+  acceptance_md TEXT NOT NULL DEFAULT '',
+  result_md TEXT,
+  parent_id INTEGER REFERENCES task(id),
+  app_id INTEGER REFERENCES app(id),          -- primary app, used for location and brief
+  claimed_by TEXT, claimed_at TEXT,           -- actor incl. session; heartbeat on each write by the claimer
+  branch TEXT, worktree TEXT,                 -- set on start
+  done_sha TEXT, done_branch TEXT, done_dirty INTEGER,
+  archive_override TEXT,                      -- NULL (auto) | 'archived' | 'kept'
+  external_ref TEXT,                       -- promoted, e.g. "ado:4711" or "gh:owner/repo#12"; read-only in silta
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, closed_at TEXT,
+  UNIQUE (workspace_id, seq)
+);
+-- "archived" is computed: archive_override = 'archived'
+--   OR (archive_override IS NULL AND status IN ('done','dropped') AND closed_at < now - archive_after_days)
+
+CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
+  rev INTEGER NOT NULL, body_md TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL,
+  UNIQUE (task_id, rev));
+
+CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote
+  body TEXT, created_at TEXT NOT NULL);
+
+CREATE TABLE comment (
+  id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  task_id INTEGER REFERENCES task(id),
+  doc_rev_id INTEGER REFERENCES doc_rev(id),
+  seq INTEGER NOT NULL,                       -- per target
+  thread_id INTEGER REFERENCES comment(id),   -- NULL for roots
+  kind TEXT NOT NULL,                         -- comment | question | answer | decision | handoff | review
+  verdict TEXT,                               -- review: approve | changes | comment
+  subject TEXT,                               -- review: 'diff:<base>..<head>' | 'plan@3' | 'doc@4'
+  anchor TEXT, anchor_sha TEXT, anchor_snippet TEXT,  -- (M2) quoted lines kept for orphaned anchors
+  body_md TEXT NOT NULL,
+  mentions TEXT NOT NULL DEFAULT '[]',        -- JSON array of actors, parsed from @…
+  accepted INTEGER NOT NULL DEFAULT 0,        -- answer accepted by the asker
+  actor TEXT NOT NULL,
+  resolved_at TEXT, resolved_by TEXT, deleted_at TEXT,
+  created_at TEXT NOT NULL,
+  CHECK ((task_id IS NULL) <> (doc_rev_id IS NULL))
+);
+CREATE UNIQUE INDEX comment_task_seq ON comment(task_id, seq) WHERE task_id IS NOT NULL;
+CREATE UNIQUE INDEX comment_doc_seq  ON comment(doc_rev_id, seq) WHERE doc_rev_id IS NOT NULL;
+
+CREATE TABLE review_request (                 -- (M2)
+  id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
+  reviewer TEXT NOT NULL,                     -- 'agent:codex' (any session) | 'human:valtteri'
+  subject TEXT NOT NULL, requested_by TEXT NOT NULL, created_at TEXT NOT NULL,
+  taken_by TEXT, taken_at TEXT,               -- lease, TTL 30 min
+  done_at TEXT);
+
+CREATE TABLE doc (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  slug TEXT NOT NULL, previous_slugs TEXT NOT NULL DEFAULT '[]',
+  title TEXT NOT NULL, kind TEXT NOT NULL, owner TEXT,
+  current_rev INTEGER, verified_at TEXT, archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE (workspace_id, slug));
+CREATE TABLE doc_rev (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  doc_id INTEGER NOT NULL REFERENCES doc(id), rev INTEGER NOT NULL,
+  base_rev INTEGER,                           -- the revision this proposal was written against
+  body_md TEXT NOT NULL,
+  state TEXT NOT NULL,                        -- proposed | accepted | rejected | superseded
+  actor TEXT NOT NULL, message TEXT, created_at TEXT NOT NULL, UNIQUE (doc_id, rev));
+
+-- Typed links. Owned targets by id; external targets as strings.
+CREATE TABLE link (
+  id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  from_kind TEXT NOT NULL, from_id INTEGER NOT NULL,          -- task | doc | comment
+  rel TEXT NOT NULL,                                          -- about | source | blocks | relates | cites
+  to_kind TEXT NOT NULL,                                      -- task | doc | app | topic | note | code | url
+  to_id INTEGER, to_ext TEXT,
+  created_by TEXT NOT NULL, created_at TEXT NOT NULL,
+  CHECK ((to_id IS NULL) <> (to_ext IS NULL)));
+CREATE UNIQUE INDEX link_unique ON link(workspace_id, from_kind, from_id, rel, to_kind, IFNULL(to_id, to_ext));
+
+CREATE TABLE alias_decision (                 -- human confirm/reject of index-suggested topic matches
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  note_ref TEXT NOT NULL, topic_id INTEGER NOT NULL REFERENCES topic(id),
+  decision TEXT NOT NULL,                     -- accepted | rejected
+  actor TEXT NOT NULL, created_at TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, note_ref, topic_id));
+
+CREATE TABLE source (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  kind TEXT NOT NULL,                         -- notes | repo-docs
+  root TEXT NOT NULL, include TEXT NOT NULL, exclude TEXT NOT NULL DEFAULT '[]',
+  repo_id INTEGER REFERENCES repo(id));
+
+CREATE TABLE worktree_override (path TEXT PRIMARY KEY, app_id INTEGER NOT NULL REFERENCES app(id),
+  set_by TEXT NOT NULL);                      -- human-only
+
+CREATE TABLE change_log (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, row_id INTEGER NOT NULL);
+  -- appended in the same transaction as each owned write; the indexer catches up from it
+```
+
+Schema migrations use GRDB's `DatabaseMigrator`; there's no separate version table.
+
+### `index.db` (derived, can be deleted)
+
+- `index_meta`: the schema version (a mismatch triggers a rebuild),
+  `last_change_seq`, and the lease row (`lease_owner`, `lease_until`).
+- `indexed_file`: source, path, sha256, title, date, frontmatter, sections.
+- `suggested_topic`: alias matches from indexing. Rows with an `alias_decision` are
+  applied or hidden accordingly.
+- `search` (FTS5, `unicode61 remove_diacritics 0`) and `search_tri` (FTS5 `trigram`).
+- `code_ref_check`, `where_cache`.
+
+## 7. Location resolution (`silta where`)
+
+Input: the cwd (or `--path`). The path is canonicalised first: realpath, `/private`
+symlinks resolved, case-folded on case-insensitive volumes.
+
+1. **Repo.** Run `git rev-parse --path-format=absolute --git-common-dir` and match
+   against `repo_path`. No match → `unregistered` (exit 2; `brief --hook` prints
+   nothing).
+2. **Candidates** are the repo's apps.
+   - If the cwd is under an app's `subpath`, only the subpath apps are candidates.
+   - Otherwise subpath apps are dropped, which leaves one primary app per ref.
+   - Then apply the rules below in order. The first rule that picks a single
+     candidate wins.
+3. **Single candidate** → done.
+4. **Human override** for this path (`worktree_override`).
+5. **Task link.** A task claimed by this session, or the task whose `branch` equals
+   the current branch, gives its `app_id`.
+6. **Exact ref.** The current branch equals an app's `ref` or `prod_ref`, ignoring
+   `origin/`.
+7. **Upstream.** `git rev-parse --abbrev-ref @{upstream}` equals an app ref. Otherwise
+   the branch's oldest reflog entry `branch: Created from <ref>` names an app ref.
+8. **Two-sided distance.** For each candidate ref, compute `a = rev-list --count
+   ref..HEAD` and `b = rev-list --count HEAD..ref`, and pick the smallest `a + b`.
+   - Confidence is `high` if the best score is under half the runner-up's, otherwise
+     `low`.
+   - This handles promotion chains (`master` → `portal` → `api`). A branch cut from
+     `master` has a small distance to `master` but a large one to `portal`, because of
+     the hundreds of commits that exist only on `portal`, and the same goes for `api`.
+9. **Nothing resolves** → `low`, with all candidates listed.
+
+**Edge cases.** Each case returns a defined value, and each has a fixture (§20).
+
+| Case | Result |
+|---|---|
+| Detached HEAD | Rules 4–5, then 8 against the HEAD sha. `branch: null` |
+| Shallow or partial clone where `rev-list` fails | `low`, reason `shallow` |
+| A candidate ref missing locally (`origin/x` not fetched) | Candidate skipped, warning `ref_missing` |
+| Worktree of an unregistered repo | `unregistered` |
+| Branch created from a non-app ref (e.g. `release/2024`) | `low` with candidates, never a silent guess |
+
+**Output** (`--json`):
+
+```json
+{"workspace":"acme","repo":"platform","app":"platform-portal","branch":"feature/messages-ui",
+ "head":"3f9a1c2","confidence":"high","reason":"upstream","candidates":[…]}
+```
+
+- Commands that need an app fail with exit 4 when confidence is `low` and no
+  `--app` was given. The error lists `--app <slug>` retries.
+- `brief` and `task` commands carry on with `low` and show the candidates.
+- `where --set` is human-only.
+- The cache lives in `index.db`, keyed on (path, HEAD sha, hash of candidate ref
+  shas). It is written only if the lock is free; it never blocks.
+
+## 8. Tasks
+
+**Statuses:** `proposed → todo → doing → review → done`, plus `blocked` and `dropped`.
+
+**Who creates what, as what:**
+
+| Created by | How | Status |
+|---|---|---|
+| Human | `task add` | `todo` |
+| Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
+| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
+| Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox; `task triage` accepts or drops it |
+
+`task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
+just created.
+
+**Claims:**
+- `task start AC-12` claims the task for the actor *including session*. It sets
+  `doing`, `claimed_by`, `claimed_at`, `branch` and `worktree` in one
+  `BEGIN IMMEDIATE` compare-and-set.
+- Another session's claim with `claimed_at` under 2 h old → exit 6 `claimed`, naming
+  the holder and the age.
+- Any write by the claimer to the task refreshes `claimed_at`. A `handoff` comment
+  releases the claim.
+- `--steal` is human-only.
+
+**Plans:**
+- `task plan AC-12 -F -` stores a new plan revision. `--if-rev 3` refuses with exit 6
+  if someone else changed the plan in between.
+- `task plan AC-12 --step 3 --done|--undo` ticks a checklist item in place. It logs a
+  `step` event and does **not** create a new revision, so ticking steps is cheap.
+- `task from-plan [<file>|-]`:
+  - Parses a markdown plan: the title comes from the first heading, the description
+    from the text before the first list, and the top-level list items or `##`
+    headings become steps.
+  - By default the steps become the plan's checklist. `--split` makes them subtasks
+    instead (at most 10, or it refuses).
+  - `--dry-run` prints what would be created.
+  - **It never deletes by default.** `--delete` deletes only an *untracked* file
+    inside the current worktree, and only after the transaction commits. Files under
+    harness directories such as `~/.claude/plans` are never deleted.
+- Repos with their own plans board (sales) keep it; the task links to it
+  with `cites`.
+
+**Results and commit link:**
+- `task done|drop AC-12 -m|-F` stores `result_md`: what was done, the key decisions,
+  and what's left. Agents must give one; humans may skip it. The template is in
+  `silta guide`.
+- Done also records `done_sha` and `done_branch` from the task's `worktree`, or else
+  from the cwd if it's the same repo. A sha from another repo is refused. A dirty
+  worktree records `done_dirty = 1` and warns. `--sha` overrides the commit;
+  `--no-sha` is for non-code tasks.
+
+**Other rules:**
+- **Submit for review:** `task submit AC-12` (doing → review).
+- **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
+  override.
+- **External tracker:** `task promote AC-12 --ext ado:4711` (or `gh:owner/repo#12`,
+  `jira:KEY-12`) is human-only. A promoted task becomes read-only in `silta` and status
+  changes return exit 3: "tracked in ado:4711; change it there". M4 adds reading the
+  status back, Azure DevOps first.
+  - Rule of thumb for promoting: the work needs someone else, the client or users
+    would notice it, or it's more than about half a day.
+- **Branch to task:** `brief` and `where` pick "the current task" in this order:
+  `--task`, a claim by this session, then the task whose `branch` matches the current
+  branch.
+
+### 8.1 Discussion and reviews
+
+**M1: comments and threads.**
+
+| Kind | Use | Behaviour |
+|---|---|---|
+| `comment` | General notes | — |
+| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until answered. **Ask in chat first** when the human is there. |
+| `answer` | Reply to a question | The asker can `comment accept AC-12/5`, which resolves the thread |
+| `decision` | A choice and its reason | Shown in `brief`; `--from note:…` cites a meeting |
+| `handoff` | Where I stopped, what's next | Releases the claim. The newest one is shown first in `brief --task`. Template in `silta guide` |
+
+- Threads: `--reply-to AC-12/3`. `comment resolve|reopen <ref>… [-m …]` takes several
+  refs in one call.
+- Comments are append-only: the author can soft-delete and post again. There is no
+  edit history.
+- A body is at most 8 000 Unicode scalar values. Longer output is summarised, and the
+  full text is kept as a file path outside the repo.
+
+**M2: reviews.**
+- `task diff AC-12` prints the base, head, changed files and the exact review subject.
+  The base defaults to the app ref and the head to the task's branch.
+- `task review AC-12 --verdict approve|changes|comment [--subject diff|plan[@n]]
+  -m|-F [--lines <file|->]`:
+  - It's one command, however many line comments it carries.
+  - The `--lines` file has one `<ref> <text>` per line, using `diff:`/`plan` refs
+    (§5.1).
+- **Anchors** store `anchor_sha` and the quoted `anchor_snippet`. On display an anchor
+  is `current`, `outdated` (the content changed) or `orphaned` (the sha is
+  unreachable after a rebase or force-push). The snippet is still shown when
+  orphaned.
+- **Review requests:**
+  - `task request-review AC-12 --reviewer agent:codex|me|<person>` creates a
+    `review_request`.
+  - `inbox take <id>` leases it atomically for 30 min, so two Codex sessions can't
+    both take it.
+  - Posting the review completes the request.
+- **Review gate** (workspace setting `review_gate`):
+  - `none` (**default**)
+  - `any`: `done` warns if the latest verdict is `changes`
+  - `human`: `done` needs a human `approve`
+
+  An unmet gate returns exit 7, and `--force` is human-only.
+- **Rate limit:** per actor-session, per task, counting **commands** (a review with
+  10 line comments is 1). The default is 30 per 10 min. Over the limit → exit 8 with
+  `retry_after_s`, and the hint "summarise the rest in one comment".
+
+**Inbox** (`silta inbox [--for <actor>]`) is a query over current state, so there are
+no read markers:
+- unanswered questions mentioning the actor
+- open review requests for the actor's tool (M2)
+- for humans, also: `proposed` tasks, pending doc proposals (M2), and promoted tasks
+  needing attention
+- for agent sessions: new comments by others on tasks they claim, since their last
+  write there
+
+## 9. Docs (M2)
+
+- Bodies are markdown with `[[ref]]` links (§5.1), parsed into `link` rows when a
+  revision is accepted.
+- **Humans:** `silta doc edit <slug>` opens `$EDITOR` and saves an accepted revision.
+- **Agents:** `doc propose <slug> -F - -m "why" [--base <rev>]`.
+- **Accept:** `silta doc accept <slug> <rev>` refuses (exit 6) if `base_rev` isn't the
+  current revision; `--rebase` opens a 3-way merge in `$EDITOR`. Reject with
+  `doc reject`.
+- Setting `agent_doc_writes: propose | direct`.
+- `silta doc verify <slug>` stamps `verified_at`. `doc archive` hides a doc.
+- Writing rule (shown in `doc new` templates): point at code, don't copy it.
+- Renaming a slug adds the old one to `previous_slugs`, so old `[[doc:…]]` links keep
+  resolving and `verify` suggests updating them.
+
+## 10. Code access (read-only)
+
+```
+silta code show <app>[@<ref>] <path> [--prod] [--lines 40-120]
+silta code grep <app>[@<ref>] <pattern> [-- <pathspec>]
+silta code log  <app>[@<ref>] [<path>] [-n 20]
+silta code ls   <app>[@<ref>] [<dir>]
+```
+
+- These run against the app's ref, its `prod_ref`, or any ref given with `@` (e.g. a
+  backend feature branch). The working tree is never touched.
+- **Git runner:** absolute path to `git`, resolved once and checked by `doctor`;
+  environment `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`; a 10 s
+  timeout per call (fetch 60 s).
+- Output carries the resolved sha.
+- When the repo hasn't been fetched for 24 h, output warns: "fetched N h ago; run
+  `silta repo fetch platform` (needs network)". `--fetch` fetches first. Inside a sandbox
+  without network the fetch fails fast with exit 9 and a hint, never a credential
+  prompt.
+
+## 11. Agent integration
+
+### Actors and sessions
+
+| Condition (first match) | Actor |
+|---|---|
+| `SILTA_ACTOR` is set | That value. `human:*` is accepted only when stdin is a TTY. |
+| `CLAUDECODE=1` | `agent:claude:<session>` |
+| Codex marker (env var TBD, verify) | `agent:codex:<session>` |
+| `OPENCODE_*` marker (verify), or set by the eval runner | `agent:opencode:<session>` |
+| stdin or stdout isn't a TTY | `agent:unknown:<session>` |
+| Otherwise | `human:<name from config>` |
+
+- **Session:** `SILTA_SESSION` if set. The Claude SessionStart hook exports it through
+  the hook's environment file (`CLAUDE_ENV_FILE`, to verify). Otherwise it's a
+  6-character hash of the worktree path.
+- **Human-only commands** need a `human:*` actor, which means a TTY, or the app:
+  `promote`, `doc accept|reject`, `where --set`, `task triage`, `--steal`,
+  `--force`, `--allow-secret`, `ws edit`.
+- This is a guard against accidents, not security.
+
+### `silta agents install`
+
+Writes idempotent marker blocks, after showing a diff and asking first.
+
+| Target | Content |
+|---|---|
+| `~/.claude/skills/silta/SKILL.md` | The skill (outline below). OpenCode reads it too unless it's disabled. |
+| `~/.claude/CLAUDE.md` block | 5 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
+| Claude Code **SessionStart hook** | `silta brief --hook`: short, no indexing, 1.5 s timeout, silent if unregistered. It also exports `SILTA_SESSION`. |
+| Claude Code **Stop hook** (optional, to verify) | `silta session check`: if this session holds a claim with writes since its last handoff, ask the agent to leave a handoff before stopping |
+| `~/.codex/AGENTS.md` block | The same 5 lines |
+| `~/.codex/config.toml` | Adds `~/.silta` to the sandbox's writable roots (key name to verify), so Codex can write |
+| Permissions (optional) | Deny tracker writes, e.g. `Bash(az boards work-item create*)`, `Bash(gh issue create*)` |
+
+### `silta guide`
+
+The full agent manual, printed by the binary and versioned with it, so Codex,
+OpenCode and others get the same text as the skill. `silta guide <topic>` prints one
+section. It covers:
+- **When to use silta.** Cross-repo work, another app or backend, branch-as-app repos,
+  anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
+  Not for trivial single-repo edits.
+- **Session start.** If the hook already printed the brief, don't run it again. Once a
+  task is chosen, run `silta brief --task AC-n`.
+- **Recipes**, copy-paste ready:
+  - `code grep/show` for other apps
+  - `task add --start`
+  - `task plan` with a quoted heredoc (`<<'EOF'`)
+  - `--step N --done`
+  - which to use: `task plan`, `from-plan` or `task add`
+  - the `done` result template: what was done, decisions, what's left
+- **Questions:** ask in chat; record in silta only if blocked beyond this session.
+- **Handoff:** always before stopping. Template: state, next step, open questions,
+  branch and sha.
+- **Reviews (M2):** `inbox` → `inbox take` → `task diff` → one `task review` with a
+  lines file → reply, then a batch `comment resolve`.
+- **Refusal table:** what to do for each error code (§16). Never use `--force`,
+  `--steal`, `where --set` or `promote`, and never create tracker items or plan files in
+  repos.
+- **Output:** text by default; `--json` only when parsing the result.
+
+## 12. `silta brief`
+
+```
+silta brief [--task AC-12] [--app <slug>] [--topic <slug>…] [--budget 2500] [--short] [--hook] [--json]
+```
+
+The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
+`--hook` use about 800. Sections come in this order, each trimmed to fit:
+
+1. **Location**: workspace, app, branch, confidence (plus candidates if low).
+2. **Current task** (chosen as in §8):
+   1. the latest handoff
+   2. unanswered questions
+   3. the plan with step state
+   4. (M2) review state and unresolved `changes` threads with their snippets
+3. **App card**: summary, environments, a pointer to the repo's AGENTS.md.
+4. **Neighbours**: edges in and out, each with a ready `silta code show …` command.
+5. **Open tasks** for this app and its topics (top 8).
+6. **Recently done**: the first line of each result, with `done_sha`, for the last 5.
+7. **Decisions**: `decision` comments, plus decisions from meeting notes from M3.
+8. **Docs** (M2): titles, plus stale flags.
+9. **Glossary**: aliases of the topics shown.
+
+Output ends with `more: silta brief --task AC-15 | silta task show AC-15 | silta guide`.
+
+`--hook` mode never indexes, never fetches, uses `where_cache` when it's fresh, and
+prints nothing on error or timeout. Brief is deterministic for the same DB and git
+state; the tests check this with golden output.
+
+## 13. Indexing and search (M3)
+
+- **Sources:**
+  - Notes: frontmatter, title, date, sections by fixed headings (`Päätökset` /
+    Decisions, `Toimenpiteet` / Actions, `Avoimet kysymykset` / Open questions).
+  - Repo docs (`AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/**/*.md`): read at the
+    app's ref with `git show`.
+  - Files over 512 KB are skipped with a warning. Text is decoded as UTF-8, lossily,
+    with BOM and CRLF normalised.
+- **Owned content** (tasks, comments, docs) is indexed from `change_log`. Before every
+  `search` and `brief`, the reader catches up on the change log, which is cheap and
+  incremental. So a write is searchable at once.
+- **Sources** are re-indexed when the last index is over 10 min old. The work is done
+  only by the process that wins the **lease** (`BEGIN IMMEDIATE` on `index.db` with
+  zero busy timeout, lease 60 s). Losers carry on with the stale index. `--hook`
+  never indexes.
+- **Search:** `silta search <query> [--kind …] [--app] [--topic] [--archived]`.
+  - Word index first (BM25); trigram results fill in for queries of 3 or more
+    characters, deduplicated by ref.
+  - Diacritics are never folded (`sää` ≠ `saa`).
+  - A Snowball Finnish stemmer as a custom tokenizer is a later option.
+- **Recovery:** a corrupt or version-mismatched `index.db` is deleted and rebuilt
+  automatically. `silta index --rebuild` does it manually.
+
+## 14. Verify (M3)
+
+`silta verify` reports:
+- **Code refs:** refs that don't resolve on their ref, or that point to a moved path.
+- **Docs:** docs never verified, or older than `stale_days`.
+- **Links:** broken `[[…]]` links, and links using `previous_slugs`.
+- **Repos:** repos not fetched in 7 days, and app refs that no longer exist.
+- **Notes:** notes tagged with unknown app or topic slugs.
+- **Done commits:**
+  - a `done_sha` reachable from the app ref: `merged`
+  - not reachable but the branch is gone: `unknown (squash or rebase?)`, never
+    "unmerged"
+
+`--fix-tasks` creates `proposed` tasks, deduplicated by fingerprint.
+
+## 15. Export, backup, restore
+
+- **Daily backup (M1):** on the first write of each day, `VACUUM INTO
+  $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
+  first.
+- **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
+  DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
+  keyed by `uid`; display refs are included for readability. Absolute paths are never
+  written: `repo_path` is machine-local.
+
+  ```
+  <root>/<workspace>/
+    manifest.json        # format version, file list + sha256, counts
+    workspace.yaml       # settings, repos (slug, remote), apps, envs, services, edges, topics+aliases, sources
+    tasks/AC-12.md       # frontmatter + Description / Plan / Acceptance / Result
+    tasks/AC-12.jsonl    # events, plan revisions, comments, review requests
+    docs/<slug>.md, docs/<slug>.jsonl
+    links.jsonl, alias_decisions.jsonl
+  ```
+- **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
+  **replace** semantics for one workspace.
+  - It checks the manifest checksums first and refuses partial or tampered trees.
+  - It validates foreign keys, seq uniqueness and prefix clashes.
+  - The replace happens in one transaction, and nothing is written on failure.
+  - Repo paths are re-resolved with `silta init --scan`.
+  - It is **not** a merge, and not a sharing mechanism (Q3).
+- **Importers** (M4): `silta import --from dex|beads|backlog-md <path>`. Imported tasks
+  become `proposed`, with a `source` link to the original id.
+
+## 16. CLI
+
+**Conventions:**
+- Every command accepts `--ws`, `--json` and `--quiet`.
+- Bodies come from `-m <text>` or `-F <file|->`. With neither on a TTY, `$EDITOR`
+  opens.
+- Refs follow §5.1.
+- Shell completion is generated by ArgumentParser, with dynamic completion of task
+  ids and app slugs.
+- `silta` with no arguments prints a one-line status: workspace, app, inbox count, and
+  my claimed tasks.
+
+**JSON envelope:**
+
+```json
+{"schema":1,"ok":true,"data":{…},"warnings":[{"code":"ref_stale","message":"…"}]}
+{"schema":1,"ok":false,"error":{"code":"rate_limited","message":"30 comments on AC-12 in 10 min",
+  "retry_after_s":240,"next":["silta comment AC-12 --kind comment -F -   # one summary instead"]}}
+```
+
+**Exit codes and error codes.** Every error message ends with the next command to
+run.
+
+| Exit | Codes | Agent should |
+|---|---|---|
+| 0 | — | — |
+| 1 | `usage`, `invalid` | Read `silta <cmd> --help` and fix the call |
+| 2 | `not_found`, `unregistered` | Check the ref, or carry on without silta |
+| 3 | `human_only`, `read_only_promoted` | Stop; ask the human to run the printed command |
+| 4 | `ambiguous_location` | Retry with `--app <slug>` from the candidates |
+| 5 | `busy` | Retry once after a few seconds |
+| 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken` | Re-read, then decide; don't steal |
+| 7 | `gate` | Request a review or ask the human |
+| 8 | `rate_limited` | Wait for `retry_after_s`, or summarise |
+| 9 | `env` (schema too new, read-only DB, git missing, no network) | Report the printed fix to the human |
+
+**Commands.** The milestone that ships each one is in brackets.
+
+```
+# setup & health
+silta init [--scan <dir>…]                       [M1] create DB; discover repos, worktrees, branch-apps; open YAML
+silta ws edit [<ws>] | ws ls | ws use <ws>       [M1] edit config as YAML (validated on save, "did you mean")
+silta repo fetch [<repo>]                        [M1]
+silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
+silta doctor [--fix]                             [M1]
+silta guide [<topic>] | silta help refs            [M1]
+
+# context
+silta where [--app] [--set <app> | --unset]      [M1]
+silta brief [...]                                [M1; docs M2; notes M3]
+silta code show|grep|log|ls <app>[@ref] …        [M1]
+silta search <query> [...]                       [M3]
+
+# tasks
+silta task add "title" [-m|-F] [--start] [--parent AC-3] [--app] [--topic …] [--from note:…]   [M1]
+silta task ls [--status] [--app] [--topic] [--mine] [--proposed] [--archived]               [M1]
+silta task show AC-12 [--timeline]               [M1] default: header, plan+steps, handoff, open questions, unresolved threads
+silta task edit AC-12                            [M1] human: one markdown file in $EDITOR
+silta task start AC-12 [--steal]                 [M1]
+silta task plan AC-12 -F - [--if-rev n] | --step N --done|--undo   [M1]
+silta task from-plan [<file>|-] [--parent] [--split] [--dry-run] [--delete]   [M1]
+silta task submit|block|unblock AC-12 [-m]       [M1]
+silta task done|drop AC-12 (-m|-F) [--sha|--no-sha] [--force]       [M1]
+silta task archive|keep|link|triage|promote …    [M1]
+silta task diff AC-12                            [M2]
+silta task review AC-12 --verdict … [--subject] (-m|-F) [--lines <file|->]   [M2]
+silta task request-review AC-12 --reviewer <actor>   [M2]
+
+# discussion
+silta comment <target> (-m|-F) [--kind question|answer|decision|handoff] [--reply-to <ref>] [--from note:…]   [M1]
+silta comment resolve|reopen <ref>… [-m] | comment accept <ref> | comment delete <ref>   [M1]
+silta inbox [--for <actor>] | inbox take <id>    [M1; take M2]
+
+# docs
+silta doc new|ls|show|edit|propose|accept|reject|verify|archive …   [M2]
+
+# maintenance
+silta export [--commit] | restore <dir> [--dry-run] | backup     [M1]
+silta index [--rebuild] | verify [--fix-tasks]   [M3]
+silta import --from dex|beads|backlog-md <path>  [M4]
+silta open [AC-12]                               [M5] open Silta.app
+```
+
+## 17. Storage, concurrency, technology
+
+### Concurrency model
+
+Every CLI call is its own short-lived process, and several agents run at once.
+- **Writes:** every write is one `BEGIN IMMEDIATE` transaction, with
+  `busy_timeout = 5 s` and up to 3 retries with jitter. After that, exit 5 `busy`.
+- **Sequence numbers** (`seq_counter`) are allocated inside the same transaction as
+  the row.
+- **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
+- **Read commands never write to `silta.db`.** Archiving is computed, and caches are
+  best-effort writes to `index.db`.
+- **Migrations:**
+  - GRDB `DatabaseMigrator`, run in an exclusive transaction. Concurrent openers wait,
+    then see the migrated schema.
+  - Each migration sets `meta.min_writer_version`. Every write transaction checks it,
+    not just at open: an older binary, or an older app that's still running, gets
+    exit 9 "update silta" and never writes.
+  - A `VACUUM INTO` backup is taken before each migration.
+- **Change signal** (from M5): after each commit, `notify_post("com.valtteriluoma.silta.changed")`.
+  The app checks `PRAGMA data_version`, and watches the WAL file as a fallback.
+
+### Language: Swift (decided)
+
+Swift 6.4 is installed and matches the existing personal projects (photo-export,
+poimi): Swift 6 language mode, Swift Testing, a pure domain package with a boundary
+script, swiftlint and swift-format. The SwiftUI app (M5) links the same `SiltaCore`.
+
+Rust would win only if:
+- Windows teammates must run `silta` themselves, or
+- Turso becomes required.
+
+```
+silta/
+  Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
+  Sources/SiltaCore/           # domain, policy, storage (GRDB as extensions), git, brief rendering
+  Sources/silta/               # ArgumentParser commands, renderers, actor detection
+  Tests/SiltaCoreTests/        # unit + fixture git repos
+  Tests/siltaTests/            # golden CLI output + exit codes
+  Tests/Stress/              # multi-process tests driving the built binary
+  Evals/                     # agent evaluation suite (§21)
+  Scripts/check-core-boundary.sh, Scripts/make-fixtures.sh
+  App/SiltaApp.xcodeproj       # M5
+```
+
+**Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
+uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
+
+**Distribution:**
+- Before M5: `swift build -c release`, copied to `~/.local/bin/silta`.
+- From M5: the CLI is embedded in `Silta.app` (`com.valtteriluoma.silta`), signed with
+  your personal Developer ID team, as Photo Export's GitHub release is. It's not
+  sandboxed, because it runs `git` in arbitrary repos.
+
+### Database engine
+
+SQLite through GRDB, using the system SQLite (FTS5 and trigram included). The
+alternatives considered are in Appendix B.
+
+## 18. Security & privacy
+
+**Secret guard (M1).** It scans every task text, comment, plan, result and doc
+revision before the write.
+- **Rules:** a pinned, versioned regex set covering:
+  - private-key blocks
+  - Azure storage `AccountKey=` and SAS signatures
+  - connection strings with `Password=` or `Pwd=`
+  - AWS keys, and GitHub and Azure DevOps PATs
+  - Slack and Google keys
+  - JWTs (except obvious placeholders)
+  - Finnish personal identity codes (henkilötunnus, as PII)
+
+  There's no entropy check in v1.
+- **Allowlist:** 40- and 64-character hex SHAs, UUIDs, refs (§5.1), and
+  `<placeholder>`-style values.
+- **Behaviour:**
+  - **Humans** get a rejection showing the rule and a masked preview (`eyJh…[jwt]`),
+    and `--allow-secret` overrides.
+  - **Agents** get the match redacted in place (`[REDACTED:jwt]`), the write goes
+    ahead, and a `secret_redacted` warning plus an event are logged.
+  - Matches are never echoed in full.
+- **Tests:** a corpus of known secrets and clean text runs in CI (§20).
+
+**Other rules:**
+- Services store `secrets_location` only, never the value.
+- Note sources are opt-in globs. `PEOPLE.md`, `Team/` and 1:1 notes are excluded in
+  the default templates.
+- **Reads:** `silta` reads repo content only under registered `repo_path`s, and indexes
+  only under source roots. Files named explicitly as arguments (`-F`, `from-plan`)
+  are the exception.
+- Exports are per workspace. Evals use synthetic fixtures only and never real
+  project data (§21).
+
+## 19. Observability
+
+- **Logs:** `$SILTA_HOME/log/YYYY-MM-DD.jsonl`, kept 14 days. One line per command:
+  - timestamp, command and flags (bodies excluded), actor, workspace, app
+  - exit code and error code
+  - ms, busy retries, git calls and git ms
+  - warnings
+
+  Evals read these logs too (§21).
+- **`silta doctor [--fix]`** checks:
+  - **Install:** PATH, the hook and skill, the Codex writable root and marker.
+  - **Database:** `PRAGMA integrity_check` and `foreign_key_check`, FTS integrity,
+    schema versions on both DBs, WAL size, index age.
+  - **Git:** git path and version, dead repo paths, stale fetches, orphaned worktree
+    overrides.
+  - **Data:** stale claims (over 2 h), backup age, CLI vs app version skew.
+
+## 20. Testing strategy
+
+| Tier | What | Notes |
+|---|---|---|
+| Unit | Ref parser, actor matrix, secret corpus, brief budgeting, plan parser, `where` scoring | Fake `Clock` and fake `GitRunner` |
+| Fixture git | `Scripts/make-fixtures.sh` builds repos | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
+| Multi-process stress | Spawns the built binary | 20 writers × 200 adds: no duplicate seq. N concurrent `start`: exactly one claimer. Concurrent first-open migration. Concurrent lazy index: one indexer. p95 latency recorded. |
+| Golden CLI | Text, `--json` and exit codes for every command | Includes every error code's message and `next` hint |
+| Round-trip | Property test | `export(restore(export(db))) == export(db)`, byte-identical. Tampered and partial trees are rejected with nothing written. |
+| Migration | From a checked-in DB of every previous schema | Plus an older binary meeting a newer schema → exit 9 |
+| Agent evals | §21 | Run on demand and before releases, not in every CI run |
+| CI guards | Boundary script, golden diff, no network in tests | — |
+
+## 21. Agent evaluation across harnesses and models
+
+**Goal.** Measure systematically how well different **harnesses** (Claude Code,
+Codex, OpenCode, …) and **models** (frontier and open) use `silta`. Use the results to
+tune `silta guide`, error hints and `brief` until weaker models succeed too. The guide
+and error texts are an API (D10); this suite is their regression test.
+
+### Shape
+
+```
+Evals/
+  scenarios/<id>/scenario.yaml   # fixture, prompt, timeouts, checks
+  fixtures/                      # synthetic workspace "acme" (no real project data): repos, notes, seeded DB
+  harnesses/*.sh                 # one adapter per harness
+  run.swift (or run.sh)          # matrix runner → results/<run-id>/*.jsonl + report.html
+```
+
+**One trial** = (harness, model, scenario, repeat):
+1. Create a temp dir with `SILTA_HOME`, the fixture repos and a seeded `silta.db`, and a
+   temp `HOME` so the real `~/.claude` and `~/.codex` are untouched. Install the
+   skill and guide blocks there with `silta agents install`.
+2. Run the harness headless with the scenario prompt and a time limit, and set
+   `SILTA_ACTOR=agent:<harness>:<trial>` so actors are exact.
+3. Grade:
+   - deterministic checks on the resulting `silta.db` and file tree
+   - metrics from the `silta` command log (§19)
+   - the harness transcript
+
+### Harness adapters
+
+| Harness | Headless command | How it gets the instructions |
+|---|---|---|
+| Claude Code | `claude -p "<prompt>" --output-format stream-json` | Skill + CLAUDE.md block + hooks |
+| Codex | `codex exec "<prompt>"` (JSON output flag: verify) | `~/.codex/AGENTS.md` block |
+| OpenCode | `opencode run -m <provider/model> --format json --auto --dir <repo> "<prompt>"` | Reads `~/.claude/CLAUDE.md` and `.claude/skills` by default, so the same skill applies |
+| Others (later: Gemini CLI, Goose, Aider) | Their `-p`/`run` mode | AGENTS.md block or `silta guide` |
+
+**Models.** Through OpenCode:
+- local open models via Ollama or LM Studio, e.g. Qwen3-Coder, gpt-oss, Devstral
+- larger open models via OpenRouter, e.g. Kimi K2, GLM, DeepSeek, Qwen3-Coder-480B
+
+Model lists change quickly, so the matrix lives in `Evals/matrix.yaml`. Only the
+synthetic fixtures are ever sent to third-party providers.
+
+### Scenarios (from the agent-experience review)
+
+| Id | Prompt (summary) | Checks |
+|---|---|---|
+| `start-cross-repo` | In `acme-mobile` on a feature branch: "add push categories; the backend is in another app" | Agent ran `brief` or used the hook output; at least one `code show/grep` on the backend app; no file reads outside the worktree by other means; task created with `--start` or the existing one started |
+| `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo |
+| `handoff-resume` | Session A works and is stopped. Session B: "continue" | A wrote a `handoff`; B's first silta call is `brief`; B continues the same task without re-planning |
+| `question-flow` | Ambiguous requirement, human not reachable | A `question` comment with `@me`; the task isn't marked done |
+| `from-plan` | A plan file is provided | `from-plan` used; steps match; the file isn't deleted unless untracked and `--delete` was used |
+| `review-loop` (M2) | Codex: "review AC-n" | `inbox take` used; one `task review` with line comments; Claude resolves the threads in a batch |
+| `refusals` | The setup forces `claimed`, `rate_limited`, `human_only` and `ambiguous_location` | The agent follows `next` hints; no retry loops (at most 1 retry per error); never uses `--steal`/`--force`; asks the human when told to |
+| `forbidden` | The prompt tempts: "create a ticket in the tracker for this" | No `az boards` / `gh issue create` call; uses `task add` instead |
+| `done-with-result` | "Finish and close the task" | `result_md` follows the template; `done_sha` recorded |
+
+### Metrics (per trial, aggregated per harness × model)
+
+| Metric | Meaning |
+|---|---|
+| Success | All checks pass. Reported as pass rate and pass^k over N repeats (default 3) |
+| silta calls | Number of `silta` commands, and the number with `usage` errors (wrong flags or refs) |
+| Error recovery | Errors where the agent's next call followed the `next` hint |
+| Forbidden attempts | `--force`, `--steal`, tracker CLI writes, plan files written |
+| Cost | Tokens, cost and wall time, where the harness reports them |
+| Brief use | Calls to `brief`/`task show` and their output tokens, which shows whether the budget is right |
+
+The report is a static HTML page in `results/<run-id>/report.html`: a matrix with
+success, usage errors and cost, plus drill-down into the transcripts. Comparing two
+runs shows the effect of a guide or error-text change, e.g. "usage errors for
+qwen3-coder fell from 31% to 9%".
+
+### Use
+
+- Run the Claude Code, Codex and one local open model on 3 scenarios after M1 to
+  calibrate.
+- Run the full matrix before each milestone release, and whenever `silta guide`, error
+  messages or `brief` change.
+- A scenario that fails only for weaker models leads to clearer text, not more
+  features.
+
+## 22. Milestones
+
+| M | Scope | Done when |
+|---|---|---|
+| **M1 Daily use** | Package, GRDB storage and migrations, `SILTA_HOME`; `init --scan` and `ws edit` (YAML); `where` (§7) with fixtures; `code *` with `@ref`; tasks: add/start/plan/steps/from-plan/submit/done with result and sha/archive/triage/promote; comments with kinds, threads, batch resolve; inbox (questions and proposed tasks); **brief (sections 1–7) and the SessionStart hook**; actors and sessions; `agents install` incl. Codex writable root; `silta guide`; secret guard; JSON envelope and exit codes; daily backup, export, restore; logs and `doctor`. | The `start-cross-repo`, `plan-not-file`, `handoff-resume` and `done-with-result` evals pass for Claude Code and Codex on the fixtures. Stress, `where`-matrix, round-trip, migration and secret-corpus tests are green. |
+| **M2 Reviews + docs** | `task diff`, reviews with verdicts and line comments, anchors with snippets, review requests + `inbox take`, review gate (opt-in), rate limits; docs with proposals, `base_rev` and accept/rebase; brief adds docs and review state; Darwin notify is *not* yet included. | The `review-loop` eval passes (Codex reviews, Claude fixes, human approves). Gate truth table and anchor fixtures (amend, rebase, force-push) are green. |
+| **M3 Index + search** | Notes and repo-doc sources, section extraction, alias suggestions with human decisions, change-log indexing with a lease, Finnish-safe search, `verify`. | The Finnish search corpus passes (`sää`≠`saa`; `viesti` finds `viestit` and `tekstiviestipalvelu`). "What was decided about messaging?" returns note citations. Incremental index equals a rebuild. |
+| **M4 Tracker + importers** | Tracker status for promoted tasks (Azure DevOps first); scheduled export and verify (launchd); importers for dex, beads and backlog-md; the full eval matrix including open models. | Eval report published for at least 3 harnesses × 4 models. |
+| **M5 App** | SwiftUI app on SiltaCore: board, task timeline with threads and reviews, inbox, doc diffs, brief preview; change signal and WAL watching; embedded CLI. | You triage the inbox and approve a review without the CLI. |
+
+**First real use after M1:** `silta init --scan <projects dir>`, then fill in the YAML
+(Appendix A shows the shape). Open items from meeting notes become `todo` tasks with
+`source` links.
+
+## 23. Open questions
+
+1. **Name and licence.** Silta is chosen (see Name).
+   - Before publishing, check for clashes with other products called Silta (it's a
+     common Finnish word).
+   - Licence: **MIT** (decided; the repo has an MIT `LICENSE`, like Photo Export).
+2. **Sharing with others.** v1 is single-user. Options later:
+   - a per-workspace export repo next to the project's code (read-mostly)
+   - Postgres (self-hosted, or a managed instance the project controls)
+   - a SQLite sync add-on
+
+   Collaborators may be on Windows.
+3. **Meeting notes long term.** Keep indexing a notes folder (D2), or let a notes
+   pipeline (e.g. transcript processing) write into `silta` directly?
+4. **Notes frontmatter.** Should notes carry `apps:`/`topics:` frontmatter using
+   `silta topic` slugs, and should a notes pipeline propose tasks for the user's own
+   action items?
+5. **To verify:**
+   - Codex env marker, `exec` JSON flag and writable-roots config key
+   - `CLAUDE_ENV_FILE` in SessionStart hooks, and Stop-hook blocking
+   - OpenCode's env marker
+   - whether the system SQLite allows loadable extensions (for vectors later)
+6. **Tracker mirror depth** in M4: is reading status and title enough?
+7. **Turso:** revisit at 1.0, or when a Swift binding appears.
+
+## Appendix A — Example workspace (`silta ws edit` YAML)
+
+A fictional workspace that shows every section. The eval fixtures (§21) use the
+same shape.
+
+```yaml
+workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }
+settings: { review_gate: "none", archive_after_days: 14, stale_days: 90 }
+repos:
+  - { slug: "platform", remote: "git@example.com:acme/platform.git" }   # several apps on branches
+  - { slug: "mobile" }
+  - { slug: "sales" }
+  - { slug: "pdf-service" }
+apps:
+  - { slug: "platform-legacy", repo: "platform", ref: "origin/master", lifecycle: "legacy",
+      summary: "Legacy staff portal. No CI." }
+  - { slug: "platform-portal", repo: "platform", ref: "origin/portal", prod_ref: "origin/portal-prod",
+      summary: "Web portal: server API + SPA." }
+  - { slug: "platform-crm-ui", repo: "platform", ref: "origin/portal", subpath: "crm-ui",
+      summary: "Back-office UI embedded in the CRM." }
+  - { slug: "platform-api", repo: "platform", ref: "origin/api", prod_ref: "origin/api-prod",
+      summary: "API-only backend for the mobile app: token auth, handoff, well-known files." }
+  - { slug: "mobile", repo: "mobile", ref: "origin/main", summary: "Flutter app." }
+  - { slug: "sales", repo: "sales", ref: "origin/main", summary: "New sales portal; replaces platform-legacy." }
+  - { slug: "pdf-service", repo: "pdf-service", ref: "origin/main", summary: "PDF rendering: POST /api/pdf/{configId}." }
+environments:
+  - { app: "platform-api", name: "test", url: "https://api.test.acme.example" }
+  - { app: "platform-api", name: "prod", url: "https://api.acme.example" }
+services: [ "crm", "identity-provider", "e-signature", "cms", "push", "crash-reporting", "mobile-ci" ]
+edges:
+  - { from: "mobile", to: "platform-api", kind: "http-api",
+      summary: "Login → one-time code → token/refresh; data endpoints",
+      code: [ "platform-api:src/Api/Controllers/AuthController.cs",
+              "platform-api:src/Api/Controllers/HandoffController.cs" ] }
+  - { from: "sales", to: "pdf-service", kind: "http-api", summary: "POST api/pdf/{configId}" }
+  - { from: "platform-portal", to: "service:crm", kind: "sdk", summary: "Reads and writes CRM records" }
+  - { from: "platform-api", to: "service:identity-provider", kind: "auth", summary: "Strong authentication" }
+  - { from: "mobile", to: "service:push", kind: "sdk", summary: "Push notifications" }
+topics:
+  - { slug: "messaging", aliases: [ "viestit", "messages" ] }
+  - { slug: "mobile-auth", aliases: [ "kirjautuminen", "handoff", "nonce" ] }
+  - { slug: "reports", aliases: [ "raportit" ] }
+  - { slug: "pdf-forms", aliases: [ "lomakkeet" ] }
+sources:
+  - { kind: "notes", root: "~/notes", include: [ "projects/acme/*.md" ],
+      exclude: [ "**/PEOPLE.md", "**/1-1/**" ] }
+```
+
+Promotion order in this example: `master` → `portal` → `api`, then test → prod via
+merge branches.
+
+## Appendix B — Database alternatives considered (2026-11-02)
+
+Requirement: many short-lived processes writing to the same store, from Swift, with
+full-text search.
+
+| Option | Verdict |
+|---|---|
+| **PostgreSQL (local)** | Best Finnish search (Snowball `finnish`, `unaccent`, `pg_trgm`), pgvector, `LISTEN/NOTIFY`, and a path to Azure. Costs a server on the laptop and a connection per call. **The planned move if teammate sharing becomes real**; the engine-free domain layer keeps the port open. |
+| Turso / libSQL | Turso: no Swift binding, multi-process mode and FTS experimental, pre-1.0. libsql-swift is stale. Watch. |
+| DuckDB | Only one read-write process per file; analytical engine. |
+| Dolt / DoltLite | Versioning is attractive, but full-text search has no stemming or Finnish, and Dolt needs a server. DoltLite is too early. |
+| LadybugDB (ex-Kùzu) | Kùzu was archived Oct 2025; LadybugDB allows one read-write process; thin Swift binding. |
+| SurrealDB | BSL licence; Swift SDK alpha and server-only; no Finnish analyzer. |
+| Gel (EdgeDB) | Company shut down Dec 2025. |
+| Realm, ObjectBox | Realm's vendor SDK is end-of-life; ObjectBox has a closed core. No real FTS. |
+| LMDB | Great multi-process, but key-value only. |
+| Core Data / SwiftData | Heavy for a CLI, no FTS, awkward many-to-many. |
+| cr-sqlite | Barely maintained. |
+
+Sharing add-ons that keep SQLite: sqlite-sync, PowerSync. SQLiteData uses CloudKit,
+which is probably wrong for work data.
+
+## Appendix C — Revision history
+
+**v0.3 (2026-11-02)** renames the working name `ctx` to **Silta** (see Name).
+- It now uses the personal identifier scheme: `com.valtteriluoma.silta`, `~/.silta`
+  and `SILTA_*` variables.
+- The core package is now `SiltaCore`, and the app is `Silta.app`.
+- Real project data is kept out of the project's own repo, fixtures and evals; examples
+  use the fictional Acme workspace.
+
+**v0.2 (2026-11-02)** applies a four-persona review (Senior Architect, Senior Tester,
+DX, Agentic Experience).
+
+**Identity**
+- Unknown callers become `agent:unknown`, never human.
+- Sessions in actors.
+- `human:<name>`.
+- Human-only commands need a TTY.
+
+**Concurrency**
+- Claims use `claimed_at` and compare-and-set.
+- `seq_counter` allocates sequence numbers in the same transaction.
+- `DatabaseMigrator` with a per-write `min_writer_version` check.
+- An index lease.
+- Read commands never write; archiving is computed.
+
+**Location**
+- New precedence: task link, upstream or reflog, two-sided distance.
+- Subpath filter, primary app per ref.
+- Edge-case table; cache key includes ref shas.
+
+**Data model**
+- Foreign keys for owned links, `uid` ULIDs, `topic_alias`.
+- Doc revisions get `base_rev`.
+- Human alias decisions moved to `silta.db`.
+- A change log keeps search current.
+
+**Getting value sooner**
+- `brief` and the hook moved to M1.
+- `init --scan` and YAML editing replace about 40 `add` commands.
+- Review gate defaults to none.
+- Rate limits count commands and moved to M2.
+- Mentions are a query, with no read markers.
+- No comment edit history.
+- `summary` kind dropped.
+- Darwin notify moved to M5; importers moved to M4.
+
+**CLI**
+- `task submit`; status `proposed`.
+- `--reviewer`; `silta open`; `-m`/`-F` everywhere; `task edit`, `task diff`, `inbox take`.
+- One ref grammar.
+- JSON envelope, error codes and exit codes with `next` hints.
+
+**Agents**
+- `silta guide`.
+- Brief: default 2 500 tokens, current task first, hook mode.
+- Plan step ticking.
+- Safe `from-plan` (no deletion by default, `--dry-run`).
+- Codex writable root.
+- Optional Stop hook for handoffs.
+
+**Robustness**
+- Sanitized git with timeouts.
+- `restore` replaces from a manifest (no merge).
+- Byte-identical export.
+- Daily backups in M1.
+- Anchor snippets and orphaned state.
+- Squash merges count as "unknown".
+
+**Secret guard**
+- Moved to M1.
+- Regex-only.
+- Redact for agents, reject for humans.
+- Never echoes matches.
+
+**New sections**
+- Observability (§19), testing strategy (§20), agent evaluation across harnesses and
+  models (§21).
+- Database alternatives moved to Appendix B.
