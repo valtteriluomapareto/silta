@@ -65,7 +65,7 @@ package enum SiltaBinary {
   /// - Parameters:
   ///   - scratch: a directory from `withScratchDirectory`.
   ///   - cwd: the working directory; `<scratch>/work` when nil.
-  ///   - timeout: seconds before the child is terminated and the result is `.timedOut`.
+  ///   - timeout: seconds before the child gets SIGTERM and the result is `.timedOut`.
   package static func run(
     _ arguments: [String],
     in scratch: URL,
@@ -78,13 +78,15 @@ package enum SiltaBinary {
   }
 
   /// Runs any executable under the same rules as `run`. Used to test the runner itself.
+  /// A child that ignores SIGTERM gets SIGKILL `killAfter` seconds later.
   package static func runProcess(
     _ executable: URL,
     _ arguments: [String],
     in scratch: URL,
     cwd: URL? = nil,
     environment: [String: String] = [:],
-    timeout: Double = 30
+    timeout: Double = 30,
+    killAfter: Double = 5
   ) throws -> CLIResult {
     let fm = FileManager.default
     let home = scratch.appending(path: "home", directoryHint: .isDirectory)
@@ -118,7 +120,7 @@ package enum SiltaBinary {
     process.standardOutput = stdout
     process.standardError = stderr
     return CLIResult(
-      termination: try runToEnd(process, timeout: timeout),
+      termination: try runToEnd(process, timeout: timeout, killAfter: killAfter),
       stdout: try utf8(contentsOf: stdoutURL),
       stderr: try utf8(contentsOf: stderrURL)
     )
@@ -126,13 +128,15 @@ package enum SiltaBinary {
 
   /// Starts `process` and waits for it, killing it if it outlives `timeout` seconds.
   /// The deadline bounds a hung child; it never stands in for waiting on a result.
-  private static func runToEnd(_ process: Process, timeout: Double) throws -> Termination {
+  private static func runToEnd(
+    _ process: Process, timeout: Double, killAfter: Double
+  ) throws -> Termination {
     let exited = DispatchSemaphore(value: 0)
     process.terminationHandler = { _ in exited.signal() }
     try process.run()
     if exited.wait(timeout: .now() + timeout) == .timedOut {
       process.terminate()
-      if exited.wait(timeout: .now() + 5) == .timedOut {
+      if exited.wait(timeout: .now() + killAfter) == .timedOut {
         kill(process.processIdentifier, SIGKILL)
         exited.wait()
       }

@@ -127,8 +127,9 @@ quietly diverge.
 - **Parameterized tests for matrices:** the actor matrix, the `where` matrix, the
   error-code table, the secret corpus.
 - **Tiers:**
-  - slow tests carry `.tags(.slow)` and `.enabled(if: TestTier.slowEnabled)`, which
-    is driven by `SILTA_SLOW_TESTS=1`
+  - slow tests carry a `.slow` tag and run only when `SILTA_SLOW_TESTS=1`; the
+    first slice with a slow test (CP or S3) adds the tag and the gate to
+    `SiltaTestSupport`
   - the scenario runner is a slow test
 - **Isolation:** each test gets its own scratch directory and `SILTA_HOME`, so tests
   share no state and run in parallel.

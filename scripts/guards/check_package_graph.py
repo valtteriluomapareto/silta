@@ -81,6 +81,9 @@ def check(root: Path) -> list[str]:
             continue
         deps_start = code.index("[", deps_match.end())
         deps_end = closing_bracket(code, deps_start)
+        if code[deps_end + 1:end].lstrip()[:1] not in (",", ")"):
+            errors.append(f"Package.swift:{line}: {name}'s dependencies must be a literal array so this guard can read them")
+            continue
         deps = [
             v for o, v in inside
             if deps_start < o < deps_end and not PACKAGE.search(code[deps_start:o])

@@ -326,6 +326,11 @@ class PackageGraphTests(GuardTestCase):
             '.target(name: \"SiltaCore\", dependencies: [\n', '.target(name: \"SiltaCore\", dependencies: coreDeps + [\n'))
         self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
 
+    def test_dependencies_extended_after_the_literal_fail(self) -> None:
+        self.tree.write("Package.swift", "let extra: [Target.Dependency] = []\n" + self.PACKAGE.replace(
+            '    ], swiftSettings: s),\n', '    ] + extra, swiftSettings: s),\n', 1))
+        self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)
+
     def test_missing_core_target_fails(self) -> None:
         self.tree.write("Package.swift", self.PACKAGE.replace('name: \"SiltaCore\", dependencies: [\n', 'name: \"Core\", dependencies: [\n'))
         self.assertEqual(len(check_package_graph.check(self.tree.root)), 1)

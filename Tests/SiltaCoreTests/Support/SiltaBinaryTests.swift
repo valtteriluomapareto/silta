@@ -34,8 +34,27 @@ struct SiltaBinaryTests {
     #expect(result.termination == .signal(SIGABRT))
   }
 
+  // These measure elapsed time because what they prove is that the runner stops
+  // waiting: a runner that waited for the 30 s child would still report .timedOut.
   @Test func hungChildIsKilledAtTheTimeout() throws {
-    let result = try run("/bin/sleep", ["30"], timeout: 0.5)
-    #expect(result.termination == .timedOut)
+    var result: CLIResult?
+    let elapsed = try ContinuousClock().measure {
+      result = try run("/bin/sleep", ["30"], timeout: 0.5)
+    }
+    #expect(result?.termination == .timedOut)
+    #expect(elapsed < .seconds(3))  // SIGTERM, not the SIGKILL fallback 5 s later
+  }
+
+  @Test func childIgnoringTermIsKilled() throws {
+    var result: CLIResult?
+    let elapsed = try ContinuousClock().measure {
+      result = try withScratchDirectory {
+        try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-c", "trap '' TERM; exec /bin/sleep 30"], in: $0,
+          timeout: 0.5, killAfter: 0.5)
+      }
+    }
+    #expect(result?.termination == .timedOut)
+    #expect(elapsed < .seconds(10))
   }
 }
