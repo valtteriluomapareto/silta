@@ -116,8 +116,8 @@ through. Fix the change, or propose a decision first.
 5. **Commit** in imperative sentence case, under ~72 characters, ending with the
    `Co-Authored-By` trailer the harness gives you.
    - Branches are `<agent>/<slice>-<slug>`, e.g. `claude/s4-output-contract`.
-   - Until the first code lands, small documentation changes may go straight to
-     `main`.
+   - Every change reaches `main` through a pull request, docs included. `main` is
+     protected: squash merges only, and CI must pass on a branch that is up to date.
 6. **Report honestly:** what changed, what you verified, and what remains unverified.
 
 ## Dogfooding
