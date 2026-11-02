@@ -32,6 +32,10 @@ extension SeamError: ErrorExamples {
   static var examples: [SeamError] { Array(allCases) }
 }
 
+extension StorageError: ErrorExamples {
+  static var examples: [StorageError] { Array(allCases) }
+}
+
 extension SecretError: ErrorExamples {
   static var examples: [SecretError] {
     [SecretError(command: "silta task add -F -", text: "Pwd=acme-secret")]
@@ -46,11 +50,12 @@ struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
+    StorageError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
-    .notFound, .unregistered, .humanOnly, .readOnlyPromoted, .ambiguousLocation, .busy,
+    .notFound, .unregistered, .humanOnly, .readOnlyPromoted, .ambiguousLocation,
     .conflict, .claimed, .staleRev, .leaseTaken, .gate, .rateLimited,
   ]
 
