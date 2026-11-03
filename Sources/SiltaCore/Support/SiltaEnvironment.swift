@@ -13,14 +13,16 @@ package struct SiltaEnvironment: Sendable {
   /// Opens the truth database only when a caller explicitly requests storage.
   package let db: DatabaseStore
   /// Attributes this command and enforces human-only policy.
-  package let actor: Actor
+  package let actor: ActorID
+  /// Warnings from assembling the environment, shown with the command's own.
+  package let warnings: [OutputWarning]
   /// Records best-effort command diagnostics.
   package let log: any Log
 
   /// Assembles supplied seams without reading process globals or doing I/O.
   package init(
     clock: any Clock, ids: any IDGenerator, git: any GitRunner, home: SiltaHome, db: DatabaseStore,
-    log: any Log, actor: Actor
+    log: any Log, actor: ActorID, warnings: [OutputWarning] = []
   ) {
     self.clock = clock
     self.ids = ids
@@ -29,6 +31,7 @@ package struct SiltaEnvironment: Sendable {
     self.db = db
     self.log = log
     self.actor = actor
+    self.warnings = warnings
   }
 
   /// Builds system seams from an environment snapshot. Invalid enabled overrides throw;
@@ -68,7 +71,7 @@ package struct SiltaEnvironment: Sendable {
       }
     }
     let git = SystemGitRunner(environment: environment)
-    let actor = await Actor.resolve(
+    let (actor, warnings) = try await ActorID.resolve(
       environment: environment, terminal: .system(), git: git,
       directory: URL(filePath: FileManager.default.currentDirectoryPath))
     let deterministicTime = clock is IncrementingClock
@@ -77,6 +80,7 @@ package struct SiltaEnvironment: Sendable {
       db: DatabaseStore(
         home: home.url, clock: clock,
         jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) }),
-      log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose), actor: actor)
+      log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose), actor: actor,
+      warnings: warnings)
   }
 }

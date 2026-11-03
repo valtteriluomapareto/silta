@@ -180,3 +180,30 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     - the `schema` goldens fail on any change
   - On an ArgumentParser upgrade, check `silta schema` first.
 
+## Wave-3 follow-up (2026-11-03)
+
+- **D32: `min_writer_version` is the one write gate.**
+  - A binary that meets a newer schema (unknown migrations) never migrates it, and
+    writes while `min_writer_version` is at most its own writer version.
+  - Why: the rule lives in the older binary, so it must be right before the first
+    release; and the app, the CLI and dev builds in worktrees run side by side. Under
+    "any unknown migration blocks", adding one column would lock out the app until it
+    updated, and a long-running app would answer differently from a fresh CLI.
+  - A migration that adds a constraint or changes what a column means raises the
+    version; a purely additive one doesn't.
+- **D33: Actors are `ActorID` values, validated where they enter.**
+  - `human(name)` or `agent(tool, session)`, recorded as `human:<name>` or
+    `agent:<tool>:<session>`. Each part is 1 to 64 letters, digits, `.`, `_`, `-`,
+    `@` or `+`.
+  - Why: rows store actors from S10 on, and claims compare sessions (D9); a malformed
+    value in a row is permanent after DF0. The name avoids Swift's `Actor` protocol.
+  - `SILTA_ACTOR=agent:<tool>` gets the resolved session appended, so D9 holds without
+    agents computing a session.
+  - `human_only` names the detected actor, and why an unknown agent was detected.
+- **D34: Bad `SILTA_*` configuration is `env`, for the human.**
+  - Covers `SILTA_HOME`, `SILTA_NOW`, `SILTA_ID_SEED`, `SILTA_ACTOR` and
+    `SILTA_SESSION`.
+  - Why: the harness, the eval runner or the human's profile sets them, not the agent.
+    An agent's shell may not keep an `unset` between calls, so "unset it and retry"
+    loops, and for `SILTA_HOME` the obvious workaround writes to the real
+    `~/.silta`.

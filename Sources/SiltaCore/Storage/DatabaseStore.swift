@@ -41,13 +41,10 @@ package final class DatabaseStore: Sendable {
         let queue = try DatabaseQueue(path: path, configuration: config)
         let migrator = StorageSchema.migrator
         let pending = try queue.read { db -> String? in
-          guard try !migrator.hasBeenSuperseded(db) else { throw StorageError.schemaTooNew }
-          if try db.tableExists("meta") {
-            let version = try Int.fetchOne(
-              db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-            guard let version else { throw StorageError.unavailable }
-            guard version <= Self.writerVersion else { throw StorageError.schemaTooNew }
-          }
+          if try db.tableExists("meta") { try Self.checkWriterVersion(db) }
+          // A newer binary's schema is never migrated here; min_writer_version alone
+          // decides whether this binary may still write to it (D32).
+          guard try !migrator.hasBeenSuperseded(db) else { return nil }
           let applied = try migrator.appliedIdentifiers(db)
           return migrator.migrations.first { !applied.contains($0) }
         }
@@ -84,10 +81,7 @@ package final class DatabaseStore: Sendable {
       let backup = StorageBackup(home: home)
       let result = try withStorageRetry(clock: clock, jitter: jitter) {
         try queue.write { db in
-          let version = try Int.fetchOne(
-            db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-          guard let version else { throw StorageError.unavailable }
-          guard version <= Self.writerVersion else { throw StorageError.schemaTooNew }
+          try Self.checkWriterVersion(db)
           // WAL lock acquisition alone does not prove the main file is writable.
           guard FileManager.default.isWritableFile(atPath: path) else {
             throw StorageError.unavailable
@@ -111,6 +105,14 @@ package final class DatabaseStore: Sendable {
     } catch {
       throw StorageError.mapped(error)
     }
+  }
+
+  /// Refuses when a migration raised `min_writer_version` past this binary's.
+  private static func checkWriterVersion(_ db: Database) throws {
+    let version = try Int.fetchOne(
+      db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
+    guard let version else { throw StorageError.unavailable }
+    guard version <= writerVersion else { throw StorageError.schemaTooNew }
   }
 
   /// Reads only an existing database through a read-only connection and transaction.

@@ -173,7 +173,7 @@ struct StorageSchemaTests {
       if raisedVersion {
         #expect(throws: StorageError.schemaTooNew) { try older.initialize() }
       } else {
-        try older.write { try StorageWriteTests.insert($0, uid: "acme") }
+        _ = try older.write { try StorageWriteTests.insert($0, uid: "acme") }
       }
       #expect(
         try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 2)

@@ -50,7 +50,9 @@ struct ActorTests {
       environment: ["SILTA_ACTOR": "agent:acme"], stdin: false, stdout: false,
       expected: "agent:acme:acme"),
     // Empty values count as unset; a USER that can't be recorded is unknown.
-    Row(environment: ["SILTA_ACTOR": ""], stdin: false, stdout: false, expected: "agent:unknown:acme"),
+    Row(
+      environment: ["SILTA_ACTOR": ""], stdin: false, stdout: false,
+      expected: "agent:unknown:acme"),
     Row(environment: ["USER": "acme user"], stdin: true, stdout: true, expected: "human:unknown"),
   ]
 
