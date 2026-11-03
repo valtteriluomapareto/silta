@@ -19,20 +19,7 @@ extension TaskService {
     let at = environment.clock.now()
     let slug = try selected()
     return try environment.db.write { tx in
-      var tasks: [TaskDetails] = []
-      for ref in refs {
-        let task: TaskDetails
-        do { task = try Self.lookup(ref, workspace: slug, in: tx.database) } catch TaskError
-          .notFound
-        {
-          throw TaskReferenceError(ref: ref, missing: true)
-        } catch TaskError.invalid { throw TaskReferenceError(ref: ref, missing: false) }
-        try validateClaim(task, at: at)
-        guard task.status == "blocked" else {
-          throw TaskError.transition(task.ref, status: task.status)
-        }
-        if !tasks.contains(where: { $0.id == task.id }) { tasks.append(task) }
-      }
+      let tasks = try blockedBatch(refs, workspace: slug, at: at, in: tx.database)
       let open = try tasks.contains { try Self.waiting($0, at: at, in: tx.database)?.ready != true }
       let used =
         try approval
@@ -59,6 +46,25 @@ extension TaskService {
       }
       return (results, used != nil)
     }
+  }
+
+  /// The distinct blocked tasks of a batch; the first bad ref fails the whole batch.
+  private func blockedBatch(_ refs: [String], workspace: String, at date: Date, in db: Database)
+    throws -> [TaskDetails]
+  {
+    var tasks: [TaskDetails] = []
+    for ref in refs {
+      let task: TaskDetails
+      do { task = try Self.lookup(ref, workspace: workspace, in: db) } catch TaskError.notFound {
+        throw TaskReferenceError(ref: ref, missing: true)
+      } catch TaskError.invalid { throw TaskReferenceError(ref: ref, missing: false) }
+      try validateClaim(task, at: date)
+      guard task.status == "blocked" else {
+        throw TaskError.transition(task.ref, status: task.status)
+      }
+      if !tasks.contains(where: { $0.id == task.id }) { tasks.append(task) }
+    }
+    return tasks
   }
 
   static func clearBlock(_ task: TaskDetails, in tx: StorageTransaction) throws {

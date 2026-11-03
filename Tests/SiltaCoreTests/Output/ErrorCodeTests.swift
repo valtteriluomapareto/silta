@@ -35,7 +35,8 @@ struct ErrorCodeTests {
     1: "Read `silta <cmd> --help` and fix the call",
     2: "Check the ref, or carry on without silta",
     3:
-      "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` after they say yes",
+      "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` "
+      + "after they say yes",
     4: "Retry with `--app <slug>` from the candidates",
     5: "Retry once after a few seconds",
     6: "Re-read, then decide; don't steal, and don't unblock while blockers are open",

@@ -17,10 +17,9 @@ extension TaskService {
       throw TaskError.invalid("--split accepts at most 10 steps; keep a checklist or shorten it.")
     }
     let preview = try importPreview(parsed, options: options)
+    let warnings = content.1 ? [SecretGuard.warning] : []
     if options.dryRun {
-      return TaskImportResult(
-        dryRun: true, preview: preview, tasks: [],
-        warnings: content.1 ? [SecretGuard.warning] : [])
+      return TaskImportResult(dryRun: true, preview: preview, tasks: [], warnings: warnings)
     }
     let cleanup = try await sourceToDelete(text, options: options, source: source, in: directory)
     let slug = try selected()
@@ -43,8 +42,7 @@ extension TaskService {
         identity: (environment.ids, creations[0].at), in: tx)
       let actualPreview = try importPreview(parsed, options: options, rootStatus: root.status)
       return TaskImportResult(
-        dryRun: false, preview: actualPreview, tasks: tasks,
-        warnings: content.1 ? [SecretGuard.warning] : [])
+        dryRun: false, preview: actualPreview, tasks: tasks, warnings: warnings)
     }
     guard let cleanup else { return result }
     var completed = result

@@ -39,56 +39,56 @@ struct TaskListCommand: OutputCommand {
     let tasks = try TaskService(environment: context.environment, workspace: global.ws).list(filter)
     return CommandOutput(
       text: tasks.isEmpty ? "No tasks." : tasks.map(TaskOutput.summary).joined(separator: "\n"),
-      data: Data(tasks: tasks.map(Summary.init)))
+      data: Data(tasks: tasks.map(TaskSummary.init)))
   }
 
   private struct Data: Encodable {
-    let tasks: [Summary]
+    let tasks: [TaskSummary]
+  }
+}
+
+/// The fields of `TaskOutput.summaryShape`; bodies come from `task show`.
+private struct TaskSummary: Encodable {
+  let ref: String
+  let title: String
+  let status: String
+  let priority: Int
+  let app: String?
+  let parent: String?
+  let claimedBy: String?
+  let claimedAt: String?
+  let externalRef: String?
+  let waiting: TaskWaiting?
+  let followUpAt: String?
+  let createdBy: String
+  let createdAt: String
+  let updatedAt: String
+
+  init(_ task: TaskDetails) {
+    ref = task.ref
+    title = task.title
+    status = task.status
+    priority = task.priority
+    app = task.app
+    parent = task.parent
+    claimedBy = task.claimedBy
+    claimedAt = task.claimedAt
+    externalRef = task.externalRef
+    waiting = task.waiting
+    followUpAt = task.followUpAt
+    createdBy = task.createdBy
+    createdAt = task.createdAt
+    updatedAt = task.updatedAt
   }
 
-  /// The fields of `TaskOutput.summaryShape`; bodies come from `task show`.
-  private struct Summary: Encodable {
-    let ref: String
-    let title: String
-    let status: String
-    let priority: Int
-    let app: String?
-    let parent: String?
-    let claimedBy: String?
-    let claimedAt: String?
-    let externalRef: String?
-    let waiting: TaskWaiting?
-    let followUpAt: String?
-    let createdBy: String
-    let createdAt: String
-    let updatedAt: String
-
-    init(_ task: TaskDetails) {
-      ref = task.ref
-      title = task.title
-      status = task.status
-      priority = task.priority
-      app = task.app
-      parent = task.parent
-      claimedBy = task.claimedBy
-      claimedAt = task.claimedAt
-      externalRef = task.externalRef
-      waiting = task.waiting
-      followUpAt = task.followUpAt
-      createdBy = task.createdBy
-      createdAt = task.createdAt
-      updatedAt = task.updatedAt
-    }
-
-    enum CodingKeys: String, CodingKey {
-      case ref, title, status, priority, app, parent, waiting
-      case claimedBy = "claimed_by"
-      case claimedAt = "claimed_at"
-      case externalRef = "external_ref"
-      case followUpAt = "follow_up_at"
-      case createdBy = "created_by"
-      case createdAt = "created_at"
-      case updatedAt = "updated_at"
-    }
+  enum CodingKeys: String, CodingKey {
+    case ref, title, status, priority, app, parent, waiting
+    case claimedBy = "claimed_by"
+    case claimedAt = "claimed_at"
+    case externalRef = "external_ref"
+    case followUpAt = "follow_up_at"
+    case createdBy = "created_by"
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
   }
 }

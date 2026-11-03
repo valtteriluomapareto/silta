@@ -18,14 +18,7 @@ extension TaskService {
     try validateResult(content.0, commit: commit)
     let before = try show(ref)
     let at = environment.clock.now()
-    try validateClaim(before, at: at)
-    try canClose(before, dropped: dropped)
-    if commit.force, !dropped, try environment.db.read({ try gate(before, in: $0).unmet }) {
-      _ = try self.approval(required: true, command: audit + " -F <file>")
-    }
-    if commit.sha != nil, before.appID == nil || dropped {
-      throw TaskError.invalid("--sha requires an app task completed with done.")
-    }
+    try closable(before, dropped: dropped, commit: commit, audit: audit, at: at)
     let cwd = before.worktree.map { URL(filePath: $0, directoryHint: .isDirectory) } ?? directory
     let git = try await TaskGit.inspect(
       repo: before.repoPath, directory: cwd, runner: environment.git,
@@ -36,16 +29,10 @@ extension TaskService {
       try validateClaim(task, at: at)
       try canClose(task, dropped: dropped)
       try Self.sameRepository(task, before)
-      var warnings = content.1 ? [SecretGuard.warning] : []
-      var used = approval
-      if !dropped {
-        let review = try gate(task, in: tx.database)
-        if review.unmet {
-          guard commit.force else { throw TaskError.gate(task.ref) }
-          used = try used ?? self.approval(required: true, command: audit + " -F <file>")
-        }
-        warnings += review.warnings
-      }
+      let review = try review(
+        task, dropped: dropped, commit: commit, command: audit, in: tx.database)
+      var warnings = (content.1 ? [SecretGuard.warning] : []) + review.warnings
+      let used = approval ?? review.forced
       if git.dirty == true {
         warnings.append(
           OutputWarning(code: "dirty_worktree", message: "The task worktree is dirty."))
@@ -93,6 +80,32 @@ extension TaskService {
     guard ["todo", "doing", "review", "blocked"].contains(task.status) else {
       throw TaskError.transition(task.ref, status: task.status)
     }
+  }
+
+  /// Everything a close checks before git runs, so a refusal never waits on git.
+  private func closable(
+    _ task: TaskDetails, dropped: Bool, commit: TaskCommit, audit: String, at date: Date
+  ) throws {
+    try validateClaim(task, at: date)
+    try canClose(task, dropped: dropped)
+    if commit.sha != nil, task.appID == nil || dropped {
+      throw TaskError.invalid("--sha requires an app task completed with done.")
+    }
+    _ = try environment.db.read {
+      try review(task, dropped: dropped, commit: commit, command: audit, in: $0)
+    }
+  }
+
+  /// The review gate's warnings for a completion. An unmet gate refuses it unless
+  /// `--force` has the human's go-ahead, which is then the approval this write records.
+  private func review(
+    _ task: TaskDetails, dropped: Bool, commit: TaskCommit, command: String, in db: Database
+  ) throws -> (warnings: [OutputWarning], forced: HumanApproval?) {
+    guard !dropped else { return ([], nil) }
+    let review = try gate(task, in: db)
+    guard review.unmet else { return (review.warnings, nil) }
+    guard commit.force else { throw TaskError.gate(task.ref) }
+    return (review.warnings, try approval(required: true, command: command + " -F <file>"))
   }
 
   /// The review gate's warnings, and whether an unmet `human` gate refuses completion.
