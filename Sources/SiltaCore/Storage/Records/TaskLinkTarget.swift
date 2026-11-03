@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Concrete storage for an owned identity or an external reference, with an optional line anchor.
-struct TaskLinkTarget: Hashable {
+struct TaskLinkTarget {
   let kind: String
   var id: Int64?
   var external: String?

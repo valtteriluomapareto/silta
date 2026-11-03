@@ -4,7 +4,7 @@ import Foundation
 enum TaskFollowUp {
   static func day(_ raw: String?, at date: Date) throws -> String {
     var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+    calendar.timeZone = .gmt
     let today = calendar.startOfDay(for: date)
     let value = raw ?? "7d"
     let target: Date
@@ -18,11 +18,11 @@ enum TaskFollowUp {
       target = result
     } else {
       guard let match = value.wholeMatch(of: /([0-9]{4})-([0-9]{2})-([0-9]{2})/),
-        let year = Int(match.1), let month = Int(match.2), let day = Int(match.3), year > 0,
-        let result = calendar.date(from: DateComponents(year: year, month: month, day: day)),
-        calendar.component(.year, from: result) == year,
-        calendar.component(.month, from: result) == month,
-        calendar.component(.day, from: result) == day, result >= today
+        let year = Int(match.1), let month = Int(match.2), let day = Int(match.3), year > 0
+      else { throw invalid }
+      let parts = DateComponents(year: year, month: month, day: day)
+      guard parts.isValidDate(in: calendar), let result = calendar.date(from: parts),
+        result >= today
       else { throw invalid }
       target = result
     }

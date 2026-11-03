@@ -7,7 +7,6 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct TaskBlockReviewTests {
   @Test func namedBlockRecoveryPreservesTargetsAndDay() async throws {
-    try await withKnownIssue("S10d review reproduction") {
     try await withScratchDirectory { home in
       let service = try TaskOrganizationTests.service(home)
       try await TaskBlockTests.add(service, count: 2, directory: home)
@@ -26,11 +25,9 @@ struct TaskBlockReviewTests {
         #expect(!retry.contains("Acme answer"))
       }
     }
-    }
   }
 
   @Test func linkOrderAndUIDAssignmentFollowInputOrder() async throws {
-    try await withKnownIssue("S10d review reproduction") {
     try await withScratchDirectory { home in
       let service = try TaskOrganizationTests.service(home)
       try await TaskBlockTests.add(service, directory: home)
@@ -48,7 +45,6 @@ struct TaskBlockReviewTests {
         #expect(rows.map { $0["uid"] as String } == uids)
       }
     }
-    }
   }
 
   @Test func reasonOnlySecretPolicyProtectsPersistedEvent() async throws {
@@ -59,12 +55,16 @@ struct TaskBlockReviewTests {
       let result = try service.block("AC-1", TaskBlockTests.input(why: secret))
       #expect(result.warnings.map(\.code) == ["secret_redacted"])
       try service.environment.db.read { db in
-        let raw = try #require(try String.fetchOne(db, sql: "SELECT body FROM task_event WHERE kind='block'"))
+        let raw = try #require(
+          try String.fetchOne(db, sql: "SELECT body FROM task_event WHERE kind='block'"))
         #expect(try TaskBlockEvent.decode(raw).why == "[REDACTED:password]")
       }
       _ = try service.unblock(["AC-1"])
-      let human = TaskService(environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
-      #expect(throws: SecretError.self) { _ = try human.block("AC-1", TaskBlockTests.input(why: secret)) }
+      let human = TaskService(
+        environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
+      #expect(throws: SecretError.self) {
+        _ = try human.block("AC-1", TaskBlockTests.input(why: secret))
+      }
     }
   }
   @Test func taskFilterIdentityAndEmptyBacklogValidation() async throws {
@@ -88,7 +88,8 @@ struct TaskBlockReviewTests {
       try await TaskBlockTests.add(service, directory: home)
       _ = try service.block("AC-1", TaskBlockTests.input())
       let secret = "Pwd=" + "acme-secret"
-      let human = TaskService(environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
+      let human = TaskService(
+        environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
       #expect(throws: SecretError.self) { _ = try human.unblock(["AC-1"], why: secret) }
       let result = try service.unblock(["AC-1"], why: secret)
       #expect(result.first?.warnings.map(\.code) == ["secret_redacted"])
@@ -99,4 +100,24 @@ struct TaskBlockReviewTests {
     }
   }
 
+}
+
+struct TaskBlockRecoveryPrivacyTests {
+  @Test func safeRetryKeepsIdentifiersAndRequiresURLReplacement() {
+    let party = "ext:" + String(repeating: "a", count: 52)
+    let secret = "Pwd=" + "acme-secret"
+    var input = TaskBlockTests.input([
+      party, "url:https://example.com/?" + secret,
+      "url:https://example.com/acme", "task:AC-2",
+    ])
+    input.followUp = "3d"
+    let command = input.command("AC-1")
+    #expect(command.contains("--on '" + party + "'"))
+    #expect(command.contains("--on '<blocker-ref>'"))
+    #expect(command.contains("--on 'url:https://example.com/acme'"))
+    #expect(command.contains("--on 'task:AC-2'"))
+    #expect(command.contains("--follow-up '3d'"))
+    #expect(!command.contains("acme-secret") && !command.contains("REDACTED"))
+    #expect(!input.command(secret).contains("acme-secret"))
+  }
 }

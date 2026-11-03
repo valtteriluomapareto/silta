@@ -67,9 +67,7 @@ extension TaskService {
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
-      let task = try Self.decorate(
-        Self.lookup(ref, workspace: slug, in: tx.database),
-        at: at, in: tx.database)
+      let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, at: at)
       guard task.status == "doing" else {
         throw TaskError.transition(task.ref, status: task.status)

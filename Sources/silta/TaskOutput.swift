@@ -42,6 +42,7 @@ enum TaskOutput {
     var lines = [
       "Waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d: \(waiting.why)"
     ]
+    if waiting.ready { lines.append("Ready to unblock.") }
     if !waiting.dropped.isEmpty {
       lines.append("Blocker dropped: re-plan (" + waiting.dropped.joined(separator: ", ") + ")")
     }

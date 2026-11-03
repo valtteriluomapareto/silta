@@ -67,6 +67,13 @@ struct TaskBlockPartyTests {
         try String.fetchOne(db, sql: "SELECT body FROM task_event WHERE kind='block'")
       }
       _ = try service.block("AC-1", TaskBlockTests.input())
+      try service.environment.db.write { tx in
+        try tx.database.execute(
+          sql: "UPDATE task SET claimed_by=?,claimed_at=?",
+          arguments: [
+            TaskServiceTests.agent.description, TaskService.timestamp(TaskServiceTests.now),
+          ])
+      }
       _ = try service.unblock(["AC-1"])
       let task = try service.show("AC-1")
       #expect(task.claimedBy == nil && task.claimedAt == nil && task.followUpAt == nil)

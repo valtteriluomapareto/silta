@@ -24,13 +24,14 @@ struct TaskBlockCommand: OutputCommand {
   var followUp: String?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
-    var input = TaskBlock(
-      why: try body.read(
-        actor: context.environment.actor,
-        command: "silta task block " + shellWord(ref), approved: global.approved) ?? "")
+    var input = TaskBlock(why: "")
     input.on = on
     input.followUp = followUp
     input.allowSecret = body.allowSecret
+    input.why =
+      try body.read(
+        actor: context.environment.actor,
+        command: input.command(ref), approved: global.approved) ?? ""
     let result = try TaskService(
       environment: context.environment, workspace: global.ws,
       approved: global.approved
@@ -60,7 +61,9 @@ struct TaskUnblockCommand: OutputCommand {
   @Argument(help: "One or more blocked task references.") var refs: [String]
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
-    let command = "silta task unblock " + refs.map(shellWord).joined(separator: " ")
+    let command =
+      "silta task unblock "
+      + refs.map { shellWord(SecretGuard.redacted($0)) }.joined(separator: " ")
     let why = try body.read(
       actor: context.environment.actor, command: command, approved: global.approved)
     let tasks = try TaskService(

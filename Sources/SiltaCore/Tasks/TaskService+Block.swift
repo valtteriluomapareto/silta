@@ -4,13 +4,14 @@ import GRDB
 extension TaskService {
   /// Records what would unblock open work, releases its claim, and sends nothing.
   package func block(_ ref: String, _ input: TaskBlock) throws -> TaskBlockResult {
-    let command = "silta task block " + shellWord(SecretGuard.redacted(ref)) + " -F <file>"
-    let approval = try approval(required: input.allowSecret, command: command + " --allow-secret")
-    let content = try blockContent(input, command: command)
+    let command = input.command(ref)
+    let approval = try approval(
+      required: input.allowSecret, command: command + " -F <file> --allow-secret")
+    let content = try blockContent(input, command: command + " -F <file>")
     var redacted = content.1
     let refs = try input.on.map { raw in
       if TaskBlock.party(raw) != nil { return raw }
-      let checked = try checked(raw, allow: input.allowSecret, command: command)
+      let checked = try checked(raw, allow: input.allowSecret, command: command + " -F <file>")
       redacted = redacted || checked.1
       return checked.0
     }
@@ -29,7 +30,7 @@ extension TaskService {
       let known = try Self.knownParties(workspace: task.workspaceID, in: tx.database)
       let newParties = Set(targets.filter { $0.kind == "ext" }.compactMap(\.external)).subtracting(
         known)
-      for target in Set(targets) { try insertBlock(target, task: task, at: at, in: tx) }
+      for target in targets { try insertBlock(target, task: task, at: at, in: tx) }
       let on = try Self.blockIdentities(task, in: tx.database)
       try tx.database.execute(
         sql: """

@@ -19,6 +19,18 @@ package struct TaskBlock: Sendable {
     self.why = why
   }
 
+  /// Keeps named blockers and follow-up in body-free recovery and audit commands.
+  /// Credential-bearing targets require manual replacement, never a changed URL identity.
+  package func command(_ ref: String) -> String {
+    var value = "silta task block " + shellWord(SecretGuard.redacted(ref))
+    for raw in on {
+      let safe = Self.party(raw) != nil || SecretGuard.matches(in: raw).isEmpty
+      value += " --on " + shellWord(safe ? raw : "<blocker-ref>")
+    }
+    if let followUp { value += " --follow-up " + shellWord(SecretGuard.redacted(followUp)) }
+    return value
+  }
+
   static func party(_ raw: String) -> String? {
     guard raw.hasPrefix("ext:") else { return nil }
     let value = String(raw.dropFirst(4))
