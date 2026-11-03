@@ -60,6 +60,9 @@ struct RepositoryFetchTests {
           sql: "INSERT INTO repo_path(repo_id,path,fetched_at) SELECT id,?||slug,'kept' FROM repo",
           arguments: [home.path + "/"])
       }
+      for slug in ["a", "c"] {
+        try FileManager.default.createDirectory(at: home.appending(path: slug + "/.git"), withIntermediateDirectories: true)
+      }
       let none = ScriptedGitRunner(script: [])
       await #expect(throws: RepoError.self) {
         try await RepositoryFetch.fetch(
@@ -120,6 +123,29 @@ struct RepositoryFetchTests {
           at: WorkspaceConfigTests.instant)
       }
       #expect(git.requests.isEmpty)
+    }
+  }
+
+  @Test func staleNestedCloneCannotFetchAnEnclosingRepo() async throws {
+    await withKnownIssue("#9: staleNestedCloneCannotFetchAnEnclosingRepo") {
+    try await withScratchDirectory { home in
+      let parent = home.appending(path: "parent")
+      let nested = parent.appending(path: "clone")
+      try FileManager.default.createDirectory(at: parent.appending(path: ".git"), withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal + "repos: [{slug: platform}]", to: store)
+      try WorkspaceSelection.use("acme", in: store)
+      try store.write { tx in
+        try tx.database.execute(sql: "INSERT INTO repo_path(repo_id,path) SELECT id,? FROM repo", arguments: [nested.path])
+      }
+      let git = ScriptedGitRunner(script: [])
+      await #expect(throws: RepoError.localPath) {
+        try await RepositoryFetch.fetch(nil, workspace: nil, store: store, git: git,
+          at: WorkspaceConfigTests.instant)
+      }
+      #expect(git.requests.isEmpty)
+    }
     }
   }
 
