@@ -306,8 +306,9 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
   UNIQUE (task_id, rev));
 
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
-  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock
-  body TEXT, created_at TEXT NOT NULL);
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | secret_redacted
+  body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
+CREATE INDEX task_event_task ON task_event(task_id, kind);
 
 CREATE TABLE comment (
   id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -382,7 +383,7 @@ CREATE TABLE worktree_override (path TEXT PRIMARY KEY, app_id INTEGER NOT NULL R
 CREATE TABLE approval (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   workspace TEXT,                             -- slug, no foreign key: survives restore
   actor TEXT NOT NULL,
-  command TEXT NOT NULL,                      -- path, refs and flag names; no bodies
+  command TEXT NOT NULL,                      -- path, refs and passed flag names; no bodies; creating commands end with ' -> <created refs>'
   words TEXT NOT NULL, created_at TEXT NOT NULL);  -- an agent's --approved run (D38)
 
 CREATE TABLE change_log (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, row_id INTEGER NOT NULL);
@@ -480,9 +481,15 @@ uses `-F <file>` when the body came from stdin. A human's request in chat for th
 write is its go-ahead. Proposals that already exist when the setting changes stay in
 triage, or leave the inbox after 14 days as usual.
 
+`--parent` needs an open (not `done` or `dropped`), unpromoted parent. `from-plan
+--split` children take the root's status, decided once per import: `todo` under a
+`todo` or `doing` root, `proposed` under a `proposed` one; `--dry-run` shows the same
+(D40). A title is one line without control characters.
+
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
-just created. `task ls` sorts by priority (1–3, 1 first, default 2; set with
-`task add --priority` or in triage), then oldest first.
+just created; `--status proposed` lists everyone's (it implies `--proposed`). Promoted
+tasks are left out unless `--promoted` is given. `task ls` sorts by priority (1–3, 1
+first, default 2; set with `task add --priority` or in triage), then oldest first.
 
 **Working the backlog (D37).** When the human says "work the backlog" without naming
 a task, the agent runs `silta task ls --status todo [--app <app>]` and starts the first
@@ -493,8 +500,8 @@ going until the list is empty or the human stops it.
 **Triage (D37, D38)** is human-only and batched, so one answer is one command:
 `task triage --accept <ref>… --drop <ref>… [--priority n] [-m <why>]`.
 - It is all or nothing: a bad ref fails the whole call, and the error names it.
-- `--priority` applies to the accepted tasks. `-m` is the result stored on the dropped
-  ones, "Dropped in triage." by default.
+- `--priority` sets the accepted tasks' priority; without it they keep their own. `-m`
+  is the result stored on the dropped ones, "Dropped in triage." by default.
 - A proposal nobody triaged leaves the inbox 14 days after `created_at`, which means
   "not now". It stays in `task ls --status proposed` and in `inbox --all`, and no write
   happens.
@@ -508,18 +515,23 @@ going until the list is empty or the human stops it.
   the holder and the age.
 - Any write by the claimer to the task refreshes `claimed_at`. A `handoff` comment
   releases the claim.
-- `--steal` is human-only.
+- `--steal` is human-only when it overrides another session's fresh claim. Otherwise
+  it changes nothing and needs no approval (D40).
 - Start accepts `todo`, `doing` and `review`, and never reopens terminal tasks.
-  Proposals need human triage before they can start or complete. An agent may drop
-  its own proposal with a result; it cannot drop another actor's proposal.
+  Proposals need human triage before they can start or complete; the refusal's `next`
+  is `silta task triage --accept <ref> --approved "<the human's words>"`. An agent may
+  drop its own proposal with a result; it cannot drop another actor's proposal.
 - Writes refuse another actor's fresh claim. An expired claim can be reclaimed with
   `start`; each claim compares the complete actor, including session.
 
 **Plans:**
-- `task plan AC-12 -F -` stores a new plan revision. `--if-rev 3` refuses with exit 6
-  if someone else changed the plan in between.
+- `task plan AC-12 -F -` stores a new plan revision; a blank body is `invalid`.
+  `--if-rev 3` refuses with exit 6 if someone else changed the plan in between.
 - `task plan AC-12 --step 3 --done|--undo` ticks a checklist item in place. It logs a
-  `step` event and does **not** create a new revision, so ticking steps is cheap.
+  `step` event and does **not** create a new revision, so ticking steps is cheap. A
+  tick adds no text, so the secret guard leaves the plan as stored and
+  `--allow-secret` is `invalid` with `--step`.
+- The secret guard checks only text a write adds or changes.
 - `task from-plan [<file>|-]`:
   - Parses a markdown plan: the title comes from the first heading, the description
     from the text before the first list, and the top-level list items or `##`
@@ -584,6 +596,11 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   again. A blocked task can also go straight to `done` (the App Store approved it)
   or `drop`. `unblock`, `done` and `drop` clear the follow-up day and delete the
   `blocked_by` links; the `block` events keep them, so exports keep the history.
+- **Unblocking a block that isn't ready needs the human's go-ahead (D40).** An agent's
+  `unblock` of a batch with any task that isn't ready is `human_only` unless it
+  carries `--approved`. Readiness is decided inside the write, and one approval row
+  covers the batch, all or nothing. A ready unblock needs no approval; `--approved`
+  on it warns `approval_unused`.
 - `task start` on a blocked task fails with exit 6 `blocked`, naming the blockers and
   their age; `--steal` doesn't bypass it. `next` is `silta task unblock AC-12` only
   when the block is ready; otherwise `silta task ls --status todo`, to pick other
@@ -596,13 +613,17 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   holds that state.
 
 **Other rules:**
-- **Submit for review:** `task submit AC-12` (doing → review).
+- **Submit for review:** `task submit AC-12` (doing → review). It takes no body; a
+  `status` event's body is always the new status.
 - **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
   override.
 - **External tracker:** `task promote AC-12 --ext ado:4711` (or `gh:owner/repo#12`,
   `jira:KEY-12`) is human-only. A promoted task becomes read-only in `silta` and status
-  changes return exit 3: "tracked in ado:4711; change it there". M4 adds reading the
+  changes return exit 3: "tracked in ado:4711; change it there", with `next`
+  `silta task ls --status todo` for the agent to pick other work. M4 adds reading the
   status back, Azure DevOps first.
+  - A proposal can't be promoted until it is triaged, and a blocked task until it is
+    unblocked (`conflict`, D40), so no proposal or block outlives promotion.
   - Rule of thumb for promoting: the work needs someone else, the client or users
     would notice it, or it's more than about half a day.
 - **Branch to task:** `brief` and `where` pick "the current task" in this order:
@@ -651,7 +672,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   - `any`: `done` warns if the latest verdict is `changes`
   - `human`: `done` needs a human `approve`
 
-  An unmet gate returns exit 7, and `--force` is human-only.
+  An unmet gate returns exit 7, and `--force` past it is human-only. On a met gate
+  `--force` changes nothing and needs no approval (D40).
 - **Rate limit:** per actor-session, per task, counting **commands** (a review with
   10 line comments is 1). The default is 30 per 10 min. Over the limit → exit 8 with
   `retry_after_s`, and the hint "summarise the rest in one comment".
@@ -753,9 +775,10 @@ silta code ls   <app>[@<ref>] [<dir>]
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need the human's go-ahead (D38): `promote`, `task edit`,
-  `doc edit|accept|reject`, `where --set`, `task triage`, `--steal`, `--force`,
-  `--allow-secret`, `ws edit`; and, with `proposals: ask` (D39), any agent write that
-  would create a `proposed` task (§8).
+  `doc edit|accept|reject`, `where --set`, `task triage`, `--steal` over another
+  session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
+  `ws edit`, and an agent's `task unblock` of a block that isn't ready (D40); and, with
+  `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
   - A `human:*` actor (a TTY, or the app) runs them directly; `--approved` from a
     human is ignored.
   - An agent runs them with `--approved "<the human's words>"`: what the human wrote
@@ -763,17 +786,22 @@ silta code ls   <app>[@<ref>] [<dir>]
     prompt, an earlier instruction or the agent's own text never counts. One answer
     covers every command named in the message it answers, and nothing else.
   - The words are 1–300 Unicode scalars after trimming and secret-guarded like any agent text. Words in
-    angle brackets, like the `<the human's words>` placeholder, are `invalid`.
+    angle brackets, or containing a printed placeholder such as `<the human's words>`
+    anywhere, are `invalid`.
   - The approval is stored as an `approval` row in the same write: the actor, the
-    command with its refs and flag names (no bodies), and the words. So every approval
-    can be read back, exported and counted.
+    command with its refs and the flag names passed (no bodies), and the words. A
+    command that creates tasks ends with ` -> <created refs>` (D40). So every approval
+    can be read back, exported, counted and tied to what it changed.
   - Without `--approved`, an agent gets `human_only` (exit 3). The message says the
     command needs the human's go-ahead; `next` is the same command with
     `--approved "<the human's words>"`.
   - `--approved` on a command that doesn't need it warns `approval_unused` and stores
     nothing. The exception (D39): on an agent write that would create a `proposed`
     task, `--approved` is used under either setting and creates `todo` (§8).
-  - `task edit` on a task the agent itself claims needs no approval.
+  - `task edit` on a task the agent itself claims needs no approval. `task edit
+    --print` prints the current document and is a read. An edit that changes nothing
+    stores no approval, so `--approved` warns `approval_unused`. An agent's edit can't
+    blank a stored Result or Plan (`invalid`, naming the field); a human's can.
 - This is a guard against accidents, not security: an agent could invent a quote. The
   `refusals` and `forbidden` evals check that agents never do.
 
@@ -980,12 +1008,17 @@ state; the tests check this with golden output.
 - One line per output. Keys are sorted by Unicode code point at every level, so output
   is byte-stable.
 - `warnings` is always present. `retry_after_s` is present only when set.
-- `next_by` says who acts on the `next` commands: `human` for `human_only`,
-  `read_only_promoted` and `env`, otherwise `agent`. The human works through an agent
+- `next_by` says who acts on the `next` commands: `human` for `human_only` and `env`,
+  otherwise `agent`. The human works through an agent
   (D38), so for `human` the agent asks the human in chat; for `human_only` it then
   runs the printed command with `--approved "<their words>"`.
 - `schema` is the envelope version. Data shapes only gain fields; any other change
   bumps `schema`.
+- `task ls --json` returns one summary per task (D40): `ref`, `title`, `status`,
+  `priority`, `created_by`, `created_at`, `updated_at`, and when set `app`, `parent`,
+  `claimed_by`, `claimed_at`, `external_ref`, `waiting` and `follow_up_at`. Bodies
+  (description, plan, acceptance, result) come from `task show`, which returns the
+  full detail, `parent` included.
 
 **Text errors** go to stderr: one line, the wait if there is one, then the commands, so
 the output always ends with what to run:
@@ -1000,8 +1033,8 @@ When `next_by` is `human`, the lines read `ask human: <cmd>` instead of `next: <
 Several `next` commands are alternatives, best first: run one.
 Task recovery commands preserve a known workspace, so a noncurrent workspace remains
 selected when following a hint. Early human-only refusals preserve an explicit
-`--ws` without reading storage. Invalid task values point to the failed command's
-help. A busy retry names only the parsed command path, without body-bearing
+`--ws` without reading storage. Invalid task values, an unreadable `-F` file
+included, point to the failed command's help. A busy retry names only the parsed command path, without body-bearing
 arguments.
 
 **Streams and global flags:**
@@ -1030,7 +1063,8 @@ run.
 | 0 | — | — |
 | 1 | `usage`, `invalid` | Read `silta <cmd> --help` and fix the call |
 | 2 | `not_found`, `unregistered` | Check the ref, or carry on without silta |
-| 3 | `human_only`, `read_only_promoted` | Stop and ask the human in chat; for `human_only`, rerun with `--approved "<their words>"` after they say yes |
+| 3 | `human_only` | Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes |
+| 3 | `read_only_promoted` | Leave it to its tracker and pick other work |
 | 4 | `ambiguous_location` | Retry with `--app <slug>` from the candidates |
 | 5 | `busy` | Retry once after a few seconds |
 | 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken`, `blocked` | Re-read, then decide; don't steal, and don't unblock while blockers are open |
@@ -1057,14 +1091,14 @@ silta search <query> [...]                       [M3]
 
 # tasks
 silta task add "title" [-m|-F] [--start] [--parent AC-3] [--app] [--topic …] [--priority n] [--from note:…]   [M1]
-silta task ls [--status] [--app] [--topic] [--on <ref>] [--mine] [--proposed] [--archived]   [M1]
+silta task ls [--status] [--app] [--topic] [--on <ref>] [--mine] [--proposed] [--promoted] [--archived]   [M1] summaries
 silta task show AC-12 [--timeline]               [M1] default: header, plan+steps, handoff, open questions, unresolved threads
-silta task edit AC-12 [-F <file>]                [M1] human-only: one markdown file, in $EDITOR or from -F
+silta task edit AC-12 [-F <file> | --print]      [M1] human-only: one markdown file, in $EDITOR or from -F; --print reads it
 silta task start AC-12 [--steal]                 [M1]
 silta task plan AC-12 -F - [--if-rev n] | --step N --done|--undo   [M1]
 silta task from-plan [<file>|-] [--parent] [--split] [--dry-run] [--delete]   [M1]
-silta task submit AC-12 [-m]                     [M1]
-silta task unblock <ref>… [-m]                   [M1] several refs, all or nothing
+silta task submit AC-12                          [M1]
+silta task unblock <ref>… [-m]                   [M1] several refs, all or nothing; an open block needs the human's go-ahead
 silta task block AC-12 [--on <ref>…] [--follow-up <date>|<n>d] -m <why>   [M1] adds to an existing block
 silta task done|drop AC-12 (-m|-F) [--sha|--no-sha] [--force]       [M1]
 silta task triage --accept <ref>… --drop <ref>… [--priority n] [-m]   [M1] human-only, batched

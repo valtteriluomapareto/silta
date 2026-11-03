@@ -243,6 +243,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     meeting anyway, where the human records it and unblocks.
   - Non-code work (releases, store submissions, contracts) is an ordinary task; one
     with no app records no branch, worktree or commit.
+  - ↳ update (2026-11-03, D40): unblocking a block that isn't ready needs the human's
+    go-ahead. An agent's `unblock` of a batch with such a task is `human_only` unless
+    it carries `--approved`; a ready block still unblocks without one.
   - Why: "waiting for the customer's input on messaging" and "waiting for App Store
     approval" are the most common non-code blockers. Free text in a status can't say
     what a task waits on, can't remind anyone, and can't notice a prerequisite landing.
@@ -318,6 +321,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - ↳ update (D39): with `proposals: ask`, an agent write that would create a
     `proposed` task is human-only too. A human's request in chat for such a write
     counts as its go-ahead.
+  - ↳ update (2026-11-03, D40): `--steal` and `--force` are human-only only when they
+    bypass something (a fresh claim, an unmet review gate); an agent's `unblock` of a
+    block that isn't ready joins the list. `task edit --print` prints the document, as
+    `ws show` does. An approval row of a creating command names the refs it created,
+    and an edit that changes nothing stores no approval.
 - **D39: Each workspace chooses how much ceremony it wants.**
   - Two new workspace settings (§6, Appendix A). Each defaults to what the spec
     already describes:
@@ -425,3 +433,55 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - Why: the human wants to switch off what they don't use. Proposals waiting for
     triage and questions in chat are the parts of D37 that most often wait on the
     human, and these two settings remove most of them where the human chooses.
+
+## S10 review follow-up (2026-11-03)
+
+- **D40: Task rows stay rebuildable, and approval follows what a write bypasses.**
+  - **Event bodies.** A `status` event's body is always the new status, so status
+    history can be rebuilt from events. `task submit` takes no body: nothing read it
+    (D30). The event kinds are listed in §6, `secret_redacted` included.
+  - **`task ls --json` is a summary**: `ref`, `title`, `status`, `priority`, `app`,
+    `parent`, `claimed_by`, `claimed_at`, `external_ref`, `waiting`, `follow_up_at`,
+    `created_by`, `created_at` and `updated_at`, without the description, plan,
+    acceptance or result. `task show` keeps the full detail. Data shapes only gain
+    fields (§16), so the smaller shape is fixed now, before agents depend on the old
+    one.
+  - **`parent`** appears in `task show` and `task ls`: the parent's ref, absent when
+    there is none (an optional field is never `null`, §20.1). Text output names it in
+    the header line, e.g. `AC-4 todo (priority 2, parent AC-3): …`.
+  - **Approval rows say what they created.** For a command that creates tasks (`task
+    add`, `from-plan`), the recorded `command` ends with ` -> <created refs>`. The
+    command names only the flags actually passed, and stays body-free.
+  - **`promote` is refused from `proposed` and `blocked`** (`conflict`, exit 6). The
+    `next` is the exact triage command for a proposal and `silta task unblock <ref>`
+    for a blocked task, so no proposal or block is left where nothing can change it.
+  - **`triage --priority` is optional**: without it, accepted tasks keep their stored
+    priority.
+  - **Unblocking a block that isn't ready needs the human's go-ahead.** Ready means
+    every blocker is a task and all are done (§8). An agent's `unblock` of a batch
+    with any other task is `human_only` unless `--approved` is given, decided inside
+    the write, with one approval row for the batch, all or nothing. A ready unblock
+    needs no approval, and `--approved` on it warns `approval_unused`. Humans are
+    unchanged.
+  - **`from-plan --split` children take the root's status**, decided once per import:
+    `todo` under a `todo` or `doing` root, `proposed` under a `proposed` one.
+    `--dry-run` shows the same.
+  - **`task edit <ref> --print`** prints the exact edit document, a read with no
+    approval. An agent's edit that blanks a stored Result or Plan is `invalid` and
+    names the field; humans may clear them. An edit that changes nothing writes no
+    approval row, so `--approved` warns `approval_unused`. Only changed fields pass
+    the secret guard.
+  - **Promoted tasks are left out of `task ls`** unless `--promoted` is given. Their
+    tracker owns them, so `read_only_promoted` points the agent at other work: `next`
+    is `silta task ls --status todo` and `next_by` is `agent`.
+  - **An unreadable `-F` file is `invalid`** (exit 1) with the failing command's
+    `--help`: it's the caller's mistake, not the environment's.
+  - **`--force` and `--steal` need approval only when they bypass something**: `done
+    --force` when the review gate is unmet, `start --steal` when another session holds
+    a fresh claim. Otherwise the flag changes nothing and needs no approval.
+  - **`--status proposed` implies `--proposed`.** The proposal refusal's `next` is the
+    exact `silta task triage --accept <ref> --approved "<the human's words>"`.
+  - Why: DF0 makes rows permanent (D20). Free text in status events and approval rows
+    that can't be tied to their tasks can't be repaired afterwards. The rest are
+    places where following the contract led an agent into a loop, lost data (a
+    priority, a Result), or asked the human for something that bypassed nothing.
