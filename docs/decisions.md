@@ -262,19 +262,20 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
 - **D37: The human's attention is the budget.**
   - Silta should cost the human about ten minutes a day, in one sitting. During a
     session it interrupts them only for what an agent can't do or decide.
-  - Agents decide and record: a reversible choice inside the task becomes a
-    `decision` comment, not a question. They ask only about scope, anything
-    irreversible, the customer, or money.
+  - Agents decide and record: a choice becomes a `decision` comment, not a question,
+    except for a fixed list (§11): scope, new dependencies, public APIs, schemas and
+    migrations, anything another app or the customer sees, deleting what they didn't
+    create, anything irreversible, and money.
   - What needs the human comes in one batch: approvals, proposals and questions in
     one message, never one at a time.
-  - Fewer proposals: the guide asks for at most two per session, only what the agent
-    would bet the human wants. An untriaged proposal leaves the inbox after 14 days
+  - Fewer proposals: usually none, never more than two per session, only what the
+    agent would bet the human wants. An untriaged proposal leaves the inbox after 14 days
     ("not now") without any write.
   - Agents pick their next work: "work the backlog" takes the first `todo` task for the
     app, by priority, then age.
-  - The inbox is short and grouped: blocked tasks one item per party or URL, at most
-    12 items, then `--all`. `triage` and `unblock` take several refs, so one answer is
-    one command.
+  - The inbox is short, ordered and grouped: blocked tasks past follow-up are one item
+    per party or URL, at most 12 items, then `--all`. `triage --accept … --drop …` and
+    `unblock` take several refs, all or nothing, so one answer is one command.
   - The dogfood report measures the load: approvals, proposal outcomes, questions,
     inbox size and age.
   - Why: every inbox item, question and refusal costs the human's attention, and
@@ -283,14 +284,21 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
 - **D38: The human works through agents.**
   - The human talks to an agent, which runs `silta` for them. They don't use the CLI
     themselves. The Mac app (M5) is their own surface and counts as `human:*`.
+  - `me` and `@me` mean the human, `human:<USER>`. An agent asked "what needs me?"
+    runs `silta inbox --for me`.
   - Human-only commands stay gated. A human actor (a TTY or the app) runs them
-    directly. An agent runs them with `--approved "<the human's words>"`, quoting the
-    human's yes from this chat. The words are stored in an `approval` row in the same
-    write, with the actor and command path.
-  - Without `--approved`, `human_only` (exit 3) tells the agent to ask in chat and
-    rerun with the human's words.
+    directly. An agent names the exact commands to the human in chat, and after a yes
+    runs them with `--approved "<the human's words>"`. Only words the human wrote in
+    reply count, and they cover only the commands named. They are stored in an
+    exported `approval` row in the same write, with the actor and the command's refs
+    and flag names.
+  - Without `--approved`, `human_only` (exit 3) tells the agent to ask in chat; `next`
+    shows the command with the placeholder, which is itself refused as `invalid`.
+  - When no answer can come, the agent doesn't wait: it leaves a `question` for `@me`
+    listing the pending commands, writes a handoff and picks other work.
   - Every `$EDITOR` command also reads `-F <file>`: `ws edit`, `task edit`, `doc edit`
-    (M2). `ws show` prints the current YAML, so an agent can show the change first.
+    and `doc accept --rebase` (M2). `ws show` prints the current YAML, so an agent can
+    show the change first. An agent edits a task it claims without approval.
   - Still a guard against accidents, not security: an agent could invent a quote. The
     `refusals` and `forbidden` evals check that agents never do.
   - Rejected:
