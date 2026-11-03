@@ -20,7 +20,7 @@ struct StorageBackupTests {
       try Data("Acme".utf8).write(to: folder.appending(path: "silta-acme.db"))
       for day in 1...9 {
         let name = String(format: "silta-2023-12-%02d.db", day)
-        let file = try backups.snapshot(name: name, at: StorageSchemaTests.instant)
+        let file = try backups.snapshot(name: name)
         let queue = try DatabaseQueue(path: file.path)
         #expect(try queue.read { try String.fetchOne($0, sql: "PRAGMA integrity_check") } == "ok")
         try backups.prune()
@@ -38,13 +38,13 @@ struct StorageBackupTests {
           sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme','Acme','AC')")
       }
       _ = try backups.snapshot(
-        name: last.lastPathComponent, at: StorageSchemaTests.instant, reuseExisting: true)
+        name: last.lastPathComponent, reuseExisting: true)
       #expect(try Data(contentsOf: last) == previous)
       let collision = folder.appending(path: "silta-2023-12-10.db")
       try FileManager.default.createDirectory(at: collision, withIntermediateDirectories: false)
       #expect(throws: StorageError.backupFailed) {
         try backups.snapshot(
-          name: collision.lastPathComponent, at: StorageSchemaTests.instant, reuseExisting: true)
+          name: collision.lastPathComponent, reuseExisting: true)
       }
       let remaining = try FileManager.default.contentsOfDirectory(atPath: folder.path)
       #expect(!remaining.contains { $0.hasSuffix(".pending") })
@@ -97,7 +97,7 @@ struct StorageBackupTests {
       let backup = StorageBackup(home: scratch)
       for day in 1...8 {
         _ = try backup.snapshot(
-          name: String(format: "silta-2023-12-%02d.db", day), at: StorageSchemaTests.instant)
+          name: String(format: "silta-2023-12-%02d.db", day))
       }
       try backup.prune()
       #expect(FileManager.default.fileExists(atPath: note.path))
@@ -128,7 +128,7 @@ struct StorageBackupTests {
         try db.execute(
           sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme','Acme','AC')")
         let file = try StorageBackup(home: scratch)
-          .snapshot(name: "silta-2023-11-14.db", at: StorageSchemaTests.instant)
+          .snapshot(name: "silta-2023-11-14.db")
         let snapshot = try DatabaseQueue(path: file.path)
         #expect(
           try snapshot.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
@@ -140,7 +140,7 @@ struct StorageBackupTests {
   @Test func concurrentInitializersAllObserveCompleteSchema() throws {
     try withScratchDirectory { scratch in
       let failures = Mutex<[String]>([])
-      DispatchQueue.concurrentPerform(iterations: 10) { index in
+      DispatchQueue.concurrentPerform(iterations: 10) { _ in
         do {
           let store = StorageSchemaTests.store(scratch)
           try store.initialize()

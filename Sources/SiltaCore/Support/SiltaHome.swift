@@ -36,7 +36,7 @@ package struct SiltaHome: Sendable {
     let url = override.map { URL(filePath: $0) } ?? realHome
     let canonical = try canonicalURL(url)
     let roots = try temporaryRoots.map { try canonicalURL($0) }
-    let isRealHome = canonical.path.caseInsensitiveCompare(realHome.path) == .orderedSame
+    let isRealHome = try identity(canonical) == identity(realHome)
     let isTemporary = roots.contains { root in
       let rootPath = root.path
       return canonical.path.hasPrefix(rootPath + "/")
@@ -44,6 +44,21 @@ package struct SiltaHome: Sendable {
     return SiltaHome(
       url: canonical, permitsDeterminism: !isRealHome && (deterministic || isTemporary))
   }
+}
+
+/// The file identity of the deepest existing ancestor, plus the missing components
+/// lowercased. Paths can't prove identity: realpath leaves firmlinks such as
+/// `/System/Volumes/Data/Users/…` as they are, and volumes may ignore case.
+private func identity(_ url: URL) throws -> [String] {
+  var ancestor = url
+  var missing: [String] = []
+  var info = stat()
+  while stat(ancestor.path, &info) != 0 {
+    guard errno == ENOENT, ancestor.path != "/" else { throw SeamError.invalidHome }
+    missing.append(ancestor.lastPathComponent.lowercased())
+    ancestor.deleteLastPathComponent()
+  }
+  return ["\(info.st_dev):\(info.st_ino)"] + missing.reversed()
 }
 
 // Resolve the existing ancestor before appending missing components: Foundation's

@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   pull_request:
   schedule:
-    - cron: "0 4 * * 1"   # weekly full run (slow tiers) on main
+    - cron: "0 4 * * 1"   # weekly run on main catches runner-image and toolchain drift
   workflow_dispatch:
 
 permissions:
@@ -29,11 +29,9 @@ jobs:
       - name: Install pinned Swift tools
         run: bash scripts/ci/install-swift-tools.sh
 
+      # The slow tiers take seconds, so every run includes them.
       - name: Verify
-        run: |
-          mode=quick
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then mode=full; fi
-          scripts/verify.sh "$mode"
+        run: scripts/verify.sh full
 
       - name: Upload scenario evidence on failure
         if: failure()

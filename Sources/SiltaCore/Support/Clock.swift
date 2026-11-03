@@ -17,8 +17,14 @@ package struct SystemClock: Clock {
   package func now() -> Date {
     Date()  // guard:allow-nondeterminism the system clock is the time boundary
   }
+
   /// Waits on the host clock for a bounded retry delay.
   package func wait(milliseconds: UInt64) {
     Thread.sleep(forTimeInterval: Double(milliseconds) / 1000)
   }
+}
+
+/// The UTC calendar day of an instant, as `YYYY-MM-DD`. Names daily logs and backups.
+func utcDay(_ date: Date) -> String {
+  String(date.formatted(.iso8601).prefix(10))
 }

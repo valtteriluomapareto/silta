@@ -180,7 +180,8 @@ struct SecretGuardTests {
   // A preview shows only a public marker: never a token's own characters or a birth date.
   @Test func previewsRevealNothingPrivate() throws {
     for (text, preview) in [
-      (identity(number: 2), "…[hetu]"), (String(repeating: "Q", count: 52), "…[azure_pat]"),
+      (Self.identity(number: 2), "…[hetu]"),
+      (String(repeating: "Q", count: 52), "…[azure_pat]"),
       ("Pwd\t=acme", "Pwd…[password]"),
     ] {
       let match = try #require(SecretGuard.matches(in: text).first)
@@ -192,10 +193,8 @@ struct SecretGuardTests {
     let token = "AK" + "IA" + String(repeating: "Q", count: 16)
     let error = SecretError(
       command: "silta task add", text: Array(repeating: token, count: 7).joined(separator: " "))
-    #expect(
-      error.message
-        == "Secret content detected: " + Array(repeating: "AKIA…[aws_key]", count: 5)
-        .joined(separator: ", ") + " and 2 more")
+    let shown = Array(repeating: "AKIA…[aws_key]", count: 5).joined(separator: ", ")
+    #expect(error.message == "Secret content detected: " + shown + " and 2 more")
   }
 
   @Test func rejectionGolden() {

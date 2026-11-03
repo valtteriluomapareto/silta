@@ -32,7 +32,8 @@ package struct SiltaEnvironment: Sendable {
   }
 
   /// Builds system seams from an environment snapshot. Invalid enabled overrides throw;
-  /// disabled overrides, including those at the real home, are ignored even when malformed. Queries git for attribution but creates no home files.
+  /// disabled overrides, including those at the real home, are ignored even when
+  /// malformed. Queries git for attribution but creates no home files.
   package static func system(
     environment: [String: String],
     userHome: URL? = nil,
@@ -67,14 +68,14 @@ package struct SiltaEnvironment: Sendable {
       }
     }
     let git = SystemGitRunner(environment: environment)
-    let actor = try await Actor.resolve(
+    let actor = await Actor.resolve(
       environment: environment, terminal: .system(), git: git,
       directory: URL(filePath: FileManager.default.currentDirectoryPath))
     let deterministicTime = clock is IncrementingClock
     return SiltaEnvironment(
       clock: clock, ids: ids, git: git, home: home,
       db: DatabaseStore(
-        home: home.url, clock: clock, ids: ids,
+        home: home.url, clock: clock,
         jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) }),
       log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose), actor: actor)
   }

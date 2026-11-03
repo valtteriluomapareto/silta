@@ -11,18 +11,13 @@ package final class DatabaseStore: Sendable {
   package let path: String
   private let home: URL
   private let clock: any Clock
-  private let ids: any IDGenerator
   private let jitter: @Sendable () -> UInt64
   private let writer = Mutex<DatabaseQueue?>(nil)
 
   /// Configures the fixed database/backup locations without opening or creating files.
-  package init(
-    home: URL, clock: any Clock, ids: any IDGenerator,
-    jitter: @escaping @Sendable () -> UInt64
-  ) {
+  package init(home: URL, clock: any Clock, jitter: @escaping @Sendable () -> UInt64) {
     self.home = home
     self.clock = clock
-    self.ids = ids
     self.jitter = jitter
     path = home.appending(path: "silta.db").path
   }
@@ -45,7 +40,7 @@ package final class DatabaseStore: Sendable {
         config.busyMode = .timeout(5)
         let queue = try DatabaseQueue(path: path, configuration: config)
         let migrator = StorageSchema.migrator
-        let pending = try queue.read { db in
+        let pending = try queue.read { db -> String? in
           guard try !migrator.hasBeenSuperseded(db) else { throw StorageError.schemaTooNew }
           if try db.tableExists("meta") {
             let version = try Int.fetchOne(
@@ -53,19 +48,21 @@ package final class DatabaseStore: Sendable {
             guard let version else { throw StorageError.unavailable }
             guard version <= Self.writerVersion else { throw StorageError.schemaTooNew }
           }
-          return try !migrator.hasCompletedMigrations(db)
+          let applied = try migrator.appliedIdentifiers(db)
+          return migrator.migrations.first { !applied.contains($0) }
         }
         try queue.writeWithoutTransaction { db in
           guard try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL") == "wal" else {
             throw StorageError.unavailable
           }
         }
-        if pending {
+        if let pending {
+          // The clock keeps names unique: a failed attempt's snapshot is never replaced.
           let timestamp = clock.now()
-          let day = String(timestamp.formatted(.iso8601).prefix(10))
-          let name = "silta-\(day)-before-v1-\(try ids.next(at: timestamp)).db"
-          let backup = StorageBackup(home: home, ids: ids)
-          _ = try backup.snapshot(name: name, at: timestamp)
+          let milliseconds = Int64(timestamp.timeIntervalSince1970 * 1000)
+          let name = "silta-\(utcDay(timestamp))-before-\(pending)-\(milliseconds).db"
+          let backup = StorageBackup(home: home)
+          _ = try backup.snapshot(name: name)
           try migrator.migrate(queue)
           try? backup.prune()  // best-effort retention after the committed migration
         }
@@ -76,14 +73,15 @@ package final class DatabaseStore: Sendable {
     }
   }
 
-  /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most three times.
+  /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most
+  /// three times.
   /// The closure must perform database-only work: a rolled-back attempt can run again.
   /// Checks writer compatibility and completes the required daily snapshot before calling the body.
   package func write<T>(_ body: (StorageTransaction) throws -> T) throws -> T {
     do {
       try initialize()
       guard let queue = writer.withLock({ $0 }) else { throw StorageError.unavailable }
-      let backup = StorageBackup(home: home, ids: ids)
+      let backup = StorageBackup(home: home)
       let result = try withStorageRetry(clock: clock, jitter: jitter) {
         try queue.write { db in
           let version = try Int.fetchOne(
@@ -94,13 +92,12 @@ package final class DatabaseStore: Sendable {
           guard FileManager.default.isWritableFile(atPath: path) else {
             throw StorageError.unavailable
           }
-          let timestamp = clock.now()
-          let day = String(timestamp.formatted(.iso8601).prefix(10))
+          let day = utcDay(clock.now())
           let previous = try String.fetchOne(
             db, sql: "SELECT value FROM meta WHERE key='last_backup_day'")
           guard let previous else { throw StorageError.unavailable }
           if previous != day {
-            _ = try backup.snapshot(name: "silta-\(day).db", at: timestamp, reuseExisting: true)
+            _ = try backup.snapshot(name: "silta-\(day).db", reuseExisting: true)
             try db.execute(
               sql: "UPDATE meta SET value=? WHERE key='last_backup_day'", arguments: [day])
           }

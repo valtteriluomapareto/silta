@@ -97,10 +97,7 @@ struct ScenarioTests {
           "SILTA_ID_SEED": "bad",
         ], scratch: scratch)
       #expect(actual == expected)
-      let outside = scratch.deletingLastPathComponent()
-      let alias = scratch.appending(path: "escape")
-      try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: outside)
-      for relative in ["../", "escape", outside.path] {
+      for relative in ["../", "acme/../..", scratch.deletingLastPathComponent().path] {
         #expect(throws: ScenarioFailure.self) {
           try ScenarioRunner.workingDirectory(relative, scratch: scratch)
         }

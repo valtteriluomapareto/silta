@@ -3,7 +3,7 @@ import SiltaTestSupport
 import Testing
 
 /// Every `silta …` an error tells the caller to run must exist (spec §16), or be
-/// planned for M1. The error goldens hold every coded error's text form.
+/// planned in a slice. The error goldens hold every coded error's text form.
 @Suite(.timeLimit(.minutes(1)))
 struct NextCommandTests {
   /// Commands that errors may name before their slice ships. Remove each when it lands.
@@ -15,7 +15,8 @@ struct NextCommandTests {
     for target in ["SiltaCoreTests", "siltaTests"] {
       let golden = tests.appending(path: "\(target)/Golden")
       for name in try FileManager.default.contentsOfDirectory(atPath: golden.path)
-      where name.hasSuffix(".txt") {
+      // error-codes.txt renders synthetic sample errors, one per code.
+      where name.hasSuffix(".txt") && name != "error-codes.txt" {
         let text = try String(contentsOf: golden.appending(path: name), encoding: .utf8)
         for line in text.split(separator: "\n") {
           for prefix in ["next: silta", "ask human: silta"] where line.hasPrefix(prefix) {

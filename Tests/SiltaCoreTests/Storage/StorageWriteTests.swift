@@ -228,7 +228,7 @@ struct StorageWriteTests {
         try? FileManager.default.setAttributes(
           [.posixPermissions: 0o600], ofItemAtPath: database.path)  // restores scratch permissions
       }
-      let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant), seed: 2)
+      let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
       #expect(throws: StorageError.unavailable) {
         try store.write { try Self.insert($0, uid: "acme-refused") }
       }
