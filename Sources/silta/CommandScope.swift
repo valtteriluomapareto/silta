@@ -1,3 +1,4 @@
+import ArgumentParser
 import SiltaCore
 
 /// Resolved identities for the existing command-log fields, never raw caller values.
@@ -34,6 +35,17 @@ struct CommandScope {
     } catch {
       // Failed app attribution retains the known workspace and cannot change the result.
       return Self(workspace: workspace)
+    }
+  }
+
+  /// Attributes malformed calls through the same global and opaque-body parser rules.
+  static func usage(_ arguments: [String], context: CommandContext) -> Self {
+    do {
+      let parsed = try UsageArguments.parse(arguments)
+      return Self(
+        workspace: try WorkspaceSelection.resolve(parsed.global.ws, in: context.environment.db))
+    } catch {
+      return Self()
     }
   }
 
@@ -78,4 +90,13 @@ struct CommandExecution {
   let rendered: Rendered
 
   var scope = CommandScope()
+}
+
+/// Reads known options while ArgumentParser retains the malformed command remainder.
+private struct UsageArguments: ParsableArguments {
+  @OptionGroup var global: GlobalOptions
+
+  @OptionGroup var body: TaskBody
+
+  @Argument(parsing: .allUnrecognized) var remainder: [String] = []
 }

@@ -102,6 +102,16 @@ struct DogfoodScopeBoundaryTests {
     }
   }
 
+  @Test func namedAppCannotResolveFromAnotherWorkspace() throws {
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let result = try Self.run(["--ws", "beta", "task", "ls", "--app", "api"], scratch: scratch)
+      #expect(result.termination == .exit(0))
+      let entry = try Self.last(scratch)
+      #expect(entry["workspace"] as? String == "beta" && entry["app"] == nil)
+    }
+  }
+
   @Test func positionalWorkspaceEditAndNewScanOverrideCurrentSelection() throws {
     try withScratchDirectory { scratch in
       _ = try Self.setup(scratch)

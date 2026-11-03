@@ -69,7 +69,9 @@ enum SiltaMain {
     do {
       command = try SiltaCommand.parseAsRoot(arguments)
     } catch {
-      return CommandExecution(rendered: parseFailure(error, arguments: arguments, mode: mode))
+      return CommandExecution(
+        rendered: parseFailure(error, arguments: arguments, mode: mode),
+        scope: CommandScope.usage(arguments, context: context))
     }
     guard let outputCommand = command as? any OutputCommand else {
       // The root itself: ArgumentParser answers with help.
@@ -78,7 +80,9 @@ enum SiltaMain {
         return CommandExecution(
           rendered: Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil))
       } catch {
-        return CommandExecution(rendered: parseFailure(error, arguments: arguments, mode: mode))
+        return CommandExecution(
+          rendered: parseFailure(error, arguments: arguments, mode: mode),
+          scope: CommandScope.usage(arguments, context: context))
       }
     }
     let scope = CommandScope.resolve(outputCommand, context: context)

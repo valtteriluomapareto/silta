@@ -166,7 +166,7 @@ struct DogfoodToolingTests {
         let rows = try Row.fetchAll(db, sql: "SELECT workspace_id,status,app_id FROM task")
         #expect(
           rows.count == 2
-            && rows.allSatisfy { $0["workspace_id"] as Int64 == 2 && $0["app_id"] as Int64 == 1 })
+            && rows.allSatisfy { $0["workspace_id"] as Int64 == 2 && $0["app_id"] as Int64? == 1 })
         #expect(rows.allSatisfy { $0["status"] as String == "proposed" })
         let links = try String.fetchAll(db, sql: "SELECT to_ext FROM link ORDER BY to_ext")
         #expect(links == ["https://example.com/acme/40", "https://example.com/acme/41"])

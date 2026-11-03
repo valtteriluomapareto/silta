@@ -29,11 +29,12 @@ struct DogfoodWorkspaceTests {
         let path = try String.fetchOne(db, sql: "SELECT path FROM repo_path")
         let uid = try String.fetchOne(db, sql: "SELECT uid FROM repo")
         let apps = try Int.fetchOne(db, sql: "SELECT count(*) FROM app")
+        let ref = try String.fetchOne(db, sql: "SELECT ref FROM app")
         let repos = try Int.fetchOne(db, sql: "SELECT count(*) FROM repo")
         let topics = try String.fetchAll(db, sql: "SELECT slug FROM topic")
         let settings = try String.fetchOne(db, sql: "SELECT settings FROM workspace")
         #expect(path == home.path && uid == "acme-silta-repo")
-        #expect(apps == 1 && repos == 1 && topics == ["dogfood"])
+        #expect(apps == 1 && repos == 1 && topics == ["dogfood"] && ref == "origin/main")
         #expect(settings == "{\"future\":42}")
       }
     }

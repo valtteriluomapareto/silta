@@ -1451,7 +1451,7 @@ steps, questions, handoffs and results.
     It reads only log lines and tasks tagged with the `silta` workspace, so data
     from other workspaces (DF3) never reaches the repo; untagged lines are only
     counted. DF therefore records the resolved workspace and app on every log line
-    (§19 lists them, but nothing sets them yet). The report runs under its own
+    (§19). The report runs under its own
     `SILTA_ACTOR` and leaves that actor's calls out. Failures before the
     environment is set up (a bad `SILTA_*` value) aren't logged, so the report
     can't see them.

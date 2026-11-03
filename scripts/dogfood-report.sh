@@ -49,7 +49,8 @@ WHERE workspace='silta' AND actor<>'agent:codex:dogfood-report' AND substr(creat
 if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$temporary/detail-array" \
   --slurpfile schema "$temporary/schema" --slurpfile approvals "$temporary/approvals" \
   --arg since "$since" --arg asof "$asof" --arg actor "$SILTA_ACTOR" '
-  def seconds: sub("\\.[0-9]+Z$";"Z") | fromdateiso8601;
+  def seconds: (capture("^(?<whole>[^.]+)(?<fraction>\\.[0-9]+)?Z$") // error("invalid timestamp")) |
+    ((.whole+"Z"|fromdateiso8601) + ((.fraction // "0")|tonumber));
   def median: sort | length as $n | if $n == 0 then 0 elif $n % 2 == 1 then .[($n/2|floor)] else (.[($n/2)-1] + .[$n/2])/2 end;
   def cell: tostring | gsub("\\|";"\\|") | gsub("[\r\n]";" ");
   def table($head;$rows):
