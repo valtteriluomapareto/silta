@@ -48,6 +48,15 @@ extension WorkspaceError: ErrorExamples {
   }
 }
 
+extension RepoError: ErrorExamples {
+  static var examples: [RepoError] {
+    [
+      .scan, .notFound, .localPath, .configuration(workspace: "acme"),
+      .fetch(repo: "platform", workspace: "acme"),
+    ]
+  }
+}
+
 extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
     [.humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme"))]
@@ -62,7 +71,7 @@ struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
-    StorageError.self, ActorError.self, WorkspaceError.self,
+    StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.

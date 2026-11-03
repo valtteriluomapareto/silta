@@ -1,1 +1,1 @@
-{"error":{"code":"invalid","message":"No command 'silta nope'; commands: silta schema, silta ws ls, silta ws use, silta ws edit","next":["silta schema"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"No command 'silta nope'; commands: silta schema, silta ws ls, silta ws use, silta ws edit, silta init, silta repo fetch","next":["silta schema"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

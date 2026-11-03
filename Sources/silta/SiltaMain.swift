@@ -24,7 +24,7 @@ enum SiltaMain {
         deterministic: flags.contains("--deterministic"),
         verbose: flags.contains("--verbose") ? .standardError : nil)
       let timestamp = environment.clock.now()
-      let rendered = execute(
+      let rendered = await execute(
         arguments, context: CommandContext(mode: mode, environment: environment))
       let elapsed = started.duration(to: timer.now).components
       let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
@@ -58,7 +58,7 @@ enum SiltaMain {
   }
 
   /// Parses and executes using the environment already assembled by the command boundary.
-  static func execute(_ arguments: [String], context: CommandContext) -> Rendered {
+  static func execute(_ arguments: [String], context: CommandContext) async -> Rendered {
     let mode = context.mode
     var command: any ParsableCommand
     do {
@@ -75,12 +75,13 @@ enum SiltaMain {
         return parseFailure(error, arguments: arguments, mode: mode)
       }
     }
-    return OutputRouter.render(
-      Result {
-        var output = try outputCommand.execute(context)
-        output.warnings = context.environment.warnings + output.warnings
-        return output
-      }, mode: mode)
+    do {
+      var output = try await outputCommand.execute(context)
+      output.warnings = context.environment.warnings + output.warnings
+      return OutputRouter.render(.success(output), mode: mode)
+    } catch {
+      return OutputRouter.render(.failure(error), mode: mode)
+    }
   }
 
   /// The output mode, read from the raw arguments so a parse error can still answer in
