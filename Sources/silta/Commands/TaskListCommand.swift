@@ -7,11 +7,15 @@ struct TaskListCommand: OutputCommand {
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.detailShape)])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Option(help: "Show this status.") var status: String?
 
   @Option(help: "Show this app.") var app: String?
+
+  var appSlug: String? { app }
 
   @Option(help: "Show tasks blocked on this task, ext:party or URL.") var on: String?
 

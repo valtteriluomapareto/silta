@@ -12,6 +12,8 @@ struct WsListCommand: OutputCommand {
       ]))
   ])
 
+  static let actsOnWorkspace = false
+
   @OptionGroup var global: GlobalOptions
 
   func execute(_ context: CommandContext) throws -> CommandOutput {

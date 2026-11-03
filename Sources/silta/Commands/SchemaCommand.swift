@@ -11,6 +11,8 @@ struct SchemaCommand: OutputCommand {
 
   static let dataShape = SchemaDocument.shape
 
+  static let actsOnWorkspace = false
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "A command's name, e.g. `task ls`; a group's name lists the group.")

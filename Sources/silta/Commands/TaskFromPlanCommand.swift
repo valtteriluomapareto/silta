@@ -16,6 +16,8 @@ struct TaskFromPlanCommand: OutputCommand {
     ]), "tasks": .array(TaskOutput.receiptShape),
   ])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "UTF-8 Markdown file, or - for stdin (the default).") var file = "-"

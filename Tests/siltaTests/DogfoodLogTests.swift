@@ -37,7 +37,7 @@ struct DogfoodLogTests {
     return try #require(try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
   }
 
-  @Test func recordsResolvedSelectionAndTaskAppOnceWithoutBodies() throws {
+  @Test func recordsResolvedSelectionAndNamedAppOnceWithoutBodies() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
       try store.write { tx in
@@ -78,12 +78,10 @@ struct DogfoodLogTests {
           "beta", "acme", "acme", "acme", "acme", "acme", "acme",
         ])
       #expect(entries[2]["app"] as? String == "api")
-      #expect(entries[3]["app"] as? String == "api")
-      #expect(entries[4]["app"] as? String == "api")
-      #expect(entries[5]["app"] == nil && entries[0]["app"] == nil)
+      #expect(entries.indices.filter { entries[$0]["app"] != nil } == [2])
       #expect(!text.contains("Acme private title"))
       #expect(
-        Set(entries[3].keys) == [
+        Set(entries[2].keys) == [
           "timestamp", "command", "actor", "exit_code", "milliseconds", "flags", "warnings",
           "workspace", "app",
         ])
@@ -102,14 +100,30 @@ struct DogfoodLogTests {
     ["from-plan", "--parent", "AC-1", "--dry-run"], ["ls", "--app", "api"],
     ["add", "Acme next", "--app", "api"],
   ])
-  func everyTaskIdentityPathLogsItsResolvedApp(arguments: [String]) throws {
+  func everyTaskCommandLogsItsWorkspaceAndOnlyANamedApp(arguments: [String]) throws {
     try withScratchDirectory { scratch in
       _ = try Self.setup(scratch)
       let result = try Self.run(["--ws", "acme", "task"] + arguments, scratch: scratch)
       let entry = try Self.last(scratch)
-      #expect(entry["workspace"] as? String == "acme" && entry["app"] as? String == "api")
+      #expect(entry["workspace"] as? String == "acme")
+      #expect(entry["app"] as? String == (arguments.contains("--app") ? "api" : nil))
       let code = try #require(entry["exit_code"] as? Int32)
       #expect(result.termination == .exit(code))
+    }
+  }
+
+  @Test(arguments: [
+    (["--ws", "beta", "ws", "show", "acme"], "acme"), (["ws", "show"], "acme"),
+    (["ws", "use", "beta"], "beta"), (["--ws", "beta", "repo", "fetch"], "beta"),
+    (["ws", "use", "absent"], nil),
+  ])
+  func workspaceCommandsLogTheWorkspaceTheyResolve(arguments: [String], workspace: String?)
+    throws
+  {
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      _ = try Self.run(arguments, scratch: scratch)
+      #expect(try Self.last(scratch)["workspace"] as? String == workspace)
     }
   }
 
@@ -132,26 +146,6 @@ struct DogfoodLogTests {
       let log = try String(
         contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)
       #expect(!log.contains("acme-secret"))
-    }
-  }
-
-  @Test(arguments: [false, true]) func batchAppIsPresentOnlyForOneCommonApp(mixed: Bool) throws {
-    try withScratchDirectory { scratch in
-      let store = try Self.setup(scratch)
-      try store.write { tx in
-        try tx.database.execute(sql: "UPDATE task SET status='blocked'")
-        try tx.database.execute(
-          sql: """
-            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,created_by,
-            created_at,updated_at)
-            VALUES('acme-second',1,2,'Acme second','blocked',?,'agent:codex:acme','','')
-            """, arguments: [mixed ? nil : 1])
-      }
-      #expect(
-        try Self.run(["--ws", "acme", "task", "unblock", "AC-1", "AC-2"], scratch: scratch)
-          .termination == .exit(0))
-      let app = try Self.last(scratch)["app"] as? String
-      #expect(app == (mixed ? nil : "api"))
     }
   }
 
@@ -202,16 +196,14 @@ struct DogfoodLogTests {
 
   @Test(arguments: [
     ["schema"], ["ws", "ls"], ["init", "--scan", "missing-acme"], ["init"], ["--version"],
-    ["task"],
+    ["--help"], ["task"], ["task", "show", "--help"],
   ])
   func commandsThatActOnNoWorkspaceStayUntagged(arguments: [String]) throws {
-    withKnownIssue("Commands without a workspace inherit the current selection") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        _ = try Self.run(arguments, scratch: scratch)
-        let entry = try Self.last(scratch)
-        #expect(entry["command"] is String && entry["workspace"] == nil)
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      _ = try Self.run(arguments, scratch: scratch)
+      let entry = try Self.last(scratch)
+      #expect(entry["command"] is String && entry["workspace"] == nil)
     }
   }
 

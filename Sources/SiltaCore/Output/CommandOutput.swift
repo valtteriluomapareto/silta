@@ -11,6 +11,10 @@ package struct CommandOutput: Sendable {
   /// Whether the command used a human-only gate; this is never serialized.
   package var approvalUsed: Bool
 
+  /// The workspace the command created or changed, for the command log (spec §19);
+  /// never serialized.
+  package var workspace: String?
+
   /// A result with text, envelope data and warnings.
   package init(
     text: String, data: any Encodable & Sendable, warnings: [OutputWarning] = [],

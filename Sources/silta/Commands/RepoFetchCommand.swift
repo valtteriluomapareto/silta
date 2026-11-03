@@ -8,6 +8,8 @@ struct RepoFetchCommand: OutputCommand {
 
   static let dataShape = Shape.object(["repos": .array(.string)])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The repository slug; omitted means all registered repos.")

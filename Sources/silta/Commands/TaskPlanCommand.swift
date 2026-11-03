@@ -9,6 +9,8 @@ struct TaskPlanCommand: OutputCommand {
     "ref": .string, "plan_rev": .int, "plan": .string,
   ])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @OptionGroup var body: TaskBody

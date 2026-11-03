@@ -7,10 +7,14 @@ struct WsShowCommand: OutputCommand {
 
   static let dataShape = Shape.object(["workspace": .string, "yaml": .string])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The workspace slug; defaults to the current workspace.")
   var workspace: String?
+
+  var workspaceSlug: String? { workspace ?? global.ws }
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let store = context.environment.db

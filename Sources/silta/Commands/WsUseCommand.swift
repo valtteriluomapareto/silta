@@ -7,10 +7,14 @@ struct WsUseCommand: OutputCommand {
 
   static let dataShape = Shape.object(["workspace": .string])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The workspace slug to select.")
   var workspace: String
+
+  var workspaceSlug: String? { workspace }
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     try WorkspaceSelection.use(workspace, in: context.environment.db)

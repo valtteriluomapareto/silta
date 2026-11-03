@@ -8,10 +8,14 @@ struct WsEditCommand: OutputCommand {
 
   static let dataShape = Shape.object(["workspace": .optional(.string)])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The workspace slug; defaults to the current workspace.")
   var workspace: String?
+
+  var workspaceSlug: String? { workspace ?? global.ws }
 
   @Option(name: .customShort("F"), help: "Read UTF-8 YAML from a file, or - for stdin.")
   var file: String?
@@ -41,9 +45,11 @@ struct WsEditCommand: OutputCommand {
         return process.terminationStatus
       }
     }
-    return CommandOutput(
+    var output = CommandOutput(
       text: selected.map { "Updated workspace \($0)." } ?? "No changes.",
       data: Data(workspace: selected), approvalUsed: true)
+    output.workspace = selected
+    return output
   }
 
   private func read(_ file: String) throws -> String {
@@ -57,7 +63,7 @@ struct WsEditCommand: OutputCommand {
     } catch { throw WorkspaceError.input }
   }
 
-  struct Data: Encodable {
+  private struct Data: Encodable {
     let workspace: String?
   }
 }

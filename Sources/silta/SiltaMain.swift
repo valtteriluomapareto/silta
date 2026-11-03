@@ -69,23 +69,26 @@ enum SiltaMain {
     do {
       command = try SiltaCommand.parseAsRoot(arguments)
     } catch {
+      let store = context.environment.db
+      let scope =
+        SiltaCommand.exitCode(for: error) == .success
+        ? CommandScope()
+        : CommandScope.usage(arguments, command: parsed(arguments).command, store: store)
       return CommandExecution(
-        rendered: parseFailure(error, arguments: arguments, mode: mode),
-        scope: CommandScope.usage(arguments, context: context))
+        rendered: parseFailure(error, arguments: arguments, mode: mode), scope: scope)
     }
     guard let outputCommand = command as? any OutputCommand else {
-      // The root itself: ArgumentParser answers with help.
+      // The root or a command group: ArgumentParser answers with help.
       do {
         try command.run()
         return CommandExecution(
           rendered: Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil))
       } catch {
-        return CommandExecution(
-          rendered: parseFailure(error, arguments: arguments, mode: mode),
-          scope: CommandScope.usage(arguments, context: context))
+        return CommandExecution(rendered: parseFailure(error, arguments: arguments, mode: mode))
       }
     }
-    let scope = CommandScope.resolve(outputCommand, context: context)
+    let rendered: Rendered
+    var reported: String?
     do {
       var output = try await outputCommand.execute(context)
       let approvalWarnings = context.environment.actor.approvalWarnings(
@@ -94,20 +97,19 @@ enum SiltaMain {
         !output.warnings.contains(where: { $0.code == warning.code })
       }
       output.warnings = context.environment.warnings + output.warnings
-      let resolved =
-        outputCommand is InitCommand || outputCommand is WsEditCommand
-        ? CommandScope.resolve(outputCommand, context: context, output: output) : scope
-      return CommandExecution(
-        rendered: OutputRouter.render(.success(output), mode: mode), scope: resolved)
+      reported = output.workspace
+      rendered = OutputRouter.render(.success(output), mode: mode)
     } catch let error as any CodedError {
       let recovered = recovery(
         error, command: outputCommand, arguments: arguments, context: context)
-      return CommandExecution(
-        rendered: OutputRouter.render(.failure(recovered), mode: mode), scope: scope)
+      rendered = OutputRouter.render(.failure(recovered), mode: mode)
     } catch {
-      return CommandExecution(
-        rendered: OutputRouter.render(.failure(error), mode: mode), scope: scope)
+      rendered = OutputRouter.render(.failure(error), mode: mode)
     }
+    return CommandExecution(
+      rendered: rendered,
+      scope: CommandScope.resolve(
+        outputCommand, reported: reported, store: context.environment.db))
   }
 
   /// Keeps recovery tied to the failed command and intended workspace.
@@ -225,6 +227,13 @@ enum SiltaMain {
   /// The command being parsed, e.g. `silta task ls`: the subcommand names among the
   /// arguments, skipping flags.
   static func commandPath(_ arguments: [String]) -> String {
+    parsed(arguments).path
+  }
+
+  /// The command path and the deepest command type its names reach.
+  static func parsed(_ arguments: [String]) -> (
+    path: String, command: any ParsableCommand.Type
+  ) {
     let arguments = withoutApprovalValues(arguments)
     var path = ["silta"]
     var command: any ParsableCommand.Type = SiltaCommand.self
@@ -248,6 +257,6 @@ enum SiltaMain {
       path.append(argument)
       command = sub
     }
-    return path.joined(separator: " ")
+    return (path.joined(separator: " "), command)
   }
 }

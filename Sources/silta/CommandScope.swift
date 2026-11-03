@@ -1,88 +1,49 @@
 import ArgumentParser
 import SiltaCore
 
-/// Resolved identities for the existing command-log fields, never raw caller values.
+/// The workspace and app a command's log line names (spec §19): identities that
+/// exist in storage, never raw caller values.
 struct CommandScope {
   var workspace: String?
 
   var app: String?
 
-  static func resolve(
-    _ command: any OutputCommand, context: CommandContext,
-    output: CommandOutput? = nil
+  /// The workspace a successful command reports creating or changing, otherwise the
+  /// one it resolves when it acts on a workspace.
+  static func resolve(_ command: any OutputCommand, reported: String?, store: DatabaseStore)
+    -> Self
+  {
+    if let reported { return Self(workspace: reported) }
+    guard type(of: command).actsOnWorkspace else { return Self() }
+    return resolve(command.workspaceSlug, app: command.appSlug, store: store)
+  }
+
+  /// A malformed call to a command that acts on a workspace names its `--ws` or the
+  /// current workspace, read through the same global and opaque-body parser rules.
+  static func usage(
+    _ arguments: [String], command: any ParsableCommand.Type, store: DatabaseStore
   ) -> Self {
-    var hint = command.global.ws
-    if let use = command as? WsUseCommand { hint = use.workspace }
-    if let show = command as? WsShowCommand { hint = show.workspace ?? hint }
-    if let edit = command as? WsEditCommand { hint = edit.workspace ?? hint }
-    if let data = output?.data as? InitData { hint = data.workspace ?? hint }
-    if let data = output?.data as? WsEditCommand.Data { hint = data.workspace ?? hint }
+    guard (command as? any OutputCommand.Type)?.actsOnWorkspace == true else { return Self() }
+    let parsed: UsageArguments
+    do { parsed = try UsageArguments.parse(arguments) } catch { return Self() }
+    return resolve(parsed.global.ws, app: nil, store: store)
+  }
+
+  private static func resolve(_ slug: String?, app: String?, store: DatabaseStore) -> Self {
     let workspace: String
-    do { workspace = try WorkspaceSelection.resolve(hint, in: context.environment.db) } catch {
+    do { workspace = try WorkspaceSelection.resolve(slug, in: store) } catch {
+      // A workspace that doesn't exist stays out of the log; the command reports it.
       return Self()
     }
+    guard let app else { return Self(workspace: workspace) }
     do {
-      let app: String?
-      if let name = namedApp(command) {
-        app = try WorkspaceSelection.app(name, workspace: workspace, in: context.environment.db)
-      } else {
-        let refs = references(command)
-        let service = TaskService(environment: context.environment, workspace: workspace)
-        let apps = try refs.map { try service.app(for: $0) }
-        app = !apps.isEmpty && apps.allSatisfy { $0 == apps.first ?? nil } ? apps[0] : nil
-      }
-      return Self(workspace: workspace, app: app)
+      return Self(
+        workspace: workspace, app: try WorkspaceSelection.app(app, workspace: workspace, in: store))
     } catch {
-      // Failed app attribution retains the known workspace and cannot change the result.
+      // Failed app attribution keeps the known workspace and can't change the result.
       return Self(workspace: workspace)
     }
   }
-
-  /// Attributes malformed calls through the same global and opaque-body parser rules.
-  static func usage(_ arguments: [String], context: CommandContext) -> Self {
-    do {
-      let parsed = try UsageArguments.parse(arguments)
-      return Self(
-        workspace: try WorkspaceSelection.resolve(parsed.global.ws, in: context.environment.db))
-    } catch {
-      return Self()
-    }
-  }
-
-  private static func namedApp(_ command: any OutputCommand) -> String? {
-    if let add = command as? TaskAddCommand { return add.app }
-    if let list = command as? TaskListCommand { return list.app }
-    return nil
-  }
-
-  private static func workRef(_ command: any OutputCommand) -> String? {
-    switch command {
-    case let value as TaskShowCommand: value.ref
-    case let value as TaskStartCommand: value.ref
-    case let value as TaskSubmitCommand: value.ref
-    case let value as TaskDoneCommand: value.ref
-    case let value as TaskDropCommand: value.ref
-    case let value as TaskPlanCommand: value.ref
-    case let value as TaskEditCommand: value.ref
-    default: nil
-    }
-  }
-
-  private static func references(_ command: any OutputCommand) -> [String] {
-    if let ref = workRef(command) { return [ref] }
-    return switch command {
-    case let value as TaskArchiveCommand: [value.ref]
-    case let value as TaskKeepCommand: [value.ref]
-    case let value as TaskLinkCommand: [value.ref]
-    case let value as TaskPromoteCommand: [value.ref]
-    case let value as TaskBlockCommand: [value.ref]
-    case let value as TaskUnblockCommand: value.refs
-    case let value as TaskTriageCommand: value.accept + value.drop
-    case let value as TaskFromPlanCommand: value.parent.map { [$0] } ?? []
-    default: []
-    }
-  }
-
 }
 
 /// Keeps rendering and resolved attribution together at the process boundary.

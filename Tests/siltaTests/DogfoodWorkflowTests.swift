@@ -92,7 +92,7 @@ struct DogfoodWorkflowTests {
     #expect(laterEntries.count == 2)
     #expect(
       laterEntries.allSatisfy {
-        $0["workspace"] as? String == "silta" && $0["app"] as? String == "silta"
+        $0["workspace"] as? String == "silta" && $0["app"] == nil
       })
   }
 

@@ -1201,6 +1201,17 @@ revision before the write.
   - ms; busy retries, git calls and git ms join when the first command counts them
   - warnings
 
+  `workspace` is set only for commands that act on a workspace: `task *`,
+  `ws show|edit|use`, `repo fetch`, and a successful `init --scan`. It is the
+  workspace the command resolves (`--ws`, its slug argument, or the current
+  workspace), or the one `init --scan` or `ws edit` created. A `usage` error on a
+  `task`, `ws show|edit|use` or `repo fetch` command names `--ws` or the current
+  workspace. Other commands
+  (`schema`, `ws ls`, `init` without a scanned workspace, help and version) leave it
+  out, as does a workspace that doesn't exist. `app` is set only when the command
+  names an app with `--app` that exists in that workspace. Neither field ever
+  carries a raw argument.
+
   Evals and the dogfood report read these logs (§21, §22.1).
 - **`silta doctor [--fix]`** checks:
   - **Install:** PATH, the hook and skill, the Codex writable root and marker.
@@ -1450,8 +1461,8 @@ steps, questions, handoffs and results.
 
     It reads only log lines and tasks tagged with the `silta` workspace, so data
     from other workspaces (DF3) never reaches the repo; untagged lines are only
-    counted. DF therefore records the resolved workspace and app on every log line
-    (§19). The report runs under its own
+    counted. DF therefore records the workspace each command acts on in its log
+    line (§19). The report runs under its own
     `SILTA_ACTOR` and leaves that actor's calls out. Failures before the
     environment is set up (a bad `SILTA_*` value) aren't logged, so the report
     can't see them.

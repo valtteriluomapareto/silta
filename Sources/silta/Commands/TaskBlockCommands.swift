@@ -10,6 +10,8 @@ struct TaskBlockCommand: OutputCommand {
     "waiting": .optional(TaskOutput.waitingShape),
   ])
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
@@ -53,6 +55,8 @@ struct TaskUnblockCommand: OutputCommand {
     commandName: "unblock", abstract: "Return a blocked batch to todo after an answer.")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
+
+  static let actsOnWorkspace = true
 
   @OptionGroup var global: GlobalOptions
 

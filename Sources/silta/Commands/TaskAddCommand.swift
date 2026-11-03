@@ -8,6 +8,8 @@ struct TaskAddCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
@@ -21,6 +23,8 @@ struct TaskAddCommand: OutputCommand {
   @Option(help: "The parent task reference.") var parent: String?
 
   @Option(help: "The explicit app slug; omitted means non-code work.") var app: String?
+
+  var appSlug: String? { app }
 
   @Option(name: .customLong("topic"), help: "An existing topic slug; repeat for several topics.")
   var topics: [String] = []

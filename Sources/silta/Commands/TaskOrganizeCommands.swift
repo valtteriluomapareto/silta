@@ -8,6 +8,8 @@ struct TaskArchiveCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The task reference.")
@@ -26,6 +28,8 @@ struct TaskKeepCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The task reference.")
@@ -43,6 +47,8 @@ struct TaskLinkCommand: OutputCommand {
     abstract: "Link a task to a reference in this workspace or an external URL.")
 
   static let dataShape = TaskOutput.receiptShape
+
+  static let actsOnWorkspace = true
 
   @OptionGroup var global: GlobalOptions
 
@@ -67,6 +73,8 @@ struct TaskPromoteCommand: OutputCommand {
     abstract: "Record an external tracker and make the task read-only (human-only).")
 
   static let dataShape = TaskOutput.receiptShape
+
+  static let actsOnWorkspace = true
 
   @OptionGroup var global: GlobalOptions
 

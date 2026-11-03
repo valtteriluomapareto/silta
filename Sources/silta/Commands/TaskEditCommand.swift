@@ -17,6 +17,8 @@ struct TaskEditCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let actsOnWorkspace = true
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The task reference.")
