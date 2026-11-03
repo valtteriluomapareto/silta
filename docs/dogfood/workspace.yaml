@@ -4,6 +4,7 @@ workspace:
   task_prefix: SI
 repos:
   - slug: silta
+    remote: https://github.com/valtteriluomapareto/silta.git
 apps:
   - slug: silta
     repo: silta

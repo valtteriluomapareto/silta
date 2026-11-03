@@ -7,13 +7,7 @@ import Testing
 struct DogfoodWorkspaceTests {
   static let remote = "https://github.com/valtteriluomapareto/silta.git"
 
-  @Test func shippedConfigAppliesWithoutReplacingScannedPath() throws {
-    withKnownIssue("The shipped YAML erases the scanned remote") {
-      try Self.apply()
-    }
-  }
-
-  static func apply() throws {
+  @Test func shippedConfigAppliesWithoutReplacingScannedPathOrRemote() throws {
     let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
     let text = try String(
@@ -29,7 +23,7 @@ struct DogfoodWorkspaceTests {
             INSERT INTO repo(uid,workspace_id,slug,remote_url)
             VALUES('acme-silta-repo',1,'silta',?);
             INSERT INTO repo_path(repo_id,path) VALUES(1,?);
-            """, arguments: [remote, home.path])
+            """, arguments: [Self.remote, home.path])
       }
       try store.write {
         try config.apply(in: $0, ids: SeededIDGenerator(seed: 7), at: StorageSchemaTests.instant)
