@@ -1,11 +1,10 @@
 import Foundation
-import GRDB
 import SiltaCore
 import SiltaTestSupport
 import Testing
 
 @Suite(.timeLimit(.minutes(3)))
-struct DogfoodToolingTests {
+struct DogfoodInstallTests {
   static func git(_ args: [String], in scratch: URL, cwd: URL) throws -> String {
     let result = try SiltaBinary.runProcess(
       URL(filePath: "/usr/bin/git"), args,
@@ -94,84 +93,46 @@ struct DogfoodToolingTests {
     }
   }
 
-  static func importStore(_ scratch: URL) throws -> DatabaseStore {
-    let store = try TaskCommandTests.setup(scratch)
-    try store.write { tx in
-      try tx.database.execute(
-        sql: """
-          INSERT INTO workspace(uid,slug,name,task_prefix)
-          VALUES('silta','silta','Acme Silta','SI');
-          INSERT INTO repo(uid,workspace_id,slug) VALUES('silta-repo',2,'silta');
-          INSERT INTO app(uid,workspace_id,slug,name,repo_id,ref)
-          VALUES('silta-app',2,'silta','Acme Silta',1,'main');
-          """)
-    }
-    return store
-  }
-
-  static func githubPages(_ scratch: URL, tools: URL) throws {
-    let other = (1...31).map {
-      ["number": $0, "title": "Acme documentation", "html_url": "https://example.com/acme/\($0)"]
-        as [String: Any]
-    }
-    let match: [String: Any] = [
-      "number": 40, "title": "S7: Acme location", "html_url": "https://example.com/acme/40",
-    ]
-    let data = try JSONSerialization.data(withJSONObject: [
-      other,
-      [
-        match, match,
-        ["number": 41, "title": "DF: Acme report", "html_url": "https://example.com/acme/41"],
-        [
-          "number": 42, "title": "S99: Acme pull request",
-          "html_url": "https://example.com/acme/42", "pull_request": [:],
-        ],
-      ],
-    ])
-    let pages = scratch.appending(path: "pages.json")
-    try data.write(to: pages)
-    try DogfoodReportTests.tool(
-      "gh",
-      text: "#!/bin/bash\n[[ \"$1 $2 $3\" == 'api --paginate --slurp' ]] || exit 98\ncat "
-        + shellWord(pages.path) + "\n", in: tools)
-  }
-
-  @Test func paginatedIssueImportIsIdempotentAndExplicitlyScoped() throws {
+  @Test(arguments: ["tracked", "head", "branch"])
+  func changesDuringBuildNeverReplaceInstalledBinary(change: String) throws {
     try withScratchDirectory { scratch in
-      let store = try Self.importStore(scratch)
+      let clone = try Self.clone(scratch)
       let tools = scratch.appending(path: "tools")
-      try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
-      try FileManager.default.createSymbolicLink(
-        at: tools.appending(path: "silta"), withDestinationURL: SiltaBinary.url())
-      try Self.githubPages(scratch, tools: tools)
-      for index in 0..<2 {
-        let result = try SiltaBinary.runProcess(
-          URL(filePath: "/bin/bash"),
-          [DogfoodReportTests.root.appending(path: "scripts/dogfood-import-issues.sh").path],
-          in: scratch,
-          environment: [
-            "PATH": tools.path + ":/usr/bin:/bin",
-            "SILTA_ACTOR": ActorID.agent(tool: "codex", session: "acme").description,
-          ])
-        #expect(result.termination == .exit(0) && result.stdout.contains("Next:"))
-        if index == 0 {
-          try store.write { tx in
-            try tx.database.execute(
-              sql: "UPDATE task SET archive_override='archived',created_by=?",
-              arguments: [ActorID.agent(tool: "claude", session: "acme-other").description])
-          }
-        }
-      }
-      try store.read { db in
-        let rows = try Row.fetchAll(db, sql: "SELECT workspace_id,status,app_id FROM task")
-        #expect(
-          rows.count == 2
-            && rows.allSatisfy { $0["workspace_id"] as Int64 == 2 && $0["app_id"] as Int64? == 1 })
-        #expect(rows.allSatisfy { $0["status"] as String == "proposed" })
-        let links = try String.fetchAll(db, sql: "SELECT to_ext FROM link ORDER BY to_ext")
-        #expect(links == ["https://example.com/acme/40", "https://example.com/acme/41"])
-        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == 0)
-      }
+      let destination = scratch.appending(path: "installed/silta")
+      try FileManager.default.createDirectory(
+        at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try Data("Acme original".utf8).write(to: destination)
+      let action =
+        change == "tracked"
+        ? "echo Acme >> .gitignore"
+        : change == "head"
+          ? "git -c user.name=Acme -c user.email=acme@example.invalid commit --allow-empty -qm Acme"
+          : "git checkout -qb codex/acme"
+      try DogfoodReportTests.tool(
+        "swift",
+        text: "#!/bin/bash\nmkdir -p .build/release\necho Acme-candidate > .build/release/silta\n"
+          + action + "\n", in: tools)
+      let result = try Self.install(clone, scratch: scratch, tools: tools)
+      #expect(result.termination != .exit(0))
+      #expect(try String(contentsOf: destination, encoding: .utf8) == "Acme original")
+    }
+  }
+
+  @Test func defaultInstallDirectoryUsesOnlyTheTemporaryHome() throws {
+    try withScratchDirectory { scratch in
+      let clone = try Self.clone(scratch)
+      let tools = scratch.appending(path: "tools")
+      try DogfoodReportTests.tool(
+        "swift", text: "#!/bin/bash\nmkdir -p .build/release\necho Acme > .build/release/silta\n",
+        in: tools)
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/bash"),
+        [clone.appending(path: "scripts/install-dev.sh").path], in: scratch,
+        environment: ["PATH": tools.path + ":/usr/bin:/bin"])
+      #expect(result.termination == .exit(0))
+      #expect(
+        FileManager.default.fileExists(
+          atPath: scratch.appending(path: "home/.local/bin/silta").path))
     }
   }
 }

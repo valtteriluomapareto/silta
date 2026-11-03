@@ -54,8 +54,8 @@ struct DogfoodWorkflowTests {
   }
 
   static func prepare(_ scratch: URL) throws -> (URL, DatabaseStore) {
-    let clone = try DogfoodToolingTests.clone(scratch)
-    let store = try DogfoodToolingTests.importStore(scratch)
+    let clone = try DogfoodInstallTests.clone(scratch)
+    let store = try DogfoodImportTests.store(scratch)
     try store.write { tx in
       try tx.database.execute(
         sql: "INSERT INTO repo_path(repo_id,path) VALUES(1,?)", arguments: [clone.path])
@@ -66,7 +66,7 @@ struct DogfoodWorkflowTests {
       text: "#!/bin/bash\nmkdir -p .build/release\ncp " + shellWord(try SiltaBinary.url().path)
         + " .build/release/silta\n", in: tools)
     #expect(
-      try DogfoodToolingTests.install(clone, scratch: scratch, tools: tools).termination
+      try DogfoodInstallTests.install(clone, scratch: scratch, tools: tools).termination
         == .exit(0))
     try DogfoodReportTests.tool(
       "gh",
