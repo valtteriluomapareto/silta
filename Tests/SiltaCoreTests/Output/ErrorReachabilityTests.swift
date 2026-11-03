@@ -90,6 +90,9 @@ extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
     [
       .humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme")),
+      .notReady(
+        command: "silta task unblock 'AC-4' 'AC-7'", actor: .agent(tool: "codex", session: "acme"),
+        refs: ["AC-4", "AC-7"]),
       .invalidApproval,
     ]
   }

@@ -467,7 +467,10 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     with any other task is `human_only` unless `--approved` is given, decided inside
     the write, with one approval row for the batch, all or nothing. A ready unblock
     needs no approval, and `--approved` on it warns `approval_unused`. Humans are
-    unchanged.
+    unchanged. The refusal names the tasks that aren't ready. The gate doesn't cover
+    `done` or `drop` of a blocked task, which §8 allows outright: they end the work
+    rather than resume it while it still waits, and each records a result saying
+    why.
   - **`from-plan --split` children take the root's status**, decided once per import:
     `todo` under a `todo` or `doing` root, `proposed` under a `proposed` one.
     `--dry-run` shows the same.
@@ -486,7 +489,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     --force` when the review gate is unmet, `start --steal` when another session holds
     a fresh claim. Otherwise the flag changes nothing and needs no approval.
   - **`--status proposed` implies `--proposed`.** The proposal refusal's `next` is the
-    exact `silta task triage --accept <ref> --approved "<the human's words>"`.
+    exact `silta task triage --accept <ref> --approved "<the human's words>"`, with
+    `next_by: human`, since it carries the placeholder for the human's words. `next_by`
+    is per error, not only per code.
   - Why: DF0 makes rows permanent (D20). Free text in status events and approval rows
     that can't be tied to their tasks can't be repaired afterwards. The rest are
     places where following the contract led an agent into a loop, lost data (a

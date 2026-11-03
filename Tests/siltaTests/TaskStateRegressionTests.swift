@@ -237,25 +237,23 @@ extension TaskStateRegressionTests {
     }
   }
 
-  @Test func unblockRefusalNamesTheTasksThatAreNotReady() {
-    withKnownIssue("the unblock refusal doesn't say which tasks aren't ready") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        for title in ["Acme", "Acme two", "Acme three"] {
-          #expect(
-            try Self.run(["task", "add", title, "--start"], in: scratch).termination == .exit(0))
-        }
-        for ref in ["AC-1", "AC-3"] {
-          #expect(
-            try Self.run(["task", "block", ref, "--on", "ext:acme", "-m", "Acme?"], in: scratch)
-              .termination == .exit(0))
-        }
-        let refused = try Self.run(["task", "unblock", "AC-1", "AC-3", "--json"], in: scratch)
-        #expect(refused.termination == .exit(3))
+  @Test func unblockRefusalNamesTheTasksThatAreNotReady() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      for title in ["Acme", "Acme two", "Acme three"] {
         #expect(
-          (try Self.error(refused)["message"] as? String)?.hasPrefix(
-            "AC-1 and AC-3 still wait on open blockers") == true)
+          try Self.run(["task", "add", title, "--start"], in: scratch).termination == .exit(0))
       }
+      for ref in ["AC-1", "AC-3"] {
+        #expect(
+          try Self.run(["task", "block", ref, "--on", "ext:acme", "-m", "Acme?"], in: scratch)
+            .termination == .exit(0))
+      }
+      let refused = try Self.run(["task", "unblock", "AC-1", "AC-3", "--json"], in: scratch)
+      #expect(refused.termination == .exit(3))
+      #expect(
+        (try Self.error(refused)["message"] as? String)?.hasPrefix(
+          "AC-1 and AC-3 still wait on open blockers") == true)
     }
   }
 }

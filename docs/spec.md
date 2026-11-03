@@ -519,7 +519,8 @@ going until the list is empty or the human stops it.
   it changes nothing and needs no approval (D40).
 - Start accepts `todo`, `doing` and `review`, and never reopens terminal tasks.
   Proposals need human triage before they can start or complete; the refusal's `next`
-  is `silta task triage --accept <ref> --approved "<the human's words>"`. An agent may
+  is `silta task triage --accept <ref> --approved "<the human's words>"`, with
+  `next_by: human`. An agent may
   drop its own proposal with a result; it cannot drop another actor's proposal.
 - Writes refuse another actor's fresh claim. An expired claim can be reclaimed with
   `start`; each claim compares the complete actor, including session.
@@ -598,9 +599,10 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   `blocked_by` links; the `block` events keep them, so exports keep the history.
 - **Unblocking a block that isn't ready needs the human's go-ahead (D40).** An agent's
   `unblock` of a batch with any task that isn't ready is `human_only` unless it
-  carries `--approved`. Readiness is decided inside the write, and one approval row
-  covers the batch, all or nothing. A ready unblock needs no approval; `--approved`
-  on it warns `approval_unused`.
+  carries `--approved`; the refusal names the tasks that aren't ready. Readiness is
+  decided inside the write, and one approval row covers the batch, all or nothing. A
+  ready unblock needs no approval; `--approved` on it warns `approval_unused`. `done`
+  and `drop` of a blocked task stay ungated: each records a result that says why.
 - `task start` on a blocked task fails with exit 6 `blocked`, naming the blockers and
   their age; `--steal` doesn't bypass it. `next` is `silta task unblock AC-12` only
   when the block is ready; otherwise `silta task ls --status todo`, to pick other
@@ -1010,7 +1012,8 @@ state; the tests check this with golden output.
   is byte-stable.
 - `warnings` is always present. `retry_after_s` is present only when set.
 - `next_by` says who acts on the `next` commands: `human` for `human_only` and `env`,
-  otherwise `agent`. The human works through an agent
+  and for a refusal whose `next` carries the `--approved` placeholder (a proposal's
+  triage); otherwise `agent`. The human works through an agent
   (D38), so for `human` the agent asks the human in chat; for `human_only` it then
   runs the printed command with `--approved "<their words>"`.
 - `schema` is the envelope version. Data shapes only gain fields; any other change
