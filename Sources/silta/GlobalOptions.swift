@@ -5,6 +5,9 @@ struct GlobalOptions: ParsableArguments {
   @Option(help: "Use this workspace instead of the current selection.")
   var ws: String?
 
+  @Option(parsing: .unconditional, help: "The human's words approving this command in chat.")
+  var approved: String?
+
   @Flag(help: "Print the JSON envelope on stdout instead of text.")
   var json = false
 

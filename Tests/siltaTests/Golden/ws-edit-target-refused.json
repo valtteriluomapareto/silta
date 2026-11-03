@@ -1,1 +1,1 @@
-{"error":{"code":"human_only","message":"This command requires a human actor; detected agent:codex:acme.","next":["silta ws edit 'other'"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"human_only","message":"This command needs the human's go-ahead; ask in chat. Detected agent:codex:acme.","next":["silta ws edit 'other' -F <file> --approved \"<the human's words>\""],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

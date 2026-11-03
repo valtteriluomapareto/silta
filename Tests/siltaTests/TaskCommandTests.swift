@@ -194,7 +194,7 @@ extension TaskCommandTests {
           JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
         let error = try #require(object["error"] as? [String: Any])
         #expect(result.termination == .exit(3))
-        #expect(error["next"] as? [String] == [expected])
+        #expect(error["next"] as? [String] == [expected + " --approved \"<the human's words>\""])
       }
     }
   }

@@ -15,7 +15,7 @@ enum SiltaMain {
 
   static func run(_ arguments: [String]) async -> Rendered {
     let mode = outputMode(arguments)
-    let flags = Set(arguments.prefix { $0 != "--" })
+    let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     let timer = ContinuousClock()
     let started = timer.now
     do {
@@ -34,8 +34,10 @@ enum SiltaMain {
         milliseconds: milliseconds)
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
-      entry.flags = ["--json", "--quiet", "--deterministic", "--verbose", "--help", "--version"]
-        .filter { flags.contains($0) }
+      entry.flags = [
+        "--approved", "--json", "--quiet", "--deterministic", "--verbose", "--help", "--version",
+      ]
+      .filter { flags.contains($0) }
       environment.log.record(entry)
       return rendered
     } catch {
@@ -77,6 +79,11 @@ enum SiltaMain {
     }
     do {
       var output = try await outputCommand.execute(context)
+      let approvalWarnings = context.environment.actor.approvalWarnings(
+        outputCommand.global.approved, used: output.approvalUsed)
+      output.warnings += approvalWarnings.filter { warning in
+        !output.warnings.contains(where: { $0.code == warning.code })
+      }
       output.warnings = context.environment.warnings + output.warnings
       return OutputRouter.render(.success(output), mode: mode)
     } catch let error as any CodedError {
@@ -88,7 +95,7 @@ enum SiltaMain {
     }
   }
 
-  /// Keeps recovery tied to the failed command and the task's workspace.
+  /// Keeps recovery tied to the failed command and intended workspace.
   static func recovery(
     _ error: any CodedError, command: any OutputCommand,
     arguments: [String], context: CommandContext
@@ -96,7 +103,12 @@ enum SiltaMain {
     let path = commandPath(arguments)
     if error.code == .busy { return CommandFailure(error: error, next: [path]) }
     var next = error.next
-    if let task = error as? TaskError, task.code == .invalid { next = [path + " --help"] }
+    if error.code == .invalid, error is TaskError || error is ActorError {
+      next = [path + " --help"]
+    }
+    if let edit = command as? WsEditCommand, error is WorkspaceError, error.code != .notFound {
+      next = workspaceRecovery(error, edit: edit, context: context)
+    }
     var workspace = command.global.ws
     if workspace == nil, path.hasPrefix("silta task "), !(error is ActorError) {
       do { workspace = try WorkspaceSelection.resolve(in: context.environment.db) } catch {
@@ -112,11 +124,29 @@ enum SiltaMain {
     return CommandFailure(error: error, next: next)
   }
 
+  /// Repairs the intended workspace through file input, without an editor or quote echo.
+  static func workspaceRecovery(
+    _ error: any CodedError, edit: WsEditCommand, context: CommandContext
+  ) -> [String] {
+    var target = edit.workspace ?? edit.global.ws
+    if target == nil {
+      do { target = try WorkspaceSelection.resolve(in: context.environment.db) } catch {
+        target = nil
+      }
+    }
+    let suffix = target.map { " " + shellWord($0) } ?? ""
+    let repair = "silta ws edit" + suffix + " -F <file> --approved \"<the human's words>\""
+    if target != nil, error.code == .invalid || error.code == .conflict {
+      return ["silta ws show" + suffix, repair]
+    }
+    return [repair]
+  }
+
   /// The output mode, read from the raw arguments so a parse error can still answer in
   /// JSON. ArgumentParser itself accepts the flags before or after the subcommand.
   /// Nothing after `--` counts.
   static func outputMode(_ arguments: [String]) -> OutputMode {
-    let flags = arguments.prefix { $0 != "--" }
+    let flags = withoutApprovalValues(arguments).prefix { $0 != "--" }
     return OutputMode(json: flags.contains("--json"), quiet: flags.contains("--quiet"))
   }
 
@@ -145,9 +175,37 @@ enum SiltaMain {
     return line.count > maxMessage ? line.prefix(maxMessage - 1) + "…" : line
   }
 
+  /// Keeps approval words opaque to flag, command-path and diagnostic discovery.
+  static func withoutApprovalValues(_ arguments: [String]) -> [String] {
+    var result: [String] = []
+    var skipValue = false
+    var positional = false
+    for argument in arguments {
+      if positional {
+        result.append(argument)
+        continue
+      }
+      if skipValue {
+        skipValue = false
+        continue
+      }
+      if argument == "--approved" {
+        result.append(argument)
+        skipValue = true
+      } else if argument.hasPrefix("--approved=") {
+        result.append("--approved")
+      } else {
+        result.append(argument)
+        positional = argument == "--"
+      }
+    }
+    return result
+  }
+
   /// The command being parsed, e.g. `silta task ls`: the subcommand names among the
   /// arguments, skipping flags.
   static func commandPath(_ arguments: [String]) -> String {
+    let arguments = withoutApprovalValues(arguments)
     var path = ["silta"]
     var command: any ParsableCommand.Type = SiltaCommand.self
     var skipValue = false

@@ -29,7 +29,9 @@ struct InitCommand: OutputCommand {
         scan.map { URL(filePath: $0) }, store: env.db,
         git: env.git, identity: (env.ids, env.clock.now()), workspace: global.ws)
     }
-    let edit = workspace.map { "silta ws edit '" + $0 + "'" } ?? "silta ws edit"
+    let edit =
+      (workspace.map { "silta ws edit '" + $0 + "'" } ?? "silta ws edit")
+      + " -F <file> --approved \"<the human's words>\""
     var text = workspace.map { "Initialized workspace \($0)." } ?? "Initialized database."
     if let workspace { text += "\nnext: silta ws use '\(workspace)'" }
     text += "\nask human: \(edit)"

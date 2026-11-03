@@ -1,2 +1,2 @@
-error: No command 'silta nope'; commands: silta schema, silta ws ls, silta ws use, silta ws edit, silta init, silta repo fetch, silta task add, silta task ls, silta task show, silta task start, silta task submit, silta task done, silta task drop, silta task plan, silta task from-plan [invalid]
+error: No command 'silta nope'; commands: silta schema, silta ws ls, silta ws use, silta ws edit, silta ws show, silta init, silta repo fetch, silta task add, silta task ls, silta task show, silta task start, silta task submit, silta task done, silta task drop, silta task plan, silta task from-plan [invalid]
 next: silta schema

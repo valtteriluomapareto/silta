@@ -16,10 +16,13 @@ struct TaskStartCommand: OutputCommand {
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     TaskOutput.receipt(
-      try await TaskService(environment: context.environment, workspace: global.ws)
-        .start(
-          ref, steal: steal,
-          directory: URL(
-            filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)))
+      try await TaskService(
+        environment: context.environment, workspace: global.ws, approved: global.approved
+      )
+      .start(
+        ref, steal: steal,
+        directory: URL(
+          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
+      approvalUsed: steal)
   }
 }

@@ -85,9 +85,30 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     return (actor, warnings)
   }
 
-  /// Refuses an agent, naming who was detected so a human can see why.
-  package func requireHuman(command: String) throws {
-    guard isHuman else { throw ActorError.humanOnly(command: command, actor: self) }
+  /// Accepts a human directly, or an agent carrying the human's words from chat.
+  /// Validation happens before command input or storage is opened.
+  @discardableResult
+  package func requireHuman(command: String, approved: String? = nil) throws -> HumanApproval? {
+    if isHuman { return nil }
+    guard let approved else { throw ActorError.humanOnly(command: command, actor: self) }
+    let words = approved.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard (1...300).contains(words.unicodeScalars.count),
+      !(words.hasPrefix("<") && words.hasSuffix(">"))
+    else { throw ActorError.invalidApproval }
+    return HumanApproval(actor: self, words: SecretGuard.redacted(words))
+  }
+
+  /// Reports unused words or redaction without retaining the original quote.
+  package func approvalWarnings(_ words: String?, used: Bool) -> [OutputWarning] {
+    guard let words else { return [] }
+    if isHuman || !used {
+      return [
+        OutputWarning(
+          code: "approval_unused",
+          message: "This command did not need --approved; no approval stored.")
+      ]
+    }
+    return SecretGuard.matches(in: words).isEmpty ? [] : [SecretGuard.warning]
   }
 
   private enum Explicit: Equatable {

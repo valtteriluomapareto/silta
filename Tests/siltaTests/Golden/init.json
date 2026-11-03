@@ -1,1 +1,1 @@
-{"data":{"next":["silta ws edit"],"next_by":"human"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"next":["silta ws edit -F <file> --approved \"<the human's words>\""],"next_by":"human"},"ok":true,"schema":1,"warnings":[]}

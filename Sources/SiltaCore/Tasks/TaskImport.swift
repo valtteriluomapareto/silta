@@ -12,12 +12,21 @@ package struct TaskImport: Sendable {
   /// Removes a safely validated source only after successful creation.
   package var delete = false
 
-  /// Lets a human retain detected secrets.
+  /// Retains detected secrets with the human's go-ahead.
   package var allowSecret = false
 
   /// A body-free retry preserves the options that determine the import result.
   package var retryCommand: String {
-    var command = "silta task from-plan <file>"
+    "silta task from-plan <file>" + commandOptions
+  }
+
+  /// Safe import refs and flag names without the source body or file path.
+  package var auditCommand: String {
+    "silta task from-plan" + commandOptions + " --allow-secret"
+  }
+
+  private var commandOptions: String {
+    var command = ""
     if let parent { command += " --parent " + shellWord(parent) }
     if split { command += " --split" }
     if dryRun { command += " --dry-run" }

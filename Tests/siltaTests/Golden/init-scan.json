@@ -1,1 +1,1 @@
-{"data":{"next":["silta ws edit 'acme'"],"next_by":"human","workspace":"acme"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"next":["silta ws edit 'acme' -F <file> --approved \"<the human's words>\""],"next_by":"human","workspace":"acme"},"ok":true,"schema":1,"warnings":[]}

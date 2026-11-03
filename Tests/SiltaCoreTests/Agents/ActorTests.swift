@@ -93,7 +93,7 @@ struct ActorTests {
     } catch let error as ActorError {
       #expect(error.code == .humanOnly)
       #expect(error.exitCode == 3)
-      #expect(error.next == ["silta task triage"])
+      #expect(error.next == ["silta task triage --approved \"<the human's words>\""])
       #expect(error.message.contains("agent:unknown:acme"))
       let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
       let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))

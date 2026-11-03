@@ -39,14 +39,17 @@ struct TaskFromPlanCommand: OutputCommand {
     options.delete = delete
     options.allowSecret = allowSecret
     if allowSecret {
-      try context.environment.actor.requireHuman(command: options.retryCommand + " --allow-secret")
+      try context.environment.actor.requireHuman(
+        command: options.retryCommand + " --allow-secret", approved: global.approved)
     }
     let text = try read()
-    let result = try await TaskService(environment: context.environment, workspace: global.ws)
-      .fromPlan(
-        text, options: options, source: file == "-" ? nil : URL(filePath: file),
-        directory: URL(
-          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
+    let result = try await TaskService(
+      environment: context.environment, workspace: global.ws, approved: global.approved
+    )
+    .fromPlan(
+      text, options: options, source: file == "-" ? nil : URL(filePath: file),
+      directory: URL(
+        filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
     let preview = result.preview
     var lines =
       result.dryRun
@@ -65,7 +68,8 @@ struct TaskFromPlanCommand: OutputCommand {
       }
     }
     return CommandOutput(
-      text: lines.joined(separator: "\n"), data: result, warnings: result.warnings)
+      text: lines.joined(separator: "\n"), data: result, warnings: result.warnings,
+      approvalUsed: allowSecret)
   }
 
   private func read() throws -> String {

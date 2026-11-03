@@ -8,17 +8,14 @@ extension TaskService {
     _ ref: String, result: String?, dropped: Bool = false,
     commit: TaskCommit = TaskCommit(), directory: URL
   ) async throws -> TaskResult {
-    if commit.force {
-      try environment.actor.requireHuman(
-        command: "silta task done " + shellWord(ref) + " --force -F <file>")
-    }
-    let command = (dropped ? "silta task drop " : "silta task done ") + shellWord(ref)
+    let command = commit.command(ref, dropped: dropped)
+    let audit = command + (commit.allowSecret ? " --allow-secret" : "")
+    let approval = try approval(
+      required: commit.force || commit.allowSecret,
+      command: audit + " -F <file>")
     let content = try checked(
       result ?? "", allow: commit.allowSecret, command: command + " -F <file>")
-    try requireResult(content.0)
-    guard !(commit.sha != nil && commit.noSHA) else {
-      throw TaskError.invalid("--sha and --no-sha cannot be combined.")
-    }
+    try validateResult(content.0, commit: commit)
     let before = try show(ref)
     try canClose(before, dropped: dropped)
     let at = environment.clock.now()
@@ -56,11 +53,16 @@ extension TaskService {
       try changed(
         task.id, kind: "status", body: dropped ? "dropped" : "done",
         redacted: content.1, at: at, in: tx)
+      try approval?.record(
+        command: audit, workspace: slug, identity: (environment.ids, at), in: tx)
       return receipt(try Self.lookup(ref, workspace: slug, in: tx.database), warnings: warnings)
     }
   }
 
-  private func requireResult(_ text: String) throws {
+  private func validateResult(_ text: String, commit: TaskCommit) throws {
+    guard !(commit.sha != nil && commit.noSHA) else {
+      throw TaskError.invalid("--sha and --no-sha cannot be combined.")
+    }
     if !environment.actor.isHuman, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       throw TaskError.invalid("Agents must provide a nonblank result with -m or -F <file>.")
     }

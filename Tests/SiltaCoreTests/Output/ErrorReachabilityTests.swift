@@ -44,7 +44,7 @@ extension SecretError: ErrorExamples {
 
 extension WorkspaceError: ErrorExamples {
   static var examples: [WorkspaceError] {
-    [.invalid(["line 1: expected a mapping"]), .notFound, .conflict, .editor]
+    [.invalid(["line 1: expected a mapping"]), .notFound, .conflict, .editor, .input]
   }
 }
 
@@ -77,7 +77,10 @@ extension CommandFailure: ErrorExamples {
 
 extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
-    [.humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme"))]
+    [
+      .humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme")),
+      .invalidApproval,
+    ]
   }
 }
 

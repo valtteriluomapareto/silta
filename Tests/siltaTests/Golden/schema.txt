@@ -1,7 +1,8 @@
 silta schema  Describe the commands, their flags, their --json data and the error codes.
-silta ws ls  List workspaces; ask a human to run silta ws edit if empty.
+silta ws ls  List workspaces; ask in chat before editing configuration.
 silta ws use  Select the current workspace.
 silta ws edit  Edit workspace YAML (human-only).
+silta ws show  Print the current workspace YAML without editing it.
 silta init  Initialize or scan repos; select with ws use; configuration editing is human-only.
 silta repo fetch  Fetch a repo, or all registered repos in the workspace, without prompting.
 silta task add  Add a proposal; --start claims work requested by the human.
@@ -17,6 +18,7 @@ details: silta schema <command>
 
 global flags:
   --ws <ws>  optional: Use this workspace instead of the current selection.
+  --approved <approved>  optional: The human's words approving this command in chat.
   --json  optional: Print the JSON envelope on stdout instead of text.
   --quiet  optional: Hide success text; warnings and errors still show.
   --deterministic  optional: Allow deterministic overrides outside temporary homes; never at the real home.
@@ -27,8 +29,8 @@ error codes:
   invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call
   not_found  exit 2, next by agent: Check the ref, or carry on without silta
   unregistered  exit 2, next by agent: Check the ref, or carry on without silta
-  human_only  exit 3, next by human: Stop; ask the human to run the printed command
-  read_only_promoted  exit 3, next by human: Stop; ask the human to run the printed command
+  human_only  exit 3, next by human: Stop and ask the human in chat; for `human_only`, rerun with `--approved "<their words>"` after they say yes
+  read_only_promoted  exit 3, next by human: Stop and ask the human in chat; for `human_only`, rerun with `--approved "<their words>"` after they say yes
   ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates
   busy  exit 5, next by agent: Retry once after a few seconds
   conflict  exit 6, next by agent: Re-read, then decide; don't steal

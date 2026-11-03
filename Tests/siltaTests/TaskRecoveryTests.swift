@@ -76,7 +76,10 @@ extension TaskRecoveryTests {
       let object = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
       let error = try #require(object["error"] as? [String: Any])
-      #expect(error["next"] as? [String] == ["silta task add '<title>' --allow-secret -F <file>"])
+      #expect(
+        error["next"] as? [String] == [
+          "silta task add '<title>' --allow-secret -F <file> --approved \"<the human's words>\""
+        ])
       let help = try SiltaBinary.run(
         ["task", "add", "Acme", "--allow-secret", "-F", "body.md", "--help"], in: scratch)
       #expect(help.termination == .exit(0))

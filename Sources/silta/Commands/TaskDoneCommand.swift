@@ -22,22 +22,27 @@ struct TaskDoneCommand: OutputCommand {
   var force = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
-    if force {
-      try context.environment.actor.requireHuman(
-        command: "silta task done " + shellWord(ref) + " --force -F <file>")
-    }
-    let text = try body.read(
-      actor: context.environment.actor, command: "silta task done " + shellWord(ref))
     var commit = TaskCommit()
     commit.sha = sha
     commit.noSHA = noSha
     commit.force = force
     commit.allowSecret = body.allowSecret
+    if force {
+      try context.environment.actor.requireHuman(
+        command: commit.command(ref, dropped: false)
+          + (body.allowSecret ? " --allow-secret" : "") + " -F <file>", approved: global.approved)
+    }
+    let text = try body.read(
+      actor: context.environment.actor, command: commit.command(ref, dropped: false),
+      approved: global.approved)
     return TaskOutput.receipt(
-      try await TaskService(environment: context.environment, workspace: global.ws)
-        .close(
-          ref, result: text, commit: commit,
-          directory: URL(
-            filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)))
+      try await TaskService(
+        environment: context.environment, workspace: global.ws, approved: global.approved
+      )
+      .close(
+        ref, result: text, commit: commit,
+        directory: URL(
+          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
+      approvalUsed: force || body.allowSecret)
   }
 }
