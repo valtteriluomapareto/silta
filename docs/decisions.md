@@ -220,3 +220,26 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     An agent's shell may not keep an `unset` between calls, so "unset it and retry"
     loops, and for `SILTA_HOME` the obvious workaround writes to the real
     `~/.silta`.
+- **D35: Blockers name what would unblock them.**
+  - `task block --on <ref> -m <why>` links a task to what it waits on (`blocked_by`):
+    another task, an external party (`ext:acme`, `ext:app-store`) or a `url:`. For a
+    party, `-m` is the ask; Silta sends nothing.
+  - An external party is a plain name, not an actor and not a YAML entity: it is
+    waited on but never writes, claims or passes a human-only check, and it is never
+    renamed. A `new_party` warning catches typos.
+  - A follow-up day (default 7 days) brings every blocked task back to the human's
+    inbox, so nothing waits unnoticed. Silta never unblocks by itself, because reads
+    never write.
+  - `block` releases the claim and `unblock` always returns to `todo`, so no previous
+    status has to be stored and no stale claim comes back. `task start` on a blocked
+    task fails with its own `blocked` code, and suggests `unblock` only when every
+    blocker is a task and all are done, so following `next` never bypasses an open
+    blocker; a party or URL blocker comes back only on its follow-up day.
+  - Rejected: a customer question as a separate comment kind that the task blocks on.
+    It took two commands and a comment ref, and the answer arrives by email or in a
+    meeting anyway, where the human records it and unblocks.
+  - Non-code work (releases, store submissions, contracts) is an ordinary task; one
+    with no app records no branch, worktree or commit.
+  - Why: "waiting for the customer's input on messaging" and "waiting for App Store
+    approval" are the most common non-code blockers. Free text in a status can't say
+    what a task waits on, can't remind anyone, and can't notice a prerequisite landing.
