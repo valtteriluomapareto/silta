@@ -64,7 +64,8 @@ extension TaskService {
     let approval = try approval(required: true, command: command)
     let slug = try selected()
     return try environment.db.write { tx in
-      let task = try Self.lookup(ref, workspace: slug, in: tx.database)
+      let task = try Self.decorate(
+        Self.lookup(ref, workspace: slug, in: tx.database), at: at, in: tx.database)
       try promotable(task, at: at)
       try tx.database.execute(
         sql: """
@@ -82,7 +83,11 @@ extension TaskService {
 
   private func promotable(_ task: TaskDetails, at date: Date) throws {
     try validateClaim(task, at: date)
-    if task.status == "proposed" { throw TaskError.proposal(task.ref) }
-    if task.status == "blocked" { throw TaskError.blockedPromotion(task.ref) }
+    if task.status == "proposed" {
+      throw TaskError.proposal(task.ref, human: environment.actor.isHuman)
+    }
+    if task.status == "blocked" {
+      throw TaskError.blockedPromotion(task.ref, ready: task.waiting?.ready == true)
+    }
   }
 }

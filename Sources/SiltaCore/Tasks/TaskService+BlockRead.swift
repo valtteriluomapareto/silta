@@ -14,7 +14,8 @@ extension TaskService {
     guard !raw.contains(":") || raw.hasPrefix("task:"), !raw.contains("/") else {
       throw TaskError.invalid("Blockers must be task, ext:party or url:http(s) references.")
     }
-    return TaskLinkTarget(kind: "task", id: try lookup(raw, workspace: workspace, in: db).id)
+    return TaskLinkTarget(
+      kind: "task", id: try named("blocker") { try lookup(raw, workspace: workspace, in: db) }.id)
   }
 
   static func blockLinks(_ task: TaskDetails, in db: Database) throws -> [Row] {

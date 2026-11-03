@@ -98,6 +98,13 @@ package struct TaskService: Sendable {
     return id
   }
 
+  /// Runs `body`, naming a task it doesn't find by `role`: "parent task AC-9".
+  static func named<T>(_ role: String, _ body: () throws -> T) throws -> T {
+    do { return try body() } catch TaskError.notFound(let what) {
+      throw TaskError.notFound(role + " " + what)
+    }
+  }
+
   static func entity(_ table: String, slug: String, workspace: Int64, in db: Database) throws
     -> Int64
   {
@@ -108,7 +115,7 @@ package struct TaskService: Sendable {
           SELECT id FROM \(table)
           WHERE workspace_id=? AND slug=?
           """, arguments: [workspace, slug])
-    else { throw TaskError.notFound }
+    else { throw TaskError.notFound(table + " " + slug) }
     return id
   }
 }

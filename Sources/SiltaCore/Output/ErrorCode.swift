@@ -1,5 +1,5 @@
 /// Who must act before an error's `next` commands can run (spec §16).
-package enum NextBy: String, Sendable {
+public enum NextBy: String, Sendable {
   /// The calling agent can run them itself.
   case agent
   /// The agent must ask the human in chat before acting.

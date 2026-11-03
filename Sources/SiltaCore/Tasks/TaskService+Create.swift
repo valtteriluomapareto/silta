@@ -49,7 +49,9 @@ extension TaskService {
     let draft = creation.draft
     let db = tx.database
     let ws = try Self.workspaceID(workspace, in: db)
-    let parent = try draft.parent.map { try Self.lookup($0, workspace: workspace, in: db) }
+    let parent = try draft.parent.map { ref in
+      try Self.named("parent") { try Self.lookup(ref, workspace: workspace, in: db) }
+    }
     if let parent { try Self.validateParent(parent) }
     let app = try draft.app.map { try Self.entity("app", slug: $0, workspace: ws, in: db) }
     if let app, try Self.repoPath(app: app, in: db) != creation.path {

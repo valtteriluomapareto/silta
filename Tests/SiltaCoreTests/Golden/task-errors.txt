@@ -1,11 +1,13 @@
-error: Task or workspace entity not found. [not_found]
+error: Parent task AC-9 not found. [not_found]
 next: silta task ls
 error: A result is required. [invalid]
 next: silta task add --help
-error: AC-1 is claimed by agent:codex:acme (4 min old); do not steal. [claimed]
-next: silta task show AC-1
+error: AC-1 is claimed by agent:codex:acme (4 min old); pick other work, or ask the human before stealing it. [claimed]
+next: silta task ls --status todo
 error: Proposal AC-1 needs human triage; ask in chat before accepting it. [conflict]
 ask human: silta task triage --accept AC-1 --approved "<the human's words>"
+error: Proposal AC-1 needs triage first. [conflict]
+next: silta task triage --accept AC-1
 error: AC-1 cannot make this transition from done. [conflict]
 next: silta task show AC-1
 error: Git could not report the task's worktree or commit; ask a human to check git. [env]
@@ -31,7 +33,9 @@ next: silta task show AC-1
 error: AC-1 has plan revision 2; re-read before replacing it. [stale_rev]
 next: silta task show AC-1
 error: AC-1 is blocked; unblock it before promoting it. [conflict]
-next: silta task unblock AC-1
+next: silta task show AC-1
+error: AC-2 is blocked; unblock it before promoting it. [conflict]
+next: silta task unblock AC-2
 error: AC-1's plan has 0 checkboxes; --step N counts top-level `- [ ] …` lines, so store a revision with them. [invalid]
 next: silta task plan AC-1 -F -
 error: Database is busy; retry the original invocation once after retry_after_s. [busy]

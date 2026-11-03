@@ -27,11 +27,9 @@ struct TaskOutputRegressionTests {
       let blocker = #expect(throws: TaskError.self) {
         _ = try service.block("AC-1", TaskBlockTests.input(["AC-9"]))
       }
-      withKnownIssue("not_found doesn't name the ref") {
-        #expect(missing?.message == "Task AC-9 not found.")
-        #expect(orphan?.message == "Parent task AC-9 not found.")
-        #expect(blocker?.message == "Blocker task AC-9 not found.")
-      }
+      #expect(missing?.message == "Task AC-9 not found.")
+      #expect(orphan?.message == "Parent task AC-9 not found.")
+      #expect(blocker?.message == "Blocker task AC-9 not found.")
     }
   }
 
@@ -43,10 +41,8 @@ struct TaskOutputRegressionTests {
         environment: try TaskServiceTests.environment(
           home, actor: .agent(tool: "codex", session: "rival")))
       let refusal = #expect(throws: TaskError.self) { _ = try rival.archive("AC-1") }
-      withKnownIssue("claimed points at task show only") {
-        #expect(refusal?.next == ["silta task ls --status todo"])
-        #expect(refusal?.message.contains("ask the human before stealing") == true)
-      }
+      #expect(refusal?.next == ["silta task ls --status todo"])
+      #expect(refusal?.message.contains("ask the human before stealing") == true)
     }
   }
 
@@ -60,11 +56,9 @@ struct TaskOutputRegressionTests {
       _ = try human.block("AC-2", TaskBlockTests.input())
       let agent = TaskService(environment: try TaskServiceTests.environment(home))
       let refusal = #expect(throws: ActorError.self) { _ = try agent.unblock(["AC-1", "AC-2"]) }
-      withKnownIssue("notReady says open blockers for every wait") {
-        #expect(
-          refusal?.message.hasPrefix("AC-1 waits on ext:acme and AC-2 waits on an answer;")
-            == true)
-      }
+      #expect(
+        refusal?.message.hasPrefix("AC-1 waits on ext:acme and AC-2 waits on an answer;")
+          == true)
     }
   }
 
@@ -78,9 +72,7 @@ struct TaskOutputRegressionTests {
       let open = #expect(throws: TaskError.self) {
         _ = try human.promote("AC-2", external: "ado:42")
       }
-      withKnownIssue("blockedPromotion always points at unblock") {
-        #expect(open?.next == ["silta task show AC-2"])
-      }
+      #expect(open?.next == ["silta task show AC-2"])
       _ = try await human.close("AC-1", result: "Done", directory: home)
       let ready = #expect(throws: TaskError.self) {
         _ = try human.promote("AC-2", external: "ado:42")
@@ -100,10 +92,8 @@ struct TaskOutputRegressionTests {
         _ = try await human.start("AC-1", directory: home)
       }
       let error = try Self.json(try #require(refusal))
-      withKnownIssue("a human is told to pass --approved and ask themselves") {
-        #expect(error["next"] as? [String] == ["silta task triage --accept AC-1"])
-        #expect(error["next_by"] as? String == "agent")
-      }
+      #expect(error["next"] as? [String] == ["silta task triage --accept AC-1"])
+      #expect(error["next_by"] as? String == "agent")
     }
   }
 
@@ -142,9 +132,7 @@ struct TaskOutputRegressionTests {
       let unknown = TaskService(environment: service.environment, workspace: "acme-two")
       let refusal = #expect(throws: WorkspaceError.self) { _ = try unknown.list() }
       #expect(refusal?.code == .notFound)
-      withKnownIssue("an unknown --ws isn't named") {
-        #expect(refusal?.message.contains("acme-two") == true)
-      }
+      #expect(refusal?.message.contains("acme-two") == true)
     }
   }
 }

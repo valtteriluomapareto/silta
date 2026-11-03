@@ -88,7 +88,7 @@ extension TaskService {
         sql: query + """
           \nWHERE task.workspace_id=? AND task.seq=?
           """, arguments: [workspaceRow["id"] as Int64, seq])
-    else { throw TaskError.notFound }
+    else { throw TaskError.notFound("task " + raw) }
     return TaskDetails(row: row)
   }
 

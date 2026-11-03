@@ -44,7 +44,10 @@ extension SecretError: ErrorExamples {
 
 extension WorkspaceError: ErrorExamples {
   static var examples: [WorkspaceError] {
-    [.invalid(["line 1: expected a mapping"]), .notFound, .conflict, .editor, .input]
+    [
+      .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"), .conflict,
+      .editor, .input,
+    ]
   }
 }
 
@@ -61,16 +64,17 @@ extension RepoError: ErrorExamples {
 extension TaskError: ErrorExamples {
   static var examples: [TaskError] {
     [
-      .notFound, .invalid("A result is required."),
-      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4), .proposal("AC-1"),
+      .notFound("parent task AC-9"), .invalid("A result is required."),
+      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4),
+      .proposal("AC-1", human: false), .proposal("AC-1", human: true),
       .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
       .promoted("AC-1", external: "ado:42"), .edited("AC-1"),
       .blocked(
         "AC-1", TaskWaiting(on: ["ext:acme"], ageDays: 2, why: "Acme", ready: false, dropped: [])),
       .blocked(
         "AC-2", TaskWaiting(on: ["task:AC-1"], ageDays: 1, why: "Acme", ready: true, dropped: [])),
-      .changed("AC-1"), .staleRev("AC-1", actual: 2), .blockedPromotion("AC-1"),
-      .noCheckboxes("AC-1"),
+      .changed("AC-1"), .staleRev("AC-1", actual: 2), .blockedPromotion("AC-1", ready: false),
+      .blockedPromotion("AC-2", ready: true), .noCheckboxes("AC-1"),
     ]
   }
 }
@@ -93,7 +97,7 @@ extension ActorError: ErrorExamples {
       .humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme")),
       .notReady(
         command: "silta task unblock 'AC-4' 'AC-7'", actor: .agent(tool: "codex", session: "acme"),
-        refs: ["AC-4", "AC-7"]),
+        waits: [("AC-4", ["ext:acme", "task:AC-2"]), ("AC-7", [])]),
       .invalidApproval,
     ]
   }

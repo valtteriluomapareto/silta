@@ -20,10 +20,13 @@ extension TaskService {
     let slug = try selected()
     return try environment.db.write { tx in
       let tasks = try blockedBatch(refs, workspace: slug, at: at, in: tx.database)
-      let open = try tasks.filter { try Self.waiting($0, at: at, in: tx.database)?.ready != true }
+      let open = try tasks.compactMap { task -> (ref: String, on: [String])? in
+        let waiting = try Self.waiting(task, at: at, in: tx.database)
+        return waiting?.ready == true ? nil : (task.ref, waiting?.on ?? [])
+      }
       let retry = command + (why == nil ? "" : " -F <file>")
       if !open.isEmpty, !environment.actor.isHuman, approval == nil, approved == nil {
-        throw ActorError.notReady(command: retry, actor: environment.actor, refs: open.map(\.ref))
+        throw ActorError.notReady(command: retry, actor: environment.actor, waits: open)
       }
       let used = try approval ?? self.approval(required: !open.isEmpty, command: retry)
       for task in tasks {

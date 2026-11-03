@@ -71,9 +71,9 @@ extension TaskService {
 
   private func canClose(_ task: TaskDetails, dropped: Bool) throws {
     if task.status == "proposed" {
-      if !dropped { throw TaskError.proposal(task.ref) }
+      if !dropped { throw TaskError.proposal(task.ref, human: environment.actor.isHuman) }
       if !environment.actor.isHuman && task.createdBy != environment.actor.description {
-        throw TaskError.proposal(task.ref)
+        throw TaskError.proposal(task.ref, human: false)
       }
       return
     }

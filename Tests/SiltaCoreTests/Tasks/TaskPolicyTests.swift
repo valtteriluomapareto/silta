@@ -111,7 +111,7 @@ extension TaskPolicyTests {
         environment: try TaskServiceTests.environment(
           home,
           actor: .agent(tool: "codex", session: "other")))
-      await #expect(throws: TaskError.proposal("AC-1")) {
+      await #expect(throws: TaskError.proposal("AC-1", human: false)) {
         _ = try await rival.close(
           "AC-1", result: "Should not close.", dropped: true, directory: home)
       }
@@ -177,7 +177,7 @@ extension TaskPolicyTests {
       }
       draft.allowSecret = true
       await #expect(throws: ActorError.self) { _ = try await service.add(draft, directory: home) }
-      #expect(throws: TaskError.notFound) { _ = try service.show("AC-99") }
+      #expect(throws: TaskError.notFound("task AC-99")) { _ = try service.show("AC-99") }
     }
   }
 }

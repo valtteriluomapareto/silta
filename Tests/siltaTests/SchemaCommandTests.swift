@@ -32,9 +32,7 @@ struct SchemaCommandTests {
   }
 
   @Test func indexInText() throws {
-    withKnownIssue("the error table doesn't say next_by can be overridden") {
-      try check(["schema"], stdout: "schema.txt")
-    }
+    try check(["schema"], stdout: "schema.txt")
   }
 
   @Test(arguments: [["schema", "schema", "--json"], ["schema", "silta", "schema", "--json"]])
@@ -43,9 +41,7 @@ struct SchemaCommandTests {
   }
 
   @Test func detailInText() throws {
-    withKnownIssue("the error table doesn't say next_by can be overridden") {
-      try check(["schema", "schema"], stdout: "schema-schema.txt")
-    }
+    try check(["schema", "schema"], stdout: "schema-schema.txt")
   }
 
   @Test(arguments: [["schema", "--quiet"], ["--quiet", "schema"]])

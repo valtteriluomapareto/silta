@@ -120,9 +120,7 @@ struct TaskOutputCommandTests {
       _ = try TaskCommandTests.setup(scratch)
       let refused = try Self.run(["--ws", "acme-two", "task", "ls"], in: scratch)
       #expect(refused.termination == .exit(2))
-      withKnownIssue("the message doesn't name the workspace") {
-        #expect(refused.stderr.contains("acme-two"))
-      }
+      #expect(refused.stderr.contains("acme-two"))
     }
   }
 

@@ -91,7 +91,7 @@ struct TaskStateRegressionTests {
       #expect(blocked.termination == .exit(6))
       #expect(try Self.error(blocked)["code"] as? String == "conflict")
       #expect(
-        (try Self.error(blocked)["next"] as? [String])?.first?.contains("task unblock AC-2")
+        (try Self.error(blocked)["next"] as? [String])?.first?.contains("task show AC-2")
           == true)
     }
   }
@@ -253,7 +253,7 @@ extension TaskStateRegressionTests {
       #expect(refused.termination == .exit(3))
       #expect(
         (try Self.error(refused)["message"] as? String)?.hasPrefix(
-          "AC-1 and AC-3 still wait on open blockers") == true)
+          "AC-1 waits on ext:acme and AC-3 waits on ext:acme;") == true)
     }
   }
 }

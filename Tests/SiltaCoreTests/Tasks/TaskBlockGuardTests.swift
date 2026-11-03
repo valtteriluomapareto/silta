@@ -51,7 +51,7 @@ struct TaskBlockGuardTests {
   }
 
   private static func promotionNeedsUnblockThenFreezes(_ service: TaskService) throws {
-    #expect(throws: TaskError.blockedPromotion("AC-1")) {
+    #expect(throws: TaskError.blockedPromotion("AC-1", ready: true)) {
       _ = try service.promote("AC-1", external: "ado:42")
     }
     _ = try service.unblock(["AC-1"])
