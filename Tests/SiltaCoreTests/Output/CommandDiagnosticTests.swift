@@ -12,10 +12,10 @@ struct CommandDiagnosticTests {
     #expect(rendered.warningCodes == ["ref_stale"])
   }
 
-  @Test func logsKeepFourteenDaysAndPreserveUnrelatedEntries() throws {
+  @Test func logsKeepNinetyDaysAndPreserveUnrelatedEntries() throws {
     try withScratchDirectory { directory in
-      for day in [1, 2, 14, 15] {
-        try Data().write(to: directory.appending(path: String(format: "2023-11-%02d.jsonl", day)))
+      for day in ["2023-08-17", "2023-08-18", "2023-11-14", "2023-11-15"] {
+        try Data().write(to: directory.appending(path: "\(day).jsonl"))
       }
       try Data("Acme".utf8).write(to: directory.appending(path: "0000-Acme.txt"))
       let folder = directory.appending(path: "2000-01-01.jsonl")
@@ -25,8 +25,9 @@ struct CommandDiagnosticTests {
         actor: "agent:unknown:acme", exitCode: 0, milliseconds: 0)
       SystemLog(directory: directory).record(entry)
       let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
-      #expect(!files.contains("2023-11-01.jsonl"))
-      #expect(files.contains("2023-11-02.jsonl"))
+      #expect(!files.contains("2023-08-17.jsonl"))
+      #expect(files.contains("2023-08-18.jsonl"))
+      #expect(files.contains("2023-11-14.jsonl"))
       #expect(files.contains("2023-11-15.jsonl"))
       #expect(files.contains("0000-Acme.txt"))
       #expect(files.contains("2000-01-01.jsonl"))

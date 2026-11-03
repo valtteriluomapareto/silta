@@ -2,8 +2,12 @@ import Darwin
 package import Foundation
 
 /// File sink selected by the CLI: daily JSONL and optional verbose mirroring.
-/// Keeps fourteen UTC days using the command timestamp.
+/// Keeps `retainedDays` UTC days using the command timestamp.
 package final class SystemLog: Log {
+  /// How many UTC days of logs are kept, today included. Long enough for a dogfood
+  /// report to cover several waves (spec §19).
+  package static let retainedDays = 90
+
   private let directory: URL
   private let verbose: FileHandle?
 
@@ -39,7 +43,7 @@ package final class SystemLog: Log {
   }
 
   private func prune(at timestamp: Date) throws {
-    let oldest = utcDay(timestamp.addingTimeInterval(-13 * 86400))
+    let oldest = utcDay(timestamp.addingTimeInterval(-Double(Self.retainedDays - 1) * 86400))
     let files = try FileManager.default.contentsOfDirectory(
       at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
     for file in files where file.lastPathComponent < oldest + ".jsonl" {

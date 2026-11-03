@@ -138,8 +138,9 @@ before DF0.** Update this line when a stage starts.
 From DF0 on:
 - **Use the dogfood binary.** Always use `~/.local/bin/silta`, built from `main` by
   `scripts/install-dev.sh`. Never use a binary from your own worktree.
-- **Record friction.** Anything awkward is recorded with
-  `silta task add "<what was awkward>" --topic dogfood`.
+- **Record friction.** End every `done` result with one line: `Friction: none`, or
+  `Friction: <what was awkward>`. Friction that needs its own fix, or that comes up
+  outside a task, also gets `silta task add "<what was awkward>" --topic dogfood`.
 - **Close the issue.** When a slice's task is done, post its result on the GitHub
   issue and close the issue.
 

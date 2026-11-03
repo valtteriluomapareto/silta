@@ -109,8 +109,8 @@ They're summarised here so every decision has one index.
   - The binary used on real data is built only from `main`, by
     `scripts/install-dev.sh`.
   - From DF0 on, migrations count as shipped.
-  - Dogfooding friction is recorded as Silta tasks with the topic `dogfood`, and
-    triaged once per wave.
+  - Dogfooding friction is recorded as Silta tasks with the topic `dogfood` (and, from
+    D36, a `Friction:` line in every result), and triaged once per wave.
 
 ## Code
 
@@ -243,3 +243,18 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - Why: "waiting for the customer's input on messaging" and "waiting for App Store
     approval" are the most common non-code blockers. Free text in a status can't say
     what a task waits on, can't remind anyone, and can't notice a prerequisite landing.
+- **D36: Dogfooding measures itself.**
+  - Command logs are kept 90 days instead of 14. They hold codes, flag names and
+    actors, never bodies, so they stay small, and a report can cover several waves.
+  - Every dogfood task's result ends with a `Friction:` line, `none` included. Agents
+    rarely stop to report friction on their own, so the result asks every time.
+  - `scripts/dogfood-report.sh` turns the logs and friction lines into a Markdown
+    report: error rates, `usage` errors and retry loops per command, calls per
+    session, slow commands, unused commands and friction. Once per wave the
+    maintainer commits it under `docs/dogfood/reports/`. It reads only lines and
+    tasks tagged with the `silta` workspace, so other workspaces' data never reaches
+    the repo; DF makes every log line record its workspace and app.
+  - Not now: comparing Silta against plan files or other tools. That needs a
+    without-Silta arm in the evals (§21) and is revisited after S16.
+  - Why: the logs were collected but nothing read them, and friction depended on
+    agents volunteering it.
