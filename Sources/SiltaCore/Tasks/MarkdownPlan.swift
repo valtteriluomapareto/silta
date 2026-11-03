@@ -85,7 +85,10 @@ struct MarkdownPlan: Sendable {
     var visible: [Int] = []
     for (index, line) in lines.enumerated() {
       let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-      if let first = trimmed.first, first == "`" || first == "~" {
+      let indentation = line.prefix(while: { $0 == " " })
+      if indentation.count < 4,
+        let first = line.dropFirst(indentation.count).first, first == "`" || first == "~"
+      {
         let count = trimmed.prefix { $0 == first }.count
         if count >= 3 {
           if let current = fence {

@@ -12,7 +12,7 @@ struct TaskBody: ParsableArguments {
   @Option(name: .customShort("F"), help: "Read UTF-8 from a file, or - for stdin.")
   var file: String?
 
-  @Flag(help: "Retain detected secrets (human-only; retry with -F <file>).")
+  @Flag(help: "Retain detected secrets (human-only; use file input for a body retry).")
   var allowSecret = false
 
   func read(actor: ActorID, command: String) throws -> String? {

@@ -75,7 +75,6 @@ extension TaskPlanCommandTests {
         ).termination == .exit(0))
       for args in [
         ["plan", "AC-1"], ["plan", "AC-1", "--done"], ["plan", "AC-1", "--done", "-m", "Body"],
-        ["plan", "AC-1", "--step", "1", "--done", "--allow-secret"],
         ["plan", "AC-1", "--step", "1", "--done", "-F", "/absent"],
         ["plan", "AC-1", "--step", "1"],
         ["plan", "AC-1", "--step", "1", "--done", "--undo"],

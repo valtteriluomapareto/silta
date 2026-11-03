@@ -7,7 +7,8 @@ extension TaskService {
     _ ref: String, text: String, ifRevision: Int? = nil, allowSecret: Bool = false
   ) throws -> TaskPlanResult {
     let content = try checked(
-      text, allow: allowSecret, command: "silta task plan " + shellWord(ref) + " -F <file>")
+      text, allow: allowSecret,
+      command: Self.planCommand(ref, ifRevision: ifRevision) + " -F <file>")
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
@@ -21,21 +22,39 @@ extension TaskService {
     }
   }
 
-  /// Changes just the selected top-level checkbox and keeps the revision snapshot intact.
-  package func tick(_ ref: String, step: Int, done: Bool, ifRevision: Int? = nil) throws
+  /// Ticks a top-level checkbox without creating a revision; secret policy may redact its text.
+  package func tick(
+    _ ref: String, step: Int, done: Bool, ifRevision: Int? = nil, allowSecret: Bool = false
+  ) throws
     -> TaskPlanResult
   {
+    let command =
+      Self.planCommand(ref, ifRevision: ifRevision)
+      + " --step \(step) " + (done ? "--done" : "--undo")
+    if allowSecret { try environment.actor.requireHuman(command: command + " --allow-secret") }
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, at: at)
       try Self.compareRevision(ifRevision, task: task)
-      let text = try MarkdownPlan.tick(task.plan, step: step, done: done)
+      let content = try checked(
+        MarkdownPlan.tick(task.plan, step: step, done: done), allow: allowSecret, command: command)
+      let text = content.0
       try updatePlan(text, revision: task.planRev, task: task.id, at: at, in: tx.database)
-      try changed(task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")", at: at, in: tx)
-      return TaskPlanResult(ref: task.ref, planRev: task.planRev, plan: text)
+      try changed(
+        task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")",
+        redacted: content.1, at: at, in: tx)
+      return TaskPlanResult(
+        ref: task.ref, planRev: task.planRev, plan: text,
+        warnings: content.1 ? [SecretGuard.warning] : [])
     }
+  }
+
+  /// A body-free replacement command retains the revision guard in both CLI and core retries.
+  package static func planCommand(_ ref: String, ifRevision: Int?) -> String {
+    "silta task plan " + shellWord(ref)
+      + (ifRevision.map { " --if-rev \($0)" } ?? "")
   }
 
   static func compareRevision(_ expected: Int?, task: TaskDetails) throws {

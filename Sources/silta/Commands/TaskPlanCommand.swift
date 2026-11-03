@@ -29,16 +29,17 @@ struct TaskPlanCommand: OutputCommand {
     let service = TaskService(environment: context.environment, workspace: global.ws)
     let result: TaskPlanResult
     if let step {
-      guard done != undo, body.message == nil, body.file == nil, !body.allowSecret else {
+      guard done != undo, body.message == nil, body.file == nil else {
         throw TaskError.invalid("Use --step N with exactly one of --done/--undo and no body.")
       }
-      result = try service.tick(ref, step: step, done: done, ifRevision: ifRev)
+      result = try service.tick(
+        ref, step: step, done: done, ifRevision: ifRev, allowSecret: body.allowSecret)
     } else {
       guard !done, !undo else {
         throw TaskError.invalid("--done and --undo require --step N.")
       }
       let text = try body.read(
-        actor: context.environment.actor, command: "silta task plan " + shellWord(ref))
+        actor: context.environment.actor, command: TaskService.planCommand(ref, ifRevision: ifRev))
       guard let text else {
         throw TaskError.invalid("Supply -m or -F for a revision, or --step N --done|--undo.")
       }

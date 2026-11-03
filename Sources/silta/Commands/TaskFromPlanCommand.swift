@@ -55,10 +55,13 @@ struct TaskFromPlanCommand: OutputCommand {
         "\($0.ref) \($0.status)"
       }
     if result.dryRun {
-      lines.append(preview.description)
-      lines += preview.steps.enumerated().map {
-        "\($0.offset + 1). " + ($0.element.status.map { $0 + ": " } ?? "")
-          + "\($0.element.title)\n\($0.element.description)"
+      let description = preview.description.trimmingCharacters(in: .newlines)
+      if !description.isEmpty { lines += ["", description] }
+      lines += ["", split ? "Subtasks:" : "Checklist:"]
+      for (index, step) in preview.steps.enumerated() {
+        lines.append("\(index + 1). " + (step.status.map { $0 + ": " } ?? "") + step.title)
+        let detail = step.description.trimmingCharacters(in: .newlines)
+        if !detail.isEmpty { lines.append(detail) }
       }
     }
     return CommandOutput(
