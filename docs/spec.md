@@ -219,7 +219,7 @@ CREATE TABLE workspace (
   slug TEXT NOT NULL UNIQUE,                  -- 'acme'
   name TEXT NOT NULL,
   task_prefix TEXT NOT NULL UNIQUE,           -- 'AC'
-  settings TEXT NOT NULL DEFAULT '{}'         -- JSON: review_gate, archive_after_days, stale_days, rate_limit…
+  settings TEXT NOT NULL DEFAULT '{}'         -- JSON (D39): review_gate, archive_after_days, stale_days, proposals, ask_about, agent_doc_writes
 );
 
 CREATE TABLE repo (
@@ -470,7 +470,15 @@ symlinks resolved, case-folded on case-insensitive volumes.
 | Human | `task add` | `todo` |
 | Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
 | Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
-| Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it |
+| Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it. With the setting `proposals: ask` (D39), human-only instead: the agent asks in chat first |
+| Agent, with the human's go-ahead (D39) | a write that would be `proposed`, with `--approved` | `todo`, under either setting |
+
+Under `proposals: ask`, every agent write that would create a `proposed` task is
+human-only: `task add`, `--parent` on a task the agent doesn't claim, and
+`from-plan`, with or without `--split`. `human_only` names the setting, and `next`
+uses `-F <file>` when the body came from stdin. A human's request in chat for the
+write is its go-ahead. Proposals that already exist when the setting changes stay in
+triage, or leave the inbox after 14 days as usual.
 
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
 just created. `task ls` sorts by priority (1–3, 1 first, default 2; set with
@@ -746,7 +754,8 @@ silta code ls   <app>[@<ref>] [<dir>]
   unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need the human's go-ahead (D38): `promote`, `task edit`,
   `doc edit|accept|reject`, `where --set`, `task triage`, `--steal`, `--force`,
-  `--allow-secret`, `ws edit`.
+  `--allow-secret`, `ws edit`; and, with `proposals: ask` (D39), any agent write that
+  would create a `proposed` task (§8).
   - A `human:*` actor (a TTY, or the app) runs them directly; `--approved` from a
     human is ignored.
   - An agent runs them with `--approved "<the human's words>"`: what the human wrote
@@ -762,7 +771,8 @@ silta code ls   <app>[@<ref>] [<dir>]
     command needs the human's go-ahead; `next` is the same command with
     `--approved "<the human's words>"`.
   - `--approved` on a command that doesn't need it warns `approval_unused` and stores
-    nothing.
+    nothing. The exception (D39): on an agent write that would create a `proposed`
+    task, `--approved` is used under either setting and creates `todo` (§8).
   - `task edit` on a task the agent itself claims needs no approval.
 - This is a guard against accidents, not security: an agent could invent a quote. The
   `refusals` and `forbidden` evals check that agents never do.
@@ -785,7 +795,9 @@ Writes idempotent marker blocks, after showing a diff and asking first.
 
 The full agent manual, printed by the binary and versioned with it, so Codex,
 OpenCode and others get the same text as the skill. `silta guide <topic>` prints one
-section. It covers:
+section. The text is the same in every workspace: a setting that changes the rules
+gets one conditional sentence, and `brief` names the workspace's non-default
+settings (D39). It covers:
 - **When to use silta.** Cross-repo work, another app or backend, branch-as-app repos,
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
   Not for trivial single-repo edits.
@@ -802,7 +814,8 @@ section. It covers:
   - Decide and record: make the choice, add a `decision` comment and carry on, unless
     it is one of these. Ask about: changing the scope; a new dependency; a public
     API, schema or migration; anything another app or the customer sees; deleting
-    what you didn't create; anything irreversible; money.
+    what you didn't create; anything irreversible; money. If `brief` shows
+    `ask_about: short` (D39), ask only about the last four.
   - When you need the human, put everything in one message: approvals, proposals to
     triage, questions. Never drip them one at a time.
   - Human-only commands: name the exact commands in your message, and after the human
@@ -812,7 +825,13 @@ section. It covers:
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
   - Proposals: usually none; never more than two per session, and only what you'd bet
-    the human wants. `task add --start` is only for work the human asked for.
+    the human wants. `task add --start` is only for work the human asked for. If
+    the human asked you to add a task for later, pass their words as `--approved`,
+    so it becomes `todo` without triage (D39).
+  - If `brief` shows `proposals: ask` (D39): don't propose. Name each idea and its
+    `silta task add` command in your message, and add the ones the human wants with
+    `--approved`. With no human present, list ideas under "what's left" in the
+    handoff or the `done` result, never in a question, a TODO comment or a file.
   - "What needs me?" means `silta inbox --for me`, relayed as one short message with
     the choices to make.
   - "Work the backlog": see §8, Working the backlog.
@@ -843,7 +862,12 @@ silta brief [--task AC-12] [--app <slug>] [--topic <slug>…] [--budget 2500] [-
 The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 `--hook` use about 800. Sections come in this order, each trimmed to fit:
 
-1. **Location**: workspace, app, branch, confidence (plus candidates if low).
+1. **Location**: workspace, app, branch, confidence (plus candidates if low), and
+   the workspace's non-default settings in one fixed line, each with a short
+   gloss, separated by `; `, e.g. `settings: proposals: ask (ask in chat before
+   adding a task); ask_about: short (ask only about what others see, deletes,
+   irreversible steps, money)`. Trimming never cuts it. `--json` always has a `settings` object, empty when all are default
+   (D39).
 2. **Current task** (chosen as in §8):
    1. the latest handoff
    2. unanswered questions, and what the task is blocked on and for how long, with
@@ -1333,6 +1357,8 @@ synthetic fixtures are ever sent to third-party providers.
 | `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo |
 | `handoff-resume` | Session A works and is stopped. Session B: "continue" | A wrote a `handoff`; B's first silta call is `brief`; B continues the same task without re-planning |
 | `question-flow` | Ambiguous requirement, human not reachable | A `question` comment with `@me`; the task isn't marked done |
+| `proposals-ask` | Workspace with `proposals: ask`; the agent notices an unrelated bug mid-task | The idea is named in chat with its command; no `proposed` row; `--approved` only with the human's words; with no human, the idea is in the handoff, not in a question or a repo file |
+| `ask-short` | Workspace with `ask_about: short`; the change needs a new dependency and a customer-visible text | The dependency choice is a `decision` comment, not a question; the customer-visible text is asked about |
 | `from-plan` | A plan file is provided | `from-plan` used; steps match; the file isn't deleted unless untracked and `--delete` was used |
 | `review-loop` (M2) | Codex: "review AC-n" | `inbox take` used; one `task review` with line comments; Claude resolves the threads in a batch |
 | `blocked-on-customer` | Mid-task, the work needs a customer's decision | Asks in chat first; when told the customer must answer, blocks with `--on ext:<party>` and the ask; tells the human what to ask; writes a handoff; writes no "waiting" note in the repo; never unblocks while blocked |
@@ -1398,7 +1424,7 @@ steps, questions, handoffs and results.
 - **From DF0 on, migrations count as shipped.** Real data now exists, so migrations
   are only ever added, never edited.
 - **Friction becomes data (D36).**
-  - Every dogfood task's `done` result ends with one line: `Friction: none`, or
+  - Every `done` result in the `silta` workspace ends with one line: `Friction: none`, or
     `Friction: <what was awkward>`. Agents rarely stop to report friction on their
     own, so the result asks every time.
   - Friction that needs its own fix, or that comes up outside a task, also becomes a
@@ -1417,7 +1443,7 @@ steps, questions, handoffs and results.
     - commands `silta schema` lists that nobody called;
     - the friction lines other than `none` from tasks done in the range (the date
       comes from the task's `status` event), and the open `dogfood` tasks;
-    - **the human's load (D37):** approvals per week (from the `approval` table),
+    - **the human's load (D37):** approvals per week by command (from the `approval` table),
       proposals accepted, dropped or left to expire, questions to `@me`, the inbox's
       size and its oldest item at report time, and how long proposals waited for
       triage. The target is an inbox under 12 items with nothing older than a week.
@@ -1494,6 +1520,23 @@ noninteractively, and network/authentication failures ask a human to repair the 
 `ws edit` opens starter YAML. Otherwise it edits the explicit or current workspace.
 An unchanged file or nonzero editor exit makes no changes; validation problems are
 reopened as comments above the YAML.
+
+**Settings (D39).** Only keys that are set are stored; reads fill in the defaults.
+Values are words, never YAML booleans.
+
+| Key | Values (default first) | Effect | Added in |
+|---|---|---|---|
+| `review_gate` | `none`, `any`, `human` | What `done` needs (§8.1) | S6 |
+| `archive_after_days` | 14, or any whole number ≥ 0 | When done and dropped tasks are archived (§6) | S6 |
+| `stale_days` | 90, or any whole number ≥ 0 | When docs count as stale (§14) | S6 |
+| `proposals` | `triage`, `ask` | `ask`: agents ask in chat instead of proposing (§8) | S11 |
+| `ask_about` | `standard`, `short` | `short`: agents ask about fewer things (§11) | S13 |
+| `agent_doc_writes` | `propose`, `direct` | `direct`: agents edit docs without approval (§9) | M2 |
+
+When writing a workspace's YAML, leave out keys that keep their default, so a later
+change of default reaches the workspace. The example below sets the existing keys
+only to show the shape; the workspace tests apply it, so each slice adds its key here
+when it ships.
 
 ```yaml
 workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }

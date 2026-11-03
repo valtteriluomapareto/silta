@@ -65,6 +65,14 @@ plan on the issue and get it reviewed (`skills/persona-review`) before coding.
 | S13 Agent integration | [#17](https://github.com/valtteriluomapareto/silta/issues/17) | S4, S12 | 7 | unlocks DF2 with S12 |
 | S16 First agent evals | [#18](https://github.com/valtteriluomapareto/silta/issues/18) | S12, S13, CP | 8 | built with Silta |
 
+**Workspace settings (D39)** land with the slices that use them:
+- S11: the typed settings value and `proposals`. This touches task creation and
+  `from-plan`, not only the inbox.
+- S12: the brief's settings line.
+- S13: the guide sentences, `ask_about`, and the `proposals-ask` and `ask-short`
+  eval scenarios.
+- S14: restore validates the settings.
+
 **Why the control plane (CP) comes early.** CP is the scenario runner and the
 fixture repos. Together with the seams (S2) and the output contract (S4), it lets
 every later slice prove itself from the command line (spec §20.1). So from wave 5
