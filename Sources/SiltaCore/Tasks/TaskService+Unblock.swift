@@ -42,7 +42,7 @@ extension TaskService {
           redacted: content.1, at: at, in: tx)
       }
       try used?.record(
-        command: command + (allowSecret ? " --allow-secret" : ""), workspace: slug,
+        command: audited(command + (allowSecret ? " --allow-secret" : "")), workspace: slug,
         identity: (environment.ids, at), in: tx)
       let results = tasks.map {
         TaskResult(

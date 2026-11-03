@@ -40,7 +40,7 @@ extension TaskService {
       guard content != original else { return (receipt(task), false, []) }
       try applyEdit(content, task: task, redacted: redacted, at: at, in: tx)
       try approval?.record(
-        command: command, workspace: slug,
+        command: audited(command), workspace: slug,
         identity: (environment.ids, at), in: tx)
       return (
         receipt(task, warnings: redacted ? [SecretGuard.warning] : []), required,

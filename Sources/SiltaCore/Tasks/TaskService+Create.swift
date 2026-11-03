@@ -18,7 +18,7 @@ extension TaskService {
     return try environment.db.write { tx in
       let result = try insert(prepared, workspace: slug, in: tx)
       try approval?.record(
-        command: command + " -> " + result.ref, workspace: slug,
+        command: audited(command) + " -> " + result.ref, workspace: slug,
         identity: (environment.ids, prepared.at), in: tx)
       return result
     }

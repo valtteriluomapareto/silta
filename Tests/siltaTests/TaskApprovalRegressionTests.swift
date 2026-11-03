@@ -40,13 +40,11 @@ struct TaskApprovalRegressionTests {
       let commands = try store.read {
         try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id")
       }
-      withKnownIssue("approval rows leave out the body flag") {
-        #expect(
-          commands == [
-            "silta task add --allow-secret -m <text> -> AC-1",
-            "silta task from-plan --allow-secret -> AC-2",
-          ])
-      }
+      #expect(
+        commands == [
+          "silta task add --allow-secret -m <text> -> AC-1",
+          "silta task from-plan --allow-secret -> AC-2",
+        ])
     }
   }
 

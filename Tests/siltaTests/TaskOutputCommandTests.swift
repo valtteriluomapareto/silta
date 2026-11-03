@@ -136,14 +136,12 @@ struct TaskOutputCommandTests {
       let commands = try store.read {
         try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id")
       }
-      withKnownIssue("approval rows leave out the body flag") {
-        #expect(
-          commands == [
-            "silta task edit 'AC-1' --allow-secret -F <file>",
-            "silta task unblock 'AC-1' -m <text>",
-            "silta task done 'AC-1' --allow-secret -m <text>",
-          ])
-      }
+      #expect(
+        commands == [
+          "silta task edit 'AC-1' --allow-secret -F <file>",
+          "silta task unblock 'AC-1' -m <text>",
+          "silta task done 'AC-1' --allow-secret -m <text>",
+        ])
     }
   }
 

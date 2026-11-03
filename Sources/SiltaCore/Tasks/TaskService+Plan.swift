@@ -23,7 +23,7 @@ extension TaskService {
       try Self.compareRevision(ifRevision, task: task)
       try writePlan(content.0, task: task, redacted: content.1, at: at, in: tx)
       try approval?.record(
-        command: command + " --allow-secret", workspace: slug,
+        command: audited(command + " --allow-secret"), workspace: slug,
         identity: (environment.ids, at), in: tx)
       return TaskPlanResult(
         ref: task.ref, planRev: task.planRev + 1, plan: content.0,

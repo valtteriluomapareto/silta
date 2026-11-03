@@ -52,7 +52,8 @@ extension TaskService {
       try changed(
         task.id, kind: "status", body: dropped ? "dropped" : "done",
         redacted: content.1, at: at, in: tx)
-      try used?.record(command: audit, workspace: slug, identity: (environment.ids, at), in: tx)
+      try used?.record(
+        command: audited(audit), workspace: slug, identity: (environment.ids, at), in: tx)
       return (
         receipt(try Self.lookup(ref, workspace: slug, in: tx.database), warnings: warnings),
         used != nil

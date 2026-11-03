@@ -15,6 +15,11 @@ struct TaskBody: ParsableArguments {
   @Flag(help: "Retain detected secrets (human-only; use file input for a body retry).")
   var allowSecret = false
 
+  /// The body flag passed, as an approval row names it: `-m <text>` or `-F <file>`.
+  var flag: String? {
+    message != nil ? "-m <text>" : file != nil ? "-F <file>" : nil
+  }
+
   func read(actor: ActorID, command: String, approved: String? = nil) throws -> String? {
     if allowSecret {
       try actor.requireHuman(command: command + " --allow-secret -F <file>", approved: approved)

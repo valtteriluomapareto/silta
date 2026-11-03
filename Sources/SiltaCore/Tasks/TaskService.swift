@@ -9,11 +9,24 @@ package struct TaskService: Sendable {
 
   let approved: String?
 
+  let bodyFlag: String?
+
   /// Uses the supplied workspace, or the current selection when an operation begins.
-  package init(environment: SiltaEnvironment, workspace: String? = nil, approved: String? = nil) {
+  /// `bodyFlag` is the body flag the command was given, `-m <text>` or `-F <file>`,
+  /// which approval rows name without the body (spec §11).
+  package init(
+    environment: SiltaEnvironment, workspace: String? = nil, approved: String? = nil,
+    bodyFlag: String? = nil
+  ) {
     self.environment = environment
     self.workspace = workspace
     self.approved = approved
+    self.bodyFlag = bodyFlag
+  }
+
+  /// `command` as an approval row records it: with the body flag passed, never the body.
+  func audited(_ command: String) -> String {
+    command + (bodyFlag.map { " " + $0 } ?? "")
   }
 
   func selected() throws -> String {

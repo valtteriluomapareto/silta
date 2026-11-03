@@ -28,7 +28,8 @@ struct TaskPlanCommand: OutputCommand {
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let service = TaskService(
-      environment: context.environment, workspace: global.ws, approved: global.approved)
+      environment: context.environment, workspace: global.ws, approved: global.approved,
+      bodyFlag: body.flag)
     let result: TaskPlanResult
     if let step {
       guard done != undo, body.message == nil, body.file == nil, !body.allowSecret else {

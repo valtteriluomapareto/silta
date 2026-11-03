@@ -43,7 +43,8 @@ extension TaskService {
         body: TaskBlockEvent(on: on, followUp: day, why: content.0).encoded(),
         redacted: redacted, at: at, in: tx)
       try approval?.record(
-        command: command + " --allow-secret", workspace: slug, identity: (environment.ids, at),
+        command: audited(command + " --allow-secret"), workspace: slug,
+        identity: (environment.ids, at),
         in: tx)
       let after = try Self.decorate(
         Self.lookup(ref, workspace: slug, in: tx.database), at: at, in: tx.database)

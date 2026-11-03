@@ -32,7 +32,8 @@ struct TaskDoneCommand: OutputCommand {
       actor: context.environment.actor, command: commit.command(ref, dropped: false),
       approved: global.approved)
     let closed = try await TaskService(
-      environment: context.environment, workspace: global.ws, approved: global.approved
+      environment: context.environment, workspace: global.ws, approved: global.approved,
+      bodyFlag: body.flag
     )
     .close(
       ref, result: text, commit: commit,
