@@ -19,6 +19,7 @@ struct StorageWALFileTests {
 
   @Test func readsSurviveMissingWALFilesWithoutWriting() throws {
     try withScratchDirectory { scratch in
+      // The scope closes the writer before the files are removed, as a finished client would.
       do {
         try StorageSchemaTests.store(scratch).write { transaction in
           try transaction.database.execute(
@@ -50,11 +51,9 @@ struct StorageWALFileTests {
       let store = StorageSchemaTests.store(scratch)
       try Self.removeWALFiles(store)
       try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: store.path)
-      withKnownIssue("A read-only silta.db gets read-only -wal/-shm files") {
-        #expect(throws: StorageError.unavailable) { try store.read { _ in () } }
-        #expect(!FileManager.default.fileExists(atPath: store.path + "-shm"))
-        #expect(!FileManager.default.fileExists(atPath: store.path + "-wal"))
-      }
+      #expect(throws: StorageError.unavailable) { try store.read { _ in () } }
+      #expect(!FileManager.default.fileExists(atPath: store.path + "-shm"))
+      #expect(!FileManager.default.fileExists(atPath: store.path + "-wal"))
     }
   }
 

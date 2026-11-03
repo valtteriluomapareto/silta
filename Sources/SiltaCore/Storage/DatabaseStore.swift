@@ -131,11 +131,13 @@ package final class DatabaseStore: Sendable {
       do {
         queue = try DatabaseQueue(path: path, configuration: config)
       } catch let error as DatabaseError
-        where error.resultCode == .SQLITE_CANTOPEN && FileManager.default.fileExists(atPath: path)
+        where error.resultCode == .SQLITE_CANTOPEN
+        && FileManager.default.isWritableFile(atPath: path)
       {
         // A read-only connection cannot recreate `-wal`/`-shm`, which another SQLite
         // client removes when it closes the database last. A read-write connection can;
-        // `DatabaseQueue.read` still runs the body query-only.
+        // `DatabaseQueue.read` still runs the body query-only. A read-only `silta.db` is
+        // left alone: recreated files would inherit its mode and block later writes.
         config.readonly = false
         queue = try DatabaseQueue(path: path, configuration: config)
       }
