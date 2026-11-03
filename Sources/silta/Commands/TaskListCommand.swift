@@ -47,7 +47,8 @@ struct TaskListCommand: OutputCommand {
   }
 }
 
-/// The fields of `TaskOutput.summaryShape`; bodies come from `task show`.
+/// The fields of `TaskOutput.summaryShape`; bodies come from `task show`. Links are
+/// short and masked as in `show`, and they find a task by its issue URL.
 private struct TaskSummary: Encodable {
   let ref: String
   let title: String
@@ -63,6 +64,8 @@ private struct TaskSummary: Encodable {
   let createdBy: String
   let createdAt: String
   let updatedAt: String
+  let archived: Bool
+  let links: [TaskLink]
 
   init(_ task: TaskDetails) {
     ref = task.ref
@@ -79,10 +82,12 @@ private struct TaskSummary: Encodable {
     createdBy = task.createdBy
     createdAt = task.createdAt
     updatedAt = task.updatedAt
+    archived = task.archived
+    links = task.links
   }
 
   enum CodingKeys: String, CodingKey {
-    case ref, title, status, priority, app, parent, waiting
+    case ref, title, status, priority, app, parent, waiting, archived, links
     case claimedBy = "claimed_by"
     case claimedAt = "claimed_at"
     case externalRef = "external_ref"

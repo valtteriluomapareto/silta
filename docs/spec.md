@@ -1016,8 +1016,10 @@ state; the tests check this with golden output.
 - `schema` is the envelope version. Data shapes only gain fields; any other change
   bumps `schema`.
 - `task ls --json` returns one summary per task (D40): `ref`, `title`, `status`,
-  `priority`, `created_by`, `created_at`, `updated_at`, and when set `app`, `parent`,
-  `claimed_by`, `claimed_at`, `external_ref`, `waiting` and `follow_up_at`. Bodies
+  `priority`, `archived`, `links` (`rel` and `target`, masked as in `show`, so a task
+  can be found by its issue URL), `created_by`, `created_at`, `updated_at`, and when
+  set `app`, `parent`, `claimed_by`, `claimed_at`, `external_ref`, `waiting` and
+  `follow_up_at`. Bodies
   (description, plan, acceptance, result) come from `task show`, which returns the
   full detail, `parent` included.
 

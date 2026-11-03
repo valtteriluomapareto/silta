@@ -16,8 +16,10 @@ enum TaskOutput {
     "claimed_by": .optional(.string), "claimed_at": .optional(.string),
     "external_ref": .optional(.string), "waiting": .optional(waitingShape),
     "follow_up_at": .optional(.string), "created_by": .string, "created_at": .string,
-    "updated_at": .string,
+    "updated_at": .string, "archived": .bool, "links": linksShape,
   ])
+
+  static let linksShape = Shape.array(.object(["rel": .string, "target": .string]))
 
   static let detailShape = Shape.object([
     "ref": .string, "title": .string, "status": .string, "description": .string,
@@ -29,7 +31,7 @@ enum TaskOutput {
     "claimed_by": .optional(.string), "claimed_at": .optional(.string), "app": .optional(.string),
     "branch": .optional(.string), "worktree": .optional(.string), "done_sha": .optional(.string),
     "done_branch": .optional(.string), "done_dirty": .optional(.bool),
-    "links": .array(.object(["rel": .string, "target": .string])),
+    "links": linksShape,
     "timeline": .optional(
       .array(
         .object([

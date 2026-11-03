@@ -105,7 +105,9 @@ struct SchemaCommandTests {
       Data(
         """
         {"object":{"tasks":{"array":{"object":{
-          "app":{"optional":"string"},"claimed_at":{"optional":"string"},
+          "app":{"optional":"string"},"archived":"bool",
+          "links":{"array":{"object":{"rel":"string","target":"string"}}},
+          "claimed_at":{"optional":"string"},
           "claimed_by":{"optional":"string"},"created_at":"string","created_by":"string",
           "external_ref":{"optional":"string"},"follow_up_at":{"optional":"string"},
           "parent":{"optional":"string"},"priority":"int","ref":"string","status":"string",

@@ -60,7 +60,10 @@ struct TaskStateRegressionTests {
       let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
       #expect(
         Set(try #require(listed.first).keys)
-          == ["created_at", "created_by", "priority", "ref", "status", "title", "updated_at"])
+          == [
+            "archived", "created_at", "created_by", "links", "priority", "ref", "status", "title",
+            "updated_at",
+          ])
     }
   }
 
@@ -204,20 +207,18 @@ struct TaskStateRegressionTests {
 }
 
 extension TaskStateRegressionTests {
-  @Test func listSummaryKeepsLinksAndArchived() {
-    withKnownIssue("the ls summary drops links and archived") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(
-          try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
-        let url = "url:https://example.com/acme/issues/4"
-        #expect(try Self.run(["task", "link", "AC-1", url], in: scratch).termination == .exit(0))
-        let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
-        let task = try #require(listed.first)
-        #expect(task["archived"] as? Bool == false)
-        let links = try #require(task["links"] as? [[String: String]])
-        #expect(links == [["rel": "cites", "target": url]])
-      }
+  @Test func listSummaryKeepsLinksAndArchived() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(
+        try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
+      let url = "url:https://example.com/acme/issues/4"
+      #expect(try Self.run(["task", "link", "AC-1", url], in: scratch).termination == .exit(0))
+      let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
+      let task = try #require(listed.first)
+      #expect(task["archived"] as? Bool == false)
+      let links = try #require(task["links"] as? [[String: String]])
+      #expect(links == [["rel": "cites", "target": url]])
     }
   }
 

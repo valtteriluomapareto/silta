@@ -442,8 +442,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     (D30). The event kinds are listed in §6, `secret_redacted` included.
   - **`task ls --json` is a summary**: `ref`, `title`, `status`, `priority`, `app`,
     `parent`, `claimed_by`, `claimed_at`, `external_ref`, `waiting`, `follow_up_at`,
-    `created_by`, `created_at` and `updated_at`, without the description, plan,
-    acceptance or result. `task show` keeps the full detail. Data shapes only gain
+    `created_by`, `created_at`, `updated_at`, `archived` and `links`, without the
+    description, plan, acceptance or result. Links are short, and the dogfood import
+    and agents find a task by its `url:` link there. `task show` keeps the full detail. Data shapes only gain
     fields (§16), so the smaller shape is fixed now, before DF0 and before agents
     depend on the old one; this one narrowing doesn't bump `schema`.
   - **`parent`** appears in `task show` and `task ls`: the parent's ref, absent when
