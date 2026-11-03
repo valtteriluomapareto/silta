@@ -4,15 +4,15 @@ import GRDB
 extension TaskService {
   /// Stores a result and closes work, releasing the claim in the same write.
   /// App completion records its commit outside the transaction, then rechecks the task.
+  /// `--force` is human-only only when it overrides an unmet review gate, decided again
+  /// inside the write; otherwise it changes nothing.
   package func close(
     _ ref: String, result: String?, dropped: Bool = false,
     commit: TaskCommit = TaskCommit(), directory: URL
-  ) async throws -> TaskResult {
+  ) async throws -> (result: TaskResult, approvalUsed: Bool) {
     let command = commit.command(ref, dropped: dropped)
     let audit = command + (commit.allowSecret ? " --allow-secret" : "")
-    let approval = try approval(
-      required: commit.force || commit.allowSecret,
-      command: audit + " -F <file>")
+    let approval = try approval(required: commit.allowSecret, command: audit + " -F <file>")
     let content = try checked(
       result ?? "", allow: commit.allowSecret, command: command + " -F <file>")
     try validateResult(content.0, commit: commit)
@@ -20,6 +20,9 @@ extension TaskService {
     let at = environment.clock.now()
     try validateClaim(before, at: at)
     try canClose(before, dropped: dropped)
+    if commit.force, !dropped, try environment.db.read({ try gate(before, in: $0).unmet }) {
+      _ = try self.approval(required: true, command: audit + " -F <file>")
+    }
     if commit.sha != nil, before.appID == nil || dropped {
       throw TaskError.invalid("--sha requires an app task completed with done.")
     }
@@ -34,7 +37,15 @@ extension TaskService {
       try canClose(task, dropped: dropped)
       try Self.sameRepository(task, before)
       var warnings = content.1 ? [SecretGuard.warning] : []
-      if !dropped { warnings += try gate(task, force: commit.force, in: tx.database) }
+      var used = approval
+      if !dropped {
+        let review = try gate(task, in: tx.database)
+        if review.unmet {
+          guard commit.force else { throw TaskError.gate(task.ref) }
+          used = try used ?? self.approval(required: true, command: audit + " -F <file>")
+        }
+        warnings += review.warnings
+      }
       if git.dirty == true {
         warnings.append(
           OutputWarning(code: "dirty_worktree", message: "The task worktree is dirty."))
@@ -54,9 +65,11 @@ extension TaskService {
       try changed(
         task.id, kind: "status", body: dropped ? "dropped" : "done",
         redacted: content.1, at: at, in: tx)
-      try approval?.record(
-        command: audit, workspace: slug, identity: (environment.ids, at), in: tx)
-      return receipt(try Self.lookup(ref, workspace: slug, in: tx.database), warnings: warnings)
+      try used?.record(command: audit, workspace: slug, identity: (environment.ids, at), in: tx)
+      return (
+        receipt(try Self.lookup(ref, workspace: slug, in: tx.database), warnings: warnings),
+        used != nil
+      )
     }
   }
 
@@ -82,8 +95,10 @@ extension TaskService {
     }
   }
 
-  private func gate(_ task: TaskDetails, force: Bool, in db: Database) throws -> [OutputWarning] {
-    guard !force else { return [] }
+  /// The review gate's warnings, and whether an unmet `human` gate refuses completion.
+  private func gate(_ task: TaskDetails, in db: Database) throws
+    -> (warnings: [OutputWarning], unmet: Bool)
+  {
     let raw =
       try String.fetchOne(
         db, sql: "SELECT settings FROM workspace WHERE id=?",
@@ -98,7 +113,7 @@ extension TaskService {
             SELECT EXISTS(SELECT 1 FROM comment
               WHERE task_id=? AND verdict='approve' AND actor LIKE 'human:%' AND deleted_at IS NULL)
             """, arguments: [task.id]) ?? false
-      if !approved { throw TaskError.gate(task.ref) }
+      return ([], !approved)
     }
     if gate == "any" {
       let latest = try String.fetchOne(
@@ -111,11 +126,12 @@ extension TaskService {
           LIMIT 1
           """, arguments: [task.id])
       if latest == "changes" {
-        return [
-          OutputWarning(code: "review_changes", message: "The latest review requests changes.")
-        ]
+        return (
+          [OutputWarning(code: "review_changes", message: "The latest review requests changes.")],
+          false
+        )
       }
     }
-    return []
+    return ([], false)
   }
 }

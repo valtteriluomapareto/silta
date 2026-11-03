@@ -12,17 +12,16 @@ struct TaskStartCommand: OutputCommand {
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Flag(help: "Override another actor's claim (human-only).") var steal = false
+  @Flag(help: "Override another session's fresh claim (human-only then).") var steal = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
-    TaskOutput.receipt(
-      try await TaskService(
-        environment: context.environment, workspace: global.ws, approved: global.approved
-      )
-      .start(
-        ref, steal: steal,
-        directory: URL(
-          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
-      approvalUsed: steal)
+    let started = try await TaskService(
+      environment: context.environment, workspace: global.ws, approved: global.approved
+    )
+    .start(
+      ref, steal: steal,
+      directory: URL(
+        filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
+    return TaskOutput.receipt(started.result, approvalUsed: started.approvalUsed)
   }
 }

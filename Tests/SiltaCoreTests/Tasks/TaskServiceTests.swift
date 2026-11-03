@@ -88,7 +88,7 @@ struct TaskServiceTests {
       clock.advance(milliseconds: 7_199_000)
       await #expect(throws: TaskError.self) { _ = try await rival.start("AC-1", directory: home) }
       clock.advance(milliseconds: 1000)
-      #expect(try await rival.start("AC-1", directory: home).status == "doing")
+      #expect(try await rival.start("AC-1", directory: home).result.status == "doing")
       #expect(try service.show("AC-1").claimedBy == "agent:codex:other")
       await #expect(throws: ActorError.self) {
         _ = try await service.start("AC-1", steal: true, directory: home)
@@ -157,7 +157,7 @@ struct TaskServiceTests {
       #expect(result.warnings == [SecretGuard.warning])
       #expect(try service.show("AC-1").title == "[REDACTED:password]")
       #expect(try service.show("AC-1").description == "[REDACTED:password]")
-      let finished = try await service.close("AC-1", result: secret, directory: home)
+      let finished = try await service.close("AC-1", result: secret, directory: home).result
       #expect(finished.warnings == [SecretGuard.warning])
       #expect(
         try service.show("AC-1", timeline: true).timeline?.filter { $0.kind == "secret_redacted" }

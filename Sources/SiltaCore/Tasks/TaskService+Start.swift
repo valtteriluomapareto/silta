@@ -3,14 +3,16 @@ import GRDB
 
 extension TaskService {
   /// Claims open work atomically, refusing another session's fresh claim.
-  /// Human-only steal never reopens a proposal or a terminal task.
-  package func start(_ ref: String, steal: Bool = false, directory: URL) async throws -> TaskResult
+  /// `--steal` is human-only only when it overrides such a claim, decided again inside the
+  /// write; otherwise it changes nothing. It never reopens a proposal or a terminal task.
+  package func start(_ ref: String, steal: Bool = false, directory: URL) async throws
+    -> (result: TaskResult, approvalUsed: Bool)
   {
     let command = "silta task start " + shellWord(ref) + " --steal"
-    let approval = try approval(required: steal, command: command)
     let before = try show(ref)
     let at = environment.clock.now()
     try validateClaim(before, at: at, steal: steal)
+    _ = try approval(required: steal && foreignClaim(before, at: at) != nil, command: command)
     try canStart(before)
     let git = try await TaskGit.inspect(
       repo: before.repoPath, directory: directory, runner: environment.git,
@@ -21,6 +23,8 @@ extension TaskService {
         Self.lookup(ref, workspace: slug, in: tx.database),
         at: at, in: tx.database)
       try validateClaim(task, at: at, steal: steal)
+      let approval = try approval(
+        required: steal && foreignClaim(task, at: at) != nil, command: command)
       try canStart(task)
       try Self.sameRepository(task, before)
       try tx.database.execute(
@@ -36,7 +40,7 @@ extension TaskService {
       try changed(task.id, kind: "claim", body: nil, at: at, in: tx)
       try approval?.record(
         command: command, workspace: slug, identity: (environment.ids, at), in: tx)
-      return receipt(try Self.lookup(ref, workspace: slug, in: tx.database))
+      return (receipt(try Self.lookup(ref, workspace: slug, in: tx.database)), approval != nil)
     }
   }
 

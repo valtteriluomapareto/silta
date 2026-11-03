@@ -20,14 +20,13 @@ struct TaskDropCommand: OutputCommand {
     let text = try body.read(
       actor: context.environment.actor, command: commit.command(ref, dropped: true),
       approved: global.approved)
-    return TaskOutput.receipt(
-      try await TaskService(
-        environment: context.environment, workspace: global.ws, approved: global.approved
-      )
-      .close(
-        ref, result: text, dropped: true, commit: commit,
-        directory: URL(
-          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
-      approvalUsed: body.allowSecret)
+    let closed = try await TaskService(
+      environment: context.environment, workspace: global.ws, approved: global.approved
+    )
+    .close(
+      ref, result: text, dropped: true, commit: commit,
+      directory: URL(
+        filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
+    return TaskOutput.receipt(closed.result, approvalUsed: closed.approvalUsed)
   }
 }

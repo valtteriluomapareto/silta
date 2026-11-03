@@ -83,33 +83,31 @@ struct TaskApprovalRegressionTests {
     }
   }
 
-  @Test func forceAndStealNeedApprovalOnlyWhenTheyBypass() {
-    withKnownIssue("no-op --force and --steal still need approval") {
-      try withScratchDirectory { scratch in
-        let store = try TaskCommandTests.setup(scratch)
-        #expect(try Self.run(["task", "add", "Acme"], in: scratch).termination == .exit(0))
-        #expect(
-          try Self.run(["task", "triage", "--accept", "AC-1", "--approved", "Yes"], in: scratch)
-            .termination == .exit(0))
-        #expect(
-          try Self.run(["task", "start", "AC-1", "--steal"], in: scratch).termination == .exit(0))
-        #expect(
-          try Self.run(["task", "done", "AC-1", "--force", "-m", "Acme done"], in: scratch)
-            .termination == .exit(0))
-        #expect(
-          try Self.run(["task", "add", "Acme held", "--start"], in: scratch, as: Self.other)
-            .termination == .exit(0))
-        let refused = try Self.run(["task", "start", "AC-2", "--steal"], in: scratch)
-        #expect(refused.termination == .exit(3))
-        let stolen = try Self.run(
-          ["task", "start", "AC-2", "--steal", "--approved", "Take it over"], in: scratch)
-        #expect(stolen.termination == .exit(0))
-        let commands = try store.read {
-          try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id")
-        }
-        #expect(
-          commands == ["silta task triage --accept 'AC-1'", "silta task start 'AC-2' --steal"])
+  @Test func forceAndStealNeedApprovalOnlyWhenTheyBypass() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      #expect(try Self.run(["task", "add", "Acme"], in: scratch).termination == .exit(0))
+      #expect(
+        try Self.run(["task", "triage", "--accept", "AC-1", "--approved", "Yes"], in: scratch)
+          .termination == .exit(0))
+      #expect(
+        try Self.run(["task", "start", "AC-1", "--steal"], in: scratch).termination == .exit(0))
+      #expect(
+        try Self.run(["task", "done", "AC-1", "--force", "-m", "Acme done"], in: scratch)
+          .termination == .exit(0))
+      #expect(
+        try Self.run(["task", "add", "Acme held", "--start"], in: scratch, as: Self.other)
+          .termination == .exit(0))
+      let refused = try Self.run(["task", "start", "AC-2", "--steal"], in: scratch)
+      #expect(refused.termination == .exit(3))
+      let stolen = try Self.run(
+        ["task", "start", "AC-2", "--steal", "--approved", "Take it over"], in: scratch)
+      #expect(stolen.termination == .exit(0))
+      let commands = try store.read {
+        try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id")
       }
+      #expect(
+        commands == ["silta task triage --accept 'AC-1'", "silta task start 'AC-2' --steal"])
     }
   }
 }

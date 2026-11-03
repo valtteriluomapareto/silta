@@ -94,12 +94,11 @@ struct TaskCommandTests {
     }
   }
 
-  @Test func agentsCannotStealOrAllowSecrets() throws {
+  @Test func agentsCannotAllowSecretsBeforeStorageOpens() throws {
     try withScratchDirectory { scratch in
       for args in [
-        ["task", "start", "AC-1", "--steal"],
         ["task", "add", "Acme", "--allow-secret"],
-        ["task", "done", "AC-1", "--force"],
+        ["task", "done", "AC-1", "--allow-secret"],
       ] {
         let result = try SiltaBinary.run(args + ["--json"], in: scratch, environment: Self.actor)
         #expect(result.termination == .exit(3))
@@ -184,9 +183,21 @@ extension TaskCommandTests {
 extension TaskCommandTests {
   @Test func humanOnlyRecoveryRetainsTaskAndFileInput() throws {
     try withScratchDirectory { scratch in
+      let store = try Self.setup(scratch)
+      for actor in ["agent:codex:other", "agent:codex:acme"] {
+        let added = try SiltaBinary.run(
+          ["task", "add", "Acme", "--start"], in: scratch, environment: ["SILTA_ACTOR": actor])
+        #expect(added.termination == .exit(0))
+      }
+      try store.write {
+        try $0.database.execute(sql: #"UPDATE workspace SET settings='{"review_gate":"human"}'"#)
+      }
       for (args, expected) in [
-        (["task", "start", "AC-7", "--steal"], "silta task start 'AC-7' --steal"),
-        (["task", "done", "AC-7", "--force"], "silta task done 'AC-7' --force -F <file>"),
+        (["task", "start", "AC-1", "--steal"], "silta task start 'AC-1' --steal"),
+        (
+          ["task", "done", "AC-2", "--force", "-m", "Acme done"],
+          "silta task done 'AC-2' --force -F <file>"
+        ),
         (
           ["task", "done", "AC-7", "--allow-secret"],
           "silta task done 'AC-7' --allow-secret -F <file>"

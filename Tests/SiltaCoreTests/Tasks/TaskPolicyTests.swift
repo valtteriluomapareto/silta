@@ -71,8 +71,9 @@ struct TaskPolicyTests {
       }
       try Self.verdict("changes", actor: TaskServiceTests.agent, task: 2, in: env.db)
       #expect(
-        try await service.close("AC-2", result: "Done with warning.", directory: home).warnings.map(
-          \.code) == ["review_changes"])
+        try await service.close("AC-2", result: "Done with warning.", directory: home).result
+          .warnings.map(
+            \.code) == ["review_changes"])
     }
   }
 

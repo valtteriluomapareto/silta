@@ -335,8 +335,11 @@ extension ApprovalCommandTests {
         in: scratch, environment: TaskCommandTests.actor)
       #expect(done.termination == .exit(3))
       #expect(done.stdout.contains("--force --sha 'acme-commit' --allow-secret -F <file>"))
+      try store.write {
+        try $0.database.execute(sql: #"UPDATE workspace SET settings='{"review_gate":"human"}'"#)
+      }
       let noSHA = try SiltaBinary.run(
-        ["task", "done", "AC-1", "--force", "--no-sha", "--json"], in: scratch,
+        ["task", "done", "AC-1", "--force", "--no-sha", "-m", "Acme done", "--json"], in: scratch,
         environment: TaskCommandTests.actor)
       #expect(noSHA.termination == .exit(3) && noSHA.stdout.contains("--force --no-sha -F <file>"))
     }
