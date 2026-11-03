@@ -77,7 +77,7 @@ extension TaskService {
     _ document: TaskEditDocument, task: TaskDetails, redacted: Bool,
     at date: Date, in tx: StorageTransaction
   ) throws {
-    if document.plan != task.plan {
+    if !document.plan.utf8.elementsEqual(task.plan.utf8) {
       try writePlan(document.plan, task: task, redacted: false, at: date, in: tx)
     }
     try tx.database.execute(
@@ -89,7 +89,8 @@ extension TaskService {
         """,
       arguments: [
         document.title, document.description, document.acceptance,
-        document.result == (task.result ?? "") ? task.result : document.result,
+        document.result.utf8.elementsEqual((task.result ?? "").utf8)
+          ? task.result : document.result,
         Self.timestamp(date), environment.actor.description, Self.timestamp(date), task.id,
       ])
     try changed(task.id, kind: "field", body: "edited", redacted: redacted, at: date, in: tx)

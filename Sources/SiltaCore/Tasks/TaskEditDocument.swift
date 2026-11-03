@@ -28,6 +28,13 @@ package struct TaskEditDocument: Equatable, Sendable {
     result = task.result ?? ""
   }
 
+  /// Compares the literal UTF-8 bytes of the editable fields.
+  package static func == (left: Self, right: Self) -> Bool {
+    zip(left.values, right.values).allSatisfy { pair in
+      pair.0.utf8.elementsEqual(pair.1.utf8)
+    }
+  }
+
   var values: [String] {
 
     [title, description, acceptance, plan, result]
