@@ -1077,13 +1077,13 @@ revision before the write.
 
 ## 19. Observability
 
-- **Logs:** `$SILTA_HOME/log/YYYY-MM-DD.jsonl`, kept 14 days. One line per command:
+- **Logs:** `$SILTA_HOME/log/YYYY-MM-DD.jsonl`, kept 90 days (D36). One line per command:
   - timestamp, command and flags (bodies excluded), actor, workspace, app
   - exit code and error code
   - ms; busy retries, git calls and git ms join when the first command counts them
   - warnings
 
-  Evals read these logs too (§21).
+  Evals and the dogfood report read these logs (§21, §22.1).
 - **`silta doctor [--fix]`** checks:
   - **Install:** PATH, the hook and skill, the Codex writable root and marker.
   - **Database:** `PRAGMA integrity_check` and `foreign_key_check`, FTS integrity,
@@ -1303,11 +1303,38 @@ steps, questions, handoffs and results.
   using temporary homes.
 - **From DF0 on, migrations count as shipped.** Real data now exists, so migrations
   are only ever added, never edited.
-- **Friction becomes data.**
-  - Anything awkward while dogfooding becomes a Silta task with the topic
-    `dogfood`.
-  - One review per wave turns these into GitHub issues (label `dogfood`), changes to
-    the `silta guide` text, or nothing.
+- **Friction becomes data (D36).**
+  - Every dogfood task's `done` result ends with one line: `Friction: none`, or
+    `Friction: <what was awkward>`. Agents rarely stop to report friction on their
+    own, so the result asks every time.
+  - Friction that needs its own fix, or that comes up outside a task, also becomes a
+    task with the topic `dogfood`.
+  - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
+    Markdown report from the command logs (§19) and the tasks. `--since` defaults
+    to the date of the newest report in `docs/dogfood/reports/`, so reports leave
+    no gaps. It reports:
+    - calls per command, with the error rate and the most common error codes;
+    - `usage` errors per command, which point at unclear help or guide text;
+    - retry loops: one session getting the same error from the same command twice
+      or more in a row;
+    - calls per agent session, median and maximum;
+    - the slowest commands (maximum ms);
+    - warnings by code;
+    - commands `silta schema` lists that nobody called;
+    - the friction lines other than `none` from tasks done in the range (the date
+      comes from the task's `status` event), and the open `dogfood` tasks.
+
+    It reads only log lines and tasks tagged with the `silta` workspace, so data
+    from other workspaces (DF3) never reaches the repo; untagged lines are only
+    counted. DF therefore records the resolved workspace and app on every log line
+    (§19 lists them, but nothing sets them yet). The report runs under its own
+    `SILTA_ACTOR` and leaves that actor's calls out. Failures before the
+    environment is set up (a bad `SILTA_*` value) aren't logged, so the report
+    can't see them.
+  - Once per wave, at the latest every 60 days so no log has expired, the
+    maintainer runs the report and commits it as
+    `docs/dogfood/reports/<YYYY-MM-DD>.md`. The review turns its findings into
+    GitHub issues (label `dogfood`), changes to the `silta guide` text, or nothing.
   - This is the earliest source of agent-experience findings, before the M4 evals.
 
 **First real use after M1 (DF3):** run `silta init --scan <projects dir>`, then fill
