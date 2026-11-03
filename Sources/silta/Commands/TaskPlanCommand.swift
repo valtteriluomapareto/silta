@@ -26,7 +26,8 @@ struct TaskPlanCommand: OutputCommand {
   @Flag(help: "Mark the selected checkbox undone.") var undo = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
-    let service = TaskService(environment: context.environment, workspace: global.ws)
+    let service = TaskService(
+      environment: context.environment, workspace: global.ws, approved: global.approved)
     let result: TaskPlanResult
     if let step {
       guard done != undo, body.message == nil, body.file == nil else {
@@ -39,7 +40,8 @@ struct TaskPlanCommand: OutputCommand {
         throw TaskError.invalid("--done and --undo require --step N.")
       }
       let text = try body.read(
-        actor: context.environment.actor, command: TaskService.planCommand(ref, ifRevision: ifRev))
+        actor: context.environment.actor, command: TaskService.planCommand(ref, ifRevision: ifRev),
+        approved: global.approved)
       guard let text else {
         throw TaskError.invalid("Supply -m or -F for a revision, or --step N --done|--undo.")
       }
@@ -47,6 +49,6 @@ struct TaskPlanCommand: OutputCommand {
     }
     return CommandOutput(
       text: "\(result.ref) plan revision \(result.planRev)\n\(result.plan)", data: result,
-      warnings: result.warnings)
+      warnings: result.warnings, approvalUsed: body.allowSecret)
   }
 }

@@ -87,6 +87,7 @@ extension TaskPlanDeleteRegressionTests {
       #expect(
         error["next"] as? [String] == [
           "silta --ws 'acme' task plan 'AC-1' --if-rev 1 --allow-secret -F <file>"
+            + " --approved \"<the human's words>\""
         ])
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/silta.db").path)
@@ -111,6 +112,7 @@ extension TaskPlanDeleteRegressionTests {
       #expect(
         error["next"] as? [String] == [
           "silta --ws 'acme' task plan 'AC-1' --if-rev 1 --step 1 --done --allow-secret"
+            + " --approved \"<the human's words>\""
         ])
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/silta.db").path)

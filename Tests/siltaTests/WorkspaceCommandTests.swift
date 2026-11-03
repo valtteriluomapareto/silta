@@ -59,7 +59,7 @@ struct WorkspaceCommandTests {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(["ws", "ls"], in: scratch)
       #expect(result.termination == .exit(0))
-      #expect(result.stdout.contains("Ask human: silta ws edit"))
+      Golden.forTests().check(result.stdout, "ws-ls-empty.txt")
       let missing = try SiltaBinary.run(["ws", "use", "absent", "--json"], in: scratch)
       #expect(missing.termination == .exit(2))
       #expect(missing.stdout.contains("silta ws ls"))
@@ -90,7 +90,10 @@ struct WorkspaceCommandTests {
       let object = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
       let error = try #require(object["error"] as? [String: Any])
-      #expect(error["next"] as? [String] == ["silta ws edit 'acme'\\''s'"])
+      #expect(
+        error["next"] as? [String] == [
+          "silta ws edit 'acme'\\''s' -F <file> --approved \"<the human's words>\""
+        ])
     }
   }
 

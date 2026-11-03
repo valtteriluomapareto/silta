@@ -15,15 +15,19 @@ struct TaskDropCommand: OutputCommand {
   @Argument(help: "The task reference.") var ref: String
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
-    let text = try body.read(
-      actor: context.environment.actor, command: "silta task drop " + shellWord(ref))
     var commit = TaskCommit()
     commit.allowSecret = body.allowSecret
+    let text = try body.read(
+      actor: context.environment.actor, command: commit.command(ref, dropped: true),
+      approved: global.approved)
     return TaskOutput.receipt(
-      try await TaskService(environment: context.environment, workspace: global.ws)
-        .close(
-          ref, result: text, dropped: true, commit: commit,
-          directory: URL(
-            filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)))
+      try await TaskService(
+        environment: context.environment, workspace: global.ws, approved: global.approved
+      )
+      .close(
+        ref, result: text, dropped: true, commit: commit,
+        directory: URL(
+          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
+      approvalUsed: body.allowSecret)
   }
 }

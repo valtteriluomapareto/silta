@@ -6,6 +6,9 @@ extension TaskService {
   package func plan(
     _ ref: String, text: String, ifRevision: Int? = nil, allowSecret: Bool = false
   ) throws -> TaskPlanResult {
+    let command = Self.planCommand(ref, ifRevision: ifRevision)
+    let approval = try approval(
+      required: allowSecret, command: command + " -F <file> --allow-secret")
     let content = try checked(
       text, allow: allowSecret,
       command: Self.planCommand(ref, ifRevision: ifRevision) + " -F <file>")
@@ -16,6 +19,9 @@ extension TaskService {
       try validateClaim(task, at: at)
       try Self.compareRevision(ifRevision, task: task)
       try writePlan(content.0, task: task, redacted: content.1, at: at, in: tx)
+      try approval?.record(
+        command: command + " --allow-secret", workspace: slug,
+        identity: (environment.ids, at), in: tx)
       return TaskPlanResult(
         ref: task.ref, planRev: task.planRev + 1, plan: content.0,
         warnings: content.1 ? [SecretGuard.warning] : [])
@@ -31,7 +37,7 @@ extension TaskService {
     let command =
       Self.planCommand(ref, ifRevision: ifRevision)
       + " --step \(step) " + (done ? "--done" : "--undo")
-    if allowSecret { try environment.actor.requireHuman(command: command + " --allow-secret") }
+    let approval = try approval(required: allowSecret, command: command + " --allow-secret")
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
@@ -45,6 +51,9 @@ extension TaskService {
       try changed(
         task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")",
         redacted: content.1, at: at, in: tx)
+      try approval?.record(
+        command: command + " --allow-secret", workspace: slug,
+        identity: (environment.ids, at), in: tx)
       return TaskPlanResult(
         ref: task.ref, planRev: task.planRev, plan: text,
         warnings: content.1 ? [SecretGuard.warning] : [])

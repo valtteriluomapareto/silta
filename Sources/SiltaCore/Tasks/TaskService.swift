@@ -7,10 +7,13 @@ package struct TaskService: Sendable {
 
   let workspace: String?
 
+  let approved: String?
+
   /// Uses the supplied workspace, or the current selection when an operation begins.
-  package init(environment: SiltaEnvironment, workspace: String? = nil) {
+  package init(environment: SiltaEnvironment, workspace: String? = nil, approved: String? = nil) {
     self.environment = environment
     self.workspace = workspace
+    self.approved = approved
   }
 
   func selected() throws -> String {
@@ -22,13 +25,19 @@ package struct TaskService: Sendable {
   }
 
   func checked(_ text: String, allow: Bool, command: String) throws -> (String, Bool) {
-    if allow { try environment.actor.requireHuman(command: command + " --allow-secret") }
+    if allow {
+      try environment.actor.requireHuman(command: command + " --allow-secret", approved: approved)
+    }
     guard !SecretGuard.matches(in: text).isEmpty else { return (text, false) }
+    if allow { return (text, false) }
     if environment.actor.isHuman {
-      guard allow else { throw SecretError(command: command, text: text) }
-      return (text, false)
+      throw SecretError(command: command, text: text)
     }
     return (SecretGuard.redacted(text), true)
+  }
+
+  func approval(required: Bool, command: String) throws -> HumanApproval? {
+    try required ? environment.actor.requireHuman(command: command, approved: approved) : nil
   }
 
   func validateClaim(_ task: TaskDetails, at date: Date, steal: Bool = false) throws {

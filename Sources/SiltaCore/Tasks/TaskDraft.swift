@@ -28,4 +28,16 @@ package struct TaskDraft: Sendable {
   package init(title: String) {
     self.title = title
   }
+
+  /// The creation options without a title, body or input file contents.
+  package var command: String {
+    var value = "silta task add"
+    if start { value += " --start" }
+    if let parent { value += " --parent " + shellWord(parent) }
+    if let app { value += " --app " + shellWord(app) }
+    for topic in topics { value += " --topic " + shellWord(topic) }
+    if let source { value += " --from " + shellWord(source) }
+    return value
+  }
+
 }

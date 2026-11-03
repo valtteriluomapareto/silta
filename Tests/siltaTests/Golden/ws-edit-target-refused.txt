@@ -1,2 +1,2 @@
-error: This command requires a human actor; detected agent:codex:acme. [human_only]
-ask human: silta ws edit 'other'
+error: This command needs the human's go-ahead; ask in chat. Detected agent:codex:acme. [human_only]
+ask human: silta ws edit 'other' -F <file> --approved "<the human's words>"

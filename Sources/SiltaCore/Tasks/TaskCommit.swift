@@ -14,4 +14,14 @@ package struct TaskCommit: Sendable {
 
   /// Uses HEAD and enforces the review gate by default.
   package init() {}
+
+  /// The completion options with safe refs and no result text or file contents.
+  package func command(_ ref: String, dropped: Bool) -> String {
+    var value = (dropped ? "silta task drop " : "silta task done ") + shellWord(ref)
+    if force { value += " --force" }
+    if let sha { value += " --sha " + shellWord(sha) }
+    if noSHA { value += " --no-sha" }
+    return value
+  }
+
 }

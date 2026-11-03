@@ -1,8 +1,8 @@
-/// Who should run an error's `next` commands (spec §16).
+/// Who must act before an error's `next` commands can run (spec §16).
 package enum NextBy: String, Sendable {
   /// The calling agent can run them itself.
   case agent
-  /// Only the human can; an agent should stop and ask.
+  /// The agent must ask the human in chat before acting.
   case human
 }
 
@@ -56,7 +56,7 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
     }
   }
 
-  /// Who should run the `next` commands of an error with this code.
+  /// Who must act before the `next` commands of an error with this code can run.
   package var nextBy: NextBy {
     switch self {
     case .humanOnly, .readOnlyPromoted, .env: .human
@@ -69,7 +69,9 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
     switch self {
     case .usage, .invalid: "Read `silta <cmd> --help` and fix the call"
     case .notFound, .unregistered: "Check the ref, or carry on without silta"
-    case .humanOnly, .readOnlyPromoted: "Stop; ask the human to run the printed command"
+    case .humanOnly, .readOnlyPromoted:
+      "Stop and ask the human in chat; for `human_only`, rerun with "
+        + "`--approved \"<their words>\"` after they say yes"
     case .ambiguousLocation: "Retry with `--app <slug>` from the candidates"
     case .busy: "Retry once after a few seconds"
     case .conflict, .claimed, .staleRev, .leaseTaken: "Re-read, then decide; don't steal"

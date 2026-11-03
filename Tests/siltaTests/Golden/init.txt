@@ -1,2 +1,2 @@
 Initialized database.
-ask human: silta ws edit
+ask human: silta ws edit -F <file> --approved "<the human's words>"

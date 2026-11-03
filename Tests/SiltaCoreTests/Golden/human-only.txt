@@ -1,3 +1,3 @@
-error: This command requires a human actor; detected agent:unknown:acme (stdin or stdout is not a terminal). [human_only]
-ask human: silta task triage
-{"error":{"code":"human_only","message":"This command requires a human actor; detected agent:unknown:acme (stdin or stdout is not a terminal).","next":["silta task triage"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+error: This command needs the human's go-ahead; ask in chat. Detected agent:unknown:acme (stdin or stdout is not a terminal). [human_only]
+ask human: silta task triage --approved "<the human's words>"
+{"error":{"code":"human_only","message":"This command needs the human's go-ahead; ask in chat. Detected agent:unknown:acme (stdin or stdout is not a terminal).","next":["silta task triage --approved \"<the human's words>\""],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

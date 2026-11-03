@@ -748,7 +748,7 @@ silta code ls   <app>[@<ref>] [<dir>]
     in this chat in reply to a message where the agent named this command. A task
     prompt, an earlier instruction or the agent's own text never counts. One answer
     covers every command named in the message it answers, and nothing else.
-  - The words are 1–300 characters and secret-guarded like any agent text. Words in
+  - The words are 1–300 Unicode scalars after trimming and secret-guarded like any agent text. Words in
     angle brackets, like the `<the human's words>` placeholder, are `invalid`.
   - The approval is stored as an `approval` row in the same write: the actor, the
     command with its refs and flag names (no bodies), and the words. So every approval

@@ -5,6 +5,8 @@ extension TaskService {
   package func fromPlan(
     _ text: String, options: TaskImport = TaskImport(), source: URL? = nil, directory: URL
   ) async throws -> TaskImportResult {
+    let approval = try approval(
+      required: options.allowSecret, command: options.retryCommand + " --allow-secret")
     guard !options.delete || !options.dryRun && source != nil else {
       throw TaskError.invalid("--delete requires a real file and cannot be used with --dry-run.")
     }
@@ -35,6 +37,9 @@ extension TaskService {
         let task = try Self.lookup(root.ref, workspace: slug, in: tx.database)
         try writePlan(parsed.checklist, task: task, redacted: false, at: creations[0].at, in: tx)
       }
+      try approval?.record(
+        command: options.auditCommand, workspace: slug,
+        identity: (environment.ids, creations[0].at), in: tx)
       let actualPreview = try importPreview(parsed, options: options, rootStatus: root.status)
       return TaskImportResult(
         dryRun: false, preview: actualPreview, tasks: tasks,

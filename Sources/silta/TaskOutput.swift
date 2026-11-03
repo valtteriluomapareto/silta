@@ -18,8 +18,10 @@ enum TaskOutput {
         ]))),
   ])
 
-  static func receipt(_ result: TaskResult) -> CommandOutput {
-    CommandOutput(text: "\(result.ref) \(result.status)", data: result, warnings: result.warnings)
+  static func receipt(_ result: TaskResult, approvalUsed: Bool = false) -> CommandOutput {
+    CommandOutput(
+      text: "\(result.ref) \(result.status)", data: result, warnings: result.warnings,
+      approvalUsed: approvalUsed)
   }
 
   static func summary(_ task: TaskDetails) -> String {

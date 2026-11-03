@@ -12,13 +12,16 @@ package enum WorkspaceError: CodedError {
   /// The editor could not be started.
   case editor
 
+  /// The file cannot be read as UTF-8 YAML.
+  case input
+
   /// Validation is a caller error; referenced deletions require reconciliation.
   package var code: ErrorCode {
     switch self {
     case .invalid: .invalid
     case .notFound: .notFound
     case .conflict: .conflict
-    case .editor: .env
+    case .editor, .input: .env
     }
   }
 
@@ -29,6 +32,7 @@ package enum WorkspaceError: CodedError {
     case .notFound: "No matching workspace is selected."
     case .conflict: "Configuration conflicts with an existing reference or unique value."
     case .editor: "The editor could not be started; check EDITOR."
+    case .input: "Could not read UTF-8 workspace YAML; check the file path and permissions."
     }
   }
 
@@ -36,6 +40,7 @@ package enum WorkspaceError: CodedError {
   package var next: [String] {
     switch self {
     case .notFound: ["silta ws ls"]
+    case .input: ["silta ws edit -F <file>"]
     default: ["silta ws edit"]
     }
   }

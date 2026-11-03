@@ -6,9 +6,8 @@ extension TaskService {
   /// Human-only steal never reopens a proposal or a terminal task.
   package func start(_ ref: String, steal: Bool = false, directory: URL) async throws -> TaskResult
   {
-    if steal {
-      try environment.actor.requireHuman(command: "silta task start " + shellWord(ref) + " --steal")
-    }
+    let command = "silta task start " + shellWord(ref) + " --steal"
+    let approval = try approval(required: steal, command: command)
     let before = try show(ref)
     try canStart(before)
     let at = environment.clock.now()
@@ -33,6 +32,8 @@ extension TaskService {
           git.worktree, Self.timestamp(at), task.id,
         ])
       try changed(task.id, kind: "claim", body: nil, at: at, in: tx)
+      try approval?.record(
+        command: command, workspace: slug, identity: (environment.ids, at), in: tx)
       return receipt(try Self.lookup(ref, workspace: slug, in: tx.database))
     }
   }
@@ -54,8 +55,10 @@ extension TaskService {
   package func submit(_ ref: String, body: String? = nil, allowSecret: Bool = false) throws
     -> TaskResult
   {
-    let content = try checked(
-      body ?? "", allow: allowSecret, command: "silta task submit " + shellWord(ref) + " -F <file>")
+    let command = "silta task submit " + shellWord(ref)
+    let approval = try approval(
+      required: allowSecret, command: command + " -F <file> --allow-secret")
+    let content = try checked(body ?? "", allow: allowSecret, command: command + " -F <file>")
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
@@ -73,6 +76,9 @@ extension TaskService {
           """,
         arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
       try changed(task.id, kind: "status", body: content.0, redacted: content.1, at: at, in: tx)
+      try approval?.record(
+        command: command + " --allow-secret", workspace: slug,
+        identity: (environment.ids, at), in: tx)
       return receipt(
         try Self.lookup(ref, workspace: slug, in: tx.database),
         warnings: content.1 ? [SecretGuard.warning] : [])

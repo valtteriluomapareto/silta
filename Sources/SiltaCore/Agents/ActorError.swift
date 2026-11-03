@@ -3,9 +3,15 @@ package enum ActorError: CodedError {
   /// The caller supplies a body-free retry command with safely quoted identifiers.
   case humanOnly(command: String, actor: ActorID)
 
-  /// Human intervention is required.
+  /// The supplied words are blank, too long or an unfilled placeholder.
+  case invalidApproval(command: String)
+
+  /// Human intervention or corrected approval words are required.
   package var code: ErrorCode {
-    .humanOnly
+    switch self {
+    case .humanOnly: .humanOnly
+    case .invalidApproval: .invalid
+    }
   }
 
   /// Names the detected actor, and why an unknown agent was detected.
@@ -14,14 +20,17 @@ package enum ActorError: CodedError {
     case .humanOnly(_, let actor):
       let reason =
         if case .agent("unknown", _) = actor { " (stdin or stdout is not a terminal)" } else { "" }
-      return "This command requires a human actor; detected \(actor)\(reason)."
+      return "This command needs the human's go-ahead; ask in chat. Detected \(actor)\(reason)."
+    case .invalidApproval:
+      return "--approved needs 1–300 Unicode scalars of the human's words, not a placeholder."
     }
   }
 
-  /// The command the human should run.
+  /// The command to run after the human gives their go-ahead in chat.
   package var next: [String] {
     switch self {
-    case .humanOnly(let command, _): [command]
+    case .humanOnly(let command, _): [command + " --approved \"<the human's words>\""]
+    case .invalidApproval(let command): [command + " --help"]
     }
   }
 }

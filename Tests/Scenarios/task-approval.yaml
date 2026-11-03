@@ -1,0 +1,31 @@
+fixtures: true
+steps:
+  - args: [init, --scan, acme-missing-remote, --json]
+    cwd: fixtures
+    expect: {exit: 0, json: {data.workspace: acme-missing-remote}}
+  - args: [ws, use, acme-missing-remote, --json]
+    expect: {exit: 0}
+  - args: [ws, show, --json]
+    expect: {exit: 0, json: {data.workspace: acme-missing-remote}}
+  - args: [ws, edit, -F, fixtures/acme-platform/README.md, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 3, code: human_only}
+  - args: [ws, edit, -F, fixtures/acme-platform/README.md, --approved, Apply this YAML., --json]
+    cwd: .
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 1, code: invalid}
+  - args: [task, add, Acme release, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.status: doing}}
+  - args: [task, start, AC-1, --steal, --json]
+    env: {SILTA_ACTOR: 'agent:codex:other'}
+    expect: {exit: 3, code: human_only}
+  - args: [task, start, AC-1, --steal, --approved, Take the claim., --json]
+    env: {SILTA_ACTOR: 'agent:codex:other'}
+    expect: {exit: 0, json: {data.status: doing}}
+  - args: [task, done, AC-1, --force, --approved, Close it., -m, Released Acme., --json]
+    env: {SILTA_ACTOR: 'agent:codex:other'}
+    expect: {exit: 0, json: {data.status: done}}
+  - args: [task, show, AC-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 0, json: {data.status: done, data.result: Released Acme.}}

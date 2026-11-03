@@ -178,6 +178,12 @@ enum StorageSchema {
       app_id INTEGER NOT NULL REFERENCES app(id),
       set_by TEXT NOT NULL
     );
+    CREATE TABLE approval (
+      id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+      workspace TEXT,
+      actor TEXT NOT NULL, command TEXT NOT NULL,
+      words TEXT NOT NULL, created_at TEXT NOT NULL
+    );
     CREATE TABLE change_log (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, row_id INTEGER NOT NULL);
     """
 }
