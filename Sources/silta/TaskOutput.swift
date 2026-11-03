@@ -9,12 +9,23 @@ enum TaskOutput {
     "dropped": .array(.string),
   ])
 
+  /// What `task ls` returns per task (spec §16): enough to choose work, no bodies.
+  static let summaryShape = Shape.object([
+    "ref": .string, "title": .string, "status": .string, "priority": .int,
+    "app": .optional(.string), "parent": .optional(.string),
+    "claimed_by": .optional(.string), "claimed_at": .optional(.string),
+    "external_ref": .optional(.string), "waiting": .optional(waitingShape),
+    "follow_up_at": .optional(.string), "created_by": .string, "created_at": .string,
+    "updated_at": .string,
+  ])
+
   static let detailShape = Shape.object([
     "ref": .string, "title": .string, "status": .string, "description": .string,
     "follow_up_at": .optional(.string), "waiting": .optional(waitingShape),
     "acceptance": .string, "priority": .int, "archived": .bool,
     "archive_override": .optional(.string), "external_ref": .optional(.string),
     "plan": .string, "plan_rev": .int, "result": .optional(.string), "created_by": .string,
+    "created_at": .string, "updated_at": .string, "parent": .optional(.string),
     "claimed_by": .optional(.string), "claimed_at": .optional(.string), "app": .optional(.string),
     "branch": .optional(.string), "worktree": .optional(.string), "done_sha": .optional(.string),
     "done_branch": .optional(.string), "done_dirty": .optional(.bool),
@@ -34,7 +45,9 @@ enum TaskOutput {
 
   static func summary(_ task: TaskDetails) -> String {
     let tracker = task.externalRef.map { " [read-only: " + $0 + "]" } ?? ""
-    return "\(task.ref) \(task.status) (priority \(task.priority)): \(task.title)" + tracker
+    let parent = task.parent.map { ", parent " + $0 } ?? ""
+    return "\(task.ref) \(task.status) (priority \(task.priority)\(parent)): \(task.title)"
+      + tracker
       + (task.waiting.map { "\n" + waitingLines($0).joined(separator: "\n") } ?? "")
   }
 

@@ -5,9 +5,11 @@ extension TaskService {
   static let statuses = ["proposed", "todo", "doing", "review", "blocked", "done", "dropped"]
 
   static let query = """
-    SELECT task.*,workspace.task_prefix,app.slug AS app_slug,repo_path.path AS repo_path
+    SELECT task.*,workspace.task_prefix,app.slug AS app_slug,repo_path.path AS repo_path,
+      parent.seq AS parent_seq
     FROM task
     JOIN workspace ON workspace.id=task.workspace_id
+    LEFT JOIN task AS parent ON parent.id=task.parent_id
     LEFT JOIN app ON app.id=task.app_id
     LEFT JOIN repo_path ON repo_path.repo_id=app.repo_id
     """

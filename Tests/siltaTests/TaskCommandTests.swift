@@ -22,6 +22,9 @@ struct TaskCommandTests {
 
   static let actor = ["SILTA_ACTOR": "agent:codex:acme"]
 
+  /// The agent at a fixed instant, for goldens that carry timestamps.
+  static let fixed = actor.merging(["SILTA_NOW": "2023-11-14T22:13:20.000Z"]) { $1 }
+
   @Test func nonCodeLifecycleAndSessionRefusal() throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
@@ -62,7 +65,7 @@ struct TaskCommandTests {
     try withScratchDirectory { scratch in
       _ = try Self.setup(scratch)
       let proposed = try SiltaBinary.run(
-        ["task", "add", "Acme idea", "--json"], in: scratch, environment: Self.actor)
+        ["task", "add", "Acme idea", "--json"], in: scratch, environment: Self.fixed)
       #expect(proposed.termination == .exit(0))
       Golden.forTests().check(proposed.stdout, "task-add-proposed.json")
       for command in ["ls", "show"] {
@@ -70,7 +73,7 @@ struct TaskCommandTests {
           let args =
             ["task", command] + (command == "show" ? ["AC-1"] : [])
             + (json ? ["--json"] : [])
-          let read = try SiltaBinary.run(args, in: scratch, environment: Self.actor)
+          let read = try SiltaBinary.run(args, in: scratch, environment: Self.fixed)
           #expect(read.termination == .exit(0))
           Golden.forTests().check(read.stdout, "task-" + command + (json ? ".json" : ".txt"))
         }

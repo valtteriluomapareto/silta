@@ -96,6 +96,26 @@ struct SchemaCommandTests {
     #expect(covered == Set(commands.keys), "commands without a success golden")
   }
 
+  // Spec §16: `task ls` returns a summary per task, without bodies.
+  @Test func taskListPublishesTheSummaryShape() throws {
+    let detail = try object(Data(try silta(["schema", "task", "ls", "--json"]).stdout.utf8))
+    let entries = try #require((detail["data"] as? [String: Any])?["commands"] as? [[String: Any]])
+    let data = try #require(entries.first?["data"] as? [String: Any])
+    let expected = try object(
+      Data(
+        """
+        {"object":{"tasks":{"array":{"object":{
+          "app":{"optional":"string"},"claimed_at":{"optional":"string"},
+          "claimed_by":{"optional":"string"},"created_at":"string","created_by":"string",
+          "external_ref":{"optional":"string"},"follow_up_at":{"optional":"string"},
+          "parent":{"optional":"string"},"priority":"int","ref":"string","status":"string",
+          "title":"string","updated_at":"string",
+          "waiting":{"optional":{"object":{"age_days":"int","dropped":{"array":"string"},
+            "on":{"array":"string"},"ready":"bool","why":"string"}}}}}}}}
+        """.utf8))
+    #expect(NSDictionary(dictionary: data) == NSDictionary(dictionary: expected))
+  }
+
   /// Each command's data shape from `silta schema --json`, keyed by its dash-joined
   /// words without `silta`.
   private func publishedShapes() throws -> [String: Any] {

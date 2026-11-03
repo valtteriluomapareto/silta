@@ -52,17 +52,15 @@ struct TaskStateRegressionTests {
     }
   }
 
-  @Test func listJSONIsASummaryWithoutBodies() {
-    withKnownIssue("task ls --json carries every body") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        let added = try Self.run(["task", "add", "Acme", "-m", "Acme detail"], in: scratch)
-        #expect(added.termination == .exit(0))
-        let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
-        #expect(
-          Set(try #require(listed.first).keys)
-            == ["created_at", "created_by", "priority", "ref", "status", "title", "updated_at"])
-      }
+  @Test func listJSONIsASummaryWithoutBodies() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      let added = try Self.run(["task", "add", "Acme", "-m", "Acme detail"], in: scratch)
+      #expect(added.termination == .exit(0))
+      let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
+      #expect(
+        Set(try #require(listed.first).keys)
+          == ["created_at", "created_by", "priority", "ref", "status", "title", "updated_at"])
     }
   }
 
@@ -153,22 +151,20 @@ struct TaskStateRegressionTests {
     }
   }
 
-  @Test func parentAppearsInListAndShow() {
-    withKnownIssue("ls and show omit the parent") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(
-          try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
-        #expect(
-          try Self.run(["task", "add", "Acme child", "--parent", "AC-1"], in: scratch).termination
-            == .exit(0))
-        let shown = try Self.data(Self.run(["task", "show", "AC-2", "--json"], in: scratch))
-        #expect(shown["parent"] as? String == "AC-1")
-        let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
-        #expect(listed.map { $0["parent"] as? String } == [nil, "AC-1"])
-        let text = try Self.run(["task", "show", "AC-2"], in: scratch)
-        #expect(text.stdout.hasPrefix("AC-2 todo (priority 2, parent AC-1): Acme child\n"))
-      }
+  @Test func parentAppearsInListAndShow() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(
+        try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
+      #expect(
+        try Self.run(["task", "add", "Acme child", "--parent", "AC-1"], in: scratch).termination
+          == .exit(0))
+      let shown = try Self.data(Self.run(["task", "show", "AC-2", "--json"], in: scratch))
+      #expect(shown["parent"] as? String == "AC-1")
+      let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
+      #expect(listed.map { $0["parent"] as? String } == [nil, "AC-1"])
+      let text = try Self.run(["task", "show", "AC-2"], in: scratch)
+      #expect(text.stdout.hasPrefix("AC-2 todo (priority 2, parent AC-1): Acme child\n"))
     }
   }
 

@@ -11,6 +11,9 @@ package struct TaskDetails: Encodable, Sendable {
   /// The workspace-prefixed task reference.
   package let ref: String
 
+  /// The parent task's reference, for a subtask.
+  package let parent: String?
+
   /// The task title after secret policy is applied.
   package let title: String
 
@@ -55,6 +58,12 @@ package struct TaskDetails: Encodable, Sendable {
   /// The creating actor including its session.
   package let createdBy: String
 
+  /// The creation instant.
+  package let createdAt: String
+
+  /// The instant of the latest write to the task row.
+  package let updatedAt: String
+
   /// The current claimant including its session.
   package let claimedBy: String?
 
@@ -87,7 +96,9 @@ package struct TaskDetails: Encodable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case ref, title, status, description, plan, result, app, branch, worktree, links, timeline
-    case acceptance, priority, archived, waiting
+    case acceptance, priority, archived, waiting, parent
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
     case followUpAt = "follow_up_at"
     case archiveOverride = "archive_override"
     case externalRef = "external_ref"
