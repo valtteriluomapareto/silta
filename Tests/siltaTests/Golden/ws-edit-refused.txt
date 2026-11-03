@@ -1,0 +1,2 @@
+error: This command requires a human actor; detected agent:codex:acme. [human_only]
+ask human: silta ws edit

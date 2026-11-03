@@ -121,7 +121,17 @@ enum SiltaMain {
   static func commandPath(_ arguments: [String]) -> String {
     var path = ["silta"]
     var command: any ParsableCommand.Type = SiltaCommand.self
-    for argument in arguments.prefix(while: { $0 != "--" }) where !argument.hasPrefix("-") {
+    var skipValue = false
+    for argument in arguments.prefix(while: { $0 != "--" }) {
+      if skipValue {
+        skipValue = false
+        continue
+      }
+      if argument == "--ws" {
+        skipValue = true
+        continue
+      }
+      if argument.hasPrefix("-") { continue }
       guard
         let sub = command.configuration.subcommands.first(where: {
           // The name ArgumentParser itself matches, explicit or derived from the type.

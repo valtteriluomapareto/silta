@@ -669,7 +669,7 @@ silta code ls   <app>[@<ref>] [<dir>]
 | `CODEX_THREAD_ID` is present | `agent:codex:<session>` |
 | `OPENCODE_*` marker (provisional; unverified), or set by the eval runner | `agent:opencode:<session>` |
 | stdin or stdout isn't a TTY | `agent:unknown:<session>` |
-| Otherwise | `human:<USER>`, or `human:unknown` when unset (config name follows in S6) |
+| Otherwise | `human:<USER>`, or `human:unknown` when unset |
 
 - **Format (D33):** a name or session is 1 to 64 letters, digits, `.`, `_` or `-`,
   starting and ending with a letter or digit; a tool is lowercase. A malformed
@@ -1330,7 +1330,18 @@ tasks with `source` links.
 ## Appendix A — Example workspace (`silta ws edit` YAML)
 
 A fictional workspace that shows every section. The eval fixtures (§21) use the
-same shape.
+same shape. Slugs identify workspace, repo, app, service and topic rows. Environments
+match by app and name; edges by from, to and kind; sources by kind and root. Duplicate
+identities are invalid. Saving updates retained rows and removes omitted rows in one
+transaction; removing a referenced app or repo is a conflict. Renaming is not supported.
+Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-local
+repo paths are excluded from this view. A `workspace` change-log event invalidates
+that workspace's complete configuration, including omitted children.
+
+`ws use <slug>` records the current workspace. With no workspace yet, a human's
+`ws edit` opens starter YAML. Otherwise it edits the explicit or current workspace.
+An unchanged file or nonzero editor exit makes no changes; validation problems are
+reopened as comments above the YAML.
 
 ```yaml
 workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }

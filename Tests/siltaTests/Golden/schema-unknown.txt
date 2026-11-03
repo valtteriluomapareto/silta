@@ -1,2 +1,2 @@
-error: No command 'silta nope'; commands: silta schema [invalid]
+error: No command 'silta nope'; commands: silta schema, silta ws ls, silta ws use, silta ws edit [invalid]
 next: silta schema
