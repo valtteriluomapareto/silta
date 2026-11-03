@@ -1420,7 +1420,7 @@ steps, questions, handoffs and results.
 
 | Stage | Starts after | What Silta is used for |
 |---|---|---|
-| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the imported slice in `silta task ls` and runs `silta task start <ref>`. Only if absent, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, and closes it with `task done <ref> -F <file>`. The issue gets a one-line summary and the result when it closes. |
+| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the slice's task by its issue link in `silta task ls --proposed` (imported tasks are proposals until the human triages them) and runs `silta task start <ref>`; a `proposed` task first needs the human's `task triage --accept`. Only if no task links the issue, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, and closes it with `task done <ref> -F <file>`. The issue gets a one-line summary and the result when it closes. |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
 | **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
 | **DF3: a real second workspace** | M1 done | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
@@ -1453,24 +1453,26 @@ steps, questions, handoffs and results.
     - warnings by code;
     - commands `silta schema` lists that nobody called;
     - the friction lines other than `none` from tasks done in the range (the date
-      comes from the task's `status` event), and the open `dogfood` tasks;
+      comes from the task's last `done` status event), the done tasks without a
+      `Friction:` line, and the open `dogfood` tasks;
     - **the human's load (D37):** approvals per week by command (from the `approval` table),
-      proposals accepted, dropped or left to expire, questions to `@me`, the inbox's
-      size and its oldest item at report time, and how long proposals waited for
-      triage. The target is an inbox under 12 items with nothing older than a week.
+      proposals accepted, dropped or left to expire (each counted once) and the
+      oldest still pending, questions to `@me`, the inbox's size and its oldest item
+      at report time, and how long proposals waited for triage. The target is an
+      inbox under 12 items with nothing older than a week.
 
     It reads only log lines and tasks tagged with the `silta` workspace, so data
     from other workspaces (DF3) never reaches the repo; untagged lines are only
     counted. DF therefore records the workspace each command acts on in its log
-    line (§19). The report runs under its own
-    `SILTA_ACTOR` and leaves that actor's calls out. Failures before the
+    line (§19). The report runs under its own `SILTA_ACTOR` and leaves that
+    actor's calls and approvals out. Unreadable log lines are only counted too. Failures before the
     environment is set up (a bad `SILTA_*` value) aren't logged, so the report
     can't see them.
   - Once per wave, at the latest every 60 days so no log has expired, an agent
     runs the report with the maintainer, who reviews it before it is added through
-    a pull request as
-    `docs/dogfood/reports/<YYYY-MM-DD>.md`. The review turns its findings into
-    GitHub issues (label `dogfood`), changes to the `silta guide` text, or nothing.
+    a pull request as `docs/dogfood/reports/<YYYY-MM-DD>.md`, named by the report's
+    UTC `Until:` date. The review turns its findings into GitHub issues (label
+    `dogfood`), changes to the `silta guide` text, or nothing.
   - This is the earliest source of agent-experience findings, before the M4 evals.
 
 **First real use after M1 (DF3):** an agent runs `silta init --scan <projects dir>`,

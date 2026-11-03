@@ -261,6 +261,10 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     without-Silta arm in the evals (§21) and is revisited after S16.
   - ↳ update (2026-11-03, D39): "dogfood task" means a task in the `silta` workspace.
     The rule lives in this repo's AGENTS.md, so other workspaces never see it.
+  - ↳ update (2026-11-03, DF): an agent runs the report with the maintainer, who
+    reviews it before a pull request adds it under `docs/dogfood/reports/` (§22.1).
+    Only commands that act on a workspace record it in their log line, and the app
+    only when the command names it with `--app` (§19).
   - Why: the logs were collected but nothing read them, and friction depended on
     agents volunteering it.
 - **D37: The human's attention is the budget.**

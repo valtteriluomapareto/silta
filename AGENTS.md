@@ -134,17 +134,36 @@ The DF0 instructions below take effect only after an agent completes
 | Stage | Plans and steps | Questions and handoffs | Session start |
 |---|---|---|---|
 | Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
-| DF0 | Find the imported slice in `silta --ws silta task ls`, then `task start <ref>`. Only if absent, `task add --start` and link the issue. Keep plan/steps with `task plan`; finish with `task done -F <file>` | Comment on the slice issue | `silta task show <id>` |
+| DF0 | One task per slice. Find it by its issue link in `silta --ws silta task ls --proposed`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F <file>`, tick with `task plan <ref> --step N --done`, finish with `task done <ref> -F <file>` | Comment on the slice issue | `silta --ws silta task show <ref>` |
 | DF1 | as DF0 | `silta comment <task> --kind question` / `--kind handoff` | as DF0 |
 | DF2 | as DF0 | as DF1 | The hook runs `silta brief` |
 
-From DF0 on:
-- **Work for the human.** Follow [spec §11](docs/spec.md#silta-guide) until `silta guide` ships. Batch human decisions in chat; use their actual reply for the named gated commands. Keep one dogfood task per slice.
+From DF0 on, every command runs as `silta --ws silta …`:
+- **Find the slice's task; never add a second one.** Imported tasks stay `proposed`
+  until the maintainer triages them, and plain `task ls` hides other sessions'
+  proposals. If the task is `proposed`, name
+  `silta --ws silta task triage --accept <ref> --approved "<the human's words>"` to the
+  maintainer and start it after they say yes. If it is `dropped`, ask the maintainer
+  before doing anything.
+- **A claimed slice.** If `task start` answers `claimed`, another session holds the
+  task. Continue from that session's worktree, or name
+  `silta --ws silta task start <ref> --steal --approved "<the human's words>"` to the
+  maintainer. Until DF1, tell the other session in a comment on the slice issue.
+- **Work for the human.** Follow [spec §11](docs/spec.md#silta-guide) until
+  `silta guide` ships. Put everything you need from the maintainer in one chat
+  message. For a human-only command, name the exact command, wait for their yes,
+  and run it with `--approved "<their exact words>"`. Never write those words
+  yourself.
 - **Use the dogfood binary.** Always use `~/.local/bin/silta`, built from `main` by
-  `scripts/install-dev.sh`. Never use a binary from your own worktree.
-- **Record friction.** End every `done` result in the `silta` workspace with one line: `Friction: none`, or
-  `Friction: <what was awkward>`. Friction that needs its own fix, or that comes up
-  outside a task, also gets `silta task add "<what was awkward>" --topic dogfood`.
+  `scripts/install-dev.sh`; rerun it after pulling `main`. Never use a binary from
+  your own worktree.
+- **Record friction.** End every `done` result in the `silta` workspace with one line:
+  `Friction: none`, or `Friction: <what was awkward>`. Friction that needs its own
+  fix, or that comes up outside a task, also gets
+  `silta --ws silta task add "<what was awkward>" --topic dogfood`. That task is a
+  proposal, so it counts toward the two proposals per session
+  ([spec §11](docs/spec.md#silta-guide)); put anything
+  beyond that in the `Friction:` line.
 - **Close the issue.** When a slice's task is done, post its result on the GitHub
   issue and close the issue.
 

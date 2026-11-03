@@ -6,26 +6,21 @@ import Testing
 
 @Suite(.timeLimit(.minutes(3)))
 struct DogfoodWorkflowTests {
-  @Test func installedBinaryKeepsOneImportedTaskAcrossSessions() throws {
+  static let importer = ActorID.agent(tool: "codex", session: "acme-setup").description
+
+  @Test func freshSessionFindsTheUntriagedImportAndKeepsOneTask() throws {
     try withScratchDirectory { scratch in
       let (clone, store) = try Self.prepare(scratch)
-      let installed = scratch.appending(path: "installed/silta")
-      let tools = scratch.appending(path: "tools")
       let actor = ActorID.agent(tool: "codex", session: "acme-first").description
-      let imported = try SiltaBinary.runProcess(
-        URL(filePath: "/bin/bash"),
-        [DogfoodReportTests.root.appending(path: "scripts/dogfood-import-issues.sh").path],
-        in: scratch,
-        environment: [
-          "PATH": scratch.appending(path: "installed").path + ":" + tools.path + ":/usr/bin:/bin",
-          "SILTA_ACTOR": actor,
-        ])
-      #expect(imported.termination == .exit(0))
       func run(_ args: [String], actor: String) throws -> CLIResult {
-        try SiltaBinary.runProcess(
-          installed, ["--ws", "silta"] + args + ["--json"],
-          in: scratch, cwd: clone, environment: ["SILTA_ACTOR": actor])
+        try Self.installed(args, scratch: scratch, clone: clone, actor: actor)
       }
+      let plain = try run(["task", "ls"], actor: actor)
+      #expect(plain.termination == .exit(0) && !plain.stdout.contains("SI-1"))
+      let proposed = try run(["task", "ls", "--proposed"], actor: actor)
+      #expect(proposed.stdout.contains("\"ref\":\"SI-1\""))
+      #expect(proposed.stdout.contains("\"status\":\"proposed\""))
+      #expect(proposed.stdout.contains("url:https://example.com/acme/7"))
       #expect(
         try run(
           ["task", "triage", "--accept", "SI-1", "--approved", "Work this Acme slice"], actor: actor
@@ -53,6 +48,36 @@ struct DogfoodWorkflowTests {
     }
   }
 
+  @Test func setupCheckUsesAScratchTaskAndLeavesSlicesUntouched() throws {
+    try withScratchDirectory { scratch in
+      let (clone, store) = try Self.prepare(scratch)
+      let actor = ActorID.agent(tool: "claude", session: "acme-check").description
+      func run(_ args: [String]) throws -> CLIResult {
+        try Self.installed(args, scratch: scratch, clone: clone, actor: actor)
+      }
+      #expect(try run(["task", "ls", "--proposed"]).stdout.contains("\"ref\":\"SI-1\""))
+      let added = try run(["task", "add", "--start", "DF setup check", "--app", "silta"])
+      #expect(added.termination == .exit(0) && added.stdout.contains("\"ref\":\"SI-2\""))
+      #expect(
+        try run(["task", "plan", "SI-2", "-m", "- [ ] Check the loop"]).termination == .exit(0))
+      #expect(try run(["task", "plan", "SI-2", "--step", "1", "--done"]).termination == .exit(0))
+      #expect(try run(["task", "drop", "SI-2", "-m", "Setup check only."]).termination == .exit(0))
+      try store.read { db in
+        let statuses = try String.fetchAll(db, sql: "SELECT status FROM task ORDER BY seq")
+        #expect(statuses == ["proposed", "dropped"])
+      }
+    }
+  }
+
+  static func installed(_ args: [String], scratch: URL, clone: URL, actor: String) throws
+    -> CLIResult
+  {
+    try SiltaBinary.runProcess(
+      scratch.appending(path: "installed/silta"), ["--ws", "silta"] + args + ["--json"],
+      in: scratch, cwd: clone, environment: ["SILTA_ACTOR": actor])
+  }
+
+  /// Installs the binary from a clean clone and imports one slice issue as the setup agent.
   static func prepare(_ scratch: URL) throws -> (URL, DatabaseStore) {
     let clone = try DogfoodInstallTests.clone(scratch)
     let store = try DogfoodImportTests.store(scratch)
@@ -74,6 +99,15 @@ struct DogfoodWorkflowTests {
         #!/bin/bash
         echo '[[{"number":7,"title":"S7: Acme location","html_url":"https://example.com/acme/7"}]]'
         """, in: tools)
+    let imported = try SiltaBinary.runProcess(
+      URL(filePath: "/bin/bash"),
+      [DogfoodReportTests.root.appending(path: "scripts/dogfood-import-issues.sh").path],
+      in: scratch,
+      environment: [
+        "PATH": scratch.appending(path: "installed").path + ":" + tools.path + ":/usr/bin:/bin",
+        "SILTA_ACTOR": importer,
+      ])
+    #expect(imported.termination == .exit(0))
     return (clone, store)
   }
 
@@ -95,5 +129,4 @@ struct DogfoodWorkflowTests {
         $0["workspace"] as? String == "silta" && $0["app"] == nil
       })
   }
-
 }
