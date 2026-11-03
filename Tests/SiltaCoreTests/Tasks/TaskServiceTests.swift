@@ -135,7 +135,7 @@ struct TaskServiceTests {
           "retained", "retained",
         ])
       try env.db.write {
-        try $0.database.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
+        try $0.database.execute(sql: "UPDATE meta SET value='3' WHERE key='min_writer_version'")
       }
       await #expect(throws: StorageError.schemaTooNew) {
         _ = try await service.close("AC-1", result: "Dropped.", dropped: true, directory: home)

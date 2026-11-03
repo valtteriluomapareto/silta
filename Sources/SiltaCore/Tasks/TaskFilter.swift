@@ -15,6 +15,9 @@ package struct TaskFilter: Sendable {
   /// Includes proposals from other actors.
   package var proposed = false
 
+  /// Includes tasks whose computed archive state is archived.
+  package var archived = false
+
   /// Starts with the caller's visible open backlog.
   package init() {}
 }

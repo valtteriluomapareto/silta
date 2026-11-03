@@ -106,6 +106,11 @@ enum SiltaMain {
     if error.code == .invalid, error is TaskError || error is ActorError {
       next = [path + " --help"]
     }
+    if let edit = command as? TaskEditCommand, let taskError = error as? TaskError,
+      taskError == .input
+    {
+      next = ["silta task show " + shellWord(edit.ref), path + " --help"]
+    }
     if let edit = command as? WsEditCommand, error is WorkspaceError, error.code != .notFound {
       next = workspaceRecovery(error, edit: edit, context: context)
     }

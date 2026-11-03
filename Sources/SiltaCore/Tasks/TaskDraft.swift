@@ -3,6 +3,9 @@ package struct TaskDraft: Sendable {
   /// The required task title.
   package var title: String
 
+  /// Backlog priority, from one (first) to three.
+  package var priority = 2
+
   /// The optional markdown description.
   package var description = ""
 
@@ -32,6 +35,7 @@ package struct TaskDraft: Sendable {
   /// The creation options without a title, body or input file contents.
   package var command: String {
     var value = "silta task add"
+    if priority != 2 { value += " --priority \(priority)" }
     if start { value += " --start" }
     if let parent { value += " --parent " + shellWord(parent) }
     if let app { value += " --app " + shellWord(app) }

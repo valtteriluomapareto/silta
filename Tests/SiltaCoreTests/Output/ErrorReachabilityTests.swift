@@ -64,8 +64,15 @@ extension TaskError: ErrorExamples {
       .notFound, .invalid("A result is required."),
       .claimed("AC-1", holder: "agent:codex:acme", minutes: 4), .proposal("AC-1"),
       .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
+      .promoted("AC-1", external: "ado:42"), .edited("AC-1"),
       .changed("AC-1"), .staleRev("AC-1", actual: 2),
     ]
+  }
+}
+
+extension TaskReferenceError: ErrorExamples {
+  static var examples: [TaskReferenceError] {
+    [.init(ref: "AC-1", missing: true), .init(ref: "AC-0", missing: false)]
   }
 }
 
@@ -93,12 +100,12 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
-    CommandFailure.self,
+    CommandFailure.self, TaskReferenceError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
-    .unregistered, .readOnlyPromoted, .ambiguousLocation,
+    .unregistered, .ambiguousLocation,
     .leaseTaken, .rateLimited,
   ]
 

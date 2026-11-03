@@ -14,6 +14,8 @@ struct TaskAddCommand: OutputCommand {
 
   @Argument(help: "The task title.") var title: String
 
+  @Option(help: "Backlog priority: 1, 2 (default) or 3.") var priority = 2
+
   @Flag(help: "Start and claim this requested work.") var start = false
 
   @Option(help: "The parent task reference.") var parent: String?
@@ -27,6 +29,7 @@ struct TaskAddCommand: OutputCommand {
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     var draft = TaskDraft(title: title)
+    draft.priority = priority
     draft.allowSecret = body.allowSecret
     draft.start = start
     draft.parent = parent

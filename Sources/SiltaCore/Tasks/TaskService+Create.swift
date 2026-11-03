@@ -52,12 +52,13 @@ extension TaskService {
     let stamp = Self.timestamp(creation.at)
     try db.execute(
       sql: """
-        INSERT INTO task(uid,workspace_id,seq,title,status,description_md,parent_id,app_id,
+        INSERT INTO task(uid,workspace_id,seq,title,status,priority,description_md,parent_id,app_id,
           claimed_by,claimed_at,branch,worktree,created_by,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
       arguments: [
-        creation.uid, ws, seq, draft.title, status, draft.description, parent?.id, app,
+        creation.uid, ws, seq, draft.title, status, draft.priority, draft.description, parent?.id,
+        app,
         draft.start ? environment.actor.description : nil, draft.start ? stamp : nil,
         creation.git.branch, creation.git.worktree, environment.actor.description, stamp, stamp,
       ])
@@ -87,6 +88,7 @@ extension TaskService {
   }
 
   private func validateDraft(_ draft: TaskDraft) throws {
+    try Self.validatePriority(draft.priority)
     guard !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw TaskError.invalid("A task title is required.")
     }

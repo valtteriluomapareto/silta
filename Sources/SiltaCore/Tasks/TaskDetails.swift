@@ -20,6 +20,23 @@ package struct TaskDetails: Encodable, Sendable {
   /// The markdown description.
   package let description: String
 
+  /// The acceptance criteria markdown.
+  package let acceptance: String
+
+  /// Backlog priority, with one first.
+  package let priority: Int
+
+  /// The explicit archive choice, or nil for age-based archiving.
+  package let archiveOverride: String?
+
+  /// Whether the task is archived at the read instant.
+  package var archived = false
+
+  /// The external tracker reference for a promoted task.
+  package let externalRef: String?
+
+  let closedAt: String?
+
   /// The current markdown checklist.
   package let plan: String
 
@@ -64,6 +81,9 @@ package struct TaskDetails: Encodable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case ref, title, status, description, plan, result, app, branch, worktree, links, timeline
+    case acceptance, priority, archived
+    case archiveOverride = "archive_override"
+    case externalRef = "external_ref"
     case planRev = "plan_rev"
     case createdBy = "created_by"
     case claimedBy = "claimed_by"

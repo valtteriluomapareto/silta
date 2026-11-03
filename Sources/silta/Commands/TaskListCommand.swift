@@ -19,6 +19,8 @@ struct TaskListCommand: OutputCommand {
 
   @Flag(help: "Include other actors' proposals.") var proposed = false
 
+  @Flag(help: "Include archived tasks.") var archived = false
+
   func execute(_ context: CommandContext) throws -> CommandOutput {
     var filter = TaskFilter()
     filter.status = status
@@ -26,6 +28,7 @@ struct TaskListCommand: OutputCommand {
     filter.topic = topic
     filter.mine = mine
     filter.proposed = proposed
+    filter.archived = archived
     let tasks = try TaskService(environment: context.environment, workspace: global.ws).list(filter)
     return CommandOutput(
       text: tasks.isEmpty ? "No tasks." : tasks.map(TaskOutput.summary).joined(separator: "\n"),

@@ -167,7 +167,7 @@ struct StorageBackupTests {
           let count = try store.read {
             try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations")
           }
-          #expect(count == 1)
+          #expect(count == 2)
         } catch {
           failures.withLock { $0.append(String(describing: error)) }
         }
@@ -205,7 +205,7 @@ struct StorageBackupTests {
       #expect(failures.withLock { $0.isEmpty }, "\(failures.withLock { $0 })")
       try StorageSchemaTests.store(scratch).initialize()
       #expect(
-        try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 1)
+        try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 2)
     }
   }
 }

@@ -1,0 +1,1 @@
+{"error":{"code":"human_only","message":"This command needs the human's go-ahead; ask in chat. Detected agent:codex:acme.","next":["silta --ws 'acme' task triage --accept 'AC-1' --drop 'AC-2' --priority 3 --allow-secret -F <file> --approved \"<the human's words>\""],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
