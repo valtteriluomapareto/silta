@@ -1,0 +1,1 @@
+{"error":{"code":"human_only","message":"This command requires a human actor; detected agent:codex:acme.","next":["silta ws edit 'other'"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
