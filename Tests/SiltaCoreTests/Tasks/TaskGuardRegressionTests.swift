@@ -43,7 +43,9 @@ struct TaskGuardRegressionTests {
       for ref in ["AC-1", "AC-2"] { _ = try human.block(ref, TaskBlockTests.input()) }
       let agent = TaskService(environment: try TaskServiceTests.environment(home))
       let refusal = #expect(throws: ActorError.self) { _ = try agent.unblock(["AC-1"]) }
-      #expect(refusal?.message.hasPrefix("AC-1 still waits on open blockers;") == true)
+      withKnownIssue("notReady says open blockers for every wait") {
+        #expect(refusal?.message.hasPrefix("AC-1 waits on an answer;") == true)
+      }
       let approved = TaskService(environment: agent.environment, approved: "Unblock AC-1")
       #expect(try approved.unblock(["AC-1"]).approvalUsed)
       #expect(try !human.unblock(["AC-2"]).approvalUsed)

@@ -512,27 +512,37 @@ going until the list is empty or the human stops it.
   `BEGIN IMMEDIATE` compare-and-set; `branch` and `worktree` only when the task has an
   app.
 - Another session's claim with `claimed_at` under 2 h old → exit 6 `claimed`, naming
-  the holder and the age.
+  the holder and the age. Its `next` is `silta task ls --status todo`, to pick other
+  work; the message says to ask the human before stealing.
 - Any write by the claimer to the task refreshes `claimed_at`. A `handoff` comment
   releases the claim.
 - `--steal` is human-only when it overrides another session's fresh claim. Otherwise
   it changes nothing and needs no approval (D40).
 - Start accepts `todo`, `doing` and `review`, and never reopens terminal tasks.
-  Proposals need human triage before they can start or complete; the refusal's `next`
-  is `silta task triage --accept <ref> --approved "<the human's words>"`, with
-  `next_by: human`. An agent may
+  Proposals need human triage before they can start or complete. For an agent the
+  refusal's `next` is `silta task triage --accept <ref> --approved "<the human's
+  words>"`, with `next_by: human`; a human gets `silta task triage --accept <ref>`,
+  with `next_by: agent`, since they run it themselves. An agent may
   drop its own proposal with a result; it cannot drop another actor's proposal.
 - Writes refuse another actor's fresh claim. An expired claim can be reclaimed with
   `start`; each claim compares the complete actor, including session.
 
 **Plans:**
 - `task plan AC-12 -F -` stores a new plan revision; a blank body is `invalid`.
-  `--if-rev 3` refuses with exit 6 if someone else changed the plan in between.
+  `--if-rev 3` refuses with exit 6 if someone else changed the plan in between. It
+  prints one line, `AC-12 plan revision 3 (4 steps)`, counting the checkboxes.
 - `task plan AC-12 --step 3 --done|--undo` ticks a checklist item in place. It logs a
   `step` event and does **not** create a new revision, so ticking steps is cheap. A
   tick adds no text, so the secret guard leaves the plan as stored and
-  `--allow-secret` is `invalid` with `--step`.
-- The secret guard checks only text a write adds or changes.
+  `--allow-secret` is `invalid` with `--step`. It prints one line, `AC-12 step 3 done:
+  Patch handler (3/4)` (or `undone`), with the checked count; neither form echoes the
+  plan.
+- `--step N` counts the plan's top-level checkboxes (`- [ ] …`, `1. [x] …`), from 1;
+  `task show` numbers them, e.g. `3. [ ] Patch handler`. On a plan with no checkboxes
+  `--step` is `invalid`, says so and how to write them, with `next` `silta task plan
+  AC-12 -F -`.
+- The secret guard checks only the fields a write changes, each changed field whole
+  (not its changed lines); an unchanged field is never rescanned.
 - `task from-plan [<file>|-]`:
   - Parses a markdown plan: the title comes from the first heading, the description
     from the text before the first list, and the top-level list items or `##`
@@ -568,7 +578,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
     (not itself, and not `done` or `dropped`), an external party (`ext:app-store`) or
     a `url:`. Only `block` writes `blocked_by`; `task link` refuses it.
   - `-m` says what is being waited for. For a party, that is the ask itself, since
-    Silta sends nothing: the output says "Silta sends nothing; ask ext:acme: …".
+    Silta sends nothing: the output says "Silta sends nothing; ask ext:acme: …" for
+    each party this call names with `--on`, and not for parties from earlier blocks.
   - `--follow-up` is the day to look again, as a UTC day (not the local one), and
     never in the past; it defaults to 7 days. So nothing stays blocked unnoticed,
     cycles included.
@@ -576,7 +587,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
     follow-up day and the reason, which is how a chase is snoozed.
   - Each `block` writes a `block` event whose body is JSON:
     `{"on":[…],"follow_up":"<day>","why":"<-m>"}`, where `on` holds task uids and
-    `ext:`/`url:` strings. `ls` and `show` print the latest `why`.
+    `ext:`/`url:` strings. `ls` and `show` print the latest `why`; `show --timeline`
+    prints task refs in place of the uids.
   - First use of a party warns `new_party`, listing the parties named in earlier
     `block` events, so `ext:acme` and `ext:acme-co` don't split by accident.
 - **Examples:**
@@ -599,7 +611,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   `blocked_by` links; the `block` events keep them, so exports keep the history.
 - **Unblocking a block that isn't ready needs the human's go-ahead (D40).** An agent's
   `unblock` of a batch with any task that isn't ready is `human_only` unless it
-  carries `--approved`; the refusal names the tasks that aren't ready. Readiness is
+  carries `--approved`; the refusal names each task that isn't ready and what it
+  waits on (`AC-12 waits on ext:acme`, or `on an answer`). Readiness is
   decided inside the write, and one approval row covers the batch, all or nothing. A
   ready unblock needs no approval; `--approved` on it warns `approval_unused`. `done`
   and `drop` of a blocked task stay ungated: each records a result that says why.
@@ -619,6 +632,9 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   `status` event's body is always the new status.
 - **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
   override.
+- **Receipts say what changed:** `AC-5 archived`, `AC-5 kept`, `AC-14 linked cites
+  url:…`, `AC-5 promoted to ado:4711; read-only here`, `AC-5 edited: title, plan` (or
+  `AC-5 unchanged`). Their `--json` data stays the `ref` and `status` receipt.
 - **External tracker:** `task promote AC-12 --ext ado:4711` (or `gh:owner/repo#12`,
   `jira:KEY-12`) is human-only; refusals on the task's state come before the human is
   asked. A promoted task becomes read-only in `silta` and status
@@ -626,7 +642,9 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   `silta task ls --status todo` for the agent to pick other work. M4 adds reading the
   status back, Azure DevOps first.
   - A proposal can't be promoted until it is triaged, and a blocked task until it is
-    unblocked (`conflict`, D40), so no proposal or block outlives promotion.
+    unblocked (`conflict`, D40), so no proposal or block outlives promotion. For a
+    blocked task, `next` is `silta task unblock <ref>` when the block is ready, and
+    otherwise `silta task show <ref>`.
   - Rule of thumb for promoting: the work needs someone else, the client or users
     would notice it, or it's more than about half a day.
 - **Branch to task:** `brief` and `where` pick "the current task" in this order:
@@ -792,14 +810,16 @@ silta code ls   <app>[@<ref>] [<dir>]
     angle brackets, or containing a printed placeholder such as `<the human's words>`
     anywhere, are `invalid`.
   - The approval is stored as an `approval` row in the same write: the actor, the
-    command with its refs and the flag names passed (no bodies), and the words. A
+    command with its refs and the flag names passed (no bodies; a body flag appears as
+    `-m <text>` or `-F <file>`), and the words. A
     command that creates tasks ends with ` -> <created refs>` (D40). So every approval
     can be read back, exported, counted and tied to what it changed.
   - Without `--approved`, an agent gets `human_only` (exit 3). The message says the
     command needs the human's go-ahead; `next` is the same command with
     `--approved "<the human's words>"`.
   - `--approved` on a command that doesn't need it warns `approval_unused` and stores
-    nothing. The exception (D39): on an agent write that would create a `proposed`
+    nothing. A `--dry-run` writes nothing, so its `--approved` warns
+    `approval_unused` too. The exception (D39): on an agent write that would create a `proposed`
     task, `--approved` is used under either setting and creates `todo` (§8).
   - `task edit` on a task the agent itself claims needs no approval. `task edit
     --print` prints the current document and is a read. An edit that changes nothing
@@ -1011,9 +1031,10 @@ state; the tests check this with golden output.
 - One line per output. Keys are sorted by Unicode code point at every level, so output
   is byte-stable.
 - `warnings` is always present. `retry_after_s` is present only when set.
-- `next_by` says who acts on the `next` commands: `human` for `human_only` and `env`,
-  and for a refusal whose `next` carries the `--approved` placeholder (a proposal's
-  triage); otherwise `agent`. The human works through an agent
+- `next_by` says who acts on the `next` commands: by default `human` for `human_only`
+  and `env`, otherwise `agent`. An error can override its code's default; the one that
+  does is a proposal refusal shown to an agent, which is `human` because its `next` is
+  the human's triage. The human works through an agent
   (D38), so for `human` the agent asks the human in chat; for `human_only` it then
   runs the printed command with `--approved "<their words>"`.
 - `schema` is the envelope version. Data shapes only gain fields; any other change
@@ -1025,6 +1046,10 @@ state; the tests check this with golden output.
   `follow_up_at`. Bodies
   (description, plan, acceptance, result) come from `task show`, which returns the
   full detail, `parent` included.
+- `task plan --json` returns `ref`, `plan_rev`, `steps` (the checkbox count) and
+  `steps_done`, and for a `--step` tick also `step`, `done` and `title`. The plan
+  itself comes from `task show`. Like the `ls` summary (D40), this smaller shape is
+  fixed before DF0, before agents depend on the old one, and doesn't bump `schema`.
 
 **Text errors** go to stderr: one line, the wait if there is one, then the commands, so
 the output always ends with what to run:
@@ -1036,7 +1061,9 @@ next: silta comment AC-12 --kind comment -F -   # one summary instead
 ```
 
 When `next_by` is `human`, the lines read `ask human: <cmd>` instead of `next: <cmd>`.
-Several `next` commands are alternatives, best first: run one.
+Several `next` commands are alternatives, best first: run one. `not_found` names what
+wasn't found, and says when it was the parent or a blocker (`Parent task AC-9 not
+found.`); an unknown `--ws` names the workspace.
 Task recovery commands preserve a known workspace, so a noncurrent workspace remains
 selected when following a hint. Early human-only refusals preserve an explicit
 `--ws` without reading storage. Invalid task values, an unreadable `-F` file
@@ -1048,8 +1075,11 @@ arguments.
   stderr.
 - `--json`: everything on stdout, including errors. stderr stays empty unless debug
   output was turned on explicitly.
-- `--quiet` hides success text only. Warnings and errors still show; with `--json` it
-  changes nothing.
+- `--quiet` hides a write's receipt text. It still prints data: the refs a write
+  created (`task add`; `task from-plan`, one per line, and a `--dry-run`'s preview),
+  and the whole output of reads (`task ls`, `task show`, `task edit --print`, `ws
+  ls`, `ws show`, `schema`). Warnings and errors still show; with `--json` it changes
+  nothing.
 - `--json` and `--quiet` may come before or after the subcommand.
 - `--help` and `--version` print plain text to stdout and exit 0, even with `--json`.
 - A parse error is `usage` (exit 1). Its message is one line of at most 200
@@ -1202,7 +1232,9 @@ alternatives considered are in Appendix B.
 ## 18. Security & privacy
 
 **Secret guard (M1).** It scans every task text, comment, plan, result and doc
-revision before the write.
+revision before the write. It checks only the fields a write changes, each changed
+field whole rather than its changed lines; an unchanged field is never rescanned, so
+text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
   - private-key blocks
   - Azure storage `AccountKey=` and SAS signatures
@@ -1281,7 +1313,8 @@ scriptable and deterministic (D13).
   global flags and the error-code table. It's generated from code, so it can't drift.
   Its output is a golden test.
   - Without a name it's an index: each command's name and abstract only.
-  - With a name (`silta schema task ls`, a leading `silta` is optional) it gives full
+  - With a name (`silta schema task ls`, or one quoted argument such as `silta schema
+    "task ls"`, which is split on whitespace; a leading `silta` is optional) it gives full
     detail for every command whose name starts with those words, so a group name
     lists the group. A name that matches nothing is `invalid`; the message lists
     the commands and `next` is `silta schema`.
@@ -1303,7 +1336,8 @@ scriptable and deterministic (D13).
     repeating][: <help>]`, the value name for options only) and
     `--json data: <shape>`, with a blank line between commands. Both then list the
     global flags under `global flags:` and one line per error code under
-    `error codes:` (`<code>  exit <n>, next by <agent|human>: <agent should>`).
+    `error codes:` (`<code>  exit <n>, next by <agent|human>: <agent should>`), and a
+    last line saying that an error's own `next_by` can override its code's default.
 - **Determinism:** `SILTA_HOME` must be absolute. These overrides require a home
   strictly below a temporary root or `--deterministic`. The real home
   (`~/.silta`) and its aliases always ignore overrides, including explicit mode,

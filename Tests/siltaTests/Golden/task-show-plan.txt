@@ -1,0 +1,11 @@
+AC-1 doing (priority 2): Acme
+Created by: agent:codex:acme
+Archived: no
+Claimed by: agent:codex:acme
+
+Plan (revision 1):
+Context
+
+1. [ ] Write
+2. [x] Ship
+  - [ ] Nested
