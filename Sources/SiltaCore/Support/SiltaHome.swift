@@ -54,7 +54,7 @@ private func identity(_ url: URL) -> [String] {
   var ancestor = url
   var missing: [String] = []
   var info = stat()
-  while stat(ancestor.path, &info) != 0 {
+  while stat(ancestor.path, &info) != 0, ancestor.path != "/" {
     missing.append(ancestor.lastPathComponent.lowercased())
     ancestor.deleteLastPathComponent()
   }

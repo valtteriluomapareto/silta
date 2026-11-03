@@ -32,7 +32,10 @@ struct StorageBackup {
       let staged = open(temporary.path, O_RDONLY)
       guard staged >= 0 else { throw StorageError.backupFailed }
       defer { close(staged) }
-      guard fcntl(staged, F_FULLFSYNC) == 0 else { throw StorageError.backupFailed }
+      // Network volumes may not support F_FULLFSYNC; plain fsync is what SQLite falls back to.
+      guard fcntl(staged, F_FULLFSYNC) == 0 || fsync(staged) == 0 else {
+        throw StorageError.backupFailed
+      }
       do {
         try fm.linkItem(at: temporary, to: destination)
       } catch {
