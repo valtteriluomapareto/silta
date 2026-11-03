@@ -64,50 +64,46 @@ struct TaskStateRegressionTests {
     }
   }
 
-  @Test func promoteRefusesProposalsAndBlockedTasks() {
-    withKnownIssue("promote ignores the task's status") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(try Self.run(["task", "add", "Acme idea"], in: scratch).termination == .exit(0))
-        let proposal = try Self.run(
-          ["task", "promote", "AC-1", "--ext", "ado:1", "--approved", "Track it", "--json"],
-          in: scratch)
-        #expect(proposal.termination == .exit(6))
-        #expect(try Self.error(proposal)["code"] as? String == "conflict")
-        #expect(
-          (try Self.error(proposal)["next"] as? [String])?.first?.contains(
-            "task triage --accept 'AC-1'") == true)
-        #expect(
-          try Self.run(["task", "add", "Acme work", "--start"], in: scratch).termination
-            == .exit(0))
-        #expect(
-          try Self.run(["task", "block", "AC-2", "--on", "ext:acme", "-m", "Acme?"], in: scratch)
-            .termination == .exit(0))
-        let blocked = try Self.run(
-          ["task", "promote", "AC-2", "--ext", "ado:2", "--approved", "Track it", "--json"],
-          in: scratch)
-        #expect(blocked.termination == .exit(6))
-        #expect(try Self.error(blocked)["code"] as? String == "conflict")
-        #expect(
-          (try Self.error(blocked)["next"] as? [String])?.first?.contains("task unblock 'AC-2'")
-            == true)
-      }
+  @Test func promoteRefusesProposalsAndBlockedTasks() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(try Self.run(["task", "add", "Acme idea"], in: scratch).termination == .exit(0))
+      let proposal = try Self.run(
+        ["task", "promote", "AC-1", "--ext", "ado:1", "--approved", "Track it", "--json"],
+        in: scratch)
+      #expect(proposal.termination == .exit(6))
+      #expect(try Self.error(proposal)["code"] as? String == "conflict")
+      #expect(
+        (try Self.error(proposal)["next"] as? [String])?.first?.contains(
+          "task triage --accept AC-1 --approved") == true)
+      #expect(
+        try Self.run(["task", "add", "Acme work", "--start"], in: scratch).termination
+          == .exit(0))
+      #expect(
+        try Self.run(["task", "block", "AC-2", "--on", "ext:acme", "-m", "Acme?"], in: scratch)
+          .termination == .exit(0))
+      let blocked = try Self.run(
+        ["task", "promote", "AC-2", "--ext", "ado:2", "--approved", "Track it", "--json"],
+        in: scratch)
+      #expect(blocked.termination == .exit(6))
+      #expect(try Self.error(blocked)["code"] as? String == "conflict")
+      #expect(
+        (try Self.error(blocked)["next"] as? [String])?.first?.contains("task unblock AC-2")
+          == true)
     }
   }
 
-  @Test func triageWithoutPriorityKeepsTheStoredPriority() {
-    withKnownIssue("triage --accept resets the priority to 2") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(
-          try Self.run(["task", "add", "Acme", "--priority", "1"], in: scratch).termination
-            == .exit(0))
-        let triaged = try Self.run(
-          ["task", "triage", "--accept", "AC-1", "--approved", "Accept it"], in: scratch)
-        #expect(triaged.termination == .exit(0))
-        let shown = try Self.data(Self.run(["task", "show", "AC-1", "--json"], in: scratch))
-        #expect(shown["priority"] as? Int == 1)
-      }
+  @Test func triageWithoutPriorityKeepsTheStoredPriority() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(
+        try Self.run(["task", "add", "Acme", "--priority", "1"], in: scratch).termination
+          == .exit(0))
+      let triaged = try Self.run(
+        ["task", "triage", "--accept", "AC-1", "--approved", "Accept it"], in: scratch)
+      #expect(triaged.termination == .exit(0))
+      let shown = try Self.data(Self.run(["task", "show", "AC-1", "--json"], in: scratch))
+      #expect(shown["priority"] as? Int == 1)
     }
   }
 
@@ -168,48 +164,44 @@ struct TaskStateRegressionTests {
     }
   }
 
-  @Test func promotedTasksLeaveTheBacklog() {
-    withKnownIssue("promoted tasks stay in task ls --status todo") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(try Self.run(["task", "add", "Acme"], in: scratch).termination == .exit(0))
-        for args in [
-          ["task", "triage", "--accept", "AC-1"], ["task", "promote", "AC-1", "--ext", "ado:1"],
-        ] {
-          #expect(
-            try Self.run(args + ["--approved", "Do it"], in: scratch).termination == .exit(0))
-        }
-        let todo = try Self.run(["task", "ls", "--status", "todo", "--json"], in: scratch)
-        #expect(try Self.tasks(todo).isEmpty)
-        let promoted = try Self.run(
-          ["task", "ls", "--status", "todo", "--promoted", "--json"], in: scratch)
-        #expect(try Self.tasks(promoted).map { $0["ref"] as? String } == ["AC-1"])
-        let started = try Self.run(["task", "start", "AC-1", "--json"], in: scratch)
-        #expect(started.termination == .exit(3))
+  @Test func promotedTasksLeaveTheBacklog() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(try Self.run(["task", "add", "Acme"], in: scratch).termination == .exit(0))
+      for args in [
+        ["task", "triage", "--accept", "AC-1"], ["task", "promote", "AC-1", "--ext", "ado:1"],
+      ] {
         #expect(
-          try Self.error(started)["next"] as? [String] == [
-            "silta --ws 'acme' task ls --status todo"
-          ])
-        #expect(try Self.error(started)["next_by"] as? String == "agent")
+          try Self.run(args + ["--approved", "Do it"], in: scratch).termination == .exit(0))
       }
+      let todo = try Self.run(["task", "ls", "--status", "todo", "--json"], in: scratch)
+      #expect(try Self.tasks(todo).isEmpty)
+      let promoted = try Self.run(
+        ["task", "ls", "--status", "todo", "--promoted", "--json"], in: scratch)
+      #expect(try Self.tasks(promoted).map { $0["ref"] as? String } == ["AC-1"])
+      let started = try Self.run(["task", "start", "AC-1", "--json"], in: scratch)
+      #expect(started.termination == .exit(3))
+      #expect(
+        try Self.error(started)["next"] as? [String] == [
+          "silta --ws 'acme' task ls --status todo"
+        ])
+      #expect(try Self.error(started)["next_by"] as? String == "agent")
     }
   }
 
-  @Test func proposalsStayListedAndRefusalNamesTheTriage() {
-    withKnownIssue("--status proposed hides other actors' proposals") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(
-          try Self.run(["task", "add", "Acme idea"], in: scratch, as: Self.other).termination
-            == .exit(0))
-        let listed = try Self.run(["task", "ls", "--status", "proposed", "--json"], in: scratch)
-        #expect(try Self.tasks(listed).map { $0["ref"] as? String } == ["AC-1"])
-        let started = try Self.run(["task", "start", "AC-1", "--json"], in: scratch)
-        #expect(started.termination == .exit(6))
-        #expect(
-          (try Self.error(started)["next"] as? [String])?.first
-            == "silta --ws 'acme' task triage --accept 'AC-1' --approved \"<the human's words>\"")
-      }
+  @Test func proposalsStayListedAndRefusalNamesTheTriage() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(
+        try Self.run(["task", "add", "Acme idea"], in: scratch, as: Self.other).termination
+          == .exit(0))
+      let listed = try Self.run(["task", "ls", "--status", "proposed", "--json"], in: scratch)
+      #expect(try Self.tasks(listed).map { $0["ref"] as? String } == ["AC-1"])
+      let started = try Self.run(["task", "start", "AC-1", "--json"], in: scratch)
+      #expect(started.termination == .exit(6))
+      #expect(
+        (try Self.error(started)["next"] as? [String])?.first
+          == "silta --ws 'acme' task triage --accept AC-1 --approved \"<the human's words>\"")
     }
   }
 

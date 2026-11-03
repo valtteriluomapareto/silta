@@ -19,7 +19,10 @@ struct TaskListCommand: OutputCommand {
 
   @Flag(help: "Show tasks created or claimed by this exact actor.") var mine = false
 
-  @Flag(help: "Include other actors' proposals.") var proposed = false
+  @Flag(help: "Include other actors' proposals; --status proposed implies it.")
+  var proposed = false
+
+  @Flag(help: "Include tasks promoted to a tracker.") var promoted = false
 
   @Flag(help: "Include archived tasks.") var archived = false
 
@@ -31,6 +34,7 @@ struct TaskListCommand: OutputCommand {
     filter.topic = topic
     filter.mine = mine
     filter.proposed = proposed
+    filter.promoted = promoted
     filter.archived = archived
     let tasks = try TaskService(environment: context.environment, workspace: global.ws).list(filter)
     return CommandOutput(

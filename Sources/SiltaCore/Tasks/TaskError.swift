@@ -45,6 +45,9 @@ package enum TaskError: CodedError, Equatable {
   /// Work is still waiting for named prerequisites or an answer.
   case blocked(String, TaskWaiting)
 
+  /// A blocked task must be unblocked before a tracker can take it over.
+  case blockedPromotion(String)
+
   /// Maps task failures to the scripting contract.
   package var code: ErrorCode {
     switch self {
@@ -54,7 +57,7 @@ package enum TaskError: CodedError, Equatable {
     case .notFound: .notFound
     case .invalid, .foreignRepo: .invalid
     case .claimed: .claimed
-    case .proposal, .transition, .changed: .conflict
+    case .proposal, .transition, .changed, .blockedPromotion: .conflict
     case .git, .input, .repository: .env
     case .gate: .gate
     case .staleRev: .staleRev
@@ -68,6 +71,7 @@ package enum TaskError: CodedError, Equatable {
       "\(ref) is blocked, waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d."
         + (waiting.dropped.isEmpty ? "" : " Blocker dropped: re-plan.")
     case .promoted(let ref, let external): "\(ref) is read-only; work in tracker \(external)."
+    case .blockedPromotion(let ref): "\(ref) is blocked; unblock it before promoting it."
     case .edited: "Task fields changed during editing; re-read before applying an edit."
     case .notFound: "Task or workspace entity not found."
     case .invalid(let reason): reason
@@ -94,8 +98,14 @@ package enum TaskError: CodedError, Equatable {
     switch self {
     case .blocked(let ref, let waiting):
       waiting.ready ? ["silta task unblock \(ref)"] : ["silta task ls --status todo"]
-    case .promoted(let ref, _), .edited(let ref): ["silta task show \(ref)"]
-    case .proposal: ["silta task triage --help", "silta task ls --status todo"]
+    case .promoted: ["silta task ls --status todo"]
+    case .edited(let ref): ["silta task show \(ref)"]
+    case .proposal(let ref):
+      [
+        "silta task triage --accept \(ref) --approved \"<the human's words>\"",
+        "silta task ls --status todo",
+      ]
+    case .blockedPromotion(let ref): ["silta task unblock \(ref)"]
     case .claimed(let ref, _, _), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]

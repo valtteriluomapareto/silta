@@ -1,17 +1,18 @@
 {"error":{"code":"not_found","message":"Task or workspace entity not found.","next":["silta task ls"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"invalid","message":"A result is required.","next":["silta task add --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"claimed","message":"AC-1 is claimed by agent:codex:acme (4 min old); do not steal.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
-{"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; ask in chat before accepting it.","next":["silta task triage --help","silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; ask in chat before accepting it.","next":["silta task triage --accept AC-1 --approved \"<the human's words>\"","silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"conflict","message":"AC-1 cannot make this transition from done.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"env","message":"Git could not report the task's worktree or commit; ask a human to check git.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"env","message":"Task repository is not registered locally or its .git marker is missing; ask a human to restore or register it with init --scan.","next":["silta init --help"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"env","message":"Could not read the UTF-8 body file; check its path and permissions.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"invalid","message":"Use a worktree and commit from the task's registered repository.","next":["silta task add --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"gate","message":"A human approval is required; ask a human to approve or use done --force.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
-{"error":{"code":"read_only_promoted","message":"AC-1 is read-only; work in tracker ado:42.","next":["silta task show AC-1"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"read_only_promoted","message":"AC-1 is read-only; work in tracker ado:42.","next":["silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"conflict","message":"Task fields changed during editing; re-read before applying an edit.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"blocked","message":"AC-1 is blocked, waiting on ext:acme for 2 d.","next":["silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"blocked","message":"AC-2 is blocked, waiting on task:AC-1 for 1 d.","next":["silta task unblock AC-2"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"conflict","message":"Task repository information changed; re-read before retrying.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"stale_rev","message":"AC-1 has plan revision 2; re-read before replacing it.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"AC-1 is blocked; unblock it before promoting it.","next":["silta task unblock AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"busy","message":"Database is busy; retry the original invocation once after retry_after_s.","next":["silta task add"],"next_by":"agent","retry_after_s":5},"ok":false,"schema":1,"warnings":[]}

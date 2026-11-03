@@ -48,6 +48,8 @@ extension TaskService {
   }
 
   /// Records tracker ownership and releases the local claim without changing status.
+  /// A proposal needs triage and a blocked task an unblock first, so no proposal or
+  /// block is left behind where nothing can change it.
   package func promote(_ ref: String, external: String) throws -> TaskResult {
     let command = "silta task promote " + shellWord(ref) + " --ext " + shellWord(external)
     let approval = try approval(required: true, command: command)
@@ -61,6 +63,8 @@ extension TaskService {
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, at: at)
+      if task.status == "proposed" { throw TaskError.proposal(task.ref) }
+      if task.status == "blocked" { throw TaskError.blockedPromotion(task.ref) }
       try tx.database.execute(
         sql: """
           UPDATE task

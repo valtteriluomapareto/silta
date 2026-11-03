@@ -64,7 +64,7 @@ struct TaskOrganizationCommandTests {
       #expect(promoted.termination == .exit(0))
       Golden.forTests().check(promoted.stdout, "task-promote" + (json ? ".json" : ".txt"))
       let listed = try SiltaBinary.run(
-        ["task", "ls"], in: scratch,
+        ["task", "ls", "--promoted"], in: scratch,
         environment: TaskCommandTests.actor)
       #expect(listed.stdout.contains("[read-only: ado:42]"))
       let refused = try run(["task", "plan", "AC-1", "-m", "Changed"])

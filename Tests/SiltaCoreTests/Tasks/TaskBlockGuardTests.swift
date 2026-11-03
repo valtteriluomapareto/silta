@@ -44,6 +44,10 @@ struct TaskBlockGuardTests {
           arguments: [TaskServiceTests.agent.description, TaskService.timestamp(clock.now())])
       }
       #expect(throws: TaskError.self) { _ = try other.unblock(["AC-1"]) }
+      #expect(throws: TaskError.blockedPromotion("AC-1")) {
+        _ = try service.promote("AC-1", external: "ado:42")
+      }
+      _ = try service.unblock(["AC-1"])
       _ = try service.promote("AC-1", external: "ado:42")
       for write in [
         { _ = try service.block("AC-1", TaskBlockTests.input()) },
