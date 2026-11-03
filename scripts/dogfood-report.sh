@@ -18,7 +18,7 @@ else
 fi
 canonical="$(/bin/date -j -u -f '%Y-%m-%d' "$since" '+%Y-%m-%d' 2>/dev/null)" || fail 'invalid --since day.'
 [[ "$canonical" == "$since" ]] || fail 'use a canonical YYYY-MM-DD day.'
-asof="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+asof="$(date -u '+%Y-%m-%dT%H:%M:%S.%NZ')"
 export SILTA_ACTOR=agent:codex:dogfood-report
 home="${SILTA_HOME:-$HOME/.silta}"
 temporary="$(mktemp -d)"

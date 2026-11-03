@@ -152,7 +152,7 @@ struct DogfoodReportTests {
       "date",
       text: """
         #!/bin/bash
-        if [[ "$*" == '-u +%Y-%m-%dT%H:%M:%SZ' ]]; then
+        if [[ "$*" == '-u +%Y-%m-%dT%H:%M:%S.%NZ' ]]; then
           echo 2023-11-30T00:00:00Z
         else
           exec /bin/date "$@"

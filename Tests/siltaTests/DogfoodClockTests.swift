@@ -30,9 +30,7 @@ struct DogfoodClockTests {
       let result = try DogfoodReportTests.run(
         ["--since", "2023-11-14"], scratch: scratch, tools: tools)
       #expect(result.termination == .exit(0))
-      withKnownIssue("The report clock truncates current-second calls") {
-        #expect(result.stdout.contains("| silta task show | 1 | 0% |"))
-      }
+      #expect(result.stdout.contains("| silta task show | 1 | 0% |"))
     }
   }
 }
