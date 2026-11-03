@@ -140,7 +140,8 @@ enum SiltaMain {
     }
     if let workspace {
       next = next.map {
-        $0.hasPrefix("silta task ")
+        if $0 == "silta ws show" { return "silta ws show " + shellWord(workspace) }
+        return $0.hasPrefix("silta task ")
           ? "silta --ws " + shellWord(workspace) + String($0.dropFirst(5)) : $0
       }
     }

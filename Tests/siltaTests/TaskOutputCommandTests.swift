@@ -32,9 +32,7 @@ struct TaskOutputCommandTests {
       let refused = try Self.run(
         ["--ws", "acme", "task", "add", "X", "--app", "nope", "--json"], in: scratch)
       #expect(refused.termination == .exit(2))
-      withKnownIssue("An app not_found hint drops the explicit --ws") {
-        #expect(refused.stdout.contains(#""next":["silta ws show 'acme'"]"#))
-      }
+      #expect(refused.stdout.contains(#""next":["silta ws show 'acme'"]"#))
     }
   }
 
