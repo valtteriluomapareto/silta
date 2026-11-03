@@ -5,21 +5,26 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct SeamErrorTests {
-  @Test(arguments: ["SILTA_HOME", "SILTA_NOW", "SILTA_ID_SEED"])
-  func invalidOverridesAreCoded(variable: String) async throws {
+  // The harness or the human set these, so an agent can't fix them: they are `env`,
+  // with a human as the next step (D34).
+  @Test(arguments: [
+    ("SILTA_HOME", "bad"), ("SILTA_NOW", "bad"), ("SILTA_ID_SEED", "bad"),
+    ("SILTA_ACTOR", "bad"), ("SILTA_SESSION", "b a d"),
+  ])
+  func invalidOverridesAreCoded(variable: String, value: String) async throws {
     try await withScratchDirectory { scratch in
       do {
         var values = ["SILTA_HOME": scratch.appending(path: "data").path]
-        values[variable] = "bad"
+        values[variable] = value
         _ = try await SiltaEnvironment.system(
           environment: values, userHome: scratch, temporaryRoots: [], deterministic: true)
         Issue.record("Expected an invalid override error")
       } catch {
         let coded = try #require(error as? any CodedError)
-        #expect(coded.code == .invalid)
+        #expect(coded.code == .env)
         #expect(coded.message.contains(variable))
         #expect(!coded.next.isEmpty)
-        #expect(OutputRouter.render(.failure(error), mode: OutputMode(json: true)).exitCode == 1)
+        #expect(OutputRouter.render(.failure(error), mode: OutputMode(json: true)).exitCode == 9)
       }
     }
   }
@@ -39,6 +44,16 @@ struct SeamErrorTests {
         #expect(
           !OutputRouter.render(.failure(error), mode: OutputMode(json: false)).stderr
             .contains("internal error (bug)"))
+      }
+    }
+  }
+
+  // Process can't start in a missing directory, such as a cwd deleted under the shell.
+  @Test func missingDirectoryIsASpawnFailureNotACrash() async throws {
+    _ = try await withScratchDirectory { scratch in
+      await #expect(throws: SeamError.gitUnavailable) {
+        try await SystemGitRunner().run(
+          GitRequest(arguments: ["--version"], directory: scratch.appending(path: "gone")))
       }
     }
   }

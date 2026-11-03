@@ -1,32 +1,38 @@
-## invalidHome (exit 1)
-error: SILTA_HOME must be an absolute, resolvable directory path. [invalid]
-next: printf '%s\n' "$SILTA_HOME"
-next: silta --help
-{"error":{"code":"invalid","message":"SILTA_HOME must be an absolute, resolvable directory path.","next":["printf '%s\\n' \"$SILTA_HOME\"","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+## invalidHome (exit 9)
+error: SILTA_HOME must be an absolute path to a directory; fix it where silta is launched. [env]
+ask human: printf '%s\n' "$SILTA_HOME"
+{"error":{"code":"env","message":"SILTA_HOME must be an absolute path to a directory; fix it where silta is launched.","next":["printf '%s\\n' \"$SILTA_HOME\""],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
-## invalidNow (exit 1)
-error: SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01. [invalid]
-next: unset SILTA_NOW
-next: silta --help
-{"error":{"code":"invalid","message":"SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01.","next":["unset SILTA_NOW","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+## invalidNow (exit 9)
+error: SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01. [env]
+ask human: unset SILTA_NOW
+{"error":{"code":"env","message":"SILTA_NOW must be UTC in YYYY-MM-DDTHH:mm:ss.SSSZ format on or after 1970-01-01.","next":["unset SILTA_NOW"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
-## invalidIDSeed (exit 1)
-error: SILTA_ID_SEED must be an unsigned 64-bit decimal integer. [invalid]
-next: unset SILTA_ID_SEED
-next: silta --help
-{"error":{"code":"invalid","message":"SILTA_ID_SEED must be an unsigned 64-bit decimal integer.","next":["unset SILTA_ID_SEED","silta --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+## invalidIDSeed (exit 9)
+error: SILTA_ID_SEED must be an unsigned 64-bit decimal integer. [env]
+ask human: unset SILTA_ID_SEED
+{"error":{"code":"env","message":"SILTA_ID_SEED must be an unsigned 64-bit decimal integer.","next":["unset SILTA_ID_SEED"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
-## invalidTimestamp (exit 1)
-error: Clock timestamp must fit the unsigned 48-bit ULID millisecond range. [invalid]
-next: unset SILTA_NOW
-next: silta doctor
-{"error":{"code":"invalid","message":"Clock timestamp must fit the unsigned 48-bit ULID millisecond range.","next":["unset SILTA_NOW","silta doctor"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+## invalidTimestamp (exit 9)
+error: SILTA_NOW is outside the range a ULID timestamp can hold. [env]
+ask human: unset SILTA_NOW
+{"error":{"code":"env","message":"SILTA_NOW is outside the range a ULID timestamp can hold.","next":["unset SILTA_NOW"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## invalidActor (exit 9)
+error: SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>; the tool is lowercase, and each part is 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit. [env]
+ask human: unset SILTA_ACTOR
+{"error":{"code":"env","message":"SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>; the tool is lowercase, and each part is 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit.","next":["unset SILTA_ACTOR"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## invalidSession (exit 9)
+error: SILTA_SESSION must be 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit. [env]
+ask human: unset SILTA_SESSION
+{"error":{"code":"env","message":"SILTA_SESSION must be 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit.","next":["unset SILTA_SESSION"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## gitUnavailable (exit 9)
-error: Git could not be started; check the configured absolute git path. [env]
+error: Git could not be started; check the git path and the working directory. [env]
 ask human: /usr/bin/git --version
 ask human: silta doctor
-{"error":{"code":"env","message":"Git could not be started; check the configured absolute git path.","next":["/usr/bin/git --version","silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Git could not be started; check the git path and the working directory.","next":["/usr/bin/git --version","silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## gitCapture (exit 9)
 error: Git output could not be captured. [env]

@@ -29,8 +29,13 @@ package struct SiltaHome: Sendable {
       realHome = try canonicalURL(defaultHome)
     } catch {
       guard override != nil else { throw error }
-      // A broken unused default must not prevent an isolated custom home.
-      realHome = try canonicalURL(userHome).appending(path: ".silta")
+      // A broken unused default must not prevent an isolated custom home. A dangling
+      // symlink names where the real home will be created, so that is the real home.
+      let link = defaultHome.path
+      let target = try? FileManager.default.destinationOfSymbolicLink(atPath: link)  // not a link
+      let base = try canonicalURL(userHome)
+      let path = target ?? ".silta"
+      realHome = path.hasPrefix("/") ? URL(filePath: path) : base.appending(path: path)
     }
     if let override, !override.hasPrefix("/") { throw SeamError.invalidHome }
     let url = override.map { URL(filePath: $0) } ?? realHome

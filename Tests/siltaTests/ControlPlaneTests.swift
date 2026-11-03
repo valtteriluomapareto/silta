@@ -42,6 +42,44 @@ struct ControlPlaneTests {
     }
   }
 
+  // Environment warnings reach the output and the log like a command's own. A git
+  // fault (here an unknown repository format) is one; an agent's shell inheriting a
+  // human's SILTA_ACTOR export is not.
+  @Test func gitFaultWarnsAndAnInheritedHumanOverrideDoesNot() throws {
+    try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "acme")
+      let setup = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/git"), ["init", "-q", repo.path], in: scratch)
+      try #require(setup.termination == .exit(0))
+      try Data("[core]\n\trepositoryformatversion = 99\n".utf8)
+        .write(to: repo.appending(path: ".git/config"))
+      let result = try SiltaBinary.run(
+        ["schema"], in: scratch, cwd: repo,
+        environment: ["SILTA_ACTOR": "human:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.contains("[session_fallback]"))
+      #expect(!result.stderr.contains("actor_override_ignored"))
+      let data = try Data(contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+      let entry = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+      #expect(entry["warnings"] as? [String] == ["session_fallback"])
+    }
+  }
+
+  // A working directory deleted under the shell must not crash git spawning.
+  @Test func deletedWorkingDirectoryFallsBackInsteadOfCrashing() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"),
+        [
+          "-c", "mkdir gone && cd gone && rmdir ../gone && exec \"$0\" schema",
+          try SiltaBinary.url().path,
+        ],
+        in: scratch)
+      #expect(result.termination == .exit(0), "\(result.stderr)")
+      #expect(result.stderr.contains("[session_fallback]"))
+    }
+  }
+
   @Test func verboseKeepsJSONOnStdoutAndMirrorsOnlyDiagnostics() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
@@ -86,11 +124,12 @@ struct ControlPlaneTests {
       let result = try SiltaBinary.run(
         ["schema", "--json", "--deterministic"], in: scratch,
         environment: environment)
-      #expect(result.termination == .exit(1))
+      #expect(result.termination == .exit(9))
       let envelope = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
       let error = try #require(envelope["error"] as? [String: Any])
-      #expect(error["code"] as? String == "invalid")
+      #expect(error["code"] as? String == "env")
+      #expect(error["next_by"] as? String == "human")
       #expect(result.stderr.isEmpty)
     }
   }

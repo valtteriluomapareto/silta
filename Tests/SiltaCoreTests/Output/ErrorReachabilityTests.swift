@@ -43,7 +43,9 @@ extension SecretError: ErrorExamples {
 }
 
 extension ActorError: ErrorExamples {
-  static var examples: [ActorError] { [.humanOnly(command: "silta task triage")] }
+  static var examples: [ActorError] {
+    [.humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme"))]
+  }
 }
 
 /// Proves every `ErrorCode` is produced by some error type (spec §16, D22).

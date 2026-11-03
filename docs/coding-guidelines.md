@@ -49,6 +49,10 @@ quietly diverge.
 - **No actors in the core** unless a decision adds one. Concurrency between processes
   uses SQLite transactions for writes (spec §17), not actors. Database initialization
   uses the advisory lock recorded in D12.
+- **Writes keep what they don't know (D32).** An older binary may write to a newer
+  schema, so owned writes use `UPDATE` or `INSERT`, never `REPLACE` (which resets
+  columns it doesn't know), and JSON columns keep unknown keys. A migration that
+  changes what older writes mean raises `min_writer_version`.
 - **Swift 6 language mode** with strict concurrency checking on every target, plus
   all the Swift 7 upcoming features (§0).
 - **`@MainActor` belongs to the app.** The app target (M5) uses Swift 6.2's

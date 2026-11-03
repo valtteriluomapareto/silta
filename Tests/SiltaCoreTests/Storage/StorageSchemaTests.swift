@@ -154,24 +154,60 @@ struct StorageSchemaTests {
     }
   }
 
-  @Test(arguments: [false, true]) func unknownFutureSchemaIsRefusedWithoutMigration(
-    newerVersion: Bool
+  // One write gate (D32): a newer schema refuses older writers only when its
+  // migration raised min_writer_version. Either way it is never migrated.
+  @Test(arguments: [false, true]) func newerSchemaIsGatedOnlyByWriterVersion(
+    raisedVersion: Bool
   ) throws {
     try withScratchDirectory { scratch in
       let store = Self.store(scratch)
       try store.initialize()
       let queue = try DatabaseQueue(path: store.path)
       try queue.write { db in
-        if newerVersion {
+        try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
+        if raisedVersion {
           try db.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
-        } else {
-          try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
         }
       }
+      let older = Self.store(scratch)
+      if raisedVersion {
+        #expect(throws: StorageError.schemaTooNew) { try older.initialize() }
+      } else {
+        _ = try older.write { try StorageWriteTests.insert($0, uid: "acme") }
+      }
+      #expect(
+        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 2)
+    }
+  }
+
+  // A newer schema that lacks one of our migrations has diverged: never write to it.
+  @Test func divergedSchemaIsRefusedWithoutMigrationOrBackup() throws {
+    try withScratchDirectory { scratch in
+      let store = Self.store(scratch)
+      try store.initialize()
+      let queue = try DatabaseQueue(path: store.path)
+      try queue.write { db in
+        try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
+        try db.execute(sql: "DELETE FROM grdb_migrations WHERE identifier = 'v1'")
+      }
+      let backups = try FileManager.default.contentsOfDirectory(
+        atPath: scratch.appending(path: "backups").path)
       #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch).initialize() }
       #expect(
-        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") }
-          == (newerVersion ? 1 : 2))
+        try FileManager.default.contentsOfDirectory(
+          atPath: scratch.appending(path: "backups").path) == backups)
+    }
+  }
+
+  // The writer version a fresh database records is the one this binary writes with.
+  @Test func freshSchemaRecordsThisWriterVersion() throws {
+    try withScratchDirectory { scratch in
+      let store = Self.store(scratch)
+      try store.initialize()
+      let version = try store.read {
+        try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
+      }
+      #expect(version == DatabaseStore.writerVersion)
     }
   }
 

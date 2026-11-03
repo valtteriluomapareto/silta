@@ -45,18 +45,47 @@ struct ActorTests {
       environment: ["USER": "acme", "CLAUDECODE": "0"], stdin: true, stdout: true,
       expected: "human:acme"),
     Row(environment: [:], stdin: true, stdout: true, expected: "human:unknown"),
+    // D9: an explicit agent without a session gets the resolved one.
+    Row(
+      environment: ["SILTA_ACTOR": "agent:acme"], stdin: false, stdout: false,
+      expected: "agent:acme:acme"),
+    // Empty values count as unset; a USER that can't be recorded is unknown.
+    Row(
+      environment: ["SILTA_ACTOR": ""], stdin: false, stdout: false,
+      expected: "agent:unknown:acme"),
+    Row(environment: ["USER": "acme user"], stdin: true, stdout: true, expected: "human:unknown"),
+    Row(
+      environment: ["USER": String(repeating: "a", count: 65)], stdin: true, stdout: true,
+      expected: "human:unknown"),
+    Row(
+      environment: ["SILTA_ACTOR": "agent:acme:" + String(repeating: "s", count: 64)],
+      stdin: false, stdout: false, expected: "agent:acme:" + String(repeating: "s", count: 64)),
   ]
 
-  @Test(arguments: rows) func matrix(row: Row) {
-    let actor = Actor.detect(
+  @Test(arguments: rows) func matrix(row: Row) throws {
+    let actor = try ActorID.detect(
       environment: row.environment,
       terminal: TerminalState(stdin: row.stdin, stdout: row.stdout), session: "acme")
-    #expect(actor.value == row.expected)
+    #expect(actor.description == row.expected)
     #expect(actor.isHuman == row.expected.hasPrefix("human:"))
   }
 
+  // Actors are recorded on every write, so a malformed one never gets that far.
+  @Test(arguments: [
+    "acme", "agent:", "human:", "agent:acme:", "agent:a:b:c", "robot:acme", "agent:acme:has space",
+    "human:acme;rm", "agent:Claude", "human:acme.", "human:a@b", "agent:acme:-x",
+    "human:" + String(repeating: "a", count: 65), "human:a:b", "human:ä",
+  ])
+  func malformedExplicitActorIsRefused(value: String) {
+    #expect(throws: SeamError.invalidActor) {
+      try ActorID.detect(
+        environment: ["SILTA_ACTOR": value], terminal: TerminalState(stdin: true, stdout: true),
+        session: "acme")
+    }
+  }
+
   @Test func humanOnlyRefusalHasHumanNextAndGoldenStreams() throws {
-    let actor = Actor.detect(
+    let actor = try ActorID.detect(
       environment: [:], terminal: TerminalState(stdin: false, stdout: false), session: "acme")
     do {
       try actor.requireHuman(command: "silta task triage")
@@ -65,6 +94,7 @@ struct ActorTests {
       #expect(error.code == .humanOnly)
       #expect(error.exitCode == 3)
       #expect(error.next == ["silta task triage"])
+      #expect(error.message.contains("agent:unknown:acme"))
       let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
       let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
       Golden.forTests().check(text.stderr + json.stdout, "human-only.txt")
@@ -72,7 +102,7 @@ struct ActorTests {
   }
 
   @Test func humanActorPassesTheSinglePolicyCheck() throws {
-    let actor = Actor.detect(
+    let actor = try ActorID.detect(
       environment: ["USER": "acme"], terminal: TerminalState(stdin: true, stdout: true),
       session: "acme")
     try actor.requireHuman(command: "silta task triage")
@@ -84,7 +114,7 @@ struct ActorTests {
         environment: [
           "SILTA_HOME": home.path, "SILTA_ACTOR": "agent:acme:explicit",
         ], userHome: scratch)
-      #expect(environment.actor.value == "agent:acme:explicit")
+      #expect(environment.actor.description == "agent:acme:explicit")
       #expect(!FileManager.default.fileExists(atPath: home.path))
     }
   }

@@ -30,7 +30,8 @@ enum SiltaMain {
       let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
       var entry = LogEntry(
         timestamp: timestamp, command: commandPath(arguments),
-        actor: environment.actor.value, exitCode: rendered.exitCode, milliseconds: milliseconds)
+        actor: environment.actor.description, exitCode: rendered.exitCode,
+        milliseconds: milliseconds)
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = ["--json", "--quiet", "--deterministic", "--verbose", "--help", "--version"]
@@ -74,7 +75,12 @@ enum SiltaMain {
         return parseFailure(error, arguments: arguments, mode: mode)
       }
     }
-    return OutputRouter.render(Result { try outputCommand.execute(context) }, mode: mode)
+    return OutputRouter.render(
+      Result {
+        var output = try outputCommand.execute(context)
+        output.warnings = context.environment.warnings + output.warnings
+        return output
+      }, mode: mode)
   }
 
   /// The output mode, read from the raw arguments so a parse error can still answer in

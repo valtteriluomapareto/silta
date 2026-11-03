@@ -8,20 +8,21 @@ struct SessionTests {
   private let cwd = URL(filePath: "/Acme/worktree/nested")
   private let terminal = TerminalState(stdin: false, stdout: false)
 
-  @Test(arguments: ["acme", ""]) func explicitSessionNeverCallsGit(session: String) async throws {
+  @Test func explicitSessionNeverCallsGit() async throws {
+    let session = "acme"
     let git = ScriptedGitRunner(script: [])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: ["SILTA_SESSION": session], terminal: terminal, git: git, directory: cwd)
-    #expect(actor.value == "agent:unknown:\(session)")
+    #expect(actor.description == "agent:unknown:\(session)")
     #expect(git.requests.isEmpty)
   }
 
   @Test func acceptedExplicitActorNeverNeedsASessionOrGit() async throws {
     let git = ScriptedGitRunner(script: [])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: ["SILTA_ACTOR": "agent:acme:explicit"], terminal: terminal, git: git,
       directory: cwd)
-    #expect(actor.value == "agent:acme:explicit")
+    #expect(actor.description == "agent:acme:explicit")
     #expect(git.requests.isEmpty)
   }
 
@@ -33,9 +34,9 @@ struct SessionTests {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
     let result = GitResult(termination: .exit(0), stdout: Data((root + "\n").utf8))
     let git = ScriptedGitRunner(script: [(request, .success(result))])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: cwd)
-    #expect(actor.value == "agent:unknown:\(expected)")
+    #expect(actor.description == "agent:unknown:\(expected)")
     #expect(git.requests == [request])
   }
 
@@ -43,18 +44,18 @@ struct SessionTests {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
     let result = GitResult(termination: .exit(0), stdout: Data("/Acme/path\r\n".utf8))
     let git = ScriptedGitRunner(script: [(request, .success(result))])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: cwd)
-    #expect(actor.value == "agent:unknown:082628")
+    #expect(actor.description == "agent:unknown:082628")
   }
 
   @Test func outsideRepositoryHashesTheCwd() async throws {
     let directory = URL(filePath: "/Acme/worktree")
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
     let git = ScriptedGitRunner(script: [(request, .success(GitResult(termination: .exit(128))))])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: directory)
-    #expect(actor.value == "agent:unknown:8e7b6a")
+    #expect(actor.description == "agent:unknown:8e7b6a")
   }
 
   // Sessions guard against accidents, not attackers (§11): a git fault must not fail the command.
@@ -66,12 +67,84 @@ struct SessionTests {
     .success(GitResult(termination: .exit(0), stdout: Data([0xff]))),
     .failure(.gitUnavailable),
   ])
-  func gitFaultsFallBackToTheCwd(outcome: Result<GitResult, SeamError>) async {
+  func gitFaultsFallBackToTheCwd(outcome: Result<GitResult, SeamError>) async throws {
     let directory = URL(filePath: "/Acme/worktree")
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
     let git = ScriptedGitRunner(script: [(request, outcome.mapError { $0 as any Error })])
-    let actor = await Actor.resolve(
+    let (actor, warnings) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: directory)
-    #expect(actor.value == "agent:unknown:8e7b6a")
+    #expect(actor.description == "agent:unknown:8e7b6a")
+    #expect(warnings.map(\.code) == ["session_fallback"])
+  }
+
+  // A fallback inside a repository splits one session in two, so it leaves a trace.
+  @Test func gitFaultWarnsButLeavingARepositoryDoesNot() async throws {
+    let directory = URL(filePath: "/Acme/worktree")
+    let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
+    let outside = Data("fatal: not a git repository (or any of the parent directories): .git".utf8)
+    let corrupt = Data("fatal: Expected git repo version <= 1, found 99".utf8)
+    for (termination, stderr, warned) in [
+      (GitTermination.timedOut, Data(), true), (.exit(128), outside, false),
+      (.exit(128), corrupt, true),
+    ] {
+      let git = ScriptedGitRunner(script: [
+        (request, .success(GitResult(termination: termination, stderr: stderr)))
+      ])
+      let (_, warnings) = try await ActorID.resolve(
+        environment: [:], terminal: terminal, git: git, directory: directory)
+      #expect(warnings.map(\.code) == (warned ? ["session_fallback"] : []))
+    }
+  }
+
+  @Test func emptySessionCountsAsUnsetAndAMalformedOneIsRefused() async throws {
+    let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
+    let git = ScriptedGitRunner(script: [
+      (request, .success(GitResult(termination: .exit(0), stdout: Data("/Acme/worktree\n".utf8))))
+    ])
+    let (actor, _) = try await ActorID.resolve(
+      environment: ["SILTA_SESSION": ""], terminal: terminal, git: git, directory: cwd)
+    #expect(actor.description == "agent:unknown:8e7b6a")
+    await #expect(throws: SeamError.invalidSession) {
+      try await ActorID.resolve(
+        environment: ["SILTA_SESSION": "acme session"], terminal: terminal,
+        git: ScriptedGitRunner(script: []), directory: cwd)
+    }
+  }
+
+  @Test func explicitAgentWithoutSessionGetsTheResolvedOne() async throws {
+    let (actor, _) = try await ActorID.resolve(
+      environment: ["SILTA_ACTOR": "agent:acme", "SILTA_SESSION": "review"], terminal: terminal,
+      git: ScriptedGitRunner(script: []), directory: cwd)
+    #expect(actor.description == "agent:acme:review")
+  }
+
+  // Only a human watching stdout hears about a dropped override; an agent whose shell
+  // inherited the human's export would see it on every call.
+  @Test(arguments: [(true, ["actor_override_ignored"]), (false, [])])
+  func ignoredHumanOverrideWarnsOnlyAWatchingHuman(stdout: Bool, expected: [String]) async throws {
+    let (actor, warnings) = try await ActorID.resolve(
+      environment: ["SILTA_ACTOR": "human:acme", "SILTA_SESSION": "acme"],
+      terminal: TerminalState(stdin: false, stdout: stdout),
+      git: ScriptedGitRunner(script: []), directory: cwd)
+    #expect(actor.description == "agent:unknown:acme")
+    #expect(warnings.map(\.code) == expected)
+  }
+
+  @Test func sessionIsValidatedEvenWithACompleteActor() async {
+    await #expect(throws: SeamError.invalidSession) {
+      try await ActorID.resolve(
+        environment: ["SILTA_ACTOR": "agent:acme:review", "SILTA_SESSION": "a b"],
+        terminal: terminal, git: ScriptedGitRunner(script: []), directory: cwd)
+    }
+  }
+
+  @Test func aHumanGetsNoSessionFallbackWarning() async throws {
+    let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
+    let git = ScriptedGitRunner(script: [(request, .success(GitResult(termination: .timedOut)))])
+    let (actor, warnings) = try await ActorID.resolve(
+      environment: ["USER": "acme"], terminal: TerminalState(stdin: true, stdout: true), git: git,
+      directory: cwd)
+    #expect(actor.description == "human:acme")
+    #expect(warnings.isEmpty)
   }
 }

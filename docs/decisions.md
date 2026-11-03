@@ -180,3 +180,43 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     - the `schema` goldens fail on any change
   - On an ArgumentParser upgrade, check `silta schema` first.
 
+## Wave-3 follow-up (2026-11-03)
+
+- **D32: `min_writer_version` is the one write gate.**
+  - A binary that meets a newer schema (unknown migrations) never migrates it, and
+    writes while `min_writer_version` is at most its own writer version.
+  - Why: the rule lives in the older binary, so it must be right before the first
+    release; and the app and the CLI can run at different versions. Under "any unknown
+    migration blocks", adding one column would lock out the app until it updated, and
+    a long-running app would answer differently from a fresh CLI.
+  - **When to raise it:** whenever an older writer's normal writes could leave data a
+    newer reader misreads. That includes new constraints, invariants kept in code
+    (a mirrored or denormalized column), and new values in a vocabulary (a status, a
+    comment kind) or in a JSON column; a vocabulary change with no schema change ships
+    as a migration that only raises the version.
+  - Writers keep what they don't know: JSON columns keep unknown keys, and owned
+    writes use `UPDATE` or `INSERT`, never `REPLACE`, which would reset a newer
+    binary's columns.
+  - A newer schema that also lacks one of this binary's migrations has diverged, and
+    is refused. So migrations are never squashed or renamed once shipped.
+- **D33: Actors are `ActorID` values, validated where they enter.**
+  - `human(name)` or `agent(tool, session)`, recorded as `human:<name>` or
+    `agent:<tool>:<session>`. A name or session is 1 to 64 letters, digits, `.`, `_`
+    or `-`, starting and ending with a letter or digit; a tool is lowercase. So
+    `agent:Claude` can't be a second claimant, and a mention (`@human:acme.`) ends
+    before trailing punctuation.
+  - D9 amended: an agent's claim compares its session; a human's compares its name.
+  - A target meaning "any session of a tool" (M2's `review_request.reviewer`, `inbox
+    --for agent:codex`) is not an `ActorID`; that slice names its own type.
+  - Why: rows store actors from S10 on, and claims compare sessions (D9); a malformed
+    value in a row is permanent after DF0. The name avoids Swift's `Actor` protocol.
+  - `SILTA_ACTOR=agent:<tool>` gets the resolved session appended, so D9 holds without
+    agents computing a session.
+  - `human_only` names the detected actor, and why an unknown agent was detected.
+- **D34: Bad `SILTA_*` configuration is `env`, for the human.**
+  - Covers `SILTA_HOME`, `SILTA_NOW`, `SILTA_ID_SEED`, `SILTA_ACTOR` and
+    `SILTA_SESSION`.
+  - Why: the harness, the eval runner or the human's profile sets them, not the agent.
+    An agent's shell may not keep an `unset` between calls, so "unset it and retry"
+    loops, and for `SILTA_HOME` the obvious workaround writes to the real
+    `~/.silta`.
