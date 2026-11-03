@@ -1,0 +1,2 @@
+AC-1 proposed: Acme idea
+Created by: agent:codex:acme

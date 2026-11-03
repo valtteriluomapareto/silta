@@ -1,0 +1,23 @@
+error: Task or workspace entity not found. [not_found]
+next: silta task ls
+error: A result is required. [invalid]
+next: silta task add --help
+error: AC-1 is claimed by agent:codex:acme (4 min old); do not steal. [claimed]
+next: silta task show AC-1
+error: Proposal AC-1 needs human triage; choose todo work meanwhile. [conflict]
+next: silta task ls --status todo
+error: AC-1 cannot make this transition from done. [conflict]
+next: silta task show AC-1
+error: Git could not report the task's worktree or commit; ask a human to check git. [env]
+ask human: silta doctor
+error: Could not read the UTF-8 body file; check its path and permissions. [env]
+ask human: silta doctor
+error: Use a worktree and commit from the task's registered repository. [invalid]
+next: silta task add --help
+error: A human approval is required; ask a human to approve or use done --force. [gate]
+next: silta task show AC-1
+error: Task repository information changed; re-read before retrying. [conflict]
+next: silta task show AC-1
+error: Database is busy; retry the original invocation once after retry_after_s. [busy]
+retry after: 5s
+next: silta task add

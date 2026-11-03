@@ -1,0 +1,29 @@
+import ArgumentParser
+import Foundation
+import SiltaCore
+
+struct TaskDropCommand: OutputCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "drop", abstract: "Drop an open task and record why.")
+
+  static let dataShape = TaskOutput.receiptShape
+
+  @OptionGroup var global: GlobalOptions
+
+  @OptionGroup var body: TaskBody
+
+  @Argument(help: "The task reference.") var ref: String
+
+  func execute(_ context: CommandContext) async throws -> CommandOutput {
+    let text = try body.read(
+      actor: context.environment.actor, command: "silta task drop " + shellWord(ref))
+    var commit = TaskCommit()
+    commit.allowSecret = body.allowSecret
+    return TaskOutput.receipt(
+      try await TaskService(environment: context.environment, workspace: global.ws)
+        .close(
+          ref, result: text, dropped: true, commit: commit,
+          directory: URL(
+            filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)))
+  }
+}

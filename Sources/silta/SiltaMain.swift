@@ -79,6 +79,9 @@ enum SiltaMain {
       var output = try await outputCommand.execute(context)
       output.warnings = context.environment.warnings + output.warnings
       return OutputRouter.render(.success(output), mode: mode)
+    } catch StorageError.busy {
+      return OutputRouter.render(
+        .failure(CommandBusyError(command: commandPath(arguments))), mode: mode)
     } catch {
       return OutputRouter.render(.failure(error), mode: mode)
     }

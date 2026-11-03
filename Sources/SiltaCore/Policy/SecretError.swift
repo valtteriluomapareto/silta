@@ -11,11 +11,11 @@ package struct SecretError: CodedError {
 
   /// `command` is a fixed command skeleton, never original arguments or user text.
   /// Scans `text` but retains only masked previews; does not write or log anything.
-  package init(command: StaticString, text: String) {
+  package init(command: String, text: String) {
     let previews = SecretGuard.matches(in: text).map { $0.preview(in: text) }
     // A body full of secrets must not make the message unbounded.
     let more = previews.count > 5 ? " and \(previews.count - 5) more" : ""
     message = "Secret content detected: " + previews.prefix(5).joined(separator: ", ") + more
-    next = [String(describing: command) + " --allow-secret"]
+    next = [command + " --allow-secret"]
   }
 }

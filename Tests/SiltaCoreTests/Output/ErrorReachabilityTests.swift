@@ -38,7 +38,7 @@ extension StorageError: ErrorExamples {
 
 extension SecretError: ErrorExamples {
   static var examples: [SecretError] {
-    [SecretError(command: "silta task add -F -", text: "Pwd=acme-secret")]
+    [SecretError(command: "silta task add -F <file>", text: "Pwd=acme-secret")]
   }
 }
 
@@ -58,6 +58,21 @@ extension RepoError: ErrorExamples {
   }
 }
 
+extension TaskError: ErrorExamples {
+  static var examples: [TaskError] {
+    [
+      .notFound, .invalid("A result is required."),
+      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4), .proposal("AC-1"),
+      .transition("AC-1", status: "done"), .git, .input, .foreignRepo, .gate("AC-1"),
+      .changed("AC-1"),
+    ]
+  }
+}
+
+extension CommandBusyError: ErrorExamples {
+  static var examples: [CommandBusyError] { [.init(command: "silta task add")] }
+}
+
 extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
     [.humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme"))]
@@ -72,13 +87,14 @@ struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
-    StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self,
+    StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
+    CommandBusyError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
     .unregistered, .readOnlyPromoted, .ambiguousLocation,
-    .claimed, .staleRev, .leaseTaken, .gate, .rateLimited,
+    .staleRev, .leaseTaken, .rateLimited,
   ]
 
   static var examples: [any CodedError] {

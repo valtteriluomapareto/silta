@@ -1,0 +1,11 @@
+{"error":{"code":"not_found","message":"Task or workspace entity not found.","next":["silta task ls"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"A result is required.","next":["silta task add --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"claimed","message":"AC-1 is claimed by agent:codex:acme (4 min old); do not steal.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; choose todo work meanwhile.","next":["silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"AC-1 cannot make this transition from done.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Git could not report the task's worktree or commit; ask a human to check git.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Could not read the UTF-8 body file; check its path and permissions.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"Use a worktree and commit from the task's registered repository.","next":["silta task add --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"gate","message":"A human approval is required; ask a human to approve or use done --force.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"Task repository information changed; re-read before retrying.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"busy","message":"Database is busy; retry the original invocation once after retry_after_s.","next":["silta task add"],"next_by":"agent","retry_after_s":5},"ok":false,"schema":1,"warnings":[]}

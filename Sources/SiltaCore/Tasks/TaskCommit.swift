@@ -1,0 +1,17 @@
+/// Options for recording a completed task's commit.
+package struct TaskCommit: Sendable {
+  /// Overrides HEAD with a commit from the registered repository.
+  package var sha: String?
+
+  /// Skips git attribution for this completion.
+  package var noSHA = false
+
+  /// Lets a human override an unmet review gate.
+  package var force = false
+
+  /// Lets a human retain detected secret content in the result.
+  package var allowSecret = false
+
+  /// Uses HEAD and enforces the review gate by default.
+  package init() {}
+}

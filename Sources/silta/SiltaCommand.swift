@@ -6,7 +6,9 @@ struct SiltaCommand: ParsableCommand {
     commandName: "silta",
     abstract: "A local context hub and backlog for coding agents.",
     version: SiltaVersion.current,
-    subcommands: [SchemaCommand.self, WsCommand.self, InitCommand.self, RepoCommand.self]
+    subcommands: [
+      SchemaCommand.self, WsCommand.self, InitCommand.self, RepoCommand.self, TaskCommand.self,
+    ]
   )
 
   @OptionGroup var global: GlobalOptions
