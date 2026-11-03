@@ -50,7 +50,8 @@ struct TaskBlockCommand: OutputCommand {
 
 struct TaskUnblockCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "unblock", abstract: "Return a blocked batch to todo after an answer.")
+    commandName: "unblock",
+    abstract: "Return a blocked batch to todo; an open blocker needs the human's go-ahead.")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
 
@@ -66,13 +67,15 @@ struct TaskUnblockCommand: OutputCommand {
       + refs.map { shellWord(SecretGuard.redacted($0)) }.joined(separator: " ")
     let why = try body.read(
       actor: context.environment.actor, command: command, approved: global.approved)
-    let tasks = try TaskService(
+    let result = try TaskService(
       environment: context.environment, workspace: global.ws,
       approved: global.approved
     ).unblock(refs, why: why, allowSecret: body.allowSecret)
+    let tasks = result.tasks
     return CommandOutput(
       text: tasks.map { "\($0.ref) \($0.status)" }.joined(separator: "\n"),
-      data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings), approvalUsed: body.allowSecret)
+      data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings),
+      approvalUsed: result.approvalUsed)
   }
 
   private struct Data: Encodable {

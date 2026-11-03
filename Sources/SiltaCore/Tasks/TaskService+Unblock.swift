@@ -2,9 +2,11 @@ import Foundation
 import GRDB
 
 extension TaskService {
-  /// Returns an explicitly answered batch to todo atomically, regardless of readiness.
+  /// Returns an answered batch to todo atomically. A batch with a task that isn't ready
+  /// (spec §8: every blocker a done task) needs the human's go-ahead, decided inside the
+  /// write; one approval row covers the batch.
   package func unblock(_ refs: [String], why: String? = nil, allowSecret: Bool = false) throws
-    -> [TaskResult]
+    -> (tasks: [TaskResult], approvalUsed: Bool)
   {
     guard !refs.isEmpty else {
       throw TaskError.invalid("Unblock needs at least one task reference.")
@@ -31,6 +33,10 @@ extension TaskService {
         }
         if !tasks.contains(where: { $0.id == task.id }) { tasks.append(task) }
       }
+      let open = try tasks.contains { try Self.waiting($0, at: at, in: tx.database)?.ready != true }
+      let used =
+        try approval
+        ?? self.approval(required: open, command: command + (why == nil ? "" : " -F <file>"))
       for task in tasks {
         try Self.clearBlock(task, in: tx)
         try tx.database.execute(
@@ -43,14 +49,15 @@ extension TaskService {
           task.id, kind: "unblock", body: why == nil ? nil : content.0,
           redacted: content.1, at: at, in: tx)
       }
-      try approval?.record(
-        command: command + " --allow-secret", workspace: slug,
+      try used?.record(
+        command: command + (allowSecret ? " --allow-secret" : ""), workspace: slug,
         identity: (environment.ids, at), in: tx)
-      return tasks.map {
+      let results = tasks.map {
         TaskResult(
           ref: $0.ref, status: "todo",
           warnings: content.1 ? [SecretGuard.warning] : [])
       }
+      return (results, used != nil)
     }
   }
 

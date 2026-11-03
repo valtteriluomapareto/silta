@@ -47,41 +47,39 @@ struct TaskApprovalRegressionTests {
     }
   }
 
-  @Test func unblockingAnOpenBlockNeedsTheHuman() {
-    withKnownIssue("unblock has no readiness check") {
-      try withScratchDirectory { scratch in
-        let store = try TaskCommandTests.setup(scratch)
-        for title in ["Acme", "Acme two", "Acme three"] {
-          #expect(
-            try Self.run(["task", "add", title, "--start"], in: scratch).termination == .exit(0))
-        }
+  @Test func unblockingAnOpenBlockNeedsTheHuman() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      for title in ["Acme", "Acme two", "Acme three"] {
         #expect(
-          try Self.run(["task", "block", "AC-1", "--on", "ext:acme", "-m", "Acme?"], in: scratch)
-            .termination == .exit(0))
-        let refused = try Self.run(["task", "unblock", "AC-1", "--json"], in: scratch)
-        #expect(refused.termination == .exit(3))
-        #expect(try Self.error(refused)["code"] as? String == "human_only")
-        #expect(
-          try Self.run(["task", "show", "AC-1", "--json"], in: scratch).stdout.contains(
-            "\"status\":\"blocked\""))
-        let approved = try Self.run(
-          ["task", "unblock", "AC-1", "--approved", "Acme answered"], in: scratch)
-        #expect(approved.termination == .exit(0))
-        #expect(
-          try Self.run(["task", "block", "AC-3", "--on", "AC-2", "-m", "After two"], in: scratch)
-            .termination == .exit(0))
-        #expect(
-          try Self.run(["task", "done", "AC-2", "-m", "Acme two done"], in: scratch).termination
-            == .exit(0))
-        let ready = try Self.run(
-          ["task", "unblock", "AC-3", "--approved", "Unused", "--json"], in: scratch)
-        #expect(ready.termination == .exit(0))
-        #expect(try Self.warnings(ready) == ["approval_unused"])
-        let commands = try store.read {
-          try String.fetchAll($0, sql: "SELECT command FROM approval")
-        }
-        #expect(commands == ["silta task unblock 'AC-1'"])
+          try Self.run(["task", "add", title, "--start"], in: scratch).termination == .exit(0))
       }
+      #expect(
+        try Self.run(["task", "block", "AC-1", "--on", "ext:acme", "-m", "Acme?"], in: scratch)
+          .termination == .exit(0))
+      let refused = try Self.run(["task", "unblock", "AC-1", "--json"], in: scratch)
+      #expect(refused.termination == .exit(3))
+      #expect(try Self.error(refused)["code"] as? String == "human_only")
+      #expect(
+        try Self.run(["task", "show", "AC-1", "--json"], in: scratch).stdout.contains(
+          "\"status\":\"blocked\""))
+      let approved = try Self.run(
+        ["task", "unblock", "AC-1", "--approved", "Acme answered"], in: scratch)
+      #expect(approved.termination == .exit(0))
+      #expect(
+        try Self.run(["task", "block", "AC-3", "--on", "AC-2", "-m", "After two"], in: scratch)
+          .termination == .exit(0))
+      #expect(
+        try Self.run(["task", "done", "AC-2", "-m", "Acme two done"], in: scratch).termination
+          == .exit(0))
+      let ready = try Self.run(
+        ["task", "unblock", "AC-3", "--approved", "Unused", "--json"], in: scratch)
+      #expect(ready.termination == .exit(0))
+      #expect(try Self.warnings(ready) == ["approval_unused"])
+      let commands = try store.read {
+        try String.fetchAll($0, sql: "SELECT command FROM approval")
+      }
+      #expect(commands == ["silta task unblock 'AC-1'"])
     }
   }
 

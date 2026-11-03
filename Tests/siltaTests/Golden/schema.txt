@@ -21,7 +21,7 @@ silta task keep  Keep a task visible regardless of its closed age.
 silta task link  Link a task to a reference in this workspace or an external URL.
 silta task promote  Record an external tracker and make the task read-only (human-only).
 silta task block  Record blockers; Silta sends nothing.
-silta task unblock  Return a blocked batch to todo after an answer.
+silta task unblock  Return a blocked batch to todo; an open blocker needs the human's go-ahead.
 details: silta schema <command>
 
 global flags:
