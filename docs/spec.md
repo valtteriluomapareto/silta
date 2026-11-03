@@ -1100,6 +1100,9 @@ Every CLI call is its own short-lived process, and several agents run at once.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
 - **Read commands never write to `silta.db`.** Archiving is computed, and caches are
   best-effort writes to `index.db`.
+- **Missing `-wal`/`-shm` files are tolerated.** Another SQLite client, or copying
+  `silta.db` alone, can leave them absent; a read then opens read-write without
+  migrating so SQLite recreates them, and still reads query-only.
 - **Migrations:**
   - GRDB `DatabaseMigrator` applies atomic migrations excluding competing writers.
     Initialization is serialized across processes, including database mode setup,

@@ -120,14 +120,25 @@ package final class DatabaseStore: Sendable {
     guard version <= writerVersion else { throw StorageError.schemaTooNew }
   }
 
-  /// Reads only an existing database through a read-only connection and transaction.
+  /// Reads only an existing database through a read-only transaction, never migrating.
   /// Missing/unreadable files and attempts to mutate in the closure are coded failures.
   package func read<T>(_ body: (Database) throws -> T) throws -> T {
     do {
       var config = Configuration()
       config.readonly = true
       config.busyMode = .timeout(5)
-      let queue = try DatabaseQueue(path: path, configuration: config)
+      let queue: DatabaseQueue
+      do {
+        queue = try DatabaseQueue(path: path, configuration: config)
+      } catch let error as DatabaseError
+        where error.resultCode == .SQLITE_CANTOPEN && FileManager.default.fileExists(atPath: path)
+      {
+        // A read-only connection cannot recreate `-wal`/`-shm`, which another SQLite
+        // client removes when it closes the database last. A read-write connection can;
+        // `DatabaseQueue.read` still runs the body query-only.
+        config.readonly = false
+        queue = try DatabaseQueue(path: path, configuration: config)
+      }
       return try queue.read(body)
     } catch let error as any CodedError {
       throw error

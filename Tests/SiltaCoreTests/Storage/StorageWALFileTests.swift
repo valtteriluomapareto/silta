@@ -31,15 +31,10 @@ struct StorageWALFileTests {
       let before = try Data(contentsOf: URL(filePath: store.path))
       let backups = try FileManager.default.contentsOfDirectory(
         atPath: scratch.appending(path: "backups").path)
-      withKnownIssue("Read-only open fails when -wal/-shm are missing") {
-        let count = try store.read {
-          try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace")
-        }
-        #expect(count == 1)
-        try Self.removeWALFiles(store)
-        #expect(throws: StorageError.unavailable) {
-          try store.read { db in try db.execute(sql: "DELETE FROM workspace") }
-        }
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 1)
+      try Self.removeWALFiles(store)
+      #expect(throws: StorageError.unavailable) {
+        try store.read { db in try db.execute(sql: "DELETE FROM workspace") }
       }
       #expect(try Data(contentsOf: URL(filePath: store.path)) == before)
       #expect(
