@@ -1,0 +1,1 @@
+{"data":{"workspace":"acme","yaml":"workspace: {\"name\":\"Acme\",\"slug\":\"acme\",\"task_prefix\":\"AC\"}\nsettings: {}\nrepos: []\napps: []\nenvironments: []\nservices: []\nedges: []\ntopics: []\nsources: []\n"},"ok":true,"schema":1,"warnings":[]}
