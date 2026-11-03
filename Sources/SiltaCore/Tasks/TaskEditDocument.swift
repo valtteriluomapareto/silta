@@ -41,6 +41,12 @@ package struct TaskEditDocument: Equatable, Sendable {
 
   }
 
+  /// The fields that differ from `other`, lowercased and in document order.
+  func changed(from other: Self) -> [String] {
+    zip(Self.headings, zip(values, other.values)).filter { !$1.0.utf8.elementsEqual($1.1.utf8) }
+      .map { $0.0.lowercased() }
+  }
+
   /// Wraps each value in a tilde fence longer than any value's own tilde run.
   package func render() -> String {
     let longest = values.flatMap { $0.split(whereSeparator: { $0 != "~" }) }.map(\.count).max() ?? 0

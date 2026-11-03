@@ -4,10 +4,11 @@ import GRDB
 extension TaskService {
   /// Edits a snapshot, then rechecks content, promotion and the current claim before writing.
   /// A nil callback result cancels without writing. An edit that changes nothing writes
-  /// nothing and uses no approval. Only changed fields pass the secret guard.
+  /// nothing and uses no approval. Only changed fields pass the secret guard. `changed`
+  /// names the fields written, lowercased.
   package func edit(
     _ ref: String, allowSecret: Bool = false, input: (String) throws -> String?
-  ) throws -> (result: TaskResult, approvalUsed: Bool) {
+  ) throws -> (result: TaskResult, approvalUsed: Bool, changed: [String]) {
     let command =
       "silta task edit " + shellWord(ref)
       + (allowSecret ? " --allow-secret" : "")
@@ -16,7 +17,7 @@ extension TaskService {
     let needed = allowSecret || before.claimedBy != environment.actor.description
     _ = try approval(required: needed, command: command + " -F <file>")
     let original = TaskEditDocument(before)
-    guard let text = try input(original.render()) else { return (receipt(before), false) }
+    guard let text = try input(original.render()) else { return (receipt(before), false, []) }
     let parsed = try TaskEditDocument.parse(text, from: before)
     if parsed == original {
       return try unchangedEdit(before, allowSecret: allowSecret, command: command)
@@ -36,17 +37,20 @@ extension TaskService {
       let required = allowSecret || task.claimedBy != environment.actor.description
       let approval = try approval(required: required, command: command + " -F <file>")
       try Self.compareEdit(task, before)
-      guard content != original else { return (receipt(task), false) }
+      guard content != original else { return (receipt(task), false, []) }
       try applyEdit(content, task: task, redacted: redacted, at: at, in: tx)
       try approval?.record(
         command: command, workspace: slug,
         identity: (environment.ids, at), in: tx)
-      return (receipt(task, warnings: redacted ? [SecretGuard.warning] : []), required)
+      return (
+        receipt(task, warnings: redacted ? [SecretGuard.warning] : []), required,
+        content.changed(from: original)
+      )
     }
   }
 
   private func unchangedEdit(_ before: TaskDetails, allowSecret: Bool, command: String) throws
-    -> (result: TaskResult, approvalUsed: Bool)
+    -> (result: TaskResult, approvalUsed: Bool, changed: [String])
   {
     let slug = try selected()
     let at = environment.clock.now()
@@ -56,7 +60,7 @@ extension TaskService {
       let required = allowSecret || task.claimedBy != environment.actor.description
       _ = try approval(required: required, command: command + " -F <file>")
       try Self.compareEdit(task, before)
-      return (receipt(task), false)
+      return (receipt(task), false, [])
     }
   }
 

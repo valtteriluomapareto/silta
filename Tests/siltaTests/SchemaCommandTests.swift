@@ -46,9 +46,7 @@ struct SchemaCommandTests {
 
   @Test(arguments: [["schema", "--quiet"], ["--quiet", "schema"]])
   func quietStillPrintsARead(arguments: [String]) throws {
-    withKnownIssue("--quiet hides a read") {
-      try check(arguments, stdout: "schema.txt")
-    }
+    try check(arguments, stdout: "schema.txt")
   }
 
   @Test func unknownCommandIsInvalidAndListsTheCommands() throws {

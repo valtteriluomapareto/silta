@@ -19,10 +19,11 @@ struct SchemaCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let all = try CommandCatalog.commands()
     let global = try CommandCatalog.arguments(of: GlobalOptions.self)
-    let words = command.first == "silta" ? Array(command.dropFirst()) : command
+    let split = command.flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) }
+    let words = split.first == "silta" ? Array(split.dropFirst()) : split
     if words.isEmpty {
       let index = SchemaDocument(commands: all, globalArguments: global).index
-      return CommandOutput(text: index.indexText, data: index)
+      return CommandOutput(text: index.indexText, quiet: index.indexText, data: index)
     }
     let selected = all.filter { entry in
       let entryWords = entry.name.split(separator: " ").dropFirst().map(String.init)
@@ -33,6 +34,6 @@ struct SchemaCommand: OutputCommand {
         (["silta"] + words).joined(separator: " "), known: all.map(\.name))
     }
     let detail = SchemaDocument(commands: selected, globalArguments: global)
-    return CommandOutput(text: detail.detailText, data: detail)
+    return CommandOutput(text: detail.detailText, quiet: detail.detailText, data: detail)
   }
 }

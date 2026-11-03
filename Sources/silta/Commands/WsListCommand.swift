@@ -21,7 +21,7 @@ struct WsListCommand: OutputCommand {
       ? "No workspaces. Ask in chat, then: silta ws edit -F <file>"
         + " --approved \"<the human's words>\""
       : workspaces.map { "\($0.slug)\t\($0.name)\t\($0.taskPrefix)" }.joined(separator: "\n")
-    return CommandOutput(text: text, data: Data(workspaces: workspaces))
+    return CommandOutput(text: text, quiet: text, data: Data(workspaces: workspaces))
   }
 
   private struct Data: Encodable {

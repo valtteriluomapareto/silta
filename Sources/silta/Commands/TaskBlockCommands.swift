@@ -39,7 +39,9 @@ struct TaskBlockCommand: OutputCommand {
     var lines = ["\(result.ref) \(result.status)"]
     if let waiting = result.waiting { lines += TaskOutput.waitingLines(waiting) }
     if let day = result.followUpAt { lines.append("Follow-up: " + day) }
-    for party in result.waiting?.on ?? [] where party.hasPrefix("ext:") {
+    // The -m is the ask to the parties this call names, not to earlier ones.
+    let named = on.filter { $0.hasPrefix("ext:") }
+    for party in result.waiting?.on ?? [] where named.contains(party) {
       lines.append("Silta sends nothing; ask \(party): \(result.waiting?.why ?? "")")
     }
     return CommandOutput(

@@ -66,7 +66,7 @@ extension TaskService {
             WHERE task_id=?
             ORDER BY id
             """, arguments: [task.id]
-        ).map { try Self.safeEvent($0) }
+        ).map { try Self.safeEvent($0, in: db) }
       }
       return task
     }

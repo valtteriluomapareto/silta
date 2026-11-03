@@ -119,9 +119,7 @@ struct TaskOutputRegressionTests {
       _ = try service.block("AC-2", TaskBlockTests.input(["AC-1", "ext:acme"]))
       let timeline = try #require(try service.show("AC-2", timeline: true).timeline)
       let block = try #require(timeline.first { $0.kind == "block" }?.body)
-      withKnownIssue("block bodies show task uids") {
-        #expect(block.contains("\"task:AC-1\""))
-      }
+      #expect(block.contains("\"task:AC-1\""))
       #expect(block.contains("\"ext:acme\""))
     }
   }

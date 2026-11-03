@@ -15,7 +15,7 @@ struct TaskArchiveCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .archive(ref))
+        .archive(ref), change: "archived")
   }
 }
 
@@ -33,7 +33,7 @@ struct TaskKeepCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .archive(ref, keep: true))
+        .archive(ref, keep: true), change: "kept")
   }
 }
 
@@ -57,7 +57,8 @@ struct TaskLinkCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .link(ref, target: target, relation: rel))
+        .link(ref, target: target, relation: rel),
+      change: "linked \(rel) \(TaskError.shown(target))")
   }
 }
 
@@ -80,6 +81,7 @@ struct TaskPromoteCommand: OutputCommand {
       try TaskService(
         environment: context.environment, workspace: global.ws,
         approved: global.approved
-      ).promote(ref, external: ext), approvalUsed: true)
+      ).promote(ref, external: ext), change: "promoted to \(ext); read-only here",
+      approvalUsed: true)
   }
 }

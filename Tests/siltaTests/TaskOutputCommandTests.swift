@@ -56,9 +56,7 @@ struct TaskOutputCommandTests {
         ["task", "block", "AC-1", "--on", "ext:beta", "-m", "Which build?"], in: scratch)
       #expect(again.termination == .exit(0))
       #expect(again.stdout.contains("ask ext:beta: Which build?"))
-      withKnownIssue("every party gets the latest ask") {
-        #expect(!again.stdout.contains("ask ext:acme"))
-      }
+      #expect(!again.stdout.contains("ask ext:acme"))
     }
   }
 
@@ -73,9 +71,7 @@ struct TaskOutputCommandTests {
       }
       let shown = try Self.run(["task", "show", "AC-1", "--timeline"], in: scratch)
       #expect(shown.termination == .exit(0))
-      withKnownIssue("an event without a body ends in a space") {
-        #expect(!shown.stdout.split(separator: "\n").contains { $0.hasSuffix(" ") })
-      }
+      #expect(!shown.stdout.split(separator: "\n").contains { $0.hasSuffix(" ") })
     }
   }
 
@@ -94,12 +90,10 @@ struct TaskOutputCommandTests {
       let quietShow = try Self.run(["--quiet", "task", "show", "AC-1"], in: scratch)
       let archived = try Self.run(["task", "archive", "AC-1", "--quiet"], in: scratch)
       #expect(archived.termination == .exit(0) && archived.stdout.isEmpty)
-      withKnownIssue("--quiet hides data") {
-        #expect(added.stdout == "AC-1\n")
-        #expect(imported.stdout == "AC-2\n")
-        #expect(quietList.stdout == listed.stdout && !listed.stdout.isEmpty)
-        #expect(quietShow.stdout == shown.stdout && !shown.stdout.isEmpty)
-      }
+      #expect(added.stdout == "AC-1\n")
+      #expect(imported.stdout == "AC-2\n")
+      #expect(quietList.stdout == listed.stdout && !listed.stdout.isEmpty)
+      #expect(quietShow.stdout == shown.stdout && !shown.stdout.isEmpty)
     }
   }
 
@@ -108,10 +102,8 @@ struct TaskOutputCommandTests {
       let words = try SiltaBinary.run(["schema", "task", "add"], in: scratch)
       let quoted = try SiltaBinary.run(["schema", "task add"], in: scratch)
       #expect(words.termination == .exit(0))
-      withKnownIssue("a quoted name is one word") {
-        #expect(quoted.termination == .exit(0))
-        #expect(quoted.stdout == words.stdout)
-      }
+      #expect(quoted.termination == .exit(0))
+      #expect(quoted.stdout == words.stdout)
     }
   }
 
@@ -167,9 +159,7 @@ struct TaskOutputCommandTests {
         ], in: scratch)
       #expect(preview.termination == .exit(0))
       let warnings = try TaskStateRegressionTests.warnings(preview)
-      withKnownIssue("a dry run reports its approval as used") {
-        #expect(warnings == ["approval_unused"])
-      }
+      #expect(warnings == ["approval_unused"])
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
     }
   }

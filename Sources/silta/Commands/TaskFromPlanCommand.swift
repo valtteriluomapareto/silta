@@ -67,9 +67,11 @@ struct TaskFromPlanCommand: OutputCommand {
         if !detail.isEmpty { lines.append(detail) }
       }
     }
+    let shown = lines.joined(separator: "\n")
     return CommandOutput(
-      text: lines.joined(separator: "\n"), data: result, warnings: result.warnings,
-      approvalUsed: allowSecret)
+      text: shown,
+      quiet: result.dryRun ? shown : result.tasks.map(\.ref).joined(separator: "\n"),
+      data: result, warnings: result.warnings, approvalUsed: allowSecret && !result.dryRun)
   }
 
   private func read() throws -> String {

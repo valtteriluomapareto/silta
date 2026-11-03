@@ -43,7 +43,7 @@ struct TaskEditCommand: OutputCommand {
       }
       let printed = try service.editDocument(ref)
       return CommandOutput(
-        text: printed.document,
+        text: printed.document, quiet: printed.document,
         data: Printed(
           ref: printed.task.ref, status: printed.task.status, document: printed.document))
     }
@@ -51,7 +51,11 @@ struct TaskEditCommand: OutputCommand {
       if let file { return try read(file) }
       return try edit(original, environment: context.environment)
     }
-    return TaskOutput.receipt(result.result, approvalUsed: result.approvalUsed)
+    return TaskOutput.receipt(
+      result.result,
+      change: result.changed.isEmpty
+        ? "unchanged" : "edited: " + result.changed.joined(separator: ", "),
+      approvalUsed: result.approvalUsed)
   }
 
   private func read(_ path: String) throws -> String {

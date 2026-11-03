@@ -84,17 +84,35 @@ extension TaskService {
     }
   }
 
-  static func safeEvent(_ row: Row) throws -> TaskEvent {
+  /// An event as a timeline shows it: secrets masked, and a block's task uids as refs.
+  static func safeEvent(_ row: Row, in db: Database) throws -> TaskEvent {
     let kind: String = row["kind"]
     let body: String? = row["body"]
     let safe: String?
     if kind == "block", let body {
-      safe = try TaskBlockEvent.decode(body).safeBody()
+      let event = try TaskBlockEvent.decode(body)
+      safe = try TaskBlockEvent(
+        on: try event.on.map { try blockerRef($0, in: db) }, followUp: event.followUp,
+        why: event.why
+      ).safeBody()
     } else if kind == "unblock" {
       safe = body.map(SecretGuard.redacted)
     } else {
       safe = body
     }
     return TaskEvent(kind: kind, actor: row["actor"], body: safe, at: row["created_at"])
+  }
+
+  /// A stored blocker as a ref: `task:AC-2` for a task uid; parties and URLs as stored.
+  private static func blockerRef(_ stored: String, in db: Database) throws -> String {
+    guard !stored.hasPrefix("ext:"), !stored.hasPrefix("url:") else { return stored }
+    let ref = try String.fetchOne(
+      db,
+      sql: """
+        SELECT workspace.task_prefix || '-' || task.seq
+        FROM task JOIN workspace ON workspace.id=task.workspace_id
+        WHERE task.uid=?
+        """, arguments: [stored])
+    return ref.map { "task:" + $0 } ?? stored
   }
 }

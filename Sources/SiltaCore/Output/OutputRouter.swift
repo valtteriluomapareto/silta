@@ -32,7 +32,8 @@ package enum OutputRouter {
         warningCodes: output.warnings.map(\.code))
     }
     let warnings = output.warnings.map { "warning: \($0.message) [\($0.code)]\n" }.joined()
-    let text = mode.quiet || output.text.isEmpty ? "" : terminated(output.text)
+    let shown = mode.quiet ? output.quiet : output.text
+    let text = shown.isEmpty ? "" : terminated(shown)
     return Rendered(
       stdout: text, stderr: warnings, exitCode: 0, errorCode: nil,
       warningCodes: output.warnings.map(\.code))
