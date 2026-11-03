@@ -75,9 +75,7 @@ package struct TaskEditDocument: Equatable, Sendable {
     document.acceptance = fields[2]
     document.plan = fields[3]
     document.result = fields[4]
-    guard !document.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw TaskError.invalid("A task title is required.")
-    }
+    try TaskService.validateTitle(document.title)
     return document
   }
 

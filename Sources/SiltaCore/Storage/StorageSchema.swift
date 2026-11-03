@@ -128,6 +128,7 @@ enum StorageSchema {
     CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
       actor TEXT NOT NULL, kind TEXT NOT NULL,
       body TEXT, created_at TEXT NOT NULL);
+    CREATE INDEX task_event_task ON task_event(task_id, kind);
     CREATE TABLE comment (
       id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
       task_id INTEGER REFERENCES task(id),

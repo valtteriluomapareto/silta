@@ -9,6 +9,9 @@ extension TaskService {
     let command = Self.planCommand(ref, ifRevision: ifRevision)
     let approval = try approval(
       required: allowSecret, command: command + " -F <file> --allow-secret")
+    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw TaskError.invalid("A plan revision needs a nonblank body from -m or -F <file>.")
+    }
     let content = try checked(
       text, allow: allowSecret,
       command: Self.planCommand(ref, ifRevision: ifRevision) + " -F <file>")
@@ -28,35 +31,22 @@ extension TaskService {
     }
   }
 
-  /// Ticks a top-level checkbox without creating a revision; secret policy may redact its text.
-  package func tick(
-    _ ref: String, step: Int, done: Bool, ifRevision: Int? = nil, allowSecret: Bool = false
-  ) throws
+  /// Ticks a top-level checkbox without creating a revision. A tick adds no text, so the
+  /// secret guard has nothing new to check and the rest of the plan stays as stored.
+  package func tick(_ ref: String, step: Int, done: Bool, ifRevision: Int? = nil) throws
     -> TaskPlanResult
   {
-    let command =
-      Self.planCommand(ref, ifRevision: ifRevision)
-      + " --step \(step) " + (done ? "--done" : "--undo")
-    let approval = try approval(required: allowSecret, command: command + " --allow-secret")
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, at: at)
       try Self.compareRevision(ifRevision, task: task)
-      let content = try checked(
-        MarkdownPlan.tick(task.plan, step: step, done: done), allow: allowSecret, command: command)
-      let text = content.0
+      let text = try MarkdownPlan.tick(task.plan, step: step, done: done)
       try updatePlan(text, revision: task.planRev, task: task.id, at: at, in: tx.database)
       try changed(
-        task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")",
-        redacted: content.1, at: at, in: tx)
-      try approval?.record(
-        command: command + " --allow-secret", workspace: slug,
-        identity: (environment.ids, at), in: tx)
-      return TaskPlanResult(
-        ref: task.ref, planRev: task.planRev, plan: text,
-        warnings: content.1 ? [SecretGuard.warning] : [])
+        task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")", at: at, in: tx)
+      return TaskPlanResult(ref: task.ref, planRev: task.planRev, plan: text)
     }
   }
 

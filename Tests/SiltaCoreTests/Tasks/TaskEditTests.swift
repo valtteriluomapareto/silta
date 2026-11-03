@@ -18,7 +18,7 @@ struct TaskEditTests {
       }
       let initial = try service.show("AC-1")
       var document = TaskEditDocument(initial)
-      document.title = "Acme\né"
+      document.title = "Acme é"
       document.description = "## Plan\n~~~\n```swift\nAcme\n```\n~~~~~\n"
       document.plan = "- [ ] Acme\n\n"
       document.result = "Acme result\n"

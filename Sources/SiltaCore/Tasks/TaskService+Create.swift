@@ -27,14 +27,18 @@ extension TaskService {
   func prepare(_ draft: TaskDraft, command: String) throws -> TaskCreation {
     let title = try checked(draft.title, allow: draft.allowSecret, command: command)
     let body = try checked(draft.description, allow: draft.allowSecret, command: command)
+    let source = try draft.source.map {
+      try checked($0, allow: draft.allowSecret, command: command)
+    }
     try validateDraft(draft)
     var safe = draft
     safe.title = title.0
     safe.description = body.0
+    safe.source = source?.0
     let at = environment.clock.now()
     return TaskCreation(
       draft: safe, uid: try environment.ids.next(at: at), at: at,
-      redacted: title.1 || body.1)
+      redacted: title.1 || body.1 || source?.1 == true)
   }
 
   /// Inserts a prepared task; `status` overrides the status its creator and parent imply.
@@ -46,6 +50,9 @@ extension TaskService {
     let db = tx.database
     let ws = try Self.workspaceID(workspace, in: db)
     let parent = try draft.parent.map { try Self.lookup($0, workspace: workspace, in: db) }
+    if let parent, ["done", "dropped"].contains(parent.status) || parent.externalRef != nil {
+      throw TaskError.invalid("A parent must be an open task that is not promoted.")
+    }
     let app = try draft.app.map { try Self.entity("app", slug: $0, workspace: ws, in: db) }
     if let app, try Self.repoPath(app: app, in: db) != creation.path {
       throw TaskError.changed(nil)
@@ -92,11 +99,19 @@ extension TaskService {
 
   private func validateDraft(_ draft: TaskDraft) throws {
     try Self.validatePriority(draft.priority)
-    guard !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw TaskError.invalid("A task title is required.")
-    }
+    try Self.validateTitle(draft.title)
     if let source = draft.source, !source.hasPrefix("note:") || source.count == 5 {
       throw TaskError.invalid("--from requires a note: reference.")
+    }
+  }
+
+  /// A title is one nonblank line, so it can't fake rows in line-based output.
+  static func validateTitle(_ title: String) throws {
+    guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw TaskError.invalid("A task title is required.")
+    }
+    if title.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) {
+      throw TaskError.invalid("A task title is one line without control characters.")
     }
   }
 

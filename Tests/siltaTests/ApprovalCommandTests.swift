@@ -276,7 +276,6 @@ extension ApprovalCommandTests {
       for args in [
         ["task", "add", "Acme", "--start", "--allow-secret", "-m", secret],
         ["task", "plan", "AC-1", "--if-rev", "0", "--allow-secret", "-m", "- [ ] " + secret],
-        ["task", "plan", "AC-1", "--if-rev", "1", "--step", "1", "--done", "--allow-secret"],
         ["task", "done", "AC-1", "--force", "--allow-secret", "--no-sha", "-m", secret],
         ["task", "from-plan", plan.path, "--split", "--allow-secret"],
         ["task", "drop", "AC-2", "--allow-secret", "-m", secret],
@@ -286,7 +285,7 @@ extension ApprovalCommandTests {
           in: scratch, environment: TaskCommandTests.actor)
         #expect(result.termination == .exit(0), "\(args.prefix(2)): \(result.stdout)")
       }
-      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 6)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 5)
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT result_md FROM task WHERE seq=1") }
           == secret)
@@ -298,7 +297,7 @@ extension ApprovalCommandTests {
         in: scratch, environment: TaskCommandTests.actor)
       #expect(preview.termination == .exit(0))
       #expect(!preview.stdout.contains("approval_unused"))
-      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 6)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 5)
     }
   }
 

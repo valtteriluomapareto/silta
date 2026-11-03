@@ -63,7 +63,16 @@ struct TaskOrganizationReviewTests {
     try await withScratchDirectory { home in
       let service = try TaskOrganizationTests.service(home)
       _ = try await TaskOrganizationTests.add(service, start: true, directory: home)
-      _ = try service.plan("AC-1", text: "")
+      #expect(throws: TaskError.self) { _ = try service.plan("AC-1", text: " \n") }
+      // A human's edit can still clear a plan, which stores an empty revision.
+      try service.environment.db.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO task_plan_rev(task_id,rev,body_md,actor,created_at)
+            VALUES(1,1,'','human:acme','2023-11-14T22:13:20.000Z');
+            UPDATE task SET plan_rev=1;
+            """)
+      }
       #expect(throws: TaskError.self) { _ = try service.link("AC-1", target: "plan@1#L1") }
       #expect(try service.show("AC-1").links.isEmpty)
     }

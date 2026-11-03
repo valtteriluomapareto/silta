@@ -92,8 +92,10 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     if isHuman { return nil }
     guard let approved else { throw ActorError.humanOnly(command: command, actor: self) }
     let words = approved.trimmingCharacters(in: .whitespacesAndNewlines)
+    // The placeholders Silta prints, anywhere in the words, mean they weren't filled in.
     guard (1...300).contains(words.unicodeScalars.count),
-      !(words.hasPrefix("<") && words.hasSuffix(">"))
+      !(words.hasPrefix("<") && words.hasSuffix(">")),
+      !words.contains("<the human's words>"), !words.contains("<their words>")
     else { throw ActorError.invalidApproval }
     return HumanApproval(actor: self, words: SecretGuard.redacted(words))
   }
