@@ -19,6 +19,8 @@ They're summarised here so every decision has one index.
 - **D5: Agent writes are gated.** Unsolicited tasks start as `proposed`, doc edits are
   proposals, and some commands are human-only. Since D38, an agent runs those with
   the human's quoted go-ahead.
+  - ↳ update (D39): with `proposals: ask`, an agent's unsolicited task needs the
+    human's go-ahead in chat instead of triage.
 - **D6: Silta resolves "where am I"** from cwd, branch, upstream and claimed task.
 - **D7: Code access is read-only**, through `git show`, `grep` and `log` on
   configured refs.
@@ -257,6 +259,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     the repo; DF makes every log line record its workspace and app.
   - Not now: comparing Silta against plan files or other tools. That needs a
     without-Silta arm in the evals (§21) and is revisited after S16.
+  - ↳ update (2026-11-03, D39): "dogfood task" means a task in the `silta` workspace.
+    The rule lives in this repo's AGENTS.md, so other workspaces never see it.
   - Why: the logs were collected but nothing read them, and friction depended on
     agents volunteering it.
 - **D37: The human's attention is the budget.**
@@ -281,6 +285,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - Why: every inbox item, question and refusal costs the human's attention, and
     nothing in the design limited or measured it. A backlog the human stops looking
     at rots, and the agents' work with it.
+  - ↳ update (D39): the ask-list is fixed; a workspace's `ask_about: short` shortens
+    it.
 - **D38: The human works through agents.**
   - The human talks to an agent, which runs `silta` for them. They don't use the CLI
     themselves. The Mac app (M5) is their own surface and counts as `human:*`.
@@ -309,3 +315,113 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - Why: the maintainer never runs the CLI. Commands that need a terminal would be
     unreachable, and `ws edit`, the only way to configure a workspace, would be
     unusable.
+  - ↳ update (D39): with `proposals: ask`, an agent write that would create a
+    `proposed` task is human-only too. A human's request in chat for such a write
+    counts as its go-ahead.
+- **D39: Each workspace chooses how much ceremony it wants.**
+  - Two new workspace settings (§6, Appendix A). Each defaults to what the spec
+    already describes:
+    - `proposals: triage | ask`.
+      - With `triage`, the default, an agent's unsolicited task becomes `proposed`
+        and waits for triage.
+      - With `ask`, any agent write that would create a `proposed` task is
+        human-only. That covers `task add`, `--parent` on a task the agent doesn't
+        claim, and `from-plan` with or without `--split`. The agent names the idea to
+        the human in chat, and after a yes runs the same command with `--approved`.
+      - `human_only` names the setting, so an agent that read the default rules
+        understands why.
+      - Generated proposals, from `verify --fix-tasks` (M3) and importers (M4), still
+        go to triage. Their slices decide otherwise if needed.
+    - `ask_about: standard | short`.
+      - With `short`, agents stop asking about scope changes, new dependencies, and
+        public APIs, schemas and migrations.
+      - They still ask about anything another app or the customer sees, deleting
+        what they didn't create, anything irreversible, and money.
+      - A repo's own rules, such as its AGENTS.md, still apply.
+      - This setting changes only what agents are told. The evals check it (§21).
+  - **Approved tasks are `todo` under either setting.**
+    - An agent write that would create a `proposed` task creates `todo` when given
+      `--approved`, with one `approval` row. The human already said yes, so triage
+      would ask twice.
+    - When the human's own message in chat asks for the write (add this task,
+      import this plan), that message counts as its go-ahead, so the agent doesn't
+      ask again. A task prompt, or the agent's own text, still never counts (D38).
+    - This is the one exception to `approval_unused`: under `triage`, `--approved`
+      on such a write is used, not ignored.
+  - **Switching:** proposals that already exist stay in triage, or leave the inbox
+    after 14 days as usual.
+  - **No human present under `ask`:** ideas go under "what's left" in the handoff
+    or the `done` result. Never a `question`, which would be triage in a heavier
+    form, and never a TODO comment or file.
+  - The complete list of settings: `review_gate`, `archive_after_days`, `stale_days`,
+    `proposals`, `ask_about`, and `agent_doc_writes` (M2).
+  - **Rules for every setting:**
+    - A setting changes what Silta does and what agents are told. It never changes
+      `silta schema` or the error codes. A switched-off feature answers with an
+      existing code and a `next`.
+    - Only explicitly set keys are stored. Defaults are filled in when settings are
+      read, in one typed value, so a changed default reaches every workspace that
+      didn't set the key. "Non-default" means the value differs from the default.
+    - A rule that depends on a setting is decided inside the write's transaction,
+      as `review_gate` already is.
+    - Settings change only through `ws edit`, or with the whole workspace through
+      `restore`. `ws edit` is human-only under every setting, so every change is
+      approved and recorded (D38), and settings can't loosen themselves. S14
+      decides whether `restore` is human-only too.
+    - Never from environment variables: an agent can set those.
+    - Values are words, not booleans: YAML 1.1 reads `on`, `off`, `yes` and `no` as
+      booleans, and validation rejects them with a hint.
+    - A setting needs a current user (D30). The maintainer asked to switch off what
+      they don't use (2026-11-03), and their workspaces are the first users.
+    - D32 applies as written. A value that older writers would violate in their
+      normal writes (`proposals: ask`) needs a migration that only raises
+      `min_writer_version`. `ask_about` changes only the text agents are told.
+    - Tests:
+      - goldens use the defaults;
+      - every non-default value gets a policy test (for `ask_about`, the brief and
+        guide goldens);
+      - an absent key behaves like its default;
+      - the evals cover the agent's side.
+  - **Agents learn the settings from `brief`.**
+    - Its location section always names the non-default settings in one fixed line,
+      e.g. `settings: proposals: ask (ask in chat before adding a task)`. Trimming
+      never cuts that line.
+    - `brief --json` always has a `settings` object, which is empty when everything
+      is the default.
+    - `silta guide`, and the skill that copies it, stay the same in every workspace.
+      Each non-default value gets one conditional sentence there. A guide that
+      varied per workspace would need storage and location resolution, and the
+      static skill couldn't follow it.
+  - **Never configurable:**
+    - the secret guard, claims, backups and the write gate;
+    - actor detection, location rules and read-only code access;
+    - the inbox's order;
+    - batching what needs the human into one message;
+    - writing an `approval` row whenever an approval is required.
+  - **Not now:**
+    - **Profiles (named presets).** An agent writes the YAML for the human (D38), so
+      the human never tunes keys one by one. Presets would be a second mechanism to
+      test.
+    - **A general per-command approval toggle.** Each gate change is its own named
+      setting, like `proposals` and `agent_doc_writes`. The dogfood report counts
+      approvals per week by command (D37). A new setting comes if some other
+      command turns out to cost the human time.
+    - **Other values nobody has asked to change:** the inbox cap and proposal window,
+      the follow-up default, the claim length, the rate limit, log retention and
+      backups.
+    - **A setting for the `Friction:` line.** The rule lives in this repo's AGENTS.md
+      and covers only the `silta` workspace (D36 update), so other workspaces never
+      see it.
+  - **Slices:**
+    - S11 adds the typed settings value and `proposals`, and touches task creation
+      and `from-plan` as well as the inbox. It also adds `proposals` to Appendix A,
+      and the migration that raises `min_writer_version` for the whole database.
+      The doc comment on `ActorID.requireHuman` ("before command input or storage is
+      opened") doesn't hold for this gate.
+    - S12 adds the brief's settings line.
+    - S13 adds the guide sentences, `ask_about`, and the eval scenarios.
+    - S14's restore validates `workspace.yaml` settings like `ws edit` does, and
+      decides whether `restore` is human-only.
+  - Why: the human wants to switch off what they don't use. Proposals waiting for
+    triage and questions in chat are the parts of D37 that most often wait on the
+    human, and these two settings remove most of them where the human chooses.
