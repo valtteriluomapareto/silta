@@ -8,19 +8,23 @@ struct DogfoodWorkspaceTests {
   @Test func shippedConfigAppliesWithoutReplacingScannedPath() throws {
     let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
-    let text = try String(contentsOf: root.appending(path: "docs/dogfood/workspace.yaml"), encoding: .utf8)
+    let text = try String(
+      contentsOf: root.appending(path: "docs/dogfood/workspace.yaml"), encoding: .utf8)
     let config = try WorkspaceConfig.parse(text)
     try withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)
       try store.write { tx in
-        try tx.database.execute(sql: """
-          INSERT INTO workspace(uid,slug,name,task_prefix,settings)
-          VALUES('acme-silta','silta','Acme','SI','{"future":42}');
-          INSERT INTO repo(uid,workspace_id,slug) VALUES('acme-silta-repo',1,'silta');
-          INSERT INTO repo_path(repo_id,path) VALUES(1,?);
-          """, arguments: [home.path])
+        try tx.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix,settings)
+            VALUES('acme-silta','silta','Acme','SI','{"future":42}');
+            INSERT INTO repo(uid,workspace_id,slug) VALUES('acme-silta-repo',1,'silta');
+            INSERT INTO repo_path(repo_id,path) VALUES(1,?);
+            """, arguments: [home.path])
       }
-      try store.write { try config.apply(in: $0, ids: SeededIDGenerator(seed: 7), at: StorageSchemaTests.instant) }
+      try store.write {
+        try config.apply(in: $0, ids: SeededIDGenerator(seed: 7), at: StorageSchemaTests.instant)
+      }
       try store.read { db in
         let path = try String.fetchOne(db, sql: "SELECT path FROM repo_path")
         let uid = try String.fetchOne(db, sql: "SELECT uid FROM repo")

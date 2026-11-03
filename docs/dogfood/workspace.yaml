@@ -1,0 +1,13 @@
+workspace:
+  slug: silta
+  name: Silta
+  task_prefix: SI
+repos:
+  - slug: silta
+apps:
+  - slug: silta
+    repo: silta
+    ref: origin/main
+    summary: Local context hub and backlog for coding agents.
+topics:
+  - slug: dogfood

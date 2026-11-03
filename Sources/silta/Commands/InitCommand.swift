@@ -41,7 +41,7 @@ struct InitCommand: OutputCommand {
 
 }
 
-private struct InitData: Encodable {
+struct InitData: Encodable {
   let workspace: String?
 
   let next: [String]

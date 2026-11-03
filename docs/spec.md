@@ -1409,7 +1409,7 @@ steps, questions, handoffs and results.
 
 | Stage | Starts after | What Silta is used for |
 |---|---|---|
-| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent working a slice runs `silta task add --start "S7: Location"`, which links the GitHub issue with a `url:` link. It keeps the plan and steps in Silta and closes the task with `done --result`. The issue gets a one-line summary and the result when it closes. |
+| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the imported slice in `silta task ls` and runs `silta task start <ref>`. Only if absent, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, and closes it with `task done <ref> -F <file>`. The issue gets a one-line summary and the result when it closes. |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
 | **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
 | **DF3: a real second workspace** | M1 done | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
@@ -1455,8 +1455,9 @@ steps, questions, handoffs and results.
     `SILTA_ACTOR` and leaves that actor's calls out. Failures before the
     environment is set up (a bad `SILTA_*` value) aren't logged, so the report
     can't see them.
-  - Once per wave, at the latest every 60 days so no log has expired, the
-    maintainer runs the report and commits it as
+  - Once per wave, at the latest every 60 days so no log has expired, an agent
+    runs the report with the maintainer, who reviews it before it is added through
+    a pull request as
     `docs/dogfood/reports/<YYYY-MM-DD>.md`. The review turns its findings into
     GitHub issues (label `dogfood`), changes to the `silta guide` text, or nothing.
   - This is the earliest source of agent-experience findings, before the M4 evals.

@@ -57,7 +57,7 @@ struct WsEditCommand: OutputCommand {
     } catch { throw WorkspaceError.input }
   }
 
-  private struct Data: Encodable {
+  struct Data: Encodable {
     let workspace: String?
   }
 }

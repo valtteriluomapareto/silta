@@ -128,17 +128,21 @@ through. Fix the change, or propose a decision first.
 Silta is built with Silta as soon as it can be (spec §22.1, D20). **Current stage:
 before DF0.** Update this line when a stage starts.
 
+The DF0 instructions below take effect only after an agent completes
+[setup with the maintainer](docs/dogfood/README.md) after the DF PR merges.
+
 | Stage | Plans and steps | Questions and handoffs | Session start |
 |---|---|---|---|
 | Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
-| DF0 | `silta task add --start "<slice>: <title>"` (link the issue), `silta task plan`, `--step N --done`, `done --result` | Comment on the slice issue | `silta task show <id>` |
+| DF0 | Find the imported slice in `silta --ws silta task ls`, then `task start <ref>`. Only if absent, `task add --start` and link the issue. Keep plan/steps with `task plan`; finish with `task done -F <file>` | Comment on the slice issue | `silta task show <id>` |
 | DF1 | as DF0 | `silta comment <task> --kind question` / `--kind handoff` | as DF0 |
 | DF2 | as DF0 | as DF1 | The hook runs `silta brief` |
 
 From DF0 on:
+- **Work for the human.** Follow [spec §11](docs/spec.md#silta-guide) until `silta guide` ships. Batch human decisions in chat; use their actual reply for the named gated commands. Keep one dogfood task per slice.
 - **Use the dogfood binary.** Always use `~/.local/bin/silta`, built from `main` by
   `scripts/install-dev.sh`. Never use a binary from your own worktree.
-- **Record friction.** End every `done` result with one line: `Friction: none`, or
+- **Record friction.** End every `done` result in the `silta` workspace with one line: `Friction: none`, or
   `Friction: <what was awkward>`. Friction that needs its own fix, or that comes up
   outside a task, also gets `silta task add "<what was awkward>" --topic dogfood`.
 - **Close the issue.** When a slice's task is done, post its result on the GitHub

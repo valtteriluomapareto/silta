@@ -20,6 +20,22 @@ package enum WorkspaceSelection {
     }
   }
 
+  /// Reads an existing app identity for diagnostics without initializing storage.
+  package static func app(_ slug: String, workspace: String, in store: DatabaseStore) throws
+    -> String?
+  {
+    try store.read { db in
+      try String.fetchOne(
+        db,
+        sql: """
+          SELECT app.slug
+          FROM app
+          JOIN workspace ON workspace.id=app.workspace_id
+          WHERE workspace.slug=? AND app.slug=?
+          """, arguments: [workspace, slug])
+    }
+  }
+
   /// Stores an existing slug as the current workspace in one owned write.
   package static func use(_ slug: String, in store: DatabaseStore) throws {
     let selected = try resolve(slug, in: store)

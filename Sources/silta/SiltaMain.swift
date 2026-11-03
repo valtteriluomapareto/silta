@@ -24,14 +24,17 @@ enum SiltaMain {
         deterministic: flags.contains("--deterministic"),
         verbose: flags.contains("--verbose") ? .standardError : nil)
       let timestamp = environment.clock.now()
-      let rendered = await execute(
+      let execution = await execute(
         arguments, context: CommandContext(mode: mode, environment: environment))
+      let rendered = execution.rendered
       let elapsed = started.duration(to: timer.now).components
       let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
       var entry = LogEntry(
         timestamp: timestamp, command: commandPath(arguments),
         actor: environment.actor.description, exitCode: rendered.exitCode,
         milliseconds: milliseconds)
+      entry.workspace = execution.scope.workspace
+      entry.app = execution.scope.app
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = [
@@ -60,23 +63,25 @@ enum SiltaMain {
   }
 
   /// Parses and executes using the environment already assembled by the command boundary.
-  static func execute(_ arguments: [String], context: CommandContext) async -> Rendered {
+  static func execute(_ arguments: [String], context: CommandContext) async -> CommandExecution {
     let mode = context.mode
     var command: any ParsableCommand
     do {
       command = try SiltaCommand.parseAsRoot(arguments)
     } catch {
-      return parseFailure(error, arguments: arguments, mode: mode)
+      return CommandExecution(rendered: parseFailure(error, arguments: arguments, mode: mode))
     }
     guard let outputCommand = command as? any OutputCommand else {
       // The root itself: ArgumentParser answers with help.
       do {
         try command.run()
-        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+        return CommandExecution(
+          rendered: Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil))
       } catch {
-        return parseFailure(error, arguments: arguments, mode: mode)
+        return CommandExecution(rendered: parseFailure(error, arguments: arguments, mode: mode))
       }
     }
+    let scope = CommandScope.resolve(outputCommand, context: context)
     do {
       var output = try await outputCommand.execute(context)
       let approvalWarnings = context.environment.actor.approvalWarnings(
@@ -85,13 +90,19 @@ enum SiltaMain {
         !output.warnings.contains(where: { $0.code == warning.code })
       }
       output.warnings = context.environment.warnings + output.warnings
-      return OutputRouter.render(.success(output), mode: mode)
+      let resolved =
+        outputCommand is InitCommand || outputCommand is WsEditCommand
+        ? CommandScope.resolve(outputCommand, context: context, output: output) : scope
+      return CommandExecution(
+        rendered: OutputRouter.render(.success(output), mode: mode), scope: resolved)
     } catch let error as any CodedError {
       let recovered = recovery(
         error, command: outputCommand, arguments: arguments, context: context)
-      return OutputRouter.render(.failure(recovered), mode: mode)
+      return CommandExecution(
+        rendered: OutputRouter.render(.failure(recovered), mode: mode), scope: scope)
     } catch {
-      return OutputRouter.render(.failure(error), mode: mode)
+      return CommandExecution(
+        rendered: OutputRouter.render(.failure(error), mode: mode), scope: scope)
     }
   }
 

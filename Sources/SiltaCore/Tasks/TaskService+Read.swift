@@ -47,6 +47,12 @@ extension TaskService {
     }
   }
 
+  /// Reads only the source task's app attribution, without projections or mutation.
+  package func app(for ref: String) throws -> String? {
+    let slug = try selected()
+    return try environment.db.read { try Self.lookup(ref, workspace: slug, in: $0).app }
+  }
+
   /// Reads a task and optionally its event history without creating storage.
   package func show(_ ref: String, timeline: Bool = false) throws -> TaskDetails {
     let slug = try selected()
