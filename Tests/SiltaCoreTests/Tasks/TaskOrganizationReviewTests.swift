@@ -89,13 +89,13 @@ struct TaskOrganizationReviewTests {
     }
   }
 
-  @Test func validatedEditApprovalIsUsedOnCancelAndNoop() async throws {
+  @Test func editApprovalIsUnusedOnCancelAndNoop() async throws {
     try await withScratchDirectory { home in
       let service = try TaskOrganizationTests.service(home)
       _ = try await TaskOrganizationTests.add(service, directory: home)
       let before = try TaskOrganizationTests.counts(service)
-      #expect(try service.edit("AC-1") { _ in nil }.approvalUsed)
-      #expect(try service.edit("AC-1") { $0 }.approvalUsed)
+      #expect(try !service.edit("AC-1") { _ in nil }.approvalUsed)
+      #expect(try !service.edit("AC-1") { $0 }.approvalUsed)
       #expect(try TaskOrganizationTests.counts(service) == before)
     }
   }

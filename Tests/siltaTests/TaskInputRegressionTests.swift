@@ -24,41 +24,41 @@ struct TaskInputRegressionTests {
       .map { "## \($0.0)\n~~~\n\($0.1)\n~~~\n" }.joined()
   }
 
-  @Test func editPrintsAndKeepsResultAndPlan() {
-    withKnownIssue("edit has no --print and silently clears sections") {
-      try withScratchDirectory { scratch in
-        let store = try TaskCommandTests.setup(scratch)
-        #expect(
-          try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
-        #expect(
-          try Self.run(["task", "plan", "AC-1", "-m", "- [ ] Acme step"], in: scratch)
-            .termination == .exit(0))
-        let printed = try Self.run(["task", "edit", "AC-1", "--print"], in: scratch)
-        #expect(printed.termination == .exit(0))
-        #expect(printed.stdout == Self.document(title: "Acme", plan: "- [ ] Acme step"))
-        let file = scratch.appending(path: "edit.md")
-        try Self.document(title: "Acme", plan: "").write(
-          to: file, atomically: true, encoding: .utf8)
-        let blankPlan = try Self.run(["task", "edit", "AC-1", "-F", file.path], in: scratch)
-        #expect(blankPlan.termination == .exit(1))
-        #expect(blankPlan.stderr.contains("Plan"))
-        #expect(
-          try Self.run(["task", "done", "AC-1", "-m", "Acme result"], in: scratch).termination
-            == .exit(0))
-        let blankResult = try Self.run(
-          ["task", "edit", "AC-1", "-F", file.path, "--approved", "Edit it"], in: scratch,
-          as: Self.other)
-        #expect(blankResult.termination == .exit(1))
-        #expect(blankResult.stderr.contains("Result"))
-        try Self.document(title: "Acme", plan: "- [ ] Acme step", result: "Acme result").write(
-          to: file, atomically: true, encoding: .utf8)
-        let unchanged = try Self.run(
-          ["task", "edit", "AC-1", "-F", file.path, "--approved", "Edit it", "--json"],
-          in: scratch, as: Self.other)
-        #expect(unchanged.termination == .exit(0))
-        #expect(try Self.warnings(unchanged) == ["approval_unused"])
-        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
-      }
+  @Test func editPrintsAndKeepsResultAndPlan() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      #expect(
+        try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
+      #expect(
+        try Self.run(["task", "plan", "AC-1", "-m", "- [ ] Acme step"], in: scratch)
+          .termination == .exit(0))
+      let printed = try Self.run(["task", "edit", "AC-1", "--print"], in: scratch)
+      #expect(printed.termination == .exit(0))
+      #expect(printed.stdout == Self.document(title: "Acme", plan: "- [ ] Acme step"))
+      let json = try Self.run(["task", "edit", "AC-1", "--print", "--json"], in: scratch)
+      Golden.forTests().check(json.stdout, "task-edit-print.json")
+      let file = scratch.appending(path: "edit.md")
+      try Self.document(title: "Acme", plan: "").write(
+        to: file, atomically: true, encoding: .utf8)
+      let blankPlan = try Self.run(["task", "edit", "AC-1", "-F", file.path], in: scratch)
+      #expect(blankPlan.termination == .exit(1))
+      #expect(blankPlan.stderr.contains("Plan"))
+      #expect(
+        try Self.run(["task", "done", "AC-1", "-m", "Acme result"], in: scratch).termination
+          == .exit(0))
+      let blankResult = try Self.run(
+        ["task", "edit", "AC-1", "-F", file.path, "--approved", "Edit it"], in: scratch,
+        as: Self.other)
+      #expect(blankResult.termination == .exit(1))
+      #expect(blankResult.stderr.contains("Result"))
+      try Self.document(title: "Acme", plan: "- [ ] Acme step", result: "Acme result").write(
+        to: file, atomically: true, encoding: .utf8)
+      let unchanged = try Self.run(
+        ["task", "edit", "AC-1", "-F", file.path, "--approved", "Edit it", "--json"],
+        in: scratch, as: Self.other)
+      #expect(unchanged.termination == .exit(0))
+      #expect(try Self.warnings(unchanged) == ["approval_unused"])
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
     }
   }
 

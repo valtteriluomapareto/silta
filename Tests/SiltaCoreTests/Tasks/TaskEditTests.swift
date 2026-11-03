@@ -147,6 +147,9 @@ struct TaskEditTests {
           home,
           actor: TaskServiceTests.human()))
       document.title += " changed"
+      _ = try human.edit("AC-1") { _ in document.render() }
+      #expect(try service.show("AC-1").acceptance == ("Pwd=" + "acme-secret"))
+      document.acceptance += " Pwd=" + "acme-other"
       #expect(throws: SecretError.self) {
         _ = try human.edit("AC-1") { _ in document.render() }
       }
