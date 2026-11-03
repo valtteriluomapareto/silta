@@ -143,8 +143,8 @@ extension TaskPlanCommandTests {
         let failed = try SiltaBinary.run(
           ["task", "from-plan", source, "--dry-run", "--json"], in: scratch,
           environment: TaskCommandTests.actor)
-        #expect(failed.termination == .exit(9))
-        #expect(failed.stdout.contains("\"code\":\"env\""))
+        #expect(failed.termination == .exit(1))
+        #expect(failed.stdout.contains("\"code\":\"invalid\""))
       }
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/silta.db").path)

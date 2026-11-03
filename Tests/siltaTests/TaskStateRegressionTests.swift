@@ -107,18 +107,16 @@ struct TaskStateRegressionTests {
     }
   }
 
-  @Test func unreadableBodyFileIsInvalid() {
-    withKnownIssue("a missing -F file is env and escalates to the human") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        let result = try Self.run(
-          ["task", "add", "Acme", "-F", scratch.appending(path: "missing.md").path, "--json"],
-          in: scratch)
-        #expect(result.termination == .exit(1))
-        #expect(try Self.error(result)["code"] as? String == "invalid")
-        #expect(
-          try Self.error(result)["next"] as? [String] == ["silta --ws 'acme' task add --help"])
-      }
+  @Test func unreadableBodyFileIsInvalid() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      let result = try Self.run(
+        ["task", "add", "Acme", "-F", scratch.appending(path: "missing.md").path, "--json"],
+        in: scratch)
+      #expect(result.termination == .exit(1))
+      #expect(try Self.error(result)["code"] as? String == "invalid")
+      #expect(
+        try Self.error(result)["next"] as? [String] == ["silta --ws 'acme' task add --help"])
     }
   }
 

@@ -55,10 +55,10 @@ package enum TaskError: CodedError, Equatable {
     case .promoted: .readOnlyPromoted
     case .edited: .conflict
     case .notFound: .notFound
-    case .invalid, .foreignRepo: .invalid
+    case .invalid, .foreignRepo, .input: .invalid
     case .claimed: .claimed
     case .proposal, .transition, .changed, .blockedPromotion: .conflict
-    case .git, .input, .repository: .env
+    case .git, .repository: .env
     case .gate: .gate
     case .staleRev: .staleRev
     }
@@ -110,9 +110,9 @@ package enum TaskError: CodedError, Equatable {
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]
     case .notFound: ["silta task ls"]
-    case .invalid, .foreignRepo: ["silta task add --help"]
+    case .invalid, .foreignRepo, .input: ["silta task add --help"]
     case .repository: ["silta init --help"]
-    case .git, .input: ["silta doctor"]
+    case .git: ["silta doctor"]
     }
   }
 }

@@ -13,8 +13,8 @@ error: Git could not report the task's worktree or commit; ask a human to check 
 ask human: silta doctor
 error: Task repository is not registered locally or its .git marker is missing; ask a human to restore or register it with init --scan. [env]
 ask human: silta init --help
-error: Could not read the UTF-8 body file; check its path and permissions. [env]
-ask human: silta doctor
+error: Could not read the UTF-8 body file; check its path and permissions. [invalid]
+next: silta task add --help
 error: Use a worktree and commit from the task's registered repository. [invalid]
 next: silta task add --help
 error: A human approval is required; ask a human to approve or use done --force. [gate]

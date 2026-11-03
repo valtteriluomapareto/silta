@@ -171,11 +171,11 @@ extension TaskCommandTests {
       try Data([255]).write(to: file)
       let invalid = try SiltaBinary.run(
         ["task", "add", "Acme", "-F", file.path, "--json"], in: scratch, environment: Self.actor)
-      #expect(invalid.termination == .exit(9))
+      #expect(invalid.termination == .exit(1))
       let missing = try SiltaBinary.run(
         ["task", "add", "Acme", "-F", file.path + "-absent", "--json"], in: scratch,
         environment: Self.actor)
-      #expect(missing.termination == .exit(9))
+      #expect(missing.termination == .exit(1))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 1)
     }
   }
