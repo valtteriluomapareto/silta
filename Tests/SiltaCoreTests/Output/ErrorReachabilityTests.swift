@@ -42,6 +42,12 @@ extension SecretError: ErrorExamples {
   }
 }
 
+extension WorkspaceError: ErrorExamples {
+  static var examples: [WorkspaceError] {
+    [.invalid(["line 1: expected a mapping"]), .notFound, .conflict, .editor]
+  }
+}
+
 extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
     [.humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme"))]
@@ -56,13 +62,13 @@ struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
-    StorageError.self, ActorError.self,
+    StorageError.self, ActorError.self, WorkspaceError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
-    .notFound, .unregistered, .readOnlyPromoted, .ambiguousLocation,
-    .conflict, .claimed, .staleRev, .leaseTaken, .gate, .rateLimited,
+    .unregistered, .readOnlyPromoted, .ambiguousLocation,
+    .claimed, .staleRev, .leaseTaken, .gate, .rateLimited,
   ]
 
   static var examples: [any CodedError] {

@@ -1,7 +1,11 @@
 silta schema  Describe the commands, their flags, their --json data and the error codes.
+silta ws ls  List workspaces.
+silta ws use  Select the current workspace.
+silta ws edit  Edit workspace YAML (human-only).
 details: silta schema <command>
 
 global flags:
+  --ws <ws>  optional: Use this workspace instead of the current selection.
   --json  optional: Print the JSON envelope on stdout instead of text.
   --quiet  optional: Hide success text; warnings and errors still show.
   --deterministic  optional: Allow deterministic overrides outside temporary homes; never at the real home.

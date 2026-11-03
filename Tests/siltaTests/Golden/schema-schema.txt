@@ -4,6 +4,7 @@ silta schema
   --json data: {"object":{"commands":{"array":{"object":{"abstract":"string","arguments":{"optional":{"array":{"object":{"help":{"optional":"string"},"kind":"string","names":{"array":"string"},"repeating":"bool","required":"bool","value_name":{"optional":"string"}}}}},"data":{"optional":"any"},"name":"string"}}},"errors":{"array":{"object":{"agent_should":"string","code":"string","exit":"int","next_by":"string"}}},"global_arguments":{"array":{"object":{"help":{"optional":"string"},"kind":"string","names":{"array":"string"},"repeating":"bool","required":"bool","value_name":{"optional":"string"}}}}}}
 
 global flags:
+  --ws <ws>  optional: Use this workspace instead of the current selection.
   --json  optional: Print the JSON envelope on stdout instead of text.
   --quiet  optional: Hide success text; warnings and errors still show.
   --deterministic  optional: Allow deterministic overrides outside temporary homes; never at the real home.

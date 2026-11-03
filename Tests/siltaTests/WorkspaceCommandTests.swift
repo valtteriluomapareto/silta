@@ -9,7 +9,8 @@ struct WorkspaceCommandTests {
   @Test func listsAndSelectsWorkspace() throws {
     try withScratchDirectory { scratch in
       let clock = FakeClock(now: Date(timeIntervalSince1970: 1_700_000_000))
-      let store = DatabaseStore(home: scratch.appending(path: "silta-home"), clock: clock, jitter: { 0 })
+      let store = DatabaseStore(
+        home: scratch.appending(path: "silta-home"), clock: clock, jitter: { 0 })
       try store.write {
         try $0.database.execute(
           sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme','Acme','AC')")
@@ -23,9 +24,10 @@ struct WorkspaceCommandTests {
         #expect(selected.termination == .exit(0))
         Golden.forTests().check(selected.stdout, json ? "ws-use.json" : "ws-use.txt")
       }
-      #expect(try store.read {
-        try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='current_workspace'")
-      } == "acme")
+      #expect(
+        try store.read {
+          try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='current_workspace'")
+        } == "acme")
     }
   }
 
@@ -36,7 +38,32 @@ struct WorkspaceCommandTests {
         environment: ["SILTA_ACTOR": "agent:codex:acme", "EDITOR": "/usr/bin/false"])
       #expect(result.termination == .exit(3))
       Golden.forTests().check(result.stderr, "ws-edit-refused.txt")
-      #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/silta.db").path))
+      #expect(
+        !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/silta.db").path)
+      )
     }
   }
+  @Test(arguments: [
+    ["--ws", "acme", "ws", "use", "--nope"],
+    ["ws", "--ws", "acme", "use", "--nope"],
+  ])
+  func workspaceOptionDoesNotHideErrorCommand(arguments: [String]) throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(arguments, in: scratch)
+      #expect(result.termination == .exit(1))
+      #expect(result.stderr.contains("next: silta ws use --help"))
+    }
+  }
+
+  @Test func emptyAndStaleSelectionAreRecoverable() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(["ws", "ls"], in: scratch)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("Ask human: silta ws edit"))
+      let missing = try SiltaBinary.run(["ws", "use", "absent", "--json"], in: scratch)
+      #expect(missing.termination == .exit(2))
+      #expect(missing.stdout.contains("silta ws ls"))
+    }
+  }
+
 }

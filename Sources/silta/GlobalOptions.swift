@@ -2,6 +2,9 @@ import ArgumentParser
 
 /// Flags every command accepts, before or after the subcommand (spec §16).
 struct GlobalOptions: ParsableArguments {
+  @Option(help: "Use this workspace instead of the current selection.")
+  var ws: String?
+
   @Flag(help: "Print the JSON envelope on stdout instead of text.")
   var json = false
 

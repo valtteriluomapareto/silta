@@ -1,0 +1,39 @@
+workspace: {"name":"Acme (example)","slug":"acme","task_prefix":"AC"}
+settings: {"archive_after_days":14,"review_gate":"none","stale_days":90}
+repos:
+  - {"slug":"mobile"}
+  - {"slug":"pdf-service"}
+  - {"remote":"git@example.com:acme/platform.git","slug":"platform"}
+  - {"slug":"sales"}
+apps:
+  - {"ref":"origin/main","repo":"mobile","slug":"mobile","summary":"Flutter app."}
+  - {"ref":"origin/main","repo":"pdf-service","slug":"pdf-service","summary":"PDF rendering: POST /api/pdf/{configId}."}
+  - {"prod_ref":"origin/api-prod","ref":"origin/api","repo":"platform","slug":"platform-api","summary":"API-only backend for the mobile app: token auth, handoff, well-known files."}
+  - {"ref":"origin/portal","repo":"platform","slug":"platform-crm-ui","subpath":"crm-ui","summary":"Back-office UI embedded in the CRM."}
+  - {"lifecycle":"legacy","ref":"origin/master","repo":"platform","slug":"platform-legacy","summary":"Legacy staff portal. No CI."}
+  - {"prod_ref":"origin/portal-prod","ref":"origin/portal","repo":"platform","slug":"platform-portal","summary":"Web portal: server API + SPA."}
+  - {"ref":"origin/main","repo":"sales","slug":"sales","summary":"New sales portal; replaces platform-legacy."}
+environments:
+  - {"app":"platform-api","name":"prod","url":"https://api.acme.example"}
+  - {"app":"platform-api","name":"test","url":"https://api.test.acme.example"}
+services:
+  - "cms"
+  - "crash-reporting"
+  - "crm"
+  - "e-signature"
+  - "identity-provider"
+  - "mobile-ci"
+  - "push"
+edges:
+  - {"code":["platform-api:src/Api/Controllers/AuthController.cs","platform-api:src/Api/Controllers/HandoffController.cs"],"from":"mobile","kind":"http-api","summary":"Login → one-time code → token/refresh; data endpoints","to":"platform-api"}
+  - {"from":"mobile","kind":"sdk","summary":"Push notifications","to":"service:push"}
+  - {"from":"platform-api","kind":"auth","summary":"Strong authentication","to":"service:identity-provider"}
+  - {"from":"platform-portal","kind":"sdk","summary":"Reads and writes CRM records","to":"service:crm"}
+  - {"from":"sales","kind":"http-api","summary":"POST api/pdf/{configId}","to":"pdf-service"}
+topics:
+  - {"aliases":["messages","viestit"],"slug":"messaging"}
+  - {"aliases":["handoff","kirjautuminen","nonce"],"slug":"mobile-auth"}
+  - {"aliases":["lomakkeet"],"slug":"pdf-forms"}
+  - {"aliases":["raportit"],"slug":"reports"}
+sources:
+  - {"exclude":["**/PEOPLE.md","**/1-1/**"],"include":["projects/acme/*.md"],"kind":"notes","root":"~/notes"}
