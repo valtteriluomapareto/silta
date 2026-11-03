@@ -147,6 +147,22 @@ struct DogfoodReportTests {
     }
   }
 
+  @Test func promotedTasksKeepTheirFriction() throws {
+    withKnownIssue("task ls hides promoted tasks from the report") {
+      try withScratchDirectory { scratch in
+        let store = try Self.setup(scratch)
+        try store.write {
+          try $0.database.execute(
+            sql: "UPDATE task SET external_ref='gh:acme/silta#1' WHERE uid='silta-task-1'")
+        }
+        let tools = try Self.tools(scratch)
+        let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
+        #expect(result.termination == .exit(0))
+        #expect(result.stdout.contains("- 2023-11-15 SI-1: Re-reading the Acme plan was awkward."))
+      }
+    }
+  }
+
   @Test func proposalExpiryPreservesMilliseconds() throws {
     try withScratchDirectory { scratch in
       let store = try DogfoodReportTests.setup(scratch)

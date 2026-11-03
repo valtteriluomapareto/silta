@@ -122,6 +122,26 @@ struct DogfoodImportTests {
     }
   }
 
+  @Test func promotedSliceTaskIsFoundAndNotReimported() throws {
+    withKnownIssue("task ls hides promoted tasks, so the import duplicates them") {
+      try withScratchDirectory { scratch in
+        let store = try Self.store(scratch)
+        let tools = try Self.linkedTools(scratch)
+        try Self.issues([7: "S7: Acme location"], tools: tools)
+        #expect(try Self.run(scratch, tools: tools).termination == .exit(0))
+        try store.write {
+          try $0.database.execute(
+            sql: "UPDATE task SET status='todo',external_ref='gh:acme/silta#7' WHERE seq=1")
+        }
+        let rerun = try Self.run(scratch, tools: tools)
+        #expect(rerun.termination == .exit(0))
+        #expect(rerun.stdout.contains("Skipped linked issue https://example.com/acme/7."))
+        let count = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") }
+        #expect(count == 1)
+      }
+    }
+  }
+
   @Test func rerunNamesEveryUntriagedImport() throws {
     try withScratchDirectory { scratch in
       _ = try Self.store(scratch)
