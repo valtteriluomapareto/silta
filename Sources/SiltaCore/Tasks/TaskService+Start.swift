@@ -57,13 +57,7 @@ extension TaskService {
   }
 
   /// Submits doing work for review while refreshing its owner's heartbeat.
-  package func submit(_ ref: String, body: String? = nil, allowSecret: Bool = false) throws
-    -> TaskResult
-  {
-    let command = "silta task submit " + shellWord(ref)
-    let approval = try approval(
-      required: allowSecret, command: command + " -F <file> --allow-secret")
-    let content = try checked(body ?? "", allow: allowSecret, command: command + " -F <file>")
+  package func submit(_ ref: String) throws -> TaskResult {
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
@@ -80,13 +74,8 @@ extension TaskService {
           WHERE id=?
           """,
         arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
-      try changed(task.id, kind: "status", body: content.0, redacted: content.1, at: at, in: tx)
-      try approval?.record(
-        command: command + " --allow-secret", workspace: slug,
-        identity: (environment.ids, at), in: tx)
-      return receipt(
-        try Self.lookup(ref, workspace: slug, in: tx.database),
-        warnings: content.1 ? [SecretGuard.warning] : [])
+      try changed(task.id, kind: "status", body: "review", at: at, in: tx)
+      return receipt(try Self.lookup(ref, workspace: slug, in: tx.database))
     }
   }
 }

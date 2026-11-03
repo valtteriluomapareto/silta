@@ -95,7 +95,6 @@ struct HumanApprovalTests {
       draft.description = secret
       draft.allowSecret = true
       _ = try await service.add(draft, directory: home)
-      _ = try service.submit("AC-1", body: secret, allowSecret: true)
       _ = try service.plan("AC-1", text: "- [ ] " + secret, allowSecret: true)
       _ = try service.tick("AC-1", step: 1, done: true, allowSecret: true)
       var commit = TaskCommit()
@@ -112,23 +111,23 @@ struct HumanApprovalTests {
         "AC-2", result: secret, dropped: true, commit: commit, directory: home)
       try env.db.read { (db: Database) throws in
         let rows = try Row.fetchAll(db, sql: "SELECT * FROM approval ORDER BY id")
-        try #require(rows.count == 7)
-        #expect(Set(rows.compactMap { $0["uid"] as String? }).count == 7)
+        try #require(rows.count == 6)
+        #expect(Set(rows.compactMap { $0["uid"] as String? }).count == 6)
         #expect(rows.allSatisfy { ($0["words"] as String).contains("[REDACTED:") })
         #expect(rows.allSatisfy { ($0["actor"] as String) == TaskServiceTests.agent.description })
         #expect(rows.allSatisfy { ($0["workspace"] as String?) == "acme" })
         #expect(rows.allSatisfy { ($0["created_at"] as String) == "2023-11-14T22:13:20.000Z" })
         let commands = rows.map { $0["command"] as String }
         #expect(commands[0] == "silta task add --start --allow-secret")
-        #expect(commands[3].contains("--step 1 --done --allow-secret"))
-        #expect(commands[4].contains("--force --allow-secret"))
-        #expect(commands[5] == "silta task from-plan --split --allow-secret")
+        #expect(commands[2].contains("--step 1 --done --allow-secret"))
+        #expect(commands[3].contains("--force --allow-secret"))
+        #expect(commands[4] == "silta task from-plan --split --allow-secret")
         #expect(commands.allSatisfy { !$0.contains("acme-body") && !$0.contains("acme-quote") })
         #expect(try String.fetchOne(db, sql: "SELECT result_md FROM task WHERE seq=1") == secret)
         #expect(
           try String.fetchOne(db, sql: "SELECT plan_md FROM task WHERE seq=1") == "- [x] " + secret)
         #expect(
-          try Int.fetchOne(db, sql: "SELECT count(*) FROM change_log WHERE kind='approval'") == 7)
+          try Int.fetchOne(db, sql: "SELECT count(*) FROM change_log WHERE kind='approval'") == 6)
       }
     }
   }

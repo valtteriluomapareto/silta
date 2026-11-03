@@ -37,20 +37,18 @@ struct TaskStateRegressionTests {
     try #require(try data(result)["tasks"] as? [[String: Any]])
   }
 
-  @Test func statusEventBodyIsTheNewStatus() {
-    withKnownIssue("submit stores free text in a status event") {
-      try withScratchDirectory { scratch in
-        let store = try TaskCommandTests.setup(scratch)
-        #expect(
-          try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
-        let noted = try Self.run(["task", "submit", "AC-1", "-m", "Acme note"], in: scratch)
-        #expect(noted.termination == .exit(1))
-        #expect(try Self.run(["task", "submit", "AC-1"], in: scratch).termination == .exit(0))
-        let bodies = try store.read {
-          try String?.fetchAll($0, sql: "SELECT body FROM task_event WHERE kind='status'")
-        }
-        #expect(bodies == ["review"])
+  @Test func statusEventBodyIsTheNewStatus() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      #expect(
+        try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
+      let noted = try Self.run(["task", "submit", "AC-1", "-m", "Acme note"], in: scratch)
+      #expect(noted.termination == .exit(1))
+      #expect(try Self.run(["task", "submit", "AC-1"], in: scratch).termination == .exit(0))
+      let bodies = try store.read {
+        try String?.fetchAll($0, sql: "SELECT body FROM task_event WHERE kind='status'")
       }
+      #expect(bodies == ["review"])
     }
   }
 
