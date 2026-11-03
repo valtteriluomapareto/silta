@@ -3,7 +3,8 @@ import GRDB
 
 extension TaskService {
   /// Edits a snapshot, then rechecks content, promotion and the current claim before writing.
-  /// A nil callback result cancels without writing or recording approval.
+  /// A nil callback result cancels without writing. An edit that changes nothing writes
+  /// nothing and uses no approval. Only changed fields pass the secret guard.
   package func edit(
     _ ref: String, allowSecret: Bool = false, input: (String) throws -> String?
   ) throws -> (result: TaskResult, approvalUsed: Bool) {
@@ -15,13 +16,15 @@ extension TaskService {
     let needed = allowSecret || before.claimedBy != environment.actor.description
     _ = try approval(required: needed, command: command + " -F <file>")
     let original = TaskEditDocument(before)
-    guard let text = try input(original.render()) else { return (receipt(before), needed) }
+    guard let text = try input(original.render()) else { return (receipt(before), false) }
     let parsed = try TaskEditDocument.parse(text, from: before)
     if parsed == original {
       return try unchangedEdit(before, allowSecret: allowSecret, command: command)
     }
-    let safe = try parsed.values.map {
-      try checked($0, allow: allowSecret, command: command + " -F <file>")
+    try keepsBodies(parsed, original)
+    let safe = try zip(parsed.values, original.values).map { value, old in
+      value.utf8.elementsEqual(old.utf8)
+        ? (value, false) : try checked(value, allow: allowSecret, command: command + " -F <file>")
     }
     let content = safeDocument(safe.map(\.0), from: before)
     let redacted = safe.contains { $0.1 }
@@ -33,7 +36,7 @@ extension TaskService {
       let required = allowSecret || task.claimedBy != environment.actor.description
       let approval = try approval(required: required, command: command + " -F <file>")
       try Self.compareEdit(task, before)
-      guard content != original else { return (receipt(task), required) }
+      guard content != original else { return (receipt(task), false) }
       try applyEdit(content, task: task, redacted: redacted, at: at, in: tx)
       try approval?.record(
         command: command, workspace: slug,
@@ -53,8 +56,30 @@ extension TaskService {
       let required = allowSecret || task.claimedBy != environment.actor.description
       _ = try approval(required: required, command: command + " -F <file>")
       try Self.compareEdit(task, before)
-      return (receipt(task), required)
+      return (receipt(task), false)
     }
+  }
+
+  /// The current edit document, exactly as `-F` takes it back. A read: no approval.
+  package func editDocument(_ ref: String) throws -> (task: TaskDetails, document: String) {
+    let task = try show(ref)
+    return (task, TaskEditDocument(task).render())
+  }
+
+  /// An agent can't clear a stored Result or Plan, so a document written from a partial
+  /// read can't wipe them; a human may.
+  private func keepsBodies(_ parsed: TaskEditDocument, _ original: TaskEditDocument) throws {
+    guard !environment.actor.isHuman else { return }
+    for (name, value, old) in [
+      ("Result", parsed.result, original.result), ("Plan", parsed.plan, original.plan),
+    ] where Self.blank(value) && !Self.blank(old) {
+      throw TaskError.invalid(
+        "An agent edit cannot clear the \(name); keep its text, or ask a human to clear it.")
+    }
+  }
+
+  private static func blank(_ text: String) -> Bool {
+    text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   private static func compareEdit(_ task: TaskDetails, _ before: TaskDetails) throws {

@@ -1,1 +1,1 @@
-{"data":{"tasks":[{"acceptance":"","archived":false,"created_by":"agent:codex:acme","description":"","links":[],"plan":"","plan_rev":0,"priority":2,"ref":"AC-1","status":"proposed","title":"Acme idea"}]},"ok":true,"schema":1,"warnings":[]}
+{"data":{"tasks":[{"archived":false,"created_at":"2023-11-14T22:13:20.001Z","created_by":"agent:codex:acme","links":[],"priority":2,"ref":"AC-1","status":"proposed","title":"Acme idea","updated_at":"2023-11-14T22:13:20.001Z"}]},"ok":true,"schema":1,"warnings":[]}

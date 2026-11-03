@@ -61,7 +61,7 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
   /// Who must act before the `next` commands of an error with this code can run.
   package var nextBy: NextBy {
     switch self {
-    case .humanOnly, .readOnlyPromoted, .env: .human
+    case .humanOnly, .env: .human
     default: .agent
     }
   }
@@ -71,9 +71,9 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
     switch self {
     case .usage, .invalid: "Read `silta <cmd> --help` and fix the call"
     case .notFound, .unregistered: "Check the ref, or carry on without silta"
-    case .humanOnly, .readOnlyPromoted:
-      "Stop and ask the human in chat; for `human_only`, rerun with "
-        + "`--approved \"<their words>\"` after they say yes"
+    case .humanOnly:
+      "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` after they say yes"
+    case .readOnlyPromoted: "Leave it to its tracker and pick other work"
     case .ambiguousLocation: "Retry with `--app <slug>` from the candidates"
     case .busy: "Retry once after a few seconds"
     case .conflict, .claimed, .staleRev, .leaseTaken, .blocked:

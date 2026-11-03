@@ -7,6 +7,7 @@ extension TaskDetails {
     appID = row["app_id"]
     repoPath = row["repo_path"]
     ref = "\(row["task_prefix"] as String)-\(row["seq"] as Int64)"
+    parent = (row["parent_seq"] as Int64?).map { "\(row["task_prefix"] as String)-\($0)" }
     title = row["title"]
     status = row["status"]
     description = row["description_md"]
@@ -20,6 +21,8 @@ extension TaskDetails {
     plan = row["plan_md"]
     planRev = row["plan_rev"]
     createdBy = row["created_by"]
+    createdAt = row["created_at"]
+    updatedAt = row["updated_at"]
     claimedBy = row["claimed_by"]
     claimedAt = row["claimed_at"]
     app = row["app_slug"]

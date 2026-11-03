@@ -106,9 +106,9 @@ extension TaskEditCommandTests {
             "--ws", "acme", "task", "edit", "AC-1", "-F", path,
             "--json",
           ], in: scratch, environment: TaskCommandTests.actor)
-        #expect(result.termination == .exit(9))
+        #expect(result.termination == .exit(1))
         #expect(result.stdout.contains("silta --ws 'acme' task edit --help"))
-        #expect(result.stdout.contains("silta --ws 'acme' task show 'AC-1'"))
+        #expect(result.stdout.contains("silta --ws 'acme' task edit 'AC-1' --print"))
       }
     }
   }

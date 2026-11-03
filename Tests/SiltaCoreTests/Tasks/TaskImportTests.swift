@@ -144,7 +144,7 @@ struct TaskImportTests {
       options.parent = "AC-5"
       #expect(
         try await service.fromPlan(Self.text, options: options, directory: home).tasks.map(\.status)
-          == ["todo", "proposed", "proposed"])
+          == ["todo", "todo", "todo"])
       let humanEnv = try TaskServiceTests.environment(
         home.appending(path: "human"), actor: TaskServiceTests.human())
       try TaskServiceTests.setup(humanEnv)

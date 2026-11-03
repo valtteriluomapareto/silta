@@ -18,28 +18,35 @@ struct TaskRecoveryTests {
           sql: """
             INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Acme Beta','BT');
             UPDATE meta SET value='beta' WHERE key='current_workspace';
+            UPDATE workspace SET settings='{"review_gate":"human"}' WHERE slug='acme';
             """)
       }
+      let rival = ["SILTA_ACTOR": ActorID.agent(tool: "codex", session: "rival").description]
       for json in [false, true] {
         let result = try SiltaBinary.run(
           ["--ws", "acme", "task", "start", "AC-1"] + (json ? ["--json"] : []),
-          in: scratch,
-          environment: ["SILTA_ACTOR": ActorID.agent(tool: "codex", session: "rival").description])
+          in: scratch, environment: rival)
         #expect(result.termination == .exit(6))
         #expect((json ? result.stdout : result.stderr).contains("silta --ws 'acme' task show AC-1"))
         let retry = try SiltaBinary.run(
           ["--ws", "acme", "task", "show", "AC-1", "--json"], in: scratch)
         #expect(retry.termination == .exit(0))
       }
-      for (args, expected) in [
-        (["task", "start", "AC-1", "--steal"], "silta --ws 'acme' task start 'AC-1' --steal"),
+      // Each flag bypasses something here: the rival steals a fresh claim, and the holder
+      // forces past an unmet human review gate.
+      for (args, actor, expected) in [
         (
-          ["task", "done", "AC-1", "--force"],
+          ["task", "start", "AC-1", "--steal"], rival,
+          "silta --ws 'acme' task start 'AC-1' --steal"
+        ),
+        (
+          ["task", "done", "AC-1", "--force", "-m", "Acme done"], TaskCommandTests.actor,
           "silta --ws 'acme' task done 'AC-1' --force -F <file>"
         ),
       ] {
         let result = try SiltaBinary.run(
-          ["--ws", "acme"] + args + ["--json"], in: scratch, environment: TaskCommandTests.actor)
+          ["--ws", "acme"] + args + ["--json"], in: scratch, environment: actor)
+        #expect(result.termination == .exit(3))
         #expect(result.stdout.contains(expected))
       }
     }

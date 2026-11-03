@@ -21,7 +21,7 @@ silta task keep  Keep a task visible regardless of its closed age.
 silta task link  Link a task to a reference in this workspace or an external URL.
 silta task promote  Record an external tracker and make the task read-only (human-only).
 silta task block  Record blockers; Silta sends nothing.
-silta task unblock  Return a blocked batch to todo after an answer.
+silta task unblock  Return a blocked batch to todo; an open blocker needs the human's go-ahead.
 details: silta schema <command>
 
 global flags:
@@ -37,8 +37,8 @@ error codes:
   invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call
   not_found  exit 2, next by agent: Check the ref, or carry on without silta
   unregistered  exit 2, next by agent: Check the ref, or carry on without silta
-  human_only  exit 3, next by human: Stop and ask the human in chat; for `human_only`, rerun with `--approved "<their words>"` after they say yes
-  read_only_promoted  exit 3, next by human: Stop and ask the human in chat; for `human_only`, rerun with `--approved "<their words>"` after they say yes
+  human_only  exit 3, next by human: Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes
+  read_only_promoted  exit 3, next by agent: Leave it to its tracker and pick other work
   ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates
   busy  exit 5, next by agent: Retry once after a few seconds
   conflict  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open

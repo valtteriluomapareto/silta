@@ -32,11 +32,11 @@ struct TaskPlanCommand: OutputCommand {
       environment: context.environment, workspace: global.ws, approved: global.approved)
     let result: TaskPlanResult
     if let step {
-      guard done != undo, body.message == nil, body.file == nil else {
-        throw TaskError.invalid("Use --step N with exactly one of --done/--undo and no body.")
+      guard done != undo, body.message == nil, body.file == nil, !body.allowSecret else {
+        throw TaskError.invalid(
+          "Use --step N with exactly one of --done/--undo, and no body or --allow-secret.")
       }
-      result = try service.tick(
-        ref, step: step, done: done, ifRevision: ifRev, allowSecret: body.allowSecret)
+      result = try service.tick(ref, step: step, done: done, ifRevision: ifRev)
     } else {
       guard !done, !undo else {
         throw TaskError.invalid("--done and --undo require --step N.")

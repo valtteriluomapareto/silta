@@ -20,7 +20,8 @@ struct TaskDoneCommand: OutputCommand {
 
   @Flag(help: "Skip commit attribution.") var noSha = false
 
-  @Flag(help: "Override the review gate (human-only; provide the result with -F <file>).")
+  @Flag(
+    help: "Override an unmet review gate (human-only then; provide the result with -F <file>).")
   var force = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
@@ -29,23 +30,17 @@ struct TaskDoneCommand: OutputCommand {
     commit.noSHA = noSha
     commit.force = force
     commit.allowSecret = body.allowSecret
-    if force {
-      try context.environment.actor.requireHuman(
-        command: commit.command(ref, dropped: false)
-          + (body.allowSecret ? " --allow-secret" : "") + " -F <file>", approved: global.approved)
-    }
     let text = try body.read(
       actor: context.environment.actor, command: commit.command(ref, dropped: false),
       approved: global.approved)
-    return TaskOutput.receipt(
-      try await TaskService(
-        environment: context.environment, workspace: global.ws, approved: global.approved
-      )
-      .close(
-        ref, result: text, commit: commit,
-        directory: URL(
-          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
-      approvalUsed: force || body.allowSecret
-    ).reporting(context.taskWorkspace(global.ws))
+    let closed = try await TaskService(
+      environment: context.environment, workspace: global.ws, approved: global.approved
+    )
+    .close(
+      ref, result: text, commit: commit,
+      directory: URL(
+        filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
+    return TaskOutput.receipt(closed.result, approvalUsed: closed.approvalUsed)
+      .reporting(context.taskWorkspace(global.ws))
   }
 }

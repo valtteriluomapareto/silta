@@ -5,7 +5,7 @@ struct TaskListCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "ls", abstract: "List workspace tasks, including your own proposals.")
 
-  static let dataShape = Shape.object(["tasks": .array(TaskOutput.detailShape)])
+  static let dataShape = Shape.object(["tasks": .array(TaskOutput.summaryShape)])
 
   static let workspaceSource = WorkspaceSource.option
 
@@ -23,7 +23,10 @@ struct TaskListCommand: OutputCommand {
 
   @Flag(help: "Show tasks created or claimed by this exact actor.") var mine = false
 
-  @Flag(help: "Include other actors' proposals.") var proposed = false
+  @Flag(help: "Include other actors' proposals; --status proposed implies it.")
+  var proposed = false
+
+  @Flag(help: "Include tasks promoted to a tracker.") var promoted = false
 
   @Flag(help: "Include archived tasks.") var archived = false
 
@@ -35,15 +38,67 @@ struct TaskListCommand: OutputCommand {
     filter.topic = topic
     filter.mine = mine
     filter.proposed = proposed
+    filter.promoted = promoted
     filter.archived = archived
     let tasks = try TaskService(environment: context.environment, workspace: global.ws).list(filter)
     return CommandOutput(
       text: tasks.isEmpty ? "No tasks." : tasks.map(TaskOutput.summary).joined(separator: "\n"),
-      data: Data(tasks: tasks)
+      data: Data(tasks: tasks.map(TaskSummary.init))
     ).reporting(context.taskWorkspace(global.ws))
   }
 
   private struct Data: Encodable {
-    let tasks: [TaskDetails]
+    let tasks: [TaskSummary]
+  }
+}
+
+/// The fields of `TaskOutput.summaryShape`; bodies come from `task show`. Links are
+/// short and masked as in `show`, and they find a task by its issue URL.
+private struct TaskSummary: Encodable {
+  let ref: String
+  let title: String
+  let status: String
+  let priority: Int
+  let app: String?
+  let parent: String?
+  let claimedBy: String?
+  let claimedAt: String?
+  let externalRef: String?
+  let waiting: TaskWaiting?
+  let followUpAt: String?
+  let createdBy: String
+  let createdAt: String
+  let updatedAt: String
+  let archived: Bool
+  let links: [TaskLink]
+
+  init(_ task: TaskDetails) {
+    ref = task.ref
+    title = task.title
+    status = task.status
+    priority = task.priority
+    app = task.app
+    parent = task.parent
+    claimedBy = task.claimedBy
+    claimedAt = task.claimedAt
+    externalRef = task.externalRef
+    waiting = task.waiting
+    followUpAt = task.followUpAt
+    createdBy = task.createdBy
+    createdAt = task.createdAt
+    updatedAt = task.updatedAt
+    archived = task.archived
+    links = task.links
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case ref, title, status, priority, app, parent, waiting, archived, links
+    case claimedBy = "claimed_by"
+    case claimedAt = "claimed_at"
+    case externalRef = "external_ref"
+    case followUpAt = "follow_up_at"
+    case createdBy = "created_by"
+    case createdAt = "created_at"
+    case updatedAt = "updated_at"
   }
 }

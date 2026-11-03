@@ -7,15 +7,18 @@ struct TaskEditCommand: OutputCommand {
     commandName: "edit",
     abstract: "Edit task fields; approval is needed unless you hold its claim.",
     discussion: """
-      Read task show --json to construct file input. Use five ordered sections:
-      ## Title, ## Description, ## Acceptance, ## Plan, ## Result.
-      Each heading is followed by a tilde fence (at least ~~~), the literal value,
-      then a matching fence on its own line. Choose fences longer than any tilde run
-      in the values. Empty fields contain one empty line between fences.
+      --print prints the current document; change it and pass it back with -F.
+      It has five ordered sections: ## Title, ## Description, ## Acceptance, ## Plan,
+      ## Result. Each heading is followed by a tilde fence (at least ~~~), the literal
+      value, then a matching fence on its own line. Choose fences longer than any tilde
+      run in the values. Empty fields contain one empty line between fences.
       The editor receives this same document. A changed plan creates a revision.
+      Agents can't clear a stored Result or Plan.
       """)
 
-  static let dataShape = TaskOutput.receiptShape
+  static let dataShape = Shape.object([
+    "ref": .string, "status": .string, "document": .optional(.string),
+  ])
 
   static let workspaceSource = WorkspaceSource.option
 
@@ -27,14 +30,26 @@ struct TaskEditCommand: OutputCommand {
   @Option(name: .customShort("F"), help: "Read UTF-8 Markdown from a file, or - for stdin.")
   var file: String?
 
+  @Flag(help: "Print the current edit document without editing; needs no approval.")
+  var print = false
+
   @Flag(help: "Retain secrets with human approval.")
   var allowSecret = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
-    let result = try TaskService(
-      environment: context.environment, workspace: global.ws,
-      approved: global.approved
-    ).edit(ref, allowSecret: allowSecret) { original in
+    let service = TaskService(
+      environment: context.environment, workspace: global.ws, approved: global.approved)
+    if print {
+      guard file == nil, !allowSecret else {
+        throw TaskError.invalid("--print only reads; use it without -F or --allow-secret.")
+      }
+      let printed = try service.editDocument(ref)
+      return CommandOutput(
+        text: printed.document,
+        data: Printed(
+          ref: printed.task.ref, status: printed.task.status, document: printed.document))
+    }
+    let result = try service.edit(ref, allowSecret: allowSecret) { original in
       if let file { return try read(file) }
       return try edit(original, environment: context.environment)
     }
@@ -71,5 +86,11 @@ struct TaskEditCommand: OutputCommand {
       guard process.terminationStatus == 0 else { return nil }
       return try read(path.path)
     } catch { throw TaskError.input }
+  }
+
+  private struct Printed: Encodable {
+    let ref: String
+    let status: String
+    let document: String
   }
 }

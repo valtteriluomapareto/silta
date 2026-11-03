@@ -45,7 +45,7 @@ package enum OutputRouter {
         ok: false, data: nil,
         error: EnvelopeFailure(
           code: code.rawValue, message: error.message, next: error.next,
-          nextBy: code.nextBy.rawValue, retryAfter: error.retryAfter),
+          nextBy: nextBy(error).rawValue, retryAfter: error.retryAfter),
         warnings: [])
       do {
         return Rendered(
@@ -66,13 +66,18 @@ package enum OutputRouter {
     + #""next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}"# + "\n"
 
   private static func text(error: any CodedError, code: ErrorCode) -> Rendered {
-    let verb = code.nextBy == .human ? "ask human" : "next"
+    let verb = nextBy(error) == .human ? "ask human" : "next"
     var stderr = "error: \(error.message) [\(code.rawValue)]\n"
     if let seconds = error.retryAfter {
       stderr += "retry after: \(seconds)s\n"
     }
     stderr += error.next.map { "\(verb): \($0)\n" }.joined()
     return Rendered(stdout: "", stderr: stderr, exitCode: code.exitCode, errorCode: code)
+  }
+
+  /// The code's `next_by`, unless the error's own `next` needs the human (spec §16).
+  private static func nextBy(_ error: any CodedError) -> NextBy {
+    (error as? any HumanNextError)?.nextBy ?? error.code.nextBy
   }
 
   private static func line(_ envelope: Envelope) throws -> String {

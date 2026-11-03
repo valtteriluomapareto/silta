@@ -91,7 +91,7 @@ struct TaskBlockReviewTests {
       let human = TaskService(
         environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
       #expect(throws: SecretError.self) { _ = try human.unblock(["AC-1"], why: secret) }
-      let result = try service.unblock(["AC-1"], why: secret)
+      let result = try service.unblock(["AC-1"], why: secret).tasks
       #expect(result.first?.warnings.map(\.code) == ["secret_redacted"])
       try service.environment.db.read { db in
         let body = try String.fetchOne(db, sql: "SELECT body FROM task_event WHERE kind='unblock'")

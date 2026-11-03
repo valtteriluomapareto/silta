@@ -50,7 +50,7 @@ struct TaskBlockTests {
       #expect(try TaskOrganizationTests.counts(service) == before)
       #expect(try service.show("AC-1").status == "blocked")
       _ = try service.block("AC-3", Self.input())
-      let results = try service.unblock(["AC-1", "task:AC-1", "AC-3"], why: "Acme answered")
+      let results = try service.unblock(["AC-1", "task:AC-1", "AC-3"], why: "Acme answered").tasks
       #expect(results.map(\.ref) == ["AC-1", "AC-3"] && results.map(\.status) == ["todo", "todo"])
       let cleared = try service.show("AC-1", timeline: true)
       #expect(cleared.followUpAt == nil && cleared.waiting == nil)

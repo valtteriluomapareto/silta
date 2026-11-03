@@ -48,8 +48,15 @@ package struct TaskService: Sendable {
 
   func validateClaim(_ task: TaskDetails, at date: Date, steal: Bool = false) throws {
     try Self.mutable(task)
-    guard !steal, let holder = task.claimedBy, holder != environment.actor.description else {
-      return
+    if !steal, let claim = try foreignClaim(task, at: date) {
+      throw TaskError.claimed(task.ref, holder: claim.holder, minutes: claim.minutes)
+    }
+  }
+
+  /// Another actor's claim under two hours old: the only claim `--steal` overrides.
+  func foreignClaim(_ task: TaskDetails, at date: Date) throws -> (holder: String, minutes: Int)? {
+    guard let holder = task.claimedBy, holder != environment.actor.description else {
+      return nil
     }
     guard let raw = task.claimedAt else { throw StorageError.unavailable }
     let instant: Date
@@ -59,9 +66,7 @@ package struct TaskService: Sendable {
       throw StorageError.unavailable
     }
     let age = max(0, date.timeIntervalSince(instant))
-    if age < 7200 {
-      throw TaskError.claimed(task.ref, holder: holder, minutes: Int(age / 60))
-    }
+    return age < 7200 ? (holder, Int(age / 60)) : nil
   }
 
   static func mutable(_ task: TaskDetails) throws {

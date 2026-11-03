@@ -17,34 +17,22 @@ struct TaskPlanReviewRegressionTests {
     return service
   }
 
-  @Test func agentTicksApplySecretPolicyToStoredPlans() async throws {
+  // A tick adds no text, so the secret guard leaves a stored plan as the human kept it.
+  @Test func agentTicksKeepStoredPlans() async throws {
     try await withScratchDirectory { home in
       _ = try await Self.humanPlan(home)
       let env = try TaskServiceTests.environment(home)
       let service = TaskService(environment: env)
       let result = try service.tick("AC-1", step: 1, done: true)
-      #expect(result.plan == "- [x] Ship\n[REDACTED:password]")
-      #expect(result.warnings == [SecretGuard.warning])
+      #expect(result.plan == Self.secretPlan.replacingOccurrences(of: "[ ]", with: "[x]"))
+      #expect(result.warnings.isEmpty)
       #expect(try service.show("AC-1").plan == result.plan)
-      #expect(try service.show("AC-1", timeline: true).timeline?.last?.kind == "secret_redacted")
+      #expect(try service.show("AC-1", timeline: true).timeline?.last?.kind == "step")
       #expect(result.planRev == 1)
       #expect(
         try env.db.read { try String.fetchAll($0, sql: "SELECT body_md FROM task_plan_rev") } == [
           Self.secretPlan
         ])
-    }
-  }
-
-  @Test func humanTicksRefuseStoredSecretsWithoutOverride() async throws {
-    try await withScratchDirectory { home in
-      let service = try await Self.humanPlan(home)
-      do {
-        _ = try service.tick("AC-1", step: 1, done: true, ifRevision: 1)
-        Issue.record("Human tick accepted stored secret without override")
-      } catch let error as SecretError {
-        #expect(error.next == ["silta task plan 'AC-1' --if-rev 1 --step 1 --done --allow-secret"])
-      }
-      #expect(try service.show("AC-1").plan == Self.secretPlan)
     }
   }
 
@@ -81,15 +69,15 @@ struct TaskPlanReviewRegressionTests {
 }
 
 extension TaskPlanReviewRegressionTests {
-  @Test func humanTickOverrideRetainsPlanAndImmutableSnapshot() async throws {
+  @Test func humanTickRetainsPlanAndImmutableSnapshot() async throws {
     try await withScratchDirectory { home in
       let service = try await Self.humanPlan(home)
-      let result = try service.tick("AC-1", step: 1, done: true, ifRevision: 1, allowSecret: true)
+      let result = try service.tick("AC-1", step: 1, done: true, ifRevision: 1)
       #expect(result.plan == Self.secretPlan.replacingOccurrences(of: "[ ]", with: "[x]"))
       #expect(result.planRev == 1 && result.warnings.isEmpty)
       let env = try TaskServiceTests.environment(home)
-      #expect(throws: ActorError.self) {
-        _ = try TaskService(environment: env).tick("AC-1", step: 1, done: false, allowSecret: true)
+      #expect(throws: TaskError.staleRev("AC-1", actual: 1)) {
+        _ = try TaskService(environment: env).tick("AC-1", step: 1, done: false, ifRevision: 0)
       }
       #expect(try service.show("AC-1").plan == result.plan)
       #expect(

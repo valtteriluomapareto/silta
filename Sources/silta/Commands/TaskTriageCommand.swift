@@ -20,8 +20,8 @@ struct TaskTriageCommand: OutputCommand {
   @Option(parsing: .upToNextOption, help: "Proposal refs to drop; repeat or list several.")
   var drop: [String] = []
 
-  @Option(help: "Priority for accepted proposals: 1, 2 (default) or 3.")
-  var priority = 2
+  @Option(help: "Priority for accepted proposals: 1, 2 or 3; without it they keep their own.")
+  var priority: Int?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     var batch = TaskTriage()

@@ -27,16 +27,16 @@ struct ErrorCodeTests {
 
   @Test func onlyHumanCodesSendNextToTheHuman() {
     let human = ErrorCode.allCases.filter { $0.nextBy == .human }.map(\.rawValue)
-    #expect(human == ["human_only", "read_only_promoted", "env"])
+    #expect(human == ["human_only", "env"])
   }
 
-  // The "Agent should" column of the spec §16 table.
+  // The "Agent should" column of the spec §16 table; `read_only_promoted` has its own row.
   static let agentShould: [Int32: String] = [
     1: "Read `silta <cmd> --help` and fix the call",
     2: "Check the ref, or carry on without silta",
     3:
-      "Stop and ask the human in chat; for `human_only`, rerun with "
-      + "`--approved \"<their words>\"` after they say yes",
+      "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` "
+      + "after they say yes",
     4: "Retry with `--app <slug>` from the candidates",
     5: "Retry once after a few seconds",
     6: "Re-read, then decide; don't steal, and don't unblock while blockers are open",
@@ -47,6 +47,9 @@ struct ErrorCodeTests {
 
   @Test(arguments: ErrorCode.allCases)
   func agentShouldMatchesTheSpec(code: ErrorCode) {
-    #expect(code.agentShould == Self.agentShould[code.exitCode])
+    let promoted = "Leave it to its tracker and pick other work"
+    #expect(
+      code.agentShould
+        == (code == .readOnlyPromoted ? promoted : Self.agentShould[code.exitCode]))
   }
 }

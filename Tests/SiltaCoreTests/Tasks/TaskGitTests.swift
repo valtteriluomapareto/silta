@@ -80,7 +80,8 @@ struct TaskGitTests {
       var options = TaskCommit()
       options.sha = "release"
       let result = try await service.close(
-        "AC-1", result: "Done.", commit: options, directory: home)
+        "AC-1", result: "Done.", commit: options, directory: home
+      ).result
       #expect(result.warnings.map(\.code) == ["dirty_worktree"])
       let after = try service.show("AC-1")
       #expect(
