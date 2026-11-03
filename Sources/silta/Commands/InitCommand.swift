@@ -11,6 +11,8 @@ struct InitCommand: OutputCommand {
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,
   ])
 
+  static let workspaceSource = WorkspaceSource.none
+
   @OptionGroup var global: GlobalOptions
 
   @Option(
@@ -35,8 +37,10 @@ struct InitCommand: OutputCommand {
     var text = workspace.map { "Initialized workspace \($0)." } ?? "Initialized database."
     if let workspace { text += "\nnext: silta ws use '\(workspace)'" }
     text += "\nask human: \(edit)"
-    return CommandOutput(
+    var output = CommandOutput(
       text: text, data: InitData(workspace: workspace, next: [edit], nextBy: "human"))
+    output.workspace = workspace
+    return output
   }
 
 }

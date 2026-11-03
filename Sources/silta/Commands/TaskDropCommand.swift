@@ -8,6 +8,8 @@ struct TaskDropCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
@@ -28,5 +30,6 @@ struct TaskDropCommand: OutputCommand {
       directory: URL(
         filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
     return TaskOutput.receipt(closed.result, approvalUsed: closed.approvalUsed)
+      .reporting(context.taskWorkspace(global.ws))
   }
 }

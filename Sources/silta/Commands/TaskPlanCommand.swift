@@ -9,6 +9,8 @@ struct TaskPlanCommand: OutputCommand {
     "ref": .string, "plan_rev": .int, "plan": .string,
   ])
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
@@ -45,10 +47,12 @@ struct TaskPlanCommand: OutputCommand {
       guard let text else {
         throw TaskError.invalid("Supply -m or -F for a revision, or --step N --done|--undo.")
       }
-      result = try service.plan(ref, text: text, ifRevision: ifRev, allowSecret: body.allowSecret)
+      result = try service.plan(
+        ref, text: text, ifRevision: ifRev, allowSecret: body.allowSecret)
     }
     return CommandOutput(
       text: "\(result.ref) plan revision \(result.planRev)\n\(result.plan)", data: result,
-      warnings: result.warnings, approvalUsed: body.allowSecret)
+      warnings: result.warnings, approvalUsed: body.allowSecret
+    ).reporting(service.resolvedWorkspace())
   }
 }

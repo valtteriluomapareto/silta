@@ -1,0 +1,13 @@
+{"timestamp":"2023-11-13T10:00:00.000Z","command":"Acme before range","actor":"agent:codex:old","workspace":"silta","exit_code":1,"error_code":"usage","milliseconds":1000,"warnings":[]}
+{"timestamp":"2023-11-14T10:00:00.000Z","command":"silta task start","actor":"agent:codex:acme-a","workspace":"silta","exit_code":6,"error_code":"claimed","milliseconds":10,"warnings":[]}
+{"timestamp":"2023-11-14T10:00:30.000Z","command":"Acme foreign command","actor":"agent:codex:acme-a","workspace":"acme","exit_code":9,"error_code":"env","milliseconds":9999,"warnings":["Acme foreign warning"]}
+{"timestamp":"2023-11-14T10:01:00.000Z","command":"silta task start","actor":"agent:codex:acme-a","workspace":"silta","exit_code":6,"error_code":"claimed","milliseconds":30,"warnings":["stale_context"]}
+{"timestamp":"2023-11-14T10:02:00.000Z","command":"silta task ls","actor":"agent:codex:acme-a","workspace":"silta","exit_code":0,"milliseconds":4,"warnings":[]}
+{"timestamp":"2023-11-14T10:03:00.000Z","command":"silta task start","actor":"agent:codex:acme-a","workspace":"silta","exit_code":6,"error_code":"claimed","milliseconds":20,"warnings":[]}
+{"timestamp":"2023-11-14T11:00:00.000Z","command":"silta task add","actor":"agent:claude:acme-b","workspace":"silta","exit_code":1,"error_code":"usage","milliseconds":5,"warnings":[]}
+{"timestamp":"2023-11-14T11:01:00.000Z","command":"silta task add","actor":"agent:claude:acme-b","workspace":"silta","exit_code":1,"error_code":"usage","milliseconds":7,"warnings":[]}
+{"timestamp":"2023-11-14T11:02:00.000Z","command":"silta task add","actor":"agent:claude:acme-b","workspace":"silta","exit_code":0,"milliseconds":9,"warnings":["secret_redacted"]}
+{"timestamp":"2023-11-14T12:00:00.000Z","command":"silta ws edit","actor":"human:acme","workspace":"silta","exit_code":0,"milliseconds":25,"warnings":[]}
+{"timestamp":"2023-11-14T13:30:00.000Z","command":"silta schema","actor":"agent:codex:acme-a","exit_code":0,"milliseconds":3,"warnings":[]}
+{"timestamp":"2023-11-14T13:00:00.000Z","command":"Acme untagged detail","actor":"agent:codex:untagged","exit_code":9,"error_code":"env","milliseconds":1000,"warnings":[]}
+{"timestamp":"2023-11-14T14:00:00.000Z","command":"silta task show","actor":"agent:silta:dogfood-report","workspace":"silta","exit_code":0,"milliseconds":8888,"warnings":[]}
