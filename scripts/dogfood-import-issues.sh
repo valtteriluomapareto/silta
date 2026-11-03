@@ -26,7 +26,7 @@ silta_json() {
 
 pages="$(gh api --paginate --slurp 'repos/{owner}/{repo}/issues?state=open&per_page=100')"
 issues="$(/usr/bin/jq -ce '[.[][] | select(.pull_request == null) | select(.title | test("^S[0-9]+")) | {title,url:.html_url}]' <<<"$pages")"
-tasks="$(silta_json task ls --proposed --archived)"
+tasks="$(silta_json task ls --proposed --promoted --archived)"
 urls="$(/usr/bin/jq -ce '[.data.tasks[].links[] | .target | select(startswith("url:"))]' <<<"$tasks")"
 while IFS= read -r issue; do
   [[ -n "$issue" ]] || continue
@@ -48,7 +48,7 @@ while IFS= read -r issue; do
   urls="$(/usr/bin/jq -c --arg ref "url:$url" '. + [$ref]' <<<"$urls")"
   printf 'Created %s and linked %s.\n' "$ref" "$url"
 done <<<"$(/usr/bin/jq -c '.[]' <<<"$issues")"
-tasks="$(silta_json task ls --proposed --archived)"
+tasks="$(silta_json task ls --proposed --promoted --archived)"
 pending="$(/usr/bin/jq -r --argjson issues "$issues" '
   ($issues | map("url:" + .url)) as $links |
   [.data.tasks[] | select(.status == "proposed") |
@@ -57,5 +57,5 @@ pending="$(/usr/bin/jq -r --argjson issues "$issues" '
 if [[ -n "$pending" ]]; then
   printf 'Next: show these proposals to the maintainer and ask for one triage batch: silta --ws silta task triage --accept %s --approved "<the maintainer\x27s words>"\n' "$pending"
 else
-  echo 'Next: no imported slice waits for triage; find a slice with silta --ws silta task ls --proposed.'
+  echo 'Next: no imported slice waits for triage; find a slice with silta --ws silta task ls --proposed --promoted --archived.'
 fi

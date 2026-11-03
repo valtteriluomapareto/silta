@@ -37,7 +37,7 @@ if (( ${#files[@]} )); then
 else
   echo '[]' > "$temporary/logs"
 fi
-silta --ws silta task ls --proposed --archived --json > "$temporary/tasks" || fail 'task list failed; run silta --ws silta task ls --proposed --archived.'
+silta --ws silta task ls --proposed --promoted --archived --json > "$temporary/tasks" || fail 'task list failed; run silta --ws silta task ls --proposed --promoted --archived.'
 /usr/bin/jq -e '.ok == true and (.data.tasks | type == "array")' "$temporary/tasks" >/dev/null || fail 'invalid task list.'
 : > "$temporary/details"
 while IFS= read -r ref; do

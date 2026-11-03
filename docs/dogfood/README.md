@@ -34,9 +34,10 @@ also needs `gh` 2.48 or later, for `gh api --slurp`.
    tasks they didn't name.
 5. Check the setup in a fresh agent session using only `~/.local/bin/silta`, without
    touching a real slice (`done` is terminal):
-   - `silta ws ls` lists `silta`; `silta --ws silta task ls --proposed` lists the
-     imported slices, and `silta --ws silta task show <ref>` shows a slice's `url:`
-     link.
+   - `silta ws ls` lists `silta`;
+     `silta --ws silta task ls --proposed --promoted --archived --json` lists the
+     imported slices with their links, and `silta --ws silta task show <ref>` shows a
+     slice's `url:` link.
    - Run the work loop on a scratch task:
      `silta --ws silta task add --start "DF setup check" --app silta`, then
      `silta --ws silta task plan <ref> -m "- [ ] Check the loop"`,
