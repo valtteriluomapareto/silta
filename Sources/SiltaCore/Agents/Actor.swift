@@ -29,10 +29,12 @@ package struct Actor: Equatable, Sendable {
   }
 
   /// Resolves the session with one bounded git query unless an override supplies it.
-  /// A supplied actor needs no session query. Nonzero git exits use the current directory.
+  /// A supplied actor needs no session query. Outside git, or when git fails in any way,
+  /// the session is the current directory's: sessions guard against accidents, so
+  /// attribution must never fail a command (§11).
   package static func resolve(
     environment: [String: String], terminal: TerminalState, git: any GitRunner, directory: URL
-  ) async throws -> Actor {
+  ) async -> Actor {
     if let explicit = explicitActor(environment: environment, terminal: terminal) {
       return Actor(value: explicit)
     }
@@ -40,27 +42,22 @@ package struct Actor: Equatable, Sendable {
     if let supplied = environment["SILTA_SESSION"] {
       session = supplied
     } else {
-      let result = try await git.run(
-        GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory))
-      let path: String
-      switch result.termination {
-      case .exit(0):
-        var bytes = result.stdout
-        if bytes.last == 10 { bytes.removeLast() }
-        guard let root = String(data: bytes, encoding: .utf8) else {
-          throw SeamError.gitCapture
-        }
-        guard root.hasPrefix("/") else { throw SeamError.gitCapture }
-        path = root
-      case .exit:
-        path = directory.path
-      case .signal, .timedOut:
-        throw SeamError.gitCapture
-      }
+      let path = await repositoryRoot(git: git, directory: directory) ?? directory.path
       session = SHA256.hash(data: Data(path.utf8)).prefix(3)
         .map { String(format: "%02x", $0) }.joined()
     }
     return detect(environment: environment, terminal: terminal, session: session)
+  }
+
+  /// The repository's top-level path, or nil outside git or on any git fault.
+  private static func repositoryRoot(git: any GitRunner, directory: URL) async -> String? {
+    let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
+    let result = try? await git.run(request)  // a git fault means no repository root
+    guard let result, result.termination == .exit(0) else { return nil }
+    var bytes = result.stdout
+    if bytes.last == 10 { bytes.removeLast() }
+    guard let root = String(data: bytes, encoding: .utf8), root.hasPrefix("/") else { return nil }
+    return root
   }
 
   /// Refuses agent execution with a fixed, body-free command for a human to run.

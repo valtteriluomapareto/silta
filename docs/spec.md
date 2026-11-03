@@ -612,7 +612,8 @@ silta code ls   <app>[@<ref>] [<dir>]
 - **Session:** `SILTA_SESSION` if set. The Claude SessionStart hook exports it through
   the hook's environment file (`CLAUDE_ENV_FILE`, to verify). Otherwise it's a
   first six lowercase hexadecimal characters of SHA-256 over the UTF-8 worktree
-  root (`git rev-parse --show-toplevel`), or the current directory outside git.
+  root (`git rev-parse --show-toplevel`), or the current directory outside git or
+  when git fails: attribution never fails a command.
   Nested directories share a session; separate worktrees do not. An explicit actor
   bypasses session resolution.
 - **Codex marker evidence:** `CODEX_THREAD_ID` was present in a Codex desktop
@@ -920,8 +921,8 @@ Rust would win only if:
 ```
 silta/
   Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
-  Sources/SiltaCore/           # domain, policy, storage (GRDB as extensions), git, brief and output rendering
-  Sources/silta/               # ArgumentParser commands, the entry point, actor detection
+  Sources/SiltaCore/           # domain, policy, storage (GRDB), git, actors, brief, output
+  Sources/silta/               # ArgumentParser commands, the entry point
   Sources/SiltaTestSupport/    # fakes, golden helper, scratch dirs; used by tests and the scenario runner only
   Tests/SiltaCoreTests/        # unit + fixture git repos
   Tests/siltaTests/            # golden CLI output + exit codes
@@ -987,7 +988,7 @@ revision before the write.
 - **Logs:** `$SILTA_HOME/log/YYYY-MM-DD.jsonl`, kept 14 days. One line per command:
   - timestamp, command and flags (bodies excluded), actor, workspace, app
   - exit code and error code
-  - ms, busy retries, git calls and git ms
+  - ms; busy retries, git calls and git ms join when the first command counts them
   - warnings
 
   Evals read these logs too (§21).
@@ -1009,7 +1010,7 @@ revision before the write.
 | Golden CLI | Text, `--json` and exit codes for every command | Includes every error code's message and `next` hint |
 | Round-trip | Property test | `export(restore(export(db))) == export(db)`, byte-identical. Tampered and partial trees are rejected with nothing written. |
 | Migration | From a checked-in DB of every previous schema | Plus an older binary meeting a newer schema → exit 9 |
-| Scenarios | §20.1 | Run in `scripts/verify.sh full` and weekly in CI |
+| Scenarios | §20.1 | Run in `scripts/verify.sh full`, which CI runs on every PR |
 | Agent evals | §21 | Run on demand and before releases, not in every CI run |
 | Repository guards | `scripts/run-guards.sh`: core boundary, core determinism, core hygiene, `try?` reasons, coded errors, test waits, plan references in comments, package features, package graph, docs links, plans board | Each guard has a self-test that plants a violation (D17) |
 
@@ -1070,10 +1071,11 @@ scriptable and deterministic (D13).
     dotted paths (numeric components select array indices) equal to string, integer or boolean values
   - `fixtures: true` builds the fixed Acme suite. Seed-data/file/DB expectations
     join the format when commands need them.
+  - An unknown key fails the scenario, so a misspelled expectation can't pass unchecked.
   - Step *n* keeps `SILTA_ID_SEED=0` and uses `SILTA_NOW=base+n seconds`.
     Distinct step timestamps produce distinct first ULIDs; a rerun replays the
     transcript. Fixed home/time/seed values override step environment values.
-    Absolute cwd paths and resolved paths outside scratch are refused.
+    Absolute cwd paths and `..` components are refused.
 - **Evidence:** every run writes `artifacts/scenarios/<run>/<scenario>/` (git-ignored)
   with:
   - `summary.json`: commit, dirty flag, binary version, scenario sha256, pass or fail

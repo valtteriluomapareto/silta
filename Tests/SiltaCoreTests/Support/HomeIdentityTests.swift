@@ -17,4 +17,21 @@ struct HomeIdentityTests {
       #expect(env.clock is SystemClock)
     }
   }
+
+  // realpath leaves the Data-volume firmlink path as it is, though it names the same files.
+  @Test(arguments: [true, false])
+  func firmlinkAliasCannotEnableRealHomeOverrides(exists: Bool) throws {
+    try withScratchDirectory { scratch in
+      let real = scratch.appending(path: ".silta")
+      if exists {
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+      }
+      let alias = URL(filePath: "/System/Volumes/Data" + real.path)
+      try #require(FileManager.default.fileExists(atPath: "/System/Volumes/Data" + scratch.path))
+      let home = try SiltaHome.resolve(
+        environment: ["SILTA_HOME": alias.path], userHome: scratch, temporaryRoots: [],
+        deterministic: true)
+      #expect(!home.permitsDeterminism)
+    }
+  }
 }

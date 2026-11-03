@@ -1,8 +1,33 @@
 import Foundation
+import Yams
 
 struct Scenario: Decodable {
   var fixtures: Bool?
   var steps: [Step]
+
+  /// Decodes strictly: a misspelled key must fail, not silently skip a check (§20.1).
+  static func decode(_ yaml: String) throws -> Scenario {
+    let root = try Yams.load(yaml: yaml)
+    try checkKeys(root, allowed: ["fixtures", "steps"], at: "scenario")
+    let steps = (root as? [AnyHashable: Any])?["steps"] as? [Any] ?? []
+    for (index, step) in steps.enumerated() {
+      try checkKeys(step, allowed: ["args", "cwd", "env", "expect"], at: "step \(index)")
+      try checkKeys(
+        (step as? [AnyHashable: Any])?["expect"], allowed: ["exit", "code", "stdout", "json"],
+        at: "step \(index) expect")
+    }
+    return try YAMLDecoder().decode(Scenario.self, from: yaml)
+  }
+
+  private static func checkKeys(_ node: Any?, allowed: Set<String>, at place: String) throws {
+    guard let mapping = node as? [AnyHashable: Any] else { return }
+    let unknown = mapping.keys.map { "\($0)" }.filter { !allowed.contains($0) }.sorted()
+    guard unknown.isEmpty else {
+      let keys = unknown.joined(separator: ", ")
+      let known = allowed.sorted().joined(separator: ", ")
+      throw ScenarioFailure(description: "Unknown key \(keys) in \(place); allowed: \(known)")
+    }
+  }
 
   struct Step: Decodable {
     var args: [String]

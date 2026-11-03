@@ -1,7 +1,8 @@
 import Darwin
 package import Foundation
 
-/// Executes an absolute git binary with noninteractive authentication and bounded direct-child lifetime.
+/// Executes an absolute git binary with noninteractive authentication and a bounded
+/// direct-child lifetime.
 package struct SystemGitRunner: GitRunner {
   private let executable: String
   private let environment: [String: String]

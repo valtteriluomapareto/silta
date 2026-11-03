@@ -7,10 +7,12 @@ package enum ActorError: CodedError {
   package var code: ErrorCode {
     .humanOnly
   }
+
   /// A one-line explanation independent of user content.
   package var message: String {
     "This command requires a human actor."
   }
+
   /// The command the human should run.
   package var next: [String] {
     switch self {

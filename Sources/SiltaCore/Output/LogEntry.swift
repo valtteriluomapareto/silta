@@ -21,12 +21,6 @@ package struct LogEntry: Encodable, Equatable, Sendable {
   package var errorCode: ErrorCode?
   /// Flag names only; never flag values.
   package var flags: [String] = []
-  /// Number of database busy retries.
-  package var busyRetries: Int = 0
-  /// Number of git invocations.
-  package var gitCalls: Int = 0
-  /// Total time in git, in milliseconds.
-  package var gitMilliseconds: Int = 0
   /// Warning codes only; never message bodies.
   package var warnings: [String] = []
 

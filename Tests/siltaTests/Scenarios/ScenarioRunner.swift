@@ -1,5 +1,4 @@
 import CryptoKit
-import Darwin
 import Foundation
 import SiltaTestSupport
 import Yams
@@ -21,37 +20,13 @@ enum ScenarioRunner {
     ]) { _, fixed in fixed }
   }
 
+  /// The step's directory inside the scratch directory. Scenarios are repository-owned,
+  /// so refusing absolute paths and `..` is enough to keep a typo inside the scratch.
   static func workingDirectory(_ relative: String, scratch: URL) throws -> URL {
-    let root = try resolvedDirectory(scratch)
-    let target = try resolvedDirectory(scratch.appending(path: relative).standardizedFileURL)
-    guard !relative.hasPrefix("/"),
-      target.path == root.path || target.path.hasPrefix(root.path + "/")
-    else {
+    guard !relative.hasPrefix("/"), !relative.split(separator: "/").contains("..") else {
       throw ScenarioFailure(description: "cwd escapes the scenario scratch directory: \(relative)")
     }
-    return target
-  }
-
-  private static func resolvedDirectory(_ url: URL) throws -> URL {
-    var ancestor = url
-    var missing: [String] = []
-    while true {
-      var info = stat()
-      if lstat(ancestor.path, &info) == 0 {
-        guard let path = realpath(ancestor.path, nil) else {
-          throw ScenarioFailure(description: "Cannot resolve scenario directory")
-        }
-        defer { free(path) }
-        return missing.reversed().reduce(URL(filePath: String(cString: path))) {
-          $0.appending(path: $1)
-        }
-      }
-      guard errno == ENOENT, ancestor.path != "/" else {
-        throw ScenarioFailure(description: "Cannot resolve scenario directory")
-      }
-      missing.append(ancestor.lastPathComponent)
-      ancestor.deleteLastPathComponent()
-    }
+    return scratch.appending(path: relative)
   }
 
   static func terminationMismatch(_ actual: Termination, expected: Int32) -> String? {
@@ -70,8 +45,7 @@ enum ScenarioRunner {
     var transcript = Data()
     var failure: String?
     do {
-      let scenario = try YAMLDecoder().decode(
-        Scenario.self, from: String(contentsOf: file, encoding: .utf8))
+      let scenario = try Scenario.decode(String(contentsOf: file, encoding: .utf8))
       if scenario.fixtures == true { try fixtures(in: scratch) }
       for (index, step) in scenario.steps.enumerated() {
         try execute(step, index: index, scratch: scratch, transcript: &transcript)
@@ -135,7 +109,7 @@ enum ScenarioRunner {
     let script = repository.appending(path: "scripts/make-fixtures.sh")
     let result = try SiltaBinary.runProcess(
       URL(filePath: "/bin/bash"),
-      [script.path, try workingDirectory("fixtures", scratch: scratch).path], in: scratch)
+      [script.path, scratch.appending(path: "fixtures").path], in: scratch)
     guard result.termination == .exit(0) else {
       throw ScenarioFailure(
         description: "fixture generation failed: \(result.termination)\n\(result.stderr)")
@@ -148,15 +122,13 @@ enum ScenarioRunner {
     if let failure = terminationMismatch(result.termination, expected: expectation.exit) {
       return failure
     }
-    if let name = expectation.stdout {
-      let path = repository.appending(path: "Tests/siltaTests/Golden/\(name)")
-      let expected = try String(contentsOf: path, encoding: .utf8)
-      if result.stdout != expected {
-        return "stdout expected:\n\(expected)\nactual:\n\(result.stdout)"
-      }
+    if let name = expectation.stdout, let failure = goldenMismatch(result.stdout, golden: name) {
+      return failure
     }
     if expectation.code != nil || expectation.json != nil {
-      let object = try JSONSerialization.jsonObject(with: Data(result.stdout.utf8))
+      guard let object = try? JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) else {
+        return "code and json expectations need --json in args; stdout was not JSON"
+      }
       if let code = expectation.code {
         let actual = ((object as? [String: Any])?["error"] as? [String: Any])?["code"] as? String
         if actual != code { return "error.code expected \(code), actual \(actual ?? "missing")" }
@@ -174,6 +146,14 @@ enum ScenarioRunner {
       }
     }
     return nil
+  }
+
+  private static func goldenMismatch(_ stdout: String, golden name: String) -> String? {
+    let path = repository.appending(path: "Tests/siltaTests/Golden/\(name)")
+    guard let expected = try? String(contentsOf: path, encoding: .utf8) else {
+      return "golden \(name) not found in Tests/siltaTests/Golden"
+    }
+    return stdout == expected ? nil : "stdout expected:\n\(expected)\nactual:\n\(stdout)"
   }
 
   private static func value(at path: String, in object: Any) -> Any? {

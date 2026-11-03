@@ -49,15 +49,20 @@ enum StorageSchema {
       lifecycle TEXT NOT NULL DEFAULT 'active',
       UNIQUE (workspace_id, slug)
     );
-    CREATE UNIQUE INDEX app_primary_ref ON app(repo_id,  ref) WHERE is_primary = 1 AND subpath
-    IS NULL;
-    CREATE TABLE environment (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
-      app_id INTEGER NOT NULL REFERENCES app(id),  name TEXT NOT NULL,  url TEXT,  deploy TEXT,
-      notes TEXT);
-    CREATE TABLE service (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
-      workspace_id INTEGER NOT NULL REFERENCES workspace(id),  slug TEXT NOT NULL,  name TEXT
-      NOT NULL,
-      summary TEXT, secrets_location TEXT, UNIQUE (workspace_id, slug));
+    CREATE UNIQUE INDEX app_primary_ref ON app(repo_id, ref)
+      WHERE is_primary = 1 AND subpath IS NULL;
+    CREATE TABLE environment (
+      id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+      app_id INTEGER NOT NULL REFERENCES app(id),
+      name TEXT NOT NULL, url TEXT, deploy TEXT, notes TEXT
+    );
+    CREATE TABLE service (
+      id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+      workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+      slug TEXT NOT NULL, name TEXT NOT NULL,
+      summary TEXT, secrets_location TEXT,
+      UNIQUE (workspace_id, slug)
+    );
     CREATE TABLE edge (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
       workspace_id INTEGER NOT NULL REFERENCES workspace(id),
       from_app_id INTEGER NOT NULL REFERENCES app(id),
@@ -99,10 +104,12 @@ enum StorageSchema {
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL, closed_at TEXT,
       UNIQUE (workspace_id, seq)
     );
-    CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY,  task_id INTEGER NOT NULL REFERENCES
-    task(id),
+    CREATE TABLE task_plan_rev (
+      id INTEGER PRIMARY KEY,
+      task_id INTEGER NOT NULL REFERENCES task(id),
       rev INTEGER NOT NULL, body_md TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL,
-      UNIQUE (task_id, rev));
+      UNIQUE (task_id, rev)
+    );
     CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
       actor TEXT NOT NULL, kind TEXT NOT NULL,
       body TEXT, created_at TEXT NOT NULL);
@@ -153,8 +160,8 @@ enum StorageSchema {
       to_id INTEGER, to_ext TEXT,
       created_by TEXT NOT NULL, created_at TEXT NOT NULL,
       CHECK ((to_id IS NULL) <> (to_ext IS NULL)));
-    CREATE UNIQUE INDEX link_unique ON link(workspace_id,  from_kind,  from_id,  rel,  to_kind,
-    IFNULL(to_id,  to_ext));
+    CREATE UNIQUE INDEX link_unique
+      ON link(workspace_id, from_kind, from_id, rel, to_kind, IFNULL(to_id, to_ext));
     CREATE TABLE alias_decision (
       workspace_id INTEGER NOT NULL REFERENCES workspace(id),
       note_ref TEXT NOT NULL, topic_id INTEGER NOT NULL REFERENCES topic(id),
@@ -166,9 +173,11 @@ enum StorageSchema {
       kind TEXT NOT NULL,
       root TEXT NOT NULL, include TEXT NOT NULL, exclude TEXT NOT NULL DEFAULT '[]',
       repo_id INTEGER REFERENCES repo(id));
-    CREATE TABLE worktree_override (path TEXT PRIMARY KEY,  app_id INTEGER NOT NULL REFERENCES
-    app(id),
-      set_by TEXT NOT NULL);
+    CREATE TABLE worktree_override (
+      path TEXT PRIMARY KEY,
+      app_id INTEGER NOT NULL REFERENCES app(id),
+      set_by TEXT NOT NULL
+    );
     CREATE TABLE change_log (seq INTEGER PRIMARY KEY, kind TEXT NOT NULL, row_id INTEGER NOT NULL);
     """
 }

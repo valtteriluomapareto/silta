@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SiltaCore
 import SiltaTestSupport
@@ -21,6 +22,23 @@ struct ControlPlaneTests {
       #expect(entry["timestamp"] as? String == "2023-11-14T22:13:20.000Z")
       #expect(entry["exit_code"] as? Int == (arguments.contains("--nope") ? 1 : 0))
       #expect(entry["error_code"] as? String == (arguments.contains("--nope") ? "usage" : nil))
+    }
+  }
+
+  // Outside git the session is the working directory's hash (§11).
+  @Test func sessionHashesTheWorkingDirectory() throws {
+    try withScratchDirectory { scratch in
+      let cwd = scratch.appending(path: "acme")
+      try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+      let result = try SiltaBinary.run(
+        ["--version"], in: scratch, cwd: cwd,
+        environment: ["SILTA_NOW": "2023-11-14T22:13:20.000Z"])
+      #expect(result.termination == .exit(0))
+      let data = try Data(contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+      let entry = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+      let hash = SHA256.hash(data: Data(cwd.path.utf8)).prefix(3)
+        .map { String(format: "%02x", $0) }.joined()
+      #expect(entry["actor"] as? String == "agent:unknown:" + hash)
     }
   }
 
@@ -54,21 +72,17 @@ struct ControlPlaneTests {
 
   @Test func deterministicFlagReachesEnvironmentAndInvalidOverridesAreCoded() throws {
     try withScratchDirectory { scratch in
-      let git = try SiltaBinary.runProcess(
-        URL(filePath: "/usr/bin/git"),
-        ["rev-parse", "--path-format=absolute", "--git-common-dir"], in: scratch,
-        cwd: ScenarioRunner.repository)
-      try #require(git.termination == .exit(0))
-      let checkout = URL(filePath: git.stdout.trimmingCharacters(in: .whitespacesAndNewlines))
-        .deletingLastPathComponent()
-      let home = checkout.appending(path: ".build/isolated-home-\(UUID().uuidString)")
+      // A home outside every temporary root, even when the checkout itself is in /tmp.
+      let caches = try FileManager.default.url(
+        for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+      let home = caches.appending(path: "silta-test-home-\(UUID().uuidString)")
       try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
       defer { try? FileManager.default.removeItem(at: home) }  // test scratch cleanup
       let environment = ["SILTA_NOW": "bad", "SILTA_HOME": home.path]
       let disabled = try SiltaBinary.run(
         ["schema", "--json"], in: scratch, environment: environment)
-      let automatic = try SiltaHome.resolve(environment: environment).permitsDeterminism
-      #expect(disabled.termination == .exit(automatic ? 1 : 0))
+      try #require(!SiltaHome.resolve(environment: environment).permitsDeterminism)
+      #expect(disabled.termination == .exit(0))
       let result = try SiltaBinary.run(
         ["schema", "--json", "--deterministic"], in: scratch,
         environment: environment)

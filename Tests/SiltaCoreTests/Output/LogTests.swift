@@ -81,9 +81,7 @@ struct LogTests {
       #expect(
         Set(json.keys) == [
           "timestamp", "command", "actor", "exit_code", "milliseconds",
-          "error_code", "workspace", "app", "flags", "busy_retries", "git_calls",
-          "git_milliseconds",
-          "warnings",
+          "error_code", "workspace", "app", "flags", "warnings",
         ])
       #expect(json["error_code"] as? String == "env")
       #expect(json["exit_code"] as? Int == 9)
