@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Concrete storage for an owned identity or an external reference, with an optional line anchor.
-struct TaskLinkTarget {
+struct TaskLinkTarget: Hashable {
   let kind: String
   var id: Int64?
   var external: String?
@@ -33,18 +33,22 @@ struct TaskLinkTarget {
       return Self(kind: "note", external: String(raw.dropFirst(5)))
     }
     if raw.hasPrefix("url:") {
-      let value = String(raw.dropFirst(4))
-      guard let url = URLComponents(string: value), ["https", "http"].contains(url.scheme),
-        let host = url.host, !host.isEmpty, url.user == nil
-      else {
-        throw TaskError.invalid("Use a url:http(s) reference with a host and no credentials.")
-      }
-      return Self(kind: "url", external: value)
+      return try url(raw)
     }
     if raw.hasPrefix("code:") || raw.contains(":") && !raw.hasPrefix("task:") {
       return try code(raw, workspace: source.workspaceID, in: db)
     }
     return try task(raw, workspace: workspace, in: db)
+  }
+
+  static func url(_ raw: String) throws -> Self {
+    let value = String(raw.dropFirst(4))
+    guard let url = URLComponents(string: value), ["https", "http"].contains(url.scheme),
+      let host = url.host, !host.isEmpty, url.user == nil
+    else {
+      throw TaskError.invalid("Use a url:http(s) reference with a host and no credentials.")
+    }
+    return Self(kind: "url", external: value)
   }
 
   private static func task(_ raw: String, workspace: String, in db: Database) throws -> Self {

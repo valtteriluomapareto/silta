@@ -36,7 +36,7 @@ struct TaskLinkMigrationTests {
         let version = try Int.fetchOne(
           db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
         #expect(settings == "{\"future\":42}")
-        #expect(version == 2)
+        #expect(version == 3)
       }
       let backups = try FileManager.default.contentsOfDirectory(
         atPath: scratch.appending(path: "backups").path)

@@ -23,6 +23,10 @@ error: AC-1 is read-only; work in tracker ado:42. [read_only_promoted]
 ask human: silta task show AC-1
 error: Task fields changed during editing; re-read before applying an edit. [conflict]
 next: silta task show AC-1
+error: AC-1 is blocked, waiting on ext:acme for 2 d. [blocked]
+next: silta task ls --status todo
+error: AC-2 is blocked, waiting on task:AC-1 for 1 d. [blocked]
+next: silta task unblock AC-2
 error: Task repository information changed; re-read before retrying. [conflict]
 next: silta task show AC-1
 error: AC-1 has plan revision 2; re-read before replacing it. [stale_rev]

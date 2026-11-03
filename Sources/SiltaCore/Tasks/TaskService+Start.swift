@@ -17,7 +17,9 @@ extension TaskService {
       enabled: before.appID != nil, completion: false)
     let slug = try selected()
     return try environment.db.write { tx in
-      let task = try Self.lookup(ref, workspace: slug, in: tx.database)
+      let task = try Self.decorate(
+        Self.lookup(ref, workspace: slug, in: tx.database),
+        at: at, in: tx.database)
       try validateClaim(task, at: at, steal: steal)
       try canStart(task)
       try Self.sameRepository(task, before)
@@ -39,6 +41,9 @@ extension TaskService {
   }
 
   private func canStart(_ task: TaskDetails) throws {
+    if task.status == "blocked", let waiting = task.waiting {
+      throw TaskError.blocked(task.ref, waiting)
+    }
     if task.status == "proposed" { throw TaskError.proposal(task.ref) }
     guard ["todo", "doing", "review"].contains(task.status) else {
       throw TaskError.transition(task.ref, status: task.status)
@@ -62,7 +67,9 @@ extension TaskService {
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
-      let task = try Self.lookup(ref, workspace: slug, in: tx.database)
+      let task = try Self.decorate(
+        Self.lookup(ref, workspace: slug, in: tx.database),
+        at: at, in: tx.database)
       try validateClaim(task, at: at)
       guard task.status == "doing" else {
         throw TaskError.transition(task.ref, status: task.status)

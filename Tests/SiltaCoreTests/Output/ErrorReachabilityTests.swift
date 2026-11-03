@@ -1,5 +1,5 @@
 import Foundation
-import SiltaCore
+@testable import SiltaCore
 import Testing
 
 /// A `CodedError` type and examples of every case it can produce.
@@ -65,6 +65,10 @@ extension TaskError: ErrorExamples {
       .claimed("AC-1", holder: "agent:codex:acme", minutes: 4), .proposal("AC-1"),
       .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
       .promoted("AC-1", external: "ado:42"), .edited("AC-1"),
+      .blocked(
+        "AC-1", TaskWaiting(on: ["ext:acme"], ageDays: 2, why: "Acme", ready: false, dropped: [])),
+      .blocked(
+        "AC-2", TaskWaiting(on: ["task:AC-1"], ageDays: 1, why: "Acme", ready: true, dropped: [])),
       .changed("AC-1"), .staleRev("AC-1", actual: 2),
     ]
   }

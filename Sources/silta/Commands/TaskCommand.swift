@@ -9,6 +9,7 @@ struct TaskCommand: ParsableCommand {
       TaskPlanCommand.self, TaskFromPlanCommand.self,
       TaskEditCommand.self, TaskTriageCommand.self, TaskArchiveCommand.self,
       TaskKeepCommand.self, TaskLinkCommand.self, TaskPromoteCommand.self,
+      TaskBlockCommand.self, TaskUnblockCommand.self,
     ])
 
   @OptionGroup var global: GlobalOptions

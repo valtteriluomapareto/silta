@@ -35,6 +35,12 @@ package struct TaskDetails: Encodable, Sendable {
   /// The external tracker reference for a promoted task.
   package let externalRef: String?
 
+  /// The stored UTC day when this blocker should be revisited.
+  package let followUpAt: String?
+
+  /// Computed only while the task is blocked.
+  package var waiting: TaskWaiting?
+
   let closedAt: String?
 
   /// The current markdown checklist.
@@ -81,7 +87,8 @@ package struct TaskDetails: Encodable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case ref, title, status, description, plan, result, app, branch, worktree, links, timeline
-    case acceptance, priority, archived
+    case acceptance, priority, archived, waiting
+    case followUpAt = "follow_up_at"
     case archiveOverride = "archive_override"
     case externalRef = "external_ref"
     case planRev = "plan_rev"

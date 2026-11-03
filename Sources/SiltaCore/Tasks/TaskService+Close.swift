@@ -50,6 +50,7 @@ extension TaskService {
           dropped ? "dropped" : "done", result == nil ? nil : content.0,
           git.sha, git.branch, git.dirty, Self.timestamp(at), Self.timestamp(at), task.id,
         ])
+      try Self.clearBlock(task, in: tx)
       try changed(
         task.id, kind: "status", body: dropped ? "dropped" : "done",
         redacted: content.1, at: at, in: tx)
@@ -76,7 +77,7 @@ extension TaskService {
       }
       return
     }
-    guard ["todo", "doing", "review"].contains(task.status) else {
+    guard ["todo", "doing", "review", "blocked"].contains(task.status) else {
       throw TaskError.transition(task.ref, status: task.status)
     }
   }

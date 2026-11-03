@@ -17,6 +17,10 @@ enum StorageSchema {
     migrator.registerMigration("v2") { db in
       try db.execute(sql: anchorMigration)
     }
+    migrator.registerMigration("v3") { db in
+      try db.execute(sql: "ALTER TABLE task ADD COLUMN follow_up_at TEXT")
+      try db.execute(sql: "UPDATE meta SET value='3' WHERE key='min_writer_version'")
+    }
     return migrator
   }
 

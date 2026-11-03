@@ -9,6 +9,9 @@ package struct TaskFilter: Sendable {
   /// Restricts the topic slug.
   package var topic: String?
 
+  /// Restricts tasks to those blocked on this stored target identity.
+  package var on: String?
+
   /// Shows only tasks created or claimed by this exact actor.
   package var mine = false
 

@@ -6,7 +6,7 @@ import Synchronization
 /// A concrete database seam. Construction performs no I/O; reads never initialize or migrate.
 package final class DatabaseStore: Sendable {
   /// Integer schema compatibility supported by writes from this binary.
-  package static let writerVersion = 2
+  package static let writerVersion = 3
   /// Absolute path of the truth database.
   package let path: String
   private let home: URL

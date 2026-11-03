@@ -15,6 +15,7 @@ extension TaskDetails {
     archiveOverride = row["archive_override"]
     externalRef = row["external_ref"]
     closedAt = row["closed_at"]
+    followUpAt = row["follow_up_at"]
     result = row["result_md"]
     plan = row["plan_md"]
     planRev = row["plan_rev"]
