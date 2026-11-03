@@ -12,6 +12,9 @@ package struct TaskResult: Encodable, Sendable {
   /// The fields an edit wrote, lowercased, for its receipt text; never encoded.
   package var changed: [String] = []
 
+  /// A link's target as `task show` prints it, for its receipt text; never encoded.
+  package var target: String?
+
   private enum CodingKeys: String, CodingKey {
     case ref, status
   }

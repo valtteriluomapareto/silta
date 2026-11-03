@@ -43,18 +43,14 @@ struct TaskOutputRegressionTests {
       let refusal = #expect(throws: TaskError.self) { _ = try rival.archive("AC-1") }
       #expect(refusal?.next == ["silta task ls --status todo"])
       #expect(refusal?.message.contains("ask the human before stealing") == true)
-      withKnownIssue("the agent isn't given the exact steal command to ask about") {
-        #expect(
-          refusal?.message.contains(
-            "silta task start AC-1 --steal --approved \"<the human's words>\"") == true)
-      }
+      #expect(
+        refusal?.message.contains(
+          "silta task start AC-1 --steal --approved \"<the human's words>\"") == true)
       let human = TaskService(
         environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
       let own = #expect(throws: TaskError.self) { _ = try human.archive("AC-1") }
       let error = try Self.json(try #require(own))
-      withKnownIssue("a human is pointed at other work instead of --steal") {
-        #expect(error["next"] as? [String] == ["silta task start AC-1 --steal"])
-      }
+      #expect(error["next"] as? [String] == ["silta task start AC-1 --steal"])
       #expect(error["next_by"] as? String == "agent")
     }
   }
@@ -74,12 +70,10 @@ struct TaskOutputRegressionTests {
       let refusal = #expect(throws: ActorError.self) {
         _ = try agent.unblock(["AC-1", "AC-2", "AC-3"])
       }
-      withKnownIssue("every blocker is listed, and tasks are joined with \"and\"") {
-        #expect(
-          refusal?.message.hasPrefix(
-            "AC-1 waits on ext:acme; AC-2 waits on an answer; "
-              + "AC-3 waits on ext:beta (blocker AC-5 dropped); unblocking") == true)
-      }
+      #expect(
+        refusal?.message.hasPrefix(
+          "AC-1 waits on ext:acme; AC-2 waits on an answer; "
+            + "AC-3 waits on ext:beta (blocker AC-5 dropped); unblocking") == true)
     }
   }
 
@@ -88,11 +82,9 @@ struct TaskOutputRegressionTests {
       let service = try TaskOrganizationTests.service(home)
       try await TaskBlockTests.add(service, directory: home)
       let stored = try service.plan("AC-1", text: "- [ ] a\u{2028}b\n- [ ] c\u{0B}d\n- [ ] e")
-      withKnownIssue("the checkbox pattern stops at U+2028 and \\v") {
-        #expect(stored.steps == 3)
-        let ticked = try service.tick("AC-1", step: 1, done: true)
-        #expect(ticked.title == "a\u{2028}b")
-      }
+      #expect(stored.steps == 3)
+      let ticked = try service.tick("AC-1", step: 1, done: true)
+      #expect(ticked.title == "a\u{2028}b")
     }
   }
 
@@ -105,10 +97,8 @@ struct TaskOutputRegressionTests {
         _ = try service.tick("AC-1", step: 3, done: true)
       }
       #expect(refusal?.code == .invalid)
-      withKnownIssue("the refusal doesn't say how many checkboxes there are") {
-        #expect(refusal?.message.hasPrefix("AC-1's plan has 2 checkboxes") == true)
-        #expect(refusal?.next == ["silta task show AC-1"])
-      }
+      #expect(refusal?.message.hasPrefix("AC-1's plan has 2 checkboxes") == true)
+      #expect(refusal?.next == ["silta task show AC-1"])
     }
   }
 
@@ -121,9 +111,7 @@ struct TaskOutputRegressionTests {
         _ = try await service.add(draft, directory: home)
       }
       #expect(refusal?.message == "App acme-nope not found.")
-      withKnownIssue("a missing app points at task ls") {
-        #expect(refusal?.next == ["silta ws show"])
-      }
+      #expect(refusal?.next == ["silta ws show"])
     }
   }
 

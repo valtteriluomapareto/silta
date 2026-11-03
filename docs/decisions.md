@@ -500,3 +500,15 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     that can't be tied to their tasks can't be repaired afterwards. The rest are
     places where following the contract led an agent into a loop, lost data (a
     priority, a Result), or asked the human for something that bypassed nothing.
+  - ↳ update (2026-11-03, S10f): three points above changed.
+    - The `ls` summary is no longer the only narrowing: `task plan --json` drops the
+      plan too. Both follow the rule now stated once in §16: before DF0 a data shape
+      may narrow without a `schema` bump.
+    - A blocked task's promotion refusal points at `silta task unblock <ref>` only when
+      the block is ready, and otherwise at `silta task show <ref>`, like `start`'s
+      `blocked`.
+    - Only an agent's proposal refusal carries `--approved` with `next_by: human`. A
+      human, who runs triage themselves, gets `silta task triage --accept <ref>` with
+      `next_by: agent`.
+    - Why: each was a `next` the caller couldn't usefully run: an unblock that is
+      refused while the block is open, or a human told to ask themselves.

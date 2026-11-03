@@ -115,9 +115,7 @@ struct TaskOutputCommandTests {
       let unchanged = try Self.run(["task", "edit", "AC-1", "-F", file.path], in: scratch)
       #expect(unchanged.stdout == "AC-1 unchanged\n")
       let linked = try Self.run(["task", "link", "AC-1", "AC-2"], in: scratch)
-      withKnownIssue("the receipt echoes the target as typed") {
-        #expect(linked.stdout == "AC-1 linked cites task:AC-2\n")
-      }
+      #expect(linked.stdout == "AC-1 linked cites task:AC-2\n")
       let plan = scratch.appending(path: "plan.md")
       try "# Acme import\n\n- First\n".write(to: plan, atomically: true, encoding: .utf8)
       for arguments in [
@@ -206,14 +204,10 @@ struct TaskOutputCommandTests {
       #expect(preview.termination == .exit(0))
       let warnings = try TaskStateRegressionTests.warnings(preview)
       #expect(warnings == ["approval_unused"])
-      withKnownIssue("the warning says the command didn't need --approved") {
-        #expect(preview.stdout.contains("A dry run records nothing"))
-      }
+      #expect(preview.stdout.contains("A dry run records nothing"))
       let ungated = try Self.run(
         ["task", "from-plan", file.path, "--dry-run", "--allow-secret", "--json"], in: scratch)
-      withKnownIssue("a dry run with --allow-secret is human-only") {
-        #expect(ungated.termination == .exit(0))
-      }
+      #expect(ungated.termination == .exit(0))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
     }
   }
@@ -228,9 +222,7 @@ struct TaskOutputCommandTests {
         ["ws", "edit", "acme", "-F", file.path, "--approved", "Apply this YAML."], in: scratch)
       #expect(edited.termination == .exit(0))
       let command = try store.read { try String.fetchOne($0, sql: "SELECT command FROM approval") }
-      withKnownIssue("ws edit records a bare -F") {
-        #expect(command == "silta ws edit 'acme' -F <file>")
-      }
+      #expect(command == "silta ws edit 'acme' -F <file>")
     }
   }
 }

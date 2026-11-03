@@ -62,7 +62,8 @@ package struct TaskService: Sendable {
   func validateClaim(_ task: TaskDetails, at date: Date, steal: Bool = false) throws {
     try Self.mutable(task)
     if !steal, let claim = try foreignClaim(task, at: date) {
-      throw TaskError.claimed(task.ref, holder: claim.holder, minutes: claim.minutes)
+      throw TaskError.claimed(
+        task.ref, holder: claim.holder, minutes: claim.minutes, human: environment.actor.isHuman)
     }
   }
 

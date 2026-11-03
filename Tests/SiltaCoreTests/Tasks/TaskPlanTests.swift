@@ -70,7 +70,9 @@ struct TaskPlanTests {
       let rival = TaskService(
         environment: try TaskServiceTests.environment(
           home, actor: .agent(tool: "codex", session: "rival")))
-      #expect(throws: TaskError.claimed("AC-1", holder: env.actor.description, minutes: 0)) {
+      #expect(
+        throws: TaskError.claimed("AC-1", holder: env.actor.description, minutes: 0, human: false)
+      ) {
         _ = try rival.plan("AC-1", text: "Wrong")
       }
       #expect(throws: TaskError.self) { _ = try rival.tick("AC-1", step: 1, done: true) }

@@ -120,7 +120,7 @@ enum SiltaMain {
     let path = commandPath(arguments)
     if error.code == .busy { return CommandFailure(error: error, next: [path]) }
     var next = error.next
-    let ownNext = if case .noCheckboxes = error as? TaskError { true } else { false }
+    let ownNext = if case .step = error as? TaskError { true } else { false }
     if error.code == .invalid, !ownNext, error is TaskError || error is ActorError {
       next = [path + " --help"]
     }

@@ -42,8 +42,9 @@ extension TaskService {
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, at: at)
       try Self.compareRevision(ifRevision, task: task)
-      guard !MarkdownPlan.checkboxes(task.plan).isEmpty else {
-        throw TaskError.noCheckboxes(task.ref)
+      let count = MarkdownPlan.checkboxes(task.plan).count
+      guard count > 0, (1...count).contains(step) else {
+        throw TaskError.step(task.ref, checkboxes: count)
       }
       let text = try MarkdownPlan.tick(task.plan, step: step, done: done)
       try updatePlan(text, revision: task.planRev, task: task.id, at: at, in: tx.database)

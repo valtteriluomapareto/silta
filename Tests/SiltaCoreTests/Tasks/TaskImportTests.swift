@@ -54,10 +54,10 @@ struct TaskImportTests {
         #expect(!(try #require(String(data: encoded, encoding: .utf8))).contains("acme-value"))
         #expect(!FileManager.default.fileExists(atPath: location.path))
         options.allowSecret = true
-        await #expect(throws: ActorError.self) {
-          _ = try await TaskService(environment: env).fromPlan(
-            source, options: options, directory: home)
-        }
+        let kept = try await TaskService(environment: env).fromPlan(
+          source, options: options, directory: home)
+        #expect(kept.preview.title == secret && kept.warnings.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: location.path))
         try TaskServiceTests.setup(env)
         options.allowSecret = false
         options.dryRun = false

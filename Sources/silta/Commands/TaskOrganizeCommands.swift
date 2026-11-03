@@ -63,10 +63,10 @@ struct TaskLinkCommand: OutputCommand {
   @Option(help: "The relation; defaults to cites. blocked_by belongs to block.")
   var rel = "cites"
   func execute(_ context: CommandContext) throws -> CommandOutput {
-    TaskOutput.receipt(
-      try TaskService(environment: context.environment, workspace: global.ws)
-        .link(ref, target: target, relation: rel),
-      change: "linked \(rel) \(TaskError.shown(target))"
+    let linked = try TaskService(environment: context.environment, workspace: global.ws)
+      .link(ref, target: target, relation: rel)
+    return TaskOutput.receipt(
+      linked, change: "linked \(rel) \(TaskError.shown(linked.target ?? target))"
     ).reporting(context.taskWorkspace(global.ws))
   }
 }

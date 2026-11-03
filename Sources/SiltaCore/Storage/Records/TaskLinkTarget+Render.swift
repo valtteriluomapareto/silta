@@ -1,6 +1,12 @@
 import GRDB
 
 extension TaskLinkTarget {
+  /// This target as a stored link row renders it, e.g. `task:AC-2`.
+  func rendered(in db: Database) throws -> String {
+    try Self.render(
+      Row(["to_kind": kind, "to_id": id, "to_ext": external, "anchor": anchor]), in: db)
+  }
+
   static func render(_ row: Row, in db: Database) throws -> String {
     let kind: String = row["to_kind"]
     if let external: String = row["to_ext"] { return kind + ":" + external }

@@ -65,7 +65,8 @@ extension TaskError: ErrorExamples {
   static var examples: [TaskError] {
     [
       .notFound("parent task AC-9"), .invalid("A result is required."),
-      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4),
+      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: false),
+      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: true),
       .proposal("AC-1", human: false), .proposal("AC-1", human: true),
       .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
       .promoted("AC-1", external: "ado:42"), .edited("AC-1"),
@@ -74,7 +75,8 @@ extension TaskError: ErrorExamples {
       .blocked(
         "AC-2", TaskWaiting(on: ["task:AC-1"], ageDays: 1, why: "Acme", ready: true, dropped: [])),
       .changed("AC-1"), .staleRev("AC-1", actual: 2), .blockedPromotion("AC-1", ready: false),
-      .blockedPromotion("AC-2", ready: true), .noCheckboxes("AC-1"),
+      .blockedPromotion("AC-2", ready: true), .step("AC-1", checkboxes: 0),
+      .step("AC-1", checkboxes: 3),
     ]
   }
 }
@@ -97,7 +99,10 @@ extension ActorError: ErrorExamples {
       .humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme")),
       .notReady(
         command: "silta task unblock 'AC-4' 'AC-7'", actor: .agent(tool: "codex", session: "acme"),
-        waits: [("AC-4", ["ext:acme", "task:AC-2"]), ("AC-7", [])]),
+        waits: [
+          .init(ref: "AC-4", open: ["ext:acme", "AC-2"], dropped: ["AC-6"]),
+          .init(ref: "AC-7", open: [], dropped: []),
+        ]),
       .invalidApproval,
     ]
   }

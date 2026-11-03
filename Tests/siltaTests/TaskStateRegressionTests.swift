@@ -252,9 +252,7 @@ extension TaskStateRegressionTests {
       let refused = try Self.run(["task", "unblock", "AC-1", "AC-3", "--json"], in: scratch)
       #expect(refused.termination == .exit(3))
       let message = try Self.error(refused)["message"] as? String
-      withKnownIssue("tasks are joined with \"and\"") {
-        #expect(message?.hasPrefix("AC-1 waits on ext:acme; AC-3 waits on ext:acme;") == true)
-      }
+      #expect(message?.hasPrefix("AC-1 waits on ext:acme; AC-3 waits on ext:acme;") == true)
     }
   }
 }

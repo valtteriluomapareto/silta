@@ -9,8 +9,8 @@ package enum TaskError: CodedError, Equatable {
   /// A supplied value does not satisfy the command contract.
   case invalid(String)
 
-  /// A different actor still owns the claim.
-  case claimed(String, holder: String, minutes: Int)
+  /// A different actor still owns the claim; a human may steal it, an agent asks first.
+  case claimed(String, holder: String, minutes: Int, human: Bool)
 
   /// A proposal needs triage first; a human runs it, an agent asks the human.
   case proposal(String, human: Bool)
@@ -52,8 +52,9 @@ package enum TaskError: CodedError, Equatable {
   /// whether its block is ready to unblock.
   case blockedPromotion(String, ready: Bool)
 
-  /// `--step` on a plan without checkboxes; the fix is a revision that has them.
-  case noCheckboxes(String)
+  /// A `--step` the plan's checkbox count doesn't cover; with none, the fix is a revision
+  /// that has them.
+  case step(String, checkboxes: Int)
 
   /// `what` as a message shows it: secrets masked, control characters as spaces.
   package static func shown(_ what: String) -> String {
@@ -69,7 +70,7 @@ package enum TaskError: CodedError, Equatable {
     case .promoted: .readOnlyPromoted
     case .edited: .conflict
     case .notFound: .notFound
-    case .invalid, .foreignRepo, .input, .noCheckboxes: .invalid
+    case .invalid, .foreignRepo, .input, .step: .invalid
     case .claimed: .claimed
     case .proposal, .transition, .changed, .blockedPromotion: .conflict
     case .git, .repository: .env
@@ -90,12 +91,18 @@ package enum TaskError: CodedError, Equatable {
     case .notFound(let what):
       Self.shown(what.prefix(1).uppercased() + what.dropFirst()) + " not found."
     case .invalid(let reason): reason
-    case .noCheckboxes(let ref):
+    case .step(let ref, 0):
       "\(ref)'s plan has 0 checkboxes; --step N counts top-level `- [ ] …` lines, "
         + "so store a revision with them."
-    case .claimed(let ref, let holder, let minutes):
+    case .step(let ref, let count):
+      "\(ref)'s plan has \(count) checkbox\(count == 1 ? "" : "es"); "
+        + "--step N counts them from 1, as task show numbers them."
+    case .claimed(let ref, let holder, let minutes, true):
+      "\(ref) is claimed by \(holder) (\(minutes) min old); take it over with --steal."
+    case .claimed(let ref, let holder, let minutes, false):
       "\(ref) is claimed by \(holder) (\(minutes) min old); pick other work, "
-        + "or ask the human before stealing it."
+        + "or ask the human before stealing it with "
+        + "silta task start \(ref) --steal --approved \"<the human's words>\"."
     case .proposal(let ref, let human):
       human
         ? "Proposal \(ref) needs triage first."
@@ -119,7 +126,8 @@ package enum TaskError: CodedError, Equatable {
     switch self {
     case .blocked(let ref, let waiting):
       waiting.ready ? ["silta task unblock \(ref)"] : ["silta task ls --status todo"]
-    case .promoted, .claimed: ["silta task ls --status todo"]
+    case .promoted, .claimed(_, _, _, false): ["silta task ls --status todo"]
+    case .claimed(let ref, _, _, true): ["silta task start \(ref) --steal"]
     case .edited(let ref): ["silta task show \(ref)"]
     case .proposal(let ref, let human):
       ["silta task triage --accept \(ref)" + (human ? "" : " --approved \"<the human's words>\"")]
@@ -128,8 +136,11 @@ package enum TaskError: CodedError, Equatable {
     case .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]
-    case .notFound: ["silta task ls"]
-    case .noCheckboxes(let ref): ["silta task plan \(ref) -F -"]
+    case .notFound(let what):
+      // Apps and topics come from the workspace config.
+      what.hasPrefix("app ") || what.hasPrefix("topic ") ? ["silta ws show"] : ["silta task ls"]
+    case .step(let ref, 0): ["silta task plan \(ref) -F -"]
+    case .step(let ref, _): ["silta task show \(ref)"]
     case .invalid, .foreignRepo, .input: ["silta task add --help"]
     case .repository: ["silta init --help"]
     case .git: ["silta doctor"]

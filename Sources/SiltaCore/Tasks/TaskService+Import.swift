@@ -1,17 +1,18 @@
 package import Foundation
 
 extension TaskService {
-  /// Parses, previews or atomically imports a plan; cleanup never precedes commit.
+  /// Parses, previews or atomically imports a plan; cleanup never precedes commit. A
+  /// preview stores nothing, so `--allow-secret` on it needs no approval.
   package func fromPlan(
     _ text: String, options: TaskImport = TaskImport(), source: URL? = nil, directory: URL
   ) async throws -> TaskImportResult {
     let approval = try approval(
-      required: options.allowSecret, command: options.retryCommand + " --allow-secret")
+      required: options.allowSecret && !options.dryRun,
+      command: options.retryCommand + " --allow-secret")
     guard !options.delete || !options.dryRun && source != nil else {
       throw TaskError.invalid("--delete requires a real file and cannot be used with --dry-run.")
     }
-    let content = try checked(
-      text, allow: options.allowSecret, command: options.retryCommand)
+    let content = try importContent(text, options: options)
     let parsed = try MarkdownPlan(content.0)
     if options.split, parsed.steps.count > 10 {
       throw TaskError.invalid("--split accepts at most 10 steps; keep a checklist or shorten it.")
@@ -54,6 +55,13 @@ extension TaskService {
             "Tasks committed; source was retained. Inspect it and remove it manually if safe."))
     }
     return completed
+  }
+
+  /// The plan text after the secret guard; a dry run keeps it with `--allow-secret`,
+  /// unapproved, since it stores nothing.
+  private func importContent(_ text: String, options: TaskImport) throws -> (String, Bool) {
+    if options.dryRun && options.allowSecret { return (text, false) }
+    return try checked(text, allow: options.allowSecret, command: options.retryCommand)
   }
 
   private func importPreview(

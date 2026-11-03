@@ -30,7 +30,9 @@ extension TaskService {
             task.workspaceID, task.id, relation, target.kind,
             target.id, target.external, target.anchor,
           ]) ?? false
-      if exists { return receipt(task) }
+      var result = receipt(task, warnings: content.1 ? [SecretGuard.warning] : [])
+      result.target = try target.rendered(in: tx.database)
+      if exists { return result }
       try tx.database.execute(
         sql: """
           INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,to_ext,anchor,
@@ -50,7 +52,7 @@ extension TaskService {
           """,
         arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
       try changed(task.id, kind: "link", body: relation, redacted: content.1, at: at, in: tx)
-      return receipt(task, warnings: content.1 ? [SecretGuard.warning] : [])
+      return result
     }
   }
 

@@ -73,8 +73,12 @@ package struct MarkdownPlan: Sendable {
   static func checkboxes(_ text: String) -> [Checkbox] {
     let lines = text.components(separatedBy: "\n")
     return visibleLines(lines).compactMap { index in
-      lines[index].firstMatch(of: #/^(?:[-+*]|[0-9]+[.)]) +\[([ xX])\] (.*?)\r?$/#).map {
-        Checkbox(line: index, done: $0.output.1 != " ", title: String($0.output.2))
+      // Only the prefix is matched: `.` stops at U+2028 and \v, which a label may hold.
+      lines[index].prefixMatch(of: #/(?:[-+*]|[0-9]+[.)]) +\[([ xX])\] /#).map {
+        let rest = lines[index][$0.range.upperBound...]
+        return Checkbox(
+          line: index, done: $0.output.1 != " ",
+          title: String(rest.hasSuffix("\r") ? rest.dropLast() : rest))
       }
     }
   }

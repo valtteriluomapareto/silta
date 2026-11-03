@@ -73,6 +73,36 @@ extension TaskService {
       why: SecretGuard.redacted(latest.why), ready: ready, dropped: dropped)
   }
 
+  /// What keeps a block from being ready: parties, URLs and tasks not done (a promoted one
+  /// included) in `open`, dropped tasks in `dropped`. Tasks are bare refs (`AC-2`).
+  static func unmet(_ task: TaskDetails, in db: Database) throws
+    -> (open: [String], dropped: [String])
+  {
+    var open: [String] = []
+    var dropped: [String] = []
+    for link in try blockLinks(task, in: db) {
+      let ref = try TaskLinkTarget.render(link, in: db)
+      guard (link["to_kind"] as String) == "task" else {
+        open.append(SecretGuard.redacted(ref))
+        continue
+      }
+      guard
+        let blocker = try Row.fetchOne(
+          db, sql: "SELECT status,external_ref FROM task WHERE id=?",
+          arguments: [link["to_id"] as Int64])
+      else { throw StorageError.unavailable }
+      let bare = String(ref.dropFirst("task:".count))
+      if (blocker["status"] as String) == "dropped" {
+        dropped.append(bare)
+      } else if (blocker["status"] as String) != "done"
+        || (blocker["external_ref"] as String?) != nil
+      {
+        open.append(bare)
+      }
+    }
+    return (open, dropped)
+  }
+
   static func matchesBlocker(_ raw: String?, task: TaskDetails, workspace: String, in db: Database)
     throws -> Bool
   {
