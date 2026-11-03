@@ -20,17 +20,17 @@ struct ActorIntegrationTests {
         "PATH": "/usr/bin:/bin",
       ])
       let repo = fixtures.appending(path: "acme-platform")
-      let first = try await Actor.resolve(
+      let first = await Actor.resolve(
         environment: [:], terminal: terminal, git: git, directory: repo)
-      let nested = try await Actor.resolve(
+      let nested = await Actor.resolve(
         environment: [:], terminal: terminal, git: git, directory: repo.appending(path: "api"))
-      let worktree = try await Actor.resolve(
+      let worktree = await Actor.resolve(
         environment: [:], terminal: terminal, git: git,
         directory: fixtures.appending(path: "acme-portal-worktree"))
-      let mainWorktree = try await Actor.resolve(
+      let mainWorktree = await Actor.resolve(
         environment: [:], terminal: terminal, git: git,
         directory: fixtures.appending(path: "acme-platform"))
-      let outside = try await Actor.resolve(
+      let outside = await Actor.resolve(
         environment: [:], terminal: terminal, git: git, directory: scratch)
       #expect(outside.value.hasPrefix("agent:unknown:"))
       #expect(outside.value.count == "agent:unknown:".count + 6)

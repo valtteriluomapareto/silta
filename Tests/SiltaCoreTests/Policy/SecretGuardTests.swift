@@ -24,6 +24,10 @@ struct SecretGuardTests {
       Sample(rule: "aws_key", text: "AK" + "IA" + String(repeating: "Q", count: 16)),
       Sample(rule: "aws_key", text: "AS" + "IA" + String(repeating: "R", count: 16)),
       Sample(rule: "github_pat", text: "gh" + "p_" + String(repeating: "Q", count: 36)),
+      Sample(rule: "github_pat", text: "gh" + "o_" + String(repeating: "Q", count: 36)),
+      Sample(rule: "github_pat", text: "gh" + "u_" + String(repeating: "Q", count: 36)),
+      Sample(rule: "github_pat", text: "gh" + "s_" + String(repeating: "Q", count: 36)),
+      Sample(rule: "github_pat", text: "gh" + "r_" + String(repeating: "Q", count: 36)),
       Sample(rule: "github_pat", text: "github_" + "pat_" + String(repeating: "Q", count: 82)),
       Sample(rule: "azure_pat", text: String(repeating: "Q", count: 52)),
       Sample(rule: "azure_pat", text: String(repeating: "Q", count: 75) + "AZ" + "DO" + "Q1234"),
@@ -35,8 +39,12 @@ struct SecretGuardTests {
       Sample(
         rule: "jwt",
         text: "ey" + "JhY21lIjp0cnVlfQ.eyJhY21lIjoxfQ." + String(repeating: "q", count: 32)),
-      Sample(rule: "hetu", text: identity(number: 2)),
     ]
+      + ["a", "p", "r", "s"].map { kind in
+        Sample(rule: "slack", text: "xo" + "x\(kind)-" + String(repeating: "Q", count: 24))
+      }
+      // Every century sign, including the common `-` (1900s) and `+` (1800s).
+      + "+-ABCDEFYXWVU".map { sign in Sample(rule: "hetu", text: identity(number: 2, sign: sign)) }
   }
 
   static var keyBlock: String {
@@ -45,10 +53,10 @@ struct SecretGuardTests {
   }
 
   // Expected checks are computed from integer division independently of the scanner's digit fold.
-  static func identity(number: Int) -> String {
+  static func identity(number: Int, sign: Character = "A") -> String {
     let controls = Array("0123456789ABCDEFHJKLMNPRSTUVWXY")
     let value = 1_010_1000 + number
-    return "010101" + "A" + String(format: "%03d", number) + String(controls[value % 31])
+    return "010101" + String(sign) + String(format: "%03d", number) + String(controls[value % 31])
   }
 
   @Test(arguments: samples) func corpusFindsEveryRequiredRule(sample: Sample) throws {
@@ -81,7 +89,7 @@ struct SecretGuardTests {
       "?sig=<signature>", "eyJheader.eyJpayload.signature", "refs/heads/acme",
     ]
     let falsePositives = clean.filter { !SecretGuard.matches(in: $0).isEmpty }.count
-    #expect(falsePositives <= 1)
+    #expect(falsePositives == 0)
     for value in [sha40, sha64, uuid, ref] {
       #expect(SecretGuard.matches(in: value).isEmpty)
       // Explicit credential fields outrank otherwise clean candidate shapes.
@@ -167,6 +175,27 @@ struct SecretGuardTests {
     let json = OutputRouter.render(.success(output), mode: OutputMode(json: true))
     #expect(text.stderr == "warning: Secret content was redacted. [secret_redacted]\n")
     #expect(json.stdout.contains("secret_redacted"))
+  }
+
+  // A preview shows only a public marker: never a token's own characters or a birth date.
+  @Test func previewsRevealNothingPrivate() throws {
+    for (text, preview) in [
+      (identity(number: 2), "…[hetu]"), (String(repeating: "Q", count: 52), "…[azure_pat]"),
+      ("Pwd\t=acme", "Pwd…[password]"),
+    ] {
+      let match = try #require(SecretGuard.matches(in: text).first)
+      #expect(match.preview(in: text) == preview)
+    }
+  }
+
+  @Test func rejectionListsAtMostFivePreviews() {
+    let token = "AK" + "IA" + String(repeating: "Q", count: 16)
+    let error = SecretError(
+      command: "silta task add", text: Array(repeating: token, count: 7).joined(separator: " "))
+    #expect(
+      error.message
+        == "Secret content detected: " + Array(repeating: "AKIA…[aws_key]", count: 5)
+        .joined(separator: ", ") + " and 2 more")
   }
 
   @Test func rejectionGolden() {

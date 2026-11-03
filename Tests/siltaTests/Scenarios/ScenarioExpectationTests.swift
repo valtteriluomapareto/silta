@@ -27,6 +27,43 @@ struct ScenarioExpectationTests {
     }
   }
 
+  // Each matcher must be able to fail; a misspelled key must not silently skip one (§20.1).
+  @Test(arguments: [
+    "{exit: 1, code: not_found}", "{exit: 1, stdout: schema.txt}", "{exit: 1, cdoe: invalid}",
+  ])
+  func wrongExpectationsAndUnknownKeysFail(expectation: String) throws {
+    try withScratchDirectory { scratch in
+      let file = scratch.appending(path: "wrong.yaml")
+      try Data(
+        "steps:\n  - args: [schema, nope, --json]\n    expect: \(expectation)\n".utf8
+      ).write(to: file)
+      #expect(throws: ScenarioFailure.self) {
+        try ScenarioRunner.run(file, in: scratch, evidence: scratch.appending(path: "evidence"))
+      }
+    }
+  }
+
+  @Test(arguments: ["fixture: true\nsteps: []\n", "steps:\n  - args: []\n    enviroment: {}\n"])
+  func unknownScenarioKeysFail(yaml: String) throws {
+    try withScratchDirectory { scratch in
+      let file = scratch.appending(path: "typo.yaml")
+      try Data(yaml.utf8).write(to: file)
+      #expect(throws: ScenarioFailure.self) {
+        try ScenarioRunner.run(file, in: scratch, evidence: scratch.appending(path: "evidence"))
+      }
+    }
+  }
+
+  @Test func transcriptKeepsStderr() throws {
+    try withScratchDirectory { scratch in
+      let file = scratch.appending(path: "stderr.yaml")
+      try Data("steps:\n  - args: [schema, nope]\n    expect: {exit: 1}\n".utf8).write(to: file)
+      let transcript = try ScenarioRunner.run(file, in: scratch)
+      let entry = try #require(JSONSerialization.jsonObject(with: transcript) as? [String: Any])
+      #expect((entry["stderr"] as? String)?.hasPrefix("error: ") == true)
+    }
+  }
+
   @Test func transcriptIncludesActorAndSessionWithoutArbitraryEnvironmentValues() throws {
     try withScratchDirectory { scratch in
       let file = scratch.appending(path: "identifiers.yaml")

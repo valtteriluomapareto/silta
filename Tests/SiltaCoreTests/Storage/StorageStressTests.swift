@@ -62,7 +62,7 @@ struct StorageStressTests {
     }
   }
   private static func addTwoHundred(home: URL, index: Int) throws {
-    let store = StorageSchemaTests.store(home, seed: UInt64(index + 1))
+    let store = StorageSchemaTests.store(home)
     let ids = SeededIDGenerator(seed: UInt64(index))
     for _ in 0..<200 {
       let uid = try ids.next(at: StorageSchemaTests.instant)

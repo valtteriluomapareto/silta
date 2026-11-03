@@ -8,8 +8,8 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct StorageWriteTests {
-  static func make(_ home: URL, clock: FakeClock, seed: UInt64 = 0) -> DatabaseStore {
-    DatabaseStore(home: home, clock: clock, ids: SeededIDGenerator(seed: seed), jitter: { 7 })
+  static func make(_ home: URL, clock: FakeClock) -> DatabaseStore {
+    DatabaseStore(home: home, clock: clock, jitter: { 7 })
   }
 
   static func insert(_ transaction: StorageTransaction, uid: String) throws -> Int64 {
@@ -168,7 +168,7 @@ struct StorageWriteTests {
       let snapshot = try DatabaseQueue(path: file.path)
       #expect(
         try snapshot.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
-      let reopened = Self.make(home, clock: clock, seed: 1)
+      let reopened = Self.make(home, clock: clock)
       #expect(try reopened.write { try Self.insert($0, uid: "acme-two") } == 2)
       #expect(try Data(contentsOf: file) == original)
       clock.advance(milliseconds: 86_400_000)
@@ -195,8 +195,8 @@ struct StorageWriteTests {
 
   @Test func concurrentStoresShareOnePreWriteSnapshot() throws {
     try withScratchDirectory { home in
-      let stores = (0..<2).map {
-        Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant), seed: UInt64($0))
+      let stores = (0..<2).map { _ in
+        Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
       }
       let failures = Mutex<[String]>([])
       DispatchQueue.concurrentPerform(iterations: 2) { index in

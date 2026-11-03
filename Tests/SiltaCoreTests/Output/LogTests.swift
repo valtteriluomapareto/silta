@@ -75,6 +75,9 @@ struct LogTests {
       failed.app = "api"
       failed.flags = ["--json"]
       failed.warnings = ["ref_stale"]
+      failed.busyRetries = 1
+      failed.gitCalls = 2
+      failed.gitMilliseconds = 3
       SystemLog(directory: scratch).record(failed)
       let data = try Data(contentsOf: scratch.appending(path: "2023-11-14.jsonl"))
       let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])

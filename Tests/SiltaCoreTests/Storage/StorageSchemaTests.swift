@@ -8,9 +8,8 @@ import Testing
 struct StorageSchemaTests {
   static let instant = Date(timeIntervalSince1970: 1_700_000_000)
 
-  static func store(_ home: URL, seed: UInt64 = 0) -> DatabaseStore {
-    DatabaseStore(
-      home: home, clock: FakeClock(now: instant), ids: SeededIDGenerator(seed: seed), jitter: { 0 })
+  static func store(_ home: URL) -> DatabaseStore {
+    DatabaseStore(home: home, clock: FakeClock(now: instant), jitter: { 0 })
   }
 
   @Test func constructionAndMissingReadNeverInitialize() async throws {
@@ -64,7 +63,7 @@ struct StorageSchemaTests {
       let backups = try FileManager.default.contentsOfDirectory(
         atPath: scratch.appending(path: "backups").path)
       #expect(backups.count == 1)
-      #expect(backups[0].hasPrefix("silta-2023-11-14-before-v1-"))
+      #expect(backups == ["silta-2023-11-14-before-v1-1700000000000.db"])
       let initial = try DatabaseQueue(
         path: scratch.appending(path: "backups").appending(path: backups[0]).path)
       try initial.read { db in
@@ -74,7 +73,7 @@ struct StorageSchemaTests {
         #expect(tables == 0)
         #expect(integrity == "ok")
       }
-      try Self.store(scratch, seed: 1).initialize()
+      try Self.store(scratch).initialize()
       #expect(
         try FileManager.default.contentsOfDirectory(atPath: scratch.appending(path: "backups").path)
           == backups)
@@ -169,7 +168,7 @@ struct StorageSchemaTests {
           try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
         }
       }
-      #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch, seed: 1).initialize() }
+      #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch).initialize() }
       #expect(
         try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") }
           == (newerVersion ? 1 : 2))
