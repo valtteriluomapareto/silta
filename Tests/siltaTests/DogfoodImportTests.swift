@@ -60,36 +60,34 @@ struct DogfoodImportTests {
   }
 
   @Test func paginatedIssueImportIsIdempotentAndExplicitlyScoped() throws {
-    withKnownIssue("DF issues are imported as slices") {
-      try withScratchDirectory { scratch in
-        let store = try Self.store(scratch)
-        let tools = scratch.appending(path: "tools")
-        try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(
-          at: tools.appending(path: "silta"), withDestinationURL: SiltaBinary.url())
-        try Self.githubPages(scratch, tools: tools)
-        for index in 0..<2 {
-          let result = try Self.run(scratch, tools: tools)
-          #expect(result.termination == .exit(0) && result.stdout.contains("Next:"))
-          if index == 0 {
-            try store.write { tx in
-              try tx.database.execute(
-                sql: "UPDATE task SET archive_override='archived',created_by=?",
-                arguments: [ActorID.agent(tool: "claude", session: "acme-other").description])
-            }
+    try withScratchDirectory { scratch in
+      let store = try Self.store(scratch)
+      let tools = scratch.appending(path: "tools")
+      try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
+      try FileManager.default.createSymbolicLink(
+        at: tools.appending(path: "silta"), withDestinationURL: SiltaBinary.url())
+      try Self.githubPages(scratch, tools: tools)
+      for index in 0..<2 {
+        let result = try Self.run(scratch, tools: tools)
+        #expect(result.termination == .exit(0) && result.stdout.contains("Next:"))
+        if index == 0 {
+          try store.write { tx in
+            try tx.database.execute(
+              sql: "UPDATE task SET archive_override='archived',created_by=?",
+              arguments: [ActorID.agent(tool: "claude", session: "acme-other").description])
           }
         }
-        try store.read { db in
-          let rows = try Row.fetchAll(db, sql: "SELECT workspace_id,status,app_id FROM task")
-          #expect(
-            rows.count == 1
-              && rows.allSatisfy { $0["workspace_id"] as Int64 == 2 && $0["app_id"] as Int64? == 1 }
-          )
-          #expect(rows.allSatisfy { $0["status"] as String == "proposed" })
-          let links = try String.fetchAll(db, sql: "SELECT to_ext FROM link ORDER BY to_ext")
-          #expect(links == ["https://example.com/acme/40"])
-          #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == 0)
-        }
+      }
+      try store.read { db in
+        let rows = try Row.fetchAll(db, sql: "SELECT workspace_id,status,app_id FROM task")
+        #expect(
+          rows.count == 1
+            && rows.allSatisfy { $0["workspace_id"] as Int64 == 2 && $0["app_id"] as Int64? == 1 }
+        )
+        #expect(rows.allSatisfy { $0["status"] as String == "proposed" })
+        let links = try String.fetchAll(db, sql: "SELECT to_ext FROM link ORDER BY to_ext")
+        #expect(links == ["https://example.com/acme/40"])
+        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == 0)
       }
     }
   }
@@ -114,31 +112,27 @@ struct DogfoodImportTests {
   }
 
   @Test func failedSiltaReadPrintsItsErrorAndNext() throws {
-    withKnownIssue("JSON errors are captured and the script exits silently") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        let tools = try Self.linkedTools(scratch)
-        try Self.issues([7: "S7: Acme location"], tools: tools)
-        let result = try Self.run(scratch, tools: tools)
-        #expect(result.termination == .exit(1))
-        #expect(result.stderr.contains("not_found") && result.stderr.contains("Next: silta ws"))
-      }
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      let tools = try Self.linkedTools(scratch)
+      try Self.issues([7: "S7: Acme location"], tools: tools)
+      let result = try Self.run(scratch, tools: tools)
+      #expect(result.termination == .exit(1))
+      #expect(result.stderr.contains("not_found") && result.stderr.contains("Next: silta ws"))
     }
   }
 
   @Test func rerunNamesEveryUntriagedImport() throws {
-    withKnownIssue("Next names only the proposals created in this run") {
-      try withScratchDirectory { scratch in
-        _ = try Self.store(scratch)
-        let tools = try Self.linkedTools(scratch)
-        try Self.issues([7: "S7: Acme location"], tools: tools)
-        #expect(try Self.run(scratch, tools: tools).termination == .exit(0))
-        try Self.issues([7: "S7: Acme location", 8: "S8: Acme brief"], tools: tools)
-        let rerun = try Self.run(scratch, tools: tools)
-        #expect(rerun.termination == .exit(0))
-        let next = try #require(rerun.stdout.split(separator: "\n").last)
-        #expect(next.contains("task triage --accept SI-1 SI-2 --approved"))
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.store(scratch)
+      let tools = try Self.linkedTools(scratch)
+      try Self.issues([7: "S7: Acme location"], tools: tools)
+      #expect(try Self.run(scratch, tools: tools).termination == .exit(0))
+      try Self.issues([7: "S7: Acme location", 8: "S8: Acme brief"], tools: tools)
+      let rerun = try Self.run(scratch, tools: tools)
+      #expect(rerun.termination == .exit(0))
+      let next = try #require(rerun.stdout.split(separator: "\n").last)
+      #expect(next.contains("task triage --accept SI-1 SI-2 --approved"))
     }
   }
 
