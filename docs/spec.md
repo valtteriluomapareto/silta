@@ -1098,8 +1098,12 @@ Every CLI call is its own short-lived process, and several agents run at once.
 - **Sequence numbers** (`seq_counter`) are allocated inside the same transaction as
   the row.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
-- **Read commands never write to `silta.db`.** Archiving is computed, and caches are
-  best-effort writes to `index.db`.
+- **Read commands never change `silta.db`'s contents and never migrate.** Archiving is
+  computed, and caches are best-effort writes to `index.db`. A read may recreate the
+  `-wal`/`-shm` files that another SQLite client, or copying `silta.db` alone, left
+  absent, unless `silta.db` itself is read-only. Changes not yet checkpointed into
+  `silta.db` are lost with a missing `-wal`; backups and exports (§15) are the way to
+  move or copy data.
 - **Migrations:**
   - GRDB `DatabaseMigrator` applies atomic migrations excluding competing writers.
     Initialization is serialized across processes, including database mode setup,
