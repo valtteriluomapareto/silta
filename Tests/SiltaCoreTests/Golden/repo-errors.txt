@@ -2,9 +2,11 @@ error: Could not discover repositories; check the scan directories and git metad
 ask human: silta init --help
 error: No matching repository; check the workspace and repository slug. [not_found]
 next: silta repo fetch --help
-error: A local clone is missing or unregistered; restore it and bind its path with init --scan. [env]
-ask human: silta init --help
-error: A discovered repo is absent from the workspace; add it in ws edit, then rescan. [env]
+error: Local clone for platform in acme is missing or unregistered; restore it, then bind its path with init --scan. [env]
+ask human: silta --ws 'acme' init --scan <directory>
+error: Discovered repo "platform" is absent from the workspace; add it in ws edit, then rescan. [env]
 ask human: silta ws edit 'acme'
-error: Could not fetch platform; check network access and noninteractive git credentials. [env]
+error: More than one clone has the same repo slug; scan unambiguous directories. [conflict]
+next: silta init --help
+error: Could not fetch platform; check network access and noninteractive git credentials. Earlier successful repos remain fetched. [env]
 ask human: silta --ws 'acme' repo fetch 'platform'

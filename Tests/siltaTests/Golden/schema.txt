@@ -2,7 +2,7 @@ silta schema  Describe the commands, their flags, their --json data and the erro
 silta ws ls  List workspaces; ask a human to run silta ws edit if empty.
 silta ws use  Select the current workspace.
 silta ws edit  Edit workspace YAML (human-only).
-silta init  Initialize storage or scan local repos; configuration editing is human-only.
+silta init  Initialize or scan repos; select with ws use; configuration editing is human-only.
 silta repo fetch  Fetch a repo, or all registered repos in the workspace, without prompting.
 details: silta schema <command>
 

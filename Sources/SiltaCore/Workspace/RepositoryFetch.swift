@@ -9,28 +9,7 @@ package enum RepositoryFetch {
     _ repo: String?, workspace: String?, store: DatabaseStore, git: any GitRunner, at date: Date
   ) async throws -> [String] {
     let selected = try WorkspaceSelection.resolve(workspace, in: store)
-    let paths = try store.read { db in
-      try Row.fetchAll(
-        db,
-        sql: """
-          SELECT repo.id,repo.slug,repo_path.path
-          FROM repo
-          JOIN workspace ON workspace.id=repo.workspace_id
-          LEFT JOIN repo_path ON repo_path.repo_id=repo.id
-          WHERE workspace.slug=? AND (? IS NULL OR repo.slug=?)
-          ORDER BY repo.slug
-          """, arguments: [selected, repo, repo]
-      ).map { row -> LocalRepo in
-        let id: Int64 = row["id"]
-        let slug: String = row["slug"]
-        guard let path: String = row["path"] else { throw RepoError.localPath }
-        var directory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &directory),
-          directory.boolValue
-        else { throw RepoError.localPath }
-        return LocalRepo(id: id, slug: slug, path: URL(filePath: path, directoryHint: .isDirectory))
-      }
-    }
+    let paths = try registeredPaths(repo: repo, workspace: selected, store: store)
     guard !paths.isEmpty else { throw RepoError.notFound }
     for path in paths {
       do {
@@ -56,6 +35,41 @@ package enum RepositoryFetch {
     }
     return paths.map(\.slug)
   }
+
+  private static func registeredPaths(
+    repo: String?, workspace selected: String, store: DatabaseStore
+  ) throws -> [LocalRepo] {
+    try store.read { db in
+      try Row.fetchAll(
+        db,
+        sql: """
+          SELECT repo.id,repo.slug,repo_path.path
+          FROM repo
+          JOIN workspace ON workspace.id=repo.workspace_id
+          LEFT JOIN repo_path ON repo_path.repo_id=repo.id
+          WHERE workspace.slug=? AND (? IS NULL OR repo.slug=?)
+          ORDER BY repo.slug
+          """, arguments: [selected, repo, repo]
+      ).map { row -> LocalRepo in
+        let id: Int64 = row["id"]
+        let slug: String = row["slug"]
+        guard let path: String = row["path"] else {
+          throw RepoError.localPath(repo: slug, workspace: selected)
+        }
+        var directory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &directory),
+          directory.boolValue
+        else { throw RepoError.localPath(repo: slug, workspace: selected) }
+        guard
+          FileManager.default.fileExists(atPath: URL(filePath: path).appending(path: ".git").path)
+        else {
+          throw RepoError.localPath(repo: slug, workspace: selected)
+        }
+        return LocalRepo(id: id, slug: slug, path: URL(filePath: path, directoryHint: .isDirectory))
+      }
+    }
+  }
+
 }
 
 private struct LocalRepo: Sendable {

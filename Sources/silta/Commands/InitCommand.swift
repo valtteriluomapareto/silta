@@ -5,7 +5,7 @@ import SiltaCore
 struct InitCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "init",
-    abstract: "Initialize storage or scan local repos; configuration editing is human-only.")
+    abstract: "Initialize or scan repos; select with ws use; configuration editing is human-only.")
 
   static let dataShape = Shape.object([
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,

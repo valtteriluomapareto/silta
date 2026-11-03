@@ -51,7 +51,8 @@ extension WorkspaceError: ErrorExamples {
 extension RepoError: ErrorExamples {
   static var examples: [RepoError] {
     [
-      .scan, .notFound, .localPath, .configuration(workspace: "acme"),
+      .scan, .notFound, .localPath(repo: "platform", workspace: "acme"),
+      .configuration(repo: "platform", workspace: "acme"), .duplicateSlug,
       .fetch(repo: "platform", workspace: "acme"),
     ]
   }

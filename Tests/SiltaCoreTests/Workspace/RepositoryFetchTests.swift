@@ -9,12 +9,14 @@ struct RepositoryFetchTests {
   @Test(arguments: [GitTermination.exit(128), .timedOut, .signal(9)])
   func failuresKeepTimestampAndNameRetryTarget(termination: GitTermination) async throws {
     try await withScratchDirectory { home in
+      try FileManager.default.createDirectory(
+        at: home.appending(path: ".git"), withIntermediateDirectories: true)
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
       try WorkspaceConfigTests.apply(
         WorkspaceConfigTests.minimal + "repos: [{slug: platform}]", to: store)
       try WorkspaceSelection.use("acme", in: store)
       let noPaths = ScriptedGitRunner(script: [])
-      await #expect(throws: RepoError.localPath) {
+      await #expect(throws: RepoError.localPath(repo: "platform", workspace: "acme")) {
         try await RepositoryFetch.fetch(
           nil, workspace: nil, store: store, git: noPaths,
           at: WorkspaceConfigTests.instant)
@@ -61,7 +63,8 @@ struct RepositoryFetchTests {
           arguments: [home.path + "/"])
       }
       for slug in ["a", "c"] {
-        try FileManager.default.createDirectory(at: home.appending(path: slug + "/.git"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+          at: home.appending(path: slug + "/.git"), withIntermediateDirectories: true)
       }
       let none = ScriptedGitRunner(script: [])
       await #expect(throws: RepoError.self) {
@@ -69,9 +72,23 @@ struct RepositoryFetchTests {
           nil, workspace: nil, store: store, git: none, at: WorkspaceConfigTests.instant)
       }
       #expect(none.requests.isEmpty)
+    }
+  }
+
+  @Test func partialFailureKeepsSuccessfulTimestampsAndStops() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      try WorkspaceConfigTests.apply(
+        WorkspaceConfigTests.minimal + "repos: [{slug: a}, {slug: b}, {slug: c}]", to: store)
+      try WorkspaceSelection.use("acme", in: store)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: "INSERT INTO repo_path(repo_id,path,fetched_at) SELECT id,?||slug,'kept' FROM repo",
+          arguments: [home.path + "/"])
+      }
       for slug in ["a", "b", "c"] {
         try FileManager.default.createDirectory(
-          at: home.appending(path: slug), withIntermediateDirectories: true)
+          at: home.appending(path: slug + "/.git"), withIntermediateDirectories: true)
       }
       let git = ScriptedGitRunner(script: [
         (
@@ -105,13 +122,17 @@ struct RepositoryFetchTests {
   }
   @Test func errorsHaveGoldenRecoveryAndEmptyWorkspaceHasNoFetches() async throws {
     let examples: [RepoError] = [
-      .scan, .notFound, .localPath, .configuration(workspace: "acme"),
+      .scan, .notFound, .localPath(repo: "platform", workspace: "acme"),
+      .configuration(repo: "platform", workspace: "acme"), .duplicateSlug,
       .fetch(repo: "platform", workspace: "acme"),
     ]
     let rendered = examples.map {
       OutputRouter.render(.failure($0), mode: .init(json: false)).stderr
     }.joined()
     Golden.forTests().check(rendered, "repo-errors.txt")
+    let json = examples.map { OutputRouter.render(.failure($0), mode: .init(json: true)).stdout }
+      .joined()
+    Golden.forTests().check(json, "repo-errors.json")
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home)
       try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
@@ -127,25 +148,28 @@ struct RepositoryFetchTests {
   }
 
   @Test func staleNestedCloneCannotFetchAnEnclosingRepo() async throws {
-    await withKnownIssue("#9: staleNestedCloneCannotFetchAnEnclosingRepo") {
     try await withScratchDirectory { home in
       let parent = home.appending(path: "parent")
       let nested = parent.appending(path: "clone")
-      try FileManager.default.createDirectory(at: parent.appending(path: ".git"), withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(
+        at: parent.appending(path: ".git"), withIntermediateDirectories: true)
       try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal + "repos: [{slug: platform}]", to: store)
+      try WorkspaceConfigTests.apply(
+        WorkspaceConfigTests.minimal + "repos: [{slug: platform}]", to: store)
       try WorkspaceSelection.use("acme", in: store)
       try store.write { tx in
-        try tx.database.execute(sql: "INSERT INTO repo_path(repo_id,path) SELECT id,? FROM repo", arguments: [nested.path])
+        try tx.database.execute(
+          sql: "INSERT INTO repo_path(repo_id,path) SELECT id,? FROM repo", arguments: [nested.path]
+        )
       }
       let git = ScriptedGitRunner(script: [])
-      await #expect(throws: RepoError.localPath) {
-        try await RepositoryFetch.fetch(nil, workspace: nil, store: store, git: git,
+      await #expect(throws: RepoError.localPath(repo: "platform", workspace: "acme")) {
+        try await RepositoryFetch.fetch(
+          nil, workspace: nil, store: store, git: git,
           at: WorkspaceConfigTests.instant)
       }
       #expect(git.requests.isEmpty)
-    }
     }
   }
 

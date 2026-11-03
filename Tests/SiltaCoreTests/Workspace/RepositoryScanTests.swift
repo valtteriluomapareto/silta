@@ -191,7 +191,7 @@ struct RepositoryScanTests {
         script += Self.script(try Self.path(repo))
       }
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      await #expect(throws: WorkspaceError.self) {
+      await #expect(throws: RepoError.duplicateSlug) {
         try await RepositoryScan.scan(
           [root], store: store, git: ScriptedGitRunner(script: script),
           identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
@@ -214,7 +214,7 @@ struct RepositoryScanTests {
       let repo = home.appending(path: "new")
       try FileManager.default.createDirectory(
         at: repo.appending(path: ".git"), withIntermediateDirectories: true)
-      await #expect(throws: RepoError.configuration(workspace: "acme")) {
+      await #expect(throws: RepoError.configuration(repo: "new", workspace: "acme")) {
         try await RepositoryScan.scan(
           [repo], store: store,
           git: ScriptedGitRunner(script: Self.script(try Self.path(repo))),
@@ -263,41 +263,69 @@ struct RepositoryScanTests {
     }
   }
 
+}
+
+extension RepositoryScanTests {
   @Test func rescanRejectsSameSlugClonesAndKeepsRegisteredPath() async throws {
-    await withKnownIssue("#9: rescanRejectsSameSlugClonesAndKeepsRegisteredPath") {
     try await withScratchDirectory { home in
       let root = home.appending(path: "acme")
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal + "repos: [{slug: same}]", to: store)
+      try WorkspaceConfigTests.apply(
+        WorkspaceConfigTests.minimal + "repos: [{slug: same}]", to: store)
       try store.write { tx in
-        try tx.database.execute(sql: "INSERT INTO repo_path(repo_id,path) SELECT id,'/acme/kept' FROM repo")
+        try tx.database.execute(
+          sql: "INSERT INTO repo_path(repo_id,path) SELECT id,'/acme/kept' FROM repo")
       }
       var script: [(GitRequest, Result<GitResult, any Error>)] = []
       for suffix in ["a/same", "b/same"] {
         let repo = root.appending(path: suffix)
-        try FileManager.default.createDirectory(at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+          at: repo.appending(path: ".git"), withIntermediateDirectories: true)
         script += Self.script(try Self.path(repo))
       }
-      await #expect(throws: (any Error).self) {
-        try await RepositoryScan.scan([root], store: store, git: ScriptedGitRunner(script: script),
+      await #expect(throws: RepoError.duplicateSlug) {
+        try await RepositoryScan.scan(
+          [root], store: store, git: ScriptedGitRunner(script: script),
           identity: (SeededIDGenerator(seed: 2), WorkspaceConfigTests.instant))
       }
-      #expect(try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == "/acme/kept")
-    }
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") }
+          == "/acme/kept")
     }
   }
 
   @Test(arguments: ["origin/release/api\norigin/release/api-prod\n", "origin/master\n"])
-  func nestedBranchesAndMasterHaveStableStubs(refs: String) async throws {
+  func nestedBranchesAndDefaultRefHaveStableStubs(refs: String) async throws {
     try await withScratchDirectory { home in
       let repo = home.appending(path: "acme")
-      try FileManager.default.createDirectory(at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      _ = try await RepositoryScan.scan([repo], store: store,
+      _ = try await RepositoryScan.scan(
+        [repo], store: store,
         git: ScriptedGitRunner(script: Self.script(try Self.path(repo), refs: refs)),
         identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
       let slug = try store.read { try String.fetchOne($0, sql: "SELECT slug FROM app") }
       #expect(slug == (refs.contains("release") ? "acme-release-api" : "acme"))
+    }
+  }
+
+  @Test func gitSpawnFailureIsAnEnvironmentError() async throws {
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "acme")
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      let request = GitRequest(
+        arguments: ["worktree", "list", "--porcelain", "-z"], directory: try Self.path(repo))
+      let git = ScriptedGitRunner(script: [(request, .failure(SeamError.gitUnavailable))])
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      await #expect(throws: RepoError.scan) {
+        try await RepositoryScan.scan(
+          [repo], store: store, git: git,
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+      }
+      #expect(git.isExhausted)
+      #expect(!FileManager.default.fileExists(atPath: store.path))
     }
   }
 

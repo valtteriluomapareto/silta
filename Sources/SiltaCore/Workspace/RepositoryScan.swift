@@ -13,6 +13,7 @@ package enum RepositoryScan {
     guard let first = roots.first else { throw RepoError.scan }
     let slug = workspace ?? first.standardizedFileURL.lastPathComponent.lowercased()
     let repos = try await discover(roots, git: git)
+    guard Set(repos.map(\.slug)).count == repos.count else { throw RepoError.duplicateSlug }
     try store.write { tx in
       do {
         let db = tx.database
@@ -34,7 +35,7 @@ package enum RepositoryScan {
                 JOIN workspace ON workspace.id=repo.workspace_id
                 WHERE workspace.slug=? AND repo.slug=?
                 """, arguments: [slug, repo.slug])
-          else { throw RepoError.configuration(workspace: slug) }
+          else { throw RepoError.configuration(repo: repo.slug, workspace: slug) }
           try db.execute(
             sql: """
               INSERT INTO repo_path(repo_id,path)
