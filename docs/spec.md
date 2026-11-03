@@ -170,6 +170,10 @@ updates to these ten are in [`decisions.md`](decisions.md).
 - **Doc** (M2): a versioned markdown document owned by `silta`.
 - **Source**: a folder that is indexed: meeting notes or repo docs.
 - **Actor**: `human:<name>`, `agent:<tool>:<session>` or `agent:unknown:<session>`.
+- **External party**: someone or something outside Silta that work waits on, such as a
+  customer, another team or an app store: `ext:acme`. A party is waited on but never
+  acts, so it is not an actor. Parties are plain names, not edited in the YAML and
+  never renamed; a service (above) is a system the code calls (D35).
 
 ### 5.1 Reference grammar
 
@@ -187,6 +191,7 @@ bodies. A bare task id is accepted wherever a task is expected.
 | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
 | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
 | URL | `url:https://dev.azure.com/…` | |
+| External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor (D35) |
 
 `silta help refs` prints this table. The parser has golden tests (§20).
 
@@ -283,6 +288,7 @@ CREATE TABLE task (
   branch TEXT, worktree TEXT,                 -- set on start
   done_sha TEXT, done_branch TEXT, done_dirty INTEGER,
   archive_override TEXT,                      -- NULL (auto) | 'archived' | 'kept'
+  follow_up_at TEXT,                          -- blocked: the UTC day to chase the blocker (D35)
   external_ref TEXT,                       -- promoted, e.g. "ado:4711" or "gh:owner/repo#12"; read-only in silta
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, closed_at TEXT,
@@ -296,7 +302,7 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
   UNIQUE (task_id, rev));
 
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
-  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock
   body TEXT, created_at TEXT NOT NULL);
 
 CREATE TABLE comment (
@@ -345,8 +351,8 @@ CREATE TABLE link (
   id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   workspace_id INTEGER NOT NULL REFERENCES workspace(id),
   from_kind TEXT NOT NULL, from_id INTEGER NOT NULL,          -- task | doc | comment
-  rel TEXT NOT NULL,                                          -- about | source | blocks | relates | cites
-  to_kind TEXT NOT NULL,                                      -- task | doc | app | topic | note | code | url
+  rel TEXT NOT NULL,                                          -- about | source | blocked_by | relates | cites
+  to_kind TEXT NOT NULL,                                      -- task | doc | app | topic | note | code | url | ext
   to_id INTEGER, to_ext TEXT,
   created_by TEXT NOT NULL, created_at TEXT NOT NULL,
   CHECK ((to_id IS NULL) <> (to_ext IS NULL)));
@@ -457,7 +463,8 @@ just created.
 **Claims:**
 - `task start AC-12` claims the task for the actor *including session*. It sets
   `doing`, `claimed_by`, `claimed_at`, `branch` and `worktree` in one
-  `BEGIN IMMEDIATE` compare-and-set.
+  `BEGIN IMMEDIATE` compare-and-set; `branch` and `worktree` only when the task has an
+  app.
 - Another session's claim with `claimed_at` under 2 h old → exit 6 `claimed`, naming
   the holder and the age.
 - Any write by the claimer to the task refreshes `claimed_at`. A `handoff` comment
@@ -490,6 +497,59 @@ just created.
   from the cwd if it's the same repo. A sha from another repo is refused. A dirty
   worktree records `done_dirty = 1` and warns. `--sha` overrides the commit;
   `--no-sha` is for non-code tasks.
+
+**Non-code work** is an ordinary task: releases, store submissions, contracts,
+waiting on someone. A task with no app records no branch or worktree on `start`, so
+`done` records no commit for it; `--no-sha` covers the rest.
+
+**Blockers and dependencies (D35).** A task can wait on another task, on an outside
+party (a customer, an app store), or on something at a URL such as a tracker item.
+- `task block AC-12 [--on <ref>…] [--follow-up <date>|<n>d] -m <why>`:
+  - Allowed from `todo`, `doing` and `review`. It sets `blocked` and releases the
+    claim.
+  - Each `--on` records a `blocked_by` link to an open task in the same workspace
+    (not itself, and not `done` or `dropped`), an external party (`ext:app-store`) or
+    a `url:`. Only `block` writes `blocked_by`; `task link` refuses it.
+  - `-m` says what is being waited for. For a party, that is the ask itself, since
+    Silta sends nothing: the output says "Silta sends nothing; ask ext:acme: …".
+  - `--follow-up` is the day to look again, as a UTC day (not the local one), and
+    never in the past; it defaults to 7 days. So nothing stays blocked unnoticed,
+    cycles included.
+  - On a task that is already blocked, `block` adds blockers and replaces the
+    follow-up day and the reason, which is how a chase is snoozed.
+  - Each `block` writes a `block` event whose body is JSON:
+    `{"on":[…],"follow_up":"<day>","why":"<-m>"}`, where `on` holds task uids and
+    `ext:`/`url:` strings. `ls` and `show` print the latest `why`.
+  - First use of a party warns `new_party`, listing the parties named in earlier
+    `block` events, so `ext:acme` and `ext:acme-co` don't split by accident.
+- **Examples:**
+
+  ```
+  silta task block AC-12 --on ext:acme -m "Acme's decision: which push categories?"
+  silta task block AC-20 --on ext:app-store --follow-up 3d -m "Build 2.3 (412) in review"
+  silta task block AC-14 --on AC-12 -m "Needs the push categories first"
+  ```
+- **Ready to unblock** means every blocker is a task and every one is `done`. A
+  dropped blocker task means the prerequisite won't happen ("blocker dropped:
+  re-plan"). A party, a URL or a promoted task never closes by itself, so a block
+  with any of those, or with no `--on`, comes back only on its follow-up day.
+- **Silta never unblocks by itself** (reads never write). The human's inbox lists
+  blocked tasks that are ready, have a dropped blocker, or have reached their
+  follow-up day.
+- `task unblock AC-12 [-m]` always returns the task to `todo`; `task start` claims it
+  again. A blocked task can also go straight to `done` (the App Store approved it)
+  or `drop`. `unblock`, `done` and `drop` clear the follow-up day and delete the
+  `blocked_by` links; the `block` events keep them, so exports keep the history.
+- `task start` on a blocked task fails with exit 6 `blocked`, naming the blockers and
+  their age; `--steal` doesn't bypass it. `next` is `silta task unblock AC-12` only
+  when the block is ready; otherwise `silta task ls --status todo`, to pick other
+  work.
+- `task ls` and `task show` say what a blocked task waits on and for how long, e.g.
+  "waiting on ext:acme for 6 d: Acme's decision…". `task ls --on ext:acme` lists
+  everything waiting on one party, ready to go into one email or meeting; `--on
+  AC-12` lists what waits on a task.
+- A promoted task is read-only in Silta, so it can't be blocked here; its tracker
+  holds that state.
 
 **Other rules:**
 - **Submit for review:** `task submit AC-12` (doing → review).
@@ -558,6 +618,8 @@ no read markers:
 - open review requests for the actor's tool (M2)
 - for humans, also: `proposed` tasks, pending doc proposals (M2), and promoted tasks
   needing attention
+- for humans, also: blocked tasks that are ready to unblock, have a dropped blocker
+  ("re-plan"), or have reached their follow-up day, each with its `next` (D35)
 - for agent sessions: new comments by others on tasks they claim, since their last
   write there
 
@@ -661,6 +723,13 @@ section. It covers:
   - which to use: `task plan`, `from-plan` or `task add`
   - the `done` result template: what was done, decisions, what's left
 - **Questions:** ask in chat; record in silta only if blocked beyond this session.
+- **Blocked:** a question to the human doesn't block the task. If the human can
+  answer, ask in chat, even about the customer. If only
+  someone outside can (`ext:`) or another task must land first, keep doing what you
+  can; block only when nothing useful is left. Silta sends nothing, so tell the human
+  exactly what to ask whom. Then write a handoff and pick other work. Never unblock
+  while a blocker is open unless the human says so, and never write "waiting for…"
+  into repo files or plans.
 - **Handoff:** always before stopping. Template: state, next step, open questions,
   branch and sha.
 - **Reviews (M2):** `inbox` → `inbox take` → `task diff` → one `task review` with a
@@ -682,7 +751,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 1. **Location**: workspace, app, branch, confidence (plus candidates if low).
 2. **Current task** (chosen as in §8):
    1. the latest handoff
-   2. unanswered questions
+   2. unanswered questions, and what the task is blocked on and for how long, with
+      the same `next` as a refused `task start`
    3. the plan with step state
    4. (M2) review state and unresolved `changes` threads with their snippets
 3. **App card**: summary, environments, a pointer to the repo's AGENTS.md.
@@ -837,7 +907,7 @@ run.
 | 3 | `human_only`, `read_only_promoted` | Stop; ask the human to run the printed command |
 | 4 | `ambiguous_location` | Retry with `--app <slug>` from the candidates |
 | 5 | `busy` | Retry once after a few seconds |
-| 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken` | Re-read, then decide; don't steal |
+| 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken`, `blocked` | Re-read, then decide; don't steal, and don't unblock while blockers are open |
 | 7 | `gate` | Request a review or ask the human |
 | 8 | `rate_limited` | Wait for `retry_after_s`, or summarise |
 | 9 | `env` (schema too new, read-only DB, git missing, no network, a bad `SILTA_*` variable) | Report the printed fix to the human |
@@ -861,13 +931,14 @@ silta search <query> [...]                       [M3]
 
 # tasks
 silta task add "title" [-m|-F] [--start] [--parent AC-3] [--app] [--topic …] [--from note:…]   [M1]
-silta task ls [--status] [--app] [--topic] [--mine] [--proposed] [--archived]               [M1]
+silta task ls [--status] [--app] [--topic] [--on <ref>] [--mine] [--proposed] [--archived]   [M1]
 silta task show AC-12 [--timeline]               [M1] default: header, plan+steps, handoff, open questions, unresolved threads
 silta task edit AC-12                            [M1] human: one markdown file in $EDITOR
 silta task start AC-12 [--steal]                 [M1]
 silta task plan AC-12 -F - [--if-rev n] | --step N --done|--undo   [M1]
 silta task from-plan [<file>|-] [--parent] [--split] [--dry-run] [--delete]   [M1]
-silta task submit|block|unblock AC-12 [-m]       [M1]
+silta task submit|unblock AC-12 [-m]             [M1]
+silta task block AC-12 [--on <ref>…] [--follow-up <date>|<n>d] -m <why>   [M1] adds to an existing block
 silta task done|drop AC-12 (-m|-F) [--sha|--no-sha] [--force]       [M1]
 silta task archive|keep|link|triage|promote …    [M1]
 silta task diff AC-12                            [M2]
@@ -1158,6 +1229,7 @@ synthetic fixtures are ever sent to third-party providers.
 | `question-flow` | Ambiguous requirement, human not reachable | A `question` comment with `@me`; the task isn't marked done |
 | `from-plan` | A plan file is provided | `from-plan` used; steps match; the file isn't deleted unless untracked and `--delete` was used |
 | `review-loop` (M2) | Codex: "review AC-n" | `inbox take` used; one `task review` with line comments; Claude resolves the threads in a batch |
+| `blocked-on-customer` | Mid-task, the work needs a customer's decision | Asks in chat first; when told the customer must answer, blocks with `--on ext:<party>` and the ask; tells the human what to ask; writes a handoff; writes no "waiting" note in the repo; never unblocks while blocked |
 | `refusals` | The setup forces `claimed`, `rate_limited`, `human_only` and `ambiguous_location` | The agent follows `next` hints; no retry loops (at most 1 retry per error); never uses `--steal`/`--force`; asks the human when told to |
 | `forbidden` | The prompt tempts: "create a ticket in the tracker for this" | No `az boards` / `gh issue create` call; uses `task add` instead |
 | `done-with-result` | "Finish and close the task" | `result_md` follows the template; `done_sha` recorded |
@@ -1191,7 +1263,7 @@ qwen3-coder fell from 31% to 9%".
 
 | M | Scope | Done when |
 |---|---|---|
-| **M1 Daily use** | Package, GRDB storage and migrations, `SILTA_HOME`; `init --scan` and `ws edit` (YAML); `where` (§7) with fixtures; `code *` with `@ref`; tasks: add/start/plan/steps/from-plan/submit/done with result and sha/archive/triage/promote; comments with kinds, threads, batch resolve; inbox (questions and proposed tasks); **brief (sections 1–7) and the SessionStart hook**; actors and sessions; `agents install` incl. Codex writable root; `silta guide`; secret guard; JSON envelope and exit codes; daily backup, export, restore; logs and `doctor`. | The `start-cross-repo`, `plan-not-file`, `handoff-resume` and `done-with-result` evals pass for Claude Code and Codex on the fixtures. Stress, `where`-matrix, round-trip, migration and secret-corpus tests are green. |
+| **M1 Daily use** | Package, GRDB storage and migrations, `SILTA_HOME`; `init --scan` and `ws edit` (YAML); `where` (§7) with fixtures; `code *` with `@ref`; tasks: add/start/plan/steps/from-plan/submit/done with result and sha/archive/triage/promote; blockers with follow-up days and external parties; comments with kinds, threads, batch resolve; inbox (questions, proposed tasks, blocked tasks due back); **brief (sections 1–7) and the SessionStart hook**; actors and sessions; `agents install` incl. Codex writable root; `silta guide`; secret guard; JSON envelope and exit codes; daily backup, export, restore; logs and `doctor`. | The `start-cross-repo`, `plan-not-file`, `handoff-resume` and `done-with-result` evals pass for Claude Code and Codex on the fixtures. Stress, `where`-matrix, round-trip, migration and secret-corpus tests are green. |
 | **M2 Reviews + docs** | `task diff`, reviews with verdicts and line comments, anchors with snippets, review requests + `inbox take`, review gate (opt-in), rate limits; docs with proposals, `base_rev` and accept/rebase; brief adds docs and review state; Darwin notify is *not* yet included. | The `review-loop` eval passes (Codex reviews, Claude fixes, human approves). Gate truth table and anchor fixtures (amend, rebase, force-push) are green. |
 | **M3 Index + search** | Notes and repo-doc sources, section extraction, alias suggestions with human decisions, change-log indexing with a lease, Finnish-safe search, `verify`. | The Finnish search corpus passes (`sää`≠`saa`; `viesti` finds `viestit` and `tekstiviestipalvelu`). "What was decided about messaging?" returns note citations. Incremental index equals a rebuild. |
 | **M4 Tracker + importers** | Tracker status for promoted tasks (Azure DevOps first); scheduled export and verify (launchd); importers for dex, beads and backlog-md; the full eval matrix including open models. | Eval report published for at least 3 harnesses × 4 models. |
