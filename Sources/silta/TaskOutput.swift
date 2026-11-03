@@ -6,7 +6,7 @@ enum TaskOutput {
 
   static let detailShape = Shape.object([
     "ref": .string, "title": .string, "status": .string, "description": .string,
-    "result": .optional(.string), "created_by": .string,
+    "plan": .string, "plan_rev": .int, "result": .optional(.string), "created_by": .string,
     "claimed_by": .optional(.string), "claimed_at": .optional(.string), "app": .optional(.string),
     "branch": .optional(.string), "worktree": .optional(.string), "done_sha": .optional(.string),
     "done_branch": .optional(.string), "done_dirty": .optional(.bool),
@@ -31,6 +31,7 @@ enum TaskOutput {
     if let claim = task.claimedBy { lines.append("Claimed by: \(claim)") }
     for (heading, text) in [
       ("Description", task.description),
+      ("Plan (revision \(task.planRev))", task.plan),
       ("Result", task.result ?? ""),
     ] where !text.isEmpty {
       lines.append("\n\(heading):\n\(text)")

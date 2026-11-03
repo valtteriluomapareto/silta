@@ -1,0 +1,22 @@
+fixtures: true
+steps:
+  - args: [init, --scan, ., --json]
+    cwd: fixtures
+    expect: {exit: 0, json: {data.workspace: fixtures}}
+  - args: [ws, use, fixtures, --json]
+    expect: {exit: 0}
+  - args: [task, add, Acme plan, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: FI-1, data.status: doing}}
+  - args: [task, plan, FI-1, -m, '- [ ] Ship', --if-rev, '0', --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.plan_rev: 1, data.plan: '- [ ] Ship'}}
+  - args: [task, plan, FI-1, --step, '1', --done, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.plan_rev: 1, data.plan: '- [x] Ship'}}
+  - args: [task, done, FI-1, -m, Shipped Acme., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.status: done}}
+  - args: [task, show, FI-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 0, json: {data.plan_rev: 1, data.plan: '- [x] Ship', data.result: Shipped Acme.}}

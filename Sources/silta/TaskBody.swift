@@ -4,13 +4,15 @@ import SiltaCore
 
 /// Reads command bodies without putting their content into recovery commands.
 struct TaskBody: ParsableArguments {
-  @Option(name: [.customShort("m"), .long], help: "Supply the markdown body.")
+  @Option(
+    name: [.customShort("m"), .long], parsing: .unconditional,
+    help: "Supply the markdown body.")
   var message: String?
 
   @Option(name: .customShort("F"), help: "Read UTF-8 from a file, or - for stdin.")
   var file: String?
 
-  @Flag(help: "Retain detected secrets (human-only; retry with -F <file>).")
+  @Flag(help: "Retain detected secrets (human-only; use file input for a body retry).")
   var allowSecret = false
 
   func read(actor: ActorID, command: String) throws -> String? {

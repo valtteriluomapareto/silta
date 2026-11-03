@@ -6,6 +6,7 @@ struct TaskCommand: ParsableCommand {
     subcommands: [
       TaskAddCommand.self, TaskListCommand.self, TaskShowCommand.self,
       TaskStartCommand.self, TaskSubmitCommand.self, TaskDoneCommand.self, TaskDropCommand.self,
+      TaskPlanCommand.self, TaskFromPlanCommand.self,
     ])
 
   @OptionGroup var global: GlobalOptions

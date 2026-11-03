@@ -64,7 +64,7 @@ extension TaskError: ErrorExamples {
       .notFound, .invalid("A result is required."),
       .claimed("AC-1", holder: "agent:codex:acme", minutes: 4), .proposal("AC-1"),
       .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
-      .changed("AC-1"),
+      .changed("AC-1"), .staleRev("AC-1", actual: 2),
     ]
   }
 }
@@ -96,7 +96,7 @@ struct ErrorReachabilityTests {
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
     .unregistered, .readOnlyPromoted, .ambiguousLocation,
-    .staleRev, .leaseTaken, .rateLimited,
+    .leaseTaken, .rateLimited,
   ]
 
   static var examples: [any CodedError] {

@@ -13,7 +13,8 @@ extension TaskService {
         command: "silta task done " + shellWord(ref) + " --force -F <file>")
     }
     let command = (dropped ? "silta task drop " : "silta task done ") + shellWord(ref)
-    let content = try checked(result ?? "", allow: commit.allowSecret, command: command)
+    let content = try checked(
+      result ?? "", allow: commit.allowSecret, command: command + " -F <file>")
     try requireResult(content.0)
     guard !(commit.sha != nil && commit.noSHA) else {
       throw TaskError.invalid("--sha and --no-sha cannot be combined.")

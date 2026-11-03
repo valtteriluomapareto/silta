@@ -20,6 +20,8 @@ error: A human approval is required; ask a human to approve or use done --force.
 next: silta task show AC-1
 error: Task repository information changed; re-read before retrying. [conflict]
 next: silta task show AC-1
+error: AC-1 has plan revision 2; re-read before replacing it. [stale_rev]
+next: silta task show AC-1
 error: Database is busy; retry the original invocation once after retry_after_s. [busy]
 retry after: 5s
 next: silta task add

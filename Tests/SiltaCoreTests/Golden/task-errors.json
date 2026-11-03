@@ -9,4 +9,5 @@
 {"error":{"code":"invalid","message":"Use a worktree and commit from the task's registered repository.","next":["silta task add --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"gate","message":"A human approval is required; ask a human to approve or use done --force.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"conflict","message":"Task repository information changed; re-read before retrying.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"stale_rev","message":"AC-1 has plan revision 2; re-read before replacing it.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"busy","message":"Database is busy; retry the original invocation once after retry_after_s.","next":["silta task add"],"next_by":"agent","retry_after_s":5},"ok":false,"schema":1,"warnings":[]}
