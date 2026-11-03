@@ -14,46 +14,42 @@ struct DogfoodReportTests {
   }
 
   @Test func reportMatchesWrittenMetricsAndPrivacyContract() throws {
-    withKnownIssue("Report lacks Until, partitions and per-task friction") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        let tools = try Self.tools(scratch)
-        let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(0))
-        Golden.forTests().check(result.stdout, "dogfood-report.md")
-        #expect(
-          !result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply"))
-        #expect(result.stderr.isEmpty)
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(0))
+      Golden.forTests().check(result.stdout, "dogfood-report.md")
+      #expect(
+        !result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply"))
+      #expect(result.stderr.isEmpty)
     }
   }
 
   @Test func newestReportDateAndFirstReportFallback() throws {
-    withKnownIssue("The first report claims logs it no longer has") {
-      try withScratchDirectory { scratch in
-        _ = try DogfoodReportTests.setup(scratch)
-        let tools = try DogfoodReportTests.tools(scratch)
-        let folder = scratch.appending(path: "report-repo")
-        let scripts = folder.appending(path: "scripts")
-        let reports = folder.appending(path: "docs/dogfood/reports")
-        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
-        let script = scripts.appending(path: "dogfood-report.sh")
-        try FileManager.default.copyItem(
-          at: DogfoodReportTests.root.appending(path: "scripts/dogfood-report.sh"), to: script)
-        let first = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
-        #expect(first.termination == .exit(0) && first.stdout.contains("Since: 1970-01-01"))
-        #expect(
-          first.stdout.contains(
-            "Warning: --since predates the oldest log; calls before 2023-11-14 are missing."))
-        for day in ["2023-11-13", "2023-11-14"] {
-          try Data("Acme report".utf8).write(to: reports.appending(path: day + ".md"))
-        }
-        let next = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
-        #expect(next.termination == .exit(0))
-        #expect(!next.stdout.contains("Warning:"))
-        Golden.forTests().check(next.stdout, "dogfood-report.md")
+    try withScratchDirectory { scratch in
+      _ = try DogfoodReportTests.setup(scratch)
+      let tools = try DogfoodReportTests.tools(scratch)
+      let folder = scratch.appending(path: "report-repo")
+      let scripts = folder.appending(path: "scripts")
+      let reports = folder.appending(path: "docs/dogfood/reports")
+      try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
+      let script = scripts.appending(path: "dogfood-report.sh")
+      try FileManager.default.copyItem(
+        at: DogfoodReportTests.root.appending(path: "scripts/dogfood-report.sh"), to: script)
+      let first = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
+      #expect(first.termination == .exit(0) && first.stdout.contains("Since: 1970-01-01"))
+      #expect(
+        first.stdout.contains(
+          "Warning: --since predates the oldest log; calls before 2023-11-14 are missing."))
+      for day in ["2023-11-13", "2023-11-14"] {
+        try Data("Acme report".utf8).write(to: reports.appending(path: day + ".md"))
       }
+      let next = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
+      #expect(next.termination == .exit(0))
+      #expect(!next.stdout.contains("Warning:"))
+      Golden.forTests().check(next.stdout, "dogfood-report.md")
     }
   }
 
@@ -67,16 +63,13 @@ struct DogfoodReportTests {
     }
   }
 
-  @Test(arguments: ["logs", "list", "timeline", "schema", "sqlite", "missing", "asof"])
+  @Test(arguments: ["list", "timeline", "schema", "sqlite", "missing", "asof"])
   func failedCollectionNeverPublishesPartialMarkdown(failure: String) throws {
     try withScratchDirectory { scratch in
       _ = try DogfoodReportTests.setup(scratch)
       let tools = try DogfoodReportTests.tools(scratch)
       let binary = shellWord(try SiltaBinary.url().path)
       switch failure {
-      case "logs":
-        try Data("Acme foreign malformed content".utf8).write(
-          to: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
       case "list", "timeline", "schema":
         let match = failure == "list" ? "task ls" : failure == "timeline" ? "task show" : "schema"
         try DogfoodReportTests.tool(
@@ -108,91 +101,85 @@ struct DogfoodReportTests {
   }
 
   @Test func emptyWorkspaceHasRealZeroMeasurementsAndUnavailableInbox() throws {
-    withKnownIssue("Empty data prints median 0 and bare table headers") {
-      try withScratchDirectory { scratch in
-        _ = try DogfoodImportTests.store(scratch)
-        let tools = try DogfoodReportTests.tools(scratch)
-        try FileManager.default.removeItem(
-          at: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
-        let result = try DogfoodReportTests.run(
-          ["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("Logs available from: none."))
-        #expect(result.stdout.contains("Untagged log lines: 0. Unreadable log lines: 0."))
-        #expect(result.stdout.contains("0 sessions; median n/a; maximum n/a."))
-        #expect(
-          result.stdout.contains(
-            "Proposals accepted: 0; dropped: 0; left untriaged past 14 days: 0."))
-        #expect(result.stdout.contains("Oldest pending proposal: none."))
-        #expect(result.stdout.contains("Triage wait: median n/a; maximum n/a."))
-        #expect(result.stdout.contains("Done tasks without a Friction line: 0."))
-        #expect(result.stdout.contains("## Calls\n\nNone.\n"))
-        #expect(result.stdout.contains("## Warnings\n\nNone.\n"))
-        #expect(result.stdout.contains("Open dogfood tasks:\n\nNone.\n"))
-        #expect(result.stdout.contains("Inbox size and oldest item: n/a (S11)."))
-      }
+    try withScratchDirectory { scratch in
+      _ = try DogfoodImportTests.store(scratch)
+      let tools = try DogfoodReportTests.tools(scratch)
+      try FileManager.default.removeItem(
+        at: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+      let result = try DogfoodReportTests.run(
+        ["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("Logs available from: none."))
+      #expect(result.stdout.contains("Untagged log lines: 0. Unreadable log lines: 0."))
+      #expect(result.stdout.contains("0 sessions; median n/a; maximum n/a."))
+      #expect(
+        result.stdout.contains(
+          "Proposals accepted: 0; dropped: 0; left untriaged past 14 days: 0."))
+      #expect(result.stdout.contains("Oldest pending proposal: none."))
+      #expect(result.stdout.contains("Triage wait: median n/a; maximum n/a."))
+      #expect(result.stdout.contains("Done tasks without a Friction line: 0."))
+      #expect(result.stdout.contains("## Calls\n\nNone.\n"))
+      #expect(result.stdout.contains("## Warnings\n\nNone.\n"))
+      #expect(result.stdout.contains("Open dogfood tasks:\n\nNone.\n"))
+      #expect(result.stdout.contains("Inbox size and oldest item: n/a (S11)."))
     }
   }
 
   @Test func unreadableLogLinesAreCountedWithoutContent() throws {
-    withKnownIssue("One malformed or timeless log line aborts the report") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        let tools = try Self.tools(scratch)
-        let log = scratch.appending(path: "silta-home/log/2023-11-14.jsonl")
-        let handle = try FileHandle(forWritingTo: log)
-        try handle.seekToEnd()
-        try handle.write(
-          contentsOf: Data(
-            """
-            Acme foreign malformed content
-            {"command":"Acme untagged without time","actor":"agent:codex:acme","exit_code":0}
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let log = scratch.appending(path: "silta-home/log/2023-11-14.jsonl")
+      let handle = try FileHandle(forWritingTo: log)
+      try handle.seekToEnd()
+      try handle.write(
+        contentsOf: Data(
+          """
+          Acme foreign malformed content
+          {"command":"Acme untagged without time","actor":"agent:codex:acme","exit_code":0}
 
-            """.utf8))
-        try handle.close()
-        let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("Untagged log lines: 1. Unreadable log lines: 2."))
-        #expect(!result.stdout.contains("Acme foreign") && !result.stdout.contains("without time"))
-      }
+          """.utf8))
+      try handle.close()
+      let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("Untagged log lines: 1. Unreadable log lines: 2."))
+      #expect(!result.stdout.contains("Acme foreign") && !result.stdout.contains("without time"))
     }
   }
 
   @Test func proposalExpiryPreservesMilliseconds() throws {
-    withKnownIssue("Expiry overlaps accepted proposals") {
-      try withScratchDirectory { scratch in
-        let store = try DogfoodReportTests.setup(scratch)
-        try store.write { tx in
-          try tx.database.execute(
-            sql: """
-              UPDATE task_event
-              SET created_at='2023-11-16T00:00:00.500Z'
-              WHERE task_id=5 AND kind='created';
-              UPDATE task_event
-              SET created_at='2023-11-01T00:00:00.500Z'
-              WHERE task_id=10 AND kind='created';
-              UPDATE task_event
-              SET created_at='2023-11-15T00:00:00.400Z'
-              WHERE task_id=10 AND kind='status';
-              """)
-        }
-        let tools = try DogfoodReportTests.tools(scratch)
-        let report = try DogfoodReportTests.run(
-          ["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(report.termination == .exit(0))
-        #expect(report.stdout.contains("left untriaged past 14 days: 0."))
-        #expect(report.stdout.contains("Oldest pending proposal: 13 days."))
+    try withScratchDirectory { scratch in
+      let store = try DogfoodReportTests.setup(scratch)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            UPDATE task_event
+            SET created_at='2023-11-16T00:00:00.500Z'
+            WHERE task_id=5 AND kind='created';
+            UPDATE task_event
+            SET created_at='2023-11-01T00:00:00.500Z'
+            WHERE task_id=10 AND kind='created';
+            UPDATE task_event
+            SET created_at='2023-11-15T00:00:00.400Z'
+            WHERE task_id=10 AND kind='status';
+            """)
       }
+      let tools = try DogfoodReportTests.tools(scratch)
+      let report = try DogfoodReportTests.run(
+        ["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(report.termination == .exit(0))
+      #expect(report.stdout.contains("left untriaged past 14 days: 0."))
+      #expect(report.stdout.contains("Oldest pending proposal: 13 days."))
     }
   }
 
-  @Test func reportRangeIsInclusiveAndForeignContentIsNeverParsedAsMetrics() throws {
+  @Test func reportRangeStartsAtSinceAndForeignContentIsNeverParsedAsMetrics() throws {
     try withScratchDirectory { scratch in
       _ = try DogfoodReportTests.setup(scratch)
       let tools = try DogfoodReportTests.tools(scratch)
       let entries: [[String: Any]] = [
         ["timestamp": "2023-11-14T00:00:00.000Z", "workspace": "silta"],
-        ["timestamp": "2023-11-30T00:00:00.500Z", "workspace": "silta"],
+        ["timestamp": "2023-11-13T23:59:59.999Z", "workspace": "silta"],
         ["timestamp": "Acme private foreign date", "workspace": "acme"],
       ].map {
         $0.merging([
@@ -232,32 +219,23 @@ struct DogfoodReportTests {
     }
   }
 
-  @Test func reportTimeNeedsOnlyPortableDateFormats() throws {
-    withKnownIssue("The report asks date for nanoseconds") {
-      try withScratchDirectory { scratch in
-        _ = try DogfoodReportTests.setup(scratch)
-        let tools = try DogfoodReportTests.tools(scratch)
-        try DogfoodReportTests.tool(
-          "date",
-          text: """
-            #!/bin/bash
-            [[ "$*" == '-u +%Y-%m-%dT%H:%M:%SZ' ]] || exit 1
-            echo 2023-11-30T00:00:00Z
-            """, in: tools)
-        let entry: [String: Any] = [
-          "timestamp": "2023-11-30T00:00:00.500Z", "workspace": "silta",
-          "actor": DogfoodReportTests.actor, "command": "silta task show",
-          "exit_code": 0, "milliseconds": 1, "warnings": [],
-        ]
-        let data = try JSONSerialization.data(withJSONObject: entry)
-        try (data + Data("\n".utf8)).write(
-          to: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
-        let result = try DogfoodReportTests.run(
-          ["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("Until: 2023-11-30T00:00:00Z (UTC, report time)."))
-        #expect(result.stdout.contains("| silta task show | 1 | 0% |"))
-      }
+  @Test func reportTimeUsesAPortableDateAndKeepsItsOwnSecond() throws {
+    try withScratchDirectory { scratch in
+      _ = try DogfoodReportTests.setup(scratch)
+      let tools = try DogfoodReportTests.tools(scratch)
+      let entry: [String: Any] = [
+        "timestamp": "2023-11-30T00:00:00.500Z", "workspace": "silta",
+        "actor": DogfoodReportTests.actor, "command": "silta task show",
+        "exit_code": 0, "milliseconds": 1, "warnings": [],
+      ]
+      let data = try JSONSerialization.data(withJSONObject: entry)
+      try (data + Data("\n".utf8)).write(
+        to: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+      let result = try DogfoodReportTests.run(
+        ["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("Until: 2023-11-30T00:00:00Z (UTC, report time)."))
+      #expect(result.stdout.contains("| silta task show | 1 | 0% |"))
     }
   }
 }
@@ -403,11 +381,8 @@ extension DogfoodReportTests {
       "date",
       text: """
         #!/bin/bash
-        if [[ "$*" == '-u +%Y-%m-%dT%H:%M:%S.%NZ' ]]; then
-          echo 2023-11-30T00:00:00Z
-        else
-          exec /bin/date "$@"
-        fi
+        [[ "$*" == '-u +%Y-%m-%dT%H:%M:%SZ' ]] || exit 1
+        echo 2023-11-30T00:00:00Z
         """,
       in: tools)
     let log = scratch.appending(path: "silta-home/log")

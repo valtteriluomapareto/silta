@@ -2,6 +2,7 @@
 # Summarize only Silta's own workspace; emit Markdown after every read succeeds.
 set -euo pipefail
 fail() { echo "dogfood-report: $*" >&2; exit 1; }
+[[ -x /usr/bin/jq ]] || fail '/usr/bin/jq is missing; it ships with macOS 15 or later.'
 command -v silta >/dev/null || fail 'silta is missing from PATH.'
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 since=1970-01-01
@@ -18,15 +19,18 @@ else
 fi
 canonical="$(/bin/date -j -u -f '%Y-%m-%d' "$since" '+%Y-%m-%d' 2>/dev/null)" || fail 'invalid --since day.'
 [[ "$canonical" == "$since" ]] || fail 'use a canonical YYYY-MM-DD day.'
-asof="$(date -u '+%Y-%m-%dT%H:%M:%S.%NZ')"
+asof="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 export SILTA_ACTOR=agent:codex:dogfood-report
 home="${SILTA_HOME:-$HOME/.silta}"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 shopt -s nullglob
 files=("$home"/log/????-??-??.jsonl)
+oldest=none
 if (( ${#files[@]} )); then
-  /usr/bin/jq -s . "${files[@]}" > "$temporary/logs" 2>/dev/null || fail 'could not parse command logs.'
+  oldest="$(basename "${files[0]}" .jsonl)"
+  cat "${files[@]}" | /usr/bin/jq -nR '[inputs | select(length > 0) | (fromjson? // "unreadable")]' \
+    > "$temporary/logs" 2>/dev/null || fail 'could not read command logs.'
 else
   echo '[]' > "$temporary/logs"
 fi
@@ -48,33 +52,58 @@ WHERE workspace='silta' AND actor<>'agent:codex:dogfood-report' AND substr(creat
 [[ -s "$temporary/approvals" ]] || echo '[]' > "$temporary/approvals"
 if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$temporary/detail-array" \
   --slurpfile schema "$temporary/schema" --slurpfile approvals "$temporary/approvals" \
-  --arg since "$since" --arg asof "$asof" --arg actor "$SILTA_ACTOR" '
+  --arg since "$since" --arg asof "$asof" --arg oldest "$oldest" --arg actor "$SILTA_ACTOR" '
   def seconds: (capture("^(?<whole>[^.]+)(?<fraction>\\.[0-9]+)?Z$") // error("invalid timestamp")) |
     ((.whole+"Z"|fromdateiso8601) + ((.fraction // "0")|tonumber));
-  def median: sort | length as $n | if $n == 0 then 0 elif $n % 2 == 1 then .[($n/2|floor)] else (.[($n/2)-1] + .[$n/2])/2 end;
+  def stamp: if type == "object" and (.timestamp|type) == "string"
+    then (try (.timestamp|seconds) catch null) else null end;
+  def median: sort | length as $n | if $n % 2 == 1 then .[($n/2|floor)] else (.[($n/2)-1] + .[$n/2])/2 end;
   def cell: tostring | gsub("\\|";"\\|") | gsub("[\r\n]";" ");
   def table($head;$rows):
-    ("| " + ($head | join(" | ")) + " |"),
-    ("|" + ($head | map("---") | join("|")) + "|"),
-    ($rows[] | "| " + (map(cell) | join(" | ")) + " |");
-  def inrange($time): $time >= ($since + "T00:00:00Z" | seconds) and $time <= ($asof | seconds);
+    if ($rows|length) == 0 then "None." else
+      ("| " + ($head | join(" | ")) + " |"),
+      ("|" + ($head | map("---") | join("|")) + "|"),
+      ($rows[] | "| " + (map(cell) | join(" | ")) + " |")
+    end;
+  def list($items): if ($items|length) == 0 then "None." else $items[] end;
+  def stats($values; $unit):
+    if ($values|length) == 0 then "median n/a; maximum n/a"
+    else "median \($values|median) \($unit); maximum \($values|max) \($unit)" end;
+  ($asof | seconds) as $now |
+  ($since + "T00:00:00Z" | seconds) as $start |
+  def after($time): $time >= $start;
   def proposals:
-    $tasks[0][] | .timeline as $events |
+    $tasks[0][] | .ref as $ref | .timeline as $events |
     ($events | map(select(.kind == "created" and .body == "proposed")) | .[0]) as $created |
     select($created != null) |
     ($events | map(select(.kind == "status" and (.body == "todo" or .body == "dropped"))) | .[0]) as $decision |
-    {born:($created.at|seconds), decision:$decision,
+    {ref:$ref, born:($created.at|seconds), decision:$decision,
       decided:(if $decision == null then null else ($decision.at|seconds) end)};
-  ($raw[0] | map(select(.workspace == "silta" or .workspace == null)) |
-    map(select(.actor != $actor and (.timestamp|seconds|inrange(.))))) as $selected |
+  ($raw[0] | map(select(type != "object" or .workspace == null or .workspace == "silta"))) as $own |
+  ($own | map(select(stamp == null)) | length) as $unreadable |
+  ($own | map(select(stamp != null and .actor != $actor and (stamp|after(.))))) as $selected |
   ($selected | map(select(.workspace == "silta"))) as $logs |
   ($schema[0].data.commands | map(.name)) as $commands |
   ($logs | group_by(.command)) as $groups |
   ($logs | map(select(.actor | startswith("agent:"))) | group_by(.actor)) as $sessions |
   [proposals] as $proposals |
-  ($proposals | map(select(.decided != null and (.decided|inrange(.))) | ((.decided-.born)/60|floor))) as $waits |
-  "# Silta dogfood report", "", "Since: \($since) (UTC, inclusive).",
-  "Untagged log lines: \($selected | map(select(.workspace == null)) | length). Report calls excluded.",
+  ($proposals | map(select(.decided != null and (.decided|after(.))) | ((.decided-.born)/60|floor))) as $waits |
+  ($proposals | map(select(.decision == null))) as $pending |
+  [$tasks[0][] | . as $task |
+    ([.timeline[]? | select(.kind == "status" and .body == "done")] | last) as $done |
+    select($done != null and ($done.at|seconds|after(.))) |
+    ($task.result // "" | split("\n") | map(select(test("\\S"))) | last // "") as $line |
+    {ref:$task.ref, day:$done.at[0:10],
+      friction:($line | if startswith("Friction: ") then ltrimstr("Friction: ") | sub("\\s+$";"") else "" end)}
+  ] as $done |
+  ($done | map(select(.friction == "")) | map(.ref)) as $missing |
+  "# Silta dogfood report", "",
+  "Since: \($since) (UTC, inclusive).",
+  "Until: \($asof) (UTC, report time).",
+  "Logs available from: \($oldest).",
+  (if $oldest != "none" and $since < $oldest
+    then "Warning: --since predates the oldest log; calls before \($oldest) are missing." else empty end),
+  "Untagged log lines: \($selected | map(select(.workspace == null)) | length). Unreadable log lines: \($unreadable). Report calls excluded.",
   "", "## Calls", "",
   table(["Command","Calls","Error rate","Common error codes","Usage errors","Max ms"];
     [$groups[] | . as $group | map(select(.exit_code != 0)) as $errors |
@@ -93,31 +122,31 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
         else . + [{actor:$entry.actor,command:$entry.command,code:$entry.error_code,n:1,failed:($entry.exit_code != 0)}] end) |
       .[] | select(.failed and .n >= 2) | [.actor,.command,.code,.n]]),
   "", "## Agent sessions", "",
-  "\($sessions|length) sessions; median \($sessions|map(length)|median) calls; maximum \($sessions|map(length)|max // 0) calls.",
+  "\($sessions|length) sessions; \(stats($sessions|map(length); "calls"))" + ".",
   "", "## Warnings", "",
   table(["Code","Calls"]; [$logs[] | .warnings | unique[]] | group_by(.) | map([.[0],length])),
   "", "## Unused commands", "",
-  ($commands | sort[] | . as $command | select([$logs[].command] | index($command) == null) | "- `\($command)`"),
+  list([$commands | sort[] | . as $command | select([$logs[].command] | index($command) == null) | "- `\($command)`"]),
   "", "## Friction in the silta workspace", "",
-  ($tasks[0][] | . as $task | .timeline[]? |
-    select(.kind == "status" and .body == "done" and (.at|seconds|inrange(.))) |
-    ($task.result // "" | split("\n") | map(select(length > 0)) | last // "") as $line |
-    select($line | startswith("Friction: ")) | ($line | ltrimstr("Friction: ") | sub("\\s+$";"")) as $friction |
-    select($friction != "none") | "- \(.at[0:10]) \($task.ref): \($friction|cell)"),
+  list([$done[] | select(.friction != "" and .friction != "none") | "- \(.day) \(.ref): \(.friction|cell)"]),
+  "",
+  "Done tasks without a Friction line: \($missing|length)"
+    + (if ($missing|length) > 0 then " (\($missing|join(", ")))" else "" end) + ".",
   "", "Open dogfood tasks:", "",
-  ($tasks[0][] | select(.status != "done" and .status != "dropped") |
+  list([$tasks[0][] | select(.status != "done" and .status != "dropped") |
     select(any(.links[]; .rel == "about" and .target == "topic:dogfood")) |
-    "- \(.ref) \(.status): \(.title|cell)"),
+    "- \(.ref) \(.status): \(.title|cell)"]),
   "", "## Human load", "", "Approvals per ISO week by command:", "",
   table(["Week","Command","Approvals"];
-    [$approvals[0][] | select(.created_at|seconds|inrange(.)) | . as $approval |
+    [$approvals[0][] | select(.created_at|seconds|after(.)) | . as $approval |
       ($commands | map(. as $candidate | select($approval.command == $candidate or ($approval.command|startswith($candidate + " ")))) |
         sort_by(length) | last // "other") as $command |
       {week:(.created_at|seconds|strftime("%G-W%V")), command:$command}] |
     group_by([.week,.command]) | map([.[0].week,.[0].command,length])),
   "",
-  "Proposals accepted: \($proposals | map(select(.decision.body == "todo" and (.decided|inrange(.)))) | length); dropped: \($proposals | map(select(.decision.body == "dropped" and (.decided|inrange(.)))) | length); 14-day window expiries: \($proposals | map(select((.born+1209600|inrange(.)) and (.decided == null or .decided >= .born+1209600))) | length) (including later triage).",
-  "Triage wait: median \($waits|median) min; maximum \($waits|max // 0) min.",
+  "Proposals accepted: \($proposals | map(select(.decision.body == "todo" and (.decided|after(.)))) | length); dropped: \($proposals | map(select(.decision.body == "dropped" and (.decided|after(.)))) | length); left untriaged past 14 days: \($pending | map(select((.born+1209600) as $expiry | ($expiry|after(.)) and $expiry <= $now)) | length).",
+  "Oldest pending proposal: \(if ($pending|length) == 0 then "none" else "\($pending | map(($now-.born)/86400|floor) | max) days" end).",
+  "Triage wait: \(stats($waits; "min")).",
   "Questions to @me: n/a (S11).", "Inbox size and oldest item: n/a (S11).",
   "Target: under 12 inbox items, none older than one week."
 ' > "$temporary/report" 2> "$temporary/error"; then
