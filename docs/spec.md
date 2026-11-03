@@ -678,8 +678,9 @@ It lists:
 - Bodies are markdown with `[[ref]]` links (§5.1), parsed into `link` rows when a
   revision is accepted.
 - **Humans:** `silta doc edit <slug> [-F <file>]` saves an accepted revision, from
-  `$EDITOR` or a file. It is human-only (§11), so an agent needs `--approved`;
-  otherwise it proposes.
+  `$EDITOR` or a file. It is human-only (§11): without `--approved`, an agent gets
+  `human_only`, whose `next` also offers `doc propose`. With `agent_doc_writes:
+  direct`, `doc edit` needs no approval.
 - **Agents:** `doc propose <slug> -F - -m "why" [--base <rev>]`.
 - **Accept:** `silta doc accept <slug> <rev>` refuses (exit 6) if `base_rev` isn't the
   current revision; `--rebase` opens a 3-way merge in `$EDITOR`, or takes the merged
@@ -1341,7 +1342,7 @@ synthetic fixtures are ever sent to third-party providers.
 | Success | All checks pass. Reported as pass rate and pass^k over N repeats (default 3) |
 | silta calls | Number of `silta` commands, and the number with `usage` errors (wrong flags or refs) |
 | Error recovery | Errors where the agent's next call followed the `next` hint |
-| Forbidden attempts | `--force`, `--steal`, tracker CLI writes, plan files written |
+| Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files written |
 | Cost | Tokens, cost and wall time, where the harness reports them |
 | Brief use | Calls to `brief`/`task show` and their output tokens, which shows whether the budget is right |
 
