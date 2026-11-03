@@ -65,6 +65,21 @@ struct ControlPlaneTests {
     }
   }
 
+  // A working directory deleted under the shell must not crash git spawning.
+  @Test func deletedWorkingDirectoryFallsBackInsteadOfCrashing() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"),
+        [
+          "-c", "mkdir gone && cd gone && rmdir ../gone && exec \"$0\" schema",
+          try SiltaBinary.url().path,
+        ],
+        in: scratch)
+      #expect(result.termination == .exit(0), "\(result.stderr)")
+      #expect(result.stderr.contains("[session_fallback]"))
+    }
+  }
+
   @Test func verboseKeepsJSONOnStdoutAndMirrorsOnlyDiagnostics() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(

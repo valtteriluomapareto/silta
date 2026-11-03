@@ -19,14 +19,14 @@ ask human: unset SILTA_NOW
 {"error":{"code":"env","message":"SILTA_NOW is outside the range a ULID timestamp can hold.","next":["unset SILTA_NOW"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## invalidActor (exit 9)
-error: SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>, each part 1 to 64 letters, digits or . _ - @ +. [env]
+error: SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>; the tool is lowercase, and each part is 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit. [env]
 ask human: unset SILTA_ACTOR
-{"error":{"code":"env","message":"SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>, each part 1 to 64 letters, digits or . _ - @ +.","next":["unset SILTA_ACTOR"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>; the tool is lowercase, and each part is 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit.","next":["unset SILTA_ACTOR"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## invalidSession (exit 9)
-error: SILTA_SESSION must be 1 to 64 letters, digits or . _ - @ +. [env]
+error: SILTA_SESSION must be 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit. [env]
 ask human: unset SILTA_SESSION
-{"error":{"code":"env","message":"SILTA_SESSION must be 1 to 64 letters, digits or . _ - @ +.","next":["unset SILTA_SESSION"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"SILTA_SESSION must be 1 to 64 letters, digits, . _ or -, starting and ending with a letter or digit.","next":["unset SILTA_SESSION"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## gitUnavailable (exit 9)
 error: Git could not be started; check the git path and the working directory. [env]

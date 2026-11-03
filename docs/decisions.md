@@ -198,7 +198,7 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     writes use `UPDATE` or `INSERT`, never `REPLACE`, which would reset a newer
     binary's columns.
   - A newer schema that also lacks one of this binary's migrations has diverged, and
-    is refused.
+    is refused. So migrations are never squashed or renamed once shipped.
 - **D33: Actors are `ActorID` values, validated where they enter.**
   - `human(name)` or `agent(tool, session)`, recorded as `human:<name>` or
     `agent:<tool>:<session>`. A name or session is 1 to 64 letters, digits, `.`, `_`

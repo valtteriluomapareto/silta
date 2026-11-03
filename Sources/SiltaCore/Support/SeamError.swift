@@ -34,9 +34,12 @@ package enum SeamError: CodedError, CaseIterable {
     case .invalidIDSeed: "SILTA_ID_SEED must be an unsigned 64-bit decimal integer."
     case .invalidTimestamp: "SILTA_NOW is outside the range a ULID timestamp can hold."
     case .invalidActor:
-      "SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>, "
-        + "each part 1 to 64 letters, digits or . _ - @ +."
-    case .invalidSession: "SILTA_SESSION must be 1 to 64 letters, digits or . _ - @ +."
+      "SILTA_ACTOR must be human:<name>, agent:<tool> or agent:<tool>:<session>; "
+        + "the tool is lowercase, and each part is 1 to 64 letters, digits, . _ or -, "
+        + "starting and ending with a letter or digit."
+    case .invalidSession:
+      "SILTA_SESSION must be 1 to 64 letters, digits, . _ or -, "
+        + "starting and ending with a letter or digit."
     case .gitUnavailable: "Git could not be started; check the git path and the working directory."
     case .gitCapture: "Git output could not be captured."
     }

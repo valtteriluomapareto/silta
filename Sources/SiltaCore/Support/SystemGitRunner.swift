@@ -31,10 +31,12 @@ package struct SystemGitRunner: GitRunner {
 
   /// Waits on a dispatch worker, without blocking the caller's actor or cooperative executor.
   package func run(_ request: GitRequest) async throws -> GitResult {
-    // Process raises an uncatchable exception for a missing directory, such as a
-    // working directory deleted under the shell.
+    // Process raises an uncatchable exception for a missing or non-file directory. A
+    // working directory deleted under the shell reads as "", which becomes `./`.
+    let path = request.directory.path
     var isDirectory: ObjCBool = false
-    guard FileManager.default.fileExists(atPath: request.directory.path, isDirectory: &isDirectory),
+    guard request.directory.isFileURL, path.hasPrefix("/"),
+      FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
       isDirectory.boolValue
     else { throw SeamError.gitUnavailable }
     return try await withCheckedThrowingContinuation { continuation in
