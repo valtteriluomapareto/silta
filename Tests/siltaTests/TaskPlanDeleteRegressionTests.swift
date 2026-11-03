@@ -118,3 +118,48 @@ extension TaskPlanDeleteRegressionTests {
     }
   }
 }
+
+extension TaskPlanDeleteRegressionTests {
+  @Test func nestedSeparateGitMetadataSurvivesWithoutWrites() throws {
+    try withKnownIssue("Confirmed nested metadata defect") { () throws -> Void in
+      try withScratchDirectory { scratch in
+        let store = try TaskCommandTests.setup(scratch)
+        let repo = scratch.appending(path: "work", directoryHint: .isDirectory)
+        let nested = repo.appending(path: "nested", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        #expect(try SiltaBinary.runProcess(URL(filePath: "/usr/bin/git"), ["init", "-q"], in: scratch, cwd: repo).termination == .exit(0))
+        let admin = nested.appending(path: "admin", directoryHint: .isDirectory)
+        #expect(try SiltaBinary.runProcess(URL(filePath: "/usr/bin/git"), ["init", "-q", "--separate-git-dir", admin.path], in: scratch, cwd: nested).termination == .exit(0))
+        let file = admin.appending(path: "plan.md")
+        try "# Acme\n- Preserve metadata\n".write(to: file, atomically: true, encoding: .utf8)
+        let result = try SiltaBinary.run(["task", "from-plan", file.path, "--delete", "--json"], in: scratch, cwd: repo, environment: TaskCommandTests.actor)
+        #expect(result.termination == .exit(1))
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 0)
+      }
+    }
+  }
+}
+
+extension TaskPlanDeleteRegressionTests {
+  @Test func nestedTrackedSourceSurvivesAnEnclosingWorktreeImport() throws {
+    try withKnownIssue("Confirmed nested tracked-source defect") { () throws -> Void in
+      try withScratchDirectory { scratch in
+        let store = try TaskCommandTests.setup(scratch)
+        let repo = scratch.appending(path: "work", directoryHint: .isDirectory)
+        let nested = repo.appending(path: "nested", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        for directory in [repo, nested] {
+          #expect(try SiltaBinary.runProcess(URL(filePath: "/usr/bin/git"), ["init", "-q"], in: scratch, cwd: directory).termination == .exit(0))
+        }
+        let file = nested.appending(path: "plan.md")
+        try "# Acme\n- Preserve tracked source\n".write(to: file, atomically: true, encoding: .utf8)
+        #expect(try SiltaBinary.runProcess(URL(filePath: "/usr/bin/git"), ["add", "plan.md"], in: scratch, cwd: nested).termination == .exit(0))
+        let result = try SiltaBinary.run(["task", "from-plan", file.path, "--delete", "--json"], in: scratch, cwd: repo, environment: TaskCommandTests.actor)
+        #expect(result.termination == .exit(1))
+        #expect(FileManager.default.fileExists(atPath: file.path))
+        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 0)
+      }
+    }
+  }
+}
