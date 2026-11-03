@@ -33,6 +33,12 @@ package struct TaskService: Sendable {
     try WorkspaceSelection.resolve(workspace, in: environment.db)
   }
 
+  /// The workspace this service's operations resolve, for the command log (spec §19);
+  /// nil when it doesn't resolve, which leaves the log line untagged.
+  package func resolvedWorkspace() -> String? {
+    do { return try selected() } catch { return nil }
+  }
+
   static func timestamp(_ date: Date) -> String {
     date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
   }

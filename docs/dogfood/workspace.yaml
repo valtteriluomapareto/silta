@@ -1,0 +1,14 @@
+workspace:
+  slug: silta
+  name: Silta
+  task_prefix: SI
+repos:
+  - slug: silta
+    remote: https://github.com/valtteriluomapareto/silta.git
+apps:
+  - slug: silta
+    repo: silta
+    ref: origin/main
+    summary: Local context hub and backlog for coding agents.
+topics:
+  - slug: dogfood

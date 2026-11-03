@@ -10,6 +10,8 @@ struct TaskPlanCommand: OutputCommand {
     "step": .optional(.int), "done": .optional(.bool), "title": .optional(.string),
   ])
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
@@ -47,7 +49,8 @@ struct TaskPlanCommand: OutputCommand {
       guard let text else {
         throw TaskError.invalid("Supply -m or -F for a revision, or --step N --done|--undo.")
       }
-      result = try service.plan(ref, text: text, ifRevision: ifRev, allowSecret: body.allowSecret)
+      result = try service.plan(
+        ref, text: text, ifRevision: ifRev, allowSecret: body.allowSecret)
     }
     let text =
       if let step = result.step, let title = result.title {
@@ -58,6 +61,7 @@ struct TaskPlanCommand: OutputCommand {
           + "(\(result.steps) step\(result.steps == 1 ? "" : "s"))"
       }
     return CommandOutput(
-      text: text, data: result, warnings: result.warnings, approvalUsed: body.allowSecret)
+      text: text, data: result, warnings: result.warnings, approvalUsed: body.allowSecret
+    ).reporting(service.resolvedWorkspace())
   }
 }

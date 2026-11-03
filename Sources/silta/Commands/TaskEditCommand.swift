@@ -20,6 +20,8 @@ struct TaskEditCommand: OutputCommand {
     "ref": .string, "status": .string, "document": .optional(.string),
   ])
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The task reference.")
@@ -56,7 +58,8 @@ struct TaskEditCommand: OutputCommand {
       result.result,
       change: result.changed.isEmpty
         ? "unchanged" : "edited: " + result.changed.joined(separator: ", "),
-      approvalUsed: result.approvalUsed)
+      approvalUsed: result.approvalUsed
+    ).reporting(context.taskWorkspace(global.ws))
   }
 
   private func read(_ path: String) throws -> String {

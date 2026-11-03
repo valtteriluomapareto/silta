@@ -8,6 +8,8 @@ struct TaskStartCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The task reference.") var ref: String
@@ -23,5 +25,6 @@ struct TaskStartCommand: OutputCommand {
       directory: URL(
         filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
     return TaskOutput.receipt(started.result, approvalUsed: started.approvalUsed)
+      .reporting(context.taskWorkspace(global.ws))
   }
 }

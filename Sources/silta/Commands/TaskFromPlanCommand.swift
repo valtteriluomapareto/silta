@@ -16,6 +16,8 @@ struct TaskFromPlanCommand: OutputCommand {
     ]), "tasks": .array(TaskOutput.receiptShape),
   ])
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "UTF-8 Markdown file, or - for stdin (the default).") var file = "-"
@@ -71,7 +73,8 @@ struct TaskFromPlanCommand: OutputCommand {
     return CommandOutput(
       text: shown,
       quiet: result.dryRun ? shown : result.tasks.map(\.ref).joined(separator: "\n"),
-      data: result, warnings: result.warnings, approvalUsed: allowSecret && !result.dryRun)
+      data: result, warnings: result.warnings, approvalUsed: allowSecret && !result.dryRun
+    ).reporting(context.taskWorkspace(global.ws))
   }
 
   private func read() throws -> String {

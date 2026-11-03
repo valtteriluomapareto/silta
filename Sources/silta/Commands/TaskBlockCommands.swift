@@ -10,6 +10,8 @@ struct TaskBlockCommand: OutputCommand {
     "waiting": .optional(TaskOutput.waitingShape),
   ])
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
@@ -46,7 +48,8 @@ struct TaskBlockCommand: OutputCommand {
     }
     return CommandOutput(
       text: lines.joined(separator: "\n"), data: result,
-      warnings: result.warnings, approvalUsed: body.allowSecret)
+      warnings: result.warnings, approvalUsed: body.allowSecret
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -56,6 +59,8 @@ struct TaskUnblockCommand: OutputCommand {
     abstract: "Return a blocked batch to todo; an open blocker needs the human's go-ahead.")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
+
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -77,7 +82,8 @@ struct TaskUnblockCommand: OutputCommand {
     return CommandOutput(
       text: tasks.map { "\($0.ref) \($0.status)" }.joined(separator: "\n"),
       data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings),
-      approvalUsed: result.approvalUsed)
+      approvalUsed: result.approvalUsed
+    ).reporting(context.taskWorkspace(global.ws))
   }
 
   private struct Data: Encodable {

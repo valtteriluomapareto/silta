@@ -2,16 +2,20 @@ import ArgumentParser
 import Foundation
 import SiltaCore
 
-struct WsEditCommand: OutputCommand {
+struct WsEditCommand: WorkspaceArgumentCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit", abstract: "Edit workspace YAML (human-only).")
 
   static let dataShape = Shape.object(["workspace": .optional(.string)])
 
+  static let workspaceSource = WorkspaceSource.argument
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The workspace slug; defaults to the current workspace.")
   var workspace: String?
+
+  var workspaceArgument: String? { workspace }
 
   @Option(name: .customShort("F"), help: "Read UTF-8 YAML from a file, or - for stdin.")
   var file: String?
@@ -41,9 +45,11 @@ struct WsEditCommand: OutputCommand {
         return process.terminationStatus
       }
     }
-    return CommandOutput(
+    var output = CommandOutput(
       text: selected.map { "Updated workspace \($0)." } ?? "No changes.",
       data: Data(workspace: selected), approvalUsed: true)
+    output.workspace = selected
+    return output
   }
 
   private func read(_ file: String) throws -> String {

@@ -33,3 +33,9 @@ a plan ships:
 |---|---|---|
 | [`plans/m1-daily-use.md`](plans/m1-daily-use.md) | active | M1 broken into slices with dependencies, for parallel agents |
 <!-- plans-board:end -->
+
+## Dogfooding
+
+[Setup and daily workflow](dogfood/README.md), [workspace YAML](dogfood/workspace.yaml)
+and [reviewed reports](dogfood/reports/README.md). Setup does not activate until the
+maintainer completes it with an agent after the tooling PR merges.

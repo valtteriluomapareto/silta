@@ -8,6 +8,8 @@ struct TaskArchiveCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The task reference.")
@@ -15,7 +17,8 @@ struct TaskArchiveCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .archive(ref), change: "archived")
+        .archive(ref), change: "archived"
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -26,6 +29,8 @@ struct TaskKeepCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
+  static let workspaceSource = WorkspaceSource.option
+
   @OptionGroup var global: GlobalOptions
 
   @Argument(help: "The task reference.")
@@ -33,7 +38,8 @@ struct TaskKeepCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .archive(ref, keep: true), change: "kept")
+        .archive(ref, keep: true), change: "kept"
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -43,6 +49,8 @@ struct TaskLinkCommand: OutputCommand {
     abstract: "Link a task to a reference in this workspace or an external URL.")
 
   static let dataShape = TaskOutput.receiptShape
+
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -58,7 +66,8 @@ struct TaskLinkCommand: OutputCommand {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
         .link(ref, target: target, relation: rel),
-      change: "linked \(rel) \(TaskError.shown(target))")
+      change: "linked \(rel) \(TaskError.shown(target))"
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -68,6 +77,8 @@ struct TaskPromoteCommand: OutputCommand {
     abstract: "Record an external tracker and make the task read-only (human-only).")
 
   static let dataShape = TaskOutput.receiptShape
+
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -82,6 +93,7 @@ struct TaskPromoteCommand: OutputCommand {
         environment: context.environment, workspace: global.ws,
         approved: global.approved
       ).promote(ref, external: ext), change: "promoted to \(ext); read-only here",
-      approvalUsed: true)
+      approvalUsed: true
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }

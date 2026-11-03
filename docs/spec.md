@@ -1277,6 +1277,23 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - ms; busy retries, git calls and git ms join when the first command counts them
   - warnings
 
+  `workspace` is set only for commands that act on a workspace: `task *`,
+  `ws show|edit|use`, `repo fetch`, and a successful `init --scan`.
+  - A successful command logs the workspace it resolved and acted on (`--ws`, its
+    slug argument, or the current workspace), or the one `init --scan` or `ws edit`
+    created. It is the command's own resolution, so a command that reports none is
+    logged without one.
+  - A failed command logs the workspace its `--ws`, slug argument or current
+    selection names, when that workspace exists.
+  - A `usage` error on a `task` or `repo` command, or on the `task` or `repo` group
+    itself (an unknown subcommand), logs `--ws` or the current workspace. A `usage`
+    error on `ws show|edit|use` stays untagged, since its slug argument is unknown.
+  - Other commands (`schema`, `ws ls`, `init` without a scanned workspace, help and
+    version) leave it out, as does a workspace that doesn't exist.
+
+  `app` is set only when the command names an app with `--app` that exists in that
+  workspace. Neither field ever carries a raw argument.
+
   Evals and the dogfood report read these logs (§21, §22.1).
 - **`silta doctor [--fix]`** checks:
   - **Install:** PATH, the hook and skill, the Codex writable root and marker.
@@ -1487,7 +1504,7 @@ steps, questions, handoffs and results.
 
 | Stage | Starts after | What Silta is used for |
 |---|---|---|
-| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent working a slice runs `silta task add --start "S7: Location"`, which links the GitHub issue with a `url:` link. It keeps the plan and steps in Silta and closes the task with `done --result`. The issue gets a one-line summary and the result when it closes. |
+| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the slice's task by the issue's `url:` link in `silta task ls --proposed --promoted --archived --json` (imported tasks are proposals until the human triages them, promoted tasks are hidden otherwise, and closed tasks archive after 14 days) and runs `silta task start <ref>`; a `proposed` task first needs the human's `task triage --accept`. Only if no task links the issue, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, and closes it with `task done <ref> -F -` and a heredoc, never a result file in the repo. The issue gets a one-line summary and the result when it closes. |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
 | **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
 | **DF3: a real second workspace** | M1 done | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
@@ -1510,7 +1527,10 @@ steps, questions, handoffs and results.
   - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
     Markdown report from the command logs (§19) and the tasks. `--since` defaults
     to the date of the newest report in `docs/dogfood/reports/`, so reports leave
-    no gaps. It reports:
+    no gaps, and a `--since` after the report day is refused. The report states its
+    coverage: `Since:`, `Until:` (the UTC report time), and `Logs available from:`
+    with the oldest retained log day, plus a warning when `--since` is earlier, so
+    the call counts are incomplete. It reports:
     - calls per command, with the error rate and the most common error codes;
     - `usage` errors per command, which point at unclear help or guide text;
     - retry loops: one session getting the same error from the same command twice
@@ -1518,25 +1538,30 @@ steps, questions, handoffs and results.
     - calls per agent session, median and maximum;
     - the slowest commands (maximum ms);
     - warnings by code;
-    - commands `silta schema` lists that nobody called;
+    - commands `silta schema` lists that nobody called, counting untagged lines too,
+      since a command name is no workspace data;
     - the friction lines other than `none` from tasks done in the range (the date
-      comes from the task's `status` event), and the open `dogfood` tasks;
-    - **the human's load (D37):** approvals per week by command (from the `approval` table),
-      proposals accepted, dropped or left to expire, questions to `@me`, the inbox's
-      size and its oldest item at report time, and how long proposals waited for
-      triage. The target is an inbox under 12 items with nothing older than a week.
+      comes from the task's last `done` status event), the done tasks without a
+      `Friction:` line, and the open `dogfood` tasks;
+    - **the human's load (D37):** approvals per week by command (from the `approval`
+      table), proposals accepted, dropped or left to expire (each counted once; an
+      agent withdrawing its own proposal is no triage and isn't counted) and the
+      oldest still pending, questions to `@me`, the inbox's size and its oldest item
+      at report time, and how long proposals waited for triage. The target is an
+      inbox under 12 items with nothing older than a week.
 
     It reads only log lines and tasks tagged with the `silta` workspace, so data
     from other workspaces (DF3) never reaches the repo; untagged lines are only
-    counted. DF therefore records the resolved workspace and app on every log line
-    (§19 lists them, but nothing sets them yet). The report runs under its own
-    `SILTA_ACTOR` and leaves that actor's calls out. Failures before the
-    environment is set up (a bad `SILTA_*` value) aren't logged, so the report
-    can't see them.
-  - Once per wave, at the latest every 60 days so no log has expired, the
-    maintainer runs the report and commits it as
-    `docs/dogfood/reports/<YYYY-MM-DD>.md`. The review turns its findings into
-    GitHub issues (label `dogfood`), changes to the `silta guide` text, or nothing.
+    counted. DF therefore records the workspace each command acts on in its log
+    line (§19). The report runs under its own `SILTA_ACTOR` and leaves that
+    actor's calls and approvals out. Unreadable log lines (malformed, or missing
+    the expected fields) are only counted too. Failures before the environment is
+    set up (a bad `SILTA_*` value) aren't logged, so the report can't see them.
+  - Once per wave, at the latest every 60 days so no log has expired, an agent
+    runs the report with the maintainer, who reviews it before it is added through
+    a pull request as `docs/dogfood/reports/<YYYY-MM-DD>.md`, named by the report's
+    UTC `Until:` date. The review turns its findings into GitHub issues (label
+    `dogfood`), changes to the `silta guide` text, or nothing.
   - This is the earliest source of agent-experience findings, before the M4 evals.
 
 **First real use after M1 (DF3):** an agent runs `silta init --scan <projects dir>`,
