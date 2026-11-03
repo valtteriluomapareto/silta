@@ -37,9 +37,11 @@ extension TaskService {
       redacted: title.1 || body.1)
   }
 
-  func insert(_ creation: TaskCreation, workspace: String, in tx: StorageTransaction) throws
-    -> TaskResult
-  {
+  /// Inserts a prepared task; `status` overrides the status its creator and parent imply.
+  func insert(
+    _ creation: TaskCreation, workspace: String, status override: String? = nil,
+    in tx: StorageTransaction
+  ) throws -> TaskResult {
     let draft = creation.draft
     let db = tx.database
     let ws = try Self.workspaceID(workspace, in: db)
@@ -49,7 +51,7 @@ extension TaskService {
       throw TaskError.changed(nil)
     }
     let seq = try tx.nextSequence(scope: "task:\(ws)")
-    let status = creationStatus(parent: parent, start: draft.start)
+    let status = override ?? creationStatus(parent: parent, start: draft.start)
     let stamp = Self.timestamp(creation.at)
     try db.execute(
       sql: """

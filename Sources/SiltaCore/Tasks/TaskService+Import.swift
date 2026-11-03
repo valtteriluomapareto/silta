@@ -31,7 +31,8 @@ extension TaskService {
       if options.split {
         for var child in creations.dropFirst() {
           child.draft.parent = root.ref
-          tasks.append(try insert(child, workspace: slug, in: tx))
+          tasks.append(
+            try insert(child, workspace: slug, status: Self.childStatus(root.status), in: tx))
         }
       } else {
         let task = try Self.lookup(root.ref, workspace: slug, in: tx.database)
@@ -61,14 +62,20 @@ extension TaskService {
     _ plan: MarkdownPlan, options: TaskImport, rootStatus: String? = nil
   ) throws -> TaskImportPreview {
     let task = try rootStatus == nil ? options.parent.map { try show($0) } : nil
+    let status = rootStatus ?? creationStatus(parent: task)
     return TaskImportPreview(
-      title: plan.title, description: plan.description,
-      status: rootStatus ?? creationStatus(parent: task),
+      title: plan.title, description: plan.description, status: status,
       steps: plan.steps.map {
         TaskImportStep(
           title: $0.title, description: $0.description,
-          status: options.split ? (environment.actor.isHuman ? "todo" : "proposed") : nil)
+          status: options.split ? Self.childStatus(status) : nil)
       })
+  }
+
+  /// Split children follow the root, decided once per import: a proposal's steps are
+  /// proposals too, and the steps of authorized work are `todo`.
+  static func childStatus(_ root: String) -> String {
+    root == "proposed" ? "proposed" : "todo"
   }
 
   private func importCreations(_ plan: MarkdownPlan, options: TaskImport, redacted: Bool) throws

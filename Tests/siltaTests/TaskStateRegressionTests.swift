@@ -120,28 +120,26 @@ struct TaskStateRegressionTests {
     }
   }
 
-  @Test func splitChildrenTakeTheRootsStatus() {
-    withKnownIssue("split children are always proposals for agents") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(
-          try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
-        let plan = scratch.appending(path: "plan.md")
-        try "# Acme import\n\n- First\n- Second\n".write(
-          to: plan, atomically: true, encoding: .utf8)
-        let preview = try Self.data(
-          Self.run(
-            ["task", "from-plan", plan.path, "--split", "--parent", "AC-1", "--dry-run", "--json"],
-            in: scratch))
-        let previewed = try #require(preview["preview"] as? [String: Any])
-        #expect(previewed["status"] as? String == "todo")
-        let steps = try #require(previewed["steps"] as? [[String: Any]])
-        #expect(steps.compactMap { $0["status"] as? String } == ["todo", "todo"])
-        let created = try Self.tasks(
-          Self.run(
-            ["task", "from-plan", plan.path, "--split", "--parent", "AC-1", "--json"], in: scratch))
-        #expect(created.compactMap { $0["status"] as? String } == ["todo", "todo", "todo"])
-      }
+  @Test func splitChildrenTakeTheRootsStatus() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(
+        try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
+      let plan = scratch.appending(path: "plan.md")
+      try "# Acme import\n\n- First\n- Second\n".write(
+        to: plan, atomically: true, encoding: .utf8)
+      let preview = try Self.data(
+        Self.run(
+          ["task", "from-plan", plan.path, "--split", "--parent", "AC-1", "--dry-run", "--json"],
+          in: scratch))
+      let previewed = try #require(preview["preview"] as? [String: Any])
+      #expect(previewed["status"] as? String == "todo")
+      let steps = try #require(previewed["steps"] as? [[String: Any]])
+      #expect(steps.compactMap { $0["status"] as? String } == ["todo", "todo"])
+      let created = try Self.tasks(
+        Self.run(
+          ["task", "from-plan", plan.path, "--split", "--parent", "AC-1", "--json"], in: scratch))
+      #expect(created.compactMap { $0["status"] as? String } == ["todo", "todo", "todo"])
     }
   }
 
