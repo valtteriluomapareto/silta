@@ -20,24 +20,24 @@ struct ActorIntegrationTests {
         "PATH": "/usr/bin:/bin",
       ])
       let repo = fixtures.appending(path: "acme-platform")
-      let first = await Actor.resolve(
+      let (first, _) = try await ActorID.resolve(
         environment: [:], terminal: terminal, git: git, directory: repo)
-      let nested = await Actor.resolve(
+      let (nested, _) = try await ActorID.resolve(
         environment: [:], terminal: terminal, git: git, directory: repo.appending(path: "api"))
-      let worktree = await Actor.resolve(
+      let (worktree, _) = try await ActorID.resolve(
         environment: [:], terminal: terminal, git: git,
         directory: fixtures.appending(path: "acme-portal-worktree"))
-      let mainWorktree = await Actor.resolve(
+      let (mainWorktree, _) = try await ActorID.resolve(
         environment: [:], terminal: terminal, git: git,
         directory: fixtures.appending(path: "acme-platform"))
-      let outside = await Actor.resolve(
+      let (outside, _) = try await ActorID.resolve(
         environment: [:], terminal: terminal, git: git, directory: scratch)
-      #expect(outside.value.hasPrefix("agent:unknown:"))
-      #expect(outside.value.count == "agent:unknown:".count + 6)
+      #expect(outside.description.hasPrefix("agent:unknown:"))
+      #expect(outside.description.count == "agent:unknown:".count + 6)
       #expect(mainWorktree != worktree)
       #expect(first == nested)
       #expect(first != worktree)
-      #expect(first.value.hasPrefix("agent:unknown:"))
+      #expect(first.description.hasPrefix("agent:unknown:"))
     }
   }
 }

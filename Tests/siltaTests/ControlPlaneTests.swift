@@ -42,6 +42,20 @@ struct ControlPlaneTests {
     }
   }
 
+  // Environment warnings reach the output and the log like a command's own.
+  @Test func ignoredHumanOverrideWarnsOnStderrAndInTheLog() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(
+        ["schema"], in: scratch,
+        environment: ["SILTA_ACTOR": "human:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.contains("[actor_override_ignored]"))
+      let data = try Data(contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+      let entry = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+      #expect(entry["warnings"] as? [String] == ["actor_override_ignored"])
+    }
+  }
+
   @Test func verboseKeepsJSONOnStdoutAndMirrorsOnlyDiagnostics() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
@@ -86,11 +100,12 @@ struct ControlPlaneTests {
       let result = try SiltaBinary.run(
         ["schema", "--json", "--deterministic"], in: scratch,
         environment: environment)
-      #expect(result.termination == .exit(1))
+      #expect(result.termination == .exit(9))
       let envelope = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
       let error = try #require(envelope["error"] as? [String: Any])
-      #expect(error["code"] as? String == "invalid")
+      #expect(error["code"] as? String == "env")
+      #expect(error["next_by"] as? String == "human")
       #expect(result.stderr.isEmpty)
     }
   }

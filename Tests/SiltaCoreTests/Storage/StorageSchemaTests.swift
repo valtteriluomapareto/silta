@@ -154,24 +154,29 @@ struct StorageSchemaTests {
     }
   }
 
-  @Test(arguments: [false, true]) func unknownFutureSchemaIsRefusedWithoutMigration(
-    newerVersion: Bool
+  // One write gate (D32): a newer schema refuses older writers only when its
+  // migration raised min_writer_version. Either way it is never migrated.
+  @Test(arguments: [false, true]) func newerSchemaIsGatedOnlyByWriterVersion(
+    raisedVersion: Bool
   ) throws {
     try withScratchDirectory { scratch in
       let store = Self.store(scratch)
       try store.initialize()
       let queue = try DatabaseQueue(path: store.path)
       try queue.write { db in
-        if newerVersion {
+        try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
+        if raisedVersion {
           try db.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
-        } else {
-          try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
         }
       }
-      #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch).initialize() }
+      let older = Self.store(scratch)
+      if raisedVersion {
+        #expect(throws: StorageError.schemaTooNew) { try older.initialize() }
+      } else {
+        try older.write { try StorageWriteTests.insert($0, uid: "acme") }
+      }
       #expect(
-        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") }
-          == (newerVersion ? 1 : 2))
+        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 2)
     }
   }
 

@@ -8,20 +8,21 @@ struct SessionTests {
   private let cwd = URL(filePath: "/Acme/worktree/nested")
   private let terminal = TerminalState(stdin: false, stdout: false)
 
-  @Test(arguments: ["acme", ""]) func explicitSessionNeverCallsGit(session: String) async throws {
+  @Test func explicitSessionNeverCallsGit() async throws {
+    let session = "acme"
     let git = ScriptedGitRunner(script: [])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: ["SILTA_SESSION": session], terminal: terminal, git: git, directory: cwd)
-    #expect(actor.value == "agent:unknown:\(session)")
+    #expect(actor.description == "agent:unknown:\(session)")
     #expect(git.requests.isEmpty)
   }
 
   @Test func acceptedExplicitActorNeverNeedsASessionOrGit() async throws {
     let git = ScriptedGitRunner(script: [])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: ["SILTA_ACTOR": "agent:acme:explicit"], terminal: terminal, git: git,
       directory: cwd)
-    #expect(actor.value == "agent:acme:explicit")
+    #expect(actor.description == "agent:acme:explicit")
     #expect(git.requests.isEmpty)
   }
 
@@ -33,9 +34,9 @@ struct SessionTests {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
     let result = GitResult(termination: .exit(0), stdout: Data((root + "\n").utf8))
     let git = ScriptedGitRunner(script: [(request, .success(result))])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: cwd)
-    #expect(actor.value == "agent:unknown:\(expected)")
+    #expect(actor.description == "agent:unknown:\(expected)")
     #expect(git.requests == [request])
   }
 
@@ -43,18 +44,18 @@ struct SessionTests {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
     let result = GitResult(termination: .exit(0), stdout: Data("/Acme/path\r\n".utf8))
     let git = ScriptedGitRunner(script: [(request, .success(result))])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: cwd)
-    #expect(actor.value == "agent:unknown:082628")
+    #expect(actor.description == "agent:unknown:082628")
   }
 
   @Test func outsideRepositoryHashesTheCwd() async throws {
     let directory = URL(filePath: "/Acme/worktree")
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
     let git = ScriptedGitRunner(script: [(request, .success(GitResult(termination: .exit(128))))])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: directory)
-    #expect(actor.value == "agent:unknown:8e7b6a")
+    #expect(actor.description == "agent:unknown:8e7b6a")
   }
 
   // Sessions guard against accidents, not attackers (§11): a git fault must not fail the command.
@@ -66,12 +67,56 @@ struct SessionTests {
     .success(GitResult(termination: .exit(0), stdout: Data([0xff]))),
     .failure(.gitUnavailable),
   ])
-  func gitFaultsFallBackToTheCwd(outcome: Result<GitResult, SeamError>) async {
+  func gitFaultsFallBackToTheCwd(outcome: Result<GitResult, SeamError>) async throws {
     let directory = URL(filePath: "/Acme/worktree")
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
     let git = ScriptedGitRunner(script: [(request, outcome.mapError { $0 as any Error })])
-    let actor = await Actor.resolve(
+    let (actor, _) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: directory)
-    #expect(actor.value == "agent:unknown:8e7b6a")
+    #expect(actor.description == "agent:unknown:8e7b6a")
+  }
+
+  // A fallback inside a repository splits one session in two, so it leaves a trace.
+  @Test func gitFaultWarnsButLeavingARepositoryDoesNot() async throws {
+    let directory = URL(filePath: "/Acme/worktree")
+    let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
+    for (termination, warned) in [(GitTermination.timedOut, true), (.exit(128), false)] {
+      let git = ScriptedGitRunner(script: [
+        (request, .success(GitResult(termination: termination)))
+      ])
+      let (_, warnings) = try await ActorID.resolve(
+        environment: [:], terminal: terminal, git: git, directory: directory)
+      #expect(warnings.map(\.code) == (warned ? ["session_fallback"] : []))
+    }
+  }
+
+  @Test func emptySessionCountsAsUnsetAndAMalformedOneIsRefused() async throws {
+    let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
+    let git = ScriptedGitRunner(script: [
+      (request, .success(GitResult(termination: .exit(0), stdout: Data("/Acme/worktree\n".utf8))))
+    ])
+    let (actor, _) = try await ActorID.resolve(
+      environment: ["SILTA_SESSION": ""], terminal: terminal, git: git, directory: cwd)
+    #expect(actor.description == "agent:unknown:8e7b6a")
+    await #expect(throws: SeamError.invalidSession) {
+      try await ActorID.resolve(
+        environment: ["SILTA_SESSION": "acme session"], terminal: terminal,
+        git: ScriptedGitRunner(script: []), directory: cwd)
+    }
+  }
+
+  @Test func explicitAgentWithoutSessionGetsTheResolvedOne() async throws {
+    let (actor, _) = try await ActorID.resolve(
+      environment: ["SILTA_ACTOR": "agent:acme", "SILTA_SESSION": "review"], terminal: terminal,
+      git: ScriptedGitRunner(script: []), directory: cwd)
+    #expect(actor.description == "agent:acme:review")
+  }
+
+  @Test func ignoredHumanOverrideWarns() async throws {
+    let (actor, warnings) = try await ActorID.resolve(
+      environment: ["SILTA_ACTOR": "human:acme", "SILTA_SESSION": "acme"], terminal: terminal,
+      git: ScriptedGitRunner(script: []), directory: cwd)
+    #expect(actor.description == "agent:unknown:acme")
+    #expect(warnings.map(\.code) == ["actor_override_ignored"])
   }
 }
