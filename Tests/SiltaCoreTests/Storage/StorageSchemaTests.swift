@@ -180,6 +180,37 @@ struct StorageSchemaTests {
     }
   }
 
+  // A newer schema that lacks one of our migrations has diverged: never write to it.
+  @Test func divergedSchemaIsRefusedWithoutMigrationOrBackup() throws {
+    try withScratchDirectory { scratch in
+      let store = Self.store(scratch)
+      try store.initialize()
+      let queue = try DatabaseQueue(path: store.path)
+      try queue.write { db in
+        try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
+        try db.execute(sql: "DELETE FROM grdb_migrations WHERE identifier = 'v1'")
+      }
+      let backups = try FileManager.default.contentsOfDirectory(
+        atPath: scratch.appending(path: "backups").path)
+      #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch).initialize() }
+      #expect(
+        try FileManager.default.contentsOfDirectory(
+          atPath: scratch.appending(path: "backups").path) == backups)
+    }
+  }
+
+  // The writer version a fresh database records is the one this binary writes with.
+  @Test func freshSchemaRecordsThisWriterVersion() throws {
+    try withScratchDirectory { scratch in
+      let store = Self.store(scratch)
+      try store.initialize()
+      let version = try store.read {
+        try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
+      }
+      #expect(version == DatabaseStore.writerVersion)
+    }
+  }
+
   @Test func futureSchemaRefusalPreservesJournalMode() throws {
     try withScratchDirectory { scratch in
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta.db").path)

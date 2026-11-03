@@ -2,8 +2,7 @@ import CryptoKit
 package import Foundation
 
 /// Who runs a command (spec §11): a human by name, or an agent tool in a session.
-/// Every write records one, so only well-formed values are ever built: each part is
-/// 1 to 64 letters, digits, `.`, `_`, `-`, `@` or `+`.
+/// Every write records one, so values are validated where they enter (D33).
 package enum ActorID: Equatable, Sendable, CustomStringConvertible {
   case human(name: String)
   case agent(tool: String, session: String)
@@ -37,10 +36,10 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
   package static func detect(
     environment: [String: String], terminal: TerminalState, session: String
   ) throws -> ActorID {
-    if let explicit = try explicitActor(
-      environment: environment, terminal: terminal, session: session)
-    {
-      return explicit
+    switch try explicitActor(environment: environment, terminal: terminal) {
+    case .actor(let actor): return actor
+    case .agent(let tool): return .agent(tool: tool, session: session)
+    case .none, .droppedHuman: break
     }
     if environment["CLAUDECODE"] == "1" { return .agent(tool: "claude", session: session) }
     if environment["CODEX_THREAD_ID"] != nil { return .agent(tool: "codex", session: session) }
@@ -57,26 +56,24 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
   /// Resolves the session with one bounded git query unless `SILTA_SESSION` or a
   /// complete `SILTA_ACTOR` supplies it. Outside git, or when git fails in any way, the
   /// session is the current directory's: sessions guard against accidents, so
-  /// attribution never fails a command over git (§11). Returns warnings for a dropped
-  /// override and for a git fault.
+  /// attribution never fails a command over git (§11). Returns warnings for a git fault,
+  /// and for a dropped `human:` override when a human is watching stdout.
   package static func resolve(
     environment: [String: String], terminal: TerminalState, git: any GitRunner, directory: URL
   ) async throws -> (ActorID, [OutputWarning]) {
-    var warnings: [OutputWarning] = []
-    if environment["SILTA_ACTOR"]?.hasPrefix("human:") == true, !terminal.stdinIsTTY {
-      warnings.append(overrideIgnored)
-    }
-    if let explicit = try explicitActor(environment: environment, terminal: terminal, session: nil)
-    {
-      return (explicit, warnings)
-    }
+    let explicit = try explicitActor(environment: environment, terminal: terminal)
+    if case .actor(let actor) = explicit { return (actor, []) }
+    // An agent's shell often inherits a human's exported override; only a human
+    // piping into stdin needs telling.
+    var warnings: [OutputWarning] =
+      explicit == .droppedHuman && terminal.stdoutIsTTY ? [overrideIgnored] : []
     let session: String
     if let supplied = environment["SILTA_SESSION"], !supplied.isEmpty {
       guard isPart(supplied) else { throw SeamError.invalidSession }
       session = supplied
     } else {
       let root = await repositoryRoot(git: git, directory: directory)
-      if root == .fault { warnings.append(sessionFallback) }
+      if case .fault = root { warnings.append(sessionFallback) }
       let path = if case .root(let path) = root { path } else { directory.path }
       session = SHA256.hash(data: Data(path.utf8)).prefix(3)
         .map { String(format: "%02x", $0) }.joined()
@@ -89,36 +86,50 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     guard isHuman else { throw ActorError.humanOnly(command: command, actor: self) }
   }
 
-  /// `SILTA_ACTOR` as an actor, or nil when it is unset, empty, a `human:` override
-  /// without a terminal, or `agent:<tool>` while `session` is still unknown.
+  private enum Explicit: Equatable {
+    case none
+    case droppedHuman
+    case actor(ActorID)
+    /// `agent:<tool>`, which takes the resolved session.
+    case agent(String)
+  }
+
+  /// `SILTA_ACTOR`, parsed once. A `human:` override needs stdin to be a terminal.
   private static func explicitActor(
-    environment: [String: String], terminal: TerminalState, session: String?
-  ) throws -> ActorID? {
-    guard let value = environment["SILTA_ACTOR"], !value.isEmpty else { return nil }
+    environment: [String: String], terminal: TerminalState
+  ) throws -> Explicit {
+    guard let value = environment["SILTA_ACTOR"], !value.isEmpty else { return .none }
     let parts = value.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
-    guard parts.count > 1, parts.dropFirst().allSatisfy(isPart) else {
-      throw SeamError.invalidActor
-    }
     switch (parts[0], parts.count) {
-    case ("human", 2): return terminal.stdinIsTTY ? .human(name: parts[1]) : nil
-    case ("agent", 2): return session.map { .agent(tool: parts[1], session: $0) }
-    case ("agent", 3): return .agent(tool: parts[1], session: parts[2])
+    case ("human", 2) where isPart(parts[1]):
+      return terminal.stdinIsTTY ? .actor(.human(name: parts[1])) : .droppedHuman
+    case ("agent", 2) where isTool(parts[1]): return .agent(parts[1])
+    case ("agent", 3) where isTool(parts[1]) && isPart(parts[2]):
+      return .actor(.agent(tool: parts[1], session: parts[2]))
     default: throw SeamError.invalidActor
     }
   }
 
+  /// A name or session: letters, digits, `.`, `_` and `-`, starting and ending with a
+  /// letter or digit, so a mention like `@human:acme.` ends before the full stop.
   private static func isPart(_ value: String) -> Bool {
-    value.wholeMatch(of: /[A-Za-z0-9._@+\-]{1,64}/) != nil
+    value.wholeMatch(of: /[A-Za-z0-9]([A-Za-z0-9._\-]{0,62}[A-Za-z0-9])?/) != nil
   }
 
-  private enum Root: Equatable {
+  /// A tool is lowercase, so `agent:Claude` can't become a second claimant.
+  private static func isTool(_ value: String) -> Bool {
+    value.wholeMatch(of: /[a-z0-9]([a-z0-9\-]{0,62}[a-z0-9])?/) != nil
+  }
+
+  private enum Root {
     case root(String)
     case outside
     case fault
   }
 
-  /// The repository's top-level path. A nonzero exit means outside a repository;
-  /// anything else unexpected is a git fault.
+  /// The repository's top-level path. Only git's own "not a git repository" means
+  /// outside one (stderr is stable under the runner's `LC_ALL=C`); anything else,
+  /// such as dubious ownership or a corrupt repository, is a fault.
   private static func repositoryRoot(git: any GitRunner, directory: URL) async -> Root {
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
     let result = try? await git.run(request)  // a spawn failure is a fault, handled below
@@ -130,7 +141,9 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
         return .fault
       }
       return .root(root)
-    case .exit?: return .outside
+    case .exit?:
+      let stderr = String(bytes: result?.stderr ?? Data(), encoding: .utf8) ?? ""
+      return stderr.contains("not a git repository") ? .outside : .fault
     default: return .fault
     }
   }

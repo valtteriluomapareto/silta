@@ -67,7 +67,8 @@ struct ActorTests {
   // Actors are recorded on every write, so a malformed one never gets that far.
   @Test(arguments: [
     "acme", "agent:", "human:", "agent:acme:", "agent:a:b:c", "robot:acme", "agent:acme:has space",
-    "human:acme;rm",
+    "human:acme;rm", "agent:Claude", "human:acme.", "human:a@b", "agent:acme:-x",
+    "human:" + String(repeating: "a", count: 65),
   ])
   func malformedExplicitActorIsRefused(value: String) {
     #expect(throws: SeamError.invalidActor) {

@@ -31,7 +31,13 @@ package struct SystemGitRunner: GitRunner {
 
   /// Waits on a dispatch worker, without blocking the caller's actor or cooperative executor.
   package func run(_ request: GitRequest) async throws -> GitResult {
-    try await withCheckedThrowingContinuation { continuation in
+    // Process raises an uncatchable exception for a missing directory, such as a
+    // working directory deleted under the shell.
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: request.directory.path, isDirectory: &isDirectory),
+      isDirectory.boolValue
+    else { throw SeamError.gitUnavailable }
+    return try await withCheckedThrowingContinuation { continuation in
       DispatchQueue.global(qos: .utility).async {
         do {
           continuation.resume(returning: try execute(request))

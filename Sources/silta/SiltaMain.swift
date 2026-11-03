@@ -33,9 +33,7 @@ enum SiltaMain {
         actor: environment.actor.description, exitCode: rendered.exitCode,
         milliseconds: milliseconds)
       entry.errorCode = rendered.errorCode
-      // A failure renders no warnings, but the log still keeps the environment's.
-      entry.warnings =
-        rendered.errorCode == nil ? rendered.warningCodes : environment.warnings.map(\.code)
+      entry.warnings = rendered.warningCodes
       entry.flags = ["--json", "--quiet", "--deterministic", "--verbose", "--help", "--version"]
         .filter { flags.contains($0) }
       environment.log.record(entry)

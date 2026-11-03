@@ -48,6 +48,16 @@ struct SeamErrorTests {
     }
   }
 
+  // Process can't start in a missing directory, such as a cwd deleted under the shell.
+  @Test func missingDirectoryIsASpawnFailureNotACrash() async throws {
+    _ = try await withScratchDirectory { scratch in
+      await #expect(throws: SeamError.gitUnavailable) {
+        try await SystemGitRunner().run(
+          GitRequest(arguments: ["--version"], directory: scratch.appending(path: "gone")))
+      }
+    }
+  }
+
   @Test func unresolvableHomeIsInvalidRatherThanABug() throws {
     try withScratchDirectory { scratch in
       let file = scratch.appending(path: "file")

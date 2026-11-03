@@ -602,24 +602,25 @@ silta code ls   <app>[@<ref>] [<dir>]
 
 | Condition (first match) | Actor |
 |---|---|
-| `SILTA_ACTOR` is set | `human:<name>` (only when stdin is a TTY; otherwise ignored with an `actor_override_ignored` warning), `agent:<tool>:<session>`, or `agent:<tool>` with the resolved session appended |
+| `SILTA_ACTOR` is set | `human:<name>` (only when stdin is a TTY; otherwise ignored, with an `actor_override_ignored` warning when stdout is a TTY), `agent:<tool>:<session>`, or `agent:<tool>` with the resolved session appended |
 | `CLAUDECODE=1` | `agent:claude:<session>` |
 | `CODEX_THREAD_ID` is present | `agent:codex:<session>` |
 | `OPENCODE_*` marker (provisional; unverified), or set by the eval runner | `agent:opencode:<session>` |
 | stdin or stdout isn't a TTY | `agent:unknown:<session>` |
 | Otherwise | `human:<USER>`, or `human:unknown` when unset (config name follows in S6) |
 
-- **Format (D33):** each part of an actor is 1 to 64 letters, digits, `.`, `_`, `-`,
-  `@` or `+`. A malformed `SILTA_ACTOR` or `SILTA_SESSION` is `env` (exit 9); an
-  empty one counts as unset. A `USER` that doesn't fit becomes `human:unknown`.
-- **Session:** `SILTA_SESSION` if set. The Claude SessionStart hook exports it through
-  the hook's environment file (`CLAUDE_ENV_FILE`, to verify). Otherwise it's a
+- **Format (D33):** a name or session is 1 to 64 letters, digits, `.`, `_` or `-`,
+  starting and ending with a letter or digit; a tool is lowercase. A malformed
+  `SILTA_ACTOR` or `SILTA_SESSION` is `env` (exit 9); an empty one counts as unset. A
+  `USER` that doesn't fit becomes `human:unknown`.
+- **Session:** `SILTA_SESSION` if set and non-empty. The Claude SessionStart hook exports it through
+  the hook's environment file (`CLAUDE_ENV_FILE`, to verify). Otherwise it's the
   first six lowercase hexadecimal characters of SHA-256 over the UTF-8 worktree
   root (`git rev-parse --show-toplevel`), or the current directory outside git or
-  when git fails: attribution never fails a command over git. A git failure (not
-  merely being outside a repository) adds a `session_fallback` warning.
+  when git fails: attribution never fails a command over git. A git failure (anything
+  but git's own "not a git repository") adds a `session_fallback` warning.
   Nested directories share a session; separate worktrees do not. A complete explicit
-  actor bypasses session resolution.
+  actor bypasses session resolution, including `SILTA_SESSION`.
 - **Codex marker evidence:** `CODEX_THREAD_ID` was present in a Codex desktop
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
@@ -839,7 +840,7 @@ run.
 | 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken` | Re-read, then decide; don't steal |
 | 7 | `gate` | Request a review or ask the human |
 | 8 | `rate_limited` | Wait for `retry_after_s`, or summarise |
-| 9 | `env` (schema too new, read-only DB, git missing, no network) | Report the printed fix to the human |
+| 9 | `env` (schema too new, read-only DB, git missing, no network, a bad `SILTA_*` variable) | Report the printed fix to the human |
 
 **Commands.** The milestone that ships each one is in brackets.
 
@@ -909,9 +910,9 @@ Every CLI call is its own short-lived process, and several agents run at once.
     write transaction checks it, not just at open: an older binary, or an older app
     that's still running, gets exit 9 "update silta" and never writes. An older
     binary that meets a newer schema never migrates it, and keeps writing while
-    `min_writer_version` allows. A migration that adds a constraint or changes what
-    a column means raises it; a purely additive one (a new table, or a column with a
-    default) doesn't.
+    `min_writer_version` allows; one that has diverged (it also lacks a migration of
+    ours) is refused. A migration raises the version whenever an older writer's normal
+    writes could leave data a newer reader misreads (D32).
   - A `VACUUM INTO` backup is taken before each migration.
 - **Change signal** (from M5): after each commit, `notify_post("com.valtteriluoma.silta.changed")`.
   The app checks `PRAGMA data_version`, and watches the WAL file as a fallback.

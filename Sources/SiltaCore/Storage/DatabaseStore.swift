@@ -42,11 +42,16 @@ package final class DatabaseStore: Sendable {
         let migrator = StorageSchema.migrator
         let pending = try queue.read { db -> String? in
           if try db.tableExists("meta") { try Self.checkWriterVersion(db) }
-          // A newer binary's schema is never migrated here; min_writer_version alone
-          // decides whether this binary may still write to it (D32).
-          guard try !migrator.hasBeenSuperseded(db) else { return nil }
           let applied = try migrator.appliedIdentifiers(db)
-          return migrator.migrations.first { !applied.contains($0) }
+          let pending = migrator.migrations.first { !applied.contains($0) }
+          // A newer binary's schema is never migrated here; min_writer_version alone
+          // decides whether this binary may still write to it (D32). One that also
+          // lacks a migration of ours has diverged, and has none of our tables to trust.
+          if try migrator.hasBeenSuperseded(db) {
+            guard pending == nil else { throw StorageError.schemaTooNew }
+            return nil
+          }
+          return pending
         }
         try queue.writeWithoutTransaction { db in
           guard try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL") == "wal" else {

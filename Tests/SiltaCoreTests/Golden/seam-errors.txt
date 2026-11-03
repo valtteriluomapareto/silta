@@ -29,10 +29,10 @@ ask human: unset SILTA_SESSION
 {"error":{"code":"env","message":"SILTA_SESSION must be 1 to 64 letters, digits or . _ - @ +.","next":["unset SILTA_SESSION"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## gitUnavailable (exit 9)
-error: Git could not be started; check the configured absolute git path. [env]
+error: Git could not be started; check the git path and the working directory. [env]
 ask human: /usr/bin/git --version
 ask human: silta doctor
-{"error":{"code":"env","message":"Git could not be started; check the configured absolute git path.","next":["/usr/bin/git --version","silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Git could not be started; check the git path and the working directory.","next":["/usr/bin/git --version","silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## gitCapture (exit 9)
 error: Git output could not be captured. [env]

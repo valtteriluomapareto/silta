@@ -80,9 +80,14 @@ struct SessionTests {
   @Test func gitFaultWarnsButLeavingARepositoryDoesNot() async throws {
     let directory = URL(filePath: "/Acme/worktree")
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
-    for (termination, warned) in [(GitTermination.timedOut, true), (.exit(128), false)] {
+    let outside = Data("fatal: not a git repository (or any of the parent directories): .git".utf8)
+    let corrupt = Data("fatal: Expected git repo version <= 1, found 99".utf8)
+    for (termination, stderr, warned) in [
+      (GitTermination.timedOut, Data(), true), (.exit(128), outside, false),
+      (.exit(128), corrupt, true),
+    ] {
       let git = ScriptedGitRunner(script: [
-        (request, .success(GitResult(termination: termination)))
+        (request, .success(GitResult(termination: termination, stderr: stderr)))
       ])
       let (_, warnings) = try await ActorID.resolve(
         environment: [:], terminal: terminal, git: git, directory: directory)
@@ -112,11 +117,15 @@ struct SessionTests {
     #expect(actor.description == "agent:acme:review")
   }
 
-  @Test func ignoredHumanOverrideWarns() async throws {
+  // Only a human watching stdout hears about a dropped override; an agent whose shell
+  // inherited the human's export would see it on every call.
+  @Test(arguments: [(true, ["actor_override_ignored"]), (false, [])])
+  func ignoredHumanOverrideWarnsOnlyAWatchingHuman(stdout: Bool, expected: [String]) async throws {
     let (actor, warnings) = try await ActorID.resolve(
-      environment: ["SILTA_ACTOR": "human:acme", "SILTA_SESSION": "acme"], terminal: terminal,
+      environment: ["SILTA_ACTOR": "human:acme", "SILTA_SESSION": "acme"],
+      terminal: TerminalState(stdin: false, stdout: stdout),
       git: ScriptedGitRunner(script: []), directory: cwd)
     #expect(actor.description == "agent:unknown:acme")
-    #expect(warnings.map(\.code) == ["actor_override_ignored"])
+    #expect(warnings.map(\.code) == expected)
   }
 }

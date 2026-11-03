@@ -42,17 +42,26 @@ struct ControlPlaneTests {
     }
   }
 
-  // Environment warnings reach the output and the log like a command's own.
-  @Test func ignoredHumanOverrideWarnsOnStderrAndInTheLog() throws {
+  // Environment warnings reach the output and the log like a command's own. A git
+  // fault (here an unknown repository format) is one; an agent's shell inheriting a
+  // human's SILTA_ACTOR export is not.
+  @Test func gitFaultWarnsAndAnInheritedHumanOverrideDoesNot() throws {
     try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "acme")
+      let setup = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/git"), ["init", "-q", repo.path], in: scratch)
+      try #require(setup.termination == .exit(0))
+      try Data("[core]\n\trepositoryformatversion = 99\n".utf8)
+        .write(to: repo.appending(path: ".git/config"))
       let result = try SiltaBinary.run(
-        ["schema"], in: scratch,
+        ["schema"], in: scratch, cwd: repo,
         environment: ["SILTA_ACTOR": "human:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
       #expect(result.termination == .exit(0))
-      #expect(result.stderr.contains("[actor_override_ignored]"))
+      #expect(result.stderr.contains("[session_fallback]"))
+      #expect(!result.stderr.contains("actor_override_ignored"))
       let data = try Data(contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
       let entry = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-      #expect(entry["warnings"] as? [String] == ["actor_override_ignored"])
+      #expect(entry["warnings"] as? [String] == ["session_fallback"])
     }
   }
 
