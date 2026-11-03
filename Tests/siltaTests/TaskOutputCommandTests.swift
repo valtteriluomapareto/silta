@@ -26,6 +26,18 @@ struct TaskOutputCommandTests {
     }
   }
 
+  @Test func aMissingAppPointsAtTheWorkspaceItWasLookedUpIn() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      let refused = try Self.run(
+        ["--ws", "acme", "task", "add", "X", "--app", "nope", "--json"], in: scratch)
+      #expect(refused.termination == .exit(2))
+      withKnownIssue("An app not_found hint drops the explicit --ws") {
+        #expect(refused.stdout.contains(#""next":["silta ws show 'acme'"]"#))
+      }
+    }
+  }
+
   @Test func aStepOnAPlanWithoutCheckboxesPointsAtANewRevision() throws {
     try withScratchDirectory { scratch in
       _ = try TaskCommandTests.setup(scratch)
