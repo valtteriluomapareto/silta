@@ -17,6 +17,7 @@ struct TaskLinkMigrationTests {
             VALUES('acme','acme','Acme','AC','{"future":42}');
             INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
             VALUES('acme-task',1,1,'Acme','todo','human:acme','','');
+            UPDATE task SET future='Acme retained';
             INSERT INTO link(
             uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,created_by,created_at)
             VALUES('acme-link',1,'task',1,'cites','url','https://example.com','human:acme','');
@@ -27,7 +28,7 @@ struct TaskLinkMigrationTests {
       try store.read { db in
         let task = try #require(try Row.fetchOne(db, sql: "SELECT * FROM task"))
         let link = try #require(try Row.fetchOne(db, sql: "SELECT * FROM link"))
-        #expect(task["future"] as String == "Acme future")
+        #expect(task["future"] as String == "Acme retained")
         #expect(task["uid"] as String == "acme-task")
         #expect(link["uid"] as String == "acme-link")
         #expect(link["anchor"] as String? == nil)

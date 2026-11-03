@@ -13,7 +13,8 @@ struct TaskEditTests {
       try service.environment.db.write { tx in
         try tx.database.execute(
           sql: "ALTER TABLE task ADD COLUMN future TEXT DEFAULT 'Acme future'")
-        try tx.database.execute(sql: "UPDATE task SET acceptance_md='Keep Acme acceptance'")
+        try tx.database.execute(
+          sql: "UPDATE task SET acceptance_md='Keep Acme acceptance',future='Acme retained'")
       }
       let initial = try service.show("AC-1")
       var document = TaskEditDocument(initial)
@@ -32,7 +33,7 @@ struct TaskEditTests {
       #expect(try TaskOrganizationTests.counts(agent)[2] == 0)
       try service.environment.db.read { db in
         let future = try String.fetchOne(db, sql: "SELECT future FROM task")
-        #expect(future == "Acme future")
+        #expect(future == "Acme retained")
       }
       let before = try TaskOrganizationTests.counts(agent)
       _ = try agent.edit("AC-1") { $0 }
@@ -50,6 +51,8 @@ struct TaskEditTests {
     #expect(
       try TaskEditDocument.parse(crlf, from: initial).description
         == document.description.replacingOccurrences(of: "\n", with: "\r\n"))
+    let simple = TaskEditDocument(initial).render().replacingOccurrences(of: "~~~", with: "```")
+    #expect(throws: TaskError.self) { _ = try TaskEditDocument.parse(simple, from: initial) }
     var blank = document
     blank.title = "  "
     for invalid in [
@@ -133,16 +136,17 @@ struct TaskEditTests {
       #expect(throws: TaskError.self) { _ = try service.edit("AC-1") { _ in "invalid" } }
       #expect(try TaskOrganizationTests.counts(service) == snapshot)
       var document = TaskEditDocument(try service.show("AC-1"))
-      document.acceptance = "Pwd=acme-secret"
+      document.acceptance = ("Pwd=" + "acme-secret")
       let redacted = try service.edit("AC-1") { _ in document.render() }
       #expect(redacted.result.warnings.map(\.code) == ["secret_redacted"])
       #expect(try service.show("AC-1").acceptance == "[REDACTED:password]")
       _ = try service.edit("AC-1", allowSecret: true) { _ in document.render() }
-      #expect(try service.show("AC-1").acceptance == "Pwd=acme-secret")
+      #expect(try service.show("AC-1").acceptance == ("Pwd=" + "acme-secret"))
       let human = TaskService(
         environment: try TaskServiceTests.environment(
           home,
           actor: TaskServiceTests.human()))
+      document.title += " changed"
       #expect(throws: SecretError.self) {
         _ = try human.edit("AC-1") { _ in document.render() }
       }

@@ -4,7 +4,8 @@ error: A result is required. [invalid]
 next: silta task add --help
 error: AC-1 is claimed by agent:codex:acme (4 min old); do not steal. [claimed]
 next: silta task show AC-1
-error: Proposal AC-1 needs human triage; choose todo work meanwhile. [conflict]
+error: Proposal AC-1 needs human triage; ask in chat before accepting it. [conflict]
+next: silta task triage --help
 next: silta task ls --status todo
 error: AC-1 cannot make this transition from done. [conflict]
 next: silta task show AC-1

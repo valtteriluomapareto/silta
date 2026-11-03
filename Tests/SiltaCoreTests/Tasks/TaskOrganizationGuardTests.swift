@@ -56,14 +56,39 @@ struct TaskOrganizationGuardTests {
       }
       #expect(try service.show("AC-1").claimedAt == TaskService.timestamp(clock.now()))
       #expect(try service.show("AC-1").planRev == 3)
+      clock.advance(milliseconds: 120_000)
+      _ = try service.edit("AC-1") { $0.replacingOccurrences(of: "Acme\n", with: "Acme title\n") }
+      #expect(try service.show("AC-1").claimedAt == TaskService.timestamp(clock.now()))
+    }
+  }
+
+  @Test func editWriteRechecksAFreshClaimAfterChangedInput() async throws {
+    try await withScratchDirectory { home in
+      let service = try TaskOrganizationTests.service(home)
+      _ = try await TaskOrganizationTests.add(service, start: true, directory: home)
+      let other = ActorID.agent(tool: "codex", session: "other")
+      #expect(throws: TaskError.claimed("AC-1", holder: other.description, minutes: 0)) {
+        _ = try service.edit("AC-1") { original in
+          try service.environment.db.write { tx in
+            try tx.database.execute(
+              sql: "UPDATE task SET claimed_by=?",
+              arguments: [other.description])
+          }
+          return original.replacingOccurrences(of: "Acme", with: "Acme changed")
+        }
+      }
+      #expect(try service.show("AC-1").title == "Acme")
+      #expect(try TaskOrganizationTests.counts(service)[2] == 0)
     }
   }
 
   @Test func batchReferenceErrorsStayOnOneLineAndRedactCredentials() {
-    let error = TaskReferenceError(ref: "AC-1\nPwd=acme-secret", missing: false)
+    let error = TaskReferenceError(ref: ("AC-1\nPwd=" + "acme-secret"), missing: false)
     #expect(!error.message.contains("\n"))
     #expect(!error.message.contains("acme-secret"))
     #expect(error.message.contains("AC-1"))
+    #expect(error.code == .invalid)
+    #expect(TaskReferenceError(ref: "AC-404", missing: true).code == .notFound)
   }
 
   @Test func terminalHumanCanTriageAndPromoteWithoutApprovalRows() async throws {

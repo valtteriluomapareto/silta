@@ -48,6 +48,8 @@ struct TaskEditCommandTests {
         URL(filePath: "/bin/sh"),
         ["-c", command, "_", try SiltaBinary.url().path, file.path], in: scratch, environment: env)
       #expect(stdin.termination == .exit(0))
+      try Self.document(data, title: "Acme editor").write(
+        to: file, atomically: true, encoding: .utf8)
       try Self.editorCheck(scratch, file: file, store: store)
       let acceptance = try store.read {
         try String.fetchOne($0, sql: "SELECT acceptance_md FROM task")
@@ -68,9 +70,12 @@ struct TaskEditCommandTests {
       ["task", "edit", "AC-1", "--json"], in: scratch, environment: env)
     #expect(edited.termination == .exit(0))
     let temporary = try String(contentsOf: capture, encoding: .utf8)
+    #expect(temporary.hasPrefix("/"))
     #expect(!FileManager.default.fileExists(atPath: temporary))
+    let title = try store.read { try String.fetchOne($0, sql: "SELECT title FROM task") }
+    #expect(title == "Acme editor")
     let before = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task_event") }
-    try "printf '%s' \"$1\" > \(shellWord(capture.path))\nexit 2\n"
+    try "printf '%s' \"$1\" > \(shellWord(capture.path))\nprintf ignored > \"$1\"\nexit 2\n"
       .write(to: script, atomically: true, encoding: .utf8)
     #expect(
       try SiltaBinary.run(
@@ -81,5 +86,30 @@ struct TaskEditCommandTests {
     #expect(!FileManager.default.fileExists(atPath: cancelled))
     #expect(
       try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task_event") } == before)
+  }
+}
+
+extension TaskEditCommandTests {
+  @Test func invalidAndMissingInputHaveScopedRunnableRecovery() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(
+        try SiltaBinary.run(
+          ["task", "add", "Acme", "--start"], in: scratch,
+          environment: TaskCommandTests.actor
+        ).termination == .exit(0))
+      let file = scratch.appending(path: "invalid.md")
+      try Data([255]).write(to: file)
+      for path in [file.path, file.path + "missing"] {
+        let result = try SiltaBinary.run(
+          [
+            "--ws", "acme", "task", "edit", "AC-1", "-F", path,
+            "--json",
+          ], in: scratch, environment: TaskCommandTests.actor)
+        #expect(result.termination == .exit(9))
+        #expect(result.stdout.contains("silta --ws 'acme' task edit --help"))
+        #expect(result.stdout.contains("silta --ws 'acme' task show 'AC-1'"))
+      }
+    }
   }
 }

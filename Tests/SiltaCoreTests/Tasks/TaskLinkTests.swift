@@ -58,6 +58,8 @@ struct TaskLinkTests {
           db, sql: "SELECT * FROM link WHERE to_kind NOT IN ('code','url','note')")
         #expect(owned.count == 10)
         #expect(
+          owned.allSatisfy { ($0["created_by"] as String) == TaskServiceTests.agent.description })
+        #expect(
           owned.allSatisfy { ($0["to_id"] as Int64?) != nil && ($0["to_ext"] as String?) == nil })
         #expect(
           try Int.fetchOne(db, sql: "SELECT count(*) FROM link WHERE to_kind='task_plan_rev'") == 2)
@@ -78,7 +80,8 @@ struct TaskLinkTests {
       "plan#L0", "plan#L3", "plan#L2-1", "plan@2#L1", "plan@1#L1-3",
       "platform:../Acme.swift", "platform:/Acme.swift", "platform:Acme.swift#L0",
       "platform@:Acme.swift", "platform:Acme.swift#L2-1", "platform:Acme.swift#L01",
-      "url:file:///tmp/acme", "url:https://user:pwd@example.com", "url:https://",
+      "url:ftp://example.com/acme", "url:file:///tmp/acme", "url:https://user:pwd@example.com",
+      "url:https://",
       "note:", "ext:acme", "diff:Acme.swift#L1",
     ] {
       #expect(throws: TaskError.self) { _ = try service.link("AC-1", target: invalid) }

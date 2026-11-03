@@ -11,7 +11,9 @@ struct TaskLinkTarget {
   static func resolve(_ raw: String, source: TaskDetails, workspace: String, in db: Database)
     throws -> Self
   {
-    if raw.hasPrefix("plan") { return try plan(raw, source: source, in: db) }
+    if raw.hasPrefix("plan#") || raw.hasPrefix("plan@") && !raw.contains(":") {
+      return try plan(raw, source: source, in: db)
+    }
     if raw.hasPrefix("diff:") {
       throw TaskError.invalid(
         "Diff references need a review subject; CLI review subjects are unavailable.")
@@ -102,11 +104,11 @@ struct TaskLinkTarget {
           db, sql: "SELECT id,body_md FROM task_plan_rev WHERE task_id=? AND rev=?",
           arguments: [source.id, try number(String(rev))])
       else { throw TaskError.notFound }
-      try lines(anchor, maximum: (row["body_md"] as String).components(separatedBy: "\n").count)
+      try lines(anchor, maximum: lineCount(row["body_md"]))
       return Self(kind: "task_plan_rev", id: row["id"], anchor: "#" + anchor)
     }
     try lines(
-      anchor, maximum: source.plan.isEmpty ? 0 : source.plan.components(separatedBy: "\n").count)
+      anchor, maximum: lineCount(source.plan))
     return Self(kind: "task", id: source.id, anchor: "plan#" + anchor)
   }
 
@@ -131,6 +133,10 @@ struct TaskLinkTarget {
     }
     if target.count == 2 { try lines(String(target[1]), maximum: nil) }
     return Self(kind: "code", external: value)
+  }
+
+  private static func lineCount(_ text: String) -> Int {
+    text.isEmpty ? 0 : text.components(separatedBy: "\n").count
   }
 
   private static func number(_ raw: String) throws -> Int64 {

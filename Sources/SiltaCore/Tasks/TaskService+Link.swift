@@ -10,7 +10,7 @@ extension TaskService {
       throw TaskError.invalid("Use cites, about, source or relates; blocked_by is reserved.")
     }
     let command = "silta task link " + shellWord(ref) + " '<target>' --rel " + shellWord(relation)
-    let content = try checked(raw, allow: false, command: command)
+    let content = try linkContent(raw, command: command)
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
@@ -51,6 +51,12 @@ extension TaskService {
         arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
       try changed(task.id, kind: "link", body: relation, redacted: content.1, at: at, in: tx)
       return receipt(task, warnings: content.1 ? [SecretGuard.warning] : [])
+    }
+  }
+
+  private func linkContent(_ raw: String, command: String) throws -> (String, Bool) {
+    do { return try checked(raw, allow: false, command: command) } catch let error as SecretError {
+      throw CommandFailure(error: error, next: ["silta task link --help"])
     }
   }
 }

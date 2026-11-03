@@ -15,8 +15,11 @@ extension TaskService {
     let needed = allowSecret || before.claimedBy != environment.actor.description
     _ = try approval(required: needed, command: command + " -F <file>")
     let original = TaskEditDocument(before)
-    guard let text = try input(original.render()) else { return (receipt(before), false) }
+    guard let text = try input(original.render()) else { return (receipt(before), needed) }
     let parsed = try TaskEditDocument.parse(text, from: before)
+    if parsed == original {
+      return try unchangedEdit(before, allowSecret: allowSecret, command: command)
+    }
     let safe = try parsed.values.map {
       try checked($0, allow: allowSecret, command: command + " -F <file>")
     }
@@ -29,15 +32,34 @@ extension TaskService {
       try validateClaim(task, at: at)
       let required = allowSecret || task.claimedBy != environment.actor.description
       let approval = try approval(required: required, command: command + " -F <file>")
-      guard TaskEditDocument(task) == original, task.planRev == before.planRev else {
-        throw TaskError.edited(task.ref)
-      }
-      guard content != original else { return (receipt(task), false) }
+      try Self.compareEdit(task, before)
+      guard content != original else { return (receipt(task), required) }
       try applyEdit(content, task: task, redacted: redacted, at: at, in: tx)
       try approval?.record(
         command: command, workspace: slug,
         identity: (environment.ids, at), in: tx)
       return (receipt(task, warnings: redacted ? [SecretGuard.warning] : []), required)
+    }
+  }
+
+  private func unchangedEdit(_ before: TaskDetails, allowSecret: Bool, command: String) throws
+    -> (result: TaskResult, approvalUsed: Bool)
+  {
+    let slug = try selected()
+    let at = environment.clock.now()
+    return try environment.db.read { db in
+      let task = try Self.lookup(before.ref, workspace: slug, in: db)
+      try validateClaim(task, at: at)
+      let required = allowSecret || task.claimedBy != environment.actor.description
+      _ = try approval(required: required, command: command + " -F <file>")
+      try Self.compareEdit(task, before)
+      return (receipt(task), required)
+    }
+  }
+
+  private static func compareEdit(_ task: TaskDetails, _ before: TaskDetails) throws {
+    guard TaskEditDocument(task) == TaskEditDocument(before), task.planRev == before.planRev else {
+      throw TaskError.edited(task.ref)
     }
   }
 

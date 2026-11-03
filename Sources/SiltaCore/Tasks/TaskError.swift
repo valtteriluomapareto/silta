@@ -67,7 +67,7 @@ package enum TaskError: CodedError, Equatable {
     case .claimed(let ref, let holder, let minutes):
       "\(ref) is claimed by \(holder) (\(minutes) min old); do not steal."
     case .proposal(let ref):
-      "Proposal \(ref) needs human triage; choose todo work meanwhile."
+      "Proposal \(ref) needs human triage; ask in chat before accepting it."
     case .transition(let ref, let status): "\(ref) cannot make this transition from \(status)."
     case .repository:
       "Task repository is not registered locally or its .git marker is missing; "
@@ -86,7 +86,7 @@ package enum TaskError: CodedError, Equatable {
   package var next: [String] {
     switch self {
     case .promoted(let ref, _), .edited(let ref): ["silta task show \(ref)"]
-    case .proposal: ["silta task ls --status todo"]
+    case .proposal: ["silta task triage --help", "silta task ls --status todo"]
     case .claimed(let ref, _, _), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]

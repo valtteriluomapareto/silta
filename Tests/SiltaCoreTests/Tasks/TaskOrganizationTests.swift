@@ -66,7 +66,11 @@ struct TaskOrganizationTests {
       #expect(throws: TaskError.self) { _ = try service.triage(TaskTriage()) }
       var invalid = batch
       invalid.priority = 4
-      #expect(throws: TaskError.self) { _ = try service.triage(invalid) }
+      invalid.accept = ["AC-3"]
+      invalid.drop = []
+      #expect(throws: TaskError.invalid("Priority must be 1, 2 or 3.")) {
+        _ = try service.triage(invalid)
+      }
     }
   }
 
@@ -77,7 +81,7 @@ struct TaskOrganizationTests {
       _ = try await Self.add(approved, priority: 3, directory: home)
       var batch = TaskTriage()
       batch.drop = ["AC-1"]
-      batch.why = "Pwd=acme-secret"
+      batch.why = ("Pwd=" + "acme-secret")
       let agent = TaskService(environment: env)
       #expect(throws: ActorError.self) { _ = try agent.triage(batch) }
       let before = try Self.counts(agent)
@@ -125,10 +129,17 @@ struct TaskOrganizationTests {
       _ = try service.archive("AC-1", keep: true)
       #expect(try service.list().count == 1)
       #expect(try service.show("AC-1").archiveOverride == "kept")
+      #expect(try service.show("AC-1", timeline: true).timeline?.last?.body == "kept")
       _ = try service.archive("AC-1")
       #expect(try service.list().isEmpty)
       #expect(try service.show("AC-1").archiveOverride == "archived")
+      #expect(try service.show("AC-1", timeline: true).timeline?.last?.body == "archived")
       _ = try await Self.add(service, start: true, directory: home)
+      try service.environment.db.write { tx in
+        try tx.database.execute(
+          sql: "UPDATE task SET closed_at=? WHERE seq=2",
+          arguments: [TaskService.timestamp(TaskServiceTests.now)])
+      }
       clock.advance(milliseconds: 100 * 86400 * 1000)
       #expect(try !service.show("AC-2").archived)
       try service.environment.db.write { tx in

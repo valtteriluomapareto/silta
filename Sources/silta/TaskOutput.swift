@@ -27,12 +27,12 @@ enum TaskOutput {
   }
 
   static func summary(_ task: TaskDetails) -> String {
-    "\(task.ref) \(task.status) (priority \(task.priority)): \(task.title)"
+    let tracker = task.externalRef.map { " [read-only: " + $0 + "]" } ?? ""
+    return "\(task.ref) \(task.status) (priority \(task.priority)): \(task.title)" + tracker
   }
 
   static func detail(_ task: TaskDetails) -> String {
     var lines = [summary(task), "Created by: \(task.createdBy)"]
-    if let external = task.externalRef { lines.append("Tracker: \(external) (read-only)") }
     lines.append("Archived: \(task.archived ? "yes" : "no")")
     if let claim = task.claimedBy { lines.append("Claimed by: \(claim)") }
     for (heading, text) in [

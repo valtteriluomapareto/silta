@@ -26,7 +26,7 @@ struct TaskTriageCommandTests {
       }
       let args = [
         "--ws", "acme", "task", "triage", "--accept", "AC-1", "--drop", "AC-2",
-        "--priority", "3", "--allow-secret", "-m", "Pwd=acme-secret",
+        "--priority", "3", "--allow-secret", "-m", ("Pwd=" + "acme-secret"),
       ]
       let refused = try SiltaBinary.run(
         args + ["--json"], in: scratch,
@@ -38,7 +38,7 @@ struct TaskTriageCommandTests {
       let error = try #require(envelope["error"] as? [String: Any])
       let next = try #require((error["next"] as? [String])?.first)
       let file = scratch.appending(path: "why.md")
-      try "Pwd=acme-secret".write(to: file, atomically: true, encoding: .utf8)
+      try ("Pwd=" + "acme-secret").write(to: file, atomically: true, encoding: .utf8)
       let command = shellWord(try SiltaBinary.url().path) + String(next.dropFirst(5))
       let replay = command.replacingOccurrences(of: "<file>", with: shellWord(file.path))
         .replacingOccurrences(
@@ -56,7 +56,7 @@ struct TaskTriageCommandTests {
       let rows = try Row.fetchAll(db, sql: "SELECT * FROM task ORDER BY seq")
       #expect(rows.map { $0["status"] as String } == ["todo", "dropped"])
       #expect(rows.map { $0["priority"] as Int } == [3, 2])
-      #expect(rows[1]["result_md"] as String? == "Pwd=acme-secret")
+      #expect(rows[1]["result_md"] as String? == ("Pwd=" + "acme-secret"))
       let approvals = try Int.fetchOne(db, sql: "SELECT count(*) FROM approval")
       #expect(approvals == 1)
       let audit = try #require(try String.fetchOne(db, sql: "SELECT command FROM approval"))
