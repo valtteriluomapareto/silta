@@ -17,6 +17,7 @@ struct DogfoodReviewTests {
         ["--ws=silta", "task", "show", "--approved", "--ws=acme"],
         ["--ws", "silta", "task", "show", "-m", "--ws=acme"],
         ["--ws", secret, "task", "show"],
+        ["--ws", "silta", "task", "show", "--acme-unknown"],
       ]
       for (index, arguments) in cases.enumerated() {
         if index == 1 {
@@ -34,7 +35,7 @@ struct DogfoodReviewTests {
       let report = try DogfoodReportTests.run(
         ["--since", "2023-11-14"], scratch: scratch, tools: tools)
       #expect(report.termination == .exit(0))
-      #expect(report.stdout.contains("| silta task show | 4 | 100% | usage: 4 | 4 |"))
+      #expect(report.stdout.contains("| silta task show | 5 | 100% | usage: 5 | 5 |"))
       #expect(!report.stdout.contains("acme-secret"))
     }
   }
