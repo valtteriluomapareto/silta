@@ -1263,7 +1263,8 @@ match by app and name; edges by from, to and kind; sources by kind and root. Dup
 identities are invalid. Saving updates retained rows and removes omitted rows in one
 transaction; removing a referenced app or repo is a conflict. Renaming is not supported.
 Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-local
-repo paths are excluded from this view.
+repo paths are excluded from this view. A `workspace` change-log event invalidates
+that workspace's complete configuration, including omitted children.
 
 `ws use <slug>` records the current workspace. With no workspace yet, a human's
 `ws edit` opens starter YAML. Otherwise it edits the explicit or current workspace.

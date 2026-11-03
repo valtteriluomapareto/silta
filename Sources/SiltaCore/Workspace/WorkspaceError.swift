@@ -27,7 +27,7 @@ package enum WorkspaceError: CodedError {
     switch self {
     case .invalid(let problems): problems.joined(separator: "; ")
     case .notFound: "No matching workspace is selected."
-    case .conflict: "Configuration deletion conflicts with an existing reference."
+    case .conflict: "Configuration conflicts with an existing reference or unique value."
     case .editor: "The editor could not be started; check EDITOR."
     }
   }

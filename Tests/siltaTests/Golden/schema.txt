@@ -1,5 +1,5 @@
 silta schema  Describe the commands, their flags, their --json data and the error codes.
-silta ws ls  List workspaces.
+silta ws ls  List workspaces; ask a human to run silta ws edit if empty.
 silta ws use  Select the current workspace.
 silta ws edit  Edit workspace YAML (human-only).
 details: silta schema <command>

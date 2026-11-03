@@ -34,6 +34,13 @@ struct WorkspaceConfigTests {
       Golden.forTests().check(rendered, "workspace.yaml")
       try Self.apply(rendered, to: store)
       #expect(try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") } == rendered)
+      #expect(
+        try store.read {
+          try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='change_seq'")
+        } == "2")
+      #expect(
+        try store.read { try String.fetchAll($0, sql: "SELECT kind FROM change_log ORDER BY seq") }
+          == ["workspace", "workspace"])
       for (table, count) in [
         "repo": 4, "app": 7, "environment": 2, "service": 7,
         "edge": 5, "topic": 4, "topic_alias": 7, "source": 1,
@@ -108,7 +115,8 @@ struct WorkspaceConfigTests {
           try tx.database.execute(sql: "ALTER TABLE \(table) ADD COLUMN future TEXT")
           try tx.database.execute(sql: "UPDATE \(table) SET future='kept'")
         }
-        try tx.database.execute(sql: "UPDATE workspace SET settings='{\"future\":42}'")
+        try tx.database.execute(
+          sql: "UPDATE workspace SET settings='{\"future\":42,\"archive_after_days\":14}'")
         try tx.database.execute(
           sql: "INSERT INTO repo_path(repo_id,path) SELECT id,'/acme' FROM repo")
       }

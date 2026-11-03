@@ -6,6 +6,9 @@ import Testing
 struct WorkspaceValidationTests {
   static let invalidCases: [(String, String)] = [
     ("", "expected a workspace mapping"),
+    ("repos: []", "workspace is required"),
+    (WorkspaceConfigTests.minimal + "settings: {stale_days: '14'}", "nonnegative integer"),
+    (WorkspaceConfigTests.minimal + "settings: []", "expected a mapping"),
     ("workspace: [", "invalid YAML"),
     ("workspace: {slug: acme, name: 12, task_prefix: AC}", "name must be"),
     ("workspace: {slug: '-acme', name: Acme, task_prefix: AC}", "invalid slug"),

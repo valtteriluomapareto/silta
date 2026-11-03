@@ -2,7 +2,8 @@ import ArgumentParser
 import SiltaCore
 
 struct WsListCommand: OutputCommand {
-  static let configuration = CommandConfiguration(commandName: "ls", abstract: "List workspaces.")
+  static let configuration = CommandConfiguration(
+    commandName: "ls", abstract: "List workspaces; ask a human to run silta ws edit if empty.")
 
   static let dataShape = Shape.object([
     "workspaces": .array(

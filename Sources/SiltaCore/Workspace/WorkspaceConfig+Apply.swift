@@ -132,21 +132,7 @@ private struct WorkspaceWriter {
             .databaseValue,
         ])
     }
-    try db.execute(sql: "DELETE FROM topic_alias WHERE workspace_id=?", arguments: [workspace])
-    for topic in config.rows("topics") {
-      let id = try persist(
-        "topic",
-        identity: [
-          "workspace_id": workspace.databaseValue, "slug": text(topic, "slug"),
-        ], values: ["name": text(topic, "slug")])
-      for alias in topic["aliases"]?.array(of: String.self) ?? [] {
-        try db.execute(
-          sql: """
-            INSERT INTO topic_alias(workspace_id,topic_id,alias)
-            VALUES(?,?,?)
-            """, arguments: [workspace, id, WorkspaceConfig.normalize(alias)])
-      }
-    }
+    try applyTopics()
     for source in config.rows("sources") {
       _ = try persist(
         "source",
@@ -162,6 +148,40 @@ private struct WorkspaceWriter {
         ])
     }
 
+  }
+
+  private mutating func applyTopics() throws {
+    var aliases: Set<String> = []
+    for topic in config.rows("topics") {
+      let id = try persist(
+        "topic",
+        identity: [
+          "workspace_id": workspace.databaseValue, "slug": text(topic, "slug"),
+        ], values: ["name": text(topic, "slug")])
+      for raw in topic["aliases"]?.array(of: String.self) ?? [] {
+        let alias = WorkspaceConfig.normalize(raw)
+        aliases.insert(alias)
+        try db.execute(
+          sql: """
+            INSERT INTO topic_alias(workspace_id,topic_id,alias)
+            VALUES(?,?,?)
+            ON CONFLICT(workspace_id,alias) DO UPDATE SET topic_id=excluded.topic_id
+            """, arguments: [workspace, id, alias])
+      }
+    }
+    let existing = try String.fetchAll(
+      db,
+      sql: """
+        SELECT alias FROM topic_alias
+        WHERE workspace_id=?
+        """, arguments: [workspace])
+    for alias in existing where !aliases.contains(alias) {
+      try db.execute(
+        sql: """
+          DELETE FROM topic_alias
+          WHERE workspace_id=? AND alias=?
+          """, arguments: [workspace, alias])
+    }
   }
 
   private func deleteMissing() throws {

@@ -86,7 +86,7 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
   }
 
   /// Refuses an agent, naming who was detected so a human can see why.
-  package func requireHuman(command: StaticString) throws {
+  package func requireHuman(command: String) throws {
     guard isHuman else { throw ActorError.humanOnly(command: command, actor: self) }
   }
 

@@ -171,6 +171,9 @@ private struct WorkspaceValidation {
         problem(entry[key] ?? entry, "invalid \(key)")
       }
     }
+    if let gate = entry["review_gate"]?.string, !["none", "any", "human"].contains(gate) {
+      problem(entry["review_gate"] ?? entry, "review_gate must be none, any or human")
+    }
     if let lifecycle = entry["lifecycle"]?.string,
       !["active", "legacy", "dead"].contains(lifecycle)
     {

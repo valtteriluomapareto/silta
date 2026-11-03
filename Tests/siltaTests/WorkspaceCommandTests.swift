@@ -68,16 +68,29 @@ struct WorkspaceCommandTests {
 
   @Test(arguments: [["ws", "edit", "other"], ["--ws", "other", "ws", "edit"]])
   func refusalRetainsExplicitWorkspace(arguments: [String]) throws {
-    try withKnownIssue("#9: refusalRetainsExplicitWorkspace") {
     try withScratchDirectory { scratch in
       for json in [false, true] {
-        let result = try SiltaBinary.run(arguments + (json ? ["--json"] : []), in: scratch,
+        let result = try SiltaBinary.run(
+          arguments + (json ? ["--json"] : []), in: scratch,
           environment: ["SILTA_ACTOR": "agent:codex:acme"])
         #expect(result.termination == .exit(3))
-        Golden.forTests().check(json ? result.stdout : result.stderr,
+        Golden.forTests().check(
+          json ? result.stdout : result.stderr,
           json ? "ws-edit-target-refused.json" : "ws-edit-target-refused.txt")
       }
     }
+  }
+
+  @Test func refusalQuotesWorkspaceShellCharacters() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(
+        ["ws", "edit", "acme's", "--json"], in: scratch,
+        environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      #expect(result.termination == .exit(3))
+      let object = try #require(
+        JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+      let error = try #require(object["error"] as? [String: Any])
+      #expect(error["next"] as? [String] == ["silta ws edit 'acme'\\''s'"])
     }
   }
 
