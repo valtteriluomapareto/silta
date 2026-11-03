@@ -97,6 +97,54 @@ struct TaskOutputCommandTests {
     }
   }
 
+  @Test func everyReceiptAndQuietFormSaysWhatItShould() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      for arguments in [
+        ["task", "add", "Acme", "--start"], ["task", "add", "Acme two", "--start"],
+        ["task", "plan", "AC-1", "-m", "- [ ] Ship"],
+        ["task", "plan", "AC-1", "--step", "1", "--done"],
+      ] {
+        #expect(try Self.run(arguments, in: scratch).termination == .exit(0))
+      }
+      let undone = try Self.run(["task", "plan", "AC-1", "--step", "1", "--undo"], in: scratch)
+      #expect(undone.stdout == "AC-1 step 1 undone: Ship (0/1)\n")
+      let printed = try Self.run(["task", "edit", "AC-1", "--print"], in: scratch)
+      let file = scratch.appending(path: "edit.md")
+      try printed.stdout.write(to: file, atomically: true, encoding: .utf8)
+      let unchanged = try Self.run(["task", "edit", "AC-1", "-F", file.path], in: scratch)
+      #expect(unchanged.stdout == "AC-1 unchanged\n")
+      let linked = try Self.run(["task", "link", "AC-1", "AC-2"], in: scratch)
+      withKnownIssue("the receipt echoes the target as typed") {
+        #expect(linked.stdout == "AC-1 linked cites task:AC-2\n")
+      }
+      let plan = scratch.appending(path: "plan.md")
+      try "# Acme import\n\n- First\n".write(to: plan, atomically: true, encoding: .utf8)
+      for arguments in [
+        ["task", "edit", "AC-1", "--print"], ["ws", "ls"], ["ws", "show"],
+        ["task", "from-plan", plan.path, "--dry-run"],
+      ] {
+        let loud = try Self.run(arguments, in: scratch)
+        let quiet = try Self.run(arguments + ["--quiet"], in: scratch)
+        #expect(!loud.stdout.isEmpty && quiet.stdout == loud.stdout, "\(arguments)")
+      }
+    }
+  }
+
+  @Test func aTerminalHumanRefusedOnAProposalRunsTriageThemselves() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(try Self.run(["task", "add", "Acme idea"], in: scratch).termination == .exit(0))
+      let refused = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/script"),
+        ["-q", "/dev/null", try SiltaBinary.url().path, "task", "start", "AC-1"],
+        in: scratch, environment: ["USER": "acme"])
+      let output = refused.stdout.replacingOccurrences(of: "\r\n", with: "\n")
+      #expect(output.contains("[conflict]"))
+      #expect(output.hasSuffix("next: silta --ws 'acme' task triage --accept AC-1\n"))
+    }
+  }
+
   @Test func schemaSplitsOneQuotedName() throws {
     try withScratchDirectory { scratch in
       let words = try SiltaBinary.run(["schema", "task", "add"], in: scratch)
@@ -158,7 +206,31 @@ struct TaskOutputCommandTests {
       #expect(preview.termination == .exit(0))
       let warnings = try TaskStateRegressionTests.warnings(preview)
       #expect(warnings == ["approval_unused"])
+      withKnownIssue("the warning says the command didn't need --approved") {
+        #expect(preview.stdout.contains("A dry run records nothing"))
+      }
+      let ungated = try Self.run(
+        ["task", "from-plan", file.path, "--dry-run", "--allow-secret", "--json"], in: scratch)
+      withKnownIssue("a dry run with --allow-secret is human-only") {
+        #expect(ungated.termination == .exit(0))
+      }
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
+    }
+  }
+
+  @Test func wsEditApprovalRowsNameTheFileFlagLikeTaskRows() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let file = scratch.appending(path: "workspace.yaml")
+      try "workspace: {slug: acme, name: Acme Updated, task_prefix: AC}\n".write(
+        to: file, atomically: true, encoding: .utf8)
+      let edited = try Self.run(
+        ["ws", "edit", "acme", "-F", file.path, "--approved", "Apply this YAML."], in: scratch)
+      #expect(edited.termination == .exit(0))
+      let command = try store.read { try String.fetchOne($0, sql: "SELECT command FROM approval") }
+      withKnownIssue("ws edit records a bare -F") {
+        #expect(command == "silta ws edit 'acme' -F <file>")
+      }
     }
   }
 }
