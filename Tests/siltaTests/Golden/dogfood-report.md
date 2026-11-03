@@ -1,7 +1,9 @@
 # Silta dogfood report
 
 Since: 2023-11-14 (UTC, inclusive).
-Untagged log lines: 1. Report calls excluded.
+Until: 2023-11-30T00:00:00Z (UTC, report time).
+Logs available from: 2023-11-14.
+Untagged log lines: 1. Unreadable log lines: 0. Report calls excluded.
 
 ## Calls
 
@@ -57,7 +59,9 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 
 ## Friction in the silta workspace
 
-- 2023-11-14 SI-1: Re-reading the Acme plan was awkward.
+- 2023-11-15 SI-1: Re-reading the Acme plan was awkward.
+
+Done tasks without a Friction line: 1 (SI-13).
 
 Open dogfood tasks:
 
@@ -69,12 +73,14 @@ Approvals per ISO week by command:
 
 | Week | Command | Approvals |
 |---|---|---|
+| 2023-W46 | other | 1 |
 | 2023-W46 | silta task start | 2 |
 | 2023-W46 | silta ws edit | 1 |
 | 2023-W47 | silta task triage | 1 |
 | 2023-W47 | silta ws edit | 1 |
 
-Proposals accepted: 5; dropped: 1; 14-day window expiries: 3 (including later triage).
+Proposals accepted: 5; dropped: 1; left untriaged past 14 days: 1.
+Oldest pending proposal: 14 days.
 Triage wait: median 20159.5 min; maximum 30240 min.
 Questions to @me: n/a (S11).
 Inbox size and oldest item: n/a (S11).

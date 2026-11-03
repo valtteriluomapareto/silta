@@ -200,6 +200,21 @@ struct DogfoodLogTests {
     }
   }
 
+  @Test(arguments: [
+    ["schema"], ["ws", "ls"], ["init", "--scan", "missing-acme"], ["init"], ["--version"],
+    ["task"],
+  ])
+  func commandsThatActOnNoWorkspaceStayUntagged(arguments: [String]) throws {
+    withKnownIssue("Commands without a workspace inherit the current selection") {
+      try withScratchDirectory { scratch in
+        _ = try Self.setup(scratch)
+        _ = try Self.run(arguments, scratch: scratch)
+        let entry = try Self.last(scratch)
+        #expect(entry["command"] is String && entry["workspace"] == nil)
+      }
+    }
+  }
+
   @Test func absentStorageAttributionDoesNotInitializeDatabase() throws {
     try withScratchDirectory { scratch in
       let result = try Self.run(["task", "show", "AC-1"], scratch: scratch)

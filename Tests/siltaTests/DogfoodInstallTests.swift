@@ -65,6 +65,30 @@ struct DogfoodInstallTests {
     }
   }
 
+  @Test(arguments: ["behind", "ahead"])
+  func installerRefusesMainThatDiffersFromOrigin(direction: String) throws {
+    withKnownIssue("install-dev builds a local main that differs from origin") {
+      try withScratchDirectory { scratch in
+        let clone = try Self.clone(scratch)
+        let tools = scratch.appending(path: "tools")
+        try DogfoodReportTests.tool(
+          "swift", text: "#!/bin/bash\nmkdir -p .build/release\necho Acme > .build/release/silta\n",
+          in: tools)
+        let commit = [
+          "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit",
+          "--allow-empty", "-qm", "Acme " + direction,
+        ]
+        let repository = direction == "behind" ? scratch.appending(path: "origin") : clone
+        _ = try Self.git(commit, in: scratch, cwd: repository)
+        let result = try Self.install(clone, scratch: scratch, tools: tools)
+        #expect(result.termination == .exit(1))
+        #expect(result.stderr.contains(direction == "behind" ? "1 behind" : "1 ahead"))
+        #expect(
+          !FileManager.default.fileExists(atPath: scratch.appending(path: "installed/silta").path))
+      }
+    }
+  }
+
   @Test func installerBuildsCleanMainAndPreservesExistingBinaryOnFailure() throws {
     try withScratchDirectory { scratch in
       let clone = try Self.clone(scratch)
