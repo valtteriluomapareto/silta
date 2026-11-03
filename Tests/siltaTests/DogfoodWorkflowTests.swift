@@ -17,7 +17,7 @@ struct DogfoodWorkflowTests {
       }
       let plain = try run(["task", "ls"], actor: actor)
       #expect(plain.termination == .exit(0) && !plain.stdout.contains("SI-1"))
-      let proposed = try run(["task", "ls", "--proposed"], actor: actor)
+      let proposed = try run(["task", "ls", "--proposed", "--archived"], actor: actor)
       #expect(proposed.stdout.contains("\"ref\":\"SI-1\""))
       #expect(proposed.stdout.contains("\"status\":\"proposed\""))
       #expect(proposed.stdout.contains("url:https://example.com/acme/7"))

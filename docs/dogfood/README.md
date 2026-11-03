@@ -4,7 +4,8 @@ These instructions take effect after the DF PR merges and an agent completes set
 with the maintainer in chat. The current stage stays **before DF0** until that has
 happened. The maintainer does not run CLI commands.
 
-The scripts need `/usr/bin/jq`, which ships with macOS 15 or later.
+The scripts need `/usr/bin/jq`, which ships with macOS 15 or later. The import
+also needs `gh` 2.48 or later, for `gh api --slurp`.
 
 ## Setup with an agent
 
@@ -38,8 +39,9 @@ The scripts need `/usr/bin/jq`, which ships with macOS 15 or later.
      link.
    - Run the work loop on a scratch task:
      `silta --ws silta task add --start "DF setup check" --app silta`, then
-     `task plan <ref> -m "- [ ] Check the loop"`, `task plan <ref> --step 1 --done`
-     and `task drop <ref> -m "Setup check only."`.
+     `silta --ws silta task plan <ref> -m "- [ ] Check the loop"`,
+     `silta --ws silta task plan <ref> --step 1 --done` and
+     `silta --ws silta task drop <ref> -m "Setup check only."`.
 
    Only after this works should a PR change the stage line in AGENTS.md to DF0.
 
@@ -63,14 +65,20 @@ workspace and excludes its own actor's calls and approvals.
   prior report, all retained logs and task history are considered. `Until:` is the
   UTC report time. Logs are kept 90 days: `Logs available from:` names the oldest
   one, and a warning says when `--since` is earlier, so the call counts are
-  incomplete. Task and approval history is complete.
+  incomplete. The first report always shows that warning, because it starts at
+  1970-01-01. Task and approval history is complete. A `--since` after the report
+  day is refused.
 - **Log lines.** Lines tagged with another workspace are omitted. Untagged lines
-  and unreadable lines (malformed, or without a timestamp) are only counted.
+  and unreadable lines (malformed, or missing the expected fields) are only counted;
+  untagged lines also count toward "Unused commands", since a command name is no
+  workspace data. The report runs as `agent:silta:dogfood-report`, whichever tool
+  runs it.
   Failures before CLI environment setup are not logged and cannot appear here.
 - **Repeated failures** means adjacent failures within the selected Silta stream for
   one agent actor/session.
 - **Human load.** Approvals per ISO week and command. Proposals are accepted,
-  dropped, or left untriaged past 14 days, each counted once; the oldest pending
+  dropped, or left untriaged past 14 days, each counted once; an agent withdrawing
+  its own proposal is not triage and isn't counted; the oldest pending
   proposal shows what still waits. The first report's numbers are mostly the setup
   triage. Questions and inbox measurements are `n/a` until S11.
 

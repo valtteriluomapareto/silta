@@ -134,19 +134,26 @@ The DF0 instructions below take effect only after an agent completes
 | Stage | Plans and steps | Questions and handoffs | Session start |
 |---|---|---|---|
 | Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
-| DF0 | One task per slice. Find it by its issue link in `silta --ws silta task ls --proposed`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F <file>`, tick with `task plan <ref> --step N --done`, finish with `task done <ref> -F <file>` | Comment on the slice issue | `silta --ws silta task show <ref>` |
+| DF0 | One task per slice. Find it by the issue's `url:` link in `silta --ws silta task ls --proposed --archived --json`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F - <<'EOF'`, tick with `task plan <ref> --step N --done`, finish with `task done <ref> -F - <<'EOF'` | Comment on the slice issue | `silta --ws silta task show <ref>` |
 | DF1 | as DF0 | `silta comment <task> --kind question` / `--kind handoff` | as DF0 |
 | DF2 | as DF0 | as DF1 | The hook runs `silta brief` |
 
 From DF0 on, every command runs as `silta --ws silta …`:
 - **Find the slice's task; never add a second one.** Imported tasks stay `proposed`
-  until the maintainer triages them, and plain `task ls` hides other sessions'
-  proposals. If the task is `proposed`, name
+  until the maintainer triages them, plain `task ls` hides other sessions'
+  proposals, and done or dropped tasks are archived after 14 days. So look for the
+  issue's `url:` link in the `--proposed --archived --json` listing; the text listing
+  shows no links. If the task is `proposed`, name
   `silta --ws silta task triage --accept <ref> --approved "<the human's words>"` to the
   maintainer and start it after they say yes. If it is `dropped`, ask the maintainer
   before doing anything.
+- **Plans and results go through stdin.** Pass them with `-F -` and a quoted
+  heredoc (`<<'EOF'`); never write a plan or result file into the repository.
 - **A claimed slice.** If `task start` answers `claimed`, another session holds the
-  task. Continue from that session's worktree, or name
+  task. The claim belongs to the whole actor, `agent:<tool>:<session>`, and the
+  session comes from the worktree. So continue in the claiming worktree
+  (`silta --ws silta task show <ref> --json` names it as `worktree`) with the same
+  tool, or name
   `silta --ws silta task start <ref> --steal --approved "<the human's words>"` to the
   maintainer. Until DF1, tell the other session in a comment on the slice issue.
 - **Work for the human.** Follow [spec §11](docs/spec.md#silta-guide) until
