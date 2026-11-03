@@ -1,0 +1,4 @@
+AC-1 blocked
+Waiting on ext:acme for 0 d: Confirm the Acme release date.
+Follow-up: 2023-11-21
+Silta sends nothing; ask ext:acme: Confirm the Acme release date.

@@ -1,0 +1,1 @@
+{"data":{"follow_up_at":"2023-11-21","ref":"AC-1","status":"blocked","waiting":{"age_days":0,"dropped":[],"on":["ext:acme"],"ready":false,"why":"Acme decision"}},"ok":true,"schema":1,"warnings":[{"code":"new_party","message":"New party ext:acme; known parties: none. Silta sends nothing."}]}

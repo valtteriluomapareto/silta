@@ -4,8 +4,14 @@ import SiltaCore
 enum TaskOutput {
   static let receiptShape = Shape.object(["ref": .string, "status": .string])
 
+  static let waitingShape = Shape.object([
+    "on": .array(.string), "age_days": .int, "why": .string, "ready": .bool,
+    "dropped": .array(.string),
+  ])
+
   static let detailShape = Shape.object([
     "ref": .string, "title": .string, "status": .string, "description": .string,
+    "follow_up_at": .optional(.string), "waiting": .optional(waitingShape),
     "acceptance": .string, "priority": .int, "archived": .bool,
     "archive_override": .optional(.string), "external_ref": .optional(.string),
     "plan": .string, "plan_rev": .int, "result": .optional(.string), "created_by": .string,
@@ -29,11 +35,24 @@ enum TaskOutput {
   static func summary(_ task: TaskDetails) -> String {
     let tracker = task.externalRef.map { " [read-only: " + $0 + "]" } ?? ""
     return "\(task.ref) \(task.status) (priority \(task.priority)): \(task.title)" + tracker
+      + (task.waiting.map { "\n" + waitingLines($0).joined(separator: "\n") } ?? "")
+  }
+
+  static func waitingLines(_ waiting: TaskWaiting) -> [String] {
+    var lines = [
+      "Waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d: \(waiting.why)"
+    ]
+    if waiting.ready { lines.append("Ready to unblock.") }
+    if !waiting.dropped.isEmpty {
+      lines.append("Blocker dropped: re-plan (" + waiting.dropped.joined(separator: ", ") + ")")
+    }
+    return lines
   }
 
   static func detail(_ task: TaskDetails) -> String {
     var lines = [summary(task), "Created by: \(task.createdBy)"]
     lines.append("Archived: \(task.archived ? "yes" : "no")")
+    if let day = task.followUpAt { lines.append("Follow-up: " + day) }
     if let claim = task.claimedBy { lines.append("Claimed by: \(claim)") }
     for (heading, text) in [
       ("Description", task.description),

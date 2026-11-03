@@ -13,6 +13,8 @@ struct TaskListCommand: OutputCommand {
 
   @Option(help: "Show this app.") var app: String?
 
+  @Option(help: "Show tasks blocked on this task, ext:party or URL.") var on: String?
+
   @Option(help: "Show this topic.") var topic: String?
 
   @Flag(help: "Show tasks created or claimed by this exact actor.") var mine = false
@@ -24,6 +26,7 @@ struct TaskListCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     var filter = TaskFilter()
     filter.status = status
+    filter.on = on
     filter.app = app
     filter.topic = topic
     filter.mine = mine

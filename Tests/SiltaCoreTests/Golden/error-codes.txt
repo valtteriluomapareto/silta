@@ -59,6 +59,11 @@ error: sample lease_taken error [lease_taken]
 next: silta sample --next
 {"error":{"code":"lease_taken","message":"sample lease_taken error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 
+## blocked (exit 6)
+error: sample blocked error [blocked]
+next: silta sample --next
+{"error":{"code":"blocked","message":"sample blocked error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
 ## gate (exit 7)
 error: sample gate error [gate]
 next: silta sample --next

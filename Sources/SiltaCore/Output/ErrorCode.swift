@@ -33,6 +33,8 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
   case staleRev = "stale_rev"
   /// Someone else holds the lease.
   case leaseTaken = "lease_taken"
+  /// Work is waiting for prerequisites or an answer.
+  case blocked
   /// A review gate isn't met.
   case gate
   /// Too many writes in a short time.
@@ -49,7 +51,7 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
     case .humanOnly, .readOnlyPromoted: 3
     case .ambiguousLocation: 4
     case .busy: 5
-    case .conflict, .claimed, .staleRev, .leaseTaken: 6
+    case .conflict, .claimed, .staleRev, .leaseTaken, .blocked: 6
     case .gate: 7
     case .rateLimited: 8
     case .env: 9
@@ -74,7 +76,8 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
         + "`--approved \"<their words>\"` after they say yes"
     case .ambiguousLocation: "Retry with `--app <slug>` from the candidates"
     case .busy: "Retry once after a few seconds"
-    case .conflict, .claimed, .staleRev, .leaseTaken: "Re-read, then decide; don't steal"
+    case .conflict, .claimed, .staleRev, .leaseTaken, .blocked:
+      "Re-read, then decide; don't steal, and don't unblock while blockers are open"
     case .gate: "Request a review or ask the human"
     case .rateLimited: "Wait for `retry_after_s`, or summarise"
     case .env: "Report the printed fix to the human"

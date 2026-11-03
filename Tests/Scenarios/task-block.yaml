@@ -1,0 +1,22 @@
+fixtures: true
+steps:
+  - args: [init, --scan, acme-missing-remote, --json]
+    cwd: fixtures
+    expect: {exit: 0}
+  - args: [ws, use, acme-missing-remote, --json]
+    expect: {exit: 0}
+  - args: [task, add, Acme decision, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.status: doing}}
+  - args: [task, block, AC-1, --on, 'ext:acme', -m, Confirm the Acme release date.]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, stdout: task-block-scenario.txt}
+  - args: [task, start, AC-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 6, code: blocked, json: {error.next_by: agent}}
+  - args: [task, add, Acme other work, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 0, json: {data.status: doing}}
+  - args: [task, ls, --on, 'ext:acme']
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 0, stdout: task-block-list-scenario.txt}

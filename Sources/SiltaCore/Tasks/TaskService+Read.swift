@@ -20,6 +20,7 @@ extension TaskService {
     let slug = try selected()
     return try environment.db.read { db in
       let id = try Self.workspaceID(slug, in: db)
+      if let on = filter.on { _ = try Self.blocker(on, workspace: slug, in: db) }
       return try Row.fetchAll(
         db,
         sql: Self.query + """
@@ -34,13 +35,14 @@ extension TaskService {
           && (filter.app == nil || filter.app == $0.app)
           && (!filter.mine || $0.createdBy == environment.actor.description
             || $0.claimedBy == environment.actor.description)
-      }.map { try Self.decorate($0, at: environment.clock.now(), in: db) }.filter {
-        (!($0.archived) || filter.archived)
-          && (filter.topic == nil
-            || $0.links.contains {
-              $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
-            })
-      }
+      }.filter { try Self.matchesBlocker(filter.on, task: $0, workspace: slug, in: db) }
+        .map { try Self.decorate($0, at: environment.clock.now(), in: db) }.filter {
+          (!($0.archived) || filter.archived)
+            && (filter.topic == nil
+              || $0.links.contains {
+                $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
+              })
+        }
 
     }
   }
@@ -60,9 +62,7 @@ extension TaskService {
             WHERE task_id=?
             ORDER BY id
             """, arguments: [task.id]
-        ).map {
-          TaskEvent(kind: $0["kind"], actor: $0["actor"], body: $0["body"], at: $0["created_at"])
-        }
+        ).map { try Self.safeEvent($0) }
       }
       return task
     }
@@ -93,6 +93,7 @@ extension TaskService {
   {
     var task = original
     task.archived = try isArchived(task, at: date, in: db)
+    task.waiting = try waiting(task, at: date, in: db)
     task.links = try Row.fetchAll(
       db,
       sql: """
@@ -102,7 +103,11 @@ extension TaskService {
         ORDER BY link.id
         """, arguments: [task.id, task.workspaceID]
     ).map { row in
-      return TaskLink(rel: row["rel"], target: try TaskLinkTarget.render(row, in: db))
+      let target = try TaskLinkTarget.render(row, in: db)
+      return TaskLink(
+        rel: row["rel"],
+        target: (row["rel"] as String) == "blocked_by"
+          && (row["to_kind"] as String) == "url" ? SecretGuard.redacted(target) : target)
     }
     return task
   }
