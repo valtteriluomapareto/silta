@@ -50,9 +50,7 @@ extension TaskService {
     let db = tx.database
     let ws = try Self.workspaceID(workspace, in: db)
     let parent = try draft.parent.map { try Self.lookup($0, workspace: workspace, in: db) }
-    if let parent, ["done", "dropped"].contains(parent.status) || parent.externalRef != nil {
-      throw TaskError.invalid("A parent must be an open task that is not promoted.")
-    }
+    if let parent { try Self.validateParent(parent) }
     let app = try draft.app.map { try Self.entity("app", slug: $0, workspace: ws, in: db) }
     if let app, try Self.repoPath(app: app, in: db) != creation.path {
       throw TaskError.changed(nil)
@@ -102,6 +100,13 @@ extension TaskService {
     try Self.validateTitle(draft.title)
     if let source = draft.source, !source.hasPrefix("note:") || source.count == 5 {
       throw TaskError.invalid("--from requires a note: reference.")
+    }
+  }
+
+  /// A parent is open and unpromoted, so a subtask never hangs off finished or tracked work.
+  static func validateParent(_ parent: TaskDetails) throws {
+    if ["done", "dropped"].contains(parent.status) || parent.externalRef != nil {
+      throw TaskError.invalid("A parent must be an open task that is not promoted.")
     }
   }
 

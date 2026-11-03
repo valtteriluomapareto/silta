@@ -444,17 +444,21 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     `parent`, `claimed_by`, `claimed_at`, `external_ref`, `waiting`, `follow_up_at`,
     `created_by`, `created_at` and `updated_at`, without the description, plan,
     acceptance or result. `task show` keeps the full detail. Data shapes only gain
-    fields (§16), so the smaller shape is fixed now, before agents depend on the old
-    one.
+    fields (§16), so the smaller shape is fixed now, before DF0 and before agents
+    depend on the old one; this one narrowing doesn't bump `schema`.
   - **`parent`** appears in `task show` and `task ls`: the parent's ref, absent when
     there is none (an optional field is never `null`, §20.1). Text output names it in
     the header line, e.g. `AC-4 todo (priority 2, parent AC-3): …`.
   - **Approval rows say what they created.** For a command that creates tasks (`task
     add`, `from-plan`), the recorded `command` ends with ` -> <created refs>`. The
-    command names only the flags actually passed, and stays body-free.
+    command names only the flags actually passed, and stays body-free. Refs carry the
+    workspace's task prefix at the time, as every approval row's refs do; a later
+    prefix change in `ws edit` leaves them naming the old prefix.
   - **`promote` is refused from `proposed` and `blocked`** (`conflict`, exit 6). The
     `next` is the exact triage command for a proposal and `silta task unblock <ref>`
     for a blocked task, so no proposal or block is left where nothing can change it.
+    Like every state refusal of an approved command (`start --steal` too), it comes
+    before the human's go-ahead is asked for.
   - **`triage --priority` is optional**: without it, accepted tasks keep their stored
     priority.
   - **Unblocking a block that isn't ready needs the human's go-ahead.** Ready means
@@ -470,12 +474,13 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     approval. An agent's edit that blanks a stored Result or Plan is `invalid` and
     names the field; humans may clear them. An edit that changes nothing writes no
     approval row, so `--approved` warns `approval_unused`. Only changed fields pass
-    the secret guard.
+    the secret guard. A `--step` tick adds no text, so the guard leaves the plan as
+    stored and `--allow-secret` with `--step` is `invalid`.
   - **Promoted tasks are left out of `task ls`** unless `--promoted` is given. Their
     tracker owns them, so `read_only_promoted` points the agent at other work: `next`
     is `silta task ls --status todo` and `next_by` is `agent`.
-  - **An unreadable `-F` file is `invalid`** (exit 1) with the failing command's
-    `--help`: it's the caller's mistake, not the environment's.
+  - **An unreadable `-F` file of a task command is `invalid`** (exit 1) with the
+    failing command's `--help`: it's the caller's mistake, not the environment's.
   - **`--force` and `--steal` need approval only when they bypass something**: `done
     --force` when the review gate is unmet, `start --steal` when another session holds
     a fresh claim. Otherwise the flag changes nothing and needs no approval.

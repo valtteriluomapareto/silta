@@ -110,4 +110,34 @@ struct TaskApprovalRegressionTests {
         commands == ["silta task triage --accept 'AC-1'", "silta task start 'AC-2' --steal"])
     }
   }
+
+  @Test func mixedUnblockBatchIsRefusedWholeAndStateComesBeforeApproval() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      for title in ["Acme", "Acme two", "Acme three"] {
+        #expect(
+          try Self.run(["task", "add", title, "--start"], in: scratch).termination == .exit(0))
+      }
+      for args in [
+        ["task", "block", "AC-2", "--on", "AC-1", "-m", "After one"],
+        ["task", "done", "AC-1", "-m", "Acme done"],
+        ["task", "block", "AC-3", "--on", "ext:acme", "-m", "Acme?"],
+      ] {
+        #expect(try Self.run(args, in: scratch).termination == .exit(0))
+      }
+      let mixed = try Self.run(["task", "unblock", "AC-2", "AC-3", "--json"], in: scratch)
+      #expect(mixed.termination == .exit(3))
+      #expect(try Self.error(mixed)["code"] as? String == "human_only")
+      let statuses = try store.read {
+        try String.fetchAll($0, sql: "SELECT status FROM task ORDER BY seq")
+      }
+      #expect(statuses == ["done", "blocked", "blocked"])
+      #expect(try Self.run(["task", "add", "Acme idea"], in: scratch).termination == .exit(0))
+      let promoted = try Self.run(
+        ["task", "promote", "AC-4", "--ext", "ado:1", "--json"], in: scratch)
+      #expect(promoted.termination == .exit(6))
+      #expect(try Self.error(promoted)["code"] as? String == "conflict")
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
+    }
+  }
 }

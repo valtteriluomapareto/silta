@@ -618,7 +618,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
   override.
 - **External tracker:** `task promote AC-12 --ext ado:4711` (or `gh:owner/repo#12`,
-  `jira:KEY-12`) is human-only. A promoted task becomes read-only in `silta` and status
+  `jira:KEY-12`) is human-only; refusals on the task's state come before the human is
+  asked. A promoted task becomes read-only in `silta` and status
   changes return exit 3: "tracked in ado:4711; change it there", with `next`
   `silta task ls --status todo` for the agent to pick other work. M4 adds reading the
   status back, Azure DevOps first.

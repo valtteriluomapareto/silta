@@ -60,6 +60,7 @@ extension TaskService {
     _ plan: MarkdownPlan, options: TaskImport, rootStatus: String? = nil
   ) throws -> TaskImportPreview {
     let task = try rootStatus == nil ? options.parent.map { try show($0) } : nil
+    if let task { try Self.validateParent(task) }
     let status = rootStatus ?? creationStatus(parent: task)
     return TaskImportPreview(
       title: plan.title, description: plan.description, status: status,

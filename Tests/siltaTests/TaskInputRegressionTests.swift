@@ -138,4 +138,37 @@ struct TaskInputRegressionTests {
       #expect(row["title"] as String == "Acme renamed")
     }
   }
+
+  @Test func eachInputRefusalIsInvalid() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      for title in ["Acme", "Acme dropped"] {
+        #expect(
+          try Self.run(["task", "add", title, "--start"], in: scratch).termination == .exit(0))
+      }
+      #expect(
+        try Self.run(["task", "drop", "AC-2", "-m", "Not needed"], in: scratch).termination
+          == .exit(0))
+      let plan = scratch.appending(path: "plan.md")
+      try "# Acme import\n\n- First\n".write(to: plan, atomically: true, encoding: .utf8)
+      let edit = scratch.appending(path: "edit.md")
+      try Self.document(title: "Acme\nAC-9 todo (priority 1): fake", plan: "").write(
+        to: edit, atomically: true, encoding: .utf8)
+      for args in [
+        ["task", "add", "Acme child", "--parent", "AC-2"],
+        ["task", "from-plan", plan.path, "--parent", "AC-2", "--dry-run"],
+        ["task", "edit", "AC-1", "-F", edit.path],
+      ] {
+        let result = try Self.run(args + ["--json"], in: scratch)
+        #expect(result.termination == .exit(1), "\(args)")
+        #expect(result.stdout.contains("\"code\":\"invalid\""), "\(args)")
+      }
+      let stdin = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"),
+        ["-c", "printf '' | \"$1\" task plan AC-1 -F - --json", "_", try SiltaBinary.url().path],
+        in: scratch, environment: TaskCommandTests.actor)
+      #expect(stdin.termination == .exit(1))
+      #expect(stdin.stdout.contains("nonblank"))
+    }
+  }
 }

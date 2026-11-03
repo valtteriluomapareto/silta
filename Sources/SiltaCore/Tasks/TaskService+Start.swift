@@ -12,8 +12,8 @@ extension TaskService {
     let before = try show(ref)
     let at = environment.clock.now()
     try validateClaim(before, at: at, steal: steal)
-    _ = try approval(required: steal && foreignClaim(before, at: at) != nil, command: command)
     try canStart(before)
+    _ = try approval(required: steal && foreignClaim(before, at: at) != nil, command: command)
     let git = try await TaskGit.inspect(
       repo: before.repoPath, directory: directory, runner: environment.git,
       enabled: before.appID != nil, completion: false)
@@ -23,9 +23,9 @@ extension TaskService {
         Self.lookup(ref, workspace: slug, in: tx.database),
         at: at, in: tx.database)
       try validateClaim(task, at: at, steal: steal)
+      try canStart(task)
       let approval = try approval(
         required: steal && foreignClaim(task, at: at) != nil, command: command)
-      try canStart(task)
       try Self.sameRepository(task, before)
       try tx.database.execute(
         sql: """

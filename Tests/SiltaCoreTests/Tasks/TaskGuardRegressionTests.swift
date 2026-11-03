@@ -4,7 +4,8 @@ import GRDB
 import SiltaTestSupport
 import Testing
 
-/// The secret guard checks only text a write adds, and task reads have their index.
+/// Guards that depend on who writes: the secret guard checks only added text, a human
+/// unblocks without approval, and task reads have their index.
 @Suite(.timeLimit(.minutes(1)))
 struct TaskGuardRegressionTests {
   @Test func humanTickKeepsAnAllowedSecretPlan() async throws {
@@ -30,6 +31,25 @@ struct TaskGuardRegressionTests {
         try String.fetchAll($0, sql: "SELECT name FROM pragma_index_info('task_event_task')")
       }
       #expect(columns == ["task_id", "kind"])
+    }
+  }
+
+  @Test func humansUnblockOpenBlocksAndAgentsNeedApproval() async throws {
+    try await withScratchDirectory { home in
+      let human = TaskService(
+        environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
+      try TaskServiceTests.setup(human.environment)
+      for _ in 0..<2 { _ = try await human.add(TaskDraft(title: "Acme"), directory: home) }
+      for ref in ["AC-1", "AC-2"] { _ = try human.block(ref, TaskBlockTests.input()) }
+      let agent = TaskService(environment: try TaskServiceTests.environment(home))
+      #expect(throws: ActorError.self) { _ = try agent.unblock(["AC-1"]) }
+      let approved = TaskService(environment: agent.environment, approved: "Unblock AC-1")
+      #expect(try approved.unblock(["AC-1"]).approvalUsed)
+      #expect(try !human.unblock(["AC-2"]).approvalUsed)
+      let rows = try human.environment.db.read {
+        try Int.fetchOne($0, sql: "SELECT count(*) FROM approval")
+      }
+      #expect(rows == 1)
     }
   }
 }
