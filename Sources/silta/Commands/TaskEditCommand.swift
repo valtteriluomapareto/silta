@@ -17,7 +17,7 @@ struct TaskEditCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -39,6 +39,7 @@ struct TaskEditCommand: OutputCommand {
       return try edit(original, environment: context.environment)
     }
     return TaskOutput.receipt(result.result, approvalUsed: result.approvalUsed)
+      .reporting(context.taskWorkspace(global.ws))
   }
 
   private func read(_ path: String) throws -> String {

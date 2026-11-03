@@ -8,7 +8,7 @@ struct TaskStartCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -25,6 +25,7 @@ struct TaskStartCommand: OutputCommand {
         ref, steal: steal,
         directory: URL(
           filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
-      approvalUsed: steal)
+      approvalUsed: steal
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }

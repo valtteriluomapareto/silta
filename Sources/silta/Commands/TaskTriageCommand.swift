@@ -8,7 +8,7 @@ struct TaskTriageCommand: OutputCommand {
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -42,7 +42,8 @@ struct TaskTriageCommand: OutputCommand {
     ).triage(batch)
     return CommandOutput(
       text: tasks.map { "\($0.ref) \($0.status)" }.joined(separator: "\n"),
-      data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings), approvalUsed: true)
+      data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings), approvalUsed: true
+    ).reporting(context.taskWorkspace(global.ws))
   }
 
   private struct Data: Encodable {

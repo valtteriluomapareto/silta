@@ -12,7 +12,7 @@ struct WsListCommand: OutputCommand {
       ]))
   ])
 
-  static let actsOnWorkspace = false
+  static let workspaceSource = WorkspaceSource.none
 
   @OptionGroup var global: GlobalOptions
 

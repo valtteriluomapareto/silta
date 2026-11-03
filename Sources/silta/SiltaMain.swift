@@ -87,8 +87,7 @@ enum SiltaMain {
         return CommandExecution(rendered: parseFailure(error, arguments: arguments, mode: mode))
       }
     }
-    let rendered: Rendered
-    var reported: String?
+    let store = context.environment.db
     do {
       var output = try await outputCommand.execute(context)
       let approvalWarnings = context.environment.actor.approvalWarnings(
@@ -97,19 +96,20 @@ enum SiltaMain {
         !output.warnings.contains(where: { $0.code == warning.code })
       }
       output.warnings = context.environment.warnings + output.warnings
-      reported = output.workspace
-      rendered = OutputRouter.render(.success(output), mode: mode)
+      return CommandExecution(
+        rendered: OutputRouter.render(.success(output), mode: mode),
+        scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store))
     } catch let error as any CodedError {
       let recovered = recovery(
         error, command: outputCommand, arguments: arguments, context: context)
-      rendered = OutputRouter.render(.failure(recovered), mode: mode)
+      return CommandExecution(
+        rendered: OutputRouter.render(.failure(recovered), mode: mode),
+        scope: CommandScope.failure(outputCommand, store: store))
     } catch {
-      rendered = OutputRouter.render(.failure(error), mode: mode)
+      return CommandExecution(
+        rendered: OutputRouter.render(.failure(error), mode: mode),
+        scope: CommandScope.failure(outputCommand, store: store))
     }
-    return CommandExecution(
-      rendered: rendered,
-      scope: CommandScope.resolve(
-        outputCommand, reported: reported, store: context.environment.db))
   }
 
   /// Keeps recovery tied to the failed command and intended workspace.

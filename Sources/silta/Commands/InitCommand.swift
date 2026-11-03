@@ -11,7 +11,7 @@ struct InitCommand: OutputCommand {
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,
   ])
 
-  static let actsOnWorkspace = false
+  static let workspaceSource = WorkspaceSource.none
 
   @OptionGroup var global: GlobalOptions
 

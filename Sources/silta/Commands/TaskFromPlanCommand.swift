@@ -16,7 +16,7 @@ struct TaskFromPlanCommand: OutputCommand {
     ]), "tasks": .array(TaskOutput.receiptShape),
   ])
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -71,7 +71,8 @@ struct TaskFromPlanCommand: OutputCommand {
     }
     return CommandOutput(
       text: lines.joined(separator: "\n"), data: result, warnings: result.warnings,
-      approvalUsed: allowSecret)
+      approvalUsed: allowSecret
+    ).reporting(context.taskWorkspace(global.ws))
   }
 
   private func read() throws -> String {

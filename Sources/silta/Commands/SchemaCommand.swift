@@ -11,7 +11,7 @@ struct SchemaCommand: OutputCommand {
 
   static let dataShape = SchemaDocument.shape
 
-  static let actsOnWorkspace = false
+  static let workspaceSource = WorkspaceSource.none
 
   @OptionGroup var global: GlobalOptions
 

@@ -1206,15 +1206,21 @@ revision before the write.
   - warnings
 
   `workspace` is set only for commands that act on a workspace: `task *`,
-  `ws show|edit|use`, `repo fetch`, and a successful `init --scan`. It is the
-  workspace the command resolves (`--ws`, its slug argument, or the current
-  workspace), or the one `init --scan` or `ws edit` created. A `usage` error on a
-  `task`, `ws show|edit|use` or `repo fetch` command names `--ws` or the current
-  workspace. Other commands
-  (`schema`, `ws ls`, `init` without a scanned workspace, help and version) leave it
-  out, as does a workspace that doesn't exist. `app` is set only when the command
-  names an app with `--app` that exists in that workspace. Neither field ever
-  carries a raw argument.
+  `ws show|edit|use`, `repo fetch`, and a successful `init --scan`.
+  - A successful command logs the workspace it resolved and acted on (`--ws`, its
+    slug argument, or the current workspace), or the one `init --scan` or `ws edit`
+    created. It is the command's own resolution, so a command that reports none is
+    logged without one.
+  - A failed command logs the workspace its `--ws`, slug argument or current
+    selection names, when that workspace exists.
+  - A `usage` error on a `task` or `repo` command, or on the `task` or `repo` group
+    itself (an unknown subcommand), logs `--ws` or the current workspace. A `usage`
+    error on `ws show|edit|use` stays untagged, since its slug argument is unknown.
+  - Other commands (`schema`, `ws ls`, `init` without a scanned workspace, help and
+    version) leave it out, as does a workspace that doesn't exist.
+
+  `app` is set only when the command names an app with `--app` that exists in that
+  workspace. Neither field ever carries a raw argument.
 
   Evals and the dogfood report read these logs (§21, §22.1).
 - **`silta doctor [--fix]`** checks:

@@ -8,7 +8,7 @@ struct TaskDoneCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -45,6 +45,7 @@ struct TaskDoneCommand: OutputCommand {
         ref, result: text, commit: commit,
         directory: URL(
           filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
-      approvalUsed: force || body.allowSecret)
+      approvalUsed: force || body.allowSecret
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }

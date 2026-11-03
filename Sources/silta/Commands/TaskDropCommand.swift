@@ -8,7 +8,7 @@ struct TaskDropCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -30,6 +30,7 @@ struct TaskDropCommand: OutputCommand {
         ref, result: text, dropped: true, commit: commit,
         directory: URL(
           filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory)),
-      approvalUsed: body.allowSecret)
+      approvalUsed: body.allowSecret
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }

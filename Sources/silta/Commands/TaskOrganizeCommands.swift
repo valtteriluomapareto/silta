@@ -8,7 +8,7 @@ struct TaskArchiveCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -17,7 +17,8 @@ struct TaskArchiveCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .archive(ref))
+        .archive(ref)
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -28,7 +29,7 @@ struct TaskKeepCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -37,7 +38,8 @@ struct TaskKeepCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .archive(ref, keep: true))
+        .archive(ref, keep: true)
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -48,7 +50,7 @@ struct TaskLinkCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -63,7 +65,8 @@ struct TaskLinkCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     TaskOutput.receipt(
       try TaskService(environment: context.environment, workspace: global.ws)
-        .link(ref, target: target, relation: rel))
+        .link(ref, target: target, relation: rel)
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -74,7 +77,7 @@ struct TaskPromoteCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -88,6 +91,7 @@ struct TaskPromoteCommand: OutputCommand {
       try TaskService(
         environment: context.environment, workspace: global.ws,
         approved: global.approved
-      ).promote(ref, external: ext), approvalUsed: true)
+      ).promote(ref, external: ext), approvalUsed: true
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }

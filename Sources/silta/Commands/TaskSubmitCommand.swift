@@ -7,7 +7,7 @@ struct TaskSubmitCommand: OutputCommand {
 
   static let dataShape = TaskOutput.receiptShape
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -23,6 +23,7 @@ struct TaskSubmitCommand: OutputCommand {
       try TaskService(
         environment: context.environment, workspace: global.ws, approved: global.approved
       )
-      .submit(ref, body: text, allowSecret: body.allowSecret), approvalUsed: body.allowSecret)
+      .submit(ref, body: text, allowSecret: body.allowSecret), approvalUsed: body.allowSecret
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }

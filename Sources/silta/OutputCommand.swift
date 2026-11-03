@@ -11,11 +11,10 @@ protocol OutputCommand: ParsableCommand {
   /// `silta schema`.
   static var dataShape: Shape { get }
 
-  /// Whether the command acts on a workspace, so its log line names it (spec §19).
-  static var actsOnWorkspace: Bool { get }
-
-  /// The slug the command resolves its workspace from; nil means the current workspace.
-  var workspaceSlug: String? { get }
+  /// Where the command takes the workspace it acts on (spec §19). A successful command
+  /// reports the workspace it resolved in `CommandOutput.workspace`; this attributes
+  /// failures and usage errors.
+  static var workspaceSource: WorkspaceSource { get }
 
   /// The app the command names with `--app`, if any.
   var appSlug: String? { get }
@@ -25,7 +24,21 @@ protocol OutputCommand: ParsableCommand {
 }
 
 extension OutputCommand {
-  var workspaceSlug: String? { global.ws }
-
   var appSlug: String? { nil }
+}
+
+/// A command whose workspace is its slug argument when given (`ws show|edit|use`).
+protocol WorkspaceArgumentCommand: OutputCommand {
+  /// The slug argument, if given.
+  var workspaceArgument: String? { get }
+}
+
+/// Where a command takes the workspace it acts on.
+enum WorkspaceSource {
+  /// The command acts on no workspace.
+  case none
+  /// `--ws`, else the current workspace.
+  case option
+  /// The command's slug argument, else `--ws`, else the current workspace.
+  case argument
 }

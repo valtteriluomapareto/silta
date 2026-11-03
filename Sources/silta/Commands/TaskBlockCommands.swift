@@ -10,7 +10,7 @@ struct TaskBlockCommand: OutputCommand {
     "waiting": .optional(TaskOutput.waitingShape),
   ])
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -46,7 +46,8 @@ struct TaskBlockCommand: OutputCommand {
     }
     return CommandOutput(
       text: lines.joined(separator: "\n"), data: result,
-      warnings: result.warnings, approvalUsed: body.allowSecret)
+      warnings: result.warnings, approvalUsed: body.allowSecret
+    ).reporting(context.taskWorkspace(global.ws))
   }
 }
 
@@ -56,7 +57,7 @@ struct TaskUnblockCommand: OutputCommand {
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
 
-  static let actsOnWorkspace = true
+  static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
 
@@ -76,7 +77,8 @@ struct TaskUnblockCommand: OutputCommand {
     ).unblock(refs, why: why, allowSecret: body.allowSecret)
     return CommandOutput(
       text: tasks.map { "\($0.ref) \($0.status)" }.joined(separator: "\n"),
-      data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings), approvalUsed: body.allowSecret)
+      data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings), approvalUsed: body.allowSecret
+    ).reporting(context.taskWorkspace(global.ws))
   }
 
   private struct Data: Encodable {

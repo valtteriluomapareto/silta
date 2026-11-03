@@ -344,14 +344,12 @@ extension DogfoodLogTests {
   func usageErrorsNameOnlyAWorkspaceTheyCouldResolve(arguments: [String], workspace: String?)
     throws
   {
-    withKnownIssue("Group usage errors are untagged; positional ws usage errors are tagged") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        #expect(try Self.run(arguments, scratch: scratch).termination == .exit(1))
-        let entry = try Self.last(scratch)
-        #expect(entry["error_code"] as? String == "usage")
-        #expect(entry["workspace"] as? String == workspace)
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      #expect(try Self.run(arguments, scratch: scratch).termination == .exit(1))
+      let entry = try Self.last(scratch)
+      #expect(entry["error_code"] as? String == "usage")
+      #expect(entry["workspace"] as? String == workspace)
     }
   }
 }
