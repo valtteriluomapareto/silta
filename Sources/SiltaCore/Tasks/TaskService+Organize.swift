@@ -48,19 +48,24 @@ extension TaskService {
   }
 
   /// Records tracker ownership and releases the local claim without changing status.
+  /// A proposal needs triage and a blocked task an unblock first, so no proposal or
+  /// block is left behind where nothing can change it.
+  /// State refusals come before the human's go-ahead is asked for, so a yes is never spent
+  /// on a promotion that can't happen.
   package func promote(_ ref: String, external: String) throws -> TaskResult {
     let command = "silta task promote " + shellWord(ref) + " --ext " + shellWord(external)
-    let approval = try approval(required: true, command: command)
     guard
       external.wholeMatch(of: /ado:[1-9][0-9]*/) != nil
         || external.wholeMatch(of: /gh:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9][0-9]*/) != nil
         || external.wholeMatch(of: /jira:[A-Z][A-Z0-9]*-[1-9][0-9]*/) != nil
     else { throw TaskError.invalid("Use ado:<id>, gh:<owner>/<repo>#<id> or jira:<KEY>-<id>.") }
-    let slug = try selected()
     let at = environment.clock.now()
+    try promotable(try show(ref), at: at)
+    let approval = try approval(required: true, command: command)
+    let slug = try selected()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try promotable(task, at: at)
       try tx.database.execute(
         sql: """
           UPDATE task
@@ -73,5 +78,11 @@ extension TaskService {
         identity: (environment.ids, at), in: tx)
       return receipt(task)
     }
+  }
+
+  private func promotable(_ task: TaskDetails, at date: Date) throws {
+    try validateClaim(task, at: date)
+    if task.status == "proposed" { throw TaskError.proposal(task.ref) }
+    if task.status == "blocked" { throw TaskError.blockedPromotion(task.ref) }
   }
 }

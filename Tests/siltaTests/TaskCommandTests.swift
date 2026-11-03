@@ -22,6 +22,9 @@ struct TaskCommandTests {
 
   static let actor = ["SILTA_ACTOR": "agent:codex:acme"]
 
+  /// The agent at a fixed instant, for goldens that carry timestamps.
+  static let fixed = actor.merging(["SILTA_NOW": "2023-11-14T22:13:20.000Z"]) { $1 }
+
   @Test func nonCodeLifecycleAndSessionRefusal() throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
@@ -62,7 +65,7 @@ struct TaskCommandTests {
     try withScratchDirectory { scratch in
       _ = try Self.setup(scratch)
       let proposed = try SiltaBinary.run(
-        ["task", "add", "Acme idea", "--json"], in: scratch, environment: Self.actor)
+        ["task", "add", "Acme idea", "--json"], in: scratch, environment: Self.fixed)
       #expect(proposed.termination == .exit(0))
       Golden.forTests().check(proposed.stdout, "task-add-proposed.json")
       for command in ["ls", "show"] {
@@ -70,7 +73,7 @@ struct TaskCommandTests {
           let args =
             ["task", command] + (command == "show" ? ["AC-1"] : [])
             + (json ? ["--json"] : [])
-          let read = try SiltaBinary.run(args, in: scratch, environment: Self.actor)
+          let read = try SiltaBinary.run(args, in: scratch, environment: Self.fixed)
           #expect(read.termination == .exit(0))
           Golden.forTests().check(read.stdout, "task-" + command + (json ? ".json" : ".txt"))
         }
@@ -91,12 +94,11 @@ struct TaskCommandTests {
     }
   }
 
-  @Test func agentsCannotStealOrAllowSecrets() throws {
+  @Test func agentsCannotAllowSecretsBeforeStorageOpens() throws {
     try withScratchDirectory { scratch in
       for args in [
-        ["task", "start", "AC-1", "--steal"],
         ["task", "add", "Acme", "--allow-secret"],
-        ["task", "done", "AC-1", "--force"],
+        ["task", "done", "AC-1", "--allow-secret"],
       ] {
         let result = try SiltaBinary.run(args + ["--json"], in: scratch, environment: Self.actor)
         #expect(result.termination == .exit(3))
@@ -168,11 +170,11 @@ extension TaskCommandTests {
       try Data([255]).write(to: file)
       let invalid = try SiltaBinary.run(
         ["task", "add", "Acme", "-F", file.path, "--json"], in: scratch, environment: Self.actor)
-      #expect(invalid.termination == .exit(9))
+      #expect(invalid.termination == .exit(1))
       let missing = try SiltaBinary.run(
         ["task", "add", "Acme", "-F", file.path + "-absent", "--json"], in: scratch,
         environment: Self.actor)
-      #expect(missing.termination == .exit(9))
+      #expect(missing.termination == .exit(1))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 1)
     }
   }
@@ -181,9 +183,21 @@ extension TaskCommandTests {
 extension TaskCommandTests {
   @Test func humanOnlyRecoveryRetainsTaskAndFileInput() throws {
     try withScratchDirectory { scratch in
+      let store = try Self.setup(scratch)
+      for actor in ["agent:codex:other", "agent:codex:acme"] {
+        let added = try SiltaBinary.run(
+          ["task", "add", "Acme", "--start"], in: scratch, environment: ["SILTA_ACTOR": actor])
+        #expect(added.termination == .exit(0))
+      }
+      try store.write {
+        try $0.database.execute(sql: #"UPDATE workspace SET settings='{"review_gate":"human"}'"#)
+      }
       for (args, expected) in [
-        (["task", "start", "AC-7", "--steal"], "silta task start 'AC-7' --steal"),
-        (["task", "done", "AC-7", "--force"], "silta task done 'AC-7' --force -F <file>"),
+        (["task", "start", "AC-1", "--steal"], "silta task start 'AC-1' --steal"),
+        (
+          ["task", "done", "AC-2", "--force", "-m", "Acme done"],
+          "silta task done 'AC-2' --force -F <file>"
+        ),
         (
           ["task", "done", "AC-7", "--allow-secret"],
           "silta task done 'AC-7' --allow-secret -F <file>"

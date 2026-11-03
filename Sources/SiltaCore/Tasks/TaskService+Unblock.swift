@@ -2,9 +2,11 @@ import Foundation
 import GRDB
 
 extension TaskService {
-  /// Returns an explicitly answered batch to todo atomically, regardless of readiness.
+  /// Returns an answered batch to todo atomically. A batch with a task that isn't ready
+  /// (spec §8: every blocker a done task) needs the human's go-ahead, decided inside the
+  /// write; one approval row covers the batch.
   package func unblock(_ refs: [String], why: String? = nil, allowSecret: Bool = false) throws
-    -> [TaskResult]
+    -> (tasks: [TaskResult], approvalUsed: Bool)
   {
     guard !refs.isEmpty else {
       throw TaskError.invalid("Unblock needs at least one task reference.")
@@ -17,20 +19,13 @@ extension TaskService {
     let at = environment.clock.now()
     let slug = try selected()
     return try environment.db.write { tx in
-      var tasks: [TaskDetails] = []
-      for ref in refs {
-        let task: TaskDetails
-        do { task = try Self.lookup(ref, workspace: slug, in: tx.database) } catch TaskError
-          .notFound
-        {
-          throw TaskReferenceError(ref: ref, missing: true)
-        } catch TaskError.invalid { throw TaskReferenceError(ref: ref, missing: false) }
-        try validateClaim(task, at: at)
-        guard task.status == "blocked" else {
-          throw TaskError.transition(task.ref, status: task.status)
-        }
-        if !tasks.contains(where: { $0.id == task.id }) { tasks.append(task) }
+      let tasks = try blockedBatch(refs, workspace: slug, at: at, in: tx.database)
+      let open = try tasks.filter { try Self.waiting($0, at: at, in: tx.database)?.ready != true }
+      let retry = command + (why == nil ? "" : " -F <file>")
+      if !open.isEmpty, !environment.actor.isHuman, approval == nil, approved == nil {
+        throw ActorError.notReady(command: retry, actor: environment.actor, refs: open.map(\.ref))
       }
+      let used = try approval ?? self.approval(required: !open.isEmpty, command: retry)
       for task in tasks {
         try Self.clearBlock(task, in: tx)
         try tx.database.execute(
@@ -43,15 +38,35 @@ extension TaskService {
           task.id, kind: "unblock", body: why == nil ? nil : content.0,
           redacted: content.1, at: at, in: tx)
       }
-      try approval?.record(
-        command: command + " --allow-secret", workspace: slug,
+      try used?.record(
+        command: command + (allowSecret ? " --allow-secret" : ""), workspace: slug,
         identity: (environment.ids, at), in: tx)
-      return tasks.map {
+      let results = tasks.map {
         TaskResult(
           ref: $0.ref, status: "todo",
           warnings: content.1 ? [SecretGuard.warning] : [])
       }
+      return (results, used != nil)
     }
+  }
+
+  /// The distinct blocked tasks of a batch; the first bad ref fails the whole batch.
+  private func blockedBatch(_ refs: [String], workspace: String, at date: Date, in db: Database)
+    throws -> [TaskDetails]
+  {
+    var tasks: [TaskDetails] = []
+    for ref in refs {
+      let task: TaskDetails
+      do { task = try Self.lookup(ref, workspace: workspace, in: db) } catch TaskError.notFound {
+        throw TaskReferenceError(ref: ref, missing: true)
+      } catch TaskError.invalid { throw TaskReferenceError(ref: ref, missing: false) }
+      try validateClaim(task, at: date)
+      guard task.status == "blocked" else {
+        throw TaskError.transition(task.ref, status: task.status)
+      }
+      if !tasks.contains(where: { $0.id == task.id }) { tasks.append(task) }
+    }
+    return tasks
   }
 
   static func clearBlock(_ task: TaskDetails, in tx: StorageTransaction) throws {

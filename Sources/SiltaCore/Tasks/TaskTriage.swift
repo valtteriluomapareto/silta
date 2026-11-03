@@ -6,8 +6,8 @@ package struct TaskTriage: Sendable {
   /// Proposals to drop.
   package var drop: [String] = []
 
-  /// Priority for accepted proposals only.
-  package var priority = 2
+  /// Priority for accepted proposals only; nil keeps each task's own.
+  package var priority: Int?
 
   /// An optional reason for dropping proposals.
   package var why: String?
@@ -28,7 +28,7 @@ package struct TaskTriage: Sendable {
     var value = "silta task triage"
     for ref in accept { value += " --accept " + shellWord(ref) }
     for ref in drop { value += " --drop " + shellWord(ref) }
-    if priority != 2 { value += " --priority \(priority)" }
+    if let priority { value += " --priority \(priority)" }
     if allowSecret { value += " --allow-secret" }
     return value
   }

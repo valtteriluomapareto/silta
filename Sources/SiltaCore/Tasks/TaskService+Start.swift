@@ -3,15 +3,17 @@ import GRDB
 
 extension TaskService {
   /// Claims open work atomically, refusing another session's fresh claim.
-  /// Human-only steal never reopens a proposal or a terminal task.
-  package func start(_ ref: String, steal: Bool = false, directory: URL) async throws -> TaskResult
+  /// `--steal` is human-only only when it overrides such a claim, decided again inside the
+  /// write; otherwise it changes nothing. It never reopens a proposal or a terminal task.
+  package func start(_ ref: String, steal: Bool = false, directory: URL) async throws
+    -> (result: TaskResult, approvalUsed: Bool)
   {
     let command = "silta task start " + shellWord(ref) + " --steal"
-    let approval = try approval(required: steal, command: command)
     let before = try show(ref)
     let at = environment.clock.now()
     try validateClaim(before, at: at, steal: steal)
     try canStart(before)
+    _ = try approval(required: steal && foreignClaim(before, at: at) != nil, command: command)
     let git = try await TaskGit.inspect(
       repo: before.repoPath, directory: directory, runner: environment.git,
       enabled: before.appID != nil, completion: false)
@@ -22,6 +24,8 @@ extension TaskService {
         at: at, in: tx.database)
       try validateClaim(task, at: at, steal: steal)
       try canStart(task)
+      let approval = try approval(
+        required: steal && foreignClaim(task, at: at) != nil, command: command)
       try Self.sameRepository(task, before)
       try tx.database.execute(
         sql: """
@@ -36,7 +40,7 @@ extension TaskService {
       try changed(task.id, kind: "claim", body: nil, at: at, in: tx)
       try approval?.record(
         command: command, workspace: slug, identity: (environment.ids, at), in: tx)
-      return receipt(try Self.lookup(ref, workspace: slug, in: tx.database))
+      return (receipt(try Self.lookup(ref, workspace: slug, in: tx.database)), approval != nil)
     }
   }
 
@@ -57,13 +61,7 @@ extension TaskService {
   }
 
   /// Submits doing work for review while refreshing its owner's heartbeat.
-  package func submit(_ ref: String, body: String? = nil, allowSecret: Bool = false) throws
-    -> TaskResult
-  {
-    let command = "silta task submit " + shellWord(ref)
-    let approval = try approval(
-      required: allowSecret, command: command + " -F <file> --allow-secret")
-    let content = try checked(body ?? "", allow: allowSecret, command: command + " -F <file>")
+  package func submit(_ ref: String) throws -> TaskResult {
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
@@ -80,13 +78,8 @@ extension TaskService {
           WHERE id=?
           """,
         arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
-      try changed(task.id, kind: "status", body: content.0, redacted: content.1, at: at, in: tx)
-      try approval?.record(
-        command: command + " --allow-secret", workspace: slug,
-        identity: (environment.ids, at), in: tx)
-      return receipt(
-        try Self.lookup(ref, workspace: slug, in: tx.database),
-        warnings: content.1 ? [SecretGuard.warning] : [])
+      try changed(task.id, kind: "status", body: "review", at: at, in: tx)
+      return receipt(try Self.lookup(ref, workspace: slug, in: tx.database))
     }
   }
 }

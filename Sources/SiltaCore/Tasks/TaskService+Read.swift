@@ -5,14 +5,17 @@ extension TaskService {
   static let statuses = ["proposed", "todo", "doing", "review", "blocked", "done", "dropped"]
 
   static let query = """
-    SELECT task.*,workspace.task_prefix,app.slug AS app_slug,repo_path.path AS repo_path
+    SELECT task.*,workspace.task_prefix,app.slug AS app_slug,repo_path.path AS repo_path,
+      parent.seq AS parent_seq
     FROM task
     JOIN workspace ON workspace.id=task.workspace_id
+    LEFT JOIN task AS parent ON parent.id=task.parent_id
     LEFT JOIN app ON app.id=task.app_id
     LEFT JOIN repo_path ON repo_path.repo_id=app.repo_id
     """
 
   /// Reads the selected workspace backlog and always retains the caller's proposals.
+  /// Promoted tasks belong to their tracker and are left out unless asked for.
   package func list(_ filter: TaskFilter = TaskFilter()) throws -> [TaskDetails] {
     if let status = filter.status, !Self.statuses.contains(status) {
       throw TaskError.invalid("Unknown task status.")
@@ -29,9 +32,10 @@ extension TaskService {
           """, arguments: [id]
       ).map { TaskDetails(row: $0) }.filter {
         let visible =
-          $0.status != "proposed" || filter.proposed || environment.actor.isHuman
-          || $0.createdBy == environment.actor.description
-        return visible && (filter.status == nil || filter.status == $0.status)
+          $0.status != "proposed" || filter.proposed || filter.status == "proposed"
+          || environment.actor.isHuman || $0.createdBy == environment.actor.description
+        return visible && ($0.externalRef == nil || filter.promoted)
+          && (filter.status == nil || filter.status == $0.status)
           && (filter.app == nil || filter.app == $0.app)
           && (!filter.mine || $0.createdBy == environment.actor.description
             || $0.claimedBy == environment.actor.description)

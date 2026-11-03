@@ -18,6 +18,9 @@ package struct TaskFilter: Sendable {
   /// Includes proposals from other actors.
   package var proposed = false
 
+  /// Includes tasks promoted to an external tracker.
+  package var promoted = false
+
   /// Includes tasks whose computed archive state is archived.
   package var archived = false
 

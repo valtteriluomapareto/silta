@@ -25,8 +25,8 @@ ask human: silta sample --next
 
 ## read_only_promoted (exit 3)
 error: sample read_only_promoted error [read_only_promoted]
-ask human: silta sample --next
-{"error":{"code":"read_only_promoted","message":"sample read_only_promoted error","next":["silta sample --next"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+next: silta sample --next
+{"error":{"code":"read_only_promoted","message":"sample read_only_promoted error","next":["silta sample --next"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 
 ## ambiguous_location (exit 4)
 error: sample ambiguous_location error [ambiguous_location]

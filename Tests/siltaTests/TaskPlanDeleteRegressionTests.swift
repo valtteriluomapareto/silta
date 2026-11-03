@@ -97,7 +97,8 @@ extension TaskPlanDeleteRegressionTests {
 }
 
 extension TaskPlanDeleteRegressionTests {
-  @Test func agentTickOverrideRefusalKeepsRevisionAndMode() throws {
+  // A tick adds no text, so --allow-secret has nothing to allow.
+  @Test func tickRefusesAllowSecretBeforeStorage() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
         [
@@ -105,15 +106,12 @@ extension TaskPlanDeleteRegressionTests {
           "--allow-secret", "--json",
         ],
         in: scratch, environment: TaskCommandTests.actor)
-      #expect(result.termination == .exit(3))
+      #expect(result.termination == .exit(1))
       let object = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
       let error = try #require(object["error"] as? [String: Any])
-      #expect(
-        error["next"] as? [String] == [
-          "silta --ws 'acme' task plan 'AC-1' --if-rev 1 --step 1 --done --allow-secret"
-            + " --approved \"<the human's words>\""
-        ])
+      #expect(error["code"] as? String == "invalid")
+      #expect(error["next"] as? [String] == ["silta --ws 'acme' task plan --help"])
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/silta.db").path)
       )

@@ -109,7 +109,7 @@ enum SiltaMain {
     if let edit = command as? TaskEditCommand, let taskError = error as? TaskError,
       taskError == .input
     {
-      next = ["silta task show " + shellWord(edit.ref), path + " --help"]
+      next = ["silta task edit " + shellWord(edit.ref) + " --print", path + " --help"]
     }
     if let edit = command as? WsEditCommand, error is WorkspaceError, error.code != .notFound {
       next = workspaceRecovery(error, edit: edit, context: context)

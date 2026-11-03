@@ -37,7 +37,8 @@ struct TaskBlockCommandTests {
       #expect(failed.termination == .exit(2))
       #expect((failed.stdout + failed.stderr).contains("AC-404"))
       let unblocked = try run([
-        "task", "unblock", "AC-1", "task:AC-1", "AC-2", "-m", "Acme answered",
+        "task", "unblock", "AC-1", "task:AC-1", "AC-2", "-m", "Acme answered", "--approved",
+        "Unblock both",
       ])
       #expect(unblocked.termination == .exit(0))
       Golden.forTests().check(unblocked.stdout, "task-unblock" + (json ? ".json" : ".txt"))
@@ -87,7 +88,9 @@ struct TaskBlockPrivacyCommandTests {
       let blocked = try run(["task", "start", "AC-1"])
       #expect(blocked.termination == .exit(6) && !blocked.stdout.contains("acme-secret"))
       #expect(blocked.stdout.contains("--ws 'acme' task ls --status todo"))
-      let unblock = try run(["task", "unblock", "AC-1", "-F", file.path])
+      let unblock = try run([
+        "task", "unblock", "AC-1", "-F", file.path, "--approved", "Unblock it",
+      ])
       #expect(unblock.termination == .exit(0) && unblock.stdout.contains("secret_redacted"))
       #expect(try run(["task", "show", "AC-1"]).stdout.contains("\"status\":\"todo\""))
       let logs = try String(
@@ -95,7 +98,7 @@ struct TaskBlockPrivacyCommandTests {
       #expect(!logs.contains("acme-secret"))
       try store.read { db in
         let commands = try String.fetchAll(db, sql: "SELECT command FROM approval")
-        #expect(commands.count == 1 && !commands[0].contains("acme-secret"))
+        #expect(commands.count == 2 && !commands.joined().contains("acme-secret"))
         let body = try #require(
           try String.fetchOne(db, sql: "SELECT body FROM task_event WHERE kind='block'"))
         #expect(body.contains("acme-secret"))

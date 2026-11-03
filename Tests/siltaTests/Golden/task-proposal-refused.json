@@ -1,1 +1,1 @@
-{"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; ask in chat before accepting it.","next":["silta --ws 'acme' task triage --help","silta --ws 'acme' task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; ask in chat before accepting it.","next":["silta --ws 'acme' task triage --accept AC-1 --approved \"<the human's words>\""],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

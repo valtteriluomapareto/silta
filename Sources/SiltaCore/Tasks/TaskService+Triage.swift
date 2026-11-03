@@ -7,7 +7,7 @@ extension TaskService {
     guard !batch.accept.isEmpty || !batch.drop.isEmpty else {
       throw TaskError.invalid("Triage needs at least one --accept or --drop reference.")
     }
-    try Self.validatePriority(batch.priority)
+    if let priority = batch.priority { try Self.validatePriority(priority) }
     let command = batch.command
     let approval = try approval(required: true, command: batch.retryCommand)
     let content = try checked(
@@ -31,7 +31,8 @@ extension TaskService {
             WHERE id=?
             """,
           arguments: [
-            accept ? "todo" : "dropped", accept ? batch.priority : task.priority,
+            accept ? "todo" : "dropped",
+            batch.priority.map { accept ? $0 : task.priority } ?? task.priority,
             accept ? task.result : content.0, accept ? nil : Self.timestamp(at),
             Self.timestamp(at), task.id,
           ])
