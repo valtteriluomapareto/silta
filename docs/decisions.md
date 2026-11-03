@@ -109,8 +109,8 @@ They're summarised here so every decision has one index.
   - The binary used on real data is built only from `main`, by
     `scripts/install-dev.sh`.
   - From DF0 on, migrations count as shipped.
-  - Dogfooding friction is recorded as Silta tasks with the topic `dogfood`, and
-    triaged once per wave.
+  - Dogfooding friction is recorded as Silta tasks with the topic `dogfood` (and, from
+    D36, a `Friction:` line in every result), and triaged once per wave.
 
 ## Code
 
@@ -251,8 +251,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - `scripts/dogfood-report.sh` turns the logs and friction lines into a Markdown
     report: error rates, `usage` errors and retry loops per command, calls per
     session, slow commands, unused commands and friction. Once per wave the
-    maintainer commits it under `docs/dogfood/reports/`. It reads only the `silta`
-    workspace, so other workspaces' data never reaches the repo.
+    maintainer commits it under `docs/dogfood/reports/`. It reads only lines and
+    tasks tagged with the `silta` workspace, so other workspaces' data never reaches
+    the repo; DF makes every log line record its workspace and app.
   - Not now: comparing Silta against plan files or other tools. That needs a
     without-Silta arm in the evals (§21) and is revisited after S16.
   - Why: the logs were collected but nothing read them, and friction depended on

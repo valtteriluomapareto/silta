@@ -1310,20 +1310,27 @@ steps, questions, handoffs and results.
   - Friction that needs its own fix, or that comes up outside a task, also becomes a
     task with the topic `dogfood`.
   - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
-    Markdown report from the command logs (§19) and the tasks:
+    Markdown report from the command logs (§19) and the tasks. `--since` defaults
+    to the date of the newest report in `docs/dogfood/reports/`, so reports leave
+    no gaps. It reports:
     - calls per command, with the error rate and the most common error codes;
     - `usage` errors per command, which point at unclear help or guide text;
     - retry loops: one session getting the same error from the same command twice
       or more in a row;
     - calls per agent session, median and maximum;
-    - the slowest commands (95th percentile ms);
+    - the slowest commands (maximum ms);
     - warnings by code;
     - commands `silta schema` lists that nobody called;
-    - the friction lines other than `none` from tasks done in the range, and the
-      open `dogfood` tasks.
+    - the friction lines other than `none` from tasks done in the range (the date
+      comes from the task's `status` event), and the open `dogfood` tasks.
 
-    It reads only the `silta` workspace and log lines with no workspace, so data
-    from other workspaces (DF3) never reaches the repo.
+    It reads only log lines and tasks tagged with the `silta` workspace, so data
+    from other workspaces (DF3) never reaches the repo; untagged lines are only
+    counted. DF therefore records the resolved workspace and app on every log line
+    (§19 lists them, but nothing sets them yet). The report runs under its own
+    `SILTA_ACTOR` and leaves that actor's calls out. Failures before the
+    environment is set up (a bad `SILTA_*` value) aren't logged, so the report
+    can't see them.
   - Once per wave, at the latest every 60 days so no log has expired, the
     maintainer runs the report and commits it as
     `docs/dogfood/reports/<YYYY-MM-DD>.md`. The review turns its findings into
