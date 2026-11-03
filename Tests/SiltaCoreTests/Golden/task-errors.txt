@@ -18,6 +18,10 @@ error: Use a worktree and commit from the task's registered repository. [invalid
 next: silta task add --help
 error: A human approval is required; ask a human to approve or use done --force. [gate]
 next: silta task show AC-1
+error: AC-1 is read-only; work in tracker ado:42. [read_only_promoted]
+ask human: silta task show AC-1
+error: Task fields changed during editing; re-read before applying an edit. [conflict]
+next: silta task show AC-1
 error: Task repository information changed; re-read before retrying. [conflict]
 next: silta task show AC-1
 error: AC-1 has plan revision 2; re-read before replacing it. [stale_rev]

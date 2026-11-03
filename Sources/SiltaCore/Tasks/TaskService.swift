@@ -41,6 +41,7 @@ package struct TaskService: Sendable {
   }
 
   func validateClaim(_ task: TaskDetails, at date: Date, steal: Bool = false) throws {
+    try Self.mutable(task)
     guard !steal, let holder = task.claimedBy, holder != environment.actor.description else {
       return
     }
@@ -55,6 +56,10 @@ package struct TaskService: Sendable {
     if age < 7200 {
       throw TaskError.claimed(task.ref, holder: holder, minutes: Int(age / 60))
     }
+  }
+
+  static func mutable(_ task: TaskDetails) throws {
+    if let ref = task.externalRef { throw TaskError.promoted(task.ref, external: ref) }
   }
 
   func event(

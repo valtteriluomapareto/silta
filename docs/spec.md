@@ -192,7 +192,7 @@ bodies. A bare task id is accepted wherever a task is expected.
 | App, topic | `app:platform-api`, `topic:messaging` | |
 | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
 | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
-| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
+| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject; CLI resolution waits for the M2 subject producer |
 | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
 | URL | `url:https://dev.azure.com/…` | |
 | External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor (D35) |
@@ -356,11 +356,12 @@ CREATE TABLE link (
   workspace_id INTEGER NOT NULL REFERENCES workspace(id),
   from_kind TEXT NOT NULL, from_id INTEGER NOT NULL,          -- task | doc | comment
   rel TEXT NOT NULL,                                          -- about | source | blocked_by | relates | cites
-  to_kind TEXT NOT NULL,                                      -- task | doc | app | topic | note | code | url | ext
+  to_kind TEXT NOT NULL,                                      -- task | task_plan_rev | comment | doc | doc_rev | app | topic | note | code | url | ext
   to_id INTEGER, to_ext TEXT,
+  anchor TEXT,                                -- owned target line anchor, separate from identity
   created_by TEXT NOT NULL, created_at TEXT NOT NULL,
   CHECK ((to_id IS NULL) <> (to_ext IS NULL)));
-CREATE UNIQUE INDEX link_unique ON link(workspace_id, from_kind, from_id, rel, to_kind, IFNULL(to_id, to_ext));
+CREATE UNIQUE INDEX link_unique ON link(workspace_id, from_kind, from_id, rel, to_kind, IFNULL(to_id, to_ext), IFNULL(anchor, ''));
 
 CREATE TABLE alias_decision (                 -- human confirm/reject of index-suggested topic matches
   workspace_id INTEGER NOT NULL REFERENCES workspace(id),
@@ -399,6 +400,10 @@ Schema migrations use GRDB's `DatabaseMigrator`; there's no separate version tab
   applied or hidden accordingly.
 - `search` (FTS5, `unicode61 remove_diacritics 0`) and `search_tri` (FTS5 `trigram`).
 - `code_ref_check`, `where_cache`.
+
+Owned line links keep `to_id` and a separate `anchor`. Current `plan#L…` links target
+that task; historical `plan@n#L…` links target its `task_plan_rev` row. Revisions and
+comments also use owned IDs. Different anchors on the same target are distinct links.
 
 ## 7. Location resolution (`silta where`)
 

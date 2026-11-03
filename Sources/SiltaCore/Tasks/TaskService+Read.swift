@@ -24,7 +24,7 @@ extension TaskService {
         db,
         sql: Self.query + """
           \nWHERE task.workspace_id=?
-          ORDER BY task.seq
+          ORDER BY task.priority,task.seq
           """, arguments: [id]
       ).map { TaskDetails(row: $0) }.filter {
         let visible =
@@ -34,11 +34,12 @@ extension TaskService {
           && (filter.app == nil || filter.app == $0.app)
           && (!filter.mine || $0.createdBy == environment.actor.description
             || $0.claimedBy == environment.actor.description)
-      }.map { try Self.decorate($0, in: db) }.filter {
-        filter.topic == nil
-          || $0.links.contains {
-            $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
-          }
+      }.map { try Self.decorate($0, at: environment.clock.now(), in: db) }.filter {
+        (!($0.archived) || filter.archived)
+          && (filter.topic == nil
+            || $0.links.contains {
+              $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
+            })
       }
 
     }
@@ -48,7 +49,8 @@ extension TaskService {
   package func show(_ ref: String, timeline: Bool = false) throws -> TaskDetails {
     let slug = try selected()
     return try environment.db.read { db in
-      var task = try Self.decorate(Self.lookup(ref, workspace: slug, in: db), in: db)
+      var task = try Self.decorate(
+        Self.lookup(ref, workspace: slug, in: db), at: environment.clock.now(), in: db)
       if timeline {
         task.timeline = try Row.fetchAll(
           db,
@@ -86,22 +88,21 @@ extension TaskService {
     return TaskDetails(row: row)
   }
 
-  static func decorate(_ original: TaskDetails, in db: Database) throws -> TaskDetails {
+  static func decorate(_ original: TaskDetails, at date: Date, in db: Database) throws
+    -> TaskDetails
+  {
     var task = original
+    task.archived = try isArchived(task, at: date, in: db)
     task.links = try Row.fetchAll(
       db,
       sql: """
-        SELECT link.rel,link.to_kind,link.to_ext,app.slug AS app_slug,topic.slug AS topic_slug
+        SELECT link.*
         FROM link
-        LEFT JOIN app ON link.to_kind='app' AND app.id=link.to_id
-        LEFT JOIN topic ON link.to_kind='topic' AND topic.id=link.to_id
         WHERE link.from_kind='task' AND link.from_id=? AND link.workspace_id=?
         ORDER BY link.id
         """, arguments: [task.id, task.workspaceID]
     ).map { row in
-      let kind: String = row["to_kind"]
-      let target: String = row["to_ext"] ?? row["app_slug"] ?? row["topic_slug"] ?? ""
-      return TaskLink(rel: row["rel"], target: kind + ":" + target)
+      return TaskLink(rel: row["rel"], target: try TaskLinkTarget.render(row, in: db))
     }
     return task
   }

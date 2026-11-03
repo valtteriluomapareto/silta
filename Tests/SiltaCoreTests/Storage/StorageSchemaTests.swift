@@ -47,7 +47,7 @@ struct StorageSchemaTests {
         #expect(try Int.fetchOne(db, sql: "PRAGMA busy_timeout") == 5000)
         #expect(
           try String.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-            == "1")
+            == "2")
         let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(task)").map {
           $0["name"] as String
         }
@@ -166,7 +166,7 @@ struct StorageSchemaTests {
       try queue.write { db in
         try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
         if raisedVersion {
-          try db.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
+          try db.execute(sql: "UPDATE meta SET value='3' WHERE key='min_writer_version'")
         }
       }
       let older = Self.store(scratch)
@@ -176,7 +176,7 @@ struct StorageSchemaTests {
         _ = try older.write { try StorageWriteTests.insert($0, uid: "acme") }
       }
       #expect(
-        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 2)
+        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 3)
     }
   }
 
@@ -216,7 +216,7 @@ struct StorageSchemaTests {
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta.db").path)
       try StorageSchema.migrator.migrate(queue)
       try queue.write {
-        try $0.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
+        try $0.execute(sql: "UPDATE meta SET value='3' WHERE key='min_writer_version'")
       }
       #expect(try queue.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") } == "delete")
       #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch).initialize() }

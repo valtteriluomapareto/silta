@@ -14,8 +14,19 @@ enum StorageSchema {
           """
       )
     }
+    migrator.registerMigration("v2") { db in
+      try db.execute(sql: anchorMigration)
+    }
     return migrator
   }
+
+  private static let anchorMigration = """
+    ALTER TABLE link ADD COLUMN anchor TEXT;
+    DROP INDEX link_unique;
+    CREATE UNIQUE INDEX link_unique
+    ON link(workspace_id,from_kind,from_id,rel,to_kind,IFNULL(to_id,to_ext),IFNULL(anchor,''));
+    UPDATE meta SET value='2' WHERE key='min_writer_version';
+    """
 
   private static let sql = """
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);

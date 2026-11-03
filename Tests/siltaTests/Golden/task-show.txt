@@ -1,2 +1,3 @@
-AC-1 proposed: Acme idea
+AC-1 proposed (priority 2): Acme idea
 Created by: agent:codex:acme
+Archived: no

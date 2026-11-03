@@ -6,6 +6,31 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct TaskOrganizationCommandTests {
+  private static func writeDocument(to file: URL) throws {
+    try """
+    ## Title
+    ~~~
+    Acme edited
+    ~~~
+    ## Description
+    ~~~
+    Acme description
+    ~~~
+    ## Acceptance
+    ~~~
+    Acme acceptance
+    ~~~
+    ## Plan
+    ~~~
+    - [ ] Acme step
+    ~~~
+    ## Result
+    ~~~
+
+    ~~~
+    """.write(to: file, atomically: true, encoding: .utf8)
+  }
+
   @Test func organizationCommandsRoundTrip() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
@@ -20,28 +45,7 @@ struct TaskOrganizationCommandTests {
       Golden.forTests().check(triage.stdout, "task-triage.json")
       #expect(try run(["task", "start", "AC-1"]).termination == .exit(0))
       let file = scratch.appending(path: "edit.md")
-      try """
-        ## Title
-        ~~~
-        Acme edited
-        ~~~
-        ## Description
-        ~~~
-        Acme description
-        ~~~
-        ## Acceptance
-        ~~~
-        Acme acceptance
-        ~~~
-        ## Plan
-        ~~~
-        - [ ] Acme step
-        ~~~
-        ## Result
-        ~~~
-        
-        ~~~
-        """.write(to: file, atomically: true, encoding: .utf8)
+      try Self.writeDocument(to: file)
       let edited = try run(["task", "edit", "AC-1", "-F", file.path])
       #expect(edited.termination == .exit(0))
       Golden.forTests().check(edited.stdout, "task-edit.json")

@@ -17,9 +17,9 @@ extension TaskService {
       result ?? "", allow: commit.allowSecret, command: command + " -F <file>")
     try validateResult(content.0, commit: commit)
     let before = try show(ref)
-    try canClose(before, dropped: dropped)
     let at = environment.clock.now()
     try validateClaim(before, at: at)
+    try canClose(before, dropped: dropped)
     if commit.sha != nil, before.appID == nil || dropped {
       throw TaskError.invalid("--sha requires an app task completed with done.")
     }
@@ -30,8 +30,8 @@ extension TaskService {
     let slug = try selected()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try canClose(task, dropped: dropped)
       try validateClaim(task, at: at)
+      try canClose(task, dropped: dropped)
       try Self.sameRepository(task, before)
       var warnings = content.1 ? [SecretGuard.warning] : []
       if !dropped { warnings += try gate(task, force: commit.force, in: tx.database) }

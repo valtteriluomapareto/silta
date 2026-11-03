@@ -9,17 +9,17 @@ extension TaskService {
     let command = "silta task start " + shellWord(ref) + " --steal"
     let approval = try approval(required: steal, command: command)
     let before = try show(ref)
-    try canStart(before)
     let at = environment.clock.now()
     try validateClaim(before, at: at, steal: steal)
+    try canStart(before)
     let git = try await TaskGit.inspect(
       repo: before.repoPath, directory: directory, runner: environment.git,
       enabled: before.appID != nil, completion: false)
     let slug = try selected()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try canStart(task)
       try validateClaim(task, at: at, steal: steal)
+      try canStart(task)
       try Self.sameRepository(task, before)
       try tx.database.execute(
         sql: """

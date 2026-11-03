@@ -1,0 +1,34 @@
+fixtures: true
+steps:
+  - args: [init, --scan, acme-missing-remote, --json]
+    cwd: fixtures
+    expect: {exit: 0}
+  - args: [ws, use, acme-missing-remote, --json]
+    expect: {exit: 0}
+  - args: [task, add, Acme idea, --priority, '3', --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.status: proposed}}
+  - args: [task, add, Acme duplicate, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0}
+  - args: [task, triage, --accept, AC-1, --drop, AC-2, --priority, '1', --approved, Accept the first and drop the duplicate., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0}
+  - args: [task, start, AC-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.status: doing}}
+  - args: [task, edit, AC-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme', EDITOR: '/usr/bin/perl -pi -e s/Acme/AcmeEdited/g'}
+    expect: {exit: 0}
+  - args: [task, link, AC-1, 'url:https://example.com/acme/42', --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0}
+  - args: [task, promote, AC-1, --ext, 'ado:42', --approved, Track this work in ADO., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0}
+  - args: [task, archive, AC-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 3, code: read_only_promoted}
+  - args: [task, show, AC-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 0, json: {data.title: AcmeEdited idea, data.priority: 1, data.external_ref: 'ado:42'}}

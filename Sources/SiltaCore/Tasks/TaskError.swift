@@ -36,9 +36,17 @@ package enum TaskError: CodedError, Equatable {
   /// Git attribution became stale before the write.
   case changed(String?)
 
+  /// Local writes must stop after promotion to the named tracker.
+  case promoted(String, external: String)
+
+  /// Editable fields changed while input was being prepared.
+  case edited(String)
+
   /// Maps task failures to the scripting contract.
   package var code: ErrorCode {
     switch self {
+    case .promoted: .readOnlyPromoted
+    case .edited: .conflict
     case .notFound: .notFound
     case .invalid, .foreignRepo: .invalid
     case .claimed: .claimed
@@ -52,6 +60,8 @@ package enum TaskError: CodedError, Equatable {
   /// Explains the failure without quoting task bodies or raw git diagnostics.
   package var message: String {
     switch self {
+    case .promoted(let ref, let external): "\(ref) is read-only; work in tracker \(external)."
+    case .edited: "Task fields changed during editing; re-read before applying an edit."
     case .notFound: "Task or workspace entity not found."
     case .invalid(let reason): reason
     case .claimed(let ref, let holder, let minutes):
@@ -75,6 +85,7 @@ package enum TaskError: CodedError, Equatable {
   /// Names only implemented, body-free commands.
   package var next: [String] {
     switch self {
+    case .promoted(let ref, _), .edited(let ref): ["silta task show \(ref)"]
     case .proposal: ["silta task ls --status todo"]
     case .claimed(let ref, _, _), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
