@@ -56,8 +56,8 @@ struct TaskEditCommand: OutputCommand {
     }
     return TaskOutput.receipt(
       result.result,
-      change: result.changed.isEmpty
-        ? "unchanged" : "edited: " + result.changed.joined(separator: ", "),
+      change: result.result.changed.isEmpty
+        ? "unchanged" : "edited: " + result.result.changed.joined(separator: ", "),
       approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
   }

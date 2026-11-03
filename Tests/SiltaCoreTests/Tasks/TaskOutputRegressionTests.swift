@@ -124,8 +124,8 @@ struct TaskOutputRegressionTests {
     }
   }
 
-  @Test func anUnknownWorkspaceIsNamed() async throws {
-    try await withScratchDirectory { home in
+  @Test func anUnknownWorkspaceIsNamed() throws {
+    try withScratchDirectory { home in
       let service = try TaskOrganizationTests.service(home)
       let unknown = TaskService(environment: service.environment, workspace: "acme-two")
       let refusal = #expect(throws: WorkspaceError.self) { _ = try unknown.list() }
