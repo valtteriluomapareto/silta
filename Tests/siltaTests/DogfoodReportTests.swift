@@ -81,7 +81,7 @@ struct DogfoodReportTests {
       _ = try Self.setup(scratch)
       let tools = scratch.appending(path: "tools")
       try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
-      try FileManager.default.createSymbolicLink(at: tools.appending(path: "silta"), withDestinationURL: SiltaBinary.url())
+      try Self.tool("silta", text: "#!/bin/bash\nexec " + shellWord(try SiltaBinary.url().path) + " \"$@\" --deterministic\n", in: tools)
       try Self.tool("date", text: "#!/bin/bash\nif [[ \"$*\" == '-u +%Y-%m-%dT%H:%M:%SZ' ]]; then echo 2023-11-30T00:00:00Z; else exec /bin/date \"$@\"; fi\n", in: tools)
       let log = scratch.appending(path: "silta-home/log")
       try FileManager.default.createDirectory(at: log, withIntermediateDirectories: true)
@@ -89,7 +89,7 @@ struct DogfoodReportTests {
       try FileManager.default.copyItem(at: fixture, to: log.appending(path: "2023-11-14.jsonl"))
       let result = try SiltaBinary.runProcess(URL(filePath: "/bin/bash"),
         [Self.root.appending(path: "scripts/dogfood-report.sh").path, "--since", "2023-11-14"],
-        in: scratch, environment: ["PATH": tools.path + ":/usr/bin:/bin", "SILTA_ACTOR": Self.actor])
+        in: scratch, environment: ["PATH": tools.path + ":/usr/bin:/bin", "SILTA_ACTOR": Self.actor, "SILTA_NOW": "2023-11-30T00:00:00.000Z"])
       #expect(result.termination == .exit(0))
       Golden.forTests().check(result.stdout, "dogfood-report.md")
       #expect(!result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply"))
