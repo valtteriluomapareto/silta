@@ -296,7 +296,7 @@ extension ApprovalCommandTests {
         ],
         in: scratch, environment: TaskCommandTests.actor)
       #expect(preview.termination == .exit(0))
-      #expect(!preview.stdout.contains("approval_unused"))
+      #expect(preview.stdout.contains("approval_unused"))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 5)
     }
   }

@@ -66,7 +66,7 @@ extension TaskService {
             WHERE task_id=?
             ORDER BY id
             """, arguments: [task.id]
-        ).map { try Self.safeEvent($0) }
+        ).map { try Self.safeEvent($0, in: db) }
       }
       return task
     }
@@ -88,7 +88,7 @@ extension TaskService {
         sql: query + """
           \nWHERE task.workspace_id=? AND task.seq=?
           """, arguments: [workspaceRow["id"] as Int64, seq])
-    else { throw TaskError.notFound }
+    else { throw TaskError.notFound("task " + raw) }
     return TaskDetails(row: row)
   }
 

@@ -9,11 +9,24 @@ package struct TaskService: Sendable {
 
   let approved: String?
 
+  let bodyFlag: String?
+
   /// Uses the supplied workspace, or the current selection when an operation begins.
-  package init(environment: SiltaEnvironment, workspace: String? = nil, approved: String? = nil) {
+  /// `bodyFlag` is the body flag the command was given, `-m <text>` or `-F <file>`,
+  /// which approval rows name without the body (spec §11).
+  package init(
+    environment: SiltaEnvironment, workspace: String? = nil, approved: String? = nil,
+    bodyFlag: String? = nil
+  ) {
     self.environment = environment
     self.workspace = workspace
     self.approved = approved
+    self.bodyFlag = bodyFlag
+  }
+
+  /// `command` as an approval row records it: with the body flag passed, never the body.
+  func audited(_ command: String) -> String {
+    command + (bodyFlag.map { " " + $0 } ?? "")
   }
 
   func selected() throws -> String {
@@ -49,7 +62,8 @@ package struct TaskService: Sendable {
   func validateClaim(_ task: TaskDetails, at date: Date, steal: Bool = false) throws {
     try Self.mutable(task)
     if !steal, let claim = try foreignClaim(task, at: date) {
-      throw TaskError.claimed(task.ref, holder: claim.holder, minutes: claim.minutes)
+      throw TaskError.claimed(
+        task.ref, holder: claim.holder, minutes: claim.minutes, human: environment.actor.isHuman)
     }
   }
 
@@ -104,6 +118,13 @@ package struct TaskService: Sendable {
     return id
   }
 
+  /// Runs `body`, naming a task it doesn't find by `role`: "parent task AC-9".
+  static func named<T>(_ role: String, _ body: () throws -> T) throws -> T {
+    do { return try body() } catch TaskError.notFound(let what) {
+      throw TaskError.notFound(role + " " + what)
+    }
+  }
+
   static func entity(_ table: String, slug: String, workspace: Int64, in db: Database) throws
     -> Int64
   {
@@ -114,7 +135,7 @@ package struct TaskService: Sendable {
           SELECT id FROM \(table)
           WHERE workspace_id=? AND slug=?
           """, arguments: [workspace, slug])
-    else { throw TaskError.notFound }
+    else { throw TaskError.notFound(table + " " + slug) }
     return id
   }
 }

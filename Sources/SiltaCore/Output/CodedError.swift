@@ -10,19 +10,17 @@ public protocol CodedError: Error, Sendable {  // guard:allow-error the root err
   var next: [String] { get }
   /// Seconds to wait before retrying, for `rate_limited` and `busy`.
   var retryAfter: Int? { get }
+  /// Who acts on the `next` commands (spec §16).
+  var nextBy: NextBy { get }
 }
 
 extension CodedError {
   /// No retry delay unless the error sets one.
   public var retryAfter: Int? { nil }
 
+  /// The code's default; an error whose `next` needs someone else overrides it.
+  public var nextBy: NextBy { code.nextBy }
+
   /// The process exit status, derived from `code` so the two can't disagree.
   package var exitCode: Int32 { code.exitCode }
-}
-
-/// An error whose `next` needs the human although its code's `next_by` is `agent`, such
-/// as a command carrying the `--approved` placeholder (spec §16).
-package protocol HumanNextError: CodedError {
-  /// Who acts on this error's `next` commands.
-  var nextBy: NextBy { get }
 }

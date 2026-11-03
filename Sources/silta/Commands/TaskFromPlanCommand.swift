@@ -40,7 +40,8 @@ struct TaskFromPlanCommand: OutputCommand {
     options.dryRun = dryRun
     options.delete = delete
     options.allowSecret = allowSecret
-    if allowSecret {
+    // A dry run stores nothing, so --allow-secret on it needs no approval.
+    if allowSecret, !dryRun {
       try context.environment.actor.requireHuman(
         command: options.retryCommand + " --allow-secret", approved: global.approved)
     }
@@ -69,9 +70,19 @@ struct TaskFromPlanCommand: OutputCommand {
         if !detail.isEmpty { lines.append(detail) }
       }
     }
+    let shown = lines.joined(separator: "\n")
+    let unused =
+      result.dryRun && global.approved != nil
+      ? [
+        OutputWarning(
+          code: "approval_unused",
+          message: "A dry run records nothing, so --approved was not used; no approval stored.")
+      ] : []
     return CommandOutput(
-      text: lines.joined(separator: "\n"), data: result, warnings: result.warnings,
-      approvalUsed: allowSecret
+      text: shown,
+      quiet: result.dryRun ? shown : result.tasks.map(\.ref).joined(separator: "\n"),
+      data: result, warnings: result.warnings + unused,
+      approvalUsed: allowSecret && !result.dryRun
     ).reporting(context.taskWorkspace(global.ws))
   }
 

@@ -3,9 +3,11 @@ import GRDB
 
 /// Selects workspaces without invoking location inference.
 package enum WorkspaceSelection {
-  /// Uses an explicit slug, or the current workspace recorded in meta.
+  /// Uses an explicit slug, or the current workspace recorded in meta. A slug that names
+  /// no workspace is `unknown`, so the refusal names it.
   package static func resolve(_ slug: String? = nil, in store: DatabaseStore) throws -> String {
-    guard FileManager.default.fileExists(atPath: store.path) else { throw WorkspaceError.notFound }
+    let missing = slug.map(WorkspaceError.unknown) ?? .notFound
+    guard FileManager.default.fileExists(atPath: store.path) else { throw missing }
     return try store.read { db in
       let selected =
         try slug ?? String.fetchOne(db, sql: "SELECT value FROM meta WHERE key='current_workspace'")
@@ -14,7 +16,7 @@ package enum WorkspaceSelection {
           db, sql: "SELECT EXISTS(SELECT 1 FROM workspace WHERE slug=?)", arguments: [selected])
           == true
       else {
-        throw WorkspaceError.notFound
+        throw missing
       }
       return selected
     }

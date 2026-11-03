@@ -64,7 +64,7 @@ struct TaskLinkTarget {
           SELECT id FROM comment
           WHERE task_id=? AND seq=? AND deleted_at IS NULL
           """, arguments: [task.id, seq])
-    else { throw TaskError.notFound }
+    else { throw TaskError.notFound("comment " + raw) }
     return Self(kind: "comment", id: id)
   }
 
@@ -84,7 +84,7 @@ struct TaskLinkTarget {
       let revisionID = try Int64.fetchOne(
         db, sql: "SELECT id FROM doc_rev WHERE doc_id=? AND rev=?",
         arguments: [id, rev])
-    else { throw TaskError.notFound }
+    else { throw TaskError.notFound("doc " + pieces[0]) }
     if pieces.count == 1 { return Self(kind: "doc_rev", id: revisionID) }
     let seq = try number(String(pieces[1]))
     guard
@@ -94,7 +94,7 @@ struct TaskLinkTarget {
           SELECT id FROM comment
           WHERE doc_rev_id=? AND seq=? AND deleted_at IS NULL
           """, arguments: [revisionID, seq])
-    else { throw TaskError.notFound }
+    else { throw TaskError.notFound("comment doc:" + raw) }
     return Self(kind: "comment", id: commentID)
   }
 
@@ -107,7 +107,7 @@ struct TaskLinkTarget {
         let row = try Row.fetchOne(
           db, sql: "SELECT id,body_md FROM task_plan_rev WHERE task_id=? AND rev=?",
           arguments: [source.id, try number(String(rev))])
-      else { throw TaskError.notFound }
+      else { throw TaskError.notFound("plan revision \(rev) of \(source.ref)") }
       try lines(anchor, maximum: lineCount(row["body_md"]))
       return Self(kind: "task_plan_rev", id: row["id"], anchor: "#" + anchor)
     }

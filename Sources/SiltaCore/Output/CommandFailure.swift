@@ -1,5 +1,5 @@
 /// Retains a coded failure while applying the CLI's body-free recovery instructions.
-package struct CommandFailure: HumanNextError {
+package struct CommandFailure: CodedError {
   /// Preserves the original error's scripting category.
   package let code: ErrorCode
 
@@ -20,7 +20,7 @@ package struct CommandFailure: HumanNextError {
     code = error.code
     message = error.message
     retryAfter = error.retryAfter
-    nextBy = (error as? any HumanNextError)?.nextBy ?? error.code.nextBy
+    nextBy = error.nextBy
     self.next = next
   }
 }

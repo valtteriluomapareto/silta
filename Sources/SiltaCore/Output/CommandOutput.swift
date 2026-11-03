@@ -3,6 +3,9 @@
 package struct CommandOutput: Sendable {
   /// The text-mode output.
   package var text: String
+  /// What `--quiet` still prints (spec §16): the refs a write created, or a read's whole
+  /// text. Empty for a receipt.
+  package var quiet: String
   /// The `data` of the JSON envelope.
   package var data: any Encodable & Sendable
   /// Warnings for either mode.
@@ -18,10 +21,11 @@ package struct CommandOutput: Sendable {
 
   /// A result with text, envelope data and warnings.
   package init(
-    text: String, data: any Encodable & Sendable, warnings: [OutputWarning] = [],
-    approvalUsed: Bool = false
+    text: String, quiet: String = "", data: any Encodable & Sendable,
+    warnings: [OutputWarning] = [], approvalUsed: Bool = false
   ) {
     self.text = text
+    self.quiet = quiet
     self.data = data
     self.warnings = warnings
     self.approvalUsed = approvalUsed

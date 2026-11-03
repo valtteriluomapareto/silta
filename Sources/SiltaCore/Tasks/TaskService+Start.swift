@@ -48,7 +48,9 @@ extension TaskService {
     if task.status == "blocked", let waiting = task.waiting {
       throw TaskError.blocked(task.ref, waiting)
     }
-    if task.status == "proposed" { throw TaskError.proposal(task.ref) }
+    if task.status == "proposed" {
+      throw TaskError.proposal(task.ref, human: environment.actor.isHuman)
+    }
     guard ["todo", "doing", "review"].contains(task.status) else {
       throw TaskError.transition(task.ref, status: task.status)
     }

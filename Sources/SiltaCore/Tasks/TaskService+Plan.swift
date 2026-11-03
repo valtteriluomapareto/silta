@@ -23,7 +23,7 @@ extension TaskService {
       try Self.compareRevision(ifRevision, task: task)
       try writePlan(content.0, task: task, redacted: content.1, at: at, in: tx)
       try approval?.record(
-        command: command + " --allow-secret", workspace: slug,
+        command: audited(command + " --allow-secret"), workspace: slug,
         identity: (environment.ids, at), in: tx)
       return TaskPlanResult(
         ref: task.ref, planRev: task.planRev + 1, plan: content.0,
@@ -42,11 +42,19 @@ extension TaskService {
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, at: at)
       try Self.compareRevision(ifRevision, task: task)
+      let count = MarkdownPlan.checkboxes(task.plan).count
+      guard count > 0, (1...count).contains(step) else {
+        throw TaskError.step(task.ref, checkboxes: count)
+      }
       let text = try MarkdownPlan.tick(task.plan, step: step, done: done)
       try updatePlan(text, revision: task.planRev, task: task.id, at: at, in: tx.database)
       try changed(
         task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")", at: at, in: tx)
-      return TaskPlanResult(ref: task.ref, planRev: task.planRev, plan: text)
+      var result = TaskPlanResult(ref: task.ref, planRev: task.planRev, plan: text)
+      result.step = step
+      result.done = done
+      result.title = MarkdownPlan.checkboxes(text)[step - 1].title
+      return result
     }
   }
 

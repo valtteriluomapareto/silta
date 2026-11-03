@@ -20,10 +20,14 @@ extension TaskService {
     let slug = try selected()
     return try environment.db.write { tx in
       let tasks = try blockedBatch(refs, workspace: slug, at: at, in: tx.database)
-      let open = try tasks.filter { try Self.waiting($0, at: at, in: tx.database)?.ready != true }
+      let open = try tasks.compactMap { task -> ActorError.Wait? in
+        guard try Self.waiting(task, at: at, in: tx.database)?.ready != true else { return nil }
+        let unmet = try Self.unmet(task, in: tx.database)
+        return ActorError.Wait(ref: task.ref, open: unmet.open, dropped: unmet.dropped)
+      }
       let retry = command + (why == nil ? "" : " -F <file>")
       if !open.isEmpty, !environment.actor.isHuman, approval == nil, approved == nil {
-        throw ActorError.notReady(command: retry, actor: environment.actor, refs: open.map(\.ref))
+        throw ActorError.notReady(command: retry, actor: environment.actor, waits: open)
       }
       let used = try approval ?? self.approval(required: !open.isEmpty, command: retry)
       for task in tasks {
@@ -39,7 +43,7 @@ extension TaskService {
           redacted: content.1, at: at, in: tx)
       }
       try used?.record(
-        command: command + (allowSecret ? " --allow-secret" : ""), workspace: slug,
+        command: audited(command + (allowSecret ? " --allow-secret" : "")), workspace: slug,
         identity: (environment.ids, at), in: tx)
       let results = tasks.map {
         TaskResult(

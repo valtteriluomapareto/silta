@@ -20,7 +20,8 @@ struct WsShowCommand: WorkspaceArgumentCommand {
     let store = context.environment.db
     let slug = try context.workspace(workspace ?? global.ws)
     let yaml = try store.read { try WorkspaceConfig.render(from: $0, slug: slug) }
-    return CommandOutput(text: yaml, data: Data(workspace: slug, yaml: yaml)).reporting(slug)
+    return CommandOutput(text: yaml, quiet: yaml, data: Data(workspace: slug, yaml: yaml))
+      .reporting(slug)
   }
 
   private struct Data: Encodable {

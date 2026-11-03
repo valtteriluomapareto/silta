@@ -38,14 +38,15 @@ struct TaskEditCommand: OutputCommand {
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let service = TaskService(
-      environment: context.environment, workspace: global.ws, approved: global.approved)
+      environment: context.environment, workspace: global.ws, approved: global.approved,
+      bodyFlag: file.map { _ in "-F <file>" })
     if print {
       guard file == nil, !allowSecret else {
         throw TaskError.invalid("--print only reads; use it without -F or --allow-secret.")
       }
       let printed = try service.editDocument(ref)
       return CommandOutput(
-        text: printed.document,
+        text: printed.document, quiet: printed.document,
         data: Printed(
           ref: printed.task.ref, status: printed.task.status, document: printed.document))
     }
@@ -53,8 +54,12 @@ struct TaskEditCommand: OutputCommand {
       if let file { return try read(file) }
       return try edit(original, environment: context.environment)
     }
-    return TaskOutput.receipt(result.result, approvalUsed: result.approvalUsed)
-      .reporting(context.taskWorkspace(global.ws))
+    return TaskOutput.receipt(
+      result.result,
+      change: result.result.changed.isEmpty
+        ? "unchanged" : "edited: " + result.result.changed.joined(separator: ", "),
+      approvalUsed: result.approvalUsed
+    ).reporting(context.taskWorkspace(global.ws))
   }
 
   private func read(_ path: String) throws -> String {

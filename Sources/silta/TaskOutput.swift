@@ -39,10 +39,14 @@ enum TaskOutput {
         ]))),
   ])
 
-  static func receipt(_ result: TaskResult, approvalUsed: Bool = false) -> CommandOutput {
+  /// A receipt whose text says what changed (`AC-5 archived`), or the status by default.
+  /// `quiet` is what `--quiet` keeps: the ref a write created.
+  static func receipt(
+    _ result: TaskResult, change: String? = nil, quiet: String = "", approvalUsed: Bool = false
+  ) -> CommandOutput {
     CommandOutput(
-      text: "\(result.ref) \(result.status)", data: result, warnings: result.warnings,
-      approvalUsed: approvalUsed)
+      text: "\(result.ref) \(change ?? result.status)", quiet: quiet, data: result,
+      warnings: result.warnings, approvalUsed: approvalUsed)
   }
 
   static func summary(_ task: TaskDetails) -> String {
@@ -72,7 +76,7 @@ enum TaskOutput {
     for (heading, text) in [
       ("Description", task.description),
       ("Acceptance", task.acceptance),
-      ("Plan (revision \(task.planRev))", task.plan),
+      ("Plan (revision \(task.planRev))", MarkdownPlan.numbered(task.plan)),
       ("Result", task.result ?? ""),
     ] where !text.isEmpty {
       lines.append("\n\(heading):\n\(text)")
@@ -80,7 +84,8 @@ enum TaskOutput {
     if let sha = task.doneSHA { lines.append("Commit: \(sha)") }
     for link in task.links { lines.append("\(link.rel): \(link.target)") }
     for event in task.timeline ?? [] {
-      lines.append("\(event.at) \(event.actor) \(event.kind): \(event.body ?? "")")
+      lines.append(
+        "\(event.at) \(event.actor) \(event.kind)" + (event.body.map { ": " + $0 } ?? ""))
     }
     return lines.joined(separator: "\n")
   }

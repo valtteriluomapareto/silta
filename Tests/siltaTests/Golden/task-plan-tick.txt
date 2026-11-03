@@ -1,2 +1,1 @@
-AC-1 plan revision 1
-- [x] Ship
+AC-1 step 1 done: Ship (1/1)

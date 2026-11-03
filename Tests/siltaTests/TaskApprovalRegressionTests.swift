@@ -42,7 +42,8 @@ struct TaskApprovalRegressionTests {
       }
       #expect(
         commands == [
-          "silta task add --allow-secret -> AC-1", "silta task from-plan --allow-secret -> AC-2",
+          "silta task add --allow-secret -m <text> -> AC-1",
+          "silta task from-plan --allow-secret -> AC-2",
         ])
     }
   }

@@ -17,7 +17,8 @@ struct TaskBlockGuardTests {
           actor: .agent(tool: "codex", session: "other"), clock: clock),
         approved: "Take this Acme task")
       #expect(
-        throws: TaskError.claimed("AC-1", holder: TaskServiceTests.agent.description, minutes: 0)
+        throws: TaskError.claimed(
+          "AC-1", holder: TaskServiceTests.agent.description, minutes: 0, human: false)
       ) {
         _ = try other.block("AC-1", TaskBlockTests.input())
       }
@@ -51,7 +52,7 @@ struct TaskBlockGuardTests {
   }
 
   private static func promotionNeedsUnblockThenFreezes(_ service: TaskService) throws {
-    #expect(throws: TaskError.blockedPromotion("AC-1")) {
+    #expect(throws: TaskError.blockedPromotion("AC-1", ready: true)) {
       _ = try service.promote("AC-1", external: "ado:42")
     }
     _ = try service.unblock(["AC-1"])

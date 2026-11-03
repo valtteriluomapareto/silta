@@ -41,7 +41,7 @@ extension TaskService {
           redacted: !accept && content.1, at: at, in: tx)
       }
       try approval?.record(
-        command: command, workspace: slug,
+        command: audited(command), workspace: slug,
         identity: (environment.ids, at), in: tx)
       return accepted.map { TaskResult(ref: $0.ref, status: "todo", warnings: []) }
         + dropped.map {

@@ -27,7 +27,9 @@ struct TaskRecoveryTests {
           ["--ws", "acme", "task", "start", "AC-1"] + (json ? ["--json"] : []),
           in: scratch, environment: rival)
         #expect(result.termination == .exit(6))
-        #expect((json ? result.stdout : result.stderr).contains("silta --ws 'acme' task show AC-1"))
+        #expect(
+          (json ? result.stdout : result.stderr).contains("silta --ws 'acme' task ls --status todo")
+        )
         let retry = try SiltaBinary.run(
           ["--ws", "acme", "task", "show", "AC-1", "--json"], in: scratch)
         #expect(retry.termination == .exit(0))

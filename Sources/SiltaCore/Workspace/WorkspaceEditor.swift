@@ -71,7 +71,7 @@ package enum WorkspaceEditor {
     }
     return try save(
       text, originalSlug: original, store: store, identity: identity,
-      approval: (approval, "silta ws edit" + target + " -F"))
+      approval: (approval, "silta ws edit" + target + " -F <file>"))
   }
 
   private static func save(

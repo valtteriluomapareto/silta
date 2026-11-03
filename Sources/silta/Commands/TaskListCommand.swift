@@ -41,10 +41,9 @@ struct TaskListCommand: OutputCommand {
     filter.promoted = promoted
     filter.archived = archived
     let tasks = try TaskService(environment: context.environment, workspace: global.ws).list(filter)
-    return CommandOutput(
-      text: tasks.isEmpty ? "No tasks." : tasks.map(TaskOutput.summary).joined(separator: "\n"),
-      data: Data(tasks: tasks.map(TaskSummary.init))
-    ).reporting(context.taskWorkspace(global.ws))
+    let text = tasks.isEmpty ? "No tasks." : tasks.map(TaskOutput.summary).joined(separator: "\n")
+    return CommandOutput(text: text, quiet: text, data: Data(tasks: tasks.map(TaskSummary.init)))
+      .reporting(context.taskWorkspace(global.ws))
   }
 
   private struct Data: Encodable {

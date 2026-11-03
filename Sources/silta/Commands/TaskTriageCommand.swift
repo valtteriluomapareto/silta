@@ -38,7 +38,7 @@ struct TaskTriageCommand: OutputCommand {
       approved: global.approved)
     let tasks = try TaskService(
       environment: context.environment, workspace: global.ws,
-      approved: global.approved
+      approved: global.approved, bodyFlag: body.flag
     ).triage(batch)
     return CommandOutput(
       text: tasks.map { "\($0.ref) \($0.status)" }.joined(separator: "\n"),

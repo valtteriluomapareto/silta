@@ -79,7 +79,9 @@ struct TaskServiceTests {
       let rival = TaskService(
         environment: try Self.environment(
           home, actor: .agent(tool: "codex", session: "other"), clock: clock))
-      await #expect(throws: TaskError.claimed("AC-1", holder: Self.agent.description, minutes: 0)) {
+      await #expect(
+        throws: TaskError.claimed("AC-1", holder: Self.agent.description, minutes: 0, human: false)
+      ) {
         _ = try await rival.start("AC-1", directory: home)
       }
       clock.advance(milliseconds: 7_199_000)

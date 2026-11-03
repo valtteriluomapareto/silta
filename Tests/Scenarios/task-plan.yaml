@@ -10,10 +10,10 @@ steps:
     expect: {exit: 0, json: {data.ref: FI-1, data.status: doing}}
   - args: [task, plan, FI-1, -m, '- [ ] Ship', --if-rev, '0', --json]
     env: {SILTA_ACTOR: 'agent:codex:acme'}
-    expect: {exit: 0, json: {data.plan_rev: 1, data.plan: '- [ ] Ship'}}
+    expect: {exit: 0, json: {data.plan_rev: 1, data.steps: 1, data.steps_done: 0}}
   - args: [task, plan, FI-1, --step, '1', --done, --json]
     env: {SILTA_ACTOR: 'agent:codex:acme'}
-    expect: {exit: 0, json: {data.plan_rev: 1, data.plan: '- [x] Ship'}}
+    expect: {exit: 0, json: {data.plan_rev: 1, data.step: 1, data.title: Ship, data.steps_done: 1}}
   - args: [task, done, FI-1, -m, Shipped Acme., --json]
     env: {SILTA_ACTOR: 'agent:codex:acme'}
     expect: {exit: 0, json: {data.status: done}}

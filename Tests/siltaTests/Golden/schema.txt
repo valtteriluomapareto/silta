@@ -49,3 +49,4 @@ error codes:
   gate  exit 7, next by agent: Request a review or ask the human
   rate_limited  exit 8, next by agent: Wait for `retry_after_s`, or summarise
   env  exit 9, next by human: Report the printed fix to the human
+An error's own next_by can override its code's default.

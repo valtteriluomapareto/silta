@@ -1,1 +1,1 @@
-AC-1 doing
+AC-1 promoted to ado:42; read-only here

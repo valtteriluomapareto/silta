@@ -4,7 +4,8 @@ import GRDB
 extension TaskService {
   /// Edits a snapshot, then rechecks content, promotion and the current claim before writing.
   /// A nil callback result cancels without writing. An edit that changes nothing writes
-  /// nothing and uses no approval. Only changed fields pass the secret guard.
+  /// nothing and uses no approval. Only changed fields pass the secret guard. The result's
+  /// `changed` names the fields written.
   package func edit(
     _ ref: String, allowSecret: Bool = false, input: (String) throws -> String?
   ) throws -> (result: TaskResult, approvalUsed: Bool) {
@@ -39,9 +40,11 @@ extension TaskService {
       guard content != original else { return (receipt(task), false) }
       try applyEdit(content, task: task, redacted: redacted, at: at, in: tx)
       try approval?.record(
-        command: command, workspace: slug,
+        command: audited(command), workspace: slug,
         identity: (environment.ids, at), in: tx)
-      return (receipt(task, warnings: redacted ? [SecretGuard.warning] : []), required)
+      var result = receipt(task, warnings: redacted ? [SecretGuard.warning] : [])
+      result.changed = content.changed(from: original)
+      return (result, required)
     }
   }
 

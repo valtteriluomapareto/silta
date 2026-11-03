@@ -120,7 +120,8 @@ enum SiltaMain {
     let path = commandPath(arguments)
     if error.code == .busy { return CommandFailure(error: error, next: [path]) }
     var next = error.next
-    if error.code == .invalid, error is TaskError || error is ActorError {
+    let ownNext = if case .step = error as? TaskError { true } else { false }
+    if error.code == .invalid, !ownNext, error is TaskError || error is ActorError {
       next = [path + " --help"]
     }
     if let edit = command as? TaskEditCommand, let taskError = error as? TaskError,
@@ -139,7 +140,8 @@ enum SiltaMain {
     }
     if let workspace {
       next = next.map {
-        $0.hasPrefix("silta task ")
+        if $0 == "silta ws show" { return "silta ws show " + shellWord(workspace) }
+        return $0.hasPrefix("silta task ")
           ? "silta --ws " + shellWord(workspace) + String($0.dropFirst(5)) : $0
       }
     }

@@ -2,6 +2,8 @@ error: line 1: expected a mapping [invalid]
 next: silta ws edit
 error: No matching workspace is selected. [not_found]
 next: silta ws ls
+error: No workspace is named acme-two. [not_found]
+next: silta ws ls
 error: Configuration conflicts with an existing reference or unique value. [conflict]
 next: silta ws edit
 error: The editor could not be started; check EDITOR. [env]

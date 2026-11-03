@@ -20,7 +20,7 @@ struct TaskPlanCommandTests {
         ["task", "plan", "AC-1", "--step", "1", "--done", "--json"],
         in: scratch, environment: TaskCommandTests.actor)
       #expect(ticked.termination == .exit(0))
-      #expect(ticked.stdout.contains("- [x] Ship"))
+      Golden.forTests().check(ticked.stdout, "task-plan-tick.json")
       let staleTick = try SiltaBinary.run(
         ["task", "plan", "AC-1", "--step", "1", "--undo", "--if-rev", "0", "--json"],
         in: scratch, environment: TaskCommandTests.actor)
@@ -177,10 +177,16 @@ extension TaskPlanCommandTests {
       let object = try #require(
         JSONSerialization.jsonObject(with: Data(tick.stdout.utf8)) as? [String: Any])
       let data = try #require(object["data"] as? [String: Any])
-      let plan = try #require(data["plan"] as? String)
+      #expect(data["plan_rev"] as? Int == 1)
+      #expect(data["step"] as? Int == 2 && data["title"] as? String == "β")
+      #expect(data["steps"] as? Int == 2 && data["steps_done"] as? Int == 2)
+      let shown = try SiltaBinary.run(
+        ["task", "show", "AC-1", "--json"], in: scratch, environment: TaskCommandTests.actor)
+      let detail = try #require(
+        JSONSerialization.jsonObject(with: Data(shown.stdout.utf8)) as? [String: Any])
+      let plan = try #require((detail["data"] as? [String: Any])?["plan"] as? String)
       #expect(
         Array(plan.utf8) == Array(text.replacingOccurrences(of: "2. [ ] β", with: "2. [x] β").utf8))
-      #expect(data["plan_rev"] as? Int == 1)
       let help = try SiltaBinary.run(["task", "plan", "--help"], in: scratch)
       let words = help.stdout.split(whereSeparator: \.isWhitespace).joined(separator: " ")
       #expect(words.contains("checked entries count"))

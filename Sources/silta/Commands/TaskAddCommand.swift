@@ -45,13 +45,14 @@ struct TaskAddCommand: OutputCommand {
         actor: context.environment.actor, command: draft.command + " '<title>'",
         approved: global.approved) ?? ""
     let result = try await TaskService(
-      environment: context.environment, workspace: global.ws, approved: global.approved
+      environment: context.environment, workspace: global.ws, approved: global.approved,
+      bodyFlag: body.flag
     )
     .add(
       draft,
       directory: URL(
         filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
-    return TaskOutput.receipt(result, approvalUsed: body.allowSecret).reporting(
-      context.taskWorkspace(global.ws))
+    return TaskOutput.receipt(result, quiet: result.ref, approvalUsed: body.allowSecret)
+      .reporting(context.taskWorkspace(global.ws))
   }
 }
