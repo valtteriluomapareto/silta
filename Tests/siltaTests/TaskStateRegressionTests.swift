@@ -202,3 +202,61 @@ struct TaskStateRegressionTests {
   }
 
 }
+
+extension TaskStateRegressionTests {
+  @Test func listSummaryKeepsLinksAndArchived() {
+    withKnownIssue("the ls summary drops links and archived") {
+      try withScratchDirectory { scratch in
+        _ = try TaskCommandTests.setup(scratch)
+        #expect(
+          try Self.run(["task", "add", "Acme", "--start"], in: scratch).termination == .exit(0))
+        let url = "url:https://example.com/acme/issues/4"
+        #expect(try Self.run(["task", "link", "AC-1", url], in: scratch).termination == .exit(0))
+        let listed = try Self.tasks(Self.run(["task", "ls", "--json"], in: scratch))
+        let task = try #require(listed.first)
+        #expect(task["archived"] as? Bool == false)
+        let links = try #require(task["links"] as? [[String: String]])
+        #expect(links == [["rel": "cites", "target": url]])
+      }
+    }
+  }
+
+  @Test func proposalRefusalAsksTheHuman() {
+    withKnownIssue("the triage next needs the human's words but says next_by agent") {
+      try withScratchDirectory { scratch in
+        _ = try TaskCommandTests.setup(scratch)
+        #expect(try Self.run(["task", "add", "Acme idea"], in: scratch).termination == .exit(0))
+        let started = try Self.run(["task", "start", "AC-1", "--json"], in: scratch)
+        #expect(try Self.error(started)["next_by"] as? String == "human")
+        #expect(
+          try Self.error(started)["next"] as? [String] == [
+            "silta --ws 'acme' task triage --accept AC-1 --approved \"<the human's words>\""
+          ])
+        let text = try Self.run(["task", "start", "AC-1"], in: scratch)
+        #expect(text.stderr.contains("ask human: silta --ws 'acme' task triage --accept AC-1"))
+      }
+    }
+  }
+
+  @Test func unblockRefusalNamesTheTasksThatAreNotReady() {
+    withKnownIssue("the unblock refusal doesn't say which tasks aren't ready") {
+      try withScratchDirectory { scratch in
+        _ = try TaskCommandTests.setup(scratch)
+        for title in ["Acme", "Acme two", "Acme three"] {
+          #expect(
+            try Self.run(["task", "add", title, "--start"], in: scratch).termination == .exit(0))
+        }
+        for ref in ["AC-1", "AC-3"] {
+          #expect(
+            try Self.run(["task", "block", ref, "--on", "ext:acme", "-m", "Acme?"], in: scratch)
+              .termination == .exit(0))
+        }
+        let refused = try Self.run(["task", "unblock", "AC-1", "AC-3", "--json"], in: scratch)
+        #expect(refused.termination == .exit(3))
+        #expect(
+          (try Self.error(refused)["message"] as? String)?.hasPrefix(
+            "AC-1 and AC-3 still wait on open blockers") == true)
+      }
+    }
+  }
+}
