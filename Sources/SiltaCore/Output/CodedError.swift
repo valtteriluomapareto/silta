@@ -19,3 +19,10 @@ extension CodedError {
   /// The process exit status, derived from `code` so the two can't disagree.
   package var exitCode: Int32 { code.exitCode }
 }
+
+/// An error whose `next` needs the human although its code's `next_by` is `agent`, such
+/// as a command carrying the `--approved` placeholder (spec §16).
+package protocol HumanNextError: CodedError {
+  /// Who acts on this error's `next` commands.
+  var nextBy: NextBy { get }
+}

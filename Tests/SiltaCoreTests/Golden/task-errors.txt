@@ -5,8 +5,7 @@ next: silta task add --help
 error: AC-1 is claimed by agent:codex:acme (4 min old); do not steal. [claimed]
 next: silta task show AC-1
 error: Proposal AC-1 needs human triage; ask in chat before accepting it. [conflict]
-next: silta task triage --accept AC-1 --approved "<the human's words>"
-next: silta task ls --status todo
+ask human: silta task triage --accept AC-1 --approved "<the human's words>"
 error: AC-1 cannot make this transition from done. [conflict]
 next: silta task show AC-1
 error: Git could not report the task's worktree or commit; ask a human to check git. [env]

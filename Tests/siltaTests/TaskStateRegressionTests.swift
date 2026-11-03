@@ -222,20 +222,18 @@ extension TaskStateRegressionTests {
     }
   }
 
-  @Test func proposalRefusalAsksTheHuman() {
-    withKnownIssue("the triage next needs the human's words but says next_by agent") {
-      try withScratchDirectory { scratch in
-        _ = try TaskCommandTests.setup(scratch)
-        #expect(try Self.run(["task", "add", "Acme idea"], in: scratch).termination == .exit(0))
-        let started = try Self.run(["task", "start", "AC-1", "--json"], in: scratch)
-        #expect(try Self.error(started)["next_by"] as? String == "human")
-        #expect(
-          try Self.error(started)["next"] as? [String] == [
-            "silta --ws 'acme' task triage --accept AC-1 --approved \"<the human's words>\""
-          ])
-        let text = try Self.run(["task", "start", "AC-1"], in: scratch)
-        #expect(text.stderr.contains("ask human: silta --ws 'acme' task triage --accept AC-1"))
-      }
+  @Test func proposalRefusalAsksTheHuman() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      #expect(try Self.run(["task", "add", "Acme idea"], in: scratch).termination == .exit(0))
+      let started = try Self.run(["task", "start", "AC-1", "--json"], in: scratch)
+      #expect(try Self.error(started)["next_by"] as? String == "human")
+      #expect(
+        try Self.error(started)["next"] as? [String] == [
+          "silta --ws 'acme' task triage --accept AC-1 --approved \"<the human's words>\""
+        ])
+      let text = try Self.run(["task", "start", "AC-1"], in: scratch)
+      #expect(text.stderr.contains("ask human: silta --ws 'acme' task triage --accept AC-1"))
     }
   }
 

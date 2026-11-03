@@ -1,5 +1,5 @@
 /// Task failures with body-free recovery commands.
-package enum TaskError: CodedError, Equatable {
+package enum TaskError: HumanNextError, Equatable {
   /// The task or an explicitly named workspace entity does not exist.
   case notFound
 
@@ -101,10 +101,7 @@ package enum TaskError: CodedError, Equatable {
     case .promoted: ["silta task ls --status todo"]
     case .edited(let ref): ["silta task show \(ref)"]
     case .proposal(let ref):
-      [
-        "silta task triage --accept \(ref) --approved \"<the human's words>\"",
-        "silta task ls --status todo",
-      ]
+      ["silta task triage --accept \(ref) --approved \"<the human's words>\""]
     case .blockedPromotion(let ref): ["silta task unblock \(ref)"]
     case .claimed(let ref, _, _), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
@@ -114,5 +111,10 @@ package enum TaskError: CodedError, Equatable {
     case .repository: ["silta init --help"]
     case .git: ["silta doctor"]
     }
+  }
+
+  /// A proposal's triage needs the human's words; every other case follows its code.
+  package var nextBy: NextBy {
+    if case .proposal = self { .human } else { code.nextBy }
   }
 }
