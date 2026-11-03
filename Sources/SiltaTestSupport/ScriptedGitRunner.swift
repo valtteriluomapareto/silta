@@ -9,8 +9,14 @@ package final class ScriptedGitRunner: GitRunner {
   }
   private let state: Mutex<State>
 
-  /// Scripts spawn/capture failures as well as completed invocations.
-  package init(script: [(GitRequest, Result<GitResult, any Error>)]) {
+  private let beforeRequest: (@Sendable (GitRequest) throws -> Void)?
+
+  /// Scripts spawn/capture failures and can interleave a write before a request returns.
+  package init(
+    script: [(GitRequest, Result<GitResult, any Error>)],
+    beforeRequest: (@Sendable (GitRequest) throws -> Void)? = nil
+  ) {
+    self.beforeRequest = beforeRequest
     state = Mutex(State(steps: script))
   }
   /// Every attempted request, including mismatches and scripted failures.
@@ -24,7 +30,8 @@ package final class ScriptedGitRunner: GitRunner {
 
   /// Consumes the next matching response or throws without consuming a mismatched step.
   package func run(_ request: GitRequest) async throws -> GitResult {
-    try state.withLock { state in
+    try beforeRequest?(request)
+    return try state.withLock { state in
       state.requests.append(request)
       guard let step = state.steps.first, step.0 == request else {
         throw ScriptError.unexpectedRequest

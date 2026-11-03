@@ -470,6 +470,11 @@ just created.
 - Any write by the claimer to the task refreshes `claimed_at`. A `handoff` comment
   releases the claim.
 - `--steal` is human-only.
+- Start accepts `todo`, `doing` and `review`, and never reopens terminal tasks.
+  Proposals need human triage before they can start or complete. An agent may drop
+  its own proposal with a result; it cannot drop another actor's proposal.
+- Writes refuse another actor's fresh claim. An expired claim can be reclaimed with
+  `start`; each claim compares the complete actor, including session.
 
 **Plans:**
 - `task plan AC-12 -F -` stores a new plan revision. `--if-rev 3` refuses with exit 6
@@ -877,6 +882,11 @@ next: silta comment AC-12 --kind comment -F -   # one summary instead
 
 When `next_by` is `human`, the lines read `ask human: <cmd>` instead of `next: <cmd>`.
 Several `next` commands are alternatives, best first: run one.
+Task recovery commands preserve a known workspace, so a noncurrent workspace remains
+selected when following a hint. Early human-only refusals preserve an explicit
+`--ws` without reading storage. Invalid task values point to the failed command's
+help. A busy retry names only the parsed command path, without body-bearing
+arguments.
 
 **Streams and global flags:**
 - Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on
@@ -1051,6 +1061,8 @@ revision before the write.
   - **Agents** get the match redacted in place (`[REDACTED:jwt]`), the write goes
     ahead, and a `secret_redacted` warning plus an event are logged.
   - Matches are never echoed in full.
+- Human retry examples use `-F <file>`, keeping stdin attached to the terminal;
+  piping the body into stdin would cause agent detection (§11).
 - **Tests:** a corpus of known secrets and clean text runs in CI (§20).
 
 **Other rules:**
