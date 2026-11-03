@@ -54,6 +54,12 @@ struct ActorTests {
       environment: ["SILTA_ACTOR": ""], stdin: false, stdout: false,
       expected: "agent:unknown:acme"),
     Row(environment: ["USER": "acme user"], stdin: true, stdout: true, expected: "human:unknown"),
+    Row(
+      environment: ["USER": String(repeating: "a", count: 65)], stdin: true, stdout: true,
+      expected: "human:unknown"),
+    Row(
+      environment: ["SILTA_ACTOR": "agent:acme:" + String(repeating: "s", count: 64)],
+      stdin: false, stdout: false, expected: "agent:acme:" + String(repeating: "s", count: 64)),
   ]
 
   @Test(arguments: rows) func matrix(row: Row) throws {
@@ -68,7 +74,7 @@ struct ActorTests {
   @Test(arguments: [
     "acme", "agent:", "human:", "agent:acme:", "agent:a:b:c", "robot:acme", "agent:acme:has space",
     "human:acme;rm", "agent:Claude", "human:acme.", "human:a@b", "agent:acme:-x",
-    "human:" + String(repeating: "a", count: 65),
+    "human:" + String(repeating: "a", count: 65), "human:a:b", "human:ä",
   ])
   func malformedExplicitActorIsRefused(value: String) {
     #expect(throws: SeamError.invalidActor) {

@@ -61,6 +61,8 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
   package static func resolve(
     environment: [String: String], terminal: TerminalState, git: any GitRunner, directory: URL
   ) async throws -> (ActorID, [OutputWarning]) {
+    let supplied = environment["SILTA_SESSION"].flatMap { $0.isEmpty ? nil : $0 }
+    if let supplied, !isPart(supplied) { throw SeamError.invalidSession }
     let explicit = try explicitActor(environment: environment, terminal: terminal)
     if case .actor(let actor) = explicit { return (actor, []) }
     // An agent's shell often inherits a human's exported override; only a human
@@ -68,8 +70,7 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     var warnings: [OutputWarning] =
       explicit == .droppedHuman && terminal.stdoutIsTTY ? [overrideIgnored] : []
     let session: String
-    if let supplied = environment["SILTA_SESSION"], !supplied.isEmpty {
-      guard isPart(supplied) else { throw SeamError.invalidSession }
+    if let supplied {
       session = supplied
     } else {
       let root = await repositoryRoot(git: git, directory: directory)
@@ -78,7 +79,10 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
       session = SHA256.hash(data: Data(path.utf8)).prefix(3)
         .map { String(format: "%02x", $0) }.joined()
     }
-    return (try detect(environment: environment, terminal: terminal, session: session), warnings)
+    let actor = try detect(environment: environment, terminal: terminal, session: session)
+    // A human's actor carries no session, so a session fallback means nothing to them.
+    if actor.isHuman { warnings.removeAll { $0 == sessionFallback } }
+    return (actor, warnings)
   }
 
   /// Refuses an agent, naming who was detected so a human can see why.

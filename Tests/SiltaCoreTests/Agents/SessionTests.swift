@@ -71,9 +71,10 @@ struct SessionTests {
     let directory = URL(filePath: "/Acme/worktree")
     let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: directory)
     let git = ScriptedGitRunner(script: [(request, outcome.mapError { $0 as any Error })])
-    let (actor, _) = try await ActorID.resolve(
+    let (actor, warnings) = try await ActorID.resolve(
       environment: [:], terminal: terminal, git: git, directory: directory)
     #expect(actor.description == "agent:unknown:8e7b6a")
+    #expect(warnings.map(\.code) == ["session_fallback"])
   }
 
   // A fallback inside a repository splits one session in two, so it leaves a trace.
@@ -127,5 +128,23 @@ struct SessionTests {
       git: ScriptedGitRunner(script: []), directory: cwd)
     #expect(actor.description == "agent:unknown:acme")
     #expect(warnings.map(\.code) == expected)
+  }
+
+  @Test func sessionIsValidatedEvenWithACompleteActor() async {
+    await #expect(throws: SeamError.invalidSession) {
+      try await ActorID.resolve(
+        environment: ["SILTA_ACTOR": "agent:acme:review", "SILTA_SESSION": "a b"],
+        terminal: terminal, git: ScriptedGitRunner(script: []), directory: cwd)
+    }
+  }
+
+  @Test func aHumanGetsNoSessionFallbackWarning() async throws {
+    let request = GitRequest(arguments: ["rev-parse", "--show-toplevel"], directory: cwd)
+    let git = ScriptedGitRunner(script: [(request, .success(GitResult(termination: .timedOut)))])
+    let (actor, warnings) = try await ActorID.resolve(
+      environment: ["USER": "acme"], terminal: TerminalState(stdin: true, stdout: true), git: git,
+      directory: cwd)
+    #expect(actor.description == "human:acme")
+    #expect(warnings.isEmpty)
   }
 }

@@ -36,11 +36,13 @@ struct HomeIdentityTests {
   }
 
   // A dangling ~/.silta symlink names where the real home will be created.
-  @Test func danglingDefaultHomeTargetCannotEnableOverrides() throws {
+  @Test(arguments: [false, true])
+  func danglingDefaultHomeTargetCannotEnableOverrides(relative: Bool) throws {
     try withScratchDirectory { scratch in
       let target = scratch.appending(path: "acme-data")
       try FileManager.default.createSymbolicLink(
-        at: scratch.appending(path: ".silta"), withDestinationURL: target)
+        atPath: scratch.appending(path: ".silta").path,
+        withDestinationPath: relative ? "acme-data" : target.path)
       let home = try SiltaHome.resolve(
         environment: ["SILTA_HOME": target.path], userHome: scratch, deterministic: true)
       #expect(!home.permitsDeterminism)

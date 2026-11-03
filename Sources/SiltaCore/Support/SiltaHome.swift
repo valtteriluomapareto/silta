@@ -34,7 +34,8 @@ package struct SiltaHome: Sendable {
       let link = defaultHome.path
       let target = try? FileManager.default.destinationOfSymbolicLink(atPath: link)  // not a link
       let base = try canonicalURL(userHome)
-      realHome = URL(filePath: target ?? ".silta", relativeTo: base)
+      let path = target ?? ".silta"
+      realHome = path.hasPrefix("/") ? URL(filePath: path) : base.appending(path: path)
     }
     if let override, !override.hasPrefix("/") { throw SeamError.invalidHome }
     let url = override.map { URL(filePath: $0) } ?? realHome
