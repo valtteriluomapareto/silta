@@ -1,0 +1,6 @@
+{"error":{"code":"env","message":"Could not discover repositories; check the scan directories and git metadata.","next":["silta init --help"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"not_found","message":"No matching repository; check the workspace and repository slug.","next":["silta repo fetch --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Local clone for platform in acme is missing or unregistered; restore it, then bind its path with init --scan.","next":["silta --ws 'acme' init --scan <directory>"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Discovered repo \"platform\" is absent from the workspace; add it in ws edit, then rescan.","next":["silta ws edit 'acme'"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"More than one clone has the same repo slug; scan unambiguous directories.","next":["silta init --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Could not fetch platform; check network access and noninteractive git credentials. Earlier successful repos remain fetched.","next":["silta --ws 'acme' repo fetch 'platform'"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

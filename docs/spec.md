@@ -1338,6 +1338,20 @@ Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-
 repo paths are excluded from this view. A `workspace` change-log event invalidates
 that workspace's complete configuration, including omitted children.
 
+`init --scan` discovers repos at the root and at most two child levels, without fetching.
+The first directory's lowercased name is the workspace slug and its first two letters
+uppercase are the task prefix. Remote `X`/`X-prod` pairs create app stubs with a prod ref;
+main or master provides a default app when its ref is not already represented.
+Worktrees and path aliases resolve to one canonical main clone. Initial scans create
+configuration; rescans only refresh local paths for registered repo slugs and preserve
+edited configuration. `--ws` targets an existing workspace for path rebinding.
+Scan success names the human edit command and explicit workspace selection.
+
+`repo fetch [repo]` preflights selected local paths, then fetches sequentially with a
+60-second deadline per clone. It stops on the first failure; earlier successful fetches
+keep their timestamps, while failed and unattempted repos remain unchanged. Git runs
+noninteractively, and network/authentication failures ask a human to repair the environment.
+
 `ws use <slug>` records the current workspace. With no workspace yet, a human's
 `ws edit` opens starter YAML. Otherwise it edits the explicit or current workspace.
 An unchanged file or nonzero editor exit makes no changes; validation problems are

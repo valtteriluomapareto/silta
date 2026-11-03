@@ -1,0 +1,3 @@
+Initialized workspace acme.
+next: silta ws use 'acme'
+ask human: silta ws edit 'acme'

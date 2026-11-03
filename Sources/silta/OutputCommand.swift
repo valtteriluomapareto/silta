@@ -9,5 +9,5 @@ protocol OutputCommand: ParsableCommand {
   static var dataShape: Shape { get }
 
   /// Runs the command. Throw a `CodedError` for anything the caller should act on.
-  func execute(_ context: CommandContext) throws -> CommandOutput
+  func execute(_ context: CommandContext) async throws -> CommandOutput
 }

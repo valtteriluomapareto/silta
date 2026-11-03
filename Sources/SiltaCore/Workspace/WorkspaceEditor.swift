@@ -10,7 +10,7 @@ package enum WorkspaceEditor {
     editor: (URL) throws -> Int32
   ) throws -> String? {
     let (ids, date) = identity
-    let target = slug.map { " '" + $0.replacingOccurrences(of: "'", with: "'\\''") + "'" } ?? ""
+    let target = slug.map { " " + shellWord($0) } ?? ""
     try actor.requireHuman(command: "silta ws edit" + target)
     let available = try WorkspaceSelection.list(in: store)
     let initial: String
