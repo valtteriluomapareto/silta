@@ -72,7 +72,7 @@ enum TaskOutput {
     for (heading, text) in [
       ("Description", task.description),
       ("Acceptance", task.acceptance),
-      ("Plan (revision \(task.planRev))", task.plan),
+      ("Plan (revision \(task.planRev))", MarkdownPlan.numbered(task.plan)),
       ("Result", task.result ?? ""),
     ] where !text.isEmpty {
       lines.append("\n\(heading):\n\(text)")

@@ -96,12 +96,8 @@ struct SchemaCommandTests {
         Issue.record("\(file) has no data")
         continue
       }
-      let shape = try #require(commands[name])
-      withKnownIssue("task plan data drops the plan") {
-        #expect(ShapeCheck.violations(of: data, against: shape) == [], "\(file)")
-      } when: {
-        file.hasPrefix("task-plan")
-      }
+      #expect(
+        ShapeCheck.violations(of: data, against: try #require(commands[name])) == [], "\(file)")
     }
     #expect(covered == Set(commands.keys), "commands without a success golden")
   }

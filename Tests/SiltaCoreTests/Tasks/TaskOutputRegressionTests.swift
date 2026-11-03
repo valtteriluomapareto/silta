@@ -116,11 +116,9 @@ struct TaskOutputRegressionTests {
         _ = try service.tick("AC-1", step: 1, done: true)
       }
       #expect(refusal?.code == .invalid)
-      withKnownIssue("the refusal is generic and points at --help") {
-        #expect(refusal?.message.contains("0 checkboxes") == true)
-        #expect(refusal?.message.contains("- [ ]") == true)
-        #expect(refusal?.next == ["silta task plan AC-1 -F -"])
-      }
+      #expect(refusal?.message.contains("0 checkboxes") == true)
+      #expect(refusal?.message.contains("- [ ]") == true)
+      #expect(refusal?.next == ["silta task plan AC-1 -F -"])
     }
   }
 

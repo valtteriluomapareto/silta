@@ -1,7 +1,16 @@
 import Foundation
 
 /// The small Markdown subset used for importing and ticking task checklists.
-struct MarkdownPlan: Sendable {
+package struct MarkdownPlan: Sendable {
+  /// A top-level checkbox outside fences: what `--step N` counts, from 1.
+  struct Checkbox: Sendable {
+    let line: Int
+
+    let done: Bool
+
+    let title: String
+  }
+
   struct Step: Sendable {
     var title: String
 
@@ -61,15 +70,33 @@ struct MarkdownPlan: Sendable {
     checklist = output.joined(separator: "\n")
   }
 
+  static func checkboxes(_ text: String) -> [Checkbox] {
+    let lines = text.components(separatedBy: "\n")
+    return visibleLines(lines).compactMap { index in
+      lines[index].firstMatch(of: #/^(?:[-+*]|[0-9]+[.)]) +\[([ xX])\] (.*?)\r?$/#).map {
+        Checkbox(line: index, done: $0.output.1 != " ", title: String($0.output.2))
+      }
+    }
+  }
+
+  /// `text` with each checkbox's list marker replaced by its step number, as `task show`
+  /// prints it.
+  package static func numbered(_ text: String) -> String {
+    var lines = text.components(separatedBy: "\n")
+    for (number, box) in checkboxes(text).enumerated() {
+      lines[box.line] = lines[box.line].replacing(
+        #/^(?:[-+*]|[0-9]+[.)]) +/#, with: "\(number + 1). ", maxReplacements: 1)
+    }
+    return lines.joined(separator: "\n")
+  }
+
   static func tick(_ text: String, step: Int, done: Bool) throws -> String {
     var lines = text.components(separatedBy: "\n")
-    let boxes = visibleLines(lines).filter {
-      lines[$0].firstMatch(of: #/^(?:[-+*]|[0-9]+[.)]) +\[[ xX]\] /#) != nil
-    }
+    let boxes = checkboxes(text)
     guard step > 0, step <= boxes.count else {
       throw TaskError.invalid("--step must name an existing top-level checkbox (numbered from 1).")
     }
-    let index = boxes[step - 1]
+    let index = boxes[step - 1].line
     guard let opening = lines[index].firstIndex(of: "[") else { throw StorageError.unavailable }
     let mark = lines[index].index(after: opening)
     lines[index].replaceSubrange(mark...mark, with: done ? "x" : " ")

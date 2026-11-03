@@ -32,6 +32,8 @@ error: AC-1 has plan revision 2; re-read before replacing it. [stale_rev]
 next: silta task show AC-1
 error: AC-1 is blocked; unblock it before promoting it. [conflict]
 next: silta task unblock AC-1
+error: AC-1's plan has 0 checkboxes; --step N counts top-level `- [ ] …` lines, so store a revision with them. [invalid]
+next: silta task plan AC-1 -F -
 error: Database is busy; retry the original invocation once after retry_after_s. [busy]
 retry after: 5s
 next: silta task add

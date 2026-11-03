@@ -18,9 +18,7 @@ struct TaskPlanTextTests {
       ] {
         let result = try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.actor)
         #expect(result.termination == .exit(0))
-        withKnownIssue("plan output echoes the whole plan") {
-          Golden.forTests().check(result.stdout, golden)
-        }
+        Golden.forTests().check(result.stdout, golden)
         #expect(result.stderr.isEmpty)
       }
       let file = scratch.appending(path: "plan.md")

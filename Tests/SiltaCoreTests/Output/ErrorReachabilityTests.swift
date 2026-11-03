@@ -70,6 +70,7 @@ extension TaskError: ErrorExamples {
       .blocked(
         "AC-2", TaskWaiting(on: ["task:AC-1"], ageDays: 1, why: "Acme", ready: true, dropped: [])),
       .changed("AC-1"), .staleRev("AC-1", actual: 2), .blockedPromotion("AC-1"),
+      .noCheckboxes("AC-1"),
     ]
   }
 }

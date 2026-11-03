@@ -6,7 +6,8 @@ struct TaskPlanCommand: OutputCommand {
     commandName: "plan", abstract: "Store a plan revision or tick a top-level checkbox.")
 
   static let dataShape = Shape.object([
-    "ref": .string, "plan_rev": .int, "plan": .string,
+    "ref": .string, "plan_rev": .int, "steps": .int, "steps_done": .int,
+    "step": .optional(.int), "done": .optional(.bool), "title": .optional(.string),
   ])
 
   @OptionGroup var global: GlobalOptions
@@ -47,8 +48,15 @@ struct TaskPlanCommand: OutputCommand {
       }
       result = try service.plan(ref, text: text, ifRevision: ifRev, allowSecret: body.allowSecret)
     }
+    let text =
+      if let step = result.step, let title = result.title {
+        "\(result.ref) step \(step) \(result.done == true ? "done" : "undone"): \(title) "
+          + "(\(result.stepsDone)/\(result.steps))"
+      } else {
+        "\(result.ref) plan revision \(result.planRev) "
+          + "(\(result.steps) step\(result.steps == 1 ? "" : "s"))"
+      }
     return CommandOutput(
-      text: "\(result.ref) plan revision \(result.planRev)\n\(result.plan)", data: result,
-      warnings: result.warnings, approvalUsed: body.allowSecret)
+      text: text, data: result, warnings: result.warnings, approvalUsed: body.allowSecret)
   }
 }

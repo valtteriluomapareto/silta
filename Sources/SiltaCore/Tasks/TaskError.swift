@@ -48,6 +48,9 @@ package enum TaskError: HumanNextError, Equatable {
   /// A blocked task must be unblocked before a tracker can take it over.
   case blockedPromotion(String)
 
+  /// `--step` on a plan without checkboxes; the fix is a revision that has them.
+  case noCheckboxes(String)
+
   /// Maps task failures to the scripting contract.
   package var code: ErrorCode {
     switch self {
@@ -55,7 +58,7 @@ package enum TaskError: HumanNextError, Equatable {
     case .promoted: .readOnlyPromoted
     case .edited: .conflict
     case .notFound: .notFound
-    case .invalid, .foreignRepo, .input: .invalid
+    case .invalid, .foreignRepo, .input, .noCheckboxes: .invalid
     case .claimed: .claimed
     case .proposal, .transition, .changed, .blockedPromotion: .conflict
     case .git, .repository: .env
@@ -75,6 +78,9 @@ package enum TaskError: HumanNextError, Equatable {
     case .edited: "Task fields changed during editing; re-read before applying an edit."
     case .notFound: "Task or workspace entity not found."
     case .invalid(let reason): reason
+    case .noCheckboxes(let ref):
+      "\(ref)'s plan has 0 checkboxes; --step N counts top-level `- [ ] …` lines, "
+        + "so store a revision with them."
     case .claimed(let ref, let holder, let minutes):
       "\(ref) is claimed by \(holder) (\(minutes) min old); do not steal."
     case .proposal(let ref):
@@ -107,6 +113,7 @@ package enum TaskError: HumanNextError, Equatable {
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]
     case .notFound: ["silta task ls"]
+    case .noCheckboxes(let ref): ["silta task plan \(ref) -F -"]
     case .invalid, .foreignRepo, .input: ["silta task add --help"]
     case .repository: ["silta init --help"]
     case .git: ["silta doctor"]

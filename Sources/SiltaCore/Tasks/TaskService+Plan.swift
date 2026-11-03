@@ -42,11 +42,18 @@ extension TaskService {
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, at: at)
       try Self.compareRevision(ifRevision, task: task)
+      guard !MarkdownPlan.checkboxes(task.plan).isEmpty else {
+        throw TaskError.noCheckboxes(task.ref)
+      }
       let text = try MarkdownPlan.tick(task.plan, step: step, done: done)
       try updatePlan(text, revision: task.planRev, task: task.id, at: at, in: tx.database)
       try changed(
         task.id, kind: "step", body: "\(step) \(done ? "done" : "undo")", at: at, in: tx)
-      return TaskPlanResult(ref: task.ref, planRev: task.planRev, plan: text)
+      var result = TaskPlanResult(ref: task.ref, planRev: task.planRev, plan: text)
+      result.step = step
+      result.done = done
+      result.title = MarkdownPlan.checkboxes(text)[step - 1].title
+      return result
     }
   }
 

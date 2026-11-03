@@ -22,9 +22,7 @@ struct TaskOutputCommandTests {
         try Self.run(["task", "plan", "AC-1", "-m", plan], in: scratch).termination == .exit(0))
       let shown = try Self.run(["task", "show", "AC-1"], in: scratch)
       #expect(shown.termination == .exit(0))
-      withKnownIssue("show prints the plan without step numbers") {
-        Golden.forTests().check(shown.stdout, "task-show-plan.txt")
-      }
+      Golden.forTests().check(shown.stdout, "task-show-plan.txt")
     }
   }
 
@@ -39,10 +37,8 @@ struct TaskOutputCommandTests {
       let refused = try Self.run(
         ["task", "plan", "AC-1", "--step", "1", "--done"], in: scratch)
       #expect(refused.termination == .exit(1))
-      withKnownIssue("the refusal points at --help") {
-        #expect(refused.stderr.contains("0 checkboxes"))
-        #expect(refused.stderr.hasSuffix("next: silta --ws 'acme' task plan AC-1 -F -\n"))
-      }
+      #expect(refused.stderr.contains("0 checkboxes"))
+      #expect(refused.stderr.hasSuffix("next: silta --ws 'acme' task plan AC-1 -F -\n"))
     }
   }
 

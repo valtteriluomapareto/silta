@@ -15,16 +15,12 @@ struct TaskPlanCommandTests {
         ["task", "plan", "AC-1", "-m", "- [ ] Ship", "--if-rev", "0", "--json"],
         in: scratch, environment: TaskCommandTests.actor)
       #expect(planned.termination == .exit(0))
-      withKnownIssue("plan data echoes the whole plan") {
-        Golden.forTests().check(planned.stdout, "task-plan.json")
-      }
+      Golden.forTests().check(planned.stdout, "task-plan.json")
       let ticked = try SiltaBinary.run(
         ["task", "plan", "AC-1", "--step", "1", "--done", "--json"],
         in: scratch, environment: TaskCommandTests.actor)
       #expect(ticked.termination == .exit(0))
-      withKnownIssue("tick data echoes the whole plan") {
-        Golden.forTests().check(ticked.stdout, "task-plan-tick.json")
-      }
+      Golden.forTests().check(ticked.stdout, "task-plan-tick.json")
       let staleTick = try SiltaBinary.run(
         ["task", "plan", "AC-1", "--step", "1", "--undo", "--if-rev", "0", "--json"],
         in: scratch, environment: TaskCommandTests.actor)
@@ -182,10 +178,8 @@ extension TaskPlanCommandTests {
         JSONSerialization.jsonObject(with: Data(tick.stdout.utf8)) as? [String: Any])
       let data = try #require(object["data"] as? [String: Any])
       #expect(data["plan_rev"] as? Int == 1)
-      withKnownIssue("tick data echoes the plan instead of the step") {
-        #expect(data["step"] as? Int == 2 && data["title"] as? String == "β")
-        #expect(data["steps"] as? Int == 2 && data["steps_done"] as? Int == 2)
-      }
+      #expect(data["step"] as? Int == 2 && data["title"] as? String == "β")
+      #expect(data["steps"] as? Int == 2 && data["steps_done"] as? Int == 2)
       let shown = try SiltaBinary.run(
         ["task", "show", "AC-1", "--json"], in: scratch, environment: TaskCommandTests.actor)
       let detail = try #require(
