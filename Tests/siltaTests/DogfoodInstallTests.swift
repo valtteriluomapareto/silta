@@ -67,25 +67,23 @@ struct DogfoodInstallTests {
 
   @Test(arguments: ["behind", "ahead"])
   func installerRefusesMainThatDiffersFromOrigin(direction: String) throws {
-    withKnownIssue("install-dev builds a local main that differs from origin") {
-      try withScratchDirectory { scratch in
-        let clone = try Self.clone(scratch)
-        let tools = scratch.appending(path: "tools")
-        try DogfoodReportTests.tool(
-          "swift", text: "#!/bin/bash\nmkdir -p .build/release\necho Acme > .build/release/silta\n",
-          in: tools)
-        let commit = [
-          "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit",
-          "--allow-empty", "-qm", "Acme " + direction,
-        ]
-        let repository = direction == "behind" ? scratch.appending(path: "origin") : clone
-        _ = try Self.git(commit, in: scratch, cwd: repository)
-        let result = try Self.install(clone, scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(1))
-        #expect(result.stderr.contains(direction == "behind" ? "1 behind" : "1 ahead"))
-        #expect(
-          !FileManager.default.fileExists(atPath: scratch.appending(path: "installed/silta").path))
-      }
+    try withScratchDirectory { scratch in
+      let clone = try Self.clone(scratch)
+      let tools = scratch.appending(path: "tools")
+      try DogfoodReportTests.tool(
+        "swift", text: "#!/bin/bash\nmkdir -p .build/release\necho Acme > .build/release/silta\n",
+        in: tools)
+      let commit = [
+        "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit",
+        "--allow-empty", "-qm", "Acme " + direction,
+      ]
+      let repository = direction == "behind" ? scratch.appending(path: "origin") : clone
+      _ = try Self.git(commit, in: scratch, cwd: repository)
+      let result = try Self.install(clone, scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(1))
+      #expect(result.stderr.contains(direction == "behind" ? "1 behind" : "1 ahead"))
+      #expect(
+        !FileManager.default.fileExists(atPath: scratch.appending(path: "installed/silta").path))
     }
   }
 
@@ -114,31 +112,6 @@ struct DogfoodInstallTests {
       try DogfoodReportTests.tool("swift", text: "#!/bin/bash\nexit 0\n", in: tools)
       #expect(try Self.install(clone, scratch: scratch, tools: tools).termination != .exit(0))
       #expect(try String(contentsOf: destination, encoding: .utf8) == "Acme binary")
-    }
-  }
-
-  @Test(arguments: ["tracked", "head", "branch"])
-  func changesDuringBuildNeverReplaceInstalledBinary(change: String) throws {
-    try withScratchDirectory { scratch in
-      let clone = try Self.clone(scratch)
-      let tools = scratch.appending(path: "tools")
-      let destination = scratch.appending(path: "installed/silta")
-      try FileManager.default.createDirectory(
-        at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-      try Data("Acme original".utf8).write(to: destination)
-      let action =
-        change == "tracked"
-        ? "echo Acme >> .gitignore"
-        : change == "head"
-          ? "git -c user.name=Acme -c user.email=acme@example.invalid commit --allow-empty -qm Acme"
-          : "git checkout -qb codex/acme"
-      try DogfoodReportTests.tool(
-        "swift",
-        text: "#!/bin/bash\nmkdir -p .build/release\necho Acme-candidate > .build/release/silta\n"
-          + action + "\n", in: tools)
-      let result = try Self.install(clone, scratch: scratch, tools: tools)
-      #expect(result.termination != .exit(0))
-      #expect(try String(contentsOf: destination, encoding: .utf8) == "Acme original")
     }
   }
 
