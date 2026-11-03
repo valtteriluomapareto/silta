@@ -122,7 +122,9 @@ struct TaskServiceTests {
       _ = try await service.add(draft, directory: home)
       try env.db.write {
         try $0.database.execute(sql: "ALTER TABLE task ADD COLUMN future TEXT DEFAULT 'kept'")
+        try $0.database.execute(sql: "UPDATE task SET future='retained'")
       }
+      _ = try await service.start("AC-2", directory: home)
       _ = try service.submit("AC-2")
       _ = try await service.close("AC-2", result: "Finished.", directory: home)
       #expect(try service.show("AC-2").result == "Finished.")
@@ -130,7 +132,7 @@ struct TaskServiceTests {
       await #expect(throws: TaskError.self) { _ = try await service.start("AC-2", directory: home) }
       #expect(
         try env.db.read { try String.fetchAll($0, sql: "SELECT future FROM task") } == [
-          "kept", "kept",
+          "retained", "retained",
         ])
       try env.db.write {
         try $0.database.execute(sql: "UPDATE meta SET value='2' WHERE key='min_writer_version'")
