@@ -43,10 +43,25 @@ struct StorageWALFileTests {
     }
   }
 
+  /// Recreated `-wal`/`-shm` would inherit the read-only mode and make later writes `busy`.
+  @Test func readOnlyDatabaseWithoutWALFilesIsUnavailable() throws {
+    try withScratchDirectory { scratch in
+      do { try StorageSchemaTests.store(scratch).initialize() }
+      let store = StorageSchemaTests.store(scratch)
+      try Self.removeWALFiles(store)
+      try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: store.path)
+      withKnownIssue("A read-only silta.db gets read-only -wal/-shm files") {
+        #expect(throws: StorageError.unavailable) { try store.read { _ in () } }
+        #expect(!FileManager.default.fileExists(atPath: store.path + "-shm"))
+        #expect(!FileManager.default.fileExists(atPath: store.path + "-wal"))
+      }
+    }
+  }
+
   @Test func readOnlyDirectoryWithoutWALFilesIsUnavailable() throws {
     try withScratchDirectory { scratch in
+      do { try StorageSchemaTests.store(scratch).initialize() }
       let store = StorageSchemaTests.store(scratch)
-      try store.initialize()
       try Self.removeWALFiles(store)
       try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: scratch.path)
       defer {
