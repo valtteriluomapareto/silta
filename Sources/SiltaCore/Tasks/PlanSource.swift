@@ -34,6 +34,10 @@ struct PlanSource: Sendable {
     guard captured.content == content else {
       throw TaskError.invalid("The source changed while being read; inspect it before importing.")
     }
+    guard
+      try await locate(
+        directory: captured.canonical.deletingLastPathComponent(), runner: runner) == location
+    else { throw TaskError.invalid("--delete requires a source in the current Git worktree.") }
     let relative = String(captured.canonical.path.dropFirst(location.root.path.count + 1))
     let checked = PlanSource(
       source: source, location: location, relative: relative, snapshot: captured)
@@ -50,6 +54,8 @@ struct PlanSource: Sendable {
     do {
       guard try await isUntracked(runner: runner),
         try await Self.locate(directory: location.root, runner: runner) == location,
+        try await Self.locate(
+          directory: snapshot.canonical.deletingLastPathComponent(), runner: runner) == location,
         try Self.capture(source, location: location) == snapshot
       else { return false }
       try FileManager.default.removeItem(at: source)

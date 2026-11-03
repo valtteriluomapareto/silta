@@ -28,15 +28,17 @@ struct PlanSourceTests {
     let output = locationOutput(root)
     return [
       (rootRequest, .success(.init(termination: .exit(0), stdout: output))),
+      (postRequest, .success(.init(termination: .exit(0), stdout: output))),
       (fileRequest, .success(.init(termination: .exit(tracked ? 0 : 1)))),
       (fileRequest, .success(.init(termination: .exit(1)))),
+      (postRequest, .success(.init(termination: .exit(0), stdout: output))),
       (postRequest, .success(.init(termination: .exit(0), stdout: output))),
     ]
   }
 
   @Test(arguments: [
     "outside", "harness", "symlink", "directory", "changed", "tracked", "notgit", "gitfail",
-    "rootutf8", "rootempty", "rootshape", "roottimeout", "rootsignal", "rootexit",
+    "rootutf8", "rootempty", "rootshape", "roottimeout", "rootsignal", "rootexit", "source_context",
   ])
   func unsafeSourcesNeverCreateOrDelete(mode: String) async throws {
     try await withScratchDirectory { home in
@@ -45,7 +47,11 @@ struct PlanSourceTests {
       var source = root.appending(path: "plan.md")
       var script = Self.script(root)
       if let failure = Self.rootFailure(mode, root: root) { script[0].1 = failure }
-      if mode == "tracked" { script[1].1 = .success(.init(termination: .exit(0))) }
+      if mode == "source_context" {
+        script[1].1 = .success(
+          .init(termination: .exit(0), stdout: Self.locationOutput(root, admin: "other")))
+      }
+      if mode == "tracked" { script[2].1 = .success(.init(termination: .exit(0))) }
       if mode == "outside" { source = home.appending(path: "plan.md") }
       if mode == "harness" {
         let harness = root.appending(path: ".claude/plans", directoryHint: .isDirectory)
@@ -87,6 +93,7 @@ struct PlanSourceTests {
 
   @Test(arguments: [
     "same", "changed", "replaced", "staged", "gitfail", "removed", "unwritable", "gitdir_changed",
+    "source_gitdir_changed",
   ])
   func postcommitChangesPreserveSuccessAndAvoidRetry(mode: String) async throws {
     try await withScratchDirectory { home in
@@ -179,7 +186,7 @@ extension PlanSourceTests {
         _ = try await TaskService(environment: env).fromPlan(
           TaskImportTests.text, options: options, source: source, directory: root)
       }
-      #expect(runner.requests.count == 2)
+      #expect(runner.requests.count == 3)
       #expect(try String(contentsOf: source, encoding: .utf8) == TaskImportTests.text)
       try env.db.read { (db: Database) throws in
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM task") == 1)
@@ -288,12 +295,14 @@ extension PlanSourceTests {
     var script = Self.script(root)
     let statuses: [String: GitTermination] = ["staged": .exit(0), "gitfail": .timedOut]
     if let status = statuses[mode] {
-      script[2].1 = .success(.init(termination: status))
-      script.removeLast()
+      script[3].1 = .success(.init(termination: status))
+      script.removeLast(2)
     }
-    if mode == "gitdir_changed" {
-      script[3].1 = .success(
+    let changed: [String: Int] = ["gitdir_changed": 4, "source_gitdir_changed": 5]
+    if let index = changed[mode] {
+      script[index].1 = .success(
         .init(termination: .exit(0), stdout: Self.locationOutput(root, admin: "other")))
+      if index == 4 { script.removeLast() }
     }
     let calls = Mutex(0)
     let steps = script
