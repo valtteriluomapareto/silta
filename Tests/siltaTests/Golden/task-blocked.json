@@ -1,0 +1,1 @@
+{"error":{"code":"blocked","message":"AC-1 is blocked, waiting on ext:acme for 0 d.","next":["silta --ws 'acme' task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -20,6 +20,8 @@ silta task archive  Hide a task from the default backlog.
 silta task keep  Keep a task visible regardless of its closed age.
 silta task link  Link a task to a reference in this workspace or an external URL.
 silta task promote  Record an external tracker and make the task read-only (human-only).
+silta task block  Record blockers; Silta sends nothing.
+silta task unblock  Return a blocked batch to todo after an answer.
 details: silta schema <command>
 
 global flags:
@@ -39,10 +41,11 @@ error codes:
   read_only_promoted  exit 3, next by human: Stop and ask the human in chat; for `human_only`, rerun with `--approved "<their words>"` after they say yes
   ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates
   busy  exit 5, next by agent: Retry once after a few seconds
-  conflict  exit 6, next by agent: Re-read, then decide; don't steal
-  claimed  exit 6, next by agent: Re-read, then decide; don't steal
-  stale_rev  exit 6, next by agent: Re-read, then decide; don't steal
-  lease_taken  exit 6, next by agent: Re-read, then decide; don't steal
+  conflict  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open
+  claimed  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open
+  stale_rev  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open
+  lease_taken  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open
+  blocked  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open
   gate  exit 7, next by agent: Request a review or ask the human
   rate_limited  exit 8, next by agent: Wait for `retry_after_s`, or summarise
   env  exit 9, next by human: Report the printed fix to the human
