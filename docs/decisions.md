@@ -17,7 +17,8 @@ They're summarised here so every decision has one index.
   a workspace.
 - **D4: CLI only, `--json` everywhere.** No MCP server and no daemon.
 - **D5: Agent writes are gated.** Unsolicited tasks start as `proposed`, doc edits are
-  proposals, and some commands are human-only.
+  proposals, and some commands are human-only. Since D38, an agent runs those with
+  the human's quoted go-ahead.
 - **D6: Silta resolves "where am I"** from cwd, branch, upstream and claimed task.
 - **D7: Code access is read-only**, through `git show`, `grep` and `log` on
   configured refs.
@@ -258,3 +259,45 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     without-Silta arm in the evals (§21) and is revisited after S16.
   - Why: the logs were collected but nothing read them, and friction depended on
     agents volunteering it.
+- **D37: The human's attention is the budget.**
+  - Silta should cost the human about ten minutes a day, in one sitting. During a
+    session it interrupts them only for what an agent can't do or decide.
+  - Agents decide and record: a reversible choice inside the task becomes a
+    `decision` comment, not a question. They ask only about scope, anything
+    irreversible, the customer, or money.
+  - What needs the human comes in one batch: approvals, proposals and questions in
+    one message, never one at a time.
+  - Fewer proposals: the guide asks for at most two per session, only what the agent
+    would bet the human wants. An untriaged proposal leaves the inbox after 14 days
+    ("not now") without any write.
+  - Agents pick their next work: "work the backlog" takes the first `todo` task for the
+    app, by priority, then age.
+  - The inbox is short and grouped: blocked tasks one item per party or URL, at most
+    12 items, then `--all`. `triage` and `unblock` take several refs, so one answer is
+    one command.
+  - The dogfood report measures the load: approvals, proposal outcomes, questions,
+    inbox size and age.
+  - Why: every inbox item, question and refusal costs the human's attention, and
+    nothing in the design limited or measured it. A backlog the human stops looking
+    at rots, and the agents' work with it.
+- **D38: The human works through agents.**
+  - The human talks to an agent, which runs `silta` for them. They don't use the CLI
+    themselves. The Mac app (M5) is their own surface and counts as `human:*`.
+  - Human-only commands stay gated. A human actor (a TTY or the app) runs them
+    directly. An agent runs them with `--approved "<the human's words>"`, quoting the
+    human's yes from this chat. The words are stored in an `approval` row in the same
+    write, with the actor and command path.
+  - Without `--approved`, `human_only` (exit 3) tells the agent to ask in chat and
+    rerun with the human's words.
+  - Every `$EDITOR` command also reads `-F <file>`: `ws edit`, `task edit`, `doc edit`
+    (M2). `ws show` prints the current YAML, so an agent can show the change first.
+  - Still a guard against accidents, not security: an agent could invent a quote. The
+    `refusals` and `forbidden` evals check that agents never do.
+  - Rejected:
+    - Dropping the gate: no pause before a human decision, and no record of who
+      allowed it.
+    - A boolean `--human-ok`: easy to add by reflex, and it doesn't record what the
+      human agreed to.
+  - Why: the maintainer never runs the CLI. Commands that need a terminal would be
+    unreachable, and `ws edit`, the only way to configure a workspace, would be
+    unusable.
