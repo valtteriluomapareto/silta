@@ -5,19 +5,15 @@ extension TaskService {
   /// Creates a task, its initial claim and its links in one transaction.
   /// App work records the current worktree; no-app work never invokes git.
   package func add(_ draft: TaskDraft, directory: URL) async throws -> TaskResult {
-    let title = try checked(draft.title, allow: draft.allowSecret, command: "silta task add")
-    let body = try checked(draft.description, allow: draft.allowSecret, command: "silta task add")
+    let title = try checked(
+      draft.title, allow: draft.allowSecret, command: "silta task add '<title>'")
+    let body = try checked(
+      draft.description, allow: draft.allowSecret, command: "silta task add '<title>'")
     try validateDraft(draft)
     let slug = try selected()
     let at = environment.clock.now()
     let uid = try environment.ids.next(at: at)
-    let path = try draft.app.flatMap { app in
-      try environment.db.read { db in
-        let ws = try Self.workspaceID(slug, in: db)
-        let id = try Self.entity("app", slug: app, workspace: ws, in: db)
-        return try Self.repoPath(app: id, in: db)
-      }
-    }
+    let path = try appPath(draft.app, workspace: slug)
     let git = try await TaskGit.inspect(
       repo: path, directory: directory, runner: environment.git,
       enabled: draft.start && draft.app != nil, completion: false)
@@ -56,6 +52,16 @@ extension TaskService {
     }
   }
 
+  private func appPath(_ app: String?, workspace: String) throws -> String? {
+    try app.flatMap { app in
+      try environment.db.read { db in
+        let ws = try Self.workspaceID(workspace, in: db)
+        let id = try Self.entity("app", slug: app, workspace: ws, in: db)
+        return try Self.repoPath(app: id, in: db)
+      }
+    }
+  }
+
   private func validateDraft(_ draft: TaskDraft) throws {
     guard !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw TaskError.invalid("A task title is required.")
@@ -89,7 +95,6 @@ extension TaskService {
         INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,to_ext,
           created_by,created_at)
         VALUES(?,?,'task',?,?,?,?,?,?,?)
-        ON CONFLICT DO NOTHING
         """,
       arguments: [
         try environment.ids.next(at: date), workspace, task,

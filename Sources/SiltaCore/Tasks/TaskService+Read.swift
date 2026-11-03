@@ -26,20 +26,21 @@ extension TaskService {
           \nWHERE task.workspace_id=?
           ORDER BY task.seq
           """, arguments: [id]
-      ).map { try Self.decorate(TaskDetails(row: $0), in: db) }
-        .filter {
-          let visible =
-            $0.status != "proposed" || filter.proposed || environment.actor.isHuman
-            || $0.createdBy == environment.actor.description
-          return visible && (filter.status == nil || filter.status == $0.status)
-            && (filter.app == nil || filter.app == $0.app)
-            && (filter.topic == nil
-              || $0.links.contains {
-                $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
-              })
-            && (!filter.mine || $0.createdBy == environment.actor.description
-              || $0.claimedBy == environment.actor.description)
-        }
+      ).map { TaskDetails(row: $0) }.filter {
+        let visible =
+          $0.status != "proposed" || filter.proposed || environment.actor.isHuman
+          || $0.createdBy == environment.actor.description
+        return visible && (filter.status == nil || filter.status == $0.status)
+          && (filter.app == nil || filter.app == $0.app)
+          && (!filter.mine || $0.createdBy == environment.actor.description
+            || $0.claimedBy == environment.actor.description)
+      }.map { try Self.decorate($0, in: db) }.filter {
+        filter.topic == nil
+          || $0.links.contains {
+            $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
+          }
+      }
+
     }
   }
 

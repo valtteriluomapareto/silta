@@ -28,7 +28,7 @@ struct TaskAddCommand: OutputCommand {
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     var draft = TaskDraft(title: title)
     draft.description =
-      try body.read(actor: context.environment.actor, command: "silta task add") ?? ""
+      try body.read(actor: context.environment.actor, command: "silta task add '<title>'") ?? ""
     draft.allowSecret = body.allowSecret
     draft.start = start
     draft.parent = parent

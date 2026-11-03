@@ -1,1 +1,1 @@
-{"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; choose todo work meanwhile.","next":["silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; choose todo work meanwhile.","next":["silta --ws 'acme' task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

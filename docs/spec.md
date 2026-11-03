@@ -882,6 +882,11 @@ next: silta comment AC-12 --kind comment -F -   # one summary instead
 
 When `next_by` is `human`, the lines read `ask human: <cmd>` instead of `next: <cmd>`.
 Several `next` commands are alternatives, best first: run one.
+Task recovery commands preserve a known workspace, so a noncurrent workspace remains
+selected when following a hint. Early human-only refusals preserve an explicit
+`--ws` without reading storage. Invalid task values point to the failed command's
+help. A busy retry names only the parsed command path, without body-bearing
+arguments.
 
 **Streams and global flags:**
 - Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on

@@ -79,12 +79,37 @@ enum SiltaMain {
       var output = try await outputCommand.execute(context)
       output.warnings = context.environment.warnings + output.warnings
       return OutputRouter.render(.success(output), mode: mode)
-    } catch StorageError.busy {
-      return OutputRouter.render(
-        .failure(CommandBusyError(command: commandPath(arguments))), mode: mode)
+    } catch let error as any CodedError {
+      let recovered = recovery(
+        error, command: outputCommand, arguments: arguments, context: context)
+      return OutputRouter.render(.failure(recovered), mode: mode)
     } catch {
       return OutputRouter.render(.failure(error), mode: mode)
     }
+  }
+
+  /// Keeps recovery tied to the failed command and the task's workspace.
+  static func recovery(
+    _ error: any CodedError, command: any OutputCommand,
+    arguments: [String], context: CommandContext
+  ) -> CommandFailure {
+    let path = commandPath(arguments)
+    if error.code == .busy { return CommandFailure(error: error, next: [path]) }
+    var next = error.next
+    if let task = error as? TaskError, task.code == .invalid { next = [path + " --help"] }
+    var workspace = command.global.ws
+    if workspace == nil, path.hasPrefix("silta task "), !(error is ActorError) {
+      do { workspace = try WorkspaceSelection.resolve(in: context.environment.db) } catch {
+        workspace = nil
+      }
+    }
+    if let workspace {
+      next = next.map {
+        $0.hasPrefix("silta task ")
+          ? "silta --ws " + shellWord(workspace) + String($0.dropFirst(5)) : $0
+      }
+    }
+    return CommandFailure(error: error, next: next)
   }
 
   /// The output mode, read from the raw arguments so a parse error can still answer in

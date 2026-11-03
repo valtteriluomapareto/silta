@@ -18,6 +18,9 @@ package enum TaskError: CodedError, Equatable {
   /// Git could not provide commit or worktree information.
   case git
 
+  /// The local repository binding needs human repair.
+  case repository
+
   /// A body file could not be read as UTF-8.
   case input
 
@@ -37,7 +40,7 @@ package enum TaskError: CodedError, Equatable {
     case .invalid, .foreignRepo: .invalid
     case .claimed: .claimed
     case .proposal, .transition, .changed: .conflict
-    case .git, .input: .env
+    case .git, .input, .repository: .env
     case .gate: .gate
     }
   }
@@ -52,6 +55,9 @@ package enum TaskError: CodedError, Equatable {
     case .proposal(let ref):
       "Proposal \(ref) needs human triage; choose todo work meanwhile."
     case .transition(let ref, let status): "\(ref) cannot make this transition from \(status)."
+    case .repository:
+      "Task repository is not registered locally or its .git marker is missing; "
+        + "ask a human to restore or register it with init --scan."
     case .input: "Could not read the UTF-8 body file; check its path and permissions."
     case .git: "Git could not report the task's worktree or commit; ask a human to check git."
     case .foreignRepo: "Use a worktree and commit from the task's registered repository."
@@ -69,6 +75,7 @@ package enum TaskError: CodedError, Equatable {
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]
     case .notFound: ["silta task ls"]
     case .invalid, .foreignRepo: ["silta task add --help"]
+    case .repository: ["silta init --help"]
     case .git, .input: ["silta doctor"]
     }
   }

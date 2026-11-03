@@ -159,7 +159,7 @@ struct SecretGuardTests {
 
   @Test func rejectionAndWarningNeverStoreOrRenderMatches() throws {
     for sample in Self.samples {
-      let error = SecretError(command: "silta task add -F <file>", text: sample.text)
+      let error = SecretError(command: "silta task add '<title>' -F <file>", text: sample.text)
       let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
       let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
       for rendered in [text.stderr, json.stdout, String(reflecting: error)] {
@@ -168,7 +168,7 @@ struct SecretGuardTests {
       }
       #expect(text.exitCode == 1)
       #expect(error.code == .invalid)
-      #expect(error.next == ["silta task add -F <file> --allow-secret"])
+      #expect(error.next == ["silta task add '<title>' -F <file> --allow-secret"])
     }
     let output = CommandOutput(text: "saved", data: "saved", warnings: [SecretGuard.warning])
     let text = OutputRouter.render(.success(output), mode: OutputMode(json: false))
@@ -201,7 +201,7 @@ struct SecretGuardTests {
 
   @Test func rejectionGolden() {
     let input = "Pass" + "word=acme-secret"
-    let error = SecretError(command: "silta task add -F <file>", text: input)
+    let error = SecretError(command: "silta task add '<title>' -F <file>", text: input)
     let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
     let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
     Golden.forTests().check(text.stderr + json.stdout, "secret-error.txt")

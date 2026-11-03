@@ -16,7 +16,7 @@ struct TaskGit: Sendable {
   ) async throws -> TaskGit {
     guard enabled else { return TaskGit() }
     guard let repo, FileManager.default.fileExists(atPath: repo + "/.git") else {
-      throw TaskError.foreignRepo
+      throw TaskError.repository
     }
     let registered = URL(filePath: repo, directoryHint: .isDirectory)
     let identityArgs = ["rev-parse", "--path-format=absolute", "--git-common-dir"]
@@ -31,18 +31,30 @@ struct TaskGit: Sendable {
     let branch = try await value(
       ["rev-parse", "--abbrev-ref", "HEAD"], directory: directory, runner: runner)
     guard completion else { return TaskGit(branch: branch, worktree: root) }
-    let commit: String
-    do {
-      commit = try await value(
-        ["rev-parse", "--verify", "--end-of-options", (sha ?? "HEAD") + "^{commit}"],
-        directory: directory, runner: runner)
-    } catch {
-      if sha != nil { throw TaskError.foreignRepo }
-      throw error
-    }
+    let commit = try await commitValue(sha, directory: directory, runner: runner)
     guard commit.wholeMatch(of: /[a-f0-9]{40}|[a-f0-9]{64}/) != nil else { throw TaskError.git }
     let status = try await value(["status", "--porcelain"], directory: directory, runner: runner)
     return TaskGit(branch: branch, worktree: root, sha: commit, dirty: !status.isEmpty)
+  }
+
+  private static func commitValue(
+    _ sha: String?, directory: URL, runner: any GitRunner
+  ) async throws -> String {
+    let result: GitResult
+    do {
+      result = try await runner.run(
+        .init(
+          arguments: [
+            "rev-parse", "--verify", "--quiet", "--end-of-options", (sha ?? "HEAD") + "^{commit}",
+          ], directory: directory))
+    } catch {
+      throw TaskError.git
+    }
+    if result.termination == .exit(1), sha != nil { throw TaskError.foreignRepo }
+    guard result.termination == .exit(0),
+      let text = String(data: result.stdout, encoding: .utf8)
+    else { throw TaskError.git }
+    return text.trimmingCharacters(in: .newlines)
   }
 
   private static func value(

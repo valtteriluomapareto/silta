@@ -4,6 +4,9 @@ import SiltaCore
 /// A command that returns its result for `OutputRouter` to render, instead of
 /// printing it. Every `silta` command conforms.
 protocol OutputCommand: ParsableCommand {
+  /// Supplies explicit workspace context for recovery commands.
+  var global: GlobalOptions { get }
+
   /// The shape of the `data` in this command's `--json` output, published by
   /// `silta schema`.
   static var dataShape: Shape { get }

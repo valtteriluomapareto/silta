@@ -4,6 +4,7 @@
 {"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; choose todo work meanwhile.","next":["silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"conflict","message":"AC-1 cannot make this transition from done.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"env","message":"Git could not report the task's worktree or commit; ask a human to check git.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Task repository is not registered locally or its .git marker is missing; ask a human to restore or register it with init --scan.","next":["silta init --help"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"env","message":"Could not read the UTF-8 body file; check its path and permissions.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"invalid","message":"Use a worktree and commit from the task's registered repository.","next":["silta task add --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"gate","message":"A human approval is required; ask a human to approve or use done --force.","next":["silta task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

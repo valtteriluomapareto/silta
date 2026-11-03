@@ -6,7 +6,7 @@ struct TaskErrorTests {
   @Test func textAndJSONRecoveryMatchWrittenContract() {
     let errors: [any CodedError] =
       TaskError.examples.map { $0 as any CodedError } + [
-        CommandBusyError(command: "silta task add")
+        CommandFailure(error: StorageError.busy, next: ["silta task add"])
       ]
     Golden.forTests().check(
       errors.map {

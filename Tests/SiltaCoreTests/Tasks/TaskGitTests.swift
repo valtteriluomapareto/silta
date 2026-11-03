@@ -30,7 +30,8 @@ struct TaskGitTests {
         (
           .init(
             arguments: [
-              "rev-parse", "--verify", "--end-of-options", (override ?? "HEAD") + "^{commit}",
+              "rev-parse", "--verify", "--quiet", "--end-of-options",
+              (override ?? "HEAD") + "^{commit}",
             ], directory: cwd), sha
         ),
         (
@@ -142,7 +143,7 @@ struct TaskGitTests {
       #expect(try service.show("AC-1").claimedBy == nil)
       #expect(git.isExhausted)
       var script = Self.script(repo: repo, cwd: repo, completion: true, override: "foreign")
-      script[4].1 = .success(.init(termination: .exit(128)))
+      script[4].1 = .success(.init(termination: .exit(1)))
       script.removeLast()
       let failing = ScriptedGitRunner(script: script)
       let same = TaskService(
@@ -205,7 +206,7 @@ extension TaskGitTests {
       try FileManager.default.removeItem(at: repo.appending(path: ".git"))
       let none = ScriptedGitRunner(script: [])
       for path in [nil, repo.path] as [String?] {
-        await #expect(throws: TaskError.foreignRepo) {
+        await #expect(throws: TaskError.repository) {
           _ = try await TaskGit.inspect(
             repo: path, directory: repo, runner: none, enabled: true, completion: false)
         }

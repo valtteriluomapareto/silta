@@ -38,7 +38,7 @@ extension StorageError: ErrorExamples {
 
 extension SecretError: ErrorExamples {
   static var examples: [SecretError] {
-    [SecretError(command: "silta task add -F <file>", text: "Pwd=acme-secret")]
+    [SecretError(command: "silta task add '<title>' -F <file>", text: "Pwd=acme-secret")]
   }
 }
 
@@ -63,14 +63,16 @@ extension TaskError: ErrorExamples {
     [
       .notFound, .invalid("A result is required."),
       .claimed("AC-1", holder: "agent:codex:acme", minutes: 4), .proposal("AC-1"),
-      .transition("AC-1", status: "done"), .git, .input, .foreignRepo, .gate("AC-1"),
+      .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
       .changed("AC-1"),
     ]
   }
 }
 
-extension CommandBusyError: ErrorExamples {
-  static var examples: [CommandBusyError] { [.init(command: "silta task add")] }
+extension CommandFailure: ErrorExamples {
+  static var examples: [CommandFailure] {
+    [.init(error: StorageError.busy, next: ["silta task add"])]
+  }
 }
 
 extension ActorError: ErrorExamples {
@@ -88,7 +90,7 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
-    CommandBusyError.self,
+    CommandFailure.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
