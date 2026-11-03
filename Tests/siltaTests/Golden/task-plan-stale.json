@@ -1,1 +1,1 @@
-{"error":{"code":"stale_rev","message":"AC-1 has plan revision 1; re-read before replacing it.","next":["silta --ws 'acme' task show AC-1"],"next_by":"agent"},"ok":false}
+{"error":{"code":"stale_rev","message":"AC-1 has plan revision 1; re-read before replacing it.","next":["silta --ws 'acme' task show AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

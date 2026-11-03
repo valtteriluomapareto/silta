@@ -20,6 +20,12 @@ package struct TaskDetails: Encodable, Sendable {
   /// The markdown description.
   package let description: String
 
+  /// The current markdown checklist.
+  package let plan: String
+
+  /// The last stored plan revision; ticking does not advance it.
+  package let planRev: Int
+
   /// The recorded completion or drop result.
   package let result: String?
 
@@ -57,7 +63,8 @@ package struct TaskDetails: Encodable, Sendable {
   package var timeline: [TaskEvent]?
 
   enum CodingKeys: String, CodingKey {
-    case ref, title, status, description, result, app, branch, worktree, links, timeline
+    case ref, title, status, description, plan, result, app, branch, worktree, links, timeline
+    case planRev = "plan_rev"
     case createdBy = "created_by"
     case claimedBy = "claimed_by"
     case claimedAt = "claimed_at"

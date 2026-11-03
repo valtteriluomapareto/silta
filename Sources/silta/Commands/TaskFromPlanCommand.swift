@@ -1,0 +1,78 @@
+import ArgumentParser
+import Foundation
+import SiltaCore
+
+struct TaskFromPlanCommand: OutputCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "from-plan",
+    abstract: "Import Markdown steps; preview or safely remove the source.")
+
+  static let dataShape = Shape.object([
+    "dry_run": .bool,
+    "preview": .object([
+      "title": .string, "description": .string, "status": .string,
+      "steps": .array(
+        .object(["title": .string, "description": .string, "status": .optional(.string)])),
+    ]), "tasks": .array(TaskOutput.receiptShape),
+  ])
+
+  @OptionGroup var global: GlobalOptions
+
+  @Argument(help: "UTF-8 Markdown file, or - for stdin (the default).") var file = "-"
+
+  @Option(help: "The existing parent task reference.") var parent: String?
+
+  @Flag(help: "Create at most ten subtasks instead of a checklist.") var split = false
+
+  @Flag(help: "Preview content and statuses without creating tasks.") var dryRun = false
+
+  @Flag(help: "Remove an unchanged untracked source after commit; never a harness file.")
+  var delete = false
+
+  @Flag(help: "Retain detected secrets (human-only).") var allowSecret = false
+
+  func execute(_ context: CommandContext) async throws -> CommandOutput {
+    var options = TaskImport()
+    options.parent = parent
+    options.split = split
+    options.dryRun = dryRun
+    options.delete = delete
+    options.allowSecret = allowSecret
+    if allowSecret {
+      try context.environment.actor.requireHuman(command: options.retryCommand + " --allow-secret")
+    }
+    let text = try read()
+    let result = try await TaskService(environment: context.environment, workspace: global.ws)
+      .fromPlan(
+        text, options: options, source: file == "-" ? nil : URL(filePath: file),
+        directory: URL(
+          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
+    let preview = result.preview
+    var lines =
+      result.dryRun
+      ? ["Preview: \(preview.status): \(preview.title)"]
+      : result.tasks.map {
+        "\($0.ref) \($0.status)"
+      }
+    if result.dryRun {
+      lines.append(preview.description)
+      lines += preview.steps.enumerated().map {
+        "\($0.offset + 1). " + ($0.element.status.map { $0 + ": " } ?? "")
+          + "\($0.element.title)\n\($0.element.description)"
+      }
+    }
+    return CommandOutput(
+      text: lines.joined(separator: "\n"), data: result, warnings: result.warnings)
+  }
+
+  private func read() throws -> String {
+    do {
+      let data =
+        try file == "-"
+        ? FileHandle.standardInput.readToEnd() ?? Data()
+        : Data(contentsOf: URL(filePath: file))
+      guard let text = String(data: data, encoding: .utf8) else { throw TaskError.input }
+      return text
+    } catch { throw TaskError.input }
+  }
+}

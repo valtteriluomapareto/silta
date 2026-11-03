@@ -15,6 +15,9 @@ package enum TaskError: CodedError, Equatable {
   /// The requested transition is not valid from the current status.
   case transition(String, status: String)
 
+  /// Another writer stored a different plan revision.
+  case staleRev(String, actual: Int)
+
   /// Git could not provide commit or worktree information.
   case git
 
@@ -42,6 +45,7 @@ package enum TaskError: CodedError, Equatable {
     case .proposal, .transition, .changed: .conflict
     case .git, .input, .repository: .env
     case .gate: .gate
+    case .staleRev: .staleRev
     }
   }
 
@@ -62,6 +66,8 @@ package enum TaskError: CodedError, Equatable {
     case .git: "Git could not report the task's worktree or commit; ask a human to check git."
     case .foreignRepo: "Use a worktree and commit from the task's registered repository."
     case .gate: "A human approval is required; ask a human to approve or use done --force."
+    case .staleRev(let ref, let actual):
+      "\(ref) has plan revision \(actual); re-read before replacing it."
     case .changed: "Task repository information changed; re-read before retrying."
     }
   }
@@ -70,7 +76,7 @@ package enum TaskError: CodedError, Equatable {
   package var next: [String] {
     switch self {
     case .proposal: ["silta task ls --status todo"]
-    case .claimed(let ref, _, _), .transition(let ref, _), .gate(let ref):
+    case .claimed(let ref, _, _), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]
     case .notFound: ["silta task ls"]

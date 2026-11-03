@@ -5,51 +5,69 @@ extension TaskService {
   /// Creates a task, its initial claim and its links in one transaction.
   /// App work records the current worktree; no-app work never invokes git.
   package func add(_ draft: TaskDraft, directory: URL) async throws -> TaskResult {
-    let title = try checked(
-      draft.title, allow: draft.allowSecret, command: "silta task add '<title>'")
-    let body = try checked(
-      draft.description, allow: draft.allowSecret, command: "silta task add '<title>'")
-    try validateDraft(draft)
+    var creation = try prepare(draft, command: "silta task add '<title>' -F <file>")
     let slug = try selected()
-    let at = environment.clock.now()
-    let uid = try environment.ids.next(at: at)
-    let path = try appPath(draft.app, workspace: slug)
-    let git = try await TaskGit.inspect(
-      repo: path, directory: directory, runner: environment.git,
+    creation.path = try appPath(draft.app, workspace: slug)
+    creation.git = try await TaskGit.inspect(
+      repo: creation.path, directory: directory, runner: environment.git,
       enabled: draft.start && draft.app != nil, completion: false)
+    let prepared = creation
     return try environment.db.write { tx in
-      let db = tx.database
-      let ws = try Self.workspaceID(slug, in: db)
-      let parent = try draft.parent.map { try Self.lookup($0, workspace: slug, in: db) }
-      if let parent, !environment.actor.isHuman {
-        guard parent.claimedBy == environment.actor.description else {
-          throw TaskError.invalid("Agent subtasks require a parent claimed by this exact session.")
-        }
-      }
-      let app = try draft.app.map { try Self.entity("app", slug: $0, workspace: ws, in: db) }
-      if let app, try Self.repoPath(app: app, in: db) != path { throw TaskError.changed(nil) }
-      let seq = try tx.nextSequence(scope: "task:\(ws)")
-      let status =
-        draft.start ? "doing" : environment.actor.isHuman || parent != nil ? "todo" : "proposed"
-      let stamp = Self.timestamp(at)
-      try db.execute(
-        sql: """
-          INSERT INTO task(uid,workspace_id,seq,title,status,description_md,parent_id,app_id,
-            claimed_by,claimed_at,branch,worktree,created_by,created_at,updated_at)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-          """,
-        arguments: [
-          uid, ws, seq, title.0, status, body.0, parent?.id, app,
-          draft.start ? environment.actor.description : nil, draft.start ? stamp : nil,
-          git.branch, git.worktree, environment.actor.description, stamp, stamp,
-        ])
-      let id = db.lastInsertedRowID
-      try addLinks(draft, task: id, workspace: ws, at: at, in: db)
-      try changed(id, kind: "created", body: status, redacted: title.1 || body.1, at: at, in: tx)
-      return TaskResult(
-        ref: "\(try Self.prefix(ws, in: db))-\(seq)", status: status,
-        warnings: title.1 || body.1 ? [SecretGuard.warning] : [])
+      try insert(prepared, workspace: slug, in: tx)
     }
+  }
+
+  func prepare(_ draft: TaskDraft, command: String) throws -> TaskCreation {
+    let title = try checked(draft.title, allow: draft.allowSecret, command: command)
+    let body = try checked(draft.description, allow: draft.allowSecret, command: command)
+    try validateDraft(draft)
+    var safe = draft
+    safe.title = title.0
+    safe.description = body.0
+    let at = environment.clock.now()
+    return TaskCreation(
+      draft: safe, uid: try environment.ids.next(at: at), at: at,
+      redacted: title.1 || body.1)
+  }
+
+  func insert(_ creation: TaskCreation, workspace: String, in tx: StorageTransaction) throws
+    -> TaskResult
+  {
+    let draft = creation.draft
+    let db = tx.database
+    let ws = try Self.workspaceID(workspace, in: db)
+    let parent = try draft.parent.map { try Self.lookup($0, workspace: workspace, in: db) }
+    let app = try draft.app.map { try Self.entity("app", slug: $0, workspace: ws, in: db) }
+    if let app, try Self.repoPath(app: app, in: db) != creation.path {
+      throw TaskError.changed(nil)
+    }
+    let seq = try tx.nextSequence(scope: "task:\(ws)")
+    let status = creationStatus(parent: parent, start: draft.start)
+    let stamp = Self.timestamp(creation.at)
+    try db.execute(
+      sql: """
+        INSERT INTO task(uid,workspace_id,seq,title,status,description_md,parent_id,app_id,
+          claimed_by,claimed_at,branch,worktree,created_by,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+      arguments: [
+        creation.uid, ws, seq, draft.title, status, draft.description, parent?.id, app,
+        draft.start ? environment.actor.description : nil, draft.start ? stamp : nil,
+        creation.git.branch, creation.git.worktree, environment.actor.description, stamp, stamp,
+      ])
+    let id = db.lastInsertedRowID
+    try addLinks(draft, task: id, workspace: ws, at: creation.at, in: db)
+    try changed(
+      id, kind: "created", body: status, redacted: creation.redacted, at: creation.at, in: tx)
+    return TaskResult(
+      ref: "\(try Self.prefix(ws, in: db))-\(seq)", status: status,
+      warnings: creation.redacted ? [SecretGuard.warning] : [])
+  }
+
+  func creationStatus(parent: TaskDetails?, start: Bool = false) -> String {
+    if start { return "doing" }
+    return environment.actor.isHuman || parent?.claimedBy == environment.actor.description
+      ? "todo" : "proposed"
   }
 
   private func appPath(_ app: String?, workspace: String) throws -> String? {

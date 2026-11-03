@@ -25,7 +25,7 @@ package struct TaskService: Sendable {
     if allow { try environment.actor.requireHuman(command: command + " --allow-secret") }
     guard !SecretGuard.matches(in: text).isEmpty else { return (text, false) }
     if environment.actor.isHuman {
-      guard allow else { throw SecretError(command: command + " -F <file>", text: text) }
+      guard allow else { throw SecretError(command: command, text: text) }
       return (text, false)
     }
     return (SecretGuard.redacted(text), true)

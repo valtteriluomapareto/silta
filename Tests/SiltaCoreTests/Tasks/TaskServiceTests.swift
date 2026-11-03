@@ -52,14 +52,14 @@ struct TaskServiceTests {
       let other = TaskService(
         environment: try Self.environment(
           home, actor: .agent(tool: "codex", session: "other")))
-      await #expect(throws: TaskError.self) { _ = try await other.add(child, directory: home) }
+      #expect(try await other.add(child, directory: home).status == "proposed")
       child.topics = ["missing"]
       await #expect(throws: TaskError.self) { _ = try await service.add(child, directory: home) }
       #expect(try service.list().map(\.ref) == ["AC-1", "AC-2", "AC-3"])
-      #expect(try other.list().map(\.ref) == ["AC-2", "AC-3"])
+      #expect(try other.list().map(\.ref) == ["AC-2", "AC-3", "AC-4"])
       let human = TaskService(environment: try Self.environment(home, actor: Self.human()))
-      #expect(try await human.add(TaskDraft(title: "Human task"), directory: home).ref == "AC-4")
-      #expect(try human.show("AC-4").status == "todo")
+      #expect(try await human.add(TaskDraft(title: "Human task"), directory: home).ref == "AC-5")
+      #expect(try human.show("AC-5").status == "todo")
       for ref in ["AC-0", "AC-01", "task:AC-2/1", "ZZ-2"] {
         #expect(throws: TaskError.self) { _ = try service.show(ref) }
       }

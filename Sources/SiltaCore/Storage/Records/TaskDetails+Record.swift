@@ -11,6 +11,8 @@ extension TaskDetails {
     status = row["status"]
     description = row["description_md"]
     result = row["result_md"]
+    plan = row["plan_md"]
+    planRev = row["plan_rev"]
     createdBy = row["created_by"]
     claimedBy = row["claimed_by"]
     claimedAt = row["claimed_at"]

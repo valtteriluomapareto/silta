@@ -4,7 +4,9 @@ import SiltaCore
 
 /// Reads command bodies without putting their content into recovery commands.
 struct TaskBody: ParsableArguments {
-  @Option(name: [.customShort("m"), .long], help: "Supply the markdown body.")
+  @Option(
+    name: [.customShort("m"), .long], parsing: .unconditional,
+    help: "Supply the markdown body.")
   var message: String?
 
   @Option(name: .customShort("F"), help: "Read UTF-8 from a file, or - for stdin.")

@@ -55,7 +55,7 @@ extension TaskService {
     -> TaskResult
   {
     let content = try checked(
-      body ?? "", allow: allowSecret, command: "silta task submit " + shellWord(ref))
+      body ?? "", allow: allowSecret, command: "silta task submit " + shellWord(ref) + " -F <file>")
     let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
