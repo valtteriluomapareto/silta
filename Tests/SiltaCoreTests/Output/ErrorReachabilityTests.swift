@@ -79,7 +79,7 @@ extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
     [
       .humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme")),
-      .invalidApproval(command: "silta ws edit"),
+      .invalidApproval,
     ]
   }
 }

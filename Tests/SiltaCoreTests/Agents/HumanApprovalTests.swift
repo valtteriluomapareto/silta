@@ -19,7 +19,7 @@ struct HumanApprovalTests {
   }
 
   @Test(arguments: [
-    "", " \n", "<placeholder>", String(repeating: "a", count: 301),
+    "", " \n", "<placeholder>", "<Acme-private-words>", String(repeating: "a", count: 301),
     String(repeating: "e\u{301}", count: 151),
   ])
   func invalidWordsHaveNoEcho(words: String) throws {
@@ -28,7 +28,10 @@ struct HumanApprovalTests {
       Issue.record("Invalid approval accepted")
     } catch let error as ActorError {
       #expect(error.code == .invalid && error.exitCode == 1)
-      #expect(error.next == ["silta ws edit --help"])
+      #expect(error.next == ["silta --help"])
+      if !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        #expect(!error.message.contains(words))
+      }
     }
   }
 

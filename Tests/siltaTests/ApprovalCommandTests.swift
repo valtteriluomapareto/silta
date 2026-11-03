@@ -236,7 +236,7 @@ extension ApprovalCommandTests {
           ["ws", "edit", "-F", path, "--approved", "Apply.", "--json"], in: scratch,
           environment: TaskCommandTests.actor)
         #expect(result.termination == .exit(9))
-        #expect(result.stdout.contains("silta ws edit -F <file>"))
+        #expect(result.stdout.contains("silta ws edit 'acme' -F <file>"))
         #expect(!result.stdout.contains("silta task add"))
       }
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)

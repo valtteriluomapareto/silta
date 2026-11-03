@@ -4,7 +4,7 @@ package enum ActorError: CodedError {
   case humanOnly(command: String, actor: ActorID)
 
   /// The supplied words are blank, too long or an unfilled placeholder.
-  case invalidApproval(command: String)
+  case invalidApproval
 
   /// Human intervention or corrected approval words are required.
   package var code: ErrorCode {
@@ -30,7 +30,7 @@ package enum ActorError: CodedError {
   package var next: [String] {
     switch self {
     case .humanOnly(let command, _): [command + " --approved \"<the human's words>\""]
-    case .invalidApproval(let command): [command + " --help"]
+    case .invalidApproval: ["silta --help"]
     }
   }
 }

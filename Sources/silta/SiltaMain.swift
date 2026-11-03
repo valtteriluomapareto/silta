@@ -95,7 +95,7 @@ enum SiltaMain {
     }
   }
 
-  /// Keeps recovery tied to the failed command and the task's workspace.
+  /// Keeps recovery tied to the failed command and intended workspace.
   static func recovery(
     _ error: any CodedError, command: any OutputCommand,
     arguments: [String], context: CommandContext
@@ -103,7 +103,12 @@ enum SiltaMain {
     let path = commandPath(arguments)
     if error.code == .busy { return CommandFailure(error: error, next: [path]) }
     var next = error.next
-    if let task = error as? TaskError, task.code == .invalid { next = [path + " --help"] }
+    if error.code == .invalid, error is TaskError || error is ActorError {
+      next = [path + " --help"]
+    }
+    if let edit = command as? WsEditCommand, error is WorkspaceError, error.code != .notFound {
+      next = workspaceRecovery(error, edit: edit, context: context)
+    }
     var workspace = command.global.ws
     if workspace == nil, path.hasPrefix("silta task "), !(error is ActorError) {
       do { workspace = try WorkspaceSelection.resolve(in: context.environment.db) } catch {
@@ -117,6 +122,24 @@ enum SiltaMain {
       }
     }
     return CommandFailure(error: error, next: next)
+  }
+
+  /// Repairs the intended workspace through file input, without an editor or quote echo.
+  static func workspaceRecovery(
+    _ error: any CodedError, edit: WsEditCommand, context: CommandContext
+  ) -> [String] {
+    var target = edit.workspace ?? edit.global.ws
+    if target == nil {
+      do { target = try WorkspaceSelection.resolve(in: context.environment.db) } catch {
+        target = nil
+      }
+    }
+    let suffix = target.map { " " + shellWord($0) } ?? ""
+    let repair = "silta ws edit" + suffix + " -F <file> --approved \"<the human's words>\""
+    if target != nil, error.code == .invalid || error.code == .conflict {
+      return ["silta ws show" + suffix, repair]
+    }
+    return [repair]
   }
 
   /// The output mode, read from the raw arguments so a parse error can still answer in

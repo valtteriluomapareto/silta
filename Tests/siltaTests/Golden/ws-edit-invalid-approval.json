@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"--approved needs 1–300 Unicode scalars of the human's words, not a placeholder.","next":["silta ws edit --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

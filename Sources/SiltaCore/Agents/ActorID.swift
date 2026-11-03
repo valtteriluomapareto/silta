@@ -94,7 +94,7 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     let words = approved.trimmingCharacters(in: .whitespacesAndNewlines)
     guard (1...300).contains(words.unicodeScalars.count),
       !(words.hasPrefix("<") && words.hasSuffix(">"))
-    else { throw ActorError.invalidApproval(command: command) }
+    else { throw ActorError.invalidApproval }
     return HumanApproval(actor: self, words: SecretGuard.redacted(words))
   }
 
