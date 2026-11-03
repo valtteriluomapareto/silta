@@ -24,7 +24,8 @@ struct Scenario: Decodable {
     let unknown = mapping.keys.map { "\($0)" }.filter { !allowed.contains($0) }.sorted()
     guard unknown.isEmpty else {
       let keys = unknown.joined(separator: ", ")
-      throw ScenarioFailure(description: "Unknown key \(keys) in \(place)")
+      let known = allowed.sorted().joined(separator: ", ")
+      throw ScenarioFailure(description: "Unknown key \(keys) in \(place); allowed: \(known)")
     }
   }
 

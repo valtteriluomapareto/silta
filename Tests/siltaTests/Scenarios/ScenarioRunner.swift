@@ -8,8 +8,6 @@ enum ScenarioRunner {
   static let repository = URL(filePath: #filePath).deletingLastPathComponent()
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
   static let base = Date(timeIntervalSince1970: 1_700_000_000)
-  /// One evidence directory per test process, not one per scenario run.
-  static let runID = UUID().uuidString
 
   static func environment(step: Int, overrides: [String: String], scratch: URL) -> [String: String]
   {
@@ -41,7 +39,7 @@ enum ScenarioRunner {
       evidence
       ?? repository.appending(
         path:
-          "artifacts/scenarios/\(runID)/\(file.deletingPathExtension().lastPathComponent)"
+          "artifacts/scenarios/\(UUID().uuidString)/\(file.deletingPathExtension().lastPathComponent)"
       )
     let bytes = try Data(contentsOf: file)
     var transcript = Data()
@@ -124,15 +122,13 @@ enum ScenarioRunner {
     if let failure = terminationMismatch(result.termination, expected: expectation.exit) {
       return failure
     }
-    if let name = expectation.stdout {
-      let path = repository.appending(path: "Tests/siltaTests/Golden/\(name)")
-      let expected = try String(contentsOf: path, encoding: .utf8)
-      if result.stdout != expected {
-        return "stdout expected:\n\(expected)\nactual:\n\(result.stdout)"
-      }
+    if let name = expectation.stdout, let failure = goldenMismatch(result.stdout, golden: name) {
+      return failure
     }
     if expectation.code != nil || expectation.json != nil {
-      let object = try JSONSerialization.jsonObject(with: Data(result.stdout.utf8))
+      guard let object = try? JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) else {
+        return "code and json expectations need --json in args; stdout was not JSON"
+      }
       if let code = expectation.code {
         let actual = ((object as? [String: Any])?["error"] as? [String: Any])?["code"] as? String
         if actual != code { return "error.code expected \(code), actual \(actual ?? "missing")" }
@@ -150,6 +146,14 @@ enum ScenarioRunner {
       }
     }
     return nil
+  }
+
+  private static func goldenMismatch(_ stdout: String, golden name: String) -> String? {
+    let path = repository.appending(path: "Tests/siltaTests/Golden/\(name)")
+    guard let expected = try? String(contentsOf: path, encoding: .utf8) else {
+      return "golden \(name) not found in Tests/siltaTests/Golden"
+    }
+    return stdout == expected ? nil : "stdout expected:\n\(expected)\nactual:\n\(stdout)"
   }
 
   private static func value(at path: String, in object: Any) -> Any? {

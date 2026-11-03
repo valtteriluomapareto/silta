@@ -69,6 +69,26 @@ struct StorageBackupTests {
     }
   }
 
+  @Test func crashedStagingLeftoverIsReplaced() throws {
+    try withScratchDirectory { scratch in
+      try StorageSchemaTests.store(scratch).initialize()
+      let folder = scratch.appending(path: "backups")
+      try Data("Acme".utf8).write(to: folder.appending(path: "daily.pending"))
+      let file = try StorageBackup(home: scratch)
+        .snapshot(name: "silta-2023-11-15.db", reuseExisting: true)
+      let queue = try DatabaseQueue(path: file.path)
+      #expect(try queue.read { try String.fetchOne($0, sql: "PRAGMA integrity_check") } == "ok")
+      #expect(!FileManager.default.fileExists(atPath: folder.appending(path: "daily.pending").path))
+    }
+  }
+
+  // Backup names carry migration ids, and retention only recognizes alphanumeric ones.
+  @Test func migrationIdsFitBackupNames() {
+    for id in StorageSchema.migrator.migrations {
+      #expect(id.wholeMatch(of: /[A-Za-z0-9]+/) != nil, "\(id)")
+    }
+  }
+
   @Test func migrationSnapshotCollisionIsRefused() throws {
     try withScratchDirectory { scratch in
       let folder = scratch.appending(path: "backups")

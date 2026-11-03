@@ -18,14 +18,16 @@ struct HomeResolutionTests {
     }
   }
 
-  @Test(arguments: [false, true]) func validOverrideWorksBesideBrokenDefault(symlink: Bool) throws {
+  @Test(arguments: ["file", "dangling", "loop"])
+  func validOverrideWorksBesideBrokenDefault(kind: String) throws {
     try withScratchDirectory { scratch in
       let broken = scratch.appending(path: ".silta")
-      if symlink {
+      switch kind {
+      case "file": try Data().write(to: broken)
+      case "dangling":
         try FileManager.default.createSymbolicLink(
           at: broken, withDestinationURL: scratch.appending(path: "missing"))
-      } else {
-        try Data().write(to: broken)
+      default: try FileManager.default.createSymbolicLink(at: broken, withDestinationURL: broken)
       }
       let home = try SiltaHome.resolve(
         environment: ["SILTA_HOME": scratch.appending(path: "isolated").path],

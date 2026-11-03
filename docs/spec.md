@@ -921,7 +921,7 @@ Rust would win only if:
 ```
 silta/
   Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
-  Sources/SiltaCore/           # domain, policy, storage (GRDB as extensions), git, actors, brief and output rendering
+  Sources/SiltaCore/           # domain, policy, storage (GRDB), git, actors, brief, output
   Sources/silta/               # ArgumentParser commands, the entry point
   Sources/SiltaTestSupport/    # fakes, golden helper, scratch dirs; used by tests and the scenario runner only
   Tests/SiltaCoreTests/        # unit + fixture git repos
@@ -988,7 +988,7 @@ revision before the write.
 - **Logs:** `$SILTA_HOME/log/YYYY-MM-DD.jsonl`, kept 14 days. One line per command:
   - timestamp, command and flags (bodies excluded), actor, workspace, app
   - exit code and error code
-  - ms, busy retries, git calls and git ms (each left out until commands count it)
+  - ms; busy retries, git calls and git ms join when the first command counts them
   - warnings
 
   Evals read these logs too (§21).

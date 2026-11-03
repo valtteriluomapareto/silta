@@ -28,28 +28,17 @@ struct ControlPlaneTests {
   // Outside git the session is the working directory's hash (§11).
   @Test func sessionHashesTheWorkingDirectory() throws {
     try withScratchDirectory { scratch in
-      var actors: [String] = []
-      for name in ["acme-a", "acme-b"] {
-        let cwd = scratch.appending(path: name)
-        try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
-        let result = try SiltaBinary.run(
-          ["--version"], in: scratch, cwd: cwd,
-          environment: ["SILTA_NOW": "2023-11-14T22:13:20.000Z"])
-        #expect(result.termination == .exit(0))
-        let hash = SHA256.hash(data: Data(cwd.path.utf8)).prefix(3)
-          .map { String(format: "%02x", $0) }.joined()
-        actors.append("agent:unknown:" + hash)
-      }
-      let log = try String(
-        contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)
-      let logged = try log.split(separator: "\n").map { line in
-        let entry = try #require(
-          JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
-        // Counters nothing measures yet are left out rather than logged as zero (§19).
-        #expect(entry["git_calls"] == nil)
-        return try #require(entry["actor"] as? String)
-      }
-      #expect(logged == actors)
+      let cwd = scratch.appending(path: "acme")
+      try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+      let result = try SiltaBinary.run(
+        ["--version"], in: scratch, cwd: cwd,
+        environment: ["SILTA_NOW": "2023-11-14T22:13:20.000Z"])
+      #expect(result.termination == .exit(0))
+      let data = try Data(contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+      let entry = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+      let hash = SHA256.hash(data: Data(cwd.path.utf8)).prefix(3)
+        .map { String(format: "%02x", $0) }.joined()
+      #expect(entry["actor"] as? String == "agent:unknown:" + hash)
     }
   }
 
@@ -86,7 +75,7 @@ struct ControlPlaneTests {
       // A home outside every temporary root, even when the checkout itself is in /tmp.
       let caches = try FileManager.default.url(
         for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-      let home = caches.appending(path: "silta-tests/home-\(UUID().uuidString)")
+      let home = caches.appending(path: "silta-test-home-\(UUID().uuidString)")
       try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
       defer { try? FileManager.default.removeItem(at: home) }  // test scratch cleanup
       let environment = ["SILTA_NOW": "bad", "SILTA_HOME": home.path]

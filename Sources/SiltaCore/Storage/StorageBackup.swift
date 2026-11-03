@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import GRDB
 
@@ -5,18 +6,19 @@ import GRDB
 struct StorageBackup {
   let home: URL
 
-  /// Callers serialize snapshots of one name (the migration lock, or the write
-  /// transaction for the daily backup), so the temporary file can share its name.
-  /// With `reuseExisting`, an already published backup of that name counts as done:
-  /// publication by hard link is atomic, so an existing one is complete.
+  /// The daily backup (`reuseExisting`) runs inside the write transaction and the
+  /// pre-migration one under the migration lock, so each kind stages under one fixed
+  /// name, and a crashed attempt's leftover is replaced by the next attempt.
+  /// The staged file is flushed to disk before it is linked, so a published backup is
+  /// complete; with `reuseExisting`, one already published under `name` counts as done.
   func snapshot(name: String, reuseExisting: Bool = false) throws -> URL {
     let directory = home.appending(path: "backups")
     let destination = directory.appending(path: name)
-    let temporary = directory.appending(path: name + ".pending")
+    let temporary = directory.appending(path: reuseExisting ? "daily.pending" : "migration.pending")
     let fm = FileManager.default
     do {
       try fm.createDirectory(at: directory, withIntermediateDirectories: true)
-      try? fm.removeItem(at: temporary)  // a crashed attempt's leftover; usually absent
+      try? fm.removeItem(at: temporary)  // a crashed attempt's leftover, when there is one
       defer { try? fm.removeItem(at: temporary) }  // best-effort cleanup of an unpublished snapshot
       var config = Configuration()
       // SQLite needs write access to initialize WAL sidecars, even though VACUUM INTO
@@ -27,6 +29,10 @@ struct StorageBackup {
       try source.writeWithoutTransaction { db in
         try db.execute(sql: "VACUUM INTO ?", arguments: [temporary.path])
       }
+      let staged = open(temporary.path, O_RDONLY)
+      guard staged >= 0 else { throw StorageError.backupFailed }
+      defer { close(staged) }
+      guard fcntl(staged, F_FULLFSYNC) == 0 else { throw StorageError.backupFailed }
       do {
         try fm.linkItem(at: temporary, to: destination)
       } catch {

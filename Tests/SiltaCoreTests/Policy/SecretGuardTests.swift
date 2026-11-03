@@ -195,6 +195,8 @@ struct SecretGuardTests {
       command: "silta task add", text: Array(repeating: token, count: 7).joined(separator: " "))
     let shown = Array(repeating: "AKIA…[aws_key]", count: 5).joined(separator: ", ")
     #expect(error.message == "Secret content detected: " + shown + " and 2 more")
+    let five = Array(repeating: token, count: 5).joined(separator: " ")
+    #expect(SecretError(command: "silta task add", text: five).message.hasSuffix(shown))
   }
 
   @Test func rejectionGolden() {

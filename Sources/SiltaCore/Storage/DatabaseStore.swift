@@ -57,7 +57,7 @@ package final class DatabaseStore: Sendable {
           }
         }
         if let pending {
-          // The clock keeps names unique: a failed attempt's snapshot is never replaced.
+          // A name that already exists (a retry at the same instant) refuses, never replaces.
           let timestamp = clock.now()
           let milliseconds = Int64(timestamp.timeIntervalSince1970 * 1000)
           let name = "silta-\(utcDay(timestamp))-before-\(pending)-\(milliseconds).db"
@@ -74,8 +74,8 @@ package final class DatabaseStore: Sendable {
   }
 
   /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most
-  /// three times.
-  /// The closure must perform database-only work: a rolled-back attempt can run again.
+  /// three times. The closure must perform database-only work: a rolled-back attempt
+  /// can run again.
   /// Checks writer compatibility and completes the required daily snapshot before calling the body.
   package func write<T>(_ body: (StorageTransaction) throws -> T) throws -> T {
     do {
