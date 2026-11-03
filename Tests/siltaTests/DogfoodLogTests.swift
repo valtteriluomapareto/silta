@@ -220,38 +220,36 @@ struct DogfoodLogTests {
   }
 
   @Test func realUsageFailuresReachTheWorkspaceReportWithoutOpaqueValues() throws {
-    withKnownIssue("The report excludes only a codex report actor") {
-      try withScratchDirectory { scratch in
-        let store = try DogfoodReportTests.setup(scratch)
-        let tools = try DogfoodReportTests.tools(scratch)
-        let secret = "Pwd=" + "acme-secret"
-        let cases: [[String]] = [
-          ["--ws", "silta", "task", "show"],
-          ["task", "show"],
-          ["--ws=silta", "task", "show", "--approved", "--ws=acme"],
-          ["--ws", "silta", "task", "show", "-m", "--ws=acme"],
-          ["--ws", secret, "task", "show"],
-          ["--ws", "silta", "task", "show", "--acme-unknown"],
-        ]
-        for (index, arguments) in cases.enumerated() {
-          if index == 1 {
-            try store.write {
-              try $0.database.execute(
-                sql: "UPDATE meta SET value='silta' WHERE key='current_workspace'")
-            }
+    try withScratchDirectory { scratch in
+      let store = try DogfoodReportTests.setup(scratch)
+      let tools = try DogfoodReportTests.tools(scratch)
+      let secret = "Pwd=" + "acme-secret"
+      let cases: [[String]] = [
+        ["--ws", "silta", "task", "show"],
+        ["task", "show"],
+        ["--ws=silta", "task", "show", "--approved", "--ws=acme"],
+        ["--ws", "silta", "task", "show", "-m", "--ws=acme"],
+        ["--ws", secret, "task", "show"],
+        ["--ws", "silta", "task", "show", "--acme-unknown"],
+      ]
+      for (index, arguments) in cases.enumerated() {
+        if index == 1 {
+          try store.write {
+            try $0.database.execute(
+              sql: "UPDATE meta SET value='silta' WHERE key='current_workspace'")
           }
-          let result = try Self.run(arguments, scratch: scratch)
-          #expect(result.termination == .exit(1))
-          let entry = try Self.last(scratch)
-          #expect(entry["error_code"] as? String == "usage")
-          #expect(entry["workspace"] as? String == (index == 4 ? nil : "silta"))
         }
-        let report = try DogfoodReportTests.run(
-          ["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(report.termination == .exit(0))
-        #expect(report.stdout.contains("| silta task show | 5 | 100% | usage: 5 | 5 |"))
-        #expect(!report.stdout.contains("acme-secret"))
+        let result = try Self.run(arguments, scratch: scratch)
+        #expect(result.termination == .exit(1))
+        let entry = try Self.last(scratch)
+        #expect(entry["error_code"] as? String == "usage")
+        #expect(entry["workspace"] as? String == (index == 4 ? nil : "silta"))
       }
+      let report = try DogfoodReportTests.run(
+        ["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(report.termination == .exit(0))
+      #expect(report.stdout.contains("| silta task show | 5 | 100% | usage: 5 | 5 |"))
+      #expect(!report.stdout.contains("acme-secret"))
     }
   }
 }

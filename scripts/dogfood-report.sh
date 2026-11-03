@@ -20,7 +20,8 @@ fi
 canonical="$(/bin/date -j -u -f '%Y-%m-%d' "$since" '+%Y-%m-%d' 2>/dev/null)" || fail 'invalid --since day.'
 [[ "$canonical" == "$since" ]] || fail 'use a canonical YYYY-MM-DD day.'
 asof="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-export SILTA_ACTOR=agent:codex:dogfood-report
+[[ "$since" > "${asof:0:10}" ]] && fail "--since $since is after the report day ${asof:0:10} (UTC)."
+export SILTA_ACTOR=agent:silta:dogfood-report
 home="${SILTA_HOME:-$HOME/.silta}"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
@@ -29,8 +30,10 @@ files=("$home"/log/????-??-??.jsonl)
 oldest=none
 if (( ${#files[@]} )); then
   oldest="$(basename "${files[0]}" .jsonl)"
-  cat "${files[@]}" | /usr/bin/jq -nR '[inputs | select(length > 0) | (fromjson? // "unreadable")]' \
-    > "$temporary/logs" 2>/dev/null || fail 'could not read command logs.'
+  for file in "${files[@]}"; do
+    /usr/bin/jq -nR '[inputs | select(length > 0) | (fromjson? // "unreadable")]' "$file" \
+      2>/dev/null || fail 'could not read command logs.'
+  done | /usr/bin/jq -s 'add' > "$temporary/logs" || fail 'could not read command logs.'
 else
   echo '[]' > "$temporary/logs"
 fi
@@ -47,7 +50,7 @@ silta --ws silta schema --json > "$temporary/schema" || fail 'schema read failed
 /usr/bin/sqlite3 -readonly -json "$home/silta.db" "
 SELECT created_at,command
 FROM approval
-WHERE workspace='silta' AND actor<>'agent:codex:dogfood-report' AND substr(created_at,1,10)>='$since';
+WHERE workspace='silta' AND actor<>'$SILTA_ACTOR' AND substr(created_at,1,10)>='$since';
 " > "$temporary/approvals" 2>/dev/null || fail 'approval metadata read failed.'
 [[ -s "$temporary/approvals" ]] || echo '[]' > "$temporary/approvals"
 if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$temporary/detail-array" \
@@ -57,6 +60,10 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
     ((.whole+"Z"|fromdateiso8601) + ((.fraction // "0")|tonumber));
   def stamp: if type == "object" and (.timestamp|type) == "string"
     then (try (.timestamp|seconds) catch null) else null end;
+  def readable: stamp != null and (.actor|type) == "string" and (.command|type) == "string"
+    and (.exit_code|type) == "number" and (.milliseconds|type) == "number"
+    and (.warnings|type) == "array" and all(.warnings[]; type == "string")
+    and (.error_code == null or (.error_code|type) == "string");
   def median: sort | length as $n | if $n % 2 == 1 then .[($n/2|floor)] else (.[($n/2)-1] + .[$n/2])/2 end;
   def cell: tostring | gsub("\\|";"\\|") | gsub("[\r\n]";" ");
   def table($head;$rows):
@@ -72,22 +79,27 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   ($asof | seconds) as $now |
   ($since + "T00:00:00Z" | seconds) as $start |
   def after($time): $time >= $start;
+  ([$approvals[0][] | select(.command|startswith("silta task triage")) | .created_at|seconds]) as $triaged |
   def proposals:
     $tasks[0][] | .ref as $ref | .timeline as $events |
     ($events | map(select(.kind == "created" and .body == "proposed")) | .[0]) as $created |
     select($created != null) |
     ($events | map(select(.kind == "status" and (.body == "todo" or .body == "dropped"))) | .[0]) as $decision |
     {ref:$ref, born:($created.at|seconds), decision:$decision,
-      decided:(if $decision == null then null else ($decision.at|seconds) end)};
+      decided:(if $decision == null then null else ($decision.at|seconds) end),
+      withdrawn:($decision != null and $decision.body == "dropped"
+        and $decision.actor == $created.actor and ($created.actor|startswith("agent:"))
+        and ($decision.at|seconds) as $at | $triaged | index($at) == null)};
   ($raw[0] | map(select(type != "object" or .workspace == null or .workspace == "silta"))) as $own |
-  ($own | map(select(stamp == null)) | length) as $unreadable |
-  ($own | map(select(stamp != null and .actor != $actor and (stamp|after(.))))) as $selected |
+  ($own | map(select(readable|not)) | length) as $unreadable |
+  ($own | map(select(readable and .actor != $actor and (stamp|after(.))))) as $selected |
   ($selected | map(select(.workspace == "silta"))) as $logs |
   ($schema[0].data.commands | map(.name)) as $commands |
   ($logs | group_by(.command)) as $groups |
   ($logs | map(select(.actor | startswith("agent:"))) | group_by(.actor)) as $sessions |
   [proposals] as $proposals |
-  ($proposals | map(select(.decided != null and (.decided|after(.))) | ((.decided-.born)/60|floor))) as $waits |
+  ($proposals | map(select(.withdrawn|not))) as $triage |
+  ($triage | map(select(.decided != null and (.decided|after(.))) | ((.decided-.born)/60|floor))) as $waits |
   ($proposals | map(select(.decision == null))) as $pending |
   [$tasks[0][] | . as $task |
     ([.timeline[]? | select(.kind == "status" and .body == "done")] | last) as $done |
@@ -126,7 +138,7 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   "", "## Warnings", "",
   table(["Code","Calls"]; [$logs[] | .warnings | unique[]] | group_by(.) | map([.[0],length])),
   "", "## Unused commands", "",
-  list([$commands | sort[] | . as $command | select([$logs[].command] | index($command) == null) | "- `\($command)`"]),
+  list([$commands | sort[] | . as $command | select([$selected[].command] | index($command) == null) | "- `\($command)`"]),
   "", "## Friction in the silta workspace", "",
   list([$done[] | select(.friction != "" and .friction != "none") | "- \(.day) \(.ref): \(.friction|cell)"]),
   "",
@@ -144,7 +156,7 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
       {week:(.created_at|seconds|strftime("%G-W%V")), command:$command}] |
     group_by([.week,.command]) | map([.[0].week,.[0].command,length])),
   "",
-  "Proposals accepted: \($proposals | map(select(.decision.body == "todo" and (.decided|after(.)))) | length); dropped: \($proposals | map(select(.decision.body == "dropped" and (.decided|after(.)))) | length); left untriaged past 14 days: \($pending | map(select((.born+1209600) as $expiry | ($expiry|after(.)) and $expiry <= $now)) | length).",
+  "Proposals accepted: \($proposals | map(select(.decision.body == "todo" and (.decided|after(.)))) | length); dropped: \($triage | map(select(.decision.body == "dropped" and (.decided|after(.)))) | length); left untriaged past 14 days: \($pending | map(select((.born+1209600) as $expiry | ($expiry|after(.)) and $expiry <= $now)) | length).",
   "Oldest pending proposal: \(if ($pending|length) == 0 then "none" else "\($pending | map(($now-.born)/86400|floor) | max) days" end).",
   "Triage wait: \(stats($waits; "min")).",
   "Questions to @me: n/a (S11).", "Inbox size and oldest item: n/a (S11).",

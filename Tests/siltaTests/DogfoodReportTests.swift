@@ -14,46 +14,42 @@ struct DogfoodReportTests {
   }
 
   @Test func reportMatchesWrittenMetricsAndPrivacyContract() throws {
-    withKnownIssue("Report actor, unused commands and self-dropped proposals") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        let tools = try Self.tools(scratch)
-        let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(0))
-        Golden.forTests().check(result.stdout, "dogfood-report.md")
-        #expect(
-          !result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply"))
-        #expect(result.stderr.isEmpty)
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(0))
+      Golden.forTests().check(result.stdout, "dogfood-report.md")
+      #expect(
+        !result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply"))
+      #expect(result.stderr.isEmpty)
     }
   }
 
   @Test func newestReportDateAndFirstReportFallback() throws {
-    withKnownIssue("Report actor, unused commands and self-dropped proposals") {
-      try withScratchDirectory { scratch in
-        _ = try DogfoodReportTests.setup(scratch)
-        let tools = try DogfoodReportTests.tools(scratch)
-        let folder = scratch.appending(path: "report-repo")
-        let scripts = folder.appending(path: "scripts")
-        let reports = folder.appending(path: "docs/dogfood/reports")
-        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
-        let script = scripts.appending(path: "dogfood-report.sh")
-        try FileManager.default.copyItem(
-          at: DogfoodReportTests.root.appending(path: "scripts/dogfood-report.sh"), to: script)
-        let first = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
-        #expect(first.termination == .exit(0) && first.stdout.contains("Since: 1970-01-01"))
-        #expect(
-          first.stdout.contains(
-            "Warning: --since predates the oldest log; calls before 2023-11-14 are missing."))
-        for day in ["2023-11-13", "2023-11-14"] {
-          try Data("Acme report".utf8).write(to: reports.appending(path: day + ".md"))
-        }
-        let next = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
-        #expect(next.termination == .exit(0))
-        #expect(!next.stdout.contains("Warning:"))
-        Golden.forTests().check(next.stdout, "dogfood-report.md")
+    try withScratchDirectory { scratch in
+      _ = try DogfoodReportTests.setup(scratch)
+      let tools = try DogfoodReportTests.tools(scratch)
+      let folder = scratch.appending(path: "report-repo")
+      let scripts = folder.appending(path: "scripts")
+      let reports = folder.appending(path: "docs/dogfood/reports")
+      try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
+      let script = scripts.appending(path: "dogfood-report.sh")
+      try FileManager.default.copyItem(
+        at: DogfoodReportTests.root.appending(path: "scripts/dogfood-report.sh"), to: script)
+      let first = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
+      #expect(first.termination == .exit(0) && first.stdout.contains("Since: 1970-01-01"))
+      #expect(
+        first.stdout.contains(
+          "Warning: --since predates the oldest log; calls before 2023-11-14 are missing."))
+      for day in ["2023-11-13", "2023-11-14"] {
+        try Data("Acme report".utf8).write(to: reports.appending(path: day + ".md"))
       }
+      let next = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
+      #expect(next.termination == .exit(0))
+      #expect(!next.stdout.contains("Warning:"))
+      Golden.forTests().check(next.stdout, "dogfood-report.md")
     }
   }
 
@@ -435,54 +431,48 @@ extension DogfoodReportTests {
   }
 
   @Test func truncatedLogFileNeverSwallowsTheNextFile() throws {
-    withKnownIssue("Log files are concatenated before splitting lines") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        let tools = try Self.tools(scratch)
-        let log = scratch.appending(path: "silta-home/log")
-        try Data(#"{"timestamp":"2023-11-13T23:00:00.000Z","comm"#.utf8).write(
-          to: log.appending(path: "2023-11-13.jsonl"))
-        let next = try String(
-          contentsOf: log.appending(path: "2023-11-14.jsonl"), encoding: .utf8)
-        let first = try Self.line(["timestamp": "2023-11-14T09:00:00.000Z"])
-        try Data((first + "\n" + next).utf8).write(to: log.appending(path: "2023-11-14.jsonl"))
-        let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("Unreadable log lines: 1."))
-        #expect(result.stdout.contains("| silta task ls | 2 | 0% |"))
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let log = scratch.appending(path: "silta-home/log")
+      try Data(#"{"timestamp":"2023-11-13T23:00:00.000Z","comm"#.utf8).write(
+        to: log.appending(path: "2023-11-13.jsonl"))
+      let next = try String(
+        contentsOf: log.appending(path: "2023-11-14.jsonl"), encoding: .utf8)
+      let first = try Self.line(["timestamp": "2023-11-14T09:00:00.000Z"])
+      try Data((first + "\n" + next).utf8).write(to: log.appending(path: "2023-11-14.jsonl"))
+      let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("Unreadable log lines: 1."))
+      #expect(result.stdout.contains("| silta task ls | 2 | 0% |"))
     }
   }
 
   @Test(arguments: ["actor", "warnings", "command"])
   func wronglyShapedLogLinesAreUnreadable(field: String) throws {
-    withKnownIssue("A wrongly shaped log line aborts the report") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        let tools = try Self.tools(scratch)
-        let log = scratch.appending(path: "silta-home/log/2023-11-14.jsonl")
-        let wrong: Any = field == "warnings" ? "Acme" : field == "actor" ? 5 : ["silta"]
-        let handle = try FileHandle(forWritingTo: log)
-        try handle.seekToEnd()
-        try handle.write(contentsOf: Data((try Self.line([field: wrong]) + "\n").utf8))
-        try handle.close()
-        let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("Unreadable log lines: 1."))
-        #expect(result.stdout.contains("| silta task ls | 1 | 0% |"))
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let log = scratch.appending(path: "silta-home/log/2023-11-14.jsonl")
+      let wrong: Any = field == "warnings" ? "Acme" : field == "actor" ? 5 : ["silta"]
+      let handle = try FileHandle(forWritingTo: log)
+      try handle.seekToEnd()
+      try handle.write(contentsOf: Data((try Self.line([field: wrong]) + "\n").utf8))
+      try handle.close()
+      let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("Unreadable log lines: 1."))
+      #expect(result.stdout.contains("| silta task ls | 1 | 0% |"))
     }
   }
 
   @Test func sinceAfterTheReportDayIsRefused() throws {
-    withKnownIssue("A --since after Until prints an empty report") {
-      try withScratchDirectory { scratch in
-        _ = try Self.setup(scratch)
-        let tools = try Self.tools(scratch)
-        let result = try Self.run(["--since", "2023-12-01"], scratch: scratch, tools: tools)
-        #expect(result.termination == .exit(1) && result.stdout.isEmpty)
-        #expect(result.stderr.contains("2023-11-30"))
-      }
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let result = try Self.run(["--since", "2023-12-01"], scratch: scratch, tools: tools)
+      #expect(result.termination == .exit(1) && result.stdout.isEmpty)
+      #expect(result.stderr.contains("2023-11-30"))
     }
   }
 }

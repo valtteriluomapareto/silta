@@ -1453,7 +1453,10 @@ steps, questions, handoffs and results.
   - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
     Markdown report from the command logs (§19) and the tasks. `--since` defaults
     to the date of the newest report in `docs/dogfood/reports/`, so reports leave
-    no gaps. It reports:
+    no gaps, and a `--since` after the report day is refused. The report states its
+    coverage: `Since:`, `Until:` (the UTC report time), and `Logs available from:`
+    with the oldest retained log day, plus a warning when `--since` is earlier, so
+    the call counts are incomplete. It reports:
     - calls per command, with the error rate and the most common error codes;
     - `usage` errors per command, which point at unclear help or guide text;
     - retry loops: one session getting the same error from the same command twice
@@ -1461,12 +1464,14 @@ steps, questions, handoffs and results.
     - calls per agent session, median and maximum;
     - the slowest commands (maximum ms);
     - warnings by code;
-    - commands `silta schema` lists that nobody called;
+    - commands `silta schema` lists that nobody called, counting untagged lines too,
+      since a command name is no workspace data;
     - the friction lines other than `none` from tasks done in the range (the date
       comes from the task's last `done` status event), the done tasks without a
       `Friction:` line, and the open `dogfood` tasks;
-    - **the human's load (D37):** approvals per week by command (from the `approval` table),
-      proposals accepted, dropped or left to expire (each counted once) and the
+    - **the human's load (D37):** approvals per week by command (from the `approval`
+      table), proposals accepted, dropped or left to expire (each counted once; an
+      agent withdrawing its own proposal is no triage and isn't counted) and the
       oldest still pending, questions to `@me`, the inbox's size and its oldest item
       at report time, and how long proposals waited for triage. The target is an
       inbox under 12 items with nothing older than a week.
@@ -1475,9 +1480,9 @@ steps, questions, handoffs and results.
     from other workspaces (DF3) never reaches the repo; untagged lines are only
     counted. DF therefore records the workspace each command acts on in its log
     line (§19). The report runs under its own `SILTA_ACTOR` and leaves that
-    actor's calls and approvals out. Unreadable log lines are only counted too. Failures before the
-    environment is set up (a bad `SILTA_*` value) aren't logged, so the report
-    can't see them.
+    actor's calls and approvals out. Unreadable log lines (malformed, or missing
+    the expected fields) are only counted too. Failures before the environment is
+    set up (a bad `SILTA_*` value) aren't logged, so the report can't see them.
   - Once per wave, at the latest every 60 days so no log has expired, an agent
     runs the report with the maintainer, who reviews it before it is added through
     a pull request as `docs/dogfood/reports/<YYYY-MM-DD>.md`, named by the report's
