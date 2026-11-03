@@ -38,7 +38,7 @@ extension TaskService {
         try writePlan(parsed.checklist, task: task, redacted: false, at: creations[0].at, in: tx)
       }
       try approval?.record(
-        command: options.auditCommand, workspace: slug,
+        command: options.auditCommand(created: tasks), workspace: slug,
         identity: (environment.ids, creations[0].at), in: tx)
       let actualPreview = try importPreview(parsed, options: options, rootStatus: root.status)
       return TaskImportResult(

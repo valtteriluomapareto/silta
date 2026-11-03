@@ -20,9 +20,10 @@ package struct TaskImport: Sendable {
     "silta task from-plan <file>" + commandOptions
   }
 
-  /// Safe import refs and flag names without the source body or file path.
-  package var auditCommand: String {
-    "silta task from-plan" + commandOptions + " --allow-secret"
+  /// The flags actually passed, then the created refs, without the source body or path.
+  func auditCommand(created: [TaskResult]) -> String {
+    "silta task from-plan" + commandOptions + (allowSecret ? " --allow-secret" : "") + " -> "
+      + created.map(\.ref).joined(separator: " ")
   }
 
   private var commandOptions: String {

@@ -5,7 +5,7 @@ extension TaskService {
   /// Creates a task, its initial claim and its links in one transaction.
   /// App work records the current worktree; no-app work never invokes git.
   package func add(_ draft: TaskDraft, directory: URL) async throws -> TaskResult {
-    let command = draft.command + " --allow-secret"
+    let command = draft.command + (draft.allowSecret ? " --allow-secret" : "")
     let approval = try approval(
       required: draft.allowSecret, command: draft.command + " '<title>' -F <file> --allow-secret")
     var creation = try prepare(draft, command: draft.command + " '<title>' -F <file>")
@@ -18,7 +18,8 @@ extension TaskService {
     return try environment.db.write { tx in
       let result = try insert(prepared, workspace: slug, in: tx)
       try approval?.record(
-        command: command, workspace: slug, identity: (environment.ids, prepared.at), in: tx)
+        command: command + " -> " + result.ref, workspace: slug,
+        identity: (environment.ids, prepared.at), in: tx)
       return result
     }
   }

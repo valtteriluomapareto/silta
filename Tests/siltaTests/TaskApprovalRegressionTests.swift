@@ -23,29 +23,27 @@ struct TaskApprovalRegressionTests {
     try TaskStateRegressionTests.warnings(result)
   }
 
-  @Test func approvalRowsNameTheTasksTheyCreated() {
-    withKnownIssue("approval rows of creating commands carry no refs") {
-      try withScratchDirectory { scratch in
-        let store = try TaskCommandTests.setup(scratch)
-        let secret = "Pwd=" + "acme-secret"
-        let added = try Self.run(
-          ["task", "add", "Acme", "-m", secret, "--allow-secret", "--approved", "Keep it"],
-          in: scratch)
-        #expect(added.termination == .exit(0))
-        let plan = scratch.appending(path: "plan.md")
-        try "# Acme import\n\n- First\n".write(to: plan, atomically: true, encoding: .utf8)
-        let imported = try Self.run(
-          ["task", "from-plan", plan.path, "--allow-secret", "--approved", "Import it"],
-          in: scratch)
-        #expect(imported.termination == .exit(0))
-        let commands = try store.read {
-          try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id")
-        }
-        #expect(
-          commands == [
-            "silta task add --allow-secret -> AC-1", "silta task from-plan --allow-secret -> AC-2",
-          ])
+  @Test func approvalRowsNameTheTasksTheyCreated() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let secret = "Pwd=" + "acme-secret"
+      let added = try Self.run(
+        ["task", "add", "Acme", "-m", secret, "--allow-secret", "--approved", "Keep it"],
+        in: scratch)
+      #expect(added.termination == .exit(0))
+      let plan = scratch.appending(path: "plan.md")
+      try "# Acme import\n\n- First\n".write(to: plan, atomically: true, encoding: .utf8)
+      let imported = try Self.run(
+        ["task", "from-plan", plan.path, "--allow-secret", "--approved", "Import it"],
+        in: scratch)
+      #expect(imported.termination == .exit(0))
+      let commands = try store.read {
+        try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id")
       }
+      #expect(
+        commands == [
+          "silta task add --allow-secret -> AC-1", "silta task from-plan --allow-secret -> AC-2",
+        ])
     }
   }
 

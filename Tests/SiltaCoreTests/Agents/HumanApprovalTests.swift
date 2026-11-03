@@ -118,10 +118,10 @@ struct HumanApprovalTests {
         #expect(rows.allSatisfy { ($0["workspace"] as String?) == "acme" })
         #expect(rows.allSatisfy { ($0["created_at"] as String) == "2023-11-14T22:13:20.000Z" })
         let commands = rows.map { $0["command"] as String }
-        #expect(commands[0] == "silta task add --start --allow-secret")
+        #expect(commands[0] == "silta task add --start --allow-secret -> AC-1")
         #expect(commands[2].contains("--step 1 --done --allow-secret"))
         #expect(commands[3].contains("--force --allow-secret"))
-        #expect(commands[4] == "silta task from-plan --split --allow-secret")
+        #expect(commands[4] == "silta task from-plan --split --allow-secret -> AC-2 AC-3 AC-4")
         #expect(commands.allSatisfy { !$0.contains("acme-body") && !$0.contains("acme-quote") })
         #expect(try String.fetchOne(db, sql: "SELECT result_md FROM task WHERE seq=1") == secret)
         #expect(
