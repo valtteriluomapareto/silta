@@ -48,6 +48,24 @@ struct DogfoodWorkflowTests {
     }
   }
 
+  @Test func archivedSliceTaskIsFoundOnlyWithArchivedByItsIssueLink() throws {
+    try withScratchDirectory { scratch in
+      let (clone, store) = try Self.prepare(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE task SET status='dropped',archive_override='archived' WHERE seq=1")
+      }
+      let actor = ActorID.agent(tool: "codex", session: "acme-first").description
+      let proposed = try Self.installed(
+        ["task", "ls", "--proposed"], scratch: scratch, clone: clone, actor: actor)
+      #expect(proposed.termination == .exit(0) && !proposed.stdout.contains("SI-1"))
+      let all = try Self.installed(
+        ["task", "ls", "--proposed", "--archived"], scratch: scratch, clone: clone, actor: actor)
+      #expect(all.stdout.contains("\"ref\":\"SI-1\"") && all.stdout.contains("\"dropped\""))
+      #expect(all.stdout.contains("url:https://example.com/acme/7"))
+    }
+  }
+
   @Test func setupCheckUsesAScratchTaskAndLeavesSlicesUntouched() throws {
     try withScratchDirectory { scratch in
       let (clone, store) = try Self.prepare(scratch)

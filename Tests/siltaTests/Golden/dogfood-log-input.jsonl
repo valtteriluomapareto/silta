@@ -8,5 +8,6 @@
 {"timestamp":"2023-11-14T11:01:00.000Z","command":"silta task add","actor":"agent:claude:acme-b","workspace":"silta","exit_code":1,"error_code":"usage","milliseconds":7,"warnings":[]}
 {"timestamp":"2023-11-14T11:02:00.000Z","command":"silta task add","actor":"agent:claude:acme-b","workspace":"silta","exit_code":0,"milliseconds":9,"warnings":["secret_redacted"]}
 {"timestamp":"2023-11-14T12:00:00.000Z","command":"silta ws edit","actor":"human:acme","workspace":"silta","exit_code":0,"milliseconds":25,"warnings":[]}
+{"timestamp":"2023-11-14T13:30:00.000Z","command":"silta schema","actor":"agent:codex:acme-a","exit_code":0,"milliseconds":3,"warnings":[]}
 {"timestamp":"2023-11-14T13:00:00.000Z","command":"Acme untagged detail","actor":"agent:codex:untagged","exit_code":9,"error_code":"env","milliseconds":1000,"warnings":[]}
-{"timestamp":"2023-11-14T14:00:00.000Z","command":"silta task show","actor":"agent:codex:dogfood-report","workspace":"silta","exit_code":0,"milliseconds":8888,"warnings":[]}
+{"timestamp":"2023-11-14T14:00:00.000Z","command":"silta task show","actor":"agent:silta:dogfood-report","workspace":"silta","exit_code":0,"milliseconds":8888,"warnings":[]}

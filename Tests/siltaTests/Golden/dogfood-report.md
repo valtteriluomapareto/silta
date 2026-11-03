@@ -3,7 +3,7 @@
 Since: 2023-11-14 (UTC, inclusive).
 Until: 2023-11-30T00:00:00Z (UTC, report time).
 Logs available from: 2023-11-14.
-Untagged log lines: 1. Unreadable log lines: 0. Report calls excluded.
+Untagged log lines: 2. Unreadable log lines: 0. Report calls excluded.
 
 ## Calls
 
@@ -38,7 +38,6 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 
 - `silta init`
 - `silta repo fetch`
-- `silta schema`
 - `silta task archive`
 - `silta task block`
 - `silta task done`
@@ -75,6 +74,7 @@ Approvals per ISO week by command:
 |---|---|---|
 | 2023-W46 | other | 1 |
 | 2023-W46 | silta task start | 2 |
+| 2023-W46 | silta task triage | 1 |
 | 2023-W46 | silta ws edit | 1 |
 | 2023-W47 | silta task triage | 1 |
 | 2023-W47 | silta ws edit | 1 |
