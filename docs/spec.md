@@ -744,7 +744,9 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   the captured `human:<USER>`, or `human:unknown` for an unset/invalid USER, independently
   of the caller. Recipients are deduplicated and sorted in `mentions`; questions
   default to `me` only when neither explicit recipients nor mentions are present.
-  Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
+  Inline code spans and fenced code blocks are examples, not mentions. Tool-only
+  actors such as `@agent:codex` are refused; recipients require a complete session.
+  Other Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
   aliases/actor mentions refuse rather than redirecting to the human. Lifecycle
   explanations parse mentions too. `--from note:…` stores a nonempty, control-free
   note citation as a comment `cites` link without accessing the file; JSON exposes

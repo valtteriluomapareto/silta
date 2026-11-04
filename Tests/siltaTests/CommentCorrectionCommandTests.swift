@@ -101,3 +101,20 @@ extension CommentCorrectionCommandTests {
     }
   }
 }
+
+extension CommentCorrectionCommandTests {
+  @Test(arguments: [false, true])
+  func codeExamplesPostThroughBothBodyInputs(file: Bool) throws {
+    try withScratchDirectory { scratch in
+      _ = try CommentHandoffTests.setup(scratch)
+      let body = "Example `@agent:<tool>:<session>`\n```text\n@me-other\n```"
+      let path = scratch.appending(path: "comment.md")
+      try Data(body.utf8).write(to: path)
+      let result = try SiltaBinary.run(["comment", "AC-1", "--json"]
+        + (file ? ["-F", path.path] : ["-m", body]), in: scratch, environment: TaskCommandTests.fixed)
+      #expect(result.termination == .exit(0))
+      let data = try TaskStateRegressionTests.data(result)
+      #expect(data["body"] as? String == body && data["mentions"] as? [String] == [])
+    }
+  }
+}

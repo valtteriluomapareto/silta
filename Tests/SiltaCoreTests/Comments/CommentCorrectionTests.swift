@@ -32,18 +32,18 @@ struct CommentCorrectionTests {
     "~~~\n@me-other\n~~~",
   ])
   func codeExamplesAreNotRecipients(body: String) async throws {
-    await withKnownIssue("#13: reproduce SI-29 round 1 finding") {
+
 
       try await withScratchDirectory { home in
         let service = TaskService(environment: try await CommentTests.setup(home))
         #expect(try CommentQuestionTests.post(service, body: body).mentions.isEmpty)
       }
 
-    }
+    
   }
 
   @Test func malformedRecipientIdentifiesSafeToken() async throws {
-    await withKnownIssue("#13: reproduce SI-29 round 1 finding") {
+
       try await withScratchDirectory { home in
         let service = TaskService(environment: try await CommentTests.setup(home))
         do {
@@ -54,7 +54,7 @@ struct CommentCorrectionTests {
         }
       }
 
-    }
+    
   }
 }
 

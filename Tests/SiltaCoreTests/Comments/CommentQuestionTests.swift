@@ -27,7 +27,7 @@ struct CommentQuestionTests {
         body:
           #"**@human:acme**, `@agent:codex:other`. @human:acme: @me! mail@acme.test @meeting "@human:acme""#,
         to: ["me", "human:acme"], source: "note:notes/acme.md")
-      #expect(posted.mentions == ["agent:codex:other", "human:acme", "human:unknown"])
+      #expect(posted.mentions == ["human:acme", "human:unknown"])
       #expect(posted.source == "note:notes/acme.md")
       let links = try env.db.read {
         try Row.fetchAll($0, sql: "SELECT * FROM link WHERE from_kind='comment'")
