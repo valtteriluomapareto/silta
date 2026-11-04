@@ -1,8 +1,8 @@
 # Building Silta with Silta
 
-These instructions take effect after the DF PR merges and an agent completes setup
-with the maintainer in chat. The current stage stays **before DF0** until that has
-happened. The maintainer does not run CLI commands.
+Setup was completed with the maintainer on 2026-11-04, which started DF0. Rerun
+these steps only for a new machine or a fresh `~/.silta`. The maintainer does not
+run CLI commands.
 
 The scripts need `/usr/bin/jq`, which ships with macOS 15 or later. The import
 also needs `gh` 2.48 or later, for `gh api --slurp`.

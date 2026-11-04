@@ -126,10 +126,8 @@ through. Fix the change, or propose a decision first.
 ## Dogfooding
 
 Silta is built with Silta as soon as it can be (spec §22.1, D20). **Current stage:
-before DF0.** Update this line when a stage starts.
-
-The DF0 instructions below take effect only after an agent completes
-[setup with the maintainer](docs/dogfood/README.md) after the DF PR merges.
+DF0** (since 2026-11-04, after [setup with the maintainer](docs/dogfood/README.md)).
+Update this line when a stage starts.
 
 | Stage | Plans and steps | Questions and handoffs | Session start |
 |---|---|---|---|
