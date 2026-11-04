@@ -58,6 +58,33 @@ struct TaskRecoveryTests {
 
   }
 
+  @Test func claimedMessageNamesTheTaskWorkspaceNotTheSelection() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix)
+            VALUES('beta','beta','Acme Beta','BT');
+            """)
+      }
+      let add = try SiltaBinary.run(
+        ["--ws", "beta", "task", "add", "Acme beta work", "--start", "--json"],
+        in: scratch, environment: TaskCommandTests.actor)
+      #expect(add.termination == .exit(0))
+      let rival = ["SILTA_ACTOR": ActorID.agent(tool: "codex", session: "rival").description]
+      for json in [false, true] {
+        let result = try SiltaBinary.run(
+          ["--ws", "beta", "task", "start", "BT-1"] + (json ? ["--json"] : []),
+          in: scratch, environment: rival)
+        #expect(result.termination == .exit(6))
+        #expect(
+          (json ? result.stdout : result.stderr).contains(
+            "silta --ws 'beta' task start BT-1 --steal"))
+      }
+    }
+  }
+
   @Test(arguments: [
     (["task", "done", "AC-1"], "silta --ws 'acme' task done --help"),
     (["task", "ls", "--status", "typo"], "silta --ws 'acme' task ls --help"),
