@@ -517,7 +517,7 @@ going until the list is empty or the human stops it.
   --approved "<the human's words>"` to ask the human about. A human gets `next: silta
   task start <ref> --steal` (`next_by: agent`).
 - Any write by the claimer to the task refreshes `claimed_at`. A `handoff` comment
-  releases the claim.
+  and `task submit` release the claim (D41).
 - `--steal` is human-only when it overrides another session's fresh claim. Otherwise
   it changes nothing and needs no approval (D40).
 - Start accepts `todo`, `doing` and `review`, and never reopens terminal tasks.
@@ -634,7 +634,9 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 
 **Other rules:**
 - **Submit for review:** `task submit AC-12` (doing → review). It takes no body; a
-  `status` event's body is always the new status.
+  `status` event's body is always the new status. It releases the claim, so whoever
+  reviews and merges can finish the task with `done`; the author takes it back with
+  `task start` to address review findings (D41).
 - **Archive is computed (§6).** Reads never write. `task archive|keep` sets the
   override.
 - **Receipts say what changed:** `AC-5 archived`, `AC-5 kept`, `AC-14 linked cites
@@ -1513,7 +1515,7 @@ steps, questions, handoffs and results.
 
 | Stage | Starts after | What Silta is used for |
 |---|---|---|
-| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the slice's task by the issue's `url:` link in `silta task ls --proposed --promoted --archived --json` (imported tasks are proposals until the human triages them, promoted tasks are hidden otherwise, and closed tasks archive after 14 days) and runs `silta task start <ref>`; a `proposed` task first needs the human's `task triage --accept`. Only if no task links the issue, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, and closes it with `task done <ref> -F -` and a heredoc, never a result file in the repo. The issue gets a one-line summary and the result when it closes. |
+| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the slice's task by the issue's `url:` link in `silta task ls --proposed --promoted --archived --json` (imported tasks are proposals until the human triages them, promoted tasks are hidden otherwise, and closed tasks archive after 14 days) and runs `silta task start <ref>`; a `proposed` task first needs the human's `task triage --accept`. Only if no task links the issue, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, ticking each step as it finishes, and runs `task submit <ref>` when its PR is open for review. The PR description ends with the draft result and its `Friction:` line. Whoever merges the PR pulls `main` and finishes the task from the main checkout with `task done <ref> --sha <squash commit> -F -` and a heredoc, never a result file in the repo, then posts the result on the issue and closes it (D41). |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
 | **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
 | **DF3: a real second workspace** | M1 done | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |

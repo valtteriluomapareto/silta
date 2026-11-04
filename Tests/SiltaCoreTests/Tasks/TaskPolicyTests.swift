@@ -26,7 +26,8 @@ struct TaskPolicyTests {
       _ = try acme.submit("AC-1")
       var child = TaskDraft(title: "Child under review")
       child.parent = "AC-1"
-      #expect(try await acme.add(child, directory: home).status == "todo")
+      // Submitting released the claim, so a subtask under it is a proposal (D41).
+      #expect(try await acme.add(child, directory: home).status == "proposed")
       let other = TaskService(environment: env, workspace: "other")
       #expect(
         try await other.add(TaskDraft(title: "Other workspace"), directory: home).ref == "OT-1")

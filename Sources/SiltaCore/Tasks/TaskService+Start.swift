@@ -62,7 +62,7 @@ extension TaskService {
     else { throw TaskError.changed(task.ref) }
   }
 
-  /// Submits doing work for review while refreshing its owner's heartbeat.
+  /// Submits doing work for review and releases the claim, so a reviewer can finish it.
   package func submit(_ ref: String) throws -> TaskResult {
     let slug = try selected()
     let at = environment.clock.now()
@@ -74,12 +74,9 @@ extension TaskService {
       }
       try tx.database.execute(
         sql: """
-          UPDATE task
-          SET status='review',updated_at=?,
-            claimed_at=CASE WHEN claimed_by=? THEN ? ELSE claimed_at END
-          WHERE id=?
+          UPDATE task SET status='review',updated_at=?,claimed_by=NULL,claimed_at=NULL WHERE id=?
           """,
-        arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
+        arguments: [Self.timestamp(at), task.id])
       try changed(task.id, kind: "status", body: "review", at: at, in: tx)
       return receipt(try Self.lookup(ref, workspace: slug, in: tx.database))
     }
