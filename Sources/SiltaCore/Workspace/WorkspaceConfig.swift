@@ -7,7 +7,7 @@ package struct WorkspaceConfig {
 
   static let fields: [String: [String]] = [
     "workspace": ["slug", "name", "task_prefix"],
-    "settings": ["review_gate", "archive_after_days", "stale_days"],
+    "settings": WorkspaceSettings.CodingKeys.allCases.map(\.rawValue),
     "repos": ["slug", "remote"],
     "apps": ["slug", "repo", "ref", "prod_ref", "subpath", "summary", "lifecycle"],
     "environments": ["app", "name", "url"],
@@ -81,11 +81,9 @@ package struct WorkspaceConfig {
     return keys.map { node[$0]?.string ?? "" }.joined(separator: "\n")
   }
 
-  fileprivate static func suggestion(
-    _ value: String, among candidates: [String], maximumDistance: Int = 2
-  ) -> String {
+  fileprivate static func suggestion(_ value: String, among candidates: [String]) -> String {
     let ranked = candidates.sorted().map { ($0, distance(value, $0)) }
-    guard let best = ranked.min(by: { $0.1 < $1.1 }), best.1 <= maximumDistance else { return "" }
+    guard let best = ranked.min(by: { $0.1 < $1.1 }), best.1 <= 2 else { return "" }
     return "; did you mean \(best.0)?"
   }
 
@@ -173,15 +171,6 @@ private struct WorkspaceValidation {
         problem(entry[key] ?? entry, "invalid \(key)")
       }
     }
-    let gates = WorkspaceSettings.ReviewGate.allCases.map(\.rawValue)
-    if let node = entry["review_gate"], node.tag == Tag(.str),
-      let gate = node.string, !gate.isEmpty, !gates.contains(gate)
-    {
-      problem(
-        node,
-        "review_gate must be none, any or human"
-          + WorkspaceConfig.suggestion(gate, among: gates, maximumDistance: .max))
-    }
     if let lifecycle = entry["lifecycle"]?.string,
       !["active", "legacy", "dead"].contains(lifecycle)
     {
@@ -205,13 +194,27 @@ private struct WorkspaceValidation {
         if value.int == nil || (value.int ?? -1) < 0 {
           problem(value, "\(key) must be a nonnegative integer")
         }
-      } else if key == "review_gate", value.tag == Tag(.bool) {
-        problem(
-          value,
-          "review_gate must be a word: none, any or human; YAML booleans are not settings values")
+      } else if key == "review_gate" {
+        validateGate(value)
       } else if value.tag != Tag(.str) || (value.string ?? "").isEmpty {
         problem(value, "\(key) must be a nonempty string")
       }
+    }
+  }
+
+  mutating func validateGate(_ value: Node) {
+    let words = WorkspaceSettings.ReviewGate.allCases.map(\.rawValue)
+    let accepted = "review_gate must be none, any or human"
+    let text = value.scalar?.string ?? ""
+    if ["on", "off", "yes", "no", "true", "false", "y", "n"].contains(text.lowercased()) {
+      problem(
+        value,
+        accepted + ". none: no gate; any: done warns on a changes verdict; "
+          + "human: done needs a human approve. Ask the human which policy to use.")
+    } else if value.tag != Tag(.str) || text.isEmpty {
+      problem(value, accepted)
+    } else if !words.contains(text) {
+      problem(value, accepted + WorkspaceConfig.suggestion(text, among: words))
     }
   }
 

@@ -31,12 +31,23 @@ private struct WorkspaceRenderer {
         "task_prefix": workspace["task_prefix"] as String,
       ])) + "\n"
     let settingsText: String = workspace["settings"]
-    let settings =
-      (try JSONSerialization.jsonObject(with: Data(settingsText.utf8)) as? [String: Any]) ?? [:]
+    let stored: Any
+    do {
+      stored = try JSONSerialization.jsonObject(
+        with: Data(settingsText.utf8), options: .fragmentsAllowed)
+    } catch {
+      stored = settingsText
+    }
+    let settings: Any
+    if let mapping = stored as? [String: Any] {
+      settings = mapping.filter { (WorkspaceConfig.fields["settings"] ?? []).contains($0.key) }
+    } else {
+      // Preserve corrupt settings visibly so the editing view can be used for repair.
+      settings = stored
+    }
     output +=
       "settings: "
-      + (try WorkspaceConfig.json(
-        settings.filter { (WorkspaceConfig.fields["settings"] ?? []).contains($0.key) }))
+      + (try WorkspaceConfig.json(settings))
       + "\n"
     try renderAppsAndRepos()
     try renderRelationships()

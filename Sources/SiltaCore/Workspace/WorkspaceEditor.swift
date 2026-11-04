@@ -35,8 +35,9 @@ package enum WorkspaceEditor {
         try content.write(to: file, atomically: true, encoding: .utf8)
         guard try editor(file) == 0 else { return nil }
         let changed = try String(contentsOf: file, encoding: .utf8)
-        guard changed != content else { return nil }
         do {
+          _ = try WorkspaceConfig.parse(changed)
+          guard changed != content else { return nil }
           return try save(
             changed, originalSlug: originalSlug, store: store, identity: identity,
             approval: (approval, "silta ws edit" + target))
@@ -64,6 +65,7 @@ package enum WorkspaceEditor {
     let original =
       try slug == nil && available.isEmpty
       ? nil : WorkspaceSelection.resolve(slug, in: store)
+    _ = try WorkspaceConfig.parse(text)
     if let original,
       try store.read({ try WorkspaceConfig.render(from: $0, slug: original) }) == text
     {

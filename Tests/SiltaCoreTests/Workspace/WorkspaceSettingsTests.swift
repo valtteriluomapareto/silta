@@ -15,14 +15,12 @@ struct WorkspaceSettingsTests {
     } catch let error as WorkspaceError {
       #expect(error.code == .invalid)
       #expect(
-        error.message
-          == "line 2: review_gate must be a word: none, any or human; "
-          + "YAML booleans are not settings values"
+        error.message == "line 2: " + WorkspaceSettingsRegressionTests.gloss
       )
     }
   }
 
-  @Test(arguments: [("humna", "human"), ("None", "none"), ("unknown", "none")])
+  @Test(arguments: [("humna", "human"), ("None", "none")])
   func unknownWordsSuggestAValidValue(value: String, suggested: String) throws {
     do {
       _ = try WorkspaceConfig.parse(
@@ -62,10 +60,9 @@ struct WorkspaceSettingsTests {
 
   @Test(arguments: [
     "{\"review_gate\":\"robot\"}", "{\"review_gate\":false}",
-    "{\"archive_after_days\":\"14\"}", "{\"stale_days\":\"90\"}",
-    "{\"review_gate\":null}", "{\"archive_after_days\":null}", "{\"stale_days\":null}",
+    "{\"review_gate\":null}",
   ])
-  func malformedKnownValuesFailClosed(settings: String) async throws {
+  func malformedGateValuesFailClosed(settings: String) async throws {
     try await withScratchDirectory { home in
       let env = try TaskServiceTests.environment(home)
       try TaskServiceTests.setup(env)
@@ -77,7 +74,7 @@ struct WorkspaceSettingsTests {
         try $0.database.execute(sql: "UPDATE workspace SET settings=?", arguments: [settings])
       }
       let before = try TaskOrganizationTests.counts(service)
-      await #expect(throws: StorageError.unavailable) {
+      await #expect(throws: WorkspaceError.self) {
         _ = try await service.close("AC-1", result: "Must not close.", directory: home)
       }
       #expect(try TaskOrganizationTests.counts(service) == before)

@@ -49,7 +49,14 @@ private struct WorkspaceWriter {
     if let old = try String.fetchOne(
       db, sql: "SELECT settings FROM workspace WHERE slug=?", arguments: [config.slug])
     {
-      settings = (try JSONSerialization.jsonObject(with: Data(old.utf8)) as? [String: Any]) ?? [:]
+      do {
+        settings =
+          (try JSONSerialization.jsonObject(
+            with: Data(old.utf8), options: .fragmentsAllowed) as? [String: Any]) ?? [:]
+      } catch {
+        // A validated replacement can repair corrupt JSON with no recoverable mapping.
+        settings = [:]
+      }
     }
     for key in WorkspaceConfig.fields["settings"] ?? [] { settings.removeValue(forKey: key) }
     for (key, value) in config.root["settings"]?.mapping ?? Node.Mapping([]) {

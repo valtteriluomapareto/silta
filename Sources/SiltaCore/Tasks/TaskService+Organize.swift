@@ -38,8 +38,8 @@ extension TaskService {
     do {
       instant = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(closed)
     } catch { throw StorageError.unavailable }
-    let settings = try WorkspaceSettings.read(workspaceID: task.workspaceID, in: db)
-    return instant < date.addingTimeInterval(-Double(settings.archiveAfterDays) * 86400)
+    let days = try WorkspaceSettings.read(workspaceID: task.workspaceID, in: db).archiveAfterDays
+    return instant < date.addingTimeInterval(-Double(days) * 86400)
   }
 
   /// Records tracker ownership and releases the local claim without changing status.
