@@ -25,12 +25,16 @@ struct CommentLifecycleCommandTests {
       #expect(history.stdout.contains("silta --ws 'acme' comment reopen 'AC-1/1'"))
       let reopened = try SiltaBinary.run(
         ["comment", "reopen", "task:AC-1/2", "AC-1/1", "--json"], in: scratch, environment: env)
+      Golden.forTests().check(reopened.stdout, "comment-reopen.json")
       let data = try TaskStateRegressionTests.data(reopened)
       #expect(data["refs"] as? [String] == ["AC-1/1"])
       #expect(data["created"] as? [String] == [])
       let deleted = try SiltaBinary.run(
         ["comment", "delete", "AC-1/2", "--quiet"], in: scratch, environment: env)
       #expect(deleted.termination == .exit(0) && deleted.stdout.isEmpty)
+      let repeated = try SiltaBinary.run(
+        ["comment", "delete", "AC-1/2", "--json"], in: scratch, environment: env)
+      Golden.forTests().check(repeated.stdout, "comment-delete.json")
       let shown = try SiltaBinary.run(
         ["task", "show", "AC-1", "--json"], in: scratch, environment: env)
       #expect(shown.stdout.contains("[deleted]") && !shown.stdout.contains("Fixed."))
