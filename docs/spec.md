@@ -377,7 +377,8 @@ CREATE TABLE source (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   root TEXT NOT NULL, include TEXT NOT NULL, exclude TEXT NOT NULL DEFAULT '[]',
   repo_id INTEGER REFERENCES repo(id));
 
-CREATE TABLE worktree_override (path TEXT PRIMARY KEY, app_id INTEGER NOT NULL REFERENCES app(id),
+CREATE TABLE worktree_override (path TEXT PRIMARY KEY, -- canonical worktree toplevel
+  app_id INTEGER NOT NULL REFERENCES app(id),
   set_by TEXT NOT NULL);                      -- human-only
 
 CREATE TABLE approval (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -420,7 +421,8 @@ symlinks resolved, case-folded on case-insensitive volumes.
    - Then apply the rules below in order. The first rule that picks a single
      candidate wins.
 3. **Single candidate** → done.
-4. **Human override** for this path (`worktree_override`).
+4. **Human override** for the canonical worktree toplevel (`worktree_override`),
+   only when its app remains among the filtered candidates.
 5. **Task link.** A task claimed by this session, or the task whose `branch` equals
    the current branch, gives its `app_id`.
 6. **Exact ref.** The current branch equals an app's `ref` or `prod_ref`, ignoring
@@ -442,7 +444,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|
 | Detached HEAD | Rules 4–5, then 8 against the HEAD sha. `branch: null` |
 | Shallow or partial clone where `rev-list` fails | `low`, reason `shallow` |
-| A candidate ref missing locally (`origin/x` not fetched) | Candidate skipped, warning `ref_missing` |
+| A candidate ref missing locally (`origin/x` not fetched) | Skipped in rules 6–8; configured candidate retained, warning `ref_missing` |
 | Worktree of an unregistered repo | `unregistered` |
 | Branch created from a non-app ref (e.g. `release/2024`) | `low` with candidates, never a silent guess |
 
@@ -450,17 +452,27 @@ symlinks resolved, case-folded on case-insensitive volumes.
 
 ```json
 {"workspace":"acme","repo":"platform","app":"platform-portal","branch":"feature/messages-ui",
- "head":"3f9a1c2","confidence":"high","reason":"upstream","candidates":[…]}
+ "head":"3f9a1c2000000000000000000000000000000000","confidence":"high","reason":"upstream","candidates":[…]}
 ```
 
+- `head` is the full commit SHA, not an abbreviation. `reason` is one of
+  `explicit`, `single`, `override`, `task`, `exact_ref`, `upstream`, `reflog`,
+  `distance`, `non_app_ref`, `shallow` or `unresolved`.
+- Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
+- Outside Git, `where` returns `unregistered` with carry-on guidance and harmless
+  help, without suggesting a scan of the input directory. An unregistered Git
+  repository instead gets a scan command for its canonical toplevel.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
 - Explicit `--app <slug>` selects a filtered candidate. An app outside the filtered
   candidates is `ambiguous_location`, with candidate retries. `--task <ref>` selects
   task evidence before session claims and branch matches (§8).
-- `where` itself succeeds at low confidence: no app is selected, and its text lists
-  candidates with explicit `--app` commands. Candidate JSON entries are
+- `where` itself succeeds at low confidence: no app is selected. Its text shows
+  each candidate's slug and ref, with explicit `--app` retries. When distance ran,
+  retries are ordered by increasing score, then slug for ties; unscored candidates
+  follow by slug. The same order survives a cache hit. Retries keep the canonical
+  inspected directory, while override receipts name the canonical worktree root. Candidate JSON entries are
   `{"app":"<slug>","ref":"<development ref>"}`, sorted by app slug.
 - `where --set <app>` and `--unset` change the canonical worktree toplevel's
   override, also when invoked in a subdirectory. The override applies only among
@@ -789,7 +801,8 @@ silta code ls   <app>[@<ref>] [<dir>]
   backend feature branch). The working tree is never touched.
 - **Git runner:** absolute path to `git` (2.40 or later, for `--attr-source`; the
   pinned toolchain ships 2.54), resolved once and checked by `doctor`; environment
-  `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`; a 10 s timeout per
+  `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `GIT_NO_LAZY_FETCH=1`, `LC_ALL=C`;
+  the environment value avoids requiring a newer global Git option. A 10 s timeout per
   call (fetch 60 s).
 - Output carries the resolved sha and depends only on that commit: attributes
   (`.gitattributes`) come from the commit too, never from the clone's working tree.
@@ -863,7 +876,7 @@ silta code ls   <app>[@<ref>] [<dir>]
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need the human's go-ahead (D38): `promote`, `task edit`,
-  `doc edit|accept|reject`, `where --set|--unset`, `task triage`, `--steal` over another
+  `doc edit|accept|reject`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
   session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
   `ws edit`, and an agent's `task unblock` of a block that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
