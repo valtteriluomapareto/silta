@@ -138,7 +138,9 @@ struct WorkspaceSettingsRegressionTests {
         WorkspaceConfigTests.minimal + "settings: {review_gate: '\(word)'}")
       Issue.record("unknown gate accepted")
     } catch let error as WorkspaceError {
-      #expect(error.message == "line 2: review_gate must be none, any or human")
+      #expect(
+        error.message
+          == "line 2: review_gate must be none, any or human. Ask the human which policy to use.")
     }
   }
 

@@ -47,6 +47,7 @@ extension WorkspaceError: ErrorExamples {
     [
       .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"), .conflict,
       .editor, .input, .setting("acme", key: "review_gate", value: "\"robot\""),
+      .unknownSetting("acme", key: "review_gate", value: "\"future\""),
     ]
   }
 }
@@ -132,6 +133,9 @@ extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
     [
       .humanOnly(command: "silta task triage", actor: .agent(tool: "unknown", session: "acme")),
+      .proposalPolicy(
+        command: "silta --ws 'acme' task add", actor: .agent(tool: "codex", session: "acme"),
+        title: "-Acme"),
       .notReady(
         command: "silta task unblock 'AC-4' 'AC-7'", actor: .agent(tool: "codex", session: "acme"),
         waits: [

@@ -30,7 +30,8 @@ struct WorkspaceSettingsRecoveryTests {
         #expect(result.termination == .exit(1))
         let output = json ? result.stdout : result.stderr
         #expect(output.contains(json ? "\"code\":\"invalid\"" : "[invalid]"))
-        #expect(output.contains("archive_after_days"))
+        #expect(
+          output.contains(settings.hasPrefix("{") ? "archive_after_days" : "setting settings"))
         #expect(output.contains("silta --ws 'acme' ws show"))
         #expect(!output.contains("doctor"))
         if settings.hasPrefix("{") && command[1] == "show" {

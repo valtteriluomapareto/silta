@@ -12,6 +12,12 @@ struct StorageSchemaTests {
     DatabaseStore(home: home, clock: FakeClock(now: instant), jitter: { 0 })
   }
 
+  static func requireNewerWriter(in db: Database) throws {
+    try db.execute(
+      sql: "UPDATE meta SET value=? WHERE key='min_writer_version'",
+      arguments: [DatabaseStore.writerVersion + 1])
+  }
+
   @Test func constructionAndMissingReadNeverInitialize() async throws {
     try await withScratchDirectory { scratch in
       let home = scratch.appending(path: "data")
@@ -47,7 +53,7 @@ struct StorageSchemaTests {
         #expect(try Int.fetchOne(db, sql: "PRAGMA busy_timeout") == 5000)
         #expect(
           try String.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-            == "3")
+            == String(DatabaseStore.writerVersion))
         let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(task)").map {
           $0["name"] as String
         }
@@ -166,7 +172,7 @@ struct StorageSchemaTests {
       try queue.write { db in
         try db.execute(sql: "INSERT INTO grdb_migrations VALUES('future')")
         if raisedVersion {
-          try db.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+          try Self.requireNewerWriter(in: db)
         }
       }
       let older = Self.store(scratch)
@@ -176,7 +182,8 @@ struct StorageSchemaTests {
         _ = try older.write { try StorageWriteTests.insert($0, uid: "acme") }
       }
       #expect(
-        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 4)
+        try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") }
+          == StorageSchema.migrator.migrations.count + 1)
     }
   }
 
@@ -216,7 +223,7 @@ struct StorageSchemaTests {
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta.db").path)
       try StorageSchema.migrator.migrate(queue)
       try queue.write {
-        try $0.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+        try Self.requireNewerWriter(in: $0)
       }
       #expect(try queue.read { try String.fetchOne($0, sql: "PRAGMA journal_mode") } == "delete")
       #expect(throws: StorageError.schemaTooNew) { try Self.store(scratch).initialize() }

@@ -1,0 +1,1 @@
+{"error":{"code":"human_only","message":"This workspace sets proposals: ask; creating this task needs the human's go-ahead in chat, and with it the task is created as todo. Detected agent:codex:acme.","next":["silta --ws 'acme' task add -F <file> --approved \"<the human's words>\" -- '-Acme'"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

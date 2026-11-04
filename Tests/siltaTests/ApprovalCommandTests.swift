@@ -346,7 +346,7 @@ extension ApprovalCommandTests {
 }
 
 extension ApprovalCommandTests {
-  @Test func approvedFileEditBootstrapsAndUnusedQuoteDoesNotAuthorizeCreation() throws {
+  @Test func approvedFileEditBootstrapsAndPlaceholderCannotAuthorizeCreation() throws {
     try withScratchDirectory { scratch in
       let file = scratch.appending(path: "workspace.yaml")
       try "workspace: {slug: acme, name: Acme, task_prefix: AC}".write(
@@ -358,8 +358,8 @@ extension ApprovalCommandTests {
       let added = try SiltaBinary.run(
         ["--ws", "acme", "task", "add", "Acme idea", "--approved", "<unused>", "--json"],
         in: scratch, environment: TaskCommandTests.actor)
-      #expect(added.termination == .exit(0))
-      #expect(added.stdout.contains("proposed") && added.stdout.contains("approval_unused"))
+      #expect(added.termination == .exit(1))
+      #expect(added.stdout.contains("invalid") && !added.stdout.contains("approval_unused"))
       let store = DatabaseStore(
         home: scratch.appending(path: "silta-home"), clock: SystemClock(), jitter: { 0 })
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
