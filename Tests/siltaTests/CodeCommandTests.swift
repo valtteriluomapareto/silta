@@ -187,6 +187,7 @@ struct CodeCommandTests {
         - {slug: portal, repo: platform, ref: origin/portal, prod_ref: origin/portal-prod}
         - {slug: console, repo: platform, ref: origin/api, subpath: apps/console}
         - {slug: star, repo: platform, ref: origin/api, subpath: "apps/con*"}
+        - {slug: colon, repo: platform, ref: origin/api, subpath: ":dir"}
       """)
     try store.write { tx in
       try config.apply(
