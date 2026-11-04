@@ -103,7 +103,7 @@ extension CodeCommandTests {
       #expect(
         local.stdout.contains(
           "\"next\":[\"silta --ws 'acme' code show 'portal@origin/portal-prod' "
-            + "'portal/README.md'\"]"
+            + "-- 'portal/README.md'\"]"
         ))
     }
   }
@@ -141,14 +141,16 @@ extension CodeCommandTests {
       #expect(directory.termination == .exit(2))
       #expect(directory.stdout.contains("is a directory"))
       #expect(
-        directory.stdout.contains("\"silta --ws 'acme' code ls 'portal@origin/portal' 'portal'\"")
+        directory.stdout.contains(
+          "\"silta --ws 'acme' code ls 'portal@origin/portal' -- 'portal'\"")
       )
       let file = try SiltaBinary.run(
         ["code", "ls", "portal", "README.md", "--json"], in: scratch)
       #expect(file.termination == .exit(2))
       #expect(file.stdout.contains("is a file"))
       #expect(
-        file.stdout.contains("\"silta --ws 'acme' code show 'portal@origin/portal' 'README.md'\"")
+        file.stdout.contains(
+          "\"silta --ws 'acme' code show 'portal@origin/portal' -- 'README.md'\"")
       )
       let missing = try SiltaBinary.run(
         ["code", "ls", "console@origin/portal", "--json"], in: scratch)
@@ -200,7 +202,7 @@ extension CodeCommandTests {
         #expect(root.stdout.contains("is a directory"))
         #expect(
           root.stdout.contains(
-            "\"silta --ws 'acme' code ls 'portal@origin/portal' '\(path)'\""))
+            "\"silta --ws 'acme' code ls 'portal@origin/portal' -- '\(path)'\""))
       }
       let missing = try SiltaBinary.run(
         ["code", "show", "console@origin/portal", "README.md", "--json"], in: scratch)
@@ -230,11 +232,9 @@ extension CodeCommandTests {
         let run = try SiltaBinary.runProcess(
           URL(filePath: "/bin/sh"),
           ["-c", binary + " --json" + String(command.dropFirst("silta".count))], in: scratch)
-        withKnownIssue("the generated command treats a leading-dash path as an option") {
-          try #require(run.termination == .exit(0), "\(command): \(run.stdout)\(run.stderr)")
-          let output = try envelope(run.stdout)["output"] as? String
-          #expect(output?.hasSuffix(expected) == true, "\(command): \(run.stdout)")
-        }
+        try #require(run.termination == .exit(0), "\(command): \(run.stdout)\(run.stderr)")
+        let output = try envelope(run.stdout)["output"] as? String
+        #expect(output?.hasSuffix(expected) == true, "\(command): \(run.stdout)")
       }
     }
   }
