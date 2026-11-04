@@ -8,12 +8,17 @@ package struct GitRequest: Equatable, Sendable {
   package let directory: URL
   /// Seconds before termination is requested; must be finite and positive.
   package let timeout: TimeInterval
+  /// Whether git may fetch missing promised objects. Suppression is best effort.
+  package let lazyFetch: Bool
 
   /// Defaults to 10 s. Fetch callers pass 60 s explicitly (spec §10).
-  package init(arguments: [String], directory: URL, timeout: TimeInterval = 10) {
+  package init(
+    arguments: [String], directory: URL, timeout: TimeInterval = 10, lazyFetch: Bool = true
+  ) {
     self.arguments = arguments
     self.directory = directory
     self.timeout = timeout
+    self.lazyFetch = lazyFetch
   }
 }
 

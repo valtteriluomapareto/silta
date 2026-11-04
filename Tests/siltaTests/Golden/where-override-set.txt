@@ -1,4 +1,4 @@
-Override set for <path>.
+Override set to platform for <path>.
 acme / platform / platform [high: override]
 branch: api
 head: <head>

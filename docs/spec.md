@@ -467,25 +467,33 @@ symlinks resolved, case-folded on case-insensitive volumes.
 - `brief` and `task` commands carry on with `low` and show the candidates.
 - Explicit `--app <slug>` selects a filtered candidate. An app outside the filtered
   candidates is `ambiguous_location`, with candidate retries. `--task <ref>` selects
-  task evidence before session claims and branch matches (§8).
+  task evidence before session claims and branch matches (§8). An explicit task
+  must exist even when an earlier rule resolves the app; a valid task does not
+  change the precedence of those rules.
 - `where` itself succeeds at low confidence: no app is selected. Its text shows
   each candidate's slug and ref, with explicit `--app` retries. When distance ran,
   retries are ordered by increasing score, then slug for ties; unscored candidates
   follow by slug. The same order survives a cache hit. Retries keep the canonical
-  inspected directory, while override receipts name the canonical worktree root. Candidate JSON entries are
-  `{"app":"<slug>","ref":"<development ref>"}`, sorted by app slug.
+  inspected directory, while override receipts name the canonical worktree root.
+  Candidate JSON entries are `{"app":"<slug>","ref":"<development ref>"}`,
+  sorted by app slug.
 - `where --set <app>` and `--unset` change the canonical worktree toplevel's
   override, also when invoked in a subdirectory. The override applies only among
   that input path's filtered candidates, so a subpath app still wins. Other linked
-  worktrees have separate overrides. Both accept `--path <directory>`.
+  worktrees have separate overrides, including worktrees nested inside the parent.
+  Set accepts any configured app in the matched repository, so a worktree-root
+  approval retry can store a subpath app. The accompanying location report still
+  resolves the inspected path's filtered candidates. Both accept `--path <directory>`.
 - Effective override changes are human-only and record an approval atomically.
   Repeating a set, or unsetting an absent override, needs no approval and writes no
   rows. Supplied `--approved` then warns `approval_unused`. Receipts distinguish
-  an actual change from `No override` or `Override already <app>`. Read-proven
+  `Override set to <app>` or `Override removed` from `No override` or
+  `Override already <app>`. Read-proven
   no-ops bypass truth writes. If a concurrent change makes a planned mutation
   redundant after its write opens, no decision, approval or change-log row changes;
   normal daily-backup bookkeeping may still run.
-  Approval retries preserve the workspace and canonical inspected directory.
+  Approval retries and recorded approval commands preserve the workspace and name
+  the canonical worktree root, which is the scope of the operation.
 - A shallow clone can resolve through earlier rules. Distance inference without
   complete history returns `low`, reason `shallow`, and is never cached.
 - A named non-app reflog origin returns `low`, reason `non_app_ref`.
@@ -495,6 +503,9 @@ symlinks resolved, case-folded on case-insensitive volumes.
   low when missing competitors prevent the strict runner-up comparison.
 - The cache lives in `index.db`, keyed on (path, HEAD sha, hash of candidate ref
   shas). It is written only if the lock is free; it never blocks.
+- Location Git requests set `GIT_NO_LAZY_FETCH=1` to suppress fetching missing
+  promised objects. This is best effort: older Git versions may ignore the
+  variable. Location does not run an explicit fetch.
 
 ## 8. Tasks
 
@@ -804,9 +815,10 @@ silta code ls   <app>[@<ref>] [<dir>]
   backend feature branch). The working tree is never touched.
 - **Git runner:** absolute path to `git` (2.40 or later, for `--attr-source`; the
   pinned toolchain ships 2.54), resolved once and checked by `doctor`; environment
-  `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `GIT_NO_LAZY_FETCH=1`, `LC_ALL=C`;
-  the environment value avoids requiring a newer global Git option. A 10 s timeout per
-  call (fetch 60 s).
+  `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`. Inherited `GIT_*`
+  overrides are removed. Code reads retain normal Git lazy fetching for promised
+  objects in partial clones; only location requests suppress it (§7). A 10 s
+  timeout per call (fetch 60 s).
 - Output carries the resolved sha and depends only on that commit: attributes
   (`.gitattributes`) come from the commit too, never from the clone's working tree.
 - JSON data is `{app, ref, sha, output}`; `output` is UTF-8 text, with bytes that

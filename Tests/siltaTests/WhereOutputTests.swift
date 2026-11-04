@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.timeLimit(.minutes(3)))
-struct WhereOutputRegressionTests {
+struct WhereOutputTests {
   private let fixture = WhereCommandTests()
 
   @Test func rankedLowTextHasRefsAndSurvivesCacheHits() throws {

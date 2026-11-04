@@ -1,7 +1,7 @@
 package import Foundation
 import GRDB
 
-/// Resolves a path from registered repositories and live git/task evidence, without fetching.
+/// Resolves a path from registered repositories and live git/task evidence.
 package struct LocationService {
   let environment: SiltaEnvironment
 
@@ -25,6 +25,7 @@ package struct LocationService {
     async throws -> LocationResult
   {
     let repo = context.repo
+    let selectedTask = try task.map { try explicitTask($0, workspace: repo.workspace) }
     let git = context.git
     let candidates = context.candidates
     let branch = try await git.value(
@@ -54,7 +55,7 @@ package struct LocationService {
       return picked(selected.app, "override")
     }
     if let taskApp = try taskApp(
-      task, branch: branch, repo: repo, candidates: candidates, path: context.path)
+      selectedTask, branch: branch, repo: repo, candidates: candidates, path: context.path)
     {
       return picked(taskApp, "task")
     }
@@ -69,18 +70,20 @@ package struct LocationService {
     return try await distance(result, context: context)
   }
 
+  private func explicitTask(_ task: String, workspace: String) throws -> TaskDetails {
+    do {
+      return try TaskService(environment: environment, workspace: workspace).show(task)
+    } catch let error as any CodedError where error.code == .notFound {
+      throw CommandFailure(
+        error: error, next: ["silta --ws " + shellWord(workspace) + " task ls"])
+    }
+  }
+
   private func taskApp(
-    _ task: String?, branch: String?, repo: LocationRepository,
+    _ selected: TaskDetails?, branch: String?, repo: LocationRepository,
     candidates: [LocationCandidate], path: URL
   ) throws -> String? {
-    if let task {
-      let selected: TaskDetails
-      do {
-        selected = try TaskService(environment: environment, workspace: repo.workspace).show(task)
-      } catch let error as any CodedError where error.code == .notFound {
-        throw CommandFailure(
-          error: error, next: ["silta --ws " + shellWord(repo.workspace) + " task ls"])
-      }
+    if let selected {
       if let app = selected.app {
         try validate(app, candidates: candidates, repo: repo, path: path)
         return app

@@ -40,7 +40,8 @@ struct GitRunnerTests {
     }
   }
 
-  @Test func childEnvironmentIsExactAndPreservesCredentials() async throws {
+  @Test(arguments: [false, true])
+  func childEnvironmentIsExactAndPreservesCredentials(lazyFetch: Bool) async throws {
     try await withScratchDirectory { scratch in
       let inherited = [
         "HOME": scratch.appending(path: "acme-home").path,
@@ -53,7 +54,7 @@ struct GitRunnerTests {
         "LC_ALL": "fi_FI.UTF-8",
       ]
       let result = try await SystemGitRunner(executable: "/usr/bin/env", environment: inherited)
-        .run(GitRequest(arguments: [], directory: scratch))
+        .run(GitRequest(arguments: [], directory: scratch, lazyFetch: lazyFetch))
       #expect(result.termination == .exit(0))
       let text = try #require(String(data: result.stdout, encoding: .utf8))
       var actual = Dictionary(
@@ -65,10 +66,11 @@ struct GitRunnerTests {
       actual.removeValue(forKey: "__CF_USER_TEXT_ENCODING")
       var expected = inherited.filter { !$0.key.hasPrefix("GIT_") }
       expected.merge([
-        "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1",
+        "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0",
         "LC_ALL": "C",
         "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
       ]) { _, fixed in fixed }
+      if !lazyFetch { expected["GIT_NO_LAZY_FETCH"] = "1" }
       #expect(actual == expected)
       #expect(result.stderr.isEmpty)
     }
@@ -79,7 +81,8 @@ struct GitRunnerTests {
       let runner = SystemGitRunner(
         executable: "/usr/bin/env",
         environment: ["GIT_NO_LAZY_FETCH": "0"])
-      let result = try await runner.run(GitRequest(arguments: [], directory: scratch))
+      let result = try await runner.run(
+        GitRequest(arguments: [], directory: scratch, lazyFetch: false))
       let text = try #require(String(bytes: result.stdout, encoding: .utf8))
       #expect(text.split(separator: "\n").contains("GIT_NO_LAZY_FETCH=1"))
     }
@@ -87,14 +90,31 @@ struct GitRunnerTests {
 
   @Test(arguments: ["0", "1"])
   func defaultRequestsDoNotDisableLazyFetching(inherited: String) async throws {
-    await withKnownIssue("#11: defaultRequestsDoNotDisableLazyFetching") {
-      try await withScratchDirectory { scratch in
-        let runner = SystemGitRunner(
-          executable: "/usr/bin/env",
-          environment: ["GIT_NO_LAZY_FETCH": inherited])
-        let result = try await runner.run(.init(arguments: [], directory: scratch))
-        let output = try #require(String(bytes: result.stdout, encoding: .utf8))
-        #expect(!output.split(separator: "\n").contains { $0.hasPrefix("GIT_NO_LAZY_FETCH=") })
+    try await withScratchDirectory { scratch in
+      let runner = SystemGitRunner(
+        executable: "/usr/bin/env",
+        environment: ["GIT_NO_LAZY_FETCH": inherited])
+      let result = try await runner.run(.init(arguments: [], directory: scratch))
+      let output = try #require(String(bytes: result.stdout, encoding: .utf8))
+      #expect(!output.split(separator: "\n").contains { $0.hasPrefix("GIT_NO_LAZY_FETCH=") })
+    }
+  }
+
+  @Test(arguments: ["0", "1"])
+  func lazyFetchPolicyDoesNotLeakBetweenRequests(inherited: String) async throws {
+    try await withScratchDirectory { scratch in
+      let runner = SystemGitRunner(
+        executable: "/usr/bin/env", environment: ["GIT_NO_LAZY_FETCH": inherited])
+      let requests: [(GitRequest, Bool)] = [
+        (.init(arguments: [], directory: scratch, lazyFetch: false), true),
+        (.init(arguments: [], directory: scratch), false),
+        (.init(arguments: [], directory: scratch, lazyFetch: true), false),
+      ]
+      for (request, suppressed) in requests {
+        let result = try await runner.run(request)
+        let output = try #require(String(data: result.stdout, encoding: .utf8))
+        let variables = output.split(separator: "\n").filter { $0.hasPrefix("GIT_NO_LAZY_FETCH=") }
+        #expect(variables == (suppressed ? ["GIT_NO_LAZY_FETCH=1"] : []))
       }
     }
   }

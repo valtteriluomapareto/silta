@@ -65,7 +65,7 @@ struct WhereCommand: OutputCommand {
       if result.overrideChanged == false {
         receipt = unset ? "No override" : "Override already \(setApp ?? "")"
       } else {
-        receipt = "Override \(unset ? "removed" : "set")"
+        receipt = unset ? "Override removed" : "Override set to \(setApp ?? "")"
       }
       text = "\(receipt) for \(result.worktree).\n" + text
     }

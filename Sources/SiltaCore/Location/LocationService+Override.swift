@@ -2,23 +2,26 @@ package import Foundation
 import GRDB
 
 extension LocationService {
-  /// Changes this worktree's filtered app decision and approval atomically.
+  /// Changes this worktree's app decision and approval atomically.
   /// A read-proven no-op bypasses truth writes; mutation races are checked again in the write.
   package func override(
     path: URL, workspace: String? = nil, app: String?, approved: String? = nil
   ) async throws -> (result: LocationResult, approvalUsed: Bool) {
     let context = try await inspect(path: path, workspace: workspace)
     let repo = context.repo
-    if let app { try validate(app, candidates: context.candidates, repo: repo, path: context.path) }
-    let selected = context.candidates.first { $0.app == app }?.id
+    if let app, !repo.apps.contains(where: { $0.app == app }) {
+      try validate(app, candidates: context.candidates, repo: repo, path: context.path)
+    }
+    let selected = repo.apps.first { $0.app == app }?.id
     let before = try environment.db.read { try Self.overrideID(context.root, in: $0) }
-    var result = try await resolve(context, app: app, task: nil, ignoringOverride: true)
-    if app != nil { result.reason = result.candidates.count == 1 ? "single" : "override" }
+    let reportApp = context.candidates.first { $0.app == app }?.app
+    var result = try await resolve(context, app: reportApp, task: nil, ignoringOverride: true)
+    if reportApp != nil { result.reason = result.candidates.count == 1 ? "single" : "override" }
     result.overrideChanged = false
     guard before != selected else { return (result, false) }
     let command =
       "silta --ws " + shellWord(repo.workspace) + " where --path "
-      + shellWord(context.path.path) + (app.map { " --set " + shellWord($0) } ?? " --unset")
+      + shellWord(context.root.path) + (app.map { " --set " + shellWord($0) } ?? " --unset")
     let change = try writeOverride(context, appID: selected, command: command, approved: approved)
     result.overrideChanged = change.changed
     return (result, change.approvalUsed)
