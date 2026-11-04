@@ -15,8 +15,12 @@ extension TaskService {
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try Self.mutable(task)
       let (id, seq) = try insertComment(draft, task: task, at: at, in: tx)
-      try touchDiscussion(task, handoff: draft.kind == "handoff", at: at, in: tx)
-      if redacted { try changed(task.id, kind: "secret_redacted", body: nil, at: at, in: tx) }
+      let commentRef = "\(task.ref)/\(seq)"
+      let released = try touchDiscussion(
+        task, handoff: draft.kind == "handoff", comment: commentRef, at: at, in: tx)
+      if redacted {
+        try changed(task.id, kind: "secret_redacted", body: commentRef, at: at, in: tx)
+      }
       try tx.recordChange(kind: "comment", rowID: id)
       try consent?.record(
         command: audited(Self.commentCommand(task.ref, draft))
@@ -35,7 +39,7 @@ extension TaskService {
       }
       return CommentResult(
         comment: CommentDetails(row: row, task: task.ref), warnings: warnings,
-        approvalUsed: consent != nil)
+        approvalUsed: consent != nil, released: released)
     }
   }
 
@@ -70,6 +74,9 @@ extension TaskService {
     guard ["comment", "decision", "handoff"].contains(input.kind) else {
       throw CommentError.invalid("Use comment, decision or handoff.")
     }
+    guard !input.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw CommentError.bodyRequired(command)
+    }
     try Self.validateCommentBody(input.body)
     let body = try checked(input.body, allow: input.allowSecret, command: command + " -F <file>")
     try Self.validateCommentBody(body.0)
@@ -88,27 +95,30 @@ extension TaskService {
   }
 
   private static func validateCommentBody(_ body: String) throws {
-    guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      body.unicodeScalars.count <= 8000
-    else {
+    guard body.unicodeScalars.count <= 8000 else {
       throw CommentError.invalid(
-        "A comment needs a nonblank body of at most 8000 Unicode scalars; "
+        "A comment is at most 8000 Unicode scalars; "
           + "summarize longer output and cite its file outside the repo."
       )
     }
   }
 
   private func touchDiscussion(
-    _ task: TaskDetails, handoff: Bool, at: Date, in tx: StorageTransaction
-  ) throws {
-    guard task.claimedBy == environment.actor.description else { return }
+    _ task: TaskDetails, handoff: Bool, comment: String, at: Date, in tx: StorageTransaction
+  ) throws -> Bool {
+    guard task.claimedBy == environment.actor.description else { return false }
     try tx.database.execute(
       sql: "UPDATE task SET claimed_by=?,claimed_at=?,updated_at=? WHERE id=?",
       arguments: [
         handoff ? nil : task.claimedBy, handoff ? nil : Self.timestamp(at), Self.timestamp(at),
         task.id,
       ])
-    if handoff { try changed(task.id, kind: "claim", body: nil, at: at, in: tx) }
+    if handoff {
+      try changed(task.id, kind: "claim", body: "released " + comment, at: at, in: tx)
+    } else {
+      try tx.recordChange(kind: "task", rowID: task.id)
+    }
+    return handoff
   }
 
 }

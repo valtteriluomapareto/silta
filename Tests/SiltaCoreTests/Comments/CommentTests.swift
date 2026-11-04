@@ -24,7 +24,8 @@ struct CommentTests {
     return env
   }
 
-  @Test func discussionAndHandoffRespectTheClaimHolder() async throws {
+  @Test(arguments: ["codex", "claude"])
+  func discussionAndHandoffRespectTheClaimHolder(tool: String) async throws {
     try await withScratchDirectory { home in
       let clock = FakeClock(now: TaskServiceTests.now)
       let env = try await Self.setup(home, clock: clock)
@@ -32,18 +33,27 @@ struct CommentTests {
       let before = try owner.show("AC-1")
       let foreign = TaskService(
         environment: try TaskServiceTests.environment(
-          home, actor: .agent(tool: "claude", session: "reviewer"), clock: clock))
+          home, actor: .agent(tool: tool, session: "reviewer"), clock: clock))
       clock.advance(milliseconds: 1000)
       _ = try foreign.comment("AC-1", CommentDraft(body: "Reviewer finding"))
       #expect(try owner.show("AC-1").claimedAt == before.claimedAt)
       #expect(try owner.show("AC-1").updatedAt == before.updatedAt)
-      #expect(throws: CommentError.self) {
+      let held = try owner.show("AC-1"), snapshot = try Self.snapshot(env)
+      do {
         _ = try foreign.comment("AC-1", CommentDraft(body: "Stopped", kind: "handoff"))
-      }
+        Issue.record("Foreign handoff accepted")
+      } catch let error as CommentError { #expect(error.code == .conflict) }
+      let retained = try owner.show("AC-1")
+      #expect(retained.claimedBy == held.claimedBy && retained.claimedAt == held.claimedAt)
+      let afterCounts = try Self.snapshot(env)
+      #expect(retained.updatedAt == held.updatedAt && afterCounts == snapshot)
       _ = try owner.comment("task:AC-1", CommentDraft(body: "Finding addressed"))
       #expect(try owner.show("AC-1").claimedAt == TaskService.timestamp(clock.now()))
       let handoff = try owner.comment(
         "AC-1", CommentDraft(body: "Continue tests.", kind: "handoff"))
+      #expect(
+        try owner.show("AC-1", timeline: true).timeline?.last { $0.kind == "claim" }?.body
+          == "released " + handoff.comment.ref)
       let shown = try owner.show("AC-1")
       #expect(shown.status == "doing" && shown.claimedBy == nil && shown.claimedAt == nil)
       #expect(shown.comments?.map(\.ref) == [handoff.comment.ref, "AC-1/1", "AC-1/2"])

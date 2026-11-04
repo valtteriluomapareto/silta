@@ -18,7 +18,10 @@ extension UsageError: ErrorExamples {
 
 extension CommentError: ErrorExamples {
   static var examples: [CommentError] {
-    [.invalid("Use a supported kind."), .foreignHandoff("AC-1")]
+    [
+      .invalid("Use a supported kind."), .bodyRequired("silta comment 'AC-1'"),
+      .foreignHandoff("AC-1"),
+    ]
   }
 }
 

@@ -1,1 +1,1 @@
-{"data":{"actor":"agent:claude:reviewer","body":"Review finding.","created_at":"2023-11-14T22:13:20.001Z","deleted":false,"kind":"comment","ref":"AC-1/1"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"actor":"agent:claude:reviewer","body":"Review finding.","created_at":"2023-11-14T22:13:20.001Z","deleted":false,"kind":"comment","ref":"AC-1/1","released":false},"ok":true,"schema":1,"warnings":[]}

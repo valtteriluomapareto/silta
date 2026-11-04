@@ -271,7 +271,7 @@ CREATE TABLE topic_alias (
   PRIMARY KEY (workspace_id, alias));
 
 CREATE TABLE seq_counter (scope TEXT PRIMARY KEY, next INTEGER NOT NULL);
-  -- 'task:<workspace_id>', 'comment:task:<task_id>', 'comment:doc_rev:<id>'
+  -- 'task:<workspace_id>'; task-comment high-water marks come from retained rows (§17)
 
 CREATE TABLE task (
   id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -308,6 +308,8 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
   actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
+  -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
+  -- A comment's secret_redacted event body is that comment's ref, never its content.
 CREATE INDEX task_event_task ON task_event(task_id, kind);
 
 CREATE TABLE comment (
@@ -735,6 +737,15 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   their replies, identifying answered versus resolved questions. Roots and replies
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
   thread is omitted. `--timeline` includes full discussion alongside task events.
+  Text bodies are quoted line by line, including blank lines, so content cannot
+  impersonate a comment header. Full-history comment headers include their timestamp.
+- A post receipt adds `released` beside its existing JSON fields: true only when
+  that transaction released the author's own claim, false for ordinary/context-only
+  posts. Text says `handoff; claim released` on release. A resumable, unclaimed
+  `doing` task shows its actual release ref and a workspace-qualified `task start`
+  hint; claimed, promoted and terminal tasks never offer that hint.
+- `reply_to` in JSON denotes the thread root. A reply to a reply joins that root;
+  the immediate parent is not a separate edge.
 - Comments are append-only: the author can soft-delete and post again. There is no
   edit history.
 - A body is at most 8 000 Unicode scalar values. Longer output is summarised, and the
@@ -1280,8 +1291,11 @@ silta open [AC-12]                               [M5] open Silta.app
 Every CLI call is its own short-lived process, and several agents run at once.
 - **Writes:** every write is one `BEGIN IMMEDIATE` transaction, with
   `busy_timeout = 5 s` and up to 3 retries with jitter. After that, exit 5 `busy`.
-- **Sequence numbers** (`seq_counter`) are allocated inside the same transaction as
-  the row.
+- **Sequence numbers** are allocated inside the same transaction as the row. Tasks
+  use `seq_counter`. Task comments use `max(seq)+1` across all retained rows under
+  `BEGIN IMMEDIATE`: the append-only table supplies its own high-water mark, including
+  soft-deleted and imported/older comments without counter rows, so refs are never
+  reused and no counter bootstrap state is needed.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
 - **Read commands never change `silta.db`'s contents and never migrate.** Archiving is
   computed, and caches are best-effort writes to `index.db`. A read may recreate the

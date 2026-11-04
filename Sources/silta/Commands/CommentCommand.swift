@@ -5,13 +5,18 @@ struct CommentCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "comment",
     abstract: "Post task discussion; a claimer's handoff releases its claim.")
-  static let dataShape = CommentOutput.shape
+  static let dataShape = CommentOutput.receiptShape
   static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
   @OptionGroup var body: TaskBody
   @Argument(help: "The task reference.") var target: String
-  @Option(help: "comment, decision or handoff.") var kind = "comment"
+  @Option(
+    help: .init(
+      "comment, decision or handoff. "
+        + "A handoff names state, next step, open questions and branch/sha.")
+  )
+  var kind = "comment"
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let workspace = try context.workspace(global.ws)
     var draft = CommentDraft(body: "", kind: kind)
@@ -25,8 +30,9 @@ struct CommentCommand: OutputCommand {
       bodyFlag: body.flag
     ).comment(target, draft)
     return CommandOutput(
-      text: result.comment.ref + " " + result.comment.kind, quiet: result.comment.ref,
-      data: result.comment, warnings: result.warnings, approvalUsed: result.approvalUsed
+      text: result.comment.ref + " " + result.comment.kind
+        + (result.released ? "; claim released" : ""), quiet: result.comment.ref,
+      data: result, warnings: result.warnings, approvalUsed: result.approvalUsed
     ).reporting(workspace)
   }
 }

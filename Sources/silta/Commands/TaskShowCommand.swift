@@ -17,11 +17,12 @@ struct TaskShowCommand: OutputCommand {
   @Flag(help: "Include full discussion and attributed event history.") var timeline = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
+    // Keep one scope for the read, resume hint and shared task log resolver.
     let workspace = try context.workspace(global.ws)
     let task = try TaskService(environment: context.environment, workspace: workspace)
       .show(ref, timeline: timeline)
-    let text = TaskOutput.detail(task)
+    let text = TaskOutput.detail(task, workspace: workspace)
     return CommandOutput(text: text, quiet: text, data: task).reporting(
-      workspace)
+      context.taskWorkspace(workspace))
   }
 }

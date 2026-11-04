@@ -59,6 +59,15 @@ extension TaskService {
         Self.lookup(ref, workspace: slug, in: db), at: environment.clock.now(), in: db)
       let comments = try Self.discussion(task, timeline: timeline, in: db)
       task.comments = comments.isEmpty ? nil : comments
+      if task.status == "doing", task.claimedBy == nil, task.externalRef == nil,
+        let body = try String.fetchOne(
+          db,
+          sql: """
+            SELECT body FROM task_event WHERE task_id=? AND kind='claim' ORDER BY id DESC LIMIT 1
+            """, arguments: [task.id]), body.hasPrefix("released ")
+      {
+        task.handedOff = String(body.dropFirst("released ".count))
+      }
       if timeline {
         task.timeline = try Row.fetchAll(
           db,

@@ -120,7 +120,10 @@ enum SiltaMain {
     let path = commandPath(arguments)
     if error.code == .busy { return CommandFailure(error: error, next: [path]) }
     var next = error.next
-    let ownNext = if case .step = error as? TaskError { true } else { false }
+    let ownNext =
+      if case .step = error as? TaskError {
+        true
+      } else if case .bodyRequired = error as? CommentError { true } else { false }
     if error.code == .invalid, !ownNext,
       error is TaskError || error is ActorError || error is CommentError
     {
@@ -135,7 +138,9 @@ enum SiltaMain {
       next = workspaceRecovery(error, edit: edit, context: context)
     }
     var workspace = command.global.ws
-    let usesWorkspace = path.hasPrefix("silta task ") || path.hasPrefix("silta comment")
+    let usesWorkspace =
+      path.hasPrefix("silta task ") || path == "silta comment"
+      || path.hasPrefix("silta comment ")
     if workspace == nil, usesWorkspace,
       !(error is ActorError)
     {

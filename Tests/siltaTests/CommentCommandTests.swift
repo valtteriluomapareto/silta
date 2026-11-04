@@ -38,8 +38,8 @@ struct CommentCommandTests {
     }
   }
 
-  @Test(arguments: [false, true])
-  func refusalsKeepExplicitWorkspaceAndClaims(json: Bool) throws {
+  @Test(arguments: [false, true], ["codex", "claude"])
+  func refusalsKeepExplicitWorkspaceAndClaims(json: Bool, tool: String) throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
       #expect(
@@ -58,7 +58,7 @@ struct CommentCommandTests {
         let result = try SiltaBinary.run(
           ["--ws", "acme", "comment", "AC-1", "-m", "Acme private context"] + flags
             + (json ? ["--json"] : []), in: scratch,
-          environment: ["SILTA_ACTOR": "agent:claude:reviewer"])
+          environment: ["SILTA_ACTOR": "agent:\(tool):reviewer"])
         #expect(result.termination == .exit(name == "kind" ? 1 : 6))
         #expect((json ? result.stderr : result.stdout).isEmpty)
         Golden.forTests().check(
