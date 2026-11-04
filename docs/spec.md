@@ -764,6 +764,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   Repeating that same live acceptance writes nothing. A manually resolved question
   or a different answer selection requires reopen first; deleted posts refuse.
   JSON always includes `accepted`; text identifies accepted answers distinctly.
+- An answer posted by an agent, including a relay of the human's answer, never
+  supplies approval words; human-only commands still follow [§11](#actors-and-sessions).
 - Post findings as roots, not replies to a handoff: the newest handoff thread stays
   shown even when resolved. Task show offers no per-thread `next:` lines.
 - Threads: `--reply-to AC-12/3`. `comment resolve|reopen <ref>… [-m …]` takes several
@@ -986,6 +988,9 @@ silta code ls   <app>[@<ref>] [<dir>]
     in this chat in reply to a message where the agent named this command. A task
     prompt, an earlier instruction or the agent's own text never counts. One answer
     covers every command named in the message it answers, and nothing else.
+  - An answer or comment posted by an agent never counts as approval words, even
+    when it relays the human's answer. A human-only command still requires the
+    human's own reply in chat to a message naming that command (D38).
   - The words are 1–300 Unicode scalars after trimming and secret-guarded like any agent text. Words in
     angle brackets, or containing a printed placeholder such as `<the human's words>`
     anywhere, are `invalid`.
