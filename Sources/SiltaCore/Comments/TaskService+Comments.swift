@@ -19,7 +19,8 @@ extension TaskService {
       if redacted { try changed(task.id, kind: "secret_redacted", body: nil, at: at, in: tx) }
       try tx.recordChange(kind: "comment", rowID: id)
       try consent?.record(
-        command: audited(command) + (draft.allowSecret ? " --allow-secret" : "")
+        command: audited(Self.commentCommand(task.ref, draft))
+          + (draft.allowSecret ? " --allow-secret" : "")
           + " -> \(task.ref)/\(seq)", workspace: slug, identity: (environment.ids, at), in: tx)
       guard
         let row = try Row.fetchOne(
@@ -77,14 +78,13 @@ extension TaskService {
     return (draft, body.1)
   }
 
-  /// A body-free retry retains all posting options and its selected workspace.
-  package static func commentCommand(_ ref: String, _ draft: CommentDraft, workspace: String)
-    -> String
-  {
-    let command =
-      "silta --ws " + shellWord(workspace) + " comment " + shellWord(SecretGuard.redacted(ref))
-      + " --kind " + shellWord(SecretGuard.redacted(draft.kind))
-    return command
+  /// A body-free command omitting defaults; a supplied workspace scopes recovery.
+  package static func commentCommand(
+    _ ref: String, _ draft: CommentDraft, workspace: String? = nil
+  ) -> String {
+    let scope = workspace.map { "--ws " + shellWord($0) + " " } ?? ""
+    return "silta " + scope + "comment " + shellWord(SecretGuard.redacted(ref))
+      + (draft.kind == "comment" ? "" : " --kind " + shellWord(SecretGuard.redacted(draft.kind)))
   }
 
   private static func validateCommentBody(_ body: String) throws {

@@ -175,9 +175,7 @@ extension CommentTests {
       #expect(try approved.comment("AC-1", draft).comment.body == secret)
       #expect(try env.db.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
       let audit = try env.db.read { try String.fetchOne($0, sql: "SELECT command FROM approval") }
-      withKnownIssue("#13: Consent audit must not invent default flags") {
-        #expect(audit == "silta comment 'AC-1' -m <text> --allow-secret -> AC-1/2")
-      }
+      #expect(audit == "silta comment 'AC-1' -m <text> --allow-secret -> AC-1/2")
       try env.db.write {
         try $0.database.execute(
           sql: """
