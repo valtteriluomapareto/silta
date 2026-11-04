@@ -1,5 +1,11 @@
 /// A location report; an unresolved app is absent, and detached HEAD has a null branch.
 package struct LocationResult: Encodable, Sendable {
+  /// Canonical inspected directory, preserved in path-sensitive retries.
+  package let path: String
+  /// Canonical worktree toplevel, used only for override identity and receipts.
+  package let worktree: String
+  /// Whether an override request changed stored state; absent for ordinary reads.
+  package var overrideChanged: Bool?
   /// The workspace containing the registered repository.
   package let workspace: String
   /// The registered repository slug.

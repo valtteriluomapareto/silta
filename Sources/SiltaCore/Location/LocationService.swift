@@ -31,6 +31,7 @@ package struct LocationService {
       ["symbolic-ref", "--quiet", "--short", "HEAD"], optional: true)
     let head = try await git.required(["rev-parse", "--verify", "HEAD"])
     var result = LocationResult(
+      path: context.path.path, worktree: context.root.path,
       workspace: repo.workspace, repo: repo.slug, branch: branch,
       head: head, confidence: "low", reason: "unresolved", candidates: candidates,
       warnings: context.warnings)
@@ -47,9 +48,7 @@ package struct LocationService {
     }
     if candidates.count == 1, let single = candidates.first { return picked(single.app, "single") }
     let override = try environment.db.read {
-      try Int64.fetchOne(
-        $0, sql: "SELECT app_id FROM worktree_override WHERE path=?",
-        arguments: [context.path.path])
+      try Self.overrideID(context.root, in: $0)
     }
     if !ignoringOverride, let selected = candidates.first(where: { $0.id == override }) {
       return picked(selected.app, "override")
@@ -150,7 +149,7 @@ package struct LocationService {
         }
       }
       return LocationContext(
-        path: path, repo: repo, git: git, candidates: candidates,
+        path: path, root: root, repo: repo, git: git, candidates: candidates,
         refs: refs, warnings: warnings)
     }
     throw unregistered(path: root, workspace: workspace)

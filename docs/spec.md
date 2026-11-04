@@ -462,9 +462,15 @@ symlinks resolved, case-folded on case-insensitive volumes.
 - `where` itself succeeds at low confidence: no app is selected, and its text lists
   candidates with explicit `--app` commands. Candidate JSON entries are
   `{"app":"<slug>","ref":"<development ref>"}`, sorted by app slug.
-- `where --set <app>` and `--unset` are human-only. An override applies to the
-  exact canonical input path, not its descendants; both accept `--path <directory>`.
-  Approval retries preserve the workspace and canonical target path.
+- `where --set <app>` and `--unset` change the canonical worktree toplevel's
+  override, also when invoked in a subdirectory. The override applies only among
+  that input path's filtered candidates, so a subpath app still wins. Other linked
+  worktrees have separate overrides. Both accept `--path <directory>`.
+- Effective override changes are human-only and record an approval atomically.
+  Repeating a set, or unsetting an absent override, needs no approval and writes no
+  rows. Supplied `--approved` then warns `approval_unused`. Receipts distinguish
+  an actual change from `No override` or `Override already <app>`.
+  Approval retries preserve the workspace and canonical inspected directory.
 - A shallow clone can resolve through earlier rules. Distance inference without
   complete history returns `low`, reason `shallow`, and is never cached.
 - A named non-app reflog origin returns `low`, reason `non_app_ref`.

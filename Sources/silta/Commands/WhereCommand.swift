@@ -17,9 +17,10 @@ struct WhereCommand: OutputCommand {
   @Option(help: "Inspect this directory instead of the current one.") var path: String?
   @Option(help: "Select one of this path's candidate apps.") var app: String?
   @Option(help: "Use this task before session or branch task evidence.") var task: String?
-  @Option(name: .customLong("set"), help: "Set an override for this exact path (human-only).")
+  @Option(
+    name: .customLong("set"), help: "Set this worktree's override (human-only when changing it).")
   var setApp: String?
-  @Flag(help: "Remove this exact path's override (human-only).") var unset = false
+  @Flag(help: "Remove this worktree's override (human-only when changing it).") var unset = false
 
   var appSlug: String? { app ?? setApp }
 
@@ -58,9 +59,13 @@ struct WhereCommand: OutputCommand {
     }
     let quiet = setApp != nil || unset ? "" : text
     if setApp != nil || unset {
-      text =
-        "Override \(unset ? "removed" : "set") for \(directory.resolvingSymlinksInPath().path).\n"
-        + text
+      let receipt: String
+      if result.overrideChanged == false {
+        receipt = unset ? "No override" : "Override already \(setApp ?? "")"
+      } else {
+        receipt = "Override \(unset ? "removed" : "set")"
+      }
+      text = "\(receipt) for \(directory.resolvingSymlinksInPath().path).\n" + text
     }
     return CommandOutput(
       text: text, quiet: quiet, data: result,
