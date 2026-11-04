@@ -51,6 +51,18 @@ extension WorkspaceError: ErrorExamples {
   }
 }
 
+extension CodeError: ErrorExamples {
+  static var examples: [CodeError] {
+    [
+      .invalid("Use a relative path.", command: "silta code show"),
+      .notFound("Git ref missing.", next: ["silta --ws acme ws show"]),
+      .git(repo: "platform", workspace: "acme"),
+      .timeout(command: "silta code grep"),
+      .fetch(repo: "platform", retry: "silta --ws acme code ls api"),
+    ]
+  }
+}
+
 extension RepoError: ErrorExamples {
   static var examples: [RepoError] {
     [
@@ -117,6 +129,7 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
+    CodeError.self,
     CommandFailure.self, TaskReferenceError.self,
   ]
 

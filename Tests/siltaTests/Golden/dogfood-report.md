@@ -36,6 +36,10 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 
 ## Unused commands
 
+- `silta code grep`
+- `silta code log`
+- `silta code ls`
+- `silta code show`
 - `silta init`
 - `silta repo fetch`
 - `silta task archive`

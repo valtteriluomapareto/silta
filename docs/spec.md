@@ -766,14 +766,52 @@ silta code ls   <app>[@<ref>] [<dir>]
 
 - These run against the app's ref, its `prod_ref`, or any ref given with `@` (e.g. a
   backend feature branch). The working tree is never touched.
-- **Git runner:** absolute path to `git`, resolved once and checked by `doctor`;
-  environment `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`; a 10 s
-  timeout per call (fetch 60 s).
-- Output carries the resolved sha.
-- When the repo hasn't been fetched for 24 h, output warns: "fetched N h ago; run
-  `silta repo fetch platform` (needs network)". `--fetch` fetches first. Inside a sandbox
-  without network the fetch fails fast with exit 9 and a hint, never a credential
-  prompt.
+- **Git runner:** absolute path to `git` (2.40 or later, for `--attr-source`; the
+  pinned toolchain ships 2.54), resolved once and checked by `doctor`; environment
+  `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`; a 10 s timeout per
+  call (fetch 60 s).
+- Output carries the resolved sha and depends only on that commit: attributes
+  (`.gitattributes`) come from the commit too, never from the clone's working tree.
+- JSON data is `{app, ref, sha, output}`; `output` is UTF-8 text, with bytes that
+  aren't UTF-8 replaced by U+FFFD. Text starts with `<app>@<ref> <sha>`, followed by
+  the output. `--quiet` preserves this read output. All four commands accept `--prod`
+  and `--fetch`; `@ref` and `--prod` together are invalid. A missing `prod_ref`
+  points to workspace configuration.
+- Paths are relative to the app's subpath, or the repo root when none is set. The
+  subpath and the `show`, `log` and `ls` paths are literal. `grep` skips binary files
+  and accepts one relative wildcard pathspec after `--`, but no leading-colon Git
+  magic. Absolute paths and `..` components are invalid. Grep output uses
+  app-relative `path:line:text`; `ls` lists names relative to the requested
+  directory, with a trailing `/` on directories. No matches in grep or log are an
+  empty success. Missing show/ls paths are `not_found`, and so are `show` on a
+  directory and `ls` on a file, whose `next` is the matching command. A configured
+  subpath missing at the commit is `not_found` and names the subpath.
+- Names containing control characters, quotes or backslashes are double-quoted
+  with backslash escapes. Other names, including Unicode, display literally.
+- `grep` patterns are extended regular expressions (`git grep -E`); an invalid one
+  is `invalid`. A ref git can't find or rejects (e.g. `main@{999}`) is `not_found`.
+  When `origin/<ref>` resolves, its `next` repeats the read with
+  `<app>@origin/<ref>`; otherwise it suggests a fetch. Broken clones and missing
+  objects are `env`, rather than a missing ref or path.
+- `--lines N` or `--lines A-B` selects positive inclusive lines, truncating at EOF;
+  a range past the end adds a `lines_past_eof` warning that gives the file's line
+  count. `log -n` is positive and defaults to 20; each line is
+  `<full sha> <subject>`. Color, decoration, external diffs and text conversion are
+  disabled for code reads.
+- Output is bounded: `show` without `--lines` prints at most 400 lines, and `grep`
+  at most 200 matching lines. A cut adds an `output_truncated` warning that says how
+  much was cut and how to narrow the read (`--lines A-B` for show; a pathspec or a
+  narrower pattern for grep).
+- A git call over its 10 s timeout is `env` with `next_by: agent`: narrow the read
+  (a path, pathspec, pattern or `--lines`) and retry.
+- When the repo hasn't been fetched for 24 h, output warns (`ref_stale`): "fetched N h
+  ago; run `silta --ws <ws> repo fetch platform` (needs network)". A full commit SHA
+  given as `@ref` never warns, since a commit can't move. `--fetch` fetches first.
+  Inside a sandbox without network the fetch fails fast with exit 9, never a
+  credential prompt. The error names the repo, and its `next` (`next_by: agent`)
+  repeats the read without `--fetch`, which reads the cached ref.
+- A clone with no recorded fetch warns that it has never been fetched, with the
+  same fetch hint. Reads never update the timestamp; a successful `--fetch` does.
 
 ## 11. Agent integration
 
@@ -1041,9 +1079,10 @@ state; the tests check this with golden output.
   is byte-stable.
 - `warnings` is always present. `retry_after_s` is present only when set.
 - `next_by` says who acts on the `next` commands: by default `human` for `human_only`
-  and `env`, otherwise `agent`. An error can override its code's default; the one that
-  does is a proposal refusal shown to an agent, which is `human` because its `next` is
-  the human's triage. The human works through an agent
+  and `env`, otherwise `agent`. An error can override its code's default. A proposal refusal
+  shown to an agent is `human`, because its `next` is the human's triage. A code
+  read's timeout or failed `--fetch` (§10) is `agent`, because narrowing the read or
+  reading the cached ref comes first. The human works through an agent
   (D38), so for `human` the agent asks the human in chat; for `human_only` it then
   runs the printed command with `--approved "<their words>"`.
 - `schema` is the envelope version. Before DF0, data shapes may narrow without a

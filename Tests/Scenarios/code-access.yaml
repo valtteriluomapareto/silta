@@ -1,0 +1,15 @@
+fixtures: true
+steps:
+  - args: [init, --scan, ., --json]
+    cwd: fixtures
+    expect: {exit: 0, json: {data.workspace: fixtures}}
+  - args: [--ws, fixtures, code, show, acme-platform-portal, portal/README.md, --json]
+    expect: {exit: 0, json: {data.output: "Acme portal\n", data.sha: 47a7447ffb884b94b171dbb28ab5bce81551aecc, warnings.0.code: ref_stale}}
+  - args: [--ws, fixtures, code, show, acme-platform-portal@origin/api, api/README.md, --json]
+    expect: {exit: 0, json: {data.output: "Acme API\n", data.sha: e07a45fbad7104e01181181c5164fb0d2fb593c4}}
+  - args: [--ws, fixtures, code, show, acme-platform-portal, portal/README.md, --prod, --json]
+    expect: {exit: 0, json: {data.ref: origin/portal-prod, data.output: "Acme portal\n"}}
+  - args: [--ws, fixtures, code, show, acme-platform-portal@missing, README.md, --json]
+    expect: {exit: 2, code: not_found}
+  - args: [--ws, fixtures, code, show, acme-platform-portal, missing, --json]
+    expect: {exit: 2, code: not_found}

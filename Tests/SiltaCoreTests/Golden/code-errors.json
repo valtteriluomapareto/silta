@@ -1,0 +1,5 @@
+{"error":{"code":"invalid","message":"Use an app-relative path.","next":["silta code show --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"not_found","message":"Git ref missing.","next":["silta --ws 'acme' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Could not read code in \"platform\"; check the local clone and git environment.","next":["silta --ws 'acme' repo fetch 'platform'"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Git took longer than 10 s; narrow the read and retry.","next":["silta code grep --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Could not fetch \"platform\"; check network access and noninteractive git credentials, or read the cached ref without --fetch.","next":["silta --ws 'acme' code ls 'api'"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
