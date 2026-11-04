@@ -127,11 +127,8 @@ package enum TaskError: CodedError, Equatable {
     switch self {
     case .blocked(let ref, let waiting):
       waiting.ready ? ["silta task unblock \(ref)"] : ["silta task ls --status todo"]
-    case .promoted: ["silta task ls --status todo"]
-    case .claimed(_, _, _, false, let workspace):
-      ["silta --ws \(shellWord(workspace)) task ls --status todo"]
-    case .claimed(let ref, _, _, true, let workspace):
-      ["silta --ws \(shellWord(workspace)) task start \(ref) --steal"]
+    case .promoted, .claimed(_, _, _, false, _): ["silta task ls --status todo"]
+    case .claimed(let ref, _, _, true, _): ["silta task start \(ref) --steal"]
     case .edited(let ref): ["silta task show \(ref)"]
     case .proposal(let ref, let human):
       ["silta task triage --accept \(ref)" + (human ? "" : " --approved \"<the human's words>\"")]

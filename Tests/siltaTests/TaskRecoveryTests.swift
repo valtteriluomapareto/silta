@@ -30,6 +30,9 @@ struct TaskRecoveryTests {
         #expect(
           (json ? result.stdout : result.stderr).contains("silta --ws 'acme' task ls --status todo")
         )
+        #expect(
+          (json ? result.stdout : result.stderr).contains(
+            "silta --ws 'acme' task start AC-1 --steal"))
         let retry = try SiltaBinary.run(
           ["--ws", "acme", "task", "show", "AC-1", "--json"], in: scratch)
         #expect(retry.termination == .exit(0))

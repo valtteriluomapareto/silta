@@ -27,12 +27,13 @@ extension TaskService {
     try validateResult(content.0, commit: commit)
     let before = try show(ref)
     let at = environment.clock.now()
-    try closable(before, dropped: dropped, commit: commit, audit: audit, at: at)
+    let slug = try selected()
+    try validateClaim(before, workspace: slug, at: at)
+    try closable(before, dropped: dropped, commit: commit, audit: audit)
     let git = try await TaskGit.inspect(
       repo: before.repoPath, directory: Self.completionDirectory(before, fallback: directory),
       runner: environment.git,
       enabled: !dropped && !commit.noSHA && before.appID != nil, completion: true, sha: commit.sha)
-    let slug = try selected()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, workspace: slug, at: at)
@@ -94,9 +95,8 @@ extension TaskService {
 
   /// Everything a close checks before git runs, so a refusal never waits on git.
   private func closable(
-    _ task: TaskDetails, dropped: Bool, commit: TaskCommit, audit: String, at date: Date
+    _ task: TaskDetails, dropped: Bool, commit: TaskCommit, audit: String
   ) throws {
-    try validateClaim(task, workspace: try selected(), at: date)
     try canClose(task, dropped: dropped)
     if commit.sha != nil, task.appID == nil || dropped {
       throw TaskError.invalid("--sha requires an app task completed with done.")

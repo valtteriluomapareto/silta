@@ -42,16 +42,9 @@ struct TaskOutputRegressionTests {
           home, actor: .agent(tool: "codex", session: "rival")))
       let refusal = #expect(throws: TaskError.self) { _ = try rival.archive("AC-1") }
       #expect(refusal?.message.contains("ask the human before stealing") == true)
-      let human = TaskService(
-        environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
-      let own = #expect(throws: TaskError.self) { _ = try human.archive("AC-1") }
-      let error = try Self.json(try #require(own))
-      #expect(refusal?.next == ["silta --ws 'acme' task ls --status todo"])
       #expect(
         refusal?.message.contains(
           "silta --ws 'acme' task start AC-1 --steal --approved \"<the human's words>\"") == true)
-      #expect(error["next"] as? [String] == ["silta --ws 'acme' task start AC-1 --steal"])
-      #expect(error["next_by"] as? String == "agent")
     }
   }
 
