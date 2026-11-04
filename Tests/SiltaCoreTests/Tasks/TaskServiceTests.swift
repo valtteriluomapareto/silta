@@ -34,6 +34,19 @@ struct TaskServiceTests {
       session: "acme")
   }
 
+  @Test func environmentsForOneActorUseDistinctIDSources() throws {
+    try withScratchDirectory { home in
+      let clock = FakeClock(now: Self.now)
+      let first = try Self.environment(home, clock: clock)
+      let second = try Self.environment(home, clock: clock)
+      withKnownIssue("SI-30: environments sharing a seed reuse ids") {
+        let firstID = try? first.ids.next(at: Self.now)
+        let secondID = try? second.ids.next(at: Self.now)
+        #expect(firstID != secondID)
+      }
+    }
+  }
+
   @Test func creationMatrixParentIsolationAndAtomicSequences() async throws {
     try await withScratchDirectory { home in
       let env = try Self.environment(home)
