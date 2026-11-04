@@ -169,6 +169,22 @@ struct DoctorServiceTests {
     }
   }
 
+  @Test(arguments: ["2026-11-04T15:21:11.859Z", "2026-11-04T13:46:12.426Z"])
+  func freshClaimWithCanonicalMillisecondsIsNotReported(claimedAt: String) async throws {
+    try await withScratchDirectory { home in
+      let (_, queue) = try seedClaim(home, excess: -1)
+      try await queue.write {
+        try $0.execute(sql: "UPDATE task SET claimed_at=?", arguments: [claimedAt])
+      }
+      let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+      let at = try format.parse(claimedAt).addingTimeInterval(29 * 60)
+      let report = await inspect(home, at: at)
+      withKnownIssue("SI-22: The fractional-second round trip rejects valid milliseconds") {
+        #expect(report.checks.first { $0.id == "data.claims" }?.status == .pass)
+      }
+    }
+  }
+
   private func seedClaim(_ home: URL, excess: Double) throws -> (URL, DatabaseQueue) {
     let store = StorageSchemaTests.store(home)
     try store.initialize()
