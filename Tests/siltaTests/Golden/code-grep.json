@@ -1,0 +1,1 @@
+{"data":{"app":"console","output":"README.md:1:Acme console\n","ref":"origin/api","sha":"e07a45fbad7104e01181181c5164fb0d2fb593c4"},"ok":true,"schema":1,"warnings":[{"code":"ref_stale","message":"No fetch recorded; run silta --ws 'acme' repo fetch 'platform' (needs network)."}]}

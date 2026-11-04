@@ -768,10 +768,29 @@ silta code ls   <app>[@<ref>] [<dir>]
   environment `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`; a 10 s
   timeout per call (fetch 60 s).
 - Output carries the resolved sha.
+- JSON data is `{app, ref, sha, output}`; `output` is UTF-8 text. Text starts with
+  `<app>@<ref> <sha>`, followed by the output. `--quiet` preserves this read output.
+  All four commands accept `--prod` and `--fetch`; `@ref` and `--prod` together are
+  invalid. A missing `prod_ref` points to workspace configuration.
+- Paths are relative to the app's subpath, or the repo root when none is set.
+  `show`, `log` and `ls` paths are literal. `grep` skips binary files and accepts one
+  relative wildcard pathspec after `--`, but no leading-colon Git magic. Absolute paths and `..`
+  components are invalid. Grep output uses app-relative `path:line:text`; `ls`
+  lists names relative to the requested directory. No matches in grep or log are
+  an empty success; missing show/ls paths are `not_found`.
+- Names containing control characters, quotes or backslashes are double-quoted
+  with backslash escapes. Other names, including Unicode, display literally.
+  Invalid Git basic regular expressions are `invalid`; broken clones and missing
+  objects are `env`, rather than a missing ref or path.
+- `--lines A-B` selects positive inclusive lines, truncating at EOF. `log -n`
+  is positive and defaults to 20; each line is `<full sha> <subject>`. Color,
+  decoration, external diffs and text conversion are disabled for code reads.
 - When the repo hasn't been fetched for 24 h, output warns: "fetched N h ago; run
   `silta repo fetch platform` (needs network)". `--fetch` fetches first. Inside a sandbox
   without network the fetch fails fast with exit 9 and a hint, never a credential
   prompt.
+- A clone with no recorded fetch warns that it has never been fetched, with the
+  same fetch hint. Reads never update the timestamp; a successful `--fetch` does.
 
 ## 11. Agent integration
 

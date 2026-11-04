@@ -1,0 +1,6 @@
+error: Use an app-relative path. [invalid]
+next: silta code show --help
+error: Git ref missing. [not_found]
+next: silta --ws 'acme' ws show
+error: Could not read code in "platform"; check the local clone and git environment. [env]
+ask human: silta --ws 'acme' repo fetch 'platform'

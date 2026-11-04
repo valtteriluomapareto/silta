@@ -1,0 +1,1 @@
+{"data":{"app":"portal","output":"47a7447ffb884b94b171dbb28ab5bce81551aecc Add Acme portal\n","ref":"origin/portal","sha":"47a7447ffb884b94b171dbb28ab5bce81551aecc"},"ok":true,"schema":1,"warnings":[{"code":"ref_stale","message":"No fetch recorded; run silta --ws 'acme' repo fetch 'platform' (needs network)."}]}
