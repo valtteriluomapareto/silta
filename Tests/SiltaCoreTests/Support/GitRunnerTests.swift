@@ -73,6 +73,19 @@ struct GitRunnerTests {
     }
   }
 
+  @Test func inheritedEnvironmentCannotEnableLazyFetching() async throws {
+    await withKnownIssue("#11: inheritedEnvironmentCannotEnableLazyFetching") {
+      try await withScratchDirectory { scratch in
+        let runner = SystemGitRunner(
+          executable: "/usr/bin/env",
+          environment: ["GIT_NO_LAZY_FETCH": "0"])
+        let result = try await runner.run(GitRequest(arguments: [], directory: scratch))
+        let text = try #require(String(bytes: result.stdout, encoding: .utf8))
+        #expect(text.split(separator: "\n").contains("GIT_NO_LAZY_FETCH=1"))
+      }
+    }
+  }
+
   @Test func largeOutputCannotFillAPipe() async throws {
     try await withScratchDirectory { scratch in
       let script = scratch.appending(path: "git")
