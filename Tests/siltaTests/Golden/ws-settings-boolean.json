@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"line 2: review_gate must be a word: none, any or human; YAML booleans are not settings values","next":["silta ws show 'acme'","silta ws edit 'acme' -F <file> --approved \"<the human's words>\""],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -1,0 +1,3 @@
+error: line 2: review_gate must be none, any or human; did you mean human? [invalid]
+next: silta ws show 'acme'
+next: silta ws edit 'acme' -F <file> --approved "<the human's words>"

@@ -122,13 +122,8 @@ extension TaskService {
   private func gate(_ task: TaskDetails, in db: Database) throws
     -> (warnings: [OutputWarning], unmet: Bool)
   {
-    let raw =
-      try String.fetchOne(
-        db, sql: "SELECT settings FROM workspace WHERE id=?",
-        arguments: [task.workspaceID]) ?? "{}"
-    let settings = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any]
-    let gate = settings?["review_gate"] as? String ?? "none"
-    if gate == "human" {
+    let settings = try WorkspaceSettings.read(workspaceID: task.workspaceID, in: db)
+    if settings.reviewGate == .human {
       let approved =
         try Bool.fetchOne(
           db,
@@ -138,7 +133,7 @@ extension TaskService {
             """, arguments: [task.id]) ?? false
       return ([], !approved)
     }
-    if gate == "any" {
+    if settings.reviewGate == .any {
       let latest = try String.fetchOne(
         db,
         sql: """

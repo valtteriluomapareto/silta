@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"line 2: review_gate must be none, any or human; did you mean human?","next":["silta ws show 'acme'","silta ws edit 'acme' -F <file> --approved \"<the human's words>\""],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

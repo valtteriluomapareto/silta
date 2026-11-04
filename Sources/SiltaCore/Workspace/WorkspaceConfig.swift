@@ -81,9 +81,11 @@ package struct WorkspaceConfig {
     return keys.map { node[$0]?.string ?? "" }.joined(separator: "\n")
   }
 
-  fileprivate static func suggestion(_ value: String, among candidates: [String]) -> String {
+  fileprivate static func suggestion(
+    _ value: String, among candidates: [String], maximumDistance: Int = 2
+  ) -> String {
     let ranked = candidates.sorted().map { ($0, distance(value, $0)) }
-    guard let best = ranked.min(by: { $0.1 < $1.1 }), best.1 <= 2 else { return "" }
+    guard let best = ranked.min(by: { $0.1 < $1.1 }), best.1 <= maximumDistance else { return "" }
     return "; did you mean \(best.0)?"
   }
 
@@ -171,8 +173,14 @@ private struct WorkspaceValidation {
         problem(entry[key] ?? entry, "invalid \(key)")
       }
     }
-    if let gate = entry["review_gate"]?.string, !["none", "any", "human"].contains(gate) {
-      problem(entry["review_gate"] ?? entry, "review_gate must be none, any or human")
+    let gates = WorkspaceSettings.ReviewGate.allCases.map(\.rawValue)
+    if let node = entry["review_gate"], node.tag == Tag(.str),
+      let gate = node.string, !gate.isEmpty, !gates.contains(gate)
+    {
+      problem(
+        node,
+        "review_gate must be none, any or human"
+          + WorkspaceConfig.suggestion(gate, among: gates, maximumDistance: .max))
     }
     if let lifecycle = entry["lifecycle"]?.string,
       !["active", "legacy", "dead"].contains(lifecycle)
@@ -197,6 +205,10 @@ private struct WorkspaceValidation {
         if value.int == nil || (value.int ?? -1) < 0 {
           problem(value, "\(key) must be a nonnegative integer")
         }
+      } else if key == "review_gate", value.tag == Tag(.bool) {
+        problem(
+          value,
+          "review_gate must be a word: none, any or human; YAML booleans are not settings values")
       } else if value.tag != Tag(.str) || (value.string ?? "").isEmpty {
         problem(value, "\(key) must be a nonempty string")
       }
