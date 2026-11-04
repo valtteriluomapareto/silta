@@ -532,3 +532,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     waited for review. `done` is terminal, so review findings would have had nowhere
     to go. And with the author's claim kept through review, the merging session got
     `claimed` for up to 2 h.
+  - ↳ update (2026-11-04, after S7): until a `changes` verdict exists, reviews are PR
+    comments that start with `Review: changes (round N)` or `Review: approve`, and
+    `scripts/dogfood-finish.sh` does the merger's steps. A coordinating agent may run
+    Codex itself with `scripts/dogfood-codex.sh` and poll Silta for `review`, so the
+    maintainer no longer relays prompts. S7 needed eight relays and no decisions.

@@ -55,6 +55,29 @@ runs before that choice; it does not implement those policies itself.
 Follow the DF0 rules in [AGENTS.md](../../AGENTS.md#dogfooding). Questions and
 handoffs stay on the slice issue until DF1.
 
+## Drive Codex from another agent
+
+A coordinating agent can run Codex itself instead of asking the maintainer to paste
+prompts:
+
+1. Create Codex's worktree outside the repository, e.g.
+   `git worktree add --detach ~/.codex/worktrees/<slice>/silta origin/main`.
+2. Start Codex with `scripts/dogfood-codex.sh start <worktree> <log> <<'EOF'`, giving
+   the slice prompt on stdin. It prints the thread id and Codex's last message.
+3. Poll `silta --ws silta task show <ref>` every 5 minutes until the task is in
+   `review`; then review the PR and post a `Review:` comment.
+4. Send review rounds to the same session with
+   `scripts/dogfood-codex.sh resume <thread> <log> <<'EOF'`.
+5. After the merge, run `scripts/dogfood-finish.sh <ref> <pr>`.
+
+The script removes the caller's agent markers and session variables, so Silta records
+Codex as `agent:codex:<session>`, and Codex never sees them. Codex runs with
+`approval_policy=never`, a workspace-write sandbox with network access, and write
+access to `~/.silta` and the repository's git directory. Model and effort come from
+the maintainer's Codex configuration. Codex stops instead of asking for approval, so
+anything that needs the maintainer comes back in its last message, and the
+coordinating agent relays it in one chat message.
+
 ## Review friction
 
 Once per wave, and at least every 60 days, an agent runs
