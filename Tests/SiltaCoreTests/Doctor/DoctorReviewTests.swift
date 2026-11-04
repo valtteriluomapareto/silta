@@ -63,7 +63,8 @@ struct DoctorReviewTests {
       #expect(failure.next.first?.hasPrefix("/bin/ls -l ") == true)
       #expect(failure.message.contains("restore"))
       for id in ["database.wal", "data.backup"] {
-        #expect(report.checks.first { $0.id == id }?.status != .skipped)
+        let fileCheck = try #require(report.checks.first { $0.id == id })
+        #expect(fileCheck.status != .skipped)
       }
       #expect(
         failure.next.filter { $0.contains("sqlite3") }.allSatisfy { $0.contains("-readonly") })
@@ -179,6 +180,7 @@ struct DoctorReviewTests {
       let store = StorageSchemaTests.store(home)
       try store.initialize()
       _ = try store.write { _ in () }
+      let beforeCount = DoctorBackups(home: home, at: now).count
       let daily = home.appending(path: "backups/silta-2023-11-14.db")
       if kind == "empty" {
         try Data().write(to: daily)
@@ -186,7 +188,25 @@ struct DoctorReviewTests {
         try FileManager.default.moveItem(
           at: daily, to: home.appending(path: "backups/silta-2099-01-01.db"))
       }
+      let inventory = DoctorBackups(home: home, at: now)
+      #expect(inventory.days.isEmpty)
+      #expect(inventory.count == beforeCount - 1)
       #expect(await inspect(home).checks.first { $0.id == "data.backup" }?.status == .warning)
+    }
+  }
+
+  @Test func incompatibleSchemaRequestsHumanInstallation() async throws {
+    try await withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      try store.initialize()
+      try store.write {
+        try $0.database.execute(sql: "UPDATE meta SET value='999' WHERE key='min_writer_version'")
+      }
+      let report = await inspect(home)
+      let check = try #require(report.checks.first { $0.id == "database.schema" })
+      #expect(check.nextBy == .human)
+      #expect(DoctorFailure(report: report).nextBy == .human)
+      #expect(report.text.contains("ask human: <clean-main-checkout>/scripts/install-dev.sh"))
     }
   }
 
