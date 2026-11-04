@@ -6,7 +6,8 @@ import Testing
 
 struct CommentCorrectionCommandTests {
   @Test func bodyReadKeepsTheResolvedWorkspace() throws {
-    withKnownIssue("#13: reproduce SI-29 round 1 finding") {
+    withKnownIssue("#13: workspace changes while stdin is read") {
+
       try withScratchDirectory { scratch in
         let store = try CommentHandoffTests.setup(scratch)
         try store.write {
@@ -15,30 +16,38 @@ struct CommentCorrectionCommandTests {
               "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('other','other','Other','OT')"
           )
         }
-        let binary = shellWord(try SiltaBinary.url().path)
-        let fifo = shellWord(scratch.appending(path: "body.fifo").path)
         let script = """
-          mkfifo \(fifo)
-          (
-            exec 3> \(fifo)
-            \(binary) ws use other --json >/dev/null
-            printf 'Acme body' >&3
-          ) &
-          \(binary) comment AC-1 -F \(fifo) --json
-          status=$?
-          wait
-          exit "$status"
+          import socket, subprocess, sys
+          binary = sys.argv[1]
+          reader, writer = socket.socketpair()
+          writer.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1024)
+          reader.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024)
+          assert writer.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF) < 8000
+          child = subprocess.Popen([binary, 'comment', 'AC-1', '-F', '-', '--json'],
+              stdin=reader, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          reader.close()
+          writer.sendall(b'A' * 8000)
+          subprocess.run([binary, 'ws', 'use', 'other', '--json'], check=True,
+              stdout=subprocess.DEVNULL)
+          writer.shutdown(socket.SHUT_WR)
+          stdout, stderr = child.communicate(timeout=20)
+          writer.close()
+          sys.stdout.buffer.write(stdout)
+          sys.stderr.buffer.write(stderr)
+          sys.exit(child.returncode)
           """
         let result = try SiltaBinary.runProcess(
-          URL(filePath: "/bin/sh"), ["-c", script],
+          URL(filePath: "/usr/bin/python3"), ["-c", script, try SiltaBinary.url().path],
           in: scratch, environment: TaskCommandTests.fixed)
-        #expect(result.termination == .exit(0))
+        #expect(result.termination == .exit(0), "\(result.stdout) \(result.stderr)")
         #expect(
           try store.read {
             try Int.fetchOne($0, sql: "SELECT count(*) FROM comment WHERE task_id=1")
           } == 1)
       }
 
+    
+  
     }
   }
 
