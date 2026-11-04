@@ -77,7 +77,7 @@ package struct TaskImportResult: Encodable, Sendable {
   /// Real committed references; empty for a preview.
   package let tasks: [TaskResult]
 
-  /// Secret policy and postcommit cleanup warnings.
+  /// Secret policy, preview consent and postcommit cleanup warnings.
   package var warnings: [OutputWarning] = []
 
   /// Whether the import recorded consent; never encoded or used by a preview.

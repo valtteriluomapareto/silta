@@ -13,16 +13,15 @@ extension TaskService {
     let preview = try importPreview(parsed, options: options)
     let warnings = redacted ? [SecretGuard.warning] : []
     if options.dryRun {
-      return TaskImportResult(dryRun: true, preview: preview, tasks: [], warnings: warnings)
+      return try dryRun(parsed, options: options, preview: preview, warnings: warnings)
     }
     let cleanup = try await sourceToDelete(text, options: options, source: source, in: directory)
     let slug = try selected()
     let creations = try importCreations(parsed, options: options, redacted: redacted)
     let result = try environment.db.write { tx in
-      let retry = (
-        "silta --ws " + shellWord(slug) + String(options.retryCommand.dropFirst(5)), nil as String?
-      )
-      let inserted = try insert(creations[0], workspace: slug, retry: retry, in: tx)
+      let retry = (scopedCommand(options.retryCommand, workspace: slug), nil as String?)
+      let inserted = try insert(
+        creations[0], workspace: slug, retry: retry, count: creations.count, in: tx)
       let root = inserted.task
       var tasks = [root]
       if options.split {
@@ -30,7 +29,7 @@ extension TaskService {
           child.draft.parent = root.ref
           tasks.append(
             try insert(
-              child, workspace: slug, status: Self.childStatus(root.status), retry: retry, in: tx
+              child, workspace: slug, status: Self.childStatus(root.status), in: tx
             ).task)
         }
       } else {
@@ -56,6 +55,37 @@ extension TaskService {
             "Tasks committed; source was retained. Inspect it and remove it manually if safe."))
     }
     return completed
+  }
+
+  private func dryRun(
+    _ plan: MarkdownPlan, options: TaskImport, preview: TaskImportPreview,
+    warnings: [OutputWarning]
+  ) throws -> TaskImportResult {
+    var result = TaskImportResult(dryRun: true, preview: preview, tasks: [], warnings: warnings)
+    guard preview.status == "proposed" else { return result }
+    let policy: WorkspaceSettings.Proposals?
+    do {
+      let slug = try selected()
+      policy = try environment.db.read {
+        try WorkspaceSettings.read(workspaceID: Self.workspaceID(slug, in: $0), in: $0).proposals
+      }
+    } catch WorkspaceError.notFound where workspace == nil {
+      policy = nil
+    }
+    if approved != nil || policy == .ask {
+      result = TaskImportResult(
+        dryRun: true, preview: try importPreview(plan, options: options, rootStatus: "todo"),
+        tasks: [], warnings: warnings)
+    }
+    if approved == nil, policy == .ask {
+      let count = options.split ? plan.steps.count + 1 : 1
+      result.warnings.append(
+        OutputWarning(
+          code: "proposal_approval_required",
+          message: "This workspace sets proposals: ask; the real run needs the human's go-ahead "
+            + "in chat and will create \(count) task\(count == 1 ? "" : "s") as todo."))
+    }
+    return result
   }
 
   private func preparedImport(_ text: String, options: TaskImport, source: URL?) throws

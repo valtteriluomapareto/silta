@@ -532,8 +532,11 @@ triage, or leave the inbox after 14 days as usual.
 --split` children take the root's status, decided once per import: `todo` under a
 `todo` or `doing` root, `proposed` under a `proposed` one; `--dry-run` shows the same
 (D40). A title is one line without control characters.
-An ungated dry run ignores unused approval words and previews the ordinary creation
-status; it never treats `--approved` as consent to create anything.
+A dry run validates or records no approval words and remains ungated. With
+`--approved`, would-be proposals preview `todo` and warn `approval_unused`.
+Under `proposals: ask` without approval, they also preview `todo`, with a warning
+that the real run needs the human's go-ahead in chat and creates `todo`. Split
+children preview the same status; refusals and consent warnings name the task count.
 
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
 just created; `--status proposed` lists everyone's (it implies `--proposed`). Promoted

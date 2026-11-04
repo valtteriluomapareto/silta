@@ -3,8 +3,9 @@ package enum ActorError: CodedError {
   /// The caller supplies a body-free retry command with safely quoted identifiers.
   case humanOnly(command: String, actor: ActorID)
 
-  /// A proposal policy gate; an add title follows options and the approval placeholder.
-  case proposalPolicy(command: String, actor: ActorID, title: String?)
+  /// A proposal policy gate names the task count and authorized status; an add title
+  /// follows options and the approval placeholder.
+  case proposalPolicy(command: String, actor: ActorID, title: String?, count: Int = 1)
 
   /// An unblock of tasks that aren't ready, each named with what it still waits on, so
   /// the agent can tell the human why.
@@ -52,10 +53,11 @@ package enum ActorError: CodedError {
     switch self {
     case .humanOnly(_, let actor):
       return "This command needs the human's go-ahead; ask in chat. \(Self.detected(actor))"
-    case .proposalPolicy(_, let actor, _):
+    case .proposalPolicy(_, let actor, _, let count):
       return
-        "Workspace proposals: ask requires the human's go-ahead before creating a proposed task; "
-        + "ask in chat. \(Self.detected(actor))"
+        "This workspace sets proposals: ask; creating \(count == 1 ? "this task" : "these \(count) tasks") "
+        + "needs the human's go-ahead in chat, and with it "
+        + "\(count == 1 ? "the task is" : "the tasks are") created as todo. \(Self.detected(actor))"
     case .notReady(_, let actor, let waits):
       return waits.map(\.text).joined(separator: "; ")
         + "; unblocking needs the human's go-ahead, so ask in chat. "
@@ -70,7 +72,7 @@ package enum ActorError: CodedError {
     switch self {
     case .humanOnly(let command, _), .notReady(let command, _, _):
       [command + " --approved \"<the human's words>\""]
-    case .proposalPolicy(let command, _, let title):
+    case .proposalPolicy(let command, _, let title, _):
       [
         command + " --approved \"<the human's words>\""
           + (title.map { " -- " + shellWord($0) } ?? "")

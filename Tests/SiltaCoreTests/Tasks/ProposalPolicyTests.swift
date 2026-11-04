@@ -133,10 +133,14 @@ struct ProposalPolicyTests {
         let result = try await service.fromPlan(
           TaskImportTests.text, options: options, directory: home)
         let used = approved && !preview && ordinary == "proposed"
-        let status = used ? "todo" : ordinary
+        let authorized = approved || policy == "ask" && preview
+        let status = ordinary == "proposed" && authorized ? "todo" : ordinary
         #expect(result.preview.status == status)
         #expect(result.preview.steps.allSatisfy { $0.status == (split ? status : nil) })
         if preview {
+          #expect(
+            result.warnings.contains { $0.code == "proposal_approval_required" }
+              == (policy == "ask" && !approved && ordinary == "proposed"))
           #expect(result.tasks.isEmpty)
           #expect(try Self.snapshot(env) == before)
         } else {
@@ -148,6 +152,9 @@ struct ProposalPolicyTests {
     }
   }
 
+}
+
+extension ProposalPolicyTests {
   @Test(arguments: ["triage", "ask"], ["add", "checklist", "split"])
   func combinedSecretConsentRecordsOnce(policy: String, operation: String) async throws {
     try await withScratchDirectory { home in

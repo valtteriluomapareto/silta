@@ -6,6 +6,28 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct ProposalCommandTests {
+  @Test(arguments: [false, true], [false, true])
+  func previewDescribesAuthorizedOutcome(approved: Bool, json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try Self.setup(scratch)
+      let file = scratch.appending(path: "plan.md")
+      try "# Acme\n\nContext\n\n- First\n- Second\n".write(
+        to: file, atomically: true, encoding: .utf8)
+      let result = try SiltaBinary.run(
+        ["task", "from-plan", file.path, "--split", "--dry-run"]
+          + (approved ? ["--approved", "<unused>"] : []) + (json ? ["--json"] : []),
+        in: scratch, environment: TaskCommandTests.actor)
+      #expect(result.termination == .exit(0))
+      if json { #expect(result.stderr.isEmpty) }
+      Golden.forTests().check(
+        json ? result.stdout : result.stdout + result.stderr,
+        "task-from-plan-\(approved ? "approved" : "ask")-preview.\(json ? "json" : "txt")")
+      for table in ["task", "approval", "task_event", "seq_counter"] {
+        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM \(table)") } == 0)
+      }
+    }
+  }
+
   static func setup(_ scratch: URL) throws -> DatabaseStore {
     let store = try TaskCommandTests.setup(scratch)
     try store.write {
@@ -62,7 +84,7 @@ struct ProposalCommandTests {
         args + ["--dry-run", "--allow-secret", "--approved", "<unused>", "--json"],
         in: scratch, environment: TaskCommandTests.actor)
       #expect(preview.termination == .exit(0))
-      #expect(preview.stdout.contains("approval_unused") && preview.stdout.contains("proposed"))
+      #expect(preview.stdout.contains("approval_unused") && preview.stdout.contains("todo"))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 0)
       let approved = try SiltaBinary.run(
         args + ["--approved", "Import Acme work", "--json"], in: scratch,

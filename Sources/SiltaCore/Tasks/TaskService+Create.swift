@@ -17,7 +17,7 @@ extension TaskService {
     return try environment.db.write { tx in
       let command = prepared.draft.command + (draft.allowSecret ? " --allow-secret" : "")
       let retry =
-        "silta --ws " + shellWord(slug) + String(command.dropFirst(5))
+        scopedCommand(command, workspace: slug)
         + (bodyFlag == nil ? "" : " -F <file>")
       let inserted = try insert(
         prepared, workspace: slug, retry: (retry, prepared.draft.title), in: tx)
@@ -52,7 +52,7 @@ extension TaskService {
   /// children inherit an already-decided root status without recording extra consent.
   func insert(
     _ creation: TaskCreation, workspace: String, status override: String? = nil,
-    retry: (command: String, title: String?),
+    retry: (command: String, title: String?)? = nil, count: Int = 1,
     in tx: StorageTransaction
   ) throws -> (task: TaskResult, approval: HumanApproval?) {
     let draft = creation.draft
@@ -69,10 +69,11 @@ extension TaskService {
     var status = override ?? creationStatus(parent: parent, start: draft.start)
     var consent: HumanApproval?
     if override == nil, status == "proposed" {
+      let retry = retry ?? (scopedCommand(draft.command, workspace: workspace), draft.title)
       let policy = try WorkspaceSettings.read(workspaceID: ws, in: db).proposals
       if policy == .ask, approved == nil {
         throw ActorError.proposalPolicy(
-          command: retry.command, actor: environment.actor, title: retry.title)
+          command: retry.command, actor: environment.actor, title: retry.title, count: count)
       }
       consent = try approval(required: approved != nil, command: retry.command)
       if consent != nil { status = "todo" }
