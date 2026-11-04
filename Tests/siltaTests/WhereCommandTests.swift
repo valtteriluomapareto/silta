@@ -13,7 +13,7 @@ struct WhereCommandTests {
         ("master", "platform", "exact_ref"), ("api", "api", "exact_ref"),
         ("api-prod", "api", "exact_ref"), ("portal-prod", "portal", "exact_ref"),
         ("renamed", "platform", "reflog"), ("rebased", "portal", "reflog"),
-        ("non-app", "platform", "reflog"), ("from-non-app", "", "origin_unknown"),
+        ("non-app", "platform", "reflog"), ("from-non-app", "", "distance"),
       ] {
         try git(["checkout", "-q", branch], repo, scratch)
         let result = try run([], repo, scratch)
@@ -69,13 +69,14 @@ struct WhereCommandTests {
       try git(["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
       let missing = try run([], repo, scratch)
       #expect(missing.stdout.contains("ref_missing"))
-      #expect(try data(missing)["app"] as? String == "api")
+      #expect(try data(missing)["app"] == nil)
+      #expect(try data(missing)["confidence"] as? String == "low")
       let shallow = scratch.appending(path: "fixtures/acme-shallow")
       let store = store(scratch)
       try store.write {
         try $0.database.execute(sql: "UPDATE repo_path SET path=?", arguments: [shallow.path])
       }
-      #expect(try data(run([], shallow, scratch))["reason"] as? String == "single")
+      #expect(try data(run([], shallow, scratch))["reason"] as? String == "exact_ref")
       try git(["update-ref", "refs/remotes/origin/portal", "HEAD"], shallow, scratch)
       try git(["checkout", "-q", "--detach"], shallow, scratch)
       let incomplete = try data(run([], shallow, scratch))
@@ -269,7 +270,7 @@ struct WhereCommandTests {
 }
 
 extension WhereCommandTests {
-  @Test func delayedCheckoutCannotEstablishBranchCreationOrigin() throws {
+  @Test func delayedCheckoutUsesDistanceInsteadOfLaterCheckoutOrigin() throws {
     try withScratchDirectory { scratch in
       let repo = try setup(scratch)
       try git(["checkout", "-qB", "release/acme", "master"], repo, scratch)
@@ -277,9 +278,9 @@ extension WhereCommandTests {
       try git(["checkout", "-q", "master"], repo, scratch)
       try git(["checkout", "-q", "delayed-topic"], repo, scratch)
       let result = try data(run([], repo, scratch))
-      #expect(result["confidence"] as? String == "low")
-      #expect(result["app"] == nil)
-      #expect(result["reason"] as? String == "origin_unknown")
+      #expect(result["confidence"] as? String == "high")
+      #expect(result["app"] as? String == "platform")
+      #expect(result["reason"] as? String == "distance")
     }
   }
 
@@ -300,19 +301,19 @@ extension WhereCommandTests {
     }
   }
 
-  @Test func implicitNonAppOriginIsNotADistanceGuess() throws {
+  @Test func implicitCreationWithoutNamedEvidenceUsesDistance() throws {
     try withScratchDirectory { scratch in
       let repo = try setup(scratch)
       try git(["checkout", "-qB", "release/acme", "master"], repo, scratch)
       try git(["checkout", "-qb", "implicit-topic"], repo, scratch)
       let result = try data(run([], repo, scratch))
-      #expect(result["confidence"] as? String == "low")
-      #expect(result["reason"] as? String == "origin_unknown")
-      #expect(result["app"] == nil)
+      #expect(result["confidence"] as? String == "high")
+      #expect(result["reason"] as? String == "distance")
+      #expect(result["app"] as? String == "platform")
     }
   }
 
-  @Test func missingRefsAreSkippedBeforeAnySelection() throws {
+  @Test func missingRefsDoNotCreateFalseSingleCandidates() throws {
     try withScratchDirectory { scratch in
       let repo = try setup(scratch)
       try git(["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
@@ -320,9 +321,10 @@ extension WhereCommandTests {
       #expect(attached.stdout.contains("ref_missing"))
       try git(["update-ref", "-d", "refs/remotes/origin/api"], repo, scratch)
       let result = try data(run([], repo, scratch))
-      #expect(result["app"] as? String == "platform")
-      #expect(result["reason"] as? String == "single")
-      #expect((result["candidates"] as? [[String: String]])?.count == 1)
+      #expect(result["app"] == nil)
+      #expect(result["confidence"] as? String == "low")
+      #expect(result["reason"] as? String == "distance")
+      #expect((result["candidates"] as? [[String: String]])?.count == 3)
     }
   }
 

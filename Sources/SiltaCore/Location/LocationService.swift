@@ -59,7 +59,9 @@ package struct LocationService {
     {
       return picked(taskApp, "task")
     }
-    if let evidence = try await git.evidence(branch: branch, candidates: candidates) {
+    let available = candidates.filter { candidate in context.refs.contains { $0.0 == candidate.app }
+    }
+    if let evidence = try await git.evidence(branch: branch, candidates: available) {
       result.app = evidence.app
       result.confidence = evidence.app == nil ? "low" : "high"
       result.reason = evidence.reason
@@ -132,12 +134,11 @@ package struct LocationService {
       let registered = LocationGit(runner: environment.git, directory: URL(filePath: repo.path))
       let expected = try? await registered.commonDirectory()  // Skip stale registrations.
       guard expected == common else { continue }
-      var candidates: [LocationCandidate] = []
+      let candidates = try repo.candidates(at: path, root: root)
       var refs: [(String, String)] = []
       var warnings: [OutputWarning] = []
-      for candidate in try repo.candidates(at: path, root: root) {
+      for candidate in candidates {
         if let sha = try await git.refSHA(candidate.ref) {
-          candidates.append(candidate)
           refs.append((candidate.app, sha))
         } else {
           warnings.append(

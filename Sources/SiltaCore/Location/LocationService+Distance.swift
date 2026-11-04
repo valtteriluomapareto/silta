@@ -7,6 +7,7 @@ extension LocationService {
     let refs = context.refs
     let path = context.path
     let git = context.git
+    guard !refs.isEmpty else { return result }
     if try await git.required(["rev-parse", "--is-shallow-repository"]) == "true" {
       result.reason = "shallow"
       return result
@@ -39,6 +40,10 @@ extension LocationService {
     }
     result.app = distance.app
     result.confidence = distance.confidence
+    if refs.count != candidates.count {
+      result.app = nil
+      result.confidence = "low"
+    }
     result.reason = "distance"
     return result
   }

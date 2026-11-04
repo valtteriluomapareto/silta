@@ -91,7 +91,7 @@ struct LocationGit {
         creation.hasPrefix("branch: Created from ")
       {
         let origin = String(creation.dropFirst("branch: Created from ".count))
-        if origin == "HEAD" { return (nil, "origin_unknown") }
+        if origin == "HEAD" { return nil }
         if let app = match(origin) { return (app, "reflog") }
         return (nil, "non_app_ref")
       }
