@@ -456,7 +456,18 @@ symlinks resolved, case-folded on case-insensitive volumes.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
-- `where --set` is human-only.
+- Explicit `--app <slug>` selects a filtered candidate. An app outside the filtered
+  candidates is `ambiguous_location`, with candidate retries. `--task <ref>` selects
+  task evidence before session claims and branch matches (§8).
+- `where` itself succeeds at low confidence: no app is selected, and its text lists
+  candidates with explicit `--app` commands. Candidate JSON entries are
+  `{"app":"<slug>","ref":"<development ref>"}`, sorted by app slug.
+- `where --set <app>` and `--unset` are human-only. An override applies to the
+  exact canonical input path, not its descendants; both accept `--path <directory>`.
+  Approval retries preserve the workspace and canonical target path.
+- A shallow clone can resolve through earlier rules. Distance inference without
+  complete history returns `low`, reason `shallow`, and is never cached.
+- An explicit non-app reflog origin returns `low`, reason `non_app_ref`.
 - The cache lives in `index.db`, keyed on (path, HEAD sha, hash of candidate ref
   shas). It is written only if the lock is free; it never blocks.
 
@@ -842,7 +853,7 @@ silta code ls   <app>[@<ref>] [<dir>]
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need the human's go-ahead (D38): `promote`, `task edit`,
-  `doc edit|accept|reject`, `where --set`, `task triage`, `--steal` over another
+  `doc edit|accept|reject`, `where --set|--unset`, `task triage`, `--steal` over another
   session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
   `ws edit`, and an agent's `task unblock` of a block that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
@@ -1170,7 +1181,7 @@ silta doctor [--fix]                             [M1]
 silta guide [<topic>] | silta help refs            [M1]
 
 # context
-silta where [--app] [--set <app> | --unset]      [M1]
+silta where [--path <dir>] [--app <app>] [--task <ref>] [--set <app> | --unset]      [M1]
 silta brief [...]                                [M1; docs M2; notes M3]
 silta code show|grep|log|ls <app>[@ref] …        [M1]
 silta search <query> [...]                       [M3]
@@ -1394,7 +1405,9 @@ scriptable and deterministic (D13).
   - A shape `S` is `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`,
     `{"object":{"<field>":S,…}}`, or, as an object field only, `{"optional":S}`. An
     object has exactly its fields. An optional field is absent or has its shape; it's
-    never `null`. Every command's `--json` data matches the shape `schema` publishes
+    never `null`. The required `where.branch` field is a specific exception: a
+    string for an attached branch, `null` for detached HEAD (§7), published as `"any"`.
+    Every command's `--json` data matches the shape `schema` publishes
     for it: each command has a success golden, and a test checks every success
     golden against its command's shape.
   - Text, index: one line per command (`<name>  <abstract>`), then

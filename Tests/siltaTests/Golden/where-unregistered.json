@@ -1,0 +1,1 @@
+{"error":{"code":"unregistered","message":"This path is not in a registered repository.","next":["silta init --scan <directory>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -26,6 +26,7 @@ silta code show  Read a committed file, optionally selecting lines.
 silta code grep  Search committed text, returning app-relative paths and line numbers.
 silta code log  List commit SHA and subject at the selected ref.
 silta code ls  List immediate committed names in an app-relative directory.
+silta where  Resolve the workspace, repository and app for a local path.
 details: silta schema <command>
 
 global flags:
