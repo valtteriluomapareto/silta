@@ -14,6 +14,7 @@ struct DoctorCommand: OutputCommand {
     "checks": .array(
       .object([
         "id": .string, "status": .string, "message": .string, "next": .array(.string),
+        "next_by": .string, "next_omitted": .int,
       ]))
   ])
 
@@ -24,7 +25,7 @@ struct DoctorCommand: OutputCommand {
     let report = await DoctorService.inspect(
       store: env.db, home: env.home.url, git: env.git, at: env.clock.now())
     var output = CommandOutput(text: report.text, quiet: report.text, data: report)
-    if report.checks.contains(where: { $0.status == "fail" }) {
+    if report.checks.contains(where: { $0.status == .fail }) {
       output.failure = DoctorFailure(report: report)
     }
     return output

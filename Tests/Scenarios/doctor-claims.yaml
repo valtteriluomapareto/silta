@@ -11,7 +11,7 @@ steps:
   - args: [doctor, --ws, absent, --json]
     expect:
       exit: 0
-      json: {ok: true, data.checks.0.status: pass, data.checks.8.id: data.claims, data.checks.8.status: pass, data.checks.10.status: skipped}
+      json: {ok: true, data.checks.0.status: pass, data.checks.9.id: data.claims, data.checks.9.status: pass, data.checks.11.status: skipped}
   - args: [task, show, FI-1, --json]
     env: {SILTA_ACTOR: 'agent:codex:later'}
     expect: {exit: 0, json: {data.status: doing, data.claimed_by: 'agent:codex:acme'}}

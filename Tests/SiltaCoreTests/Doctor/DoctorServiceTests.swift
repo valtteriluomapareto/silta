@@ -27,7 +27,7 @@ struct DoctorServiceTests {
       let before = try Data(contentsOf: home.appending(path: "silta.db"))
       let report = await inspect(home, gitFailure: true)
       #expect(
-        report.checks.filter { $0.status == "fail" }.map(\.id) == [
+        report.checks.filter { $0.status == .fail }.map(\.id) == [
           "database.integrity", "git.version",
         ])
       #expect(!report.text.contains("acme-private"))
@@ -60,7 +60,7 @@ struct DoctorServiceTests {
       let report = await inspect(home)
       #expect(
         report.checks.first { $0.id == "database.schema" }?.status
-          == (kind == "future" ? "warning" : "fail"))
+          == (kind == "future" ? .warning : .fail))
       #expect(
         try await queue.read {
           try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations ORDER BY identifier")
@@ -69,7 +69,7 @@ struct DoctorServiceTests {
         #expect(report.checks.first { $0.id == "database.schema" }?.next == ["silta init"])
       }
       if kind != "future" {
-        #expect(report.checks.first { $0.id == "data.claims" }?.status == "skipped")
+        #expect(report.checks.first { $0.id == "data.claims" }?.status == .skipped)
       }
     }
   }
@@ -86,9 +86,9 @@ struct DoctorServiceTests {
         "database.integrity", "database.foreign_keys", "database.schema", "database.wal",
         "git.repos", "data.backup",
       ] {
-        #expect(report.checks.first { $0.id == id }?.status == "pass")
+        #expect(report.checks.first { $0.id == id }?.status == .pass)
       }
-      #expect(report.checks.first { $0.id == "data.claims" }?.status == "fail")
+      #expect(report.checks.first { $0.id == "data.claims" }?.status == .fail)
     }
   }
 
@@ -103,22 +103,25 @@ struct DoctorServiceTests {
         try $0.execute(sql: "INSERT INTO repo(uid,workspace_id,slug) VALUES('orphan',999,'acme')")
       }
       let report = await inspect(home)
-      #expect(report.checks.first { $0.id == "database.foreign_keys" }?.status == "fail")
+      #expect(report.checks.first { $0.id == "database.foreign_keys" }?.status == .fail)
     }
   }
 
-  @Test(arguments: [0.0, 1.0]) func agesAndDeadPathsDoNotChangeTruth(excess: Double) async throws {
+  @Test(arguments: [-1.0, 0.0, 1.0]) func agesAndDeadPathsDoNotChangeTruth(excess: Double)
+    async throws
+  {
     try await withScratchDirectory { home in
       let (repo, queue) = try seedClaim(home, excess: excess)
       let report = await inspect(home)
-      for id in ["git.fetch", "data.claims"] {
-        #expect(report.checks.first { $0.id == id }?.status == (excess == 0 ? "pass" : "warning"))
-      }
-      #expect(report.checks.first { $0.id == "git.repos" }?.status == "pass")
+      #expect(
+        report.checks.first { $0.id == "git.fetch" }?.status == (excess <= 0 ? .pass : .warning))
+      #expect(
+        report.checks.first { $0.id == "data.claims" }?.status == (excess < 0 ? .pass : .warning))
+      #expect(report.checks.first { $0.id == "git.repos" }?.status == .pass)
       try FileManager.default.removeItem(at: repo.appending(path: ".git"))
       let dead = await inspect(home)
-      #expect(dead.checks.first { $0.id == "git.repos" }?.status == "fail")
-      #expect(dead.checks.first { $0.id == "git.overrides" }?.status == "warning")
+      #expect(dead.checks.first { $0.id == "git.repos" }?.status == .fail)
+      #expect(dead.checks.first { $0.id == "git.overrides" }?.status == .warning)
       #expect(!dead.text.contains("private body"))
       #expect(
         dead.checks.first { $0.id == "git.repos" }?.next.contains { $0.contains(repo.path) } == true
@@ -129,14 +132,14 @@ struct DoctorServiceTests {
         } == true)
       try FileManager.default.removeItem(at: repo)
       let missing = await inspect(home)
-      #expect(missing.checks.first { $0.id == "git.overrides" }?.status == "warning")
+      #expect(missing.checks.first { $0.id == "git.overrides" }?.status == .warning)
       try await queue.write {
         try $0.execute(sql: "UPDATE repo_path SET fetched_at='invalid'")
         try $0.execute(sql: "UPDATE task SET claimed_at=NULL")
       }
       let invalid = await inspect(home)
       for id in ["git.fetch", "data.claims"] {
-        #expect(invalid.checks.first { $0.id == id }?.status == "warning")
+        #expect(invalid.checks.first { $0.id == id }?.status == .warning)
       }
       #expect(
         try await queue.read { try String.fetchOne($0, sql: "SELECT claimed_by FROM task") }
@@ -202,25 +205,25 @@ struct DoctorServiceTests {
     return (repo, queue)
   }
 
-  @Test func backupAgeUsesPublishedDailyFilesRatherThanMetadata() async throws {
+  @Test func lastWriteBackupCoverageUsesPublishedFiles() async throws {
     try await withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)
       try store.initialize()
       _ = try store.write { _ in () }
-      #expect(await inspect(home).checks.first { $0.id == "data.backup" }?.status == "pass")
+      #expect(await inspect(home).checks.first { $0.id == "data.backup" }?.status == .pass)
       #expect(
         await inspect(home, at: now.addingTimeInterval(86400 * 2)).checks.first {
           $0.id == "data.backup"
-        }?.status == "warning")
+        }?.status == .pass)
       #expect(
         await inspect(home, at: now.addingTimeInterval(86400)).checks.first {
           $0.id == "data.backup"
-        }?.status == "pass")
+        }?.status == .pass)
       let daily = home.appending(path: "backups/silta-2023-11-14.db")
       try FileManager.default.removeItem(at: daily)
       try FileManager.default.createSymbolicLink(
         at: daily, withDestinationURL: home.appending(path: "silta.db"))
-      #expect(await inspect(home).checks.first { $0.id == "data.backup" }?.status == "warning")
+      #expect(await inspect(home).checks.first { $0.id == "data.backup" }?.status == .warning)
     }
   }
 }
@@ -233,7 +236,7 @@ extension DoctorServiceTests {
       let handle = try FileHandle(forWritingTo: url)
       defer { try? handle.close() }  // best-effort test file cleanup
       try handle.truncate(atOffset: UInt64(64 * 1024 * 1024 + excess))
-      #expect(DoctorService.wal(home).status == (excess == 0 ? "pass" : "warning"))
+      #expect(DoctorService.wal(home).status == (excess == 0 ? .pass : .warning))
     }
   }
 }

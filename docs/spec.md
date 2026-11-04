@@ -1128,6 +1128,7 @@ state; the tests check this with golden output.
 - One line per output. Keys are sorted by Unicode code point at every level, so output
   is byte-stable.
 - `warnings` is always present. `retry_after_s` is present only when set.
+- Doctor's unhealthy envelope also carries the full report in `data` alongside `error`.
 - `next_by` says who acts on the `next` commands: by default `human` for `human_only`
   and `env`, otherwise `agent`. An error can override its code's default. A proposal refusal
   shown to an agent is `human`, because its `next` is the human's triage. A code
@@ -1401,35 +1402,80 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     schema versions on both DBs, WAL size, index age.
   - **Git:** git path and version, dead repo paths, stale fetches, orphaned worktree
     overrides.
-  - **Data:** stale claims (over 2 h), backup age, CLI vs app version skew.
+  - **Data:** stale claims (at least 2 h), backup age, CLI vs app version skew.
 
   The read-only diagnostic command reports all workspaces; `--ws` does not filter
   it. `data.checks` contains ordered checks with `id`, `status` (`pass`, `warning`,
-  `fail`, `skipped`), `message` and `next` (inspection or recovery commands).
+  `fail`, `skipped`), `message`, `next`, `next_by` (`agent` or `human`), and
+  `next_omitted`. Each `next` contains at most five distinct commands, in priority
+  order. `next_omitted` counts the remaining commands; text prints `+N more`
+  separately, never as an executable command. `next_by` owns every command in that
+  check and determines whether text says `next:` or `ask human:`.
   Failures return exit 9 / `env`, `ok:false` and the complete report in `data`;
-  the error's `next` starts at the first failed check. Warnings and skipped checks
-  alone return exit 0. Text mode keeps the report on stdout and errors on stderr,
-  including with `--quiet`. Checks never clear claims, remove overrides, fetch,
-  initialize or migrate. Missing data is a failure with `silta init` as recovery.
+  the envelope takes `next` and `next_by` from the first failed check. Warnings and
+  skipped checks alone return exit 0. Text mode keeps the report on stdout and
+  errors on stderr, including with `--quiet`. Doctor never clears claims, removes
+  overrides, fetches, initializes or migrates.
 
-  WAL above 64 MiB, missing/invalid fetch timestamps or fetches older than 24 h,
-  and missing/invalid claim timestamps or claims older than 2 h warn. Orphaned
-  overrides (missing `.git` marker) warn; dead registered repo paths fail.
-  Missing, older or writer-incompatible schema metadata fails;
-  pending migrations suggest `silta init`, which explicitly applies them; compatible unknown
-  migrations warn (D32). Checks requiring an incompatible database are skipped.
-  Backup freshness uses published nonempty regular daily backup files, excluding
-  symlinks and pre-migration snapshots: no daily backup, or the latest one older
-  than yesterday in UTC, warns. This checks presence and age, not backup integrity.
-  Each check retains its own `next`; a warning is not permission to repair data.
+  Check ids and their order are a contract: ids are never renamed or removed, only
+  added. Unavailable checks retain their own id with status `skipped`:
 
-  Installation checks and `--fix` follow the installer formats when available.
-  Install, index/FTS/index age (M3), and app version skew (M5) checks are explicitly
-  skipped until those surfaces exist; a passing diagnostic run does not certify
-  them. Repo/override checks verify `.git` marker presence, not the usability of a
-  linked worktree's `gitdir` target. Check warnings live in `data.checks`; envelope
-  and command-log warnings describe command/environment warnings. Failures before
-  CLI environment setup are not logged.
+  | Id (display order) | Check / availability |
+  |---|---|
+  | `database.integrity` | SQLite integrity or operational read failure |
+  | `database.foreign_keys` | Foreign-key integrity |
+  | `database.schema` | Truth schema and writer compatibility |
+  | `database.wal` | File-only WAL size |
+  | `git.version` | Fixed git path and version |
+  | `git.repos` | Bound repository paths |
+  | `git.bindings` | Repositories without a local path |
+  | `git.fetch` | Missing/invalid or stale fetch timestamps on bound repos |
+  | `git.overrides` | Worktree override marker presence |
+  | `data.claims` | Claim expiry |
+  | `data.backup` | File-only backup evidence and recorded daily backup |
+  | `install.path` | Skipped until installer diagnostics |
+  | `install.hook` | Skipped until installer diagnostics |
+  | `install.skill` | Skipped until installer diagnostics |
+  | `install.codex_root` | Skipped until installer diagnostics |
+  | `install.codex_marker` | Skipped until installer diagnostics |
+  | `index.integrity` | Skipped until M3 |
+  | `index.foreign_keys` | Skipped until M3 |
+  | `index.schema` | Skipped until M3 |
+  | `index.fts` | Skipped until M3 |
+  | `index.age` | Skipped until M3 |
+  | `app.version` | Skipped until M5 |
+
+  WAL above 64 MiB warns and suggests inspecting open handles. Claim timestamps
+  missing, invalid or at least 2 h old warn, using the same expiry boundary as task
+  ownership. Fetch timestamps missing/invalid or older than 24 h warn, with separate
+  counts. Unbound repositories warn and suggest workspace-scoped
+  `init --scan <directory>` after the human chooses a clone; they are excluded from
+  fetch checks. Bound dead repo paths fail. Orphaned overrides warn. These path
+  checks verify `.git` marker presence, not linked-worktree target usability.
+
+  Missing, older or incompatible schemas fail. Empty/uninitialized databases and
+  pending known migrations suggest `silta init`; real writer incompatibility names
+  the clean-main development install script and requires the human's decision.
+  Compatible unknown migrations warn (D32). Dependent checks on an incompatible
+  database are skipped. Permission and contention failures have operational
+  messages and inspection commands, rather than implying corruption.
+
+  WAL and backup checks always run, even when the truth database is missing or
+  unreadable. Published backup evidence excludes symlinks, empty files, invalid or
+  future dates, and unrelated names. Daily backup presence is checked against
+  `meta.last_backup_day`: blank means the first write has not yet needed a backup;
+  idle time alone does not warn. A recorded daily backup must exist as a nonempty
+  regular file. Pre-migration snapshots are listed as recovery evidence but do not
+  substitute for that daily file. Unreadable metadata leaves coverage unknown.
+  This checks presence, not backup integrity. When backups exist, database-failure
+  recovery starts by listing them; restore is the human's decision. SQLite hints
+  use `-readonly` and are evidence, not repeated repair attempts. Initialization is
+  suggested for a missing database only when no published backups were found.
+
+  Installation checks and `--fix` follow installer formats when available.
+  A passing diagnostic run does not certify skipped checks. Check warnings live
+  in `data.checks`; envelope and command-log warnings describe command/environment
+  warnings. Failures before CLI environment setup are not logged.
 
 ## 20. Testing strategy
 

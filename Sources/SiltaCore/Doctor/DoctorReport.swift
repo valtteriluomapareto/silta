@@ -1,25 +1,15 @@
 /// A read-only diagnostic report, including checks that could not run.
 package struct DoctorReport: Encodable, Sendable {
-  /// Checks in display order, with independent failures retained.
+  /// Checks in the fixed order documented in spec §19.
   package var checks: [DoctorCheck]
 
-  /// The same complete report in text mode, including under --quiet.
+  /// The complete text report, with action ownership and bounded command lists.
   package var text: String {
     checks.map { check in
-      "\(check.status): \(check.id): \(check.message)\n"
-        + check.next.map { "  next: \($0)\n" }.joined()
+      let verb = check.nextBy == .human ? "ask human" : "next"
+      return "\(check.status.rawValue): \(check.id): \(check.message)\n"
+        + check.next.map { "  \(verb): \($0)\n" }.joined()
+        + (check.nextOmitted > 0 ? "  +\(check.nextOmitted) more\n" : "")
     }.joined()
   }
-}
-
-/// One diagnostic result. Recovery commands inspect state; they never authorize repairs.
-package struct DoctorCheck: Encodable, Sendable {
-  /// Stable check identifier.
-  package let id: String
-  /// One of pass, warning, fail or skipped.
-  package let status: String
-  /// Body-free explanation of the result.
-  package let message: String
-  /// Recovery or inspection commands for this check alone.
-  package var next: [String] = []
 }

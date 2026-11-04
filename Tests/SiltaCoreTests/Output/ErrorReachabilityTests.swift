@@ -121,7 +121,7 @@ extension DoctorFailure: ErrorExamples {
       .init(
         report: DoctorReport(checks: [
           DoctorCheck(
-            id: "database.integrity", status: "fail", message: "Database is missing.",
+            id: "database.integrity", status: .fail, message: "Database is missing.",
             next: ["silta init"])
         ]))
     ]

@@ -9,10 +9,14 @@ package struct DoctorFailure: CodedError {
   package var code: ErrorCode { .env }
   package var message: String {
     "Doctor found failed checks: "
-      + report.checks.filter { $0.status == "fail" }.map(\.id).joined(separator: ", ") + "."
+      + report.checks.filter { $0.status == .fail }.map(\.id).joined(separator: ", ") + "."
   }
+  package var nextBy: NextBy {
+    report.checks.first { $0.status == .fail }?.nextBy ?? .agent
+  }
+
   /// Top-level recovery starts at the first failure; each check has its own next commands.
   package var next: [String] {
-    report.checks.first { $0.status == "fail" }?.next ?? ["silta init"]
+    report.checks.first { $0.status == .fail }?.next ?? ["silta init"]
   }
 }
