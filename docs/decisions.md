@@ -522,6 +522,12 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     issue. Review findings go back to the author, who reclaims with `task start`.
   - Agents tick plan steps as they finish them, not in a batch at the end, so
     `task show --timeline` shows progress.
+  - The author ends the PR description with a draft result and its `Friction:` line;
+    the merger uses it, because the friction belongs to the author's session. `done`
+    falls back to the caller's directory when the recorded worktree is gone.
+  - Open for M2: with nobody claiming a task in `review`, a `changes` verdict must
+    reach the submitter (the actor of the `review` status event), and `start` on a
+    task in review deserves a warning.
   - Why: the first DF0 slice (S8, SI-7) ran `done` and closed its issue while its PR
     waited for review. `done` is terminal, so review findings would have had nowhere
     to go. And with the author's claim kept through review, the merging session got

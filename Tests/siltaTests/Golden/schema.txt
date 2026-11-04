@@ -9,7 +9,7 @@ silta task add  Add a proposal; --start claims work requested by the human.
 silta task ls  List workspace tasks, including your own proposals.
 silta task show  Read a task's current bodies, claim and optional event timeline.
 silta task start  Claim a todo task for this exact actor and session.
-silta task submit  Submit doing work for review and refresh its claim.
+silta task submit  Submit doing work for review and release its claim.
 silta task done  Complete a task with its result and optional app commit.
 silta task drop  Drop an open task and record why.
 silta task plan  Store a plan revision or tick a top-level checkbox.

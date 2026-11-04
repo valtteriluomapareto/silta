@@ -192,9 +192,10 @@ extension TaskCommandTests {
       let done = try SiltaBinary.run(
         ["task", "done", "AC-1", "--sha", sha, "-m", "Merged."], in: scratch, cwd: repo,
         environment: ["SILTA_ACTOR": "agent:claude:merger"])
-      withKnownIssue("done --sha runs git in the removed worktree") {
-        #expect(done.termination == .exit(0))
-      }
+      #expect(done.termination == .exit(0))
+      let shown = try SiltaBinary.run(
+        ["task", "show", "AC-1", "--json"], in: scratch, environment: Self.actor)
+      #expect(shown.stdout.contains(#""done_sha":"\#(sha)""#))
     }
   }
 }

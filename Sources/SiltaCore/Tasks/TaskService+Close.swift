@@ -2,6 +2,15 @@ package import Foundation
 import GRDB
 
 extension TaskService {
+  /// The recorded worktree, or the caller's directory once that worktree is removed (the
+  /// merger finishing after review); `TaskGit.inspect` still refuses another repository.
+  static func completionDirectory(_ task: TaskDetails, fallback: URL) -> URL {
+    guard let path = task.worktree, FileManager.default.fileExists(atPath: path) else {
+      return fallback
+    }
+    return URL(filePath: path, directoryHint: .isDirectory)
+  }
+
   /// Stores a result and closes work, releasing the claim in the same write.
   /// App completion records its commit outside the transaction, then rechecks the task.
   /// `--force` is human-only only when it overrides an unmet review gate, decided again
@@ -19,9 +28,9 @@ extension TaskService {
     let before = try show(ref)
     let at = environment.clock.now()
     try closable(before, dropped: dropped, commit: commit, audit: audit, at: at)
-    let cwd = before.worktree.map { URL(filePath: $0, directoryHint: .isDirectory) } ?? directory
     let git = try await TaskGit.inspect(
-      repo: before.repoPath, directory: cwd, runner: environment.git,
+      repo: before.repoPath, directory: Self.completionDirectory(before, fallback: directory),
+      runner: environment.git,
       enabled: !dropped && !commit.noSHA && before.appID != nil, completion: true, sha: commit.sha)
     let slug = try selected()
     return try environment.db.write { tx in
