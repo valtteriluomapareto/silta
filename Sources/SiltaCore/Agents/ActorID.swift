@@ -15,6 +15,23 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     }
   }
 
+  /// Parses a complete stored actor, without resolving a session or reading process state.
+  package static func parse(_ value: String) -> ActorID? {
+    let parts = value.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+    if parts.count == 2, parts[0] == "human", isPart(parts[1]) {
+      return .human(name: parts[1])
+    }
+    if parts.count == 3, parts[0] == "agent", isTool(parts[1]), isPart(parts[2]) {
+      return .agent(tool: parts[1], session: parts[2])
+    }
+    return nil
+  }
+
+  /// The human addressed by `me`, independent of the command's actor.
+  package static func human(user: String?) -> ActorID {
+    .human(name: user.flatMap { isPart($0) ? $0 : nil } ?? "unknown")
+  }
+
   /// Human identity is established by detection, not by individual commands.
   package var isHuman: Bool {
     if case .human = self { true } else { false }
@@ -49,8 +66,7 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     if !terminal.stdinIsTTY || !terminal.stdoutIsTTY {
       return .agent(tool: "unknown", session: session)
     }
-    let user = environment["USER"] ?? ""
-    return .human(name: isPart(user) ? user : "unknown")
+    return human(user: environment["USER"])
   }
 
   /// Resolves the session with one bounded git query unless `SILTA_SESSION` or a
@@ -129,10 +145,10 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     guard let value = environment["SILTA_ACTOR"], !value.isEmpty else { return .none }
     let parts = value.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
     switch (parts[0], parts.count) {
-    case ("human", 2) where isPart(parts[1]):
+    case ("human", 2) where parse(value) != nil:
       return terminal.stdinIsTTY ? .actor(.human(name: parts[1])) : .droppedHuman
     case ("agent", 2) where isTool(parts[1]): return .agent(parts[1])
-    case ("agent", 3) where isTool(parts[1]) && isPart(parts[2]):
+    case ("agent", 3) where parse(value) != nil:
       return .actor(.agent(tool: parts[1], session: parts[2]))
     default: throw SeamError.invalidActor
     }

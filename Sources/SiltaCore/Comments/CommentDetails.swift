@@ -16,11 +16,18 @@ package struct CommentDetails: Encodable, Sendable {
   package let resolvedAt: String?
   /// The actor who resolved the containing thread, when known.
   package let resolvedBy: String?
+  /// Sorted complete recipients, including explicit targets and body mentions.
+  package let mentions: [String]
+  /// Whether the asker selected this answer.
+  package let accepted: Bool
+  /// An optional note citation.
+  package let source: String?
   /// The posting instant.
   package let createdAt: String
 
   enum CodingKeys: String, CodingKey {
-    case ref, kind, body, actor, deleted
+    case ref, kind, body, actor, deleted, mentions, accepted
+    case source = "from"
     case replyTo = "reply_to"
     case resolvedAt = "resolved_at"
     case resolvedBy = "resolved_by"

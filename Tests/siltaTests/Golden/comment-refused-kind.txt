@@ -1,2 +1,2 @@
-error: Use comment, decision or handoff. [invalid]
+error: Use comment, question, answer, decision or handoff. [invalid]
 next: silta --ws 'acme' comment --help

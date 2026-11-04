@@ -14,7 +14,8 @@ extension TaskService {
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try Self.mutable(task)
-      let (id, seq) = try insertComment(draft, task: task, at: at, in: tx)
+      let root = try replyRoot(draft, task: task, workspace: slug, in: tx.database)
+      let (id, seq) = try insertComment(draft, task: task, root: root, at: at, in: tx)
       let commentRef = "\(task.ref)/\(seq)"
       let released = try touchDiscussion(
         task, handoff: draft.kind == "handoff", comment: commentRef, at: at, in: tx)
@@ -23,7 +24,7 @@ extension TaskService {
       }
       try tx.recordChange(kind: "comment", rowID: id)
       try consent?.record(
-        command: audited(Self.commentCommand(task.ref, draft))
+        command: audited(Self.commentCommand(task.ref, input, workspace: workspace))
           + (draft.allowSecret ? " --allow-secret" : "")
           + " -> \(task.ref)/\(seq)", workspace: slug, identity: (environment.ids, at), in: tx)
       guard
@@ -56,23 +57,40 @@ extension TaskService {
       try Int.fetchOne(
         tx.database, sql: "SELECT coalesce(max(seq),0)+1 FROM comment WHERE task_id=?",
         arguments: [task.id]) ?? 1
+    guard
+      let recipients = String(bytes: try JSONEncoder().encode(draft.recipients), encoding: .utf8)
+    else { throw StorageError.unavailable }
     try tx.database.execute(
       sql: """
-        INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,actor,created_at)
-        VALUES(?,?,?,?,?,?,?,?)
+        INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,mentions,actor,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?)
         """,
       arguments: [
         try environment.ids.next(at: at), task.id, seq, root, draft.kind,
-        draft.body, environment.actor.description,
+        draft.body, recipients,
+        environment.actor.description,
         Self.timestamp(at),
       ])
     let id = tx.database.lastInsertedRowID
+    if let source = draft.source {
+      try tx.database.execute(
+        sql: """
+          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,
+            created_by,created_at)
+          VALUES(?,?,'comment',?,'cites','note',?,?,?)
+          """,
+        arguments: [
+          try environment.ids.next(at: at), task.workspaceID, id,
+          String(source.dropFirst(5)), environment.actor.description, Self.timestamp(at),
+        ])
+      try tx.recordChange(kind: "link", rowID: tx.database.lastInsertedRowID)
+    }
     return (id, seq)
   }
 
   func checkedComment(_ input: CommentDraft, command: String) throws -> (CommentDraft, Bool) {
-    guard ["comment", "decision", "handoff"].contains(input.kind) else {
-      throw CommentError.invalid("Use comment, decision or handoff.")
+    guard ["comment", "question", "answer", "decision", "handoff"].contains(input.kind) else {
+      throw CommentError.invalid("Use comment, question, answer, decision or handoff.")
     }
     guard !input.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw CommentError.bodyRequired(command)
@@ -82,6 +100,18 @@ extension TaskService {
     try Self.validateCommentBody(body.0)
     var draft = input
     draft.body = body.0
+    draft.recipients = try CommentRecipients.resolve(
+      input.recipients, body: body.0, human: environment.human, question: input.kind == "question")
+    if let source = input.source {
+      guard source.hasPrefix("note:"),
+        !source.dropFirst(5).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        !source.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+        SecretGuard.matches(in: source).isEmpty
+      else {
+        throw CommentError.invalid(
+          "--from requires a nonempty, control-free note: reference without secrets.")
+      }
+    }
     return (draft, body.1)
   }
 
@@ -91,7 +121,11 @@ extension TaskService {
   ) -> String {
     let scope = workspace.map { "--ws " + shellWord($0) + " " } ?? ""
     return "silta " + scope + "comment " + shellWord(SecretGuard.redacted(ref))
-      + (draft.kind == "comment" ? "" : " --kind " + shellWord(SecretGuard.redacted(draft.kind)))
+      + (draft.kind == "comment" && !draft.explicitKind
+        ? "" : " --kind " + shellWord(SecretGuard.redacted(draft.kind)))
+      + (draft.replyTo.map { " --reply-to " + shellWord(SecretGuard.redacted($0)) } ?? "")
+      + draft.recipients.map { " --to " + shellWord(SecretGuard.redacted($0)) }.joined()
+      + (draft.source.map { " --from " + shellWord(SecretGuard.redacted($0)) } ?? "")
   }
 
   private static func validateCommentBody(_ body: String) throws {

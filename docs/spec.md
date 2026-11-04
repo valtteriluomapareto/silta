@@ -309,7 +309,7 @@ CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERE
   actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
-  -- discussion: 'resolved <root-ref>' or 'reopened <root-ref>', once per changed root.
+  -- discussion: 'resolved <root-ref>', 'reopened <root-ref>' or 'accepted <answer-ref>', once per change.
   -- A comment's secret_redacted event body is that comment's ref, never its content.
 CREATE INDEX task_event_task ON task_event(task_id, kind);
 
@@ -732,11 +732,32 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 | Kind | Use | Behaviour |
 |---|---|---|
 | `comment` | General notes | — |
-| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until answered. **Ask in chat first** when the human is there. |
+| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until a live answer exists or the root is explicitly resolved. **Ask in chat first** when the human is there. |
 | `answer` | Reply to a question | The asker can `comment accept AC-12/5`, which resolves the thread |
 | `decision` | A choice and its reason | Shown in `brief`; `--from note:…` cites a meeting |
 | `handoff` | Where I stopped, what's next | Releases the author's own claim, preserving status. The newest one is shown first in `brief --task`. Template in `silta guide` |
 
+- Recipients: repeatable `--to <actor>|me` and body mentions `@human:<name>`,
+  `@agent:<tool>:<session>` and `@me`. Only complete actors are accepted; `me` is
+  the captured `human:<USER>`, or `human:unknown` for an unset/invalid USER, independently
+  of the caller. Recipients are deduplicated and sorted in `mentions`; questions
+  default to `me` only when neither explicit recipients nor mentions are present.
+  Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
+  aliases/actor mentions refuse rather than redirecting to the human. Lifecycle
+  explanations parse mentions too. `--from note:…` stores a nonempty, control-free
+  note citation as a comment `cites` link without accessing the file; JSON exposes
+  optional `from`. Citation/recipient metadata must contain no secrets.
+- Questions and handoffs are roots. Answers require a live unresolved question;
+  comment/decision replies require a live unresolved root. A deleted immediate
+  target or root cannot receive public replies. Cross-task/workspace replies refuse.
+- Accept requires the question's exact asker actor/session and a live answer/root.
+  It sets the answer's `accepted` flag and the root's `resolved_at`/`resolved_by`
+  to the asker, recording `accepted <answer-ref>` in the attributed discussion event.
+  Repeating that same live acceptance writes nothing. A manually resolved question
+  or a different answer selection requires reopen first; deleted posts refuse.
+  JSON always includes `accepted`; text identifies accepted answers distinctly.
+- Post findings as roots, not replies to a handoff: the newest handoff thread stays
+  shown even when resolved. Task show offers no per-thread `next:` lines.
 - Threads: `--reply-to AC-12/3`. `comment resolve|reopen <ref>… [-m …]` takes several
   refs in one call.
 - `task show` shows the newest handoff thread first and unresolved threads with
@@ -824,7 +845,8 @@ inbox is short and grouped:
   agent asks first, and maps "the rest" only to items it showed.
 
 It lists:
-- unanswered questions mentioning the actor
+- open questions mentioning the actor with no live answer; deleting the last live answer
+  restores attention if the root is open, and reopening an unanswered question restores attention
 - open review requests for the actor's tool (M2)
 - for humans, also: `proposed` tasks, pending doc proposals (M2), and promoted tasks
   needing attention

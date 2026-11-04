@@ -14,20 +14,28 @@ struct CommentPostCommand: OutputCommand {
   @Argument(help: "The task reference.") var target: String
   @Option(
     help: .init(
-      "comment, decision or handoff. "
+      "comment, question, answer, decision or handoff. "
         + "A handoff names state, next step, open questions and branch/sha.")
   )
-  var kind = "comment"
+  var kind: String?
+  @Option(help: "Join this post's thread; replies normalize to its root.") var replyTo: String?
+  @Option(name: .customLong("to"), help: "Recipient: complete actor or me (repeatable).")
+  var recipients: [String] = []
+  @Option(name: .customLong("from"), help: "Cite a note: reference.") var source: String?
+
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let workspace = try context.workspace(global.ws)
     var draft = CommentDraft(body: "", kind: kind)
     draft.allowSecret = body.allowSecret
+    draft.replyTo = replyTo
+    draft.recipients = recipients
+    draft.source = source
     let command = TaskService.commentCommand(target, draft, workspace: workspace)
     draft.body =
       try body.read(actor: context.environment.actor, command: command, approved: global.approved)
       ?? ""
     let result = try TaskService(
-      environment: context.environment, workspace: workspace, approved: global.approved,
+      environment: context.environment, workspace: global.ws, approved: global.approved,
       bodyFlag: body.flag
     ).comment(target, draft)
     return CommandOutput(

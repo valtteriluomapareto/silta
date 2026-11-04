@@ -133,7 +133,7 @@ extension TaskService {
     }
   }
 
-  private static func commentTarget(_ raw: String, workspace: String, in db: Database) throws
+  static func commentTarget(_ raw: String, workspace: String, in db: Database) throws
     -> (TaskDetails, Row)
   {
     let parts = raw.split(separator: "/", omittingEmptySubsequences: false)

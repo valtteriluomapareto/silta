@@ -14,6 +14,8 @@ package struct SiltaEnvironment: Sendable {
   package let db: DatabaseStore
   /// Attributes this command and enforces human-only policy.
   package let actor: ActorID
+  /// Captured human identity used by `me`, independently of the caller.
+  package let human: ActorID
   /// Warnings from assembling the environment, shown with the command's own.
   package let warnings: [OutputWarning]
   /// Records best-effort command diagnostics.
@@ -22,7 +24,8 @@ package struct SiltaEnvironment: Sendable {
   /// Assembles supplied seams without reading process globals or doing I/O.
   package init(
     clock: any Clock, ids: any IDGenerator, git: any GitRunner, home: SiltaHome, db: DatabaseStore,
-    log: any Log, actor: ActorID, warnings: [OutputWarning] = []
+    log: any Log, actor: ActorID, human: ActorID = .human(name: "unknown"),
+    warnings: [OutputWarning] = []
   ) {
     self.clock = clock
     self.ids = ids
@@ -31,6 +34,7 @@ package struct SiltaEnvironment: Sendable {
     self.db = db
     self.log = log
     self.actor = actor
+    self.human = human
     self.warnings = warnings
   }
 
@@ -77,6 +81,6 @@ package struct SiltaEnvironment: Sendable {
         jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) },
         readBusyTimeout: readBusyTimeout),
       log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose), actor: actor,
-      warnings: warnings)
+      human: ActorID.human(user: environment["USER"]), warnings: warnings)
   }
 }
