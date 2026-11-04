@@ -54,9 +54,16 @@ struct DogfoodAutomationTests {
     return CodexRepository(script: script, repo: repo, worktree: worktree)
   }
 
-  static func fakeCodex(_ scratch: URL, output: [String], exit status: Int32 = 0) throws {
+  static func fakeCodex(
+    _ scratch: URL, output: [String], exit status: Int32 = 0, setting: String? = nil
+  ) throws {
     let calls = shellWord(scratch.appending(path: "codex-calls").path)
-    let lines = output.map { "printf '%s\\n' " + shellWord($0) }.joined(separator: "\n")
+    var lines = output.map { "printf '%s\\n' " + shellWord($0) }.joined(separator: "\n")
+    if let setting {
+      lines +=
+        "\ngit config --file \"$(git rev-parse --absolute-git-dir)/config.worktree\" "
+        + setting
+    }
     try DogfoodReportTests.tool(
       "codex",
       text: """
@@ -164,6 +171,27 @@ struct DogfoodAutomationTests {
 }
 
 extension DogfoodAutomationTests {
+  @Test(arguments: [
+    ("codex.localEnvironmentConfigPath __none__", 0 as Int32),
+    ("core.fsmonitor 'touch acme-pwned'", 70),
+    ("include.path /tmp/acme.config", 70),
+  ])
+  func codexStopsWhenItChangesTheWorktreesGitSetup(setting: String, status: Int32) throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      try Self.fakeCodex(
+        scratch, output: [Self.started, Self.message("Acme done")], setting: setting)
+      let log = scratch.appending(path: "run.jsonl").path
+      let result = try Self.run(
+        fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
+      #expect(result.termination == .exit(status))
+      #expect(result.stdout.hasPrefix("Thread: \(Self.thread)\n"))
+      #expect(result.stderr.contains("don't run git") == (status == 70))
+    }
+  }
+}
+
+extension DogfoodAutomationTests {
   static let issue = "https://example.com/acme/issues/7"
 
   static func finish(_ scratch: URL) throws -> CLIResult {
@@ -211,7 +239,9 @@ extension DogfoodAutomationTests {
         #!/bin/bash
         echo "silta $*" >> \(log)
         case "$3 $4" in
-          'task show') cat \(shellWord(scratch.appending(path: "task.json").path)) ;;
+          'task show') [[ -f \(shellWord(scratch.appending(path: "silta-fails").path)) ]] \\
+            && { echo '{"ok":false,"error":{"code":"not_found"}}'; exit 2; }
+            cat \(shellWord(scratch.appending(path: "task.json").path)) ;;
           'task done') cat > \(log)-result; echo 'SI-1 done' ;;
           *) exit 98 ;;
         esac
@@ -258,15 +288,17 @@ extension DogfoodAutomationTests {
   }
 
   @Test(arguments: [
-    ("OPEN", "## Draft result\nDone.\nFriction: none\n"),
-    ("MERGED", "## Draft result\nDone without friction.\n"),
-    ("MERGED", "## Summary\nNo draft.\nFriction: none\n"),
+    ("OPEN", "## Draft result\nDone.\nFriction: none\n", "is not merged"),
+    ("MERGED", "## Draft result\nDone without friction.\n", "no Friction: line"),
+    ("MERGED", "## Summary\nNo draft.\nFriction: none\n", "no \"## Draft result\" section"),
   ])
-  func finishRefusesAnUnmergedPRAndAMissingDraft(state: String, body: String) throws {
+  func finishRefusesAnUnmergedPRAndAMissingDraft(state: String, body: String, reason: String)
+    throws
+  {
     try withScratchDirectory { scratch in
       try Self.fakeFinishTools(scratch, state: state, body: body, sha: try Self.head(scratch))
       let result = try Self.finish(scratch)
-      #expect(result.termination == .exit(1) && result.stderr.hasPrefix("finish: "))
+      #expect(result.termination == .exit(1) && result.stderr.contains(reason))
       let calls = try Self.log(scratch)
       #expect(!calls.contains("silta") && !calls.contains("issue"))
     }
@@ -311,6 +343,19 @@ extension DogfoodAutomationTests {
         scratch, body: body, sha: try Self.head(scratch), status: "done", linked: false)
       let unlinked = try Self.finish(scratch)
       #expect(unlinked.termination == .exit(0) && unlinked.stdout.contains("links no GitHub issue"))
+    }
+  }
+
+  @Test func finishReportsASiltaFailure() throws {
+    try withScratchDirectory { scratch in
+      try Self.fakeFinishTools(
+        scratch, body: "## Draft result\nDone.\nFriction: none\n", sha: try Self.head(scratch))
+      FileManager.default.createFile(
+        atPath: scratch.appending(path: "silta-fails").path, contents: nil)
+      let result = try Self.finish(scratch)
+      #expect(result.termination == .exit(1) && result.stderr.contains("not_found"))
+      let calls = try Self.log(scratch)
+      #expect(!calls.contains("task done") && !calls.contains("issue"))
     }
   }
 }

@@ -51,6 +51,9 @@ if [[ -z "$thread" ]]; then
 else
   command=(codex exec resume "$thread" --json "${config[@]}" -)
 fi
+# Files git trusts when it later runs in this worktree outside the sandbox.
+links() { cat "$dir/.git" "$gitdir/commondir" "$gitdir/gitdir" 2>/dev/null || true; }
+before="$(links)"
 status=0
 (cd "$dir" && env ${unset_args[@]+"${unset_args[@]}"} "${command[@]}") >"$log" || status=$?
 
@@ -59,4 +62,15 @@ started="$(/usr/bin/jq -rR 'fromjson? | select(.type == "thread.started") | .thr
 printf 'Thread: %s\n' "${started:-${thread:-unknown}}"
 /usr/bin/jq -rRn '[inputs | fromjson? | select(.type == "item.completed" and .item.type == "agent_message")
   | .item.text] | last // empty' "$log"
+
+# With extensions.worktreeConfig, the worktree's config.worktree is read by every git
+# command run there, so a core.fsmonitor or hooksPath in it would run outside the
+# sandbox. Codex's own settings live under codex.*; anything else stops the flow.
+config_keys="$(git config --file "$gitdir/config.worktree" --name-only --list 2>/dev/null \
+  | grep -v '^codex\.' || true)"
+if [[ -n "$config_keys" || "$(links)" != "$before" ]]; then
+  echo "codex: the worktree's git setup changed (${config_keys:-its links}); don't run git in $dir." >&2
+  echo "Next: inspect $gitdir, then remove the worktree with rm -rf $dir && git worktree prune" >&2
+  exit 70
+fi
 exit "$status"

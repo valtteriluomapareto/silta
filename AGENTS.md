@@ -158,7 +158,10 @@ From DF0 on, every command runs as `silta --ws silta …`:
   `silta guide` ships. Put everything you need from the maintainer in one chat
   message. For a human-only command, name the exact command, wait for their yes,
   and run it with `--approved "<their exact words>"`. Never write those words
-  yourself.
+  yourself. A run started by another agent
+  ([dogfood README](docs/dogfood/README.md#drive-codex-from-another-agent)) has no
+  chat with the maintainer: it never runs human-only commands, and names them in its
+  last message instead.
 - **Use the dogfood binary.** Always use `~/.local/bin/silta`, built from `main` by
   `scripts/install-dev.sh`; rerun it after pulling `main`. Never use a binary from
   your own worktree.
@@ -172,8 +175,6 @@ From DF0 on, every command runs as `silta --ws silta …`:
 - **Reviews are PR comments** (`gh pr comment`). Each starts with
   `Review: changes (round N)` or `Review: approve`. Changes go back to the author,
   who runs `task start <ref>` again (D41); after `approve` the merger finishes.
-  A run started by another agent ([dogfood README](docs/dogfood/README.md#drive-codex-from-another-agent))
-  never runs human-only commands: it names them in its last message instead.
 - **Finish after the merge.** `task submit` releases the claim. Whoever merges the
   slice's PR pulls `main`, then runs `scripts/dogfood-finish.sh <ref> <pr>` and
   `scripts/install-dev.sh` from the main checkout. The script runs `task done` with

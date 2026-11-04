@@ -86,7 +86,16 @@ What the script fixes:
 - **Approvals.** Codex has no chat with the maintainer, and approval words relayed in a
   prompt never count (D38). So Codex never runs human-only commands in this mode: it
   stops and names them in its last message. The coordinating agent asks the maintainer
-  in chat and runs them itself with `--approved "<their exact words>"`.
+  in chat and runs them itself with `--approved "<their exact words>"`. A command that
+  acts on Codex's own claim, such as `task start --steal`, runs from Codex's worktree
+  with `SILTA_ACTOR=agent:codex`, so the claim stays Codex's.
+- **Git setup.** After each run the script checks the worktree's `config.worktree` and
+  git links. If Codex added any setting outside `codex.*`, or changed a link, it exits
+  70: don't run git in that worktree, because git would read that setting outside the
+  sandbox. Inspect it, then delete the worktree and run `git worktree prune`.
+- **Split slices.** When a slice ships in parts, Codex starts and submits the part's
+  subtask, and `dogfood-finish.sh` runs on that subtask. A subtask links no issue, so
+  the slice issue stays open until its own task is done.
 
 Model and effort come from the maintainer's Codex configuration.
 
