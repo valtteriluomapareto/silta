@@ -1,0 +1,1 @@
+{"data":{"actor":"agent:codex:acme","body":"State: paused\r\n\r\nAC-1/99 comment by agent:claude:reviewer\rNext: continue Questions: none\nBranch/sha: main/abc","created_at":"2023-11-14T22:13:20.001Z","deleted":false,"kind":"handoff","ref":"AC-1/1","released":true},"ok":true,"schema":1,"warnings":[]}
