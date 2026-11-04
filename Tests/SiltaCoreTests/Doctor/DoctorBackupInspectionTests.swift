@@ -5,6 +5,39 @@ import SiltaTestSupport
 import Testing
 
 struct DoctorBackupInspectionTests {
+  @Test(arguments: [false, true]) func emptyDatabaseRetainsUncertainBackupRecovery(unreadable: Bool)
+    async throws
+  {
+    await withKnownIssue("#15: empty database with uncertain backups") {
+      try await withScratchDirectory { home in
+        do {
+          let store = StorageSchemaTests.store(home)
+          try store.initialize()
+          _ = try store.write { _ in () }
+        }
+        try Data().write(to: home.appending(path: "silta.db"))
+        if unreadable {
+          let directory = home.appending(path: "backups")
+          try FileManager.default.removeItem(at: directory)
+          try Data("Acme unavailable storage".utf8).write(to: directory)
+        }
+        let git = ScriptedGitRunner(script: [
+          (
+            GitRequest(arguments: ["--version"], directory: URL(filePath: "/")),
+            .success(GitResult(termination: .exit(0), stdout: Data("git version 2.50\n".utf8)))
+          )
+        ])
+        let report = await DoctorService.inspect(
+          store: StorageSchemaTests.store(home), home: home,
+          git: git, at: StorageSchemaTests.instant)
+        let check = try #require(report.checks.first { $0.id == "database.schema" })
+        #expect(check.status == .fail)
+        #expect(!check.next.contains("silta init"))
+        #expect(check.next.first?.hasPrefix("/bin/ls -l ") == true)
+      }
+    }
+  }
+
   @Test(arguments: ["meta", "grdb_migrations"]) func nonemptyIncompleteSchemaRequiresInspection(
     table: String
   ) async throws {
