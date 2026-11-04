@@ -6,6 +6,20 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkspaceSettingsTests {
+  @Test(arguments: ["aks", "yes"])
+  func proposalPolicyYamlExplainsWords(value: String) throws {
+    do {
+      _ = try WorkspaceConfig.parse(
+        WorkspaceConfigTests.minimal + "settings: {proposals: \(value)}")
+      Issue.record("invalid proposal policy accepted")
+    } catch let error as WorkspaceError {
+      #expect(error.code == .invalid)
+      #expect(error.message.contains("proposals must be triage or ask"))
+      #expect(error.message.contains("Ask the human"))
+      #expect(error.message.contains(value == "aks" ? "did you mean ask" : "triage: proposals"))
+    }
+  }
+
   @Test(arguments: ["on", "off", "yes", "no", "true", "false", "ON", "OFF", "YES", "NO"])
   func booleanSettingsNameAcceptedWords(value: String) throws {
     do {
