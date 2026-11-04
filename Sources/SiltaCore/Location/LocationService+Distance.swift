@@ -1,7 +1,9 @@
 import Foundation
 
 extension LocationService {
-  func distance(_ input: LocationResult, context: LocationContext) async throws -> LocationResult {
+  func distance(_ input: LocationResult, context: LocationContext, cacheWrites: Bool = true)
+    async throws -> LocationResult
+  {
     var result = input
     let candidates = result.candidates
     let refs = context.refs
@@ -36,7 +38,7 @@ extension LocationService {
         scores.append((app, a + b))
       }
       distance = LocationDistance.choose(scores)
-      cache.write(distance, key: key, location: path.path)
+      if cacheWrites { cache.write(distance, key: key, location: path.path) }
     }
     result.app = distance.app
     result.confidence = distance.confidence

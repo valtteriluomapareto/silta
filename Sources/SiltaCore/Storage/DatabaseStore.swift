@@ -12,13 +12,18 @@ package final class DatabaseStore: Sendable {
   private let home: URL
   private let clock: any Clock
   private let jitter: @Sendable () -> UInt64
+  private let readBusyTimeout: TimeInterval
   private let writer = Mutex<DatabaseQueue?>(nil)
 
   /// Configures the fixed database/backup locations without opening or creating files.
-  package init(home: URL, clock: any Clock, jitter: @escaping @Sendable () -> UInt64) {
+  package init(
+    home: URL, clock: any Clock, jitter: @escaping @Sendable () -> UInt64,
+    readBusyTimeout: TimeInterval = 5
+  ) {
     self.home = home
     self.clock = clock
     self.jitter = jitter
+    self.readBusyTimeout = readBusyTimeout
     path = home.appending(path: "silta.db").path
   }
 
@@ -126,7 +131,7 @@ package final class DatabaseStore: Sendable {
     do {
       var config = Configuration()
       config.readonly = true
-      config.busyMode = .timeout(5)
+      config.busyMode = .timeout(readBusyTimeout)
       let queue: DatabaseQueue
       do {
         queue = try DatabaseQueue(path: path, configuration: config)

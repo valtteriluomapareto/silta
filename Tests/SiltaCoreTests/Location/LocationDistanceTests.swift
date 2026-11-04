@@ -6,6 +6,38 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct LocationDistanceTests {
+  @Test func hookBriefUsesFreshCacheWithoutCreatingOrUpdatingIt() async throws {
+    try await withScratchDirectory { home in
+      let (repo, store) = try setup(home)
+      let common =
+        commonSteps(repo) + [step(["rev-parse", "--is-shallow-repository"], "false", repo)]
+      let index = home.appending(path: "db/index.db")
+      for mode in ["absent", "populate", "fresh", "corrupt"] {
+        if mode == "corrupt" { try Data("broken".utf8).write(to: index) }
+        let before =
+          FileManager.default.fileExists(atPath: index.path) ? try Data(contentsOf: index) : nil
+        let runner = ScriptedGitRunner(
+          script: common + (mode == "fresh" ? [] : distanceSteps(repo)))
+        let env = try environment(runner, home: home, store: store)
+        let seq = try store.read {
+          try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='change_seq'")
+        }
+        _ = try await BriefService(environment: env).resolve(path: repo, hook: mode != "populate")
+        #expect(runner.isExhausted)
+        #expect(runner.requests.allSatisfy { !$0.lazyFetch && !$0.arguments.contains("fetch") })
+        if mode != "populate" {
+          let after =
+            FileManager.default.fileExists(atPath: index.path) ? try Data(contentsOf: index) : nil
+          #expect(before == after)
+        }
+        #expect(
+          try store.read {
+            try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='change_seq'")
+          } == seq)
+      }
+    }
+  }
+
   @Test(arguments: [
     ([("api", 0), ("portal", 0)], nil),
     ([("api", 2), ("portal", 4)], nil),

@@ -13,14 +13,16 @@ package struct LocationService {
   /// Reports low confidence rather than guessing. Reads only truth storage; distance
   /// results may be cached opportunistically in index.db.
   package func resolve(
-    path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil
+    path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil,
+    cacheWrites: Bool = true
   ) async throws -> LocationResult {
     let context = try await inspect(path: path, workspace: workspace)
-    return try await resolve(context, app: app, task: task)
+    return try await resolve(context, app: app, task: task, cacheWrites: cacheWrites)
   }
 
   func resolve(
-    _ context: LocationContext, app: String?, task: String?, ignoringOverride: Bool = false
+    _ context: LocationContext, app: String?, task: String?, ignoringOverride: Bool = false,
+    cacheWrites: Bool = true
   )
     async throws -> LocationResult
   {
@@ -67,7 +69,7 @@ package struct LocationService {
       result.reason = evidence.reason
       return result
     }
-    return try await distance(result, context: context)
+    return try await distance(result, context: context, cacheWrites: cacheWrites)
   }
 
   private func explicitTask(_ task: String, workspace: String) throws -> TaskDetails {

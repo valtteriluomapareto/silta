@@ -29,6 +29,7 @@ silta code ls  List immediate committed names in an app-relative directory.
 silta where  Resolve the workspace, repository and app for a local path.
 silta doctor  Diagnose database, git and data across all workspaces without repairs.
 silta comment  Post task discussion; a claimer's handoff releases its claim.
+silta brief  Read budgeted local context for the current task.
 details: silta schema <command>
 
 global flags:

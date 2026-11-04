@@ -1061,6 +1061,26 @@ Output ends with `more: silta brief --task AC-15 | silta task show AC-15 | silta
 prints nothing on error or timeout. Brief is deterministic for the same DB and git
 state; the tests check this with golden output.
 
+An explicit `--budget` overrides the default selected by `--short` or `--hook`.
+The estimate covers rendered text; JSON syntax overhead is additional. Tiny budgets
+retain the compact location, current task reference, non-default settings and complete
+`more:` commands even when that minimum exceeds the requested budget. Candidate details
+are optional budgeted content in both formats. Recovery commands are kept whole.
+JSON contains compact `location` metadata, `settings`, optional `current_task`, ordered
+`sections` (`id` and trimmed `text`), `more` commands and a `truncated` boolean.
+
+Automatic current-task ties use newest claim time (session matches), otherwise newest
+update time (branch matches), then highest task sequence. Only local open, unarchived
+tasks in candidate apps or unbound tasks without a foreign worktree qualify. Task
+selection does not override `where`'s app-confidence rules; explicit `--task` does
+participate in location inference. The task section names its app, including when an
+explicit `--app` selects a different app. Brief masks stored task-body secrets.
+
+The available core brief omits app/backlog and discussion/inbox sections until their
+ordered additions ship. Hook mode has a 1.5 s process deadline, including environment
+assembly, fails immediately on database contention and never populates `where_cache`.
+Ordinary command logging and SQLite read-side WAL/SHM recreation remain allowed.
+
 ## 13. Indexing and search (M3)
 
 - **Sources:**

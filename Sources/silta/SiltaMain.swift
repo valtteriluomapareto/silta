@@ -7,22 +7,35 @@ import SiltaCore
 @main
 enum SiltaMain {
   static func main() async {
-    let rendered = await run(Array(CommandLine.arguments.dropFirst()))
+    let arguments = Array(CommandLine.arguments.dropFirst())
+    let hook = BriefHook.requested(arguments)
+    let deadline = hook ? ContinuousClock().now.advanced(by: .milliseconds(1500)) : nil
+    let watchdog = hook ? BriefHook.watchdog() : nil
+    defer { watchdog?.cancel() }
+    let rendered = await run(arguments, hookDeadline: deadline)
     FileHandle.standardOutput.write(Data(rendered.stdout.utf8))
     FileHandle.standardError.write(Data(rendered.stderr.utf8))
     exit(rendered.exitCode)
   }
 
-  static func run(_ arguments: [String]) async -> Rendered {
+  static func run(_ arguments: [String], hookDeadline: ContinuousClock.Instant? = nil) async
+    -> Rendered
+  {
     let mode = outputMode(arguments)
     let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     let timer = ContinuousClock()
     let started = timer.now
     do {
-      let environment = try await SiltaEnvironment.system(
-        environment: ProcessInfo.processInfo.environment,
-        deterministic: flags.contains("--deterministic"),
-        verbose: flags.contains("--verbose") ? .standardError : nil)
+      let snapshot = ProcessInfo.processInfo.environment
+      let environment: SiltaEnvironment
+      if let hookDeadline {
+        environment = try await BriefHook.environment(
+          snapshot, deterministic: flags.contains("--deterministic"), deadline: hookDeadline)
+      } else {
+        environment = try await SiltaEnvironment.system(
+          environment: snapshot, deterministic: flags.contains("--deterministic"),
+          verbose: flags.contains("--verbose") ? .standardError : nil)
+      }
       let timestamp = environment.clock.now()
       let execution = await execute(
         arguments, context: CommandContext(mode: mode, environment: environment))
@@ -42,8 +55,16 @@ enum SiltaMain {
       ]
       .filter { flags.contains($0) }
       environment.log.record(entry)
+      if let hookDeadline,
+        rendered.exitCode != 0 || ContinuousClock().now >= hookDeadline
+      {
+        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+      }
       return rendered
     } catch {
+      if hookDeadline != nil {
+        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+      }
       if let informational = informationalResult(arguments, mode: mode) { return informational }
       return OutputRouter.render(.failure(error), mode: mode)
     }
