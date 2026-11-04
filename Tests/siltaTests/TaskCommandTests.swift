@@ -331,6 +331,13 @@ extension TaskCommandTests {
       #expect(refused.termination == .exit(1))
       #expect(refused.stderr.contains("inherited from AC-1"))
       #expect(refused.stderr.contains("--app none"))
+      withKnownIssue("#SI-27: a real from-plan run names the inherited app") {
+        let real = try SiltaBinary.run(
+          ["task", "from-plan", plan.path, "--parent", "AC-1", "--split"],
+          in: scratch, environment: Self.actor)
+        #expect(real.termination == .exit(0))
+        Golden.forTests().check(real.stdout, "task-from-plan-inherited-app.txt")
+      }
     }
   }
 }

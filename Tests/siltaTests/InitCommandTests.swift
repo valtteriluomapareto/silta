@@ -50,4 +50,41 @@ struct InitCommandTests {
     }
   }
 
+  static func git(_ args: [String], in scratch: URL, cwd: URL) throws {
+    let result = try SiltaBinary.runProcess(
+      URL(filePath: "/usr/bin/git"), args, in: scratch, cwd: cwd)
+    #expect(result.termination == .exit(0))
+  }
+
+  /// A scanned repo named `none` takes a free slug with a warning, and the rest of the
+  /// scan still creates the workspace, because `none` means non-code work.
+  @Test func scanningARepoNamedNoneRenamesItAndKeepsTheScanGoing() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "acme")
+      for name in ["none", "other"] {
+        let repo = root.appending(path: name)
+        try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+        try Self.git(["init", "-q", "-b", "main"], in: scratch, cwd: repo)
+        try Data("Acme\n".utf8).write(to: repo.appending(path: "readme"))
+        try Self.git(["add", "."], in: scratch, cwd: repo)
+        try Self.git(
+          [
+            "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm",
+            "Acme",
+          ], in: scratch, cwd: repo)
+        try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
+      }
+      withKnownIssue("#SI-27: a repo named none keeps the scan going") {
+        let scan = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
+        #expect(scan.termination == .exit(0))
+        #expect(scan.stderr.contains("slug_renamed"))
+        #expect(scan.stderr.contains("none-repo"))
+        let shown = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
+        #expect(shown.termination == .exit(0))
+        #expect(shown.stdout.contains("\"slug\":\"none-repo\""))
+        #expect(!shown.stdout.contains("\"slug\":\"none\""))
+      }
+    }
+  }
+
 }
