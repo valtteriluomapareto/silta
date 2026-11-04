@@ -74,3 +74,35 @@ struct BriefVisibilityTests {
   }
 
 }
+
+extension BriefVisibilityTests {
+  @Test func filteredListRetainsIndependentPolicyReads() throws {
+    try withScratchDirectory { home in
+      let env = try TaskServiceTests.environment(home)
+      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal + """
+        repos: [{slug: platform}]
+        apps: [{slug: api, repo: platform, ref: main}]
+        """, to: env.db)
+      try WorkspaceSelection.use("acme", in: env.db)
+      try seed(env.db, cutoff: "2023-10-31T22:13:20.000Z")
+      try env.db.write {
+        try $0.database.execute(sql: "UPDATE workspace SET settings='{\"archive_after_days\":null}'")
+      }
+      var filter = TaskFilter()
+      filter.status = "todo"
+      withKnownIssue("#16: Shared visibility must preserve filtered independent policy reads") {
+        let listed = try TaskService(environment: env).list(filter)
+        #expect(listed.map(\.ref) == ["AC-1"])
+      }
+      try env.db.write {
+        try $0.database.execute(sql: """
+          UPDATE workspace SET settings='{}';
+          UPDATE task SET closed_at='2023-11-14' WHERE seq=4;
+          """)
+      }
+      withKnownIssue("#16: Archive timestamps require an instant rather than a date-only value") {
+        #expect(throws: StorageError.self) { _ = try TaskService(environment: env).list() }
+      }
+    }
+  }
+}
