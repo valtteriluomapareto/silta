@@ -23,17 +23,15 @@ struct CommentResolutionTests {
       _ = try coordinator.updateComments(["AC-1/1"], action: .reopen)
       let events =
         try owner.show("AC-1", timeline: true).timeline?.filter { $0.kind == "discussion" } ?? []
-      withKnownIssue("#13: Resolution and reopening have no attributed events") {
-        #expect(events.map(\.body) == ["resolved AC-1/1", "resolved AC-1/2", "reopened AC-1/1"])
-        #expect(
-          events.map(\.actor) == [
-            "agent:codex:reviewer", "agent:codex:reviewer", "agent:claude:coordinator",
-          ])
-        #expect(
-          events.map(\.at) == [
-            "2023-11-14T22:13:21.000Z", "2023-11-14T22:13:21.000Z", "2023-11-14T22:13:22.000Z",
-          ])
-      }
+      #expect(events.map(\.body) == ["resolved AC-1/1", "resolved AC-1/2", "reopened AC-1/1"])
+      #expect(
+        events.map(\.actor) == [
+          "agent:codex:reviewer", "agent:codex:reviewer", "agent:claude:coordinator",
+        ])
+      #expect(
+        events.map(\.at) == [
+          "2023-11-14T22:13:21.000Z", "2023-11-14T22:13:21.000Z", "2023-11-14T22:13:22.000Z",
+        ])
     }
   }
 

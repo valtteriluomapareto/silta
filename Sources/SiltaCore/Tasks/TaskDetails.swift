@@ -100,6 +100,9 @@ package struct TaskDetails: Encodable, Sendable {
   /// Latest actual claim-release comment for a resumable task.
   package var handedOff: String?
 
+  /// An actual release permits resuming even when its comment was deleted.
+  package var resumeAvailable = false
+
   enum CodingKeys: String, CodingKey {
     case handedOff = "handed_off"
     case ref, title, status, description, plan, result, app, branch, worktree, links, timeline

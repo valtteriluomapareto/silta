@@ -9,14 +9,24 @@ package enum CommentError: CodedError {
 
   /// A stored post was not found within its task.
   case missing(String, String)
-  /// A discussion permission or state refusal with task recovery.
-  case conflict(String, String)
+  /// Deletion requires the post's author, not the task holder or a human override.
+  case wrongAuthor(author: String, actor: String, root: String, task: String)
+  /// An optional explanation was supplied without content.
+  case explanationEmpty(String)
+
+  /// These invalid inputs have a concrete retry instead of generic command help.
+  package var hasConcreteInvalidNext: Bool {
+    switch self {
+    case .bodyRequired, .explanationEmpty: true
+    default: false
+    }
+  }
 
   /// The existing invalid/conflict contract.
   package var code: ErrorCode {
     switch self {
-    case .invalid, .bodyRequired: .invalid
-    case .foreignHandoff, .conflict: .conflict
+    case .invalid, .bodyRequired, .explanationEmpty: .invalid
+    case .foreignHandoff, .wrongAuthor: .conflict
     case .missing: .notFound
     }
   }
@@ -26,7 +36,9 @@ package enum CommentError: CodedError {
     case .invalid(let why): why
     case .bodyRequired: "Comment body required; use -m or -F."
     case .missing(let ref, _): "Comment \(ref) not found."
-    case .conflict(let why, _): why
+    case .wrongAuthor(let author, let actor, _, _):
+      "Only author \(SecretGuard.redacted(author)) can delete this comment; current actor is \(SecretGuard.redacted(actor))."
+    case .explanationEmpty: "Explanation empty; omit -m or give text."
     case .foreignHandoff:
       "Only the current claimer can hand off this task; post ordinary discussion instead."
     }
@@ -35,8 +47,14 @@ package enum CommentError: CodedError {
   package var next: [String] {
     switch self {
     case .invalid: ["silta comment --help"]
-    case .missing(_, let task), .conflict(_, let task):
+    case .missing(_, let task):
       ["silta task show " + shellWord(task) + " --timeline"]
+    case .wrongAuthor(_, _, let root, let task):
+      [
+        "silta comment resolve " + shellWord(root),
+        "silta task show " + shellWord(task) + " --timeline",
+      ]
+    case .explanationEmpty(let command): [command]
     case .bodyRequired(let command): [command + " -m \"<text>\""]
     case .foreignHandoff(let task): ["silta comment " + shellWord(task) + " --kind comment -F -"]
     }

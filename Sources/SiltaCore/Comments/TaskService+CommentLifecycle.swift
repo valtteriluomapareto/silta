@@ -7,33 +7,32 @@ extension TaskService {
   package func updateComments(
     _ refs: [String], action: CommentAction, explanation: String? = nil, allowSecret: Bool = false
   ) throws -> CommentMutationResult {
-    guard !refs.isEmpty, action != .delete || (refs.count == 1 && explanation == nil),
-      explanation != nil || !allowSecret
+    guard !refs.isEmpty, action != .delete || (refs.count == 1 && explanation == nil)
     else {
       throw CommentError.invalid("Name thread refs; delete takes one post and no explanation.")
     }
+    guard explanation != nil || !allowSecret else {
+      throw CommentError.invalid("--allow-secret needs an explanation from -m or -F.")
+    }
     let slug = try selected(), at = environment.clock.now()
-    let command =
-      "silta comment " + action.rawValue + " " + refs.map { shellWord($0) }.joined(separator: " ")
+    let command = action.command(refs)
     return try environment.db.write { tx in
       let targets = try commentTargets(refs, action: action, workspace: slug, in: tx.database)
       var result = CommentMutationResult(
         action: action.receipt, refs: targets.map { "\($0.0.ref)/\($0.1["seq"] as Int)" })
       let changed = targets.filter { Self.commentChanges($0.1, action: action) }
+      result.unchanged = targets.filter { !Self.commentChanges($0.1, action: action) }
+        .map { "\($0.0.ref)/\($0.1["seq"] as Int)" }
       if changed.isEmpty { return result }
       let consent = try approval(
         required: allowSecret,
         command: scopedCommand(command, workspace: slug) + " --allow-secret -F <file>")
-      var safe: (CommentDraft, Bool)?
-      if let explanation {
-        var draft = CommentDraft(body: explanation)
-        draft.allowSecret = allowSecret
-        safe = try checkedComment(draft, command: scopedCommand(command, workspace: slug))
-      }
+      let safe = try checkedExplanation(
+        explanation, allowSecret: allowSecret, command: scopedCommand(command, workspace: slug))
       var touched: Set<Int64> = []
       for (task, row) in changed {
         let id: Int64 = row["id"]
-        try setCommentState(id, action: action, at: at, in: tx)
+        try setCommentState(row, task: task, action: action, at: at, in: tx)
         if let (draft, redacted) = safe {
           let (postID, seq) = try insertComment(draft, task: task, root: id, at: at, in: tx)
           let ref = "\(task.ref)/\(seq)"
@@ -57,6 +56,18 @@ extension TaskService {
     }
   }
 
+  private func checkedExplanation(
+    _ text: String?, allowSecret: Bool, command: String
+  ) throws -> (CommentDraft, Bool)? {
+    guard let text else { return nil }
+    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw CommentError.explanationEmpty(command)
+    }
+    var draft = CommentDraft(body: text)
+    draft.allowSecret = allowSecret
+    return try checkedComment(draft, command: command)
+  }
+
   private func commentTargets(
     _ refs: [String], action: CommentAction, workspace: String, in db: Database
   ) throws -> [(TaskDetails, Row)] {
@@ -67,7 +78,9 @@ extension TaskService {
       try Self.mutable(task)
       if action == .delete {
         guard row["actor"] as String == environment.actor.description else {
-          throw CommentError.conflict("Only the author can delete this comment.", task.ref)
+          throw CommentError.wrongAuthor(
+            author: row["actor"], actor: environment.actor.description,
+            root: "\(task.ref)/\((row["root_seq"] as Int?) ?? (row["seq"] as Int))", task: task.ref)
         }
       } else if let root = row["thread_id"] as Int64? {
         guard
@@ -91,8 +104,9 @@ extension TaskService {
   }
 
   private func setCommentState(
-    _ id: Int64, action: CommentAction, at: Date, in tx: StorageTransaction
+    _ row: Row, task: TaskDetails, action: CommentAction, at: Date, in tx: StorageTransaction
   ) throws {
+    let id: Int64 = row["id"]
     switch action {
     case .resolve:
       try tx.database.execute(
@@ -112,6 +126,11 @@ extension TaskService {
         sql: "UPDATE comment SET deleted_at=? WHERE id=?", arguments: [Self.timestamp(at), id])
     }
     try tx.recordChange(kind: "comment", rowID: id)
+    if action != .delete {
+      try changed(
+        task.id, kind: "discussion", body: "\(action.receipt) \(task.ref)/\(row["seq"] as Int)",
+        at: at, in: tx)
+    }
   }
 
   private static func commentTarget(_ raw: String, workspace: String, in db: Database) throws

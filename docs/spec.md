@@ -306,9 +306,10 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
   UNIQUE (task_id, rev));
 
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
-  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | secret_redacted
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
+  -- discussion: 'resolved <root-ref>' or 'reopened <root-ref>', once per changed root.
   -- A comment's secret_redacted event body is that comment's ref, never its content.
 CREATE INDEX task_event_task ON task_event(task_id, kind);
 
@@ -740,13 +741,16 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
-  headers include their timestamp.
+  headers include their timestamp. Resolution text names the resolving actor; JSON
+  includes optional `resolved_by`, inherited from the thread root. Reopen clears both
+  resolution fields and records the reopening actor in an attributed event.
 - A post receipt adds `released` beside its existing JSON fields: true only when
   that transaction released the author's own claim, false for ordinary/context-only
   posts. Text says `handoff; claim released` on release. A resumable, unclaimed
   `doing` task shows its actual release ref and a workspace-qualified `task start`
   hint and the additive JSON `handed_off` ref; claimed, promoted and terminal tasks
-  never offer that hint or field.
+  never offer that hint or field. Deleting the release comment hides `handed_off`
+  and its ref label while preserving the resume command.
 - `reply_to` in JSON denotes the thread root. A reply to a reply joins that root;
   the immediate parent is not a separate edge.
 - Resolve/reopen normalize reply refs to thread roots, deduplicating in first-appearance
@@ -757,7 +761,9 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   transaction, with one consent for the batch. No-ops write nothing, including
   explanations, consent and heartbeats. Foreign mutations preserve holder timestamps.
   Mutation receipts contain `action`, canonical `refs` and `created` explanation refs;
-  quiet emits only created refs. Promoted discussion shows no mutation hints.
+  text labels unchanged refs as already resolved/open/deleted and lists explanation
+  refs; quiet emits only created refs. Task show offers no per-root action hints;
+  comment help explains lifecycle commands without competing with task-start guidance.
 - Comments are append-only: the author can soft-delete and post again. There is no
   edit history.
 - A body is at most 8 000 Unicode scalar values. Longer output is summarised, and the

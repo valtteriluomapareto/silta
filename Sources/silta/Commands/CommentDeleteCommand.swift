@@ -8,7 +8,7 @@ struct CommentDeleteCommand: OutputCommand {
   static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup var global: GlobalOptions
-  @Argument(help: "The post to delete, not its thread root.") var ref: String
+  @Argument(help: "The exact post to delete, including a root or reply.") var ref: String
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let workspace = try context.workspace(global.ws)

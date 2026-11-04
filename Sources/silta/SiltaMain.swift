@@ -151,9 +151,9 @@ enum SiltaMain {
     if error.code == .busy { return CommandFailure(error: error, next: [path]) }
     var next = error.next
     let ownNext =
-      if case .step = error as? TaskError {
-        true
-      } else if case .bodyRequired = error as? CommentError { true } else { false }
+      if case .step = error as? TaskError { true } else {
+        (error as? CommentError)?.hasConcreteInvalidNext == true
+      }
     if error.code == .invalid, !ownNext,
       error is TaskError || error is ActorError || error is CommentError
     {

@@ -6,6 +6,8 @@ package struct CommentMutationResult: Encodable, Sendable {
   package let refs: [String]
   /// New explanation refs, retained by quiet output.
   package var created: [String] = []
+  /// Refs already in the requested state; presentation metadata, outside JSON.
+  package var unchanged: [String] = []
   /// Secret-policy diagnostics, outside the JSON data.
   package var warnings: [OutputWarning] = []
   /// True only if this mutation recorded consent.

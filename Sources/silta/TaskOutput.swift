@@ -75,9 +75,10 @@ enum TaskOutput {
     lines.append("Archived: \(task.archived ? "yes" : "no")")
     if let day = task.followUpAt { lines.append("Follow-up: " + day) }
     if let claim = task.claimedBy { lines.append("Claimed by: \(claim)") }
-    if let handoff = task.handedOff {
+    if task.resumeAvailable {
+      let context = task.handedOff.map { " (handed off " + $0 + ")" } ?? ""
       lines.append(
-        "Unclaimed (handed off \(handoff)); next: silta --ws "
+        "Unclaimed" + context + "; next: silta --ws "
           + shellWord(workspace) + " task start " + shellWord(task.ref))
     }
     for (heading, text) in [
@@ -94,8 +95,7 @@ enum TaskOutput {
       lines.append("\nDiscussion:")
       lines += comments.map {
         CommentOutput.detail(
-          $0, comments: comments, timeline: task.timeline != nil,
-          workspace: task.externalRef == nil ? workspace : nil)
+          $0, comments: comments, timeline: task.timeline != nil)
       }
     }
     for event in task.timeline ?? [] {

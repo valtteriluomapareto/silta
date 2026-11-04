@@ -14,6 +14,8 @@ package struct CommentDetails: Encodable, Sendable {
   package let deleted: Bool
   /// Resolution of the containing thread, when resolved.
   package let resolvedAt: String?
+  /// The actor who resolved the containing thread, when known.
+  package let resolvedBy: String?
   /// The posting instant.
   package let createdAt: String
 
@@ -21,6 +23,7 @@ package struct CommentDetails: Encodable, Sendable {
     case ref, kind, body, actor, deleted
     case replyTo = "reply_to"
     case resolvedAt = "resolved_at"
+    case resolvedBy = "resolved_by"
     case createdAt = "created_at"
   }
 }

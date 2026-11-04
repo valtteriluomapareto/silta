@@ -21,8 +21,10 @@ struct CommentLifecycleCommandTests {
       Golden.forTests().check(result.stdout, "comment-resolve.\(json ? "json" : "txt")")
       let history = try SiltaBinary.run(
         ["task", "show", "AC-1", "--timeline"], in: scratch, environment: env)
-      #expect(history.stdout.contains("[resolved]") && history.stdout.contains("> Fixed."))
-      #expect(history.stdout.contains("silta --ws 'acme' comment reopen 'AC-1/1'"))
+      #expect(
+        history.stdout.contains("[resolved by agent:codex:acme]")
+          && history.stdout.contains("> Fixed."))
+      #expect(!history.stdout.contains("next: silta --ws 'acme' comment"))
       let reopened = try SiltaBinary.run(
         ["comment", "reopen", "task:AC-1/2", "AC-1/1", "--json"], in: scratch, environment: env)
       Golden.forTests().check(reopened.stdout, "comment-reopen.json")
