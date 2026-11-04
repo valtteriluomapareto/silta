@@ -133,3 +133,29 @@ struct CommentHandoffTests {
     }
   }
 }
+
+extension CommentHandoffTests {
+  @Test(arguments: [1, 2])
+  func fileNewlineTrimsOnlyTheFinalGutter(newlines: Int) throws {
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let body = "Acme context" + String(repeating: "\n", count: newlines)
+      let file = scratch.appending(path: "context.md")
+      try body.write(to: file, atomically: true, encoding: .utf8)
+      let posted = try SiltaBinary.run(
+        ["comment", "AC-1", "-F", file.path], in: scratch,
+        environment: TaskCommandTests.fixed)
+      #expect(posted.termination == .exit(0))
+      let shown = try SiltaBinary.run(
+        ["task", "show", "AC-1"], in: scratch, environment: TaskCommandTests.fixed)
+      withKnownIssue("#13: A file terminator adds a trailing bare quote line") {
+        #expect(shown.stdout.split(separator: "\n").filter { $0.hasPrefix(">") }.count == newlines)
+      }
+      let raw = try SiltaBinary.run(
+        ["task", "show", "AC-1", "--json"], in: scratch,
+        environment: TaskCommandTests.fixed)
+      let comments = try #require(try TaskStateRegressionTests.data(raw)["comments"] as? [[String: Any]])
+      #expect(comments.first?["body"] as? String == body)
+    }
+  }
+}
