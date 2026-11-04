@@ -105,3 +105,28 @@ extension BriefVisibilityTests {
     }
   }
 }
+
+extension BriefVisibilityTests {
+  @Test func archiveInstantGrammarParity() throws {
+    try withScratchDirectory { home in
+      let env = try TaskServiceTests.environment(home)
+      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal + """
+        repos: [{slug: platform}]
+        apps: [{slug: api, repo: platform, ref: main}]
+        """, to: env.db)
+      try WorkspaceSelection.use("acme", in: env.db)
+      try seed(env.db, cutoff: "2023-11-14T22:13:20.000")
+      withKnownIssue("#16: Zone-less archive timestamps must retain rejection") {
+        #expect(throws: StorageError.self) { _ = try TaskService(environment: env).list() }
+      }
+      try env.db.write {
+        try $0.database.execute(sql: "UPDATE task SET closed_at=? WHERE seq=4",
+          arguments: ["2023-11-14T22:13:20.000+0000"])
+      }
+      withKnownIssue("#16: Existing compact zone offsets must retain acceptance") {
+        let tasks = try TaskService(environment: env).list()
+        #expect(tasks.map(\.ref).contains("AC-4"))
+      }
+    }
+  }
+}
