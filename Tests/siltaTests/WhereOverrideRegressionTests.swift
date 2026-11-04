@@ -97,6 +97,69 @@ struct WhereOverrideRegressionTests {
     }
   }
 
+  @Test func nestedLinkedWorktreeDoesNotInheritParentOverride() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      let child = repo.appending(path: ".claude/worktrees/child")
+      try fixture.git(["worktree", "add", "-b", "nested-topic", child.path, "api"], repo, scratch)
+      _ = try fixture.data(
+        fixture.run(["--set", "platform", "--approved", "Yes, use platform"], repo, scratch))
+      #expect(try fixture.data(fixture.run([], repo, scratch))["app"] as? String == "platform")
+      #expect(try fixture.data(fixture.run([], child, scratch))["app"] as? String == "api")
+    }
+  }
+
+  @Test func subpathApprovalNamesAndReplaysWorktreeScope() throws {
+    withKnownIssue("#11: subpathApprovalNamesAndReplaysWorktreeScope") {
+      try withScratchDirectory { scratch in
+        let repo = try fixture.setup(scratch)
+        let console = repo.appending(path: "apps/console")
+        let root = try canonical(repo)
+        let refused = try fixture.run(["--set", "console"], console, scratch)
+        try #require(refused.termination == .exit(3))
+        let envelope = try #require(
+          JSONSerialization.jsonObject(with: Data(refused.stdout.utf8)) as? [String: Any])
+        let error = try #require(envelope["error"] as? [String: Any])
+        let hint = try #require((error["next"] as? [String])?.first)
+        let command = "silta --ws 'acme' where --path " + shellWord(root) + " --set 'console'"
+        #expect(hint == command + " --approved \"<the human's words>\"")
+        let executable = try SiltaBinary.url().path
+        let replay =
+          shellWord(executable)
+          + hint.dropFirst("silta".count)
+          .replacingOccurrences(
+            of: "\"<the human's words>\"", with: "'Yes, use console for this worktree'")
+        let result = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-c", replay],
+          in: scratch, cwd: scratch, environment: ["SILTA_ACTOR": "agent:codex:acme"])
+        try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
+        #expect(result.stdout.hasPrefix("Override set to console for " + root + ".\n"))
+        #expect(result.stdout.contains("acme / platform / api"))
+        let stored = try store(scratch).read { db in
+          try String.fetchOne(
+            db,
+            sql: """
+              SELECT app.slug FROM worktree_override JOIN app ON app.id=worktree_override.app_id
+              """)
+        }
+        #expect(stored == "console")
+        #expect(
+          try store(scratch).read {
+            try String.fetchOne($0, sql: "SELECT command FROM approval ORDER BY id DESC LIMIT 1")
+          } == command)
+        #expect(try fixture.data(fixture.run([], repo, scratch))["app"] as? String == "api")
+        #expect(try fixture.data(fixture.run([], console, scratch))["app"] as? String == "console")
+        let again = try SiltaBinary.run(
+          ["--ws", "acme", "where", "--path", root, "--set", "console"],
+          in: scratch, cwd: scratch, environment: ["SILTA_ACTOR": "agent:codex:acme"])
+        #expect(again.termination == .exit(0))
+        #expect(again.stdout.hasPrefix("Override already console for " + root + ".\n"))
+        #expect(again.stdout.contains("acme / platform / api"))
+        #expect(try fixture.run(["--app", "console"], repo, scratch).termination == .exit(4))
+      }
+    }
+  }
+
   private func store(_ scratch: URL) -> DatabaseStore {
     DatabaseStore(
       home: scratch.appending(path: "silta-home"),

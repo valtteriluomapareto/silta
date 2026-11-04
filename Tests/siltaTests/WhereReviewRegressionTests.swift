@@ -93,6 +93,46 @@ struct WhereReviewRegressionTests {
     }
   }
 
+  @Test(arguments: ["single", "override"])
+  func missingExplicitTaskIsNotIgnoredByEarlierRules(mode: String) throws {
+    withKnownIssue("#11: missingExplicitTaskIsNotIgnoredByEarlierRules") {
+      try withScratchDirectory { scratch in
+        let repo = try fixture.setup(scratch)
+        if mode == "override" {
+          _ = try fixture.data(
+            fixture.run(["--set", "platform", "--approved", "Yes"], repo, scratch))
+        }
+        let path = mode == "single" ? repo.appending(path: "apps/console") : repo
+        let result = try fixture.run(["--task", "AC-999"], path, scratch)
+        #expect(result.termination == .exit(2))
+        #expect(result.stdout.contains("Task AC-999 not found."))
+        #expect(result.stdout.contains("silta --ws 'acme' task ls"))
+      }
+    }
+  }
+
+  @Test(arguments: ["single", "override"])
+  func validTaskKeepsEarlierResolutionPrecedence(mode: String) throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try store(scratch).write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,created_by,created_at,updated_at)
+            SELECT 'portal-task',1,1,'Acme','todo',id,'human:acme','',''
+            FROM app WHERE slug='portal'
+            """)
+      }
+      if mode == "override" {
+        _ = try fixture.data(
+          fixture.run(["--set", "platform", "--approved", "Yes"], repo, scratch))
+      }
+      let path = mode == "single" ? repo.appending(path: "apps/console") : repo
+      let result = try fixture.data(fixture.run(["--task", "AC-1"], path, scratch))
+      #expect(result["app"] as? String == (mode == "single" ? "console" : "platform"))
+    }
+  }
+
   private func store(_ scratch: URL) -> DatabaseStore {
     DatabaseStore(
       home: scratch.appending(path: "silta-home"),

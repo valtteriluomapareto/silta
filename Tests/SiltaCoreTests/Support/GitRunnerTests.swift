@@ -85,6 +85,20 @@ struct GitRunnerTests {
     }
   }
 
+  @Test(arguments: ["0", "1"])
+  func defaultRequestsDoNotDisableLazyFetching(inherited: String) async throws {
+    await withKnownIssue("#11: defaultRequestsDoNotDisableLazyFetching") {
+      try await withScratchDirectory { scratch in
+        let runner = SystemGitRunner(
+          executable: "/usr/bin/env",
+          environment: ["GIT_NO_LAZY_FETCH": inherited])
+        let result = try await runner.run(.init(arguments: [], directory: scratch))
+        let output = try #require(String(bytes: result.stdout, encoding: .utf8))
+        #expect(!output.split(separator: "\n").contains { $0.hasPrefix("GIT_NO_LAZY_FETCH=") })
+      }
+    }
+  }
+
   @Test func largeOutputCannotFillAPipe() async throws {
     try await withScratchDirectory { scratch in
       let script = scratch.appending(path: "git")
