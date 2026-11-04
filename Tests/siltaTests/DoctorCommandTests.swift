@@ -31,11 +31,11 @@ struct DoctorCommandTests {
       for flags in [["--json"], ["--json", "--quiet"]] {
         let result = try SiltaBinary.run(["doctor"] + flags, in: scratch, environment: environment)
         #expect(result.termination == .exit(9))
-        Golden.forTests().check(result.stdout, "doctor-missing.json")
+        Golden.forTests().check(normalize(result.stdout, scratch), "doctor-missing.json")
         #expect(result.stderr.isEmpty)
       }
       let result = try SiltaBinary.run(["doctor"], in: scratch, environment: environment)
-      Golden.forTests().check(result.stdout, "doctor-missing.txt")
+      Golden.forTests().check(normalize(result.stdout, scratch), "doctor-missing.txt")
       Golden.forTests().check(result.stderr, "doctor-missing-error.txt")
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/silta.db").path)

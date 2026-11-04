@@ -23,20 +23,24 @@ package enum DoctorService {
     var checks = database(store, backups: backups, at: now)
     checks.append(wal(home))
     checks.append(await gitVersion(git))
-    checks += [
-      "install.path", "install.hook", "install.skill", "install.codex_root", "install.codex_marker",
-    ].map {
-      DoctorCheck(id: $0, status: .skipped, message: "Installer diagnostics are not available yet.")
+    return DoctorReport(checks: orderedChecks(checks))
+  }
+
+  /// Fills reserved ids while retaining unregistered computed checks visibly.
+  static func orderedChecks(_ checks: [DoctorCheck]) -> [DoctorCheck] {
+    let ordered = checkOrder.map { id in
+      if let check = checks.first(where: { $0.id == id }) { return check }
+      let message =
+        id.hasPrefix("install.")
+        ? "Installer diagnostics are not available yet."
+        : id.hasPrefix("index.")
+          ? "Index diagnostics are not available yet."
+          : id == "app.version"
+            ? "App version diagnostics are not available yet."
+            : "This diagnostic check is unavailable."
+      return DoctorCheck(id: id, status: .skipped, message: message)
     }
-    checks += ["index.integrity", "index.foreign_keys", "index.schema", "index.fts", "index.age"]
-      .map {
-        DoctorCheck(id: $0, status: .skipped, message: "Index diagnostics are not available yet.")
-      }
-    checks.append(
-      DoctorCheck(
-        id: "app.version", status: .skipped,
-        message: "App version diagnostics are not available yet."))
-    return DoctorReport(checks: checkOrder.compactMap { id in checks.first { $0.id == id } })
+    return ordered + checks.filter { !checkOrder.contains($0.id) }
   }
 
   private static func gitVersion(_ git: any GitRunner) async -> DoctorCheck {

@@ -53,7 +53,7 @@ struct DoctorBackups {
     guard readable else {
       return DoctorCheck(
         id: "data.backup", status: .warning,
-        message: "Backup files could not be listed; coverage is unknown.", next: [listing])
+        message: "Backup files could not be listed.", next: [listing])
     }
     if expectedDay == "" {
       return DoctorCheck(
@@ -63,8 +63,9 @@ struct DoctorBackups {
     guard let expectedDay else {
       return DoctorCheck(
         id: "data.backup", status: .warning,
-        message:
-          "\(count) published backup(s) available; write coverage is unknown. Restore is the human's decision.",
+        message: count == 0
+          ? "No published backups found; the last backup day could not be read."
+          : "\(count) published backup(s) found; the last backup day could not be read.",
         next: count > 0 ? [listing] : [])
     }
     let covered = Self.validDay(expectedDay) && days.contains(expectedDay)

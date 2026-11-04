@@ -80,8 +80,8 @@ struct DoctorReviewTests {
       let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
       let checks = try #require(json["checks"] as? [[String: Any]])
       #expect(checks.allSatisfy { ["agent", "human"].contains($0["next_by"] as? String ?? "") })
-      #expect(DoctorFailure(report: report).nextBy == .agent)
-      #expect(report.text.contains("  next: silta init"))
+      #expect(DoctorFailure(report: report).nextBy == .human)
+      #expect(report.text.contains("  ask human: silta init"))
       let ids = Set(report.checks.map(\.id))
       #expect(
         ids.isSuperset(of: [
@@ -151,7 +151,7 @@ struct DoctorReviewTests {
       #expect(claim.next.count <= 5)
       #expect(report.checks.first { $0.id == "git.repos" }?.next.count ?? 0 <= 5)
       #expect(report.text.contains("+3 more"))
-      #expect(report.checks.first { $0.id == "git.fetch" }?.message.contains("8 missing") == true)
+      #expect(report.checks.first { $0.id == "git.fetch" }?.status == .pass)
     }
 
   }

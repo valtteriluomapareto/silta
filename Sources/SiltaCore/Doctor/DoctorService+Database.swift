@@ -25,14 +25,15 @@ extension DoctorService {
       if missing {
         first = DoctorCheck(
           id: "database.integrity", status: .fail,
-          message: "Database is missing."
+          message: "Database \(store.path.debugDescription) is missing."
             + (backups.count > 0
               ? " Backups are available; restore is the human's decision."
               : !backups.readable
                 ? " Backup availability is unknown; "
                   + "the human must decide recovery after inspection."
                 : " Initialize only if no existing data is expected."),
-          next: inspectBackups ? [backups.listing] : ["silta init"])
+          next: inspectBackups ? [backups.listing] : ["silta init"],
+          nextBy: inspectBackups ? .agent : .human)
       } else {
         first = DoctorCheck(
           id: "database.integrity", status: .fail,
@@ -48,7 +49,7 @@ extension DoctorService {
     }
     do {
       return try store.read { db in
-        databaseChecks(db, backups: backups, recovery: recovery, at: now)
+        databaseChecks(db, path: store.path, backups: backups, recovery: recovery, at: now)
       }
     } catch {
       let failure = readFailure(
@@ -78,12 +79,13 @@ extension DoctorService {
   }
 
   private static func databaseChecks(
-    _ db: Database, backups: DoctorBackups, recovery: [String], at now: Date
+    _ db: Database, path: String, backups: DoctorBackups, recovery: [String], at now: Date
   ) -> [DoctorCheck] {
     var checks = integrity(db, recovery: recovery)
     let schemaCheck: DoctorCheck
     do {
-      schemaCheck = try schema(db, recovery: recovery, allowInitialization: backups.isKnownEmpty)
+      schemaCheck = try schema(
+        db, path: path, recovery: recovery, allowInitialization: backups.isKnownEmpty)
     } catch {
       schemaCheck = DoctorCheck(
         id: "database.schema", status: .fail, message: "Schema metadata could not be checked.",
@@ -148,23 +150,15 @@ extension DoctorService {
     return checks
   }
 
-  private static func schema(_ db: Database, recovery: [String], allowInitialization: Bool) throws
+  private static func schema(
+    _ db: Database, path: String, recovery: [String], allowInitialization: Bool
+  ) throws
     -> DoctorCheck
   {
     let install = ["<clean-main-checkout>/scripts/install-dev.sh"]
     guard try db.tableExists("meta"), try db.tableExists("grdb_migrations") else {
-      let empty =
-        try Int.fetchOne(
-          db, sql: "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0
-      let initialize = empty && allowInitialization
-      return DoctorCheck(
-        id: "database.schema", status: .fail,
-        message: initialize
-          ? "Database schema is uninitialized."
-          : "Database metadata is absent; "
-            + "inspect backups and read-only evidence. "
-            + "Restore is the human's decision.",
-        next: initialize ? ["silta init"] : recovery)
+      return try missingMetadata(
+        db, path: path, recovery: recovery, allowInitialization: allowInitialization)
     }
     guard
       let rawVersion = try String.fetchOne(
@@ -185,7 +179,9 @@ extension DoctorService {
     if !complete, !future, version <= DatabaseStore.writerVersion {
       return DoctorCheck(
         id: "database.schema", status: .fail,
-        message: "Schema has pending migrations; doctor never migrates it.", next: ["silta init"])
+        message:
+          "Database \(path.debugDescription) has pending migrations; doctor never migrates it.",
+        next: ["silta init"], nextBy: .human)
     }
     guard complete, version <= DatabaseStore.writerVersion else {
       return DoctorCheck(
@@ -201,6 +197,24 @@ extension DoctorService {
         ? "Newer migrations exist; this binary is still writer-compatible."
         : "Schema is compatible with this binary.", next: future ? install : [],
       nextBy: future ? .human : .agent)
+  }
+
+  private static func missingMetadata(
+    _ db: Database, path: String, recovery: [String], allowInitialization: Bool
+  ) throws -> DoctorCheck {
+    let empty =
+      try Int.fetchOne(
+        db, sql: "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0
+    let initialize = empty && allowInitialization
+    return DoctorCheck(
+      id: "database.schema", status: .fail,
+      message: initialize
+        ? "Database \(path.debugDescription) has no initialized schema; confirm this is the intended home."
+        : "Database metadata is absent; "
+          + "inspect backups and read-only evidence. "
+          + "Restore is the human's decision.",
+      next: initialize ? ["silta init"] : recovery,
+      nextBy: initialize ? .human : .agent)
   }
 
 }

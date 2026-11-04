@@ -12,7 +12,11 @@ extension DoctorService {
         """)
     let unbound = repos.filter { ($0["path"] as String?) == nil }
     let bound = repos.filter { ($0["path"] as String?) != nil }
-    let dead = bound.filter { !hasGitMarker($0["path"]) }
+    var live: [Row] = []
+    var dead: [Row] = []
+    for repo in bound {
+      if hasGitMarker(repo["path"]) { live.append(repo) } else { dead.append(repo) }
+    }
     let overrides = try Row.fetchAll(db, sql: "SELECT path FROM worktree_override ORDER BY path")
     let orphaned = overrides.filter { !hasGitMarker($0["path"]) }
     return [
@@ -21,7 +25,7 @@ extension DoctorService {
         message: dead.isEmpty
           ? "All bound repository paths have a .git marker."
           : "\(dead.count) bound repository path(s) are missing a .git marker.",
-        next: repoNext(dead, fetch: false)),
+        next: repoNext(dead, fetch: false), nextBy: dead.isEmpty ? .agent : .human),
       DoctorCheck(
         id: "git.bindings", status: unbound.isEmpty ? .pass : .warning,
         message: unbound.isEmpty
@@ -30,7 +34,7 @@ extension DoctorService {
         next: unbound.map {
           "silta --ws " + shellWord($0["workspace"]) + " init --scan <directory>"
         }, nextBy: unbound.isEmpty ? .agent : .human),
-      fetchCheck(bound, at: now),
+      fetchCheck(live, at: now),
       DoctorCheck(
         id: "git.overrides", status: orphaned.isEmpty ? .pass : .warning,
         message: orphaned.isEmpty
@@ -58,12 +62,13 @@ extension DoctorService {
   }
 
   private static func repoNext(_ rows: [Row], fetch: Bool) -> [String] {
-    rows.flatMap { row in
+    rows.map { row in
       let workspace: String = row["workspace"]
       let slug: String = row["slug"]
-      if fetch { return ["silta --ws " + shellWord(workspace) + " repo fetch " + shellWord(slug)] }
+      if fetch { return "silta --ws " + shellWord(workspace) + " repo fetch " + shellWord(slug) }
       let path: String = row["path"]
-      return [pathInspection(path), "silta --ws " + shellWord(workspace) + " ws show"]
+      return pathInspection(path) + "; silta --ws " + shellWord(workspace)
+        + " init --scan <directory>"
     }
   }
 

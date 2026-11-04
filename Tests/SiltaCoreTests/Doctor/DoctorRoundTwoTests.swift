@@ -21,72 +21,72 @@ struct DoctorRoundTwoTests {
   @Test(arguments: [false, true]) func initializationRequiresHumanAndNamesDatabase(empty: Bool)
     async throws
   {
-    await withKnownIssue("#15 round 2: initializationRequiresHumanAndNamesDatabase") {
-      try await withScratchDirectory { home in
-        let file = home.appending(path: "silta.db")
-        if empty { try Data().write(to: file) }
-        let report = await inspect(home)
-        let check = try #require(report.checks.first { $0.next == ["silta init"] })
-        #expect(check.nextBy == .human)
-        #expect(check.message.contains(file.path))
-        #expect(DoctorFailure(report: report).nextBy == .human)
-        #expect(report.text.contains("ask human: silta init"))
-      }
+
+    try await withScratchDirectory { home in
+      let file = home.appending(path: "silta.db")
+      if empty { try Data().write(to: file) }
+      let report = await inspect(home)
+      let check = try #require(report.checks.first { $0.next == ["silta init"] })
+      #expect(check.nextBy == .human)
+      #expect(check.message.contains(file.path))
+      #expect(DoctorFailure(report: report).nextBy == .human)
+      #expect(report.text.contains("ask human: silta init"))
     }
+
   }
 
   @Test func deadRepositoriesHaveCompleteBoundedRecoveryAndNoFetch() async throws {
-    await withKnownIssue("#15 round 2: deadRepositoriesHaveCompleteBoundedRecoveryAndNoFetch") {
-      try await withScratchDirectory { home in
-        let store = StorageSchemaTests.store(home)
-        try store.initialize()
-        let healthy = home.appending(path: "healthy")
-        try FileManager.default.createDirectory(
-          at: healthy.appending(path: ".git"), withIntermediateDirectories: true)
-        try store.write { tx in
+
+    try await withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      try store.initialize()
+      let healthy = home.appending(path: "healthy")
+      try FileManager.default.createDirectory(
+        at: healthy.appending(path: ".git"), withIntermediateDirectories: true)
+      try store.write { tx in
+        try tx.database.execute(
+          sql:
+            "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme','Acme','AC')")
+        for number in 1...7 {
+          let slug = "gone-\(number)"
           try tx.database.execute(
-            sql:
-              "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme','Acme','AC')")
-          for number in 1...7 {
-            let slug = "gone-\(number)"
-            try tx.database.execute(
-              sql: "INSERT INTO repo(uid,workspace_id,slug) VALUES(?,1,?)", arguments: [slug, slug])
-            try tx.database.execute(
-              sql: "INSERT INTO repo_path(repo_id,path) VALUES(?,?)",
-              arguments: [number, home.appending(path: slug).path])
-          }
+            sql: "INSERT INTO repo(uid,workspace_id,slug) VALUES(?,1,?)", arguments: [slug, slug])
           try tx.database.execute(
-            sql: "INSERT INTO repo(uid,workspace_id,slug) VALUES('healthy',1,'healthy')")
-          try tx.database.execute(
-            sql: "INSERT INTO repo_path(repo_id,path) VALUES(8,?)", arguments: [healthy.path])
+            sql: "INSERT INTO repo_path(repo_id,path) VALUES(?,?)",
+            arguments: [number, home.appending(path: slug).path])
         }
-        let report = await inspect(home)
-        let check = try #require(report.checks.first { $0.id == "git.repos" })
-        #expect(check.status == .fail)
-        #expect(check.nextBy == .human)
-        #expect(check.next.count == 5)
-        #expect(check.nextOmitted == 2)
-        for (index, recipe) in check.next.enumerated() {
-          #expect(recipe.contains(home.appending(path: "gone-\(index + 1)").path))
-          #expect(recipe.contains("; silta --ws 'acme' init --scan <directory>"))
-          #expect(!recipe.contains("&&"))
-        }
-        let fetch = try #require(report.checks.first { $0.id == "git.fetch" })
-        #expect(fetch.next == ["silta --ws 'acme' repo fetch 'healthy'"])
-        #expect(fetch.message.contains("1 missing"))
+        try tx.database.execute(
+          sql: "INSERT INTO repo(uid,workspace_id,slug) VALUES('healthy',1,'healthy')")
+        try tx.database.execute(
+          sql: "INSERT INTO repo_path(repo_id,path) VALUES(8,?)", arguments: [healthy.path])
       }
+      let report = await inspect(home)
+      let check = try #require(report.checks.first { $0.id == "git.repos" })
+      #expect(check.status == .fail)
+      #expect(check.nextBy == .human)
+      #expect(check.next.count == 5)
+      #expect(check.nextOmitted == 2)
+      for (index, recipe) in check.next.enumerated() {
+        #expect(recipe.contains(home.appending(path: "gone-\(index + 1)").path))
+        #expect(recipe.contains("; silta --ws 'acme' init --scan <directory>"))
+        #expect(!recipe.contains("&&"))
+      }
+      let fetch = try #require(report.checks.first { $0.id == "git.fetch" })
+      #expect(fetch.next == ["silta --ws 'acme' repo fetch 'healthy'"])
+      #expect(fetch.message.contains("1 missing"))
     }
+
   }
 
   @Test func absentBackupsDoNotSuggestRestorationOrUseCoverageJargon() async throws {
-    await withKnownIssue("#15 round 2: absentBackupsDoNotSuggestRestorationOrUseCoverageJargon") {
-      try await withScratchDirectory { home in
-        let report = await inspect(home)
-        let check = try #require(report.checks.first { $0.id == "data.backup" })
-        #expect(!check.message.contains("Restore"))
-        #expect(!check.message.contains("write coverage"))
-      }
+
+    try await withScratchDirectory { home in
+      let report = await inspect(home)
+      let check = try #require(report.checks.first { $0.id == "data.backup" })
+      #expect(!check.message.contains("Restore"))
+      #expect(!check.message.contains("write coverage"))
     }
+
   }
 
   @Test(arguments: ["missing", "empty", "initialized"]) func reportIDsMatchNamedOrder(state: String)
@@ -99,6 +99,14 @@ struct DoctorRoundTwoTests {
       #expect(ids == DoctorService.checkOrder)
       #expect(Set(ids).count == ids.count)
     }
+  }
+
+  @Test func computedUnregisteredChecksRemainVisible() {
+    let future = DoctorCheck(id: "install.future", status: .fail, message: "Acme diagnostic")
+    let checks = DoctorService.orderedChecks([future])
+    #expect(checks.map(\.id) == DoctorService.checkOrder + ["install.future"])
+    #expect(checks.last?.status == .fail)
+    #expect(checks.dropLast().allSatisfy { $0.status == .skipped })
   }
 
   @Test func realReadPathMapsSQLiteContentionToBusy() throws {

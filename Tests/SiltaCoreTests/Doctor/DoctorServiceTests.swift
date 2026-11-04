@@ -138,9 +138,8 @@ struct DoctorServiceTests {
         try $0.execute(sql: "UPDATE task SET claimed_at=NULL")
       }
       let invalid = await inspect(home)
-      for id in ["git.fetch", "data.claims"] {
-        #expect(invalid.checks.first { $0.id == id }?.status == .warning)
-      }
+      #expect(invalid.checks.first { $0.id == "git.fetch" }?.status == .pass)
+      #expect(invalid.checks.first { $0.id == "data.claims" }?.status == .warning)
       #expect(
         try await queue.read { try String.fetchOne($0, sql: "SELECT claimed_by FROM task") }
           == "agent:codex:acme")
@@ -166,7 +165,7 @@ struct DoctorServiceTests {
       let next = try #require(report.checks.first { $0.id == "git.repos" }?.next)
       #expect(next.contains { $0.contains(dead.path) })
       #expect(!next.contains { $0.contains(healthy.path) })
-      #expect(next.filter { $0.hasSuffix(" ws show") }.count == 1)
+      #expect(next.allSatisfy { $0.contains("init --scan <directory>") })
     }
   }
 

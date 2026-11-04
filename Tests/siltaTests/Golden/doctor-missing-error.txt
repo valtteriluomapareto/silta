@@ -1,2 +1,2 @@
 error: Doctor found failed checks: database.integrity. [env]
-next: silta init
+ask human: silta init

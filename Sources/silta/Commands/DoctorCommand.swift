@@ -8,7 +8,10 @@ struct DoctorCommand: OutputCommand {
     abstract: "Diagnose database, git and data across all workspaces without repairs.",
     discussion:
       "--ws does not filter this global report. "
-      + "Unavailable install, index and app checks are explicitly skipped."
+      + "Unavailable install, index and app checks are explicitly skipped. "
+      + "SQLite .db snapshot recovery is a human decision: stop all clients, preserve the original "
+      + "home including WAL/SHM files, then copy the chosen snapshot as silta.db into a fresh home "
+      + "without old sidecars and inspect it with doctor. silta restore takes an export directory."
   )
   static let dataShape = Shape.object([
     "checks": .array(

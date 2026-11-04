@@ -1407,8 +1407,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   The read-only diagnostic command reports all workspaces; `--ws` does not filter
   it. `data.checks` contains ordered checks with `id`, `status` (`pass`, `warning`,
   `fail`, `skipped`), `message`, `next`, `next_by` (`agent` or `human`), and
-  `next_omitted`. Each `next` contains at most five distinct commands, in priority
-  order. `next_omitted` counts the remaining commands; text prints `+N more`
+  `next_omitted`. Each `next` contains at most five distinct recovery entries, in priority
+  order. A dead-repo entry is one human-owned inspection/binding recipe; its
+  commands stay together even when inspection fails. The human chooses and
+  approves the clone directory before running it. `next_omitted` counts remaining
+  entries (including complete per-repo recipes); text prints `+N more`
   separately, never as an executable command. `next_by` owns every command in that
   check and determines whether text says `next:` or `ask human:`.
   Failures return exit 9 / `env`, `ok:false` and the complete report in `data`;
@@ -1418,7 +1421,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   overrides, fetches, initializes or migrates.
 
   Check ids and their order are a contract: ids are never renamed or removed, only
-  added. Unavailable checks retain their own id with status `skipped`:
+  added. New ids may be inserted into the display order; consumers key by id,
+  never by array index. Computed ids absent from the named order remain visible at
+  the end. Unavailable checks retain their own id with status `skipped`:
 
   | Id (display order) | Check / availability |
   |---|---|
@@ -1450,11 +1455,15 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   ownership. Fetch timestamps missing/invalid or older than 24 h warn, with separate
   counts. Unbound repositories warn and suggest workspace-scoped
   `init --scan <directory>` after the human chooses a clone; they are excluded from
-  fetch checks. Bound dead repo paths fail. Orphaned overrides warn. These path
+  fetch checks. Bound dead repo paths fail, are also excluded from fetch checks,
+  and give human-owned `init --scan` recovery paired with path inspection.
+  Orphaned overrides warn. These path
   checks verify `.git` marker presence, not linked-worktree target usability.
 
   Missing, older or incompatible schemas fail. Pending known migrations suggest `silta init`; empty databases do so only when
-  backup inventory is readable and contains no published backups;
+  backup inventory is readable and contains no published backups; all suggested
+  initialization is human-owned, and missing/empty diagnostics show the resolved
+  database path so the human can confirm the intended `SILTA_HOME`;
   nonempty databases missing metadata require backup/schema inspection first; real writer incompatibility names
   the clean-main development install script and requires the human's decision.
   Compatible unknown migrations warn (D32). Dependent checks on an incompatible
@@ -1474,6 +1483,13 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   suggested for a missing or empty database only when backup inspection succeeded and no
   published backups were found. Unreadable inventory stays unknown and leads to
   inspection, even if no write has yet required a daily backup.
+  SQLite `.db` snapshot recovery is manual: the human stops all clients, preserves
+  the original home including WAL/SHM files, copies the selected snapshot as
+  `silta.db` into a fresh empty home without old sidecars, and inspects that home
+  with `SILTA_HOME=<fresh-home> silta doctor` before choosing it for use.
+  `silta restore` takes an export directory,
+  not a `.db` file. Unknown backup metadata describes only available files and the
+  unreadable last backup day; it does not itself suggest restoration.
 
   Installation checks and `--fix` follow installer formats when available.
   A passing diagnostic run does not certify skipped checks. Check warnings live

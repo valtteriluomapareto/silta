@@ -11,14 +11,14 @@ package struct DoctorCheck: Encodable, Sendable {
   package let status: Status
   /// Body-free explanation of the result.
   package let message: String
-  /// At most five distinct commands, in deterministic priority order.
+  /// At most five distinct recovery entries; each repo recipe stays complete.
   package let next: [String]
   /// Who may run every command in this check's next list.
   package let nextBy: NextBy
-  /// Number of distinct commands omitted after the first five.
+  /// Number of distinct entries omitted after the first five.
   package let nextOmitted: Int
 
-  /// Deduplicates and bounds inspection commands before any output is rendered.
+  /// Deduplicates and bounds recovery entries before any output is rendered.
   package init(
     id: String, status: Status, message: String, next: [String] = [], nextBy: NextBy = .agent
   ) {
