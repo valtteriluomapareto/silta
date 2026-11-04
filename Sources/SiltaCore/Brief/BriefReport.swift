@@ -12,6 +12,8 @@ package struct BriefReport: Encodable, Sendable {
   package let more: [String]
   /// Whether any optional content was shortened or omitted.
   package var truncated = false
+  /// Location diagnostics rendered by the command envelope and recorded in the log.
+  package let warnings: [OutputWarning]
 
   enum CodingKeys: String, CodingKey {
     case location, settings, sections, more, truncated

@@ -39,12 +39,12 @@ enum SiltaMain {
       let timestamp = environment.clock.now()
       let execution = await execute(
         arguments, context: CommandContext(mode: mode, environment: environment))
-      let rendered = execution.rendered
+      var rendered = execution.rendered
       let elapsed = started.duration(to: timer.now).components
       let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
       var entry = LogEntry(
         timestamp: timestamp, command: commandPath(arguments),
-        actor: environment.actor.description, exitCode: rendered.exitCode,
+        actor: environment.actor.description, exitCode: hookDeadline == nil ? rendered.exitCode : 0,
         milliseconds: milliseconds)
       entry.workspace = execution.scope.workspace
       entry.app = execution.scope.app
@@ -60,6 +60,7 @@ enum SiltaMain {
       {
         return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
       }
+      if hookDeadline != nil { rendered.stderr = "" }
       return rendered
     } catch {
       if hookDeadline != nil {

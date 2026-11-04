@@ -27,11 +27,16 @@ package struct BriefSettings: Encodable, Sendable {
     if let proposals {
       items.append("proposals: \(proposals) (ask in chat before adding a task)")
     }
-    if let reviewGate { items.append("review_gate: \(reviewGate) (approval required before done)") }
+    if let reviewGate {
+      let gloss =
+        reviewGate == "human"
+        ? "human approval required before done" : "warn if latest review requests changes"
+      items.append("review_gate: \(reviewGate) (\(gloss))")
+    }
     if let archiveAfterDays {
       items.append("archive_after_days: \(archiveAfterDays) (days before closed tasks archive)")
     }
-    if let staleDays { items.append("stale_days: \(staleDays) (days before context is stale)") }
+    if let staleDays { items.append("stale_days: \(staleDays) (days before docs are stale)") }
     return items.isEmpty ? "" : "settings: " + items.joined(separator: "; ") + "\n"
   }
 }

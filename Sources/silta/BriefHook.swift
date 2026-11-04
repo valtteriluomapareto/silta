@@ -47,7 +47,8 @@ private struct HookGitRunner: GitRunner {
 
   func run(_ request: GitRequest) async throws -> GitResult {
     let duration = ContinuousClock().now.duration(to: deadline).components
-    let remaining = Double(duration.seconds) + Double(duration.attoseconds) / 1e18 - 0.1
+    // Utility workers can coalesce timeout wakeups; reserve time to terminate and reap.
+    let remaining = Double(duration.seconds) + Double(duration.attoseconds) / 1e18 - 0.5
     guard remaining > 0 else { return GitResult(termination: .timedOut) }
     return try await system.run(
       GitRequest(

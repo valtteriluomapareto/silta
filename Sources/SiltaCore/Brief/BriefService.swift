@@ -38,7 +38,7 @@ package struct BriefService {
     var report = BriefReport(
       location: BriefLocation(location), settings: settings,
       currentTask: current?.ref, sections: sections(location, current: current, command: command),
-      more: more)
+      more: more, warnings: location.warnings)
     report.trim(tokens: budget)
     return report
   }

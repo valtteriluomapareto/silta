@@ -1427,7 +1427,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - warnings
 
   `workspace` is set only for commands that act on a workspace: `task *`,
-  `ws show|edit|use`, `repo fetch`, and a successful `init --scan`.
+  `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`, and a successful `init --scan`.
   - A successful command logs the workspace it resolved and acted on (`--ws`, its
     slug argument, or the current workspace), or the one `init --scan` or `ws edit`
     created. It is the command's own resolution, so a command that reports none is
@@ -1442,6 +1442,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   `app` is set only when the command names an app with `--app` that exists in that
   workspace. Neither field ever carries a raw argument.
+
+  A suppressed hook failure logs its actual process exit status of 0 while retaining
+  the underlying `error_code`. Hook output never writes diagnostics to stderr.
 
   Evals and the dogfood report read these logs (§21, §22.1).
 - **`silta doctor [--fix]`** checks:

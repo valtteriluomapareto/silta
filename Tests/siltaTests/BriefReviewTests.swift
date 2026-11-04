@@ -22,9 +22,7 @@ extension BriefCommandTests {
           + "stale_days: 7 (days before docs are stale)\n"
         for mode in [[], ["--short"], ["--hook"]] {
           let result = try run(mode + ["--budget", "1"], repo, scratch)
-          withKnownIssue("#16: settings gloss must describe the configured policy") {
-            #expect(result.stdout.contains(line))
-          }
+          #expect(result.stdout.contains(line))
           let data = try fixture.data(run(mode + ["--budget", "1", "--json"], repo, scratch))
           let policy = try #require(data["settings"] as? [String: Any])
           #expect(policy["review_gate"] as? String == gate)
@@ -41,9 +39,7 @@ extension BriefCommandTests {
       let result = try run(["--task", "AC-99", "--hook", "--json", "--verbose"], repo, scratch)
       #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
       let entry = try DogfoodLogTests.last(scratch)
-      withKnownIssue("#16: hook log exit must match process exit") {
-        #expect(entry["exit_code"] as? Int == 0)
-      }
+      #expect(entry["exit_code"] as? Int == 0)
       #expect(entry["error_code"] as? String == "not_found")
     }
   }
@@ -57,10 +53,8 @@ extension BriefCommandTests {
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
         let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String]
-        withKnownIssue("#16: brief must retain location diagnostics") {
-          #expect(result.stdout.contains("ref_missing"))
-          #expect(warnings == ["ref_missing"])
-        }
+        #expect(result.stdout.contains("ref_missing"))
+        #expect(warnings == ["ref_missing"])
       }
     }
   }

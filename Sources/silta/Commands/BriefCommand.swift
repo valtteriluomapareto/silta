@@ -39,7 +39,9 @@ struct BriefCommand: OutputCommand {
     let report = try await BriefService(environment: context.environment).resolve(
       path: URL(filePath: FileManager.default.currentDirectoryPath), workspace: global.ws,
       app: app, task: task, budget: budget ?? (short || hook ? 800 : 2500), hook: hook)
-    return CommandOutput(text: report.text, quiet: report.text, data: report)
-      .reporting(report.location.workspace)
+    return CommandOutput(
+      text: report.text, quiet: report.text, data: report, warnings: report.warnings
+    )
+    .reporting(report.location.workspace)
   }
 }

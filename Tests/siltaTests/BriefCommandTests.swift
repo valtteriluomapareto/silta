@@ -175,9 +175,7 @@ struct BriefCommandTests {
         let descriptor = open(fifo.path, O_WRONLY | O_NONBLOCK)
         let failure = errno
         if descriptor >= 0 { close(descriptor) }
-        withKnownIssue("#16: hook must reap blocked Git before exiting") {
-          #expect(descriptor == -1 && failure == ENXIO, "Git reader survived hook exit")
-        }
+        #expect(descriptor == -1 && failure == ENXIO, "Git reader survived hook exit")
       }
     }
   }
