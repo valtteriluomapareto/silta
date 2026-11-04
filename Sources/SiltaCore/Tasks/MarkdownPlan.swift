@@ -111,7 +111,9 @@ package struct MarkdownPlan: Sendable {
     line.firstMatch(of: /^(?:[-+*]|[0-9]+[.)]) +(.+?)\r?$/).map { String($0.output.1) }
   }
 
-  private static func visibleLines(_ lines: [String]) -> [Int] {
+  static func visibleLines(_ lines: [String]) -> [Int] { visibility(lines).lines }
+
+  static func visibility(_ lines: [String]) -> (lines: [Int], unclosedFence: Bool) {
     var fence: (Character, Int)?
     var visible: [Int] = []
     for (index, line) in lines.enumerated() {
@@ -136,6 +138,6 @@ package struct MarkdownPlan: Sendable {
       }
       if fence == nil { visible.append(index) }
     }
-    return visible
+    return (visible, fence != nil)
   }
 }

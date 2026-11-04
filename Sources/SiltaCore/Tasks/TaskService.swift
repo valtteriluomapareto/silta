@@ -31,7 +31,7 @@ package struct TaskService: Sendable {
 
   /// Keeps a retry tied to the workspace selected for the attempted write.
   func scopedCommand(_ command: String, workspace: String) -> String {
-    "silta --ws " + shellWord(workspace) + String(command.dropFirst(5))
+    workspaceCommand(command, workspace: workspace)
   }
 
   func selected() throws -> String {

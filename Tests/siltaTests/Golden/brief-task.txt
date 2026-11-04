@@ -1,0 +1,8 @@
+acme / platform / api [high: explicit]
+branch: api
+task: AC-2
+doing: Acme task (app: portal)
+plan (revision 0):
+1 done
+2. [ ] Acme next
+more: silta --ws 'acme' task show AC-2

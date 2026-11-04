@@ -1,0 +1,103 @@
+import Darwin
+import Foundation
+import SiltaCore
+import Synchronization
+
+/// Owns the timeout record or yields exclusive logging/output ownership to completion.
+/// Mutable state is mutex protected; the timer is immutable.
+final class HookWatchdog: @unchecked Sendable {
+  private enum Phase { case armed, completed, fired }
+  private struct State {
+    var phase = Phase.armed
+    var record: (path: String, data: Data)?
+  }
+  private let state = Mutex(State())
+  private let timer: any DispatchSourceTimer
+  private let finished = DispatchSemaphore(value: 0)
+
+  init() {
+    timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+    timer.schedule(deadline: .now() + 1.5)
+    timer.setEventHandler { [self] in fire() }
+    timer.resume()
+  }
+
+  func prepare(snapshot: [String: String], deterministic: Bool) {
+    do {
+      let home = try SiltaHome.resolve(environment: snapshot, deterministic: deterministic)
+      let actor = try ActorID.detect(
+        environment: snapshot, terminal: .system(), session: "hook-timeout")
+      prepare(home: home.url, actor: actor, at: SystemClock().now())
+    } catch {}  // Best-effort fallback before environment assembly succeeds.
+  }
+
+  func prepare(environment: SiltaEnvironment) {
+    prepare(home: environment.home.url, actor: environment.actor, at: environment.clock.now())
+  }
+
+  private func prepare(home: URL, actor: ActorID, at timestamp: Date) {
+    do {
+      var entry = LogEntry(
+        timestamp: timestamp, command: "silta brief",
+        actor: actor.description, exitCode: 0, milliseconds: 1500)
+      entry.flags = ["--hook"]
+      entry.errorCode = .env
+      entry.warnings = ["hook_timeout"]
+      let record = try SystemLog.prepared(entry)
+      let directory = home.appending(path: "log")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let path = directory.appending(path: record.name).path
+      state.withLock { if $0.phase == .armed { $0.record = (path, record.data) } }
+    } catch {}  // Timeout diagnostics must never obstruct the command.
+  }
+
+  func cancel() {
+    let won = state.withLock { state in
+      if state.phase == .completed { return true }
+      guard state.phase == .armed else { return false }
+      state.phase = .completed
+      return true
+    }
+    if !won {
+      // The timeout owner finishes its append before either thread exits the process.
+      finished.wait()
+      _exit(0)
+    }
+    timer.setEventHandler {}
+    timer.cancel()
+  }
+
+  func finish(_ entry: LogEntry) {
+    let directory = state.withLock {
+      $0.record.map { URL(filePath: $0.path).deletingLastPathComponent() }
+    }
+    let prepared = try? SystemLog.prepared(entry)  // Best-effort command diagnostics.
+    cancel()
+    if let directory, let prepared {
+      append(path: directory.appending(path: prepared.name).path, data: prepared.data)
+    }
+  }
+
+  private func append(path: String, data: Data) {
+    let descriptor = open(path, O_WRONLY | O_CREAT | O_APPEND | O_NONBLOCK, 0o600)
+    guard descriptor >= 0 else { return }
+    defer { close(descriptor) }
+    var info = stat()
+    guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return }
+    _ = data.withUnsafeBytes { write(descriptor, $0.baseAddress, $0.count) }
+  }
+
+  private func fire() {
+    let owned = state.withLock { state -> (Bool, (path: String, data: Data)?) in
+      guard state.phase == .armed else { return (false, nil) }
+      state.phase = .fired
+      return (true, state.record)
+    }
+    guard owned.0 else { return }
+    if let record = owned.1 {
+      append(path: record.path, data: record.data)
+    }
+    finished.signal()
+    _exit(0)
+  }
+}

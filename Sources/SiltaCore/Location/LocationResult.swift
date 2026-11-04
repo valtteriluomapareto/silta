@@ -1,5 +1,7 @@
 /// A location report; an unresolved app is absent, and detached HEAD has a null branch.
 package struct LocationResult: Encodable, Sendable {
+  /// Internal evidence shared with the brief reader, never encoded as location metadata.
+  var currentTask: TaskDetails?
   /// Canonical inspected directory, preserved in path-sensitive retries.
   package let path: String
   /// Canonical worktree toplevel, used only for override identity and receipts.

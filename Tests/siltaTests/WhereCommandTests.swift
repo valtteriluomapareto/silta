@@ -379,7 +379,8 @@ extension WhereCommandTests {
             FROM app WHERE slug='api';
             """)
       }
-      #expect(try data(run([], repo, scratch))["reason"] as? String == "distance")
+      #expect(try data(run([], repo, scratch))["reason"] as? String == "task")
+      #expect(try data(run([], repo, scratch))["app"] as? String == "api")
       try git(["checkout", "-q", "api"], repo, scratch)
       try store.write {
         try $0.database.execute(
@@ -390,7 +391,7 @@ extension WhereCommandTests {
       }
       #expect(try data(run([], repo, scratch))["app"] as? String == "portal")
       try store.write { try $0.database.execute(sql: "UPDATE task SET branch='api'") }
-      #expect(try data(run([], repo, scratch))["reason"] as? String == "exact_ref")
+      #expect(try data(run([], repo, scratch))["reason"] as? String == "task")
       _ = try data(run(["--set", "platform", "--approved", "Yes, use platform"], repo, scratch))
       try git(["checkout", "-q", "--detach", "api"], repo, scratch)
       #expect(try data(run([], repo, scratch))["reason"] as? String == "override")

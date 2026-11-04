@@ -13,14 +13,16 @@ package struct LocationService {
   /// Reports low confidence rather than guessing. Reads only truth storage; distance
   /// results may be cached opportunistically in index.db.
   package func resolve(
-    path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil
+    path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil,
+    cacheWrites: Bool = true
   ) async throws -> LocationResult {
     let context = try await inspect(path: path, workspace: workspace)
-    return try await resolve(context, app: app, task: task)
+    return try await resolve(context, app: app, task: task, cacheWrites: cacheWrites)
   }
 
   func resolve(
-    _ context: LocationContext, app: String?, task: String?, ignoringOverride: Bool = false
+    _ context: LocationContext, app: String?, task: String?, ignoringOverride: Bool = false,
+    cacheWrites: Bool = true
   )
     async throws -> LocationResult
   {
@@ -31,11 +33,13 @@ package struct LocationService {
     let branch = try await git.value(
       ["symbolic-ref", "--quiet", "--short", "HEAD"], optional: true)
     let head = try await git.required(["rev-parse", "--verify", "HEAD"])
+    let current = try currentTask(selectedTask, context: context, app: app, branch: branch)
     var result = LocationResult(
       path: context.path.path, worktree: context.root.path,
       workspace: repo.workspace, repo: repo.slug, branch: branch,
       head: head, confidence: "low", reason: "unresolved", candidates: candidates,
       warnings: context.warnings)
+    result.currentTask = current
     func picked(_ app: String, _ reason: String) -> LocationResult {
       var selected = result
       selected.app = app
@@ -55,7 +59,7 @@ package struct LocationService {
       return picked(selected.app, "override")
     }
     if let taskApp = try taskApp(
-      selectedTask, branch: branch, repo: repo, candidates: candidates, path: context.path)
+      current, repo: repo, candidates: candidates, path: context.path)
     {
       return picked(taskApp, "task")
     }
@@ -67,20 +71,32 @@ package struct LocationService {
       result.reason = evidence.reason
       return result
     }
-    return try await distance(result, context: context)
+    return try await distance(result, context: context, cacheWrites: cacheWrites)
   }
 
   private func explicitTask(_ task: String, workspace: String) throws -> TaskDetails {
     do {
-      return try TaskService(environment: environment, workspace: workspace).show(task)
+      return try environment.db.read { try TaskService.lookup(task, workspace: workspace, in: $0) }
     } catch let error as any CodedError where error.code == .notFound {
       throw CommandFailure(
         error: error, next: ["silta --ws " + shellWord(workspace) + " task ls"])
     }
   }
 
+  private func currentTask(
+    _ explicit: TaskDetails?, context: LocationContext,
+    app: String?, branch: String?
+  ) throws -> TaskDetails? {
+    if let explicit { return explicit }
+    return try environment.db.read { db in
+      try CurrentTaskSelector.select(
+        context, app: app, actor: environment.actor.description,
+        branch: branch, in: db)
+    }
+  }
+
   private func taskApp(
-    _ selected: TaskDetails?, branch: String?, repo: LocationRepository,
+    _ selected: TaskDetails?, repo: LocationRepository,
     candidates: [LocationCandidate], path: URL
   ) throws -> String? {
     if let selected {
@@ -90,22 +106,7 @@ package struct LocationService {
       }
       return nil
     }
-    return try environment.db.read { db in
-      for (column, value) in [("claimed_by", environment.actor.description), ("branch", branch)] {
-        guard let value else { continue }
-        let ids = try Int64.fetchAll(
-          db,
-          sql: """
-            SELECT DISTINCT task.app_id FROM task JOIN repo ON repo.id=?
-            WHERE task.workspace_id=repo.workspace_id AND task.\(column)=?
-              AND task.app_id IS NOT NULL AND task.status IN ('todo','doing','review')
-            AND task.external_ref IS NULL
-            """, arguments: [repo.id, value])
-        let matches = candidates.filter { ids.contains($0.id) }
-        if matches.count == 1 { return matches.first?.app }
-      }
-      return nil
-    }
+    return nil
   }
 
   func validate(_ app: String, candidates: [LocationCandidate], repo: LocationRepository, path: URL)

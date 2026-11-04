@@ -303,6 +303,7 @@ extension DogfoodLogTests {
       (["ws", "ls"], nil),
       (["schema"], nil),
       (["doctor", "--ws", "absent"], nil),
+      (acme + ["brief"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
     ]
@@ -331,7 +332,12 @@ extension DogfoodLogTests {
       let names = Set(commands.compactMap { $0["name"] as? String })
       var covered: Set<String> = []
       for (args, workspace) in try Self.catalog(scratch) {
-        let result = try Self.run(args, scratch: scratch)
+        let result =
+          try args.contains("brief")
+          ? SiltaBinary.run(
+            args + ["--json", "--deterministic"], in: scratch, cwd: clone,
+            environment: TaskBlockCommandTests.environment)
+          : Self.run(args, scratch: scratch)
         #expect(result.termination == .exit(0), "\(args) \(result.stdout)")
         let entry = try Self.last(scratch)
         let command = try #require(entry["command"] as? String)

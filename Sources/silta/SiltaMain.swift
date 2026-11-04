@@ -7,31 +7,52 @@ import SiltaCore
 @main
 enum SiltaMain {
   static func main() async {
-    let rendered = await run(Array(CommandLine.arguments.dropFirst()))
+    let arguments = Array(CommandLine.arguments.dropFirst())
+    let hook = BriefHook.requested(arguments)
+    let deadline = hook ? ContinuousClock().now.advanced(by: .milliseconds(1500)) : nil
+    let watchdog = hook ? HookWatchdog() : nil
+    let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
+    watchdog?.prepare(
+      snapshot: ProcessInfo.processInfo.environment,
+      deterministic: flags.contains("--deterministic"))
+    let rendered = await run(arguments, hookDeadline: deadline, watchdog: watchdog)
+    watchdog?.cancel()
     FileHandle.standardOutput.write(Data(rendered.stdout.utf8))
     FileHandle.standardError.write(Data(rendered.stderr.utf8))
     exit(rendered.exitCode)
   }
 
-  static func run(_ arguments: [String]) async -> Rendered {
+  static func run(
+    _ arguments: [String], hookDeadline: ContinuousClock.Instant? = nil,
+    watchdog: HookWatchdog? = nil
+  ) async
+    -> Rendered
+  {
     let mode = outputMode(arguments)
     let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     let timer = ContinuousClock()
     let started = timer.now
     do {
-      let environment = try await SiltaEnvironment.system(
-        environment: ProcessInfo.processInfo.environment,
-        deterministic: flags.contains("--deterministic"),
-        verbose: flags.contains("--verbose") ? .standardError : nil)
+      let snapshot = ProcessInfo.processInfo.environment
+      let environment: SiltaEnvironment
+      if let hookDeadline {
+        environment = try await BriefHook.environment(
+          snapshot, deterministic: flags.contains("--deterministic"), deadline: hookDeadline)
+      } else {
+        environment = try await SiltaEnvironment.system(
+          environment: snapshot, deterministic: flags.contains("--deterministic"),
+          verbose: flags.contains("--verbose") ? .standardError : nil)
+      }
+      watchdog?.prepare(environment: environment)
       let timestamp = environment.clock.now()
       let execution = await execute(
         arguments, context: CommandContext(mode: mode, environment: environment))
-      let rendered = execution.rendered
+      var rendered = execution.rendered
       let elapsed = started.duration(to: timer.now).components
       let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
       var entry = LogEntry(
         timestamp: timestamp, command: commandPath(arguments),
-        actor: environment.actor.description, exitCode: rendered.exitCode,
+        actor: environment.actor.description, exitCode: hookDeadline == nil ? rendered.exitCode : 0,
         milliseconds: milliseconds)
       entry.workspace = execution.scope.workspace
       entry.app = execution.scope.app
@@ -41,9 +62,18 @@ enum SiltaMain {
         "--approved", "--json", "--quiet", "--deterministic", "--verbose", "--help", "--version",
       ]
       .filter { flags.contains($0) }
-      environment.log.record(entry)
+      if let watchdog { watchdog.finish(entry) } else { environment.log.record(entry) }
+      if let hookDeadline,
+        rendered.exitCode != 0 || ContinuousClock().now >= hookDeadline
+      {
+        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+      }
+      if hookDeadline != nil { rendered.stderr = "" }
       return rendered
     } catch {
+      if hookDeadline != nil {
+        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+      }
       if let informational = informationalResult(arguments, mode: mode) { return informational }
       return OutputRouter.render(.failure(error), mode: mode)
     }
@@ -152,7 +182,7 @@ enum SiltaMain {
       next = next.map {
         if $0 == "silta ws show" { return "silta ws show " + shellWord(workspace) }
         return $0.hasPrefix("silta task ") || $0.hasPrefix("silta comment ")
-          ? "silta --ws " + shellWord(workspace) + String($0.dropFirst(5)) : $0
+          ? workspaceCommand($0, workspace: workspace) : $0
       }
     }
     return CommandFailure(error: error, next: next)
@@ -176,99 +206,4 @@ enum SiltaMain {
     return [repair]
   }
 
-  /// The output mode, read from the raw arguments so a parse error can still answer in
-  /// JSON. ArgumentParser itself accepts the flags before or after the subcommand.
-  /// Nothing after `--` counts.
-  static func outputMode(_ arguments: [String]) -> OutputMode {
-    let flags = withoutApprovalValues(arguments).prefix { $0 != "--" }
-    return OutputMode(json: flags.contains("--json"), quiet: flags.contains("--quiet"))
-  }
-
-  /// Help and version are clean exits; anything else is a `usage` error.
-  static func parseFailure(_ error: any Error, arguments: [String], mode: OutputMode) -> Rendered {
-    if SiltaCommand.exitCode(for: error) == .success {
-      let text = SiltaCommand.fullMessage(for: error)
-      return Rendered(
-        stdout: text.hasSuffix("\n") ? text : text + "\n", stderr: "", exitCode: 0,
-        errorCode: nil)
-    }
-    let usage = UsageError.usage(
-      message: oneLine(SiltaCommand.message(for: error)), command: commandPath(arguments))
-    return OutputRouter.render(.failure(usage), mode: mode)
-  }
-
-  /// The longest parse message kept: it can quote arguments, which can carry bodies.
-  static let maxMessage = 200
-
-  /// ArgumentParser's message on one capped line.
-  static func oneLine(_ message: String) -> String {
-    let line = message.split(separator: "\n")
-      .map { $0.trimmingCharacters(in: .whitespaces) }
-      .filter { !$0.isEmpty }
-      .joined(separator: " ")
-    return line.count > maxMessage ? line.prefix(maxMessage - 1) + "…" : line
-  }
-
-  /// Keeps approval words opaque to flag, command-path and diagnostic discovery.
-  static func withoutApprovalValues(_ arguments: [String]) -> [String] {
-    var result: [String] = []
-    var skipValue = false
-    var positional = false
-    for argument in arguments {
-      if positional {
-        result.append(argument)
-        continue
-      }
-      if skipValue {
-        skipValue = false
-        continue
-      }
-      if argument == "--approved" {
-        result.append(argument)
-        skipValue = true
-      } else if argument.hasPrefix("--approved=") {
-        result.append("--approved")
-      } else {
-        result.append(argument)
-        positional = argument == "--"
-      }
-    }
-    return result
-  }
-
-  /// The command being parsed, e.g. `silta task ls`: the subcommand names among the
-  /// arguments, skipping flags.
-  static func commandPath(_ arguments: [String]) -> String {
-    parsed(arguments).path
-  }
-
-  /// The command path and the deepest command type its names reach.
-  static func parsed(_ arguments: [String]) -> (
-    path: String, command: any ParsableCommand.Type
-  ) {
-    let arguments = withoutApprovalValues(arguments)
-    var path = ["silta"]
-    var command: any ParsableCommand.Type = SiltaCommand.self
-    var skipValue = false
-    for argument in arguments.prefix(while: { $0 != "--" }) {
-      if skipValue {
-        skipValue = false
-        continue
-      }
-      if argument == "--ws" {
-        skipValue = true
-        continue
-      }
-      if argument.hasPrefix("-") { continue }
-      guard
-        let sub = command.configuration.subcommands.first(where: {
-          // The name ArgumentParser itself matches, explicit or derived from the type.
-          $0._commandName == argument
-        })
-      else { break }
-      path.append(argument)
-      command = sub
-    }
-    return (path.joined(separator: " "), command)
-  }
 }

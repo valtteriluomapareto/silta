@@ -1,0 +1,5 @@
+acme / platform / api [high: exact_ref]
+branch: api
+settings: proposals: ask (ask in chat before adding a task)
+task: none
+more: silta --ws 'acme' task ls | silta --ws 'acme' ws show
