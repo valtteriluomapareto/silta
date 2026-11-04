@@ -120,10 +120,10 @@ extension BriefCommandTests {
       try store(scratch).write {
         try $0.database.execute(sql: "UPDATE task SET app_id=NULL,plan_md='' WHERE seq=4")
       }
-      for budget in [1, 200, 800] {
+      for budget in [1, 100, 200, 800] {
         let result = try run(
           ["--task", "AC-4", "--topic", "PAYMENTS", "--budget", String(budget)], repo, scratch)
-        if budget >= 200 { #expect(result.stdout.count <= budget * 4) }
+        if budget >= 100 { #expect(result.stdout.count <= budget * 4) }
         if let candidates = result.stdout.range(of: "candidates:") {
           let task = try #require(result.stdout.range(of: "task: AC-4"))
           #expect(candidates.lowerBound < task.lowerBound)
