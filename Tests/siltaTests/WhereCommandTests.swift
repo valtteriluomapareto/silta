@@ -45,7 +45,12 @@ struct WhereCommandTests {
       #expect(try run([], alias, scratch).stdout == run([], console, scratch).stdout)
       let unregistered = try run([], scratch.appending(path: "fixtures/acme-detached"), scratch)
       #expect(unregistered.termination == .exit(2))
-      Golden.forTests().check(unregistered.stdout, "where-unregistered.json")
+      let unregisteredPath = scratch.appending(path: "fixtures/acme-detached").path
+      let normalized = unregistered.stdout.replacingOccurrences(
+        of: unregisteredPath, with: "<path>"
+      )
+      .replacingOccurrences(of: unregisteredPath.lowercased(), with: "<path>")
+      Golden.forTests().check(normalized, "where-unregistered.json")
       let outside = try run([], scratch, scratch)
       #expect(outside.termination == .exit(2))
     }
@@ -70,7 +75,8 @@ struct WhereCommandTests {
       try store.write {
         try $0.database.execute(sql: "UPDATE repo_path SET path=?", arguments: [shallow.path])
       }
-      #expect(try data(run([], shallow, scratch))["reason"] as? String == "exact_ref")
+      #expect(try data(run([], shallow, scratch))["reason"] as? String == "single")
+      try git(["update-ref", "refs/remotes/origin/portal", "HEAD"], shallow, scratch)
       try git(["checkout", "-q", "--detach"], shallow, scratch)
       let incomplete = try data(run([], shallow, scratch))
       #expect(incomplete["confidence"] as? String == "low")
@@ -198,82 +204,6 @@ struct WhereCommandTests {
     }
   }
 
-  @Test func unrelatedCorruptionDoesNotPoisonRegisteredMatch() throws {
-    withKnownIssue("#11: Ignore unrelated corrupt registrations") {
-      try withScratchDirectory { scratch in
-        let repo = try setup(scratch)
-        let broken = scratch.appending(path: "fixtures/acme-detached")
-        try store(scratch).write {
-          try $0.database.execute(
-            sql: """
-              INSERT INTO repo(id,uid,workspace_id,slug) VALUES(0,'broken',1,'broken');
-              INSERT INTO repo_path(repo_id,path) VALUES(0,?);
-              """, arguments: [broken.path])
-        }
-        try Data("broken\n".utf8).write(to: broken.appending(path: ".git/HEAD"))
-        #expect(try run([], repo, scratch).termination == .exit(0))
-        #expect(try run([], broken, scratch).termination == .exit(9))
-      }
-    }
-  }
-
-  @Test func implicitNonAppOriginIsNotADistanceGuess() throws {
-    withKnownIssue("#11: Recover implicit branch creation source") {
-      try withScratchDirectory { scratch in
-        let repo = try setup(scratch)
-        try git(["checkout", "-qB", "release/acme", "master"], repo, scratch)
-        try git(["checkout", "-qb", "implicit-topic"], repo, scratch)
-        let result = try data(run([], repo, scratch))
-        #expect(result["confidence"] as? String == "low")
-        #expect(result["reason"] as? String == "non_app_ref")
-        #expect(result["app"] == nil)
-      }
-    }
-  }
-
-  @Test func missingRefsAreSkippedBeforeAnySelection() throws {
-    withKnownIssue("#11: Skip missing refs before selection") {
-      try withScratchDirectory { scratch in
-        let repo = try setup(scratch)
-        try git(["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
-        let attached = try run([], repo, scratch)
-        #expect(attached.stdout.contains("ref_missing"))
-        try git(["update-ref", "-d", "refs/remotes/origin/api"], repo, scratch)
-        let result = try data(run([], repo, scratch))
-        #expect(result["app"] as? String == "platform")
-        #expect(result["reason"] as? String == "single")
-        #expect((result["candidates"] as? [[String: String]])?.count == 1)
-      }
-    }
-  }
-
-  @Test func crossRepoAppSelectionsOfferCurrentPathCandidates() throws {
-    withKnownIssue("#11: Distinguish workspace apps from path candidates") {
-      try withScratchDirectory { scratch in
-        let repo = try setup(scratch)
-        let store = store(scratch)
-        try store.write {
-          try $0.database.execute(
-            sql: """
-              INSERT INTO repo(id,uid,workspace_id,slug) VALUES(2,'neighbor',1,'neighbor');
-              INSERT INTO app(uid,workspace_id,slug,name,repo_id,ref)
-              VALUES('neighbor-app',1,'neighbor','Acme Neighbor',2,'main');
-              INSERT INTO task(uid,workspace_id,seq,title,status,app_id,created_by,created_at,updated_at)
-              SELECT 'neighbor-task',1,1,'Acme','todo',id,'human:acme','',''
-              FROM app WHERE slug='neighbor';
-              """)
-        }
-        for args in [["--app", "neighbor"], ["--task", "AC-1"], ["--set", "neighbor"]] {
-          let result = try run(args, repo, scratch)
-          #expect(result.termination == .exit(4), "\(result.stdout)")
-          #expect(result.stdout.contains("--path"))
-          #expect(result.stdout.contains("--app 'api'"))
-        }
-        #expect(try counts(store) == [0, 0])
-      }
-    }
-  }
-
   func setup(_ scratch: URL) throws -> URL {
     let fixture = try SiltaBinary.runProcess(
       URL(filePath: "/bin/bash"),
@@ -336,4 +266,129 @@ struct WhereCommandTests {
       }
     }
   }
+}
+
+extension WhereCommandTests {
+  @Test func unrelatedCorruptionDoesNotPoisonRegisteredMatch() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let broken = scratch.appending(path: "fixtures/acme-detached")
+      try store(scratch).write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO repo(id,uid,workspace_id,slug) VALUES(0,'broken',1,'broken');
+            INSERT INTO repo_path(repo_id,path) VALUES(0,?);
+            """, arguments: [broken.path])
+      }
+      try Data("broken\n".utf8).write(to: broken.appending(path: ".git/HEAD"))
+      #expect(try run([], repo, scratch).termination == .exit(0))
+      #expect(try run([], broken, scratch).termination == .exit(9))
+    }
+  }
+
+  @Test func implicitNonAppOriginIsNotADistanceGuess() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      try git(["checkout", "-qB", "release/acme", "master"], repo, scratch)
+      try git(["checkout", "-qb", "implicit-topic"], repo, scratch)
+      let result = try data(run([], repo, scratch))
+      #expect(result["confidence"] as? String == "low")
+      #expect(result["reason"] as? String == "non_app_ref")
+      #expect(result["app"] == nil)
+    }
+  }
+
+  @Test func missingRefsAreSkippedBeforeAnySelection() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      try git(["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
+      let attached = try run([], repo, scratch)
+      #expect(attached.stdout.contains("ref_missing"))
+      try git(["update-ref", "-d", "refs/remotes/origin/api"], repo, scratch)
+      let result = try data(run([], repo, scratch))
+      #expect(result["app"] as? String == "platform")
+      #expect(result["reason"] as? String == "single")
+      #expect((result["candidates"] as? [[String: String]])?.count == 1)
+    }
+  }
+
+  @Test func crossRepoAppSelectionsOfferCurrentPathCandidates() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let store = store(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO repo(id,uid,workspace_id,slug) VALUES(2,'neighbor',1,'neighbor');
+            INSERT INTO app(uid,workspace_id,slug,name,repo_id,ref)
+            VALUES('neighbor-app',1,'neighbor','Acme Neighbor',2,'main');
+            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,
+              created_by,created_at,updated_at)
+            SELECT 'neighbor-task',1,1,'Acme','todo',id,'human:acme','',''
+            FROM app WHERE slug='neighbor';
+            """)
+      }
+      for args in [["--app", "neighbor"], ["--task", "AC-1"], ["--set", "neighbor"]] {
+        let result = try run(args, repo, scratch)
+        #expect(result.termination == .exit(4), "\(result.stdout)")
+        #expect(result.stdout.contains("--path"))
+        #expect(result.stdout.contains("--app 'api'"))
+      }
+      #expect(try counts(store) == [0, 0])
+    }
+  }
+
+  @Test func liveTaskEvidenceAndOverridesBeatAWarmDistanceCache() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      try git(["checkout", "-q", "--detach", "api"], repo, scratch)
+      #expect(try data(run([], repo, scratch))["reason"] as? String == "distance")
+      let store = store(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,claimed_by,
+              created_by,created_at,updated_at)
+            SELECT 'portal-task',1,1,'Acme','doing',id,'agent:codex:acme','human:acme','',''
+            FROM app WHERE slug='portal';
+            """)
+      }
+      #expect(try data(run([], repo, scratch))["app"] as? String == "portal")
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,claimed_by,
+              created_by,created_at,updated_at)
+            SELECT 'api-task',1,2,'Acme','doing',id,'agent:codex:acme','human:acme','',''
+            FROM app WHERE slug='api';
+            """)
+      }
+      #expect(try data(run([], repo, scratch))["reason"] as? String == "distance")
+      try git(["checkout", "-q", "api"], repo, scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            UPDATE task SET claimed_by='agent:codex:other',
+              branch=CASE WHEN seq=1 THEN 'api' ELSE NULL END;
+            """)
+      }
+      #expect(try data(run([], repo, scratch))["app"] as? String == "portal")
+      try store.write { try $0.database.execute(sql: "UPDATE task SET branch='api'") }
+      #expect(try data(run([], repo, scratch))["reason"] as? String == "exact_ref")
+      _ = try data(run(["--set", "platform", "--approved", "Yes, use platform"], repo, scratch))
+      try git(["checkout", "-q", "--detach", "api"], repo, scratch)
+      #expect(try data(run([], repo, scratch))["reason"] as? String == "override")
+    }
+  }
+
+  @Test func noCandidateAppsOffersConfigurationRecovery() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      try store(scratch).write { try $0.database.execute(sql: "DELETE FROM app") }
+      let result = try SiltaBinary.run(["--ws", "acme", "where"], in: scratch, cwd: repo)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.hasSuffix("next: silta --ws 'acme' ws show\n"))
+    }
+  }
+
 }

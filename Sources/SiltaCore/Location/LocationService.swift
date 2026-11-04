@@ -13,10 +13,17 @@ package struct LocationService {
   /// Reports low confidence rather than guessing. Reads only truth storage; distance
   /// results may be cached opportunistically in index.db.
   package func resolve(
-    path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil,
-    ignoringOverride: Bool = false
+    path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil
   ) async throws -> LocationResult {
     let context = try await inspect(path: path, workspace: workspace)
+    return try await resolve(context, app: app, task: task)
+  }
+
+  func resolve(
+    _ context: LocationContext, app: String?, task: String?, ignoringOverride: Bool = false
+  )
+    async throws -> LocationResult
+  {
     let repo = context.repo
     let git = context.git
     let candidates = context.candidates
@@ -25,7 +32,8 @@ package struct LocationService {
     let head = try await git.required(["rev-parse", "--verify", "HEAD"])
     var result = LocationResult(
       workspace: repo.workspace, repo: repo.slug, branch: branch,
-      head: head, confidence: "low", reason: "unresolved", candidates: candidates)
+      head: head, confidence: "low", reason: "unresolved", candidates: candidates,
+      warnings: context.warnings)
     func picked(_ app: String, _ reason: String) -> LocationResult {
       var selected = result
       selected.app = app
@@ -57,7 +65,7 @@ package struct LocationService {
       result.reason = evidence.reason
       return result
     }
-    return try await distance(result, path: context.path, git: git)
+    return try await distance(result, context: context)
   }
 
   private func taskApp(
@@ -93,7 +101,8 @@ package struct LocationService {
   func validate(_ app: String, candidates: [LocationCandidate], repo: LocationRepository, path: URL)
     throws
   {
-    guard repo.apps.contains(where: { $0.app == app }) else {
+    guard try WorkspaceSelection.app(app, workspace: repo.workspace, in: environment.db) != nil
+    else {
       throw LocationError.app(app, workspace: repo.workspace)
     }
     guard candidates.contains(where: { $0.app == app }) else {
@@ -110,20 +119,46 @@ package struct LocationService {
       throw LocationError.invalidPath
     }
     let git = LocationGit(runner: environment.git, directory: path)
-    guard let common = try await git.commonDirectory() else { throw LocationError.unregistered }
+    guard let common = try await git.commonDirectory() else {
+      throw unregistered(path: path, workspace: workspace)
+    }
     if let workspace { _ = try WorkspaceSelection.resolve(workspace, in: environment.db) }
+    let root = try LocationPath.canonical(
+      URL(
+        filePath:
+          try await git.required(["rev-parse", "--show-toplevel"])))
     for repo in try LocationRepository.all(workspace: workspace, in: environment.db) {
       guard FileManager.default.fileExists(atPath: repo.path) else { continue }
       let registered = LocationGit(runner: environment.git, directory: URL(filePath: repo.path))
-      guard try await registered.commonDirectory() == common else { continue }
-      let root = try LocationPath.canonical(
-        URL(
-          filePath:
-            try await git.required(["rev-parse", "--show-toplevel"])))
+      let expected = try? await registered.commonDirectory()  // Skip stale registrations.
+      guard expected == common else { continue }
+      var candidates: [LocationCandidate] = []
+      var refs: [(String, String)] = []
+      var warnings: [OutputWarning] = []
+      for candidate in try repo.candidates(at: path, root: root) {
+        if let sha = try await git.refSHA(candidate.ref) {
+          candidates.append(candidate)
+          refs.append((candidate.app, sha))
+        } else {
+          warnings.append(
+            .init(
+              code: "ref_missing",
+              message:
+                "Ref \(candidate.ref) for \(candidate.app) is missing; run silta --ws "
+                + shellWord(repo.workspace) + " repo fetch " + shellWord(repo.slug) + "."))
+        }
+      }
       return LocationContext(
-        path: path, repo: repo, git: git,
-        candidates: try repo.candidates(at: path, root: root))
+        path: path, repo: repo, git: git, candidates: candidates,
+        refs: refs, warnings: warnings)
     }
-    throw LocationError.unregistered
+    throw unregistered(path: root, workspace: workspace)
+  }
+
+  private func unregistered(path: URL, workspace: String?) -> CommandFailure {
+    let selection = workspace.map { " --ws " + shellWord($0) } ?? ""
+    return CommandFailure(
+      error: LocationError.unregistered,
+      next: ["silta" + selection + " init --scan " + shellWord(path.path)])
   }
 }

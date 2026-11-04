@@ -86,18 +86,34 @@ struct LocationGit {
         return (app, "upstream")
       }
       let reflog = try await value(
-        ["reflog", "show", "--format=%gs", "refs/heads/" + branch], optional: true)
-      if let creation = reflog?.split(separator: "\n").last,
-        creation.hasPrefix("branch: Created from ")
-      {
-        let origin = String(creation.dropFirst("branch: Created from ".count))
-        if let app = match(origin) { return (app, "reflog") }
-        if origin != "HEAD" {
-          return (nil, "non_app_ref")
+        ["reflog", "show", "--format=%H%x09%gs", "refs/heads/" + branch], optional: true)
+      if let oldest = reflog?.split(separator: "\n").last {
+        let entry = oldest.split(separator: "\t", maxSplits: 1)
+        if entry.count == 2, entry[1].hasPrefix("branch: Created from ") {
+          let named = String(entry[1].dropFirst("branch: Created from ".count))
+          let origin =
+            named == "HEAD"
+            ? try await implicitOrigin(branch: branch, sha: String(entry[0])) : named
+          if let origin {
+            if let app = match(origin) { return (app, "reflog") }
+            return (nil, "non_app_ref")
+          }
         }
       }
     }
     return nil
+  }
+
+  private func implicitOrigin(branch: String, sha: String) async throws -> String? {
+    let history = try await value(["reflog", "show", "--format=%H%x09%gs", "HEAD"], optional: true)
+    let prefix = sha + "\tcheckout: moving from "
+    let suffix = " to " + branch
+    guard
+      let entry = history?.split(separator: "\n").reversed().first(where: {
+        $0.hasPrefix(prefix) && $0.hasSuffix(suffix)
+      })
+    else { return nil }
+    return String(entry.dropFirst(prefix.count).dropLast(suffix.count))
   }
 
   static func normalized(_ ref: String) -> String {

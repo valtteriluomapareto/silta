@@ -11,7 +11,7 @@ struct LocationCache {
       .map { String(format: "%02x", $0) }.joined()
   }
 
-  func read(key: String) -> LocationDistance? {
+  func read(key: String, location: String) -> LocationDistance? {
     do {
       var config = Configuration()
       config.readonly = true
@@ -21,7 +21,7 @@ struct LocationCache {
         guard
           let data = try Data.fetchOne(
             db,
-            sql: "SELECT value FROM where_cache WHERE key=?", arguments: [key])
+            sql: "SELECT value FROM where_cache WHERE path=? AND key=?", arguments: [location, key])
         else { return nil }
         return try JSONDecoder().decode(LocationDistance.self, from: data)
       }

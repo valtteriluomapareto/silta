@@ -55,7 +55,7 @@ g branch -m old-name renamed
 g checkout -q -b non-app master
 printf 'Acme infrastructure\n' > infrastructure.md
 commit 'Add Acme infrastructure'
-g checkout -q -b from-non-app non-app
+g checkout -q -b from-non-app
 printf 'Acme maintenance\n' > maintenance.md
 commit 'Add Acme maintenance'
 g push -q origin --all

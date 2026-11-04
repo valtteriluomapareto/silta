@@ -15,8 +15,7 @@ extension LocationService {
       + shellWord(context.path.path) + (app.map { " --set " + shellWord($0) } ?? " --unset")
     let approval = try environment.actor.requireHuman(command: command, approved: approved)
     var result = try await resolve(
-      path: context.path, workspace: repo.workspace,
-      app: app, ignoringOverride: true)
+      context, app: app, task: nil, ignoringOverride: true)
     if app != nil { result.reason = result.candidates.count == 1 ? "single" : "override" }
     let approvalUsed = try environment.db.write { tx in
       let current = try LocationRepository.read(workspace: repo.workspace, in: tx.database)

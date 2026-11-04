@@ -5,4 +5,6 @@ struct LocationContext {
   let repo: LocationRepository
   let git: LocationGit
   let candidates: [LocationCandidate]
+  let refs: [(String, String)]
+  let warnings: [OutputWarning]
 }

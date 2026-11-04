@@ -48,6 +48,9 @@ struct WhereCommand: OutputCommand {
       + "branch: \(result.branch ?? "(detached)")\nhead: \(result.head)\n"
     if result.confidence == "low" {
       text += "candidates: " + result.candidates.map(\.app).joined(separator: ", ") + "\n"
+      if result.candidates.isEmpty {
+        text += "next: silta --ws \(shellWord(result.workspace)) ws show\n"
+      }
       text += result.candidates.map {
         "next: silta --ws \(shellWord(result.workspace)) where --path \(shellWord(directory.path))"
           + " --app \(shellWord($0.app))\n"

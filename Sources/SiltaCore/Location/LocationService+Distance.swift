@@ -1,21 +1,12 @@
 import Foundation
 
 extension LocationService {
-  func distance(_ input: LocationResult, path: URL, git: LocationGit) async throws -> LocationResult
-  {
+  func distance(_ input: LocationResult, context: LocationContext) async throws -> LocationResult {
     var result = input
     let candidates = result.candidates
-    var refs: [(String, String)] = []
-    for candidate in candidates {
-      if let sha = try await git.refSHA(candidate.ref) {
-        refs.append((candidate.app, sha))
-      } else {
-        result.warnings.append(
-          .init(
-            code: "ref_missing",
-            message: "Ref \(candidate.ref) for \(candidate.app) is missing; fetch its repository."))
-      }
-    }
+    let refs = context.refs
+    let path = context.path
+    let git = context.git
     if try await git.required(["rev-parse", "--is-shallow-repository"]) == "true" {
       result.reason = "shallow"
       return result
@@ -25,7 +16,7 @@ extension LocationService {
       [path.path, result.head] + candidates.map { "\($0.id):\($0.app):\($0.ref)" }
         + refs.map { "\($0.0):\($0.1)" })
     let distance: LocationDistance
-    if let cached = cache.read(key: key) {
+    if let cached = cache.read(key: key, location: path.path) {
       distance = cached
     } else {
       var scores: [(String, Int)] = []

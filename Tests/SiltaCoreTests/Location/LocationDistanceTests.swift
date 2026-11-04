@@ -47,9 +47,9 @@ struct LocationDistanceTests {
       let (repo, store) = try setup(home)
       let common = commonSteps(repo)
       let runner = ScriptedGitRunner(
-        script: Array(common.prefix(3)) + Array(common.prefix(5)),
+        script: common,
         beforeRequest: { request in
-          if request.arguments == ["--no-lazy-fetch", "rev-parse", "--show-toplevel"] {
+          if request.arguments.last == "origin/portal^{commit}" {
             try store.write {
               try $0.database.execute(sql: "UPDATE app SET ref='origin/changed' WHERE slug='api'")
             }
@@ -105,18 +105,18 @@ struct LocationDistanceTests {
       step(
         ["rev-parse", "--path-format=absolute", "--git-common-dir"],
         repo.appending(path: ".git").path, repo),
+      step(["rev-parse", "--show-toplevel"], repo.path, repo),
       step(
         ["rev-parse", "--path-format=absolute", "--git-common-dir"],
         repo.appending(path: ".git").path, repo),
-      step(["rev-parse", "--show-toplevel"], repo.path, repo),
-      step(["symbolic-ref", "--quiet", "--short", "HEAD"], "", repo, status: 1),
-      step(["rev-parse", "--verify", "HEAD"], "aaaaaaaa", repo),
       step(
-        ["rev-parse", "--verify", "--quiet", "--end-of-options", "origin/api^{commit}"],
-        "aaaaaaaa", repo),
+        ["rev-parse", "--verify", "--quiet", "--end-of-options", "origin/api^{commit}"], "aaaaaaaa",
+        repo),
       step(
         ["rev-parse", "--verify", "--quiet", "--end-of-options", "origin/portal^{commit}"],
         "bbbbbbbb", repo),
+      step(["symbolic-ref", "--quiet", "--short", "HEAD"], "", repo, status: 1),
+      step(["rev-parse", "--verify", "HEAD"], "aaaaaaaa", repo),
     ]
   }
 
