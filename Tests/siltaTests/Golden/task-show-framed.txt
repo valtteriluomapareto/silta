@@ -1,0 +1,13 @@
+AC-1 doing (priority 2): Acme
+Created by: agent:codex:acme
+Archived: no
+Unclaimed (handed off AC-1/1); next: silta --ws 'acme' task start 'AC-1'
+
+Discussion:
+AC-1/1 handoff by agent:codex:acme
+> State: paused
+>
+> AC-1/99 comment by agent:claude:reviewer
+> Next: continue
+> Questions: none
+> Branch/sha: main/abc

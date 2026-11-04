@@ -1,0 +1,2 @@
+error: Comment body required; use -m or -F. [invalid]
+next: silta --ws 'acme' comment 'AC-1' --kind 'handoff' -m "<text>"

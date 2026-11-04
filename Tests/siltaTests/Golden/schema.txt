@@ -7,7 +7,7 @@ silta init  Initialize or scan repos; select with ws use; configuration editing 
 silta repo fetch  Fetch a repo, or all registered repos in the workspace, without prompting.
 silta task add  Add a proposal; --start claims work requested by the human.
 silta task ls  List workspace tasks, including your own proposals.
-silta task show  Read a task's current bodies, claim and optional event timeline.
+silta task show  Read task bodies, claim, handoff and unresolved discussion.
 silta task start  Claim a todo task for this exact actor and session.
 silta task submit  Submit doing work for review and release its claim.
 silta task done  Complete a task with its result and optional app commit.
@@ -28,6 +28,7 @@ silta code log  List commit SHA and subject at the selected ref.
 silta code ls  List immediate committed names in an app-relative directory.
 silta where  Resolve the workspace, repository and app for a local path.
 silta doctor  Diagnose database, git and data across all workspaces without repairs.
+silta comment  Post task discussion; a claimer's handoff releases its claim.
 details: silta schema <command>
 
 global flags:

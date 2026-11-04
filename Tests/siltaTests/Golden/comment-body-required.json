@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"Comment body required; use -m or -F.","next":["silta --ws 'acme' comment 'AC-1' --kind 'handoff' -m \"<text>\""],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

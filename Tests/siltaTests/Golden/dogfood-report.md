@@ -40,6 +40,7 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 - `silta code log`
 - `silta code ls`
 - `silta code show`
+- `silta comment`
 - `silta doctor`
 - `silta init`
 - `silta repo fetch`
