@@ -152,7 +152,7 @@ package enum CodeRead: Sendable {
   }
 
   /// Repeats this read for `target` as a shell-quoted command.
-  func command(workspace: String, target: String, prod: Bool) -> String {
+  package func command(workspace: String, target: String, prod: Bool) -> String {
     var words = ["silta", "--ws", shellWord(workspace), "code", verb, shellWord(target)]
     if prod { words.append("--prod") }
     switch self {

@@ -1,4 +1,5 @@
 import Foundation
+import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -205,6 +206,36 @@ extension CodeCommandTests {
         ["code", "show", "console@origin/portal", "README.md", "--json"], in: scratch)
       #expect(missing.termination == .exit(2))
       #expect(missing.stdout.contains("App subpath \\\"apps/console\\\" not found"))
+    }
+  }
+
+  @Test func generatedCommandsReadOptionLikePaths() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      try Data("Acme notes\n".utf8).write(to: repo.appending(path: "apps/console/-notes.md"))
+      try Data("Acme two\n".utf8).write(to: repo.appending(path: "apps/console/-notes two.md"))
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: "apps/console/-dir"), withIntermediateDirectories: true)
+      try Data("Acme inner\n".utf8).write(to: repo.appending(path: "apps/console/-dir/inner.md"))
+      try commitAll(repo, scratch)
+      let binary = shellWord(try SiltaBinary.url().path)
+      let cases: [(CodeRead, String)] = [
+        (.show("-notes.md", lines: nil), "Acme notes\n"),
+        (.show("-notes two.md", lines: "1"), "Acme two\n"),
+        (.log("-notes.md", count: 20), " Add Acme files\n"),
+        (.list("-dir"), "inner.md\n"),
+      ]
+      for (read, expected) in cases {
+        let command = read.command(workspace: "acme", target: "console@HEAD", prod: false)
+        let run = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"),
+          ["-c", binary + " --json" + String(command.dropFirst("silta".count))], in: scratch)
+        withKnownIssue("the generated command treats a leading-dash path as an option") {
+          try #require(run.termination == .exit(0), "\(command): \(run.stdout)\(run.stderr)")
+          let output = try envelope(run.stdout)["output"] as? String
+          #expect(output?.hasSuffix(expected) == true, "\(command): \(run.stdout)")
+        }
+      }
     }
   }
 }
