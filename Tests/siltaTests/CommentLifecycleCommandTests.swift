@@ -92,3 +92,47 @@ struct CommentLifecycleCommandTests {
     }
   }
 }
+
+extension CommentLifecycleCommandTests {
+  @Test(arguments: ["resolve", "reopen"], [false, true])
+  func unchangedSecretFlagsDoNotRequireConsent(action: String, placeholder: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try CommentHandoffTests.setup(scratch)
+      let env = TaskCommandTests.fixed
+      _ = try SiltaBinary.run(["comment", "AC-1", "-m", "Finding"], in: scratch, environment: env)
+      if action == "resolve" {
+        _ = try SiltaBinary.run(["comment", action, "AC-1/1"], in: scratch, environment: env)
+      }
+      func snapshot() throws -> [String] {
+        try store.read { db in
+          try ["task", "comment", "task_event", "approval", "change_log"].flatMap {
+            try Row.fetchAll(db, sql: "SELECT * FROM \($0) ORDER BY rowid").map(
+              String.init(describing:))
+          }
+        }
+      }
+      let before = try snapshot()
+      let later = env.merging(["SILTA_NOW": "2023-11-14T22:13:21.000Z"]) { $1 }
+      let args = [
+        "comment", action, "AC-1/1", "--allow-secret", "-m", "Pwd=" + "acme-value", "--json",
+      ]
+      let result = try SiltaBinary.run(
+        args + (placeholder ? ["--approved", "<the human's words>"] : []),
+        in: scratch, environment: later)
+      withKnownIssue("#13: CLI no-ops request secret consent before reading state") {
+        #expect(result.termination == .exit(0))
+        #expect(result.stdout.contains("\"created\":[]") && !result.stdout.contains("acme-value"))
+        #expect(result.stdout.contains("approval_unused") == placeholder)
+      }
+      #expect(try snapshot() == before)
+      let changed = try SiltaBinary.run(
+        [
+          "comment", action == "resolve" ? "reopen" : "resolve", "AC-1/1", "--allow-secret", "-m",
+          "Context", "--json",
+        ],
+        in: scratch, environment: later)
+      #expect(changed.termination == .exit(3) && changed.stdout.contains("human_only"))
+      #expect(try snapshot() == before)
+    }
+  }
+}
