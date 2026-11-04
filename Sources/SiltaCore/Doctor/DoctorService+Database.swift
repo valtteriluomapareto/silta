@@ -12,7 +12,7 @@ extension DoctorService {
     -> [DoctorCheck]
   {
     let evidence = "/usr/bin/sqlite3 -readonly " + shellWord(store.path)
-    let inspectBackups = backups.count > 0 || !backups.readable
+    let inspectBackups = !backups.isKnownEmpty
     let recovery =
       (inspectBackups ? [backups.listing] : [])
       + [
@@ -82,7 +82,9 @@ extension DoctorService {
   ) -> [DoctorCheck] {
     var checks = integrity(db, recovery: recovery)
     let schemaCheck: DoctorCheck
-    do { schemaCheck = try schema(db, recovery: recovery) } catch {
+    do {
+      schemaCheck = try schema(db, recovery: recovery, allowInitialization: backups.isKnownEmpty)
+    } catch {
       schemaCheck = DoctorCheck(
         id: "database.schema", status: .fail, message: "Schema metadata could not be checked.",
         next: recovery)
@@ -146,20 +148,23 @@ extension DoctorService {
     return checks
   }
 
-  private static func schema(_ db: Database, recovery: [String]) throws -> DoctorCheck {
+  private static func schema(_ db: Database, recovery: [String], allowInitialization: Bool) throws
+    -> DoctorCheck
+  {
     let install = ["<clean-main-checkout>/scripts/install-dev.sh"]
     guard try db.tableExists("meta"), try db.tableExists("grdb_migrations") else {
       let empty =
         try Int.fetchOne(
           db, sql: "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0
+      let initialize = empty && allowInitialization
       return DoctorCheck(
         id: "database.schema", status: .fail,
-        message: empty
+        message: initialize
           ? "Database schema is uninitialized."
-          : "A nonempty database is missing schema metadata; "
+          : "Database metadata is absent; "
             + "inspect backups and read-only evidence. "
             + "Restore is the human's decision.",
-        next: empty ? ["silta init"] : recovery)
+        next: initialize ? ["silta init"] : recovery)
     }
     guard
       let rawVersion = try String.fetchOne(

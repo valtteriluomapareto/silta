@@ -1453,7 +1453,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   fetch checks. Bound dead repo paths fail. Orphaned overrides warn. These path
   checks verify `.git` marker presence, not linked-worktree target usability.
 
-  Missing, older or incompatible schemas fail. Empty databases and pending known migrations suggest `silta init`;
+  Missing, older or incompatible schemas fail. Pending known migrations suggest `silta init`; empty databases do so only when
+  backup inventory is readable and contains no published backups;
   nonempty databases missing metadata require backup/schema inspection first; real writer incompatibility names
   the clean-main development install script and requires the human's decision.
   Compatible unknown migrations warn (D32). Dependent checks on an incompatible
@@ -1470,7 +1471,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   This checks presence, not backup integrity. When backups exist, database-failure
   recovery starts by listing them; restore is the human's decision. SQLite hints
   use `-readonly` and are evidence, not repeated repair attempts. Initialization is
-  suggested for a missing database only when backup inspection succeeded and no
+  suggested for a missing or empty database only when backup inspection succeeded and no
   published backups were found. Unreadable inventory stays unknown and leads to
   inspection, even if no write has yet required a daily backup.
 

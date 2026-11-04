@@ -44,6 +44,9 @@ struct DoctorBackups {
     }
   }
 
+  /// Unknown availability never establishes that recovery evidence is absent.
+  var isKnownEmpty: Bool { readable && count == 0 }
+
   var listing: String { "/bin/ls -l " + shellWord(directory.path) }
 
   func check(expectedDay: String?) -> DoctorCheck {
