@@ -3,12 +3,11 @@ import SiltaCore
 enum CommentOutput {
   static let shape = Shape.object([
     "ref": .string, "kind": .string, "body": .string, "actor": .string,
-    "mentions": .array(.string), "reply_to": .optional(.string), "source": .optional(.string),
-    "accepted": .bool, "deleted": .bool, "resolved_at": .optional(.string),
-    "resolved_by": .optional(.string), "created_at": .string,
+    "reply_to": .optional(.string), "deleted": .bool, "resolved_at": .optional(.string),
+    "created_at": .string,
   ])
 
-  static func detail(_ post: CommentDetails, comments: [CommentDetails], workspace: String)
+  static func detail(_ post: CommentDetails, comments: [CommentDetails])
     -> String
   {
     var text = "\(post.ref) \(post.kind) by \(post.actor)"
@@ -21,16 +20,7 @@ enum CommentOutput {
         " [" + (answered ? "answered, " : "") + (post.resolvedAt == nil ? "unresolved" : "resolved")
         + "]"
     }
-    if post.accepted { text += " [accepted]" }
-    if !post.mentions.isEmpty { text += " -> " + post.mentions.joined(separator: ", ") }
     text += "\n" + post.body
-    if let source = post.source { text += "\ncites: " + source }
-    if post.kind == "question", !post.deleted, post.resolvedAt == nil {
-      let task = String(post.ref.prefix { $0 != "/" })
-      text +=
-        "\nReply: silta --ws " + shellWord(workspace) + " comment " + shellWord(task)
-        + " --kind answer --reply-to " + shellWord(post.ref) + " -F -"
-    }
     return text
   }
 }

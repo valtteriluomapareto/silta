@@ -20,18 +20,6 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     if case .human = self { true } else { false }
   }
 
-  /// Parses a complete actor identity, without attribution or tool-only targets.
-  package static func parse(_ value: String) -> ActorID? {
-    let parts = value.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
-    if parts.count == 2, parts[0] == "human", isPart(parts[1]) {
-      return .human(name: parts[1])
-    }
-    if parts.count == 3, parts[0] == "agent", isTool(parts[1]), isPart(parts[2]) {
-      return .agent(tool: parts[1], session: parts[2])
-    }
-    return nil
-  }
-
   /// A `human:…` override was dropped because stdin isn't a terminal.
   static let overrideIgnored = OutputWarning(
     code: "actor_override_ignored",
@@ -139,12 +127,13 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
     environment: [String: String], terminal: TerminalState
   ) throws -> Explicit {
     guard let value = environment["SILTA_ACTOR"], !value.isEmpty else { return .none }
-    if let actor = parse(value) {
-      return actor.isHuman && !terminal.stdinIsTTY ? .droppedHuman : .actor(actor)
-    }
     let parts = value.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
     switch (parts[0], parts.count) {
+    case ("human", 2) where isPart(parts[1]):
+      return terminal.stdinIsTTY ? .actor(.human(name: parts[1])) : .droppedHuman
     case ("agent", 2) where isTool(parts[1]): return .agent(parts[1])
+    case ("agent", 3) where isTool(parts[1]) && isPart(parts[2]):
+      return .actor(.agent(tool: parts[1], session: parts[2]))
     default: throw SeamError.invalidActor
     }
   }

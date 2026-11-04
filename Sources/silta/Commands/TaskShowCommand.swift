@@ -20,7 +20,7 @@ struct TaskShowCommand: OutputCommand {
     let workspace = try context.workspace(global.ws)
     let task = try TaskService(environment: context.environment, workspace: workspace)
       .show(ref, timeline: timeline)
-    let text = TaskOutput.detail(task, workspace: workspace)
+    let text = TaskOutput.detail(task)
     return CommandOutput(text: text, quiet: text, data: task).reporting(
       workspace)
   }

@@ -6,12 +6,12 @@ steps:
   - args: [--ws, fixtures, task, add, Acme discussion, --start, --json]
     env: {SILTA_ACTOR: 'agent:codex:acme'}
     expect: {exit: 0, json: {data.ref: FI-1}}
-  - args: [--ws, fixtures, comment, FI-1, --kind, question, --to, 'agent:codex:acme', -m, Which API?, --json]
+  - args: [--ws, fixtures, comment, FI-1, -m, Review finding., --json]
     env: {SILTA_ACTOR: 'agent:claude:reviewer'}
-    expect: {exit: 0, json: {data.ref: FI-1/1, data.kind: question}}
-  - args: [--ws, fixtures, comment, FI-1, --kind, answer, --reply-to, FI-1/1, -m, Use API v2., --json]
+    expect: {exit: 0, json: {data.ref: FI-1/1, data.kind: comment}}
+  - args: [--ws, fixtures, comment, FI-1, -m, Use API v2., --json]
     env: {SILTA_ACTOR: 'agent:codex:acme'}
-    expect: {exit: 0, json: {data.reply_to: FI-1/1}}
+    expect: {exit: 0, json: {data.ref: FI-1/2}}
   - args: [--ws, fixtures, comment, FI-1, --kind, handoff, -m, API chosen; continue tests., --json]
     env: {SILTA_ACTOR: 'agent:codex:acme'}
     expect: {exit: 0, json: {data.ref: FI-1/3}}

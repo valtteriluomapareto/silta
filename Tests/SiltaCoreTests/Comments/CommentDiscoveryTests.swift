@@ -20,10 +20,8 @@ struct CommentDiscoveryTests {
       }
       let service = TaskService(environment: env)
       let shown = try #require(service.show("AC-1").comments)
-      withKnownIssue("#13: A new handoff must not hide unresolved discussion on an older one") {
-        #expect(shown.map(\.ref) == ["AC-1/2", "AC-1/1", "AC-1/3"])
-        #expect(shown.contains { $0.body == "Reviewer finding" })
-      }
+      #expect(shown.map(\.ref) == ["AC-1/2", "AC-1/1", "AC-1/3"])
+      #expect(shown.contains { $0.body == "Reviewer finding" })
       #expect(try service.show("AC-1", timeline: true).comments?.count == 3)
     }
   }

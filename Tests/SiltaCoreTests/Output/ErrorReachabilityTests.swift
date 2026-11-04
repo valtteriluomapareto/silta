@@ -18,7 +18,7 @@ extension UsageError: ErrorExamples {
 
 extension CommentError: ErrorExamples {
   static var examples: [CommentError] {
-    [.invalid("Use an actor mention."), .missing("AC-1/2"), .foreignHandoff("AC-1")]
+    [.invalid("Use a supported kind."), .foreignHandoff("AC-1")]
   }
 }
 

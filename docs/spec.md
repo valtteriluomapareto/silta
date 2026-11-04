@@ -731,13 +731,6 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 
 - Threads: `--reply-to AC-12/3`. `comment resolve|reopen <ref>… [-m …]` takes several
   refs in one call.
-- Questions start threads. An answer requires an open, nondeleted question thread;
-  replying to a reply joins its root. Other replies also require an open,
-  nondeleted root in the same task and workspace.
-- Mentions use `@human:<name>`, `@agent:<tool>:<session>` or `@me` (D33); `--to`
-  accepts the same complete actors or `me`, and may be repeated. A question with no
-  recipients defaults to the detected human (`human:<USER>`), not the calling
-  agent. External parties belong to `task block`, never to `--to` (D35).
 - `task show` shows the newest handoff thread first and unresolved threads with
   their replies, identifying answered versus resolved questions. Roots and replies
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
@@ -1266,7 +1259,7 @@ silta task review AC-12 --verdict … [--subject] (-m|-F) [--lines <file|->]   [
 silta task request-review AC-12 --reviewer <actor>   [M2]
 
 # discussion
-silta comment <target> (-m|-F) [--kind question|answer|decision|handoff] [--reply-to <ref>] [--to <actor>|me] [--from note:…]   [M1]
+silta comment <target> (-m|-F) [--kind question|answer|decision|handoff] [--reply-to <ref>] [--from note:…]   [M1]
 silta comment resolve|reopen <ref>… [-m] | comment accept <ref> | comment delete <ref>   [M1]
 silta inbox [--for <actor>|me] [--all] | inbox take <id>   [M1; take M2]
 

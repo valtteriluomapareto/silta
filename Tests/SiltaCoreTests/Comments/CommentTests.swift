@@ -9,11 +9,10 @@ struct CommentTests {
   static func snapshot(_ env: SiltaEnvironment) throws -> [Int] {
     try ProposalPolicyTests.snapshot(env)
       + env.db.read { db in
-        try ["comment", "link"].map {
-          try #require(try Int.fetchOne(db, sql: "SELECT count(*) FROM \($0)"))
-        }
+        [try #require(try Int.fetchOne(db, sql: "SELECT count(*) FROM comment"))]
       }
   }
+
   static func setup(_ home: URL, clock: FakeClock = FakeClock(now: TaskServiceTests.now))
     async throws -> SiltaEnvironment
   {
@@ -35,16 +34,13 @@ struct CommentTests {
         environment: try TaskServiceTests.environment(
           home, actor: .agent(tool: "claude", session: "reviewer"), clock: clock))
       clock.advance(milliseconds: 1000)
-      let question = try foreign.comment("AC-1", CommentDraft(body: "Which API?", kind: "question"))
-      #expect(question.comment.mentions == ["human:unknown"])
+      _ = try foreign.comment("AC-1", CommentDraft(body: "Reviewer finding"))
       #expect(try owner.show("AC-1").claimedAt == before.claimedAt)
       #expect(try owner.show("AC-1").updatedAt == before.updatedAt)
       #expect(throws: CommentError.self) {
         _ = try foreign.comment("AC-1", CommentDraft(body: "Stopped", kind: "handoff"))
       }
-      var answer = CommentDraft(body: "Use API v2.", kind: "answer")
-      answer.replyTo = question.comment.ref
-      _ = try owner.comment("task:AC-1", answer)
+      _ = try owner.comment("task:AC-1", CommentDraft(body: "Finding addressed"))
       #expect(try owner.show("AC-1").claimedAt == TaskService.timestamp(clock.now()))
       let handoff = try owner.comment(
         "AC-1", CommentDraft(body: "Continue tests.", kind: "handoff"))
@@ -52,20 +48,16 @@ struct CommentTests {
       #expect(shown.status == "doing" && shown.claimedBy == nil && shown.claimedAt == nil)
       #expect(shown.comments?.map(\.ref) == [handoff.comment.ref, "AC-1/1", "AC-1/2"])
       #expect(try await foreign.start("AC-1", directory: home).result.status == "doing")
-      #expect(try foreign.show("AC-1").comments?.last?.body == "Use API v2.")
+      #expect(try foreign.show("AC-1").comments?.last?.body == "Finding addressed")
     }
   }
 
   @Test(arguments: ["comment", "decision", "handoff"])
-  func unclaimedDiscussionAndNoteCitation(kind: String) async throws {
+  func unclaimedDiscussionRecordsContext(kind: String) async throws {
     try await withScratchDirectory { home in
-      let env = try await Self.setup(home)
-      let service = TaskService(environment: env)
+      let service = TaskService(environment: try await Self.setup(home))
       _ = try service.submit("AC-1")
-      var draft = CommentDraft(body: "Acme context", kind: kind)
-      draft.source = "note:acme/meeting.md"
-      let result = try service.comment("AC-1", draft)
-      #expect(result.comment.source == draft.source)
+      let result = try service.comment("AC-1", CommentDraft(body: "Acme context", kind: kind))
       #expect(result.warnings.contains { $0.code == "handoff_unclaimed" } == (kind == "handoff"))
       #expect(try service.show("AC-1").status == "review")
     }
@@ -91,36 +83,42 @@ struct CommentTests {
     }
   }
 
-  @Test func repliesAndRefusalsStayWithinTheirTask() async throws {
+  @Test func workspaceAndTaskStateBoundariesHold() async throws {
     try await withScratchDirectory { home in
       let env = try await Self.setup(home)
       let service = TaskService(environment: env)
-      _ = try service.comment("AC-1", CommentDraft(body: "Question", kind: "question"))
-      var reply = CommentDraft(body: "Answer", kind: "answer")
-      reply.replyTo = "AC-1/1"
-      _ = try service.comment("AC-1", reply)
-      reply.replyTo = "AC-1/2"
-      #expect(try service.comment("AC-1", reply).comment.replyTo == "AC-1/1")
-      var other = TaskDraft(title: "Other")
-      other.start = true
-      _ = try await service.add(other, directory: home)
-      _ = try service.comment("AC-2", CommentDraft(body: "Other question", kind: "question"))
-      #expect(try service.show("AC-1").comments?.count == 3)
-      #expect(try service.show("AC-2").comments?.count == 1)
-      reply.replyTo = "AC-1/1"
-      #expect(throws: CommentError.self) { _ = try service.comment("AC-2", reply) }
-      for (kind, target) in [
-        ("answer", nil), ("question", "AC-1/1"), ("comment", "AC-1/01"), ("comment", "ZZ-1/1"),
-      ] as [(String, String?)] {
-        var draft = CommentDraft(body: "Acme", kind: kind)
-        draft.replyTo = target
-        #expect(throws: (any Error).self) { _ = try service.comment("AC-1", draft) }
+      try env.db.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('other','other','Other','OT')
+            """)
       }
-      for field in ["resolved_at", "deleted_at"] {
+      let other = TaskService(environment: env, workspace: "other")
+      var task = TaskDraft(title: "Other")
+      task.start = true
+      _ = try await other.add(task, directory: home)
+      _ = try service.comment("AC-1", CommentDraft(body: "Acme"))
+      _ = try other.comment("OT-1", CommentDraft(body: "Other"))
+      #expect(try service.show("AC-1").comments?.map(\.body) == ["Acme"])
+      #expect(try other.show("OT-1").comments?.map(\.body) == ["Other"])
+      #expect(throws: TaskError.self) { _ = try other.comment("AC-1", CommentDraft(body: "Wrong")) }
+      try env.db.write {
+        try $0.database.execute(sql: "UPDATE task SET external_ref='ado:42' WHERE id=1")
+      }
+      #expect(throws: TaskError.self) {
+        _ = try service.comment("AC-1", CommentDraft(body: "Readonly"))
+      }
+      for status in ["done", "dropped"] {
         try env.db.write {
-          try $0.database.execute(sql: "UPDATE comment SET \(field)='x' WHERE seq=1")
+          try $0.database.execute(
+            sql: """
+              UPDATE task SET external_ref=NULL,status=?,closed_at=?,
+              claimed_by=NULL,claimed_at=NULL WHERE id=1
+              """, arguments: [status, TaskService.timestamp(env.clock.now())])
         }
-        #expect(throws: CommentError.self) { _ = try service.comment("AC-1", reply) }
+        #expect(
+          try service.comment("AC-1", CommentDraft(body: "Closed context")).comment.kind
+            == "comment")
       }
     }
   }
@@ -131,6 +129,7 @@ struct CommentTests {
       try env.db.write { tx in
         for (offset, kind) in [
           "review", "future", "comment", "comment", "comment", "handoff", "handoff", "comment",
+          "question", "answer",
         ].enumerated() {
           let seq = offset + 1
           try tx.database.execute(
@@ -141,50 +140,26 @@ struct CommentTests {
               """,
             arguments: [
               seq, "c\(seq)", seq, kind, [4, 8].contains(seq) ? "x" : nil,
-              seq == 3 ? "x" : nil, seq == 5 ? 4 : nil,
+              seq == 3 ? "x" : nil, seq == 5 ? 4 : seq == 10 ? 9 : nil,
             ])
         }
       }
       let service = TaskService(environment: env)
       let shown = try #require(service.show("AC-1").comments)
-      #expect(shown.map(\.ref) == ["AC-1/7", "AC-1/1", "AC-1/2", "AC-1/4", "AC-1/5"])
+      #expect(
+        shown.map(\.ref) == ["AC-1/7", "AC-1/1", "AC-1/2", "AC-1/4", "AC-1/5", "AC-1/9", "AC-1/10"])
       #expect(shown.first { $0.deleted }?.body == "[deleted]")
-      #expect(try service.show("AC-1", timeline: true).comments?.count == 8)
-      #expect(try service.comment("AC-1", CommentDraft(body: "Next")).comment.ref == "AC-1/9")
+      #expect(try service.show("AC-1", timeline: true).comments?.count == 10)
+      #expect(try service.comment("AC-1", CommentDraft(body: "Next")).comment.ref == "AC-1/11")
     }
   }
 }
 
 extension CommentTests {
-  @Test func mentionsUseCompleteActorsAndHumanIdentity() async throws {
+  @Test func secretsAndLateHandoffFailureNeverPartiallyCommit() async throws {
     try await withScratchDirectory { home in
-      let env = try await Self.setup(home)
-      let service = TaskService(environment: env)
-      var draft = CommentDraft(body: "@human:acme. @agent:codex:s-1, @me @human:acme")
-      draft.to = ["agent:claude:reviewer"]
-      #expect(
-        try service.comment("AC-1", draft).comment.mentions == [
-          "agent:claude:reviewer", "agent:codex:s-1", "human:acme", "human:unknown",
-        ])
-      for target in [
-        "ext:acme", "agent:codex", "agent:Claude:acme", "human:bad/name",
-        "human:" + String(repeating: "x", count: 65),
-      ] {
-        var invalid = CommentDraft(body: "Acme")
-        invalid.to = [target]
-        let before = try Self.snapshot(env)
-        #expect(throws: CommentError.self) { _ = try service.comment("AC-1", invalid) }
-        invalid.to = []
-        invalid.body = "@" + target
-        #expect(throws: CommentError.self) { _ = try service.comment("AC-1", invalid) }
-        #expect(try Self.snapshot(env) == before)
-      }
-    }
-  }
-
-  @Test func secretsAndLateFailuresNeverPartiallyCommit() async throws {
-    try await withScratchDirectory { home in
-      let env = try await Self.setup(home)
+      let clock = FakeClock(now: TaskServiceTests.now)
+      let env = try await Self.setup(home, clock: clock)
       let service = TaskService(environment: env)
       let secret = "Pwd=" + "acme-value"
       let masked = try service.comment("AC-1", CommentDraft(body: secret))
@@ -209,11 +184,21 @@ extension CommentTests {
             BEGIN SELECT RAISE(ABORT,'Acme failure'); END
             """)
       }
-      let stable = try Self.snapshot(env)
+      let stable = try Self.snapshot(env), claim = try service.show("AC-1")
+      clock.advance(milliseconds: 1000)
+      draft.kind = "handoff"
       #expect(throws: StorageError.self) { _ = try approved.comment("AC-1", draft) }
       #expect(try Self.snapshot(env) == stable)
-      for invalid in [CommentDraft(body: " "), CommentDraft(body: "Acme", kind: "review")] {
-        #expect(throws: CommentError.self) { _ = try service.comment("AC-1", invalid) }
+      let after = try service.show("AC-1")
+      #expect(after.claimedBy == claim.claimedBy && after.claimedAt == claim.claimedAt)
+      #expect(after.updatedAt == claim.updatedAt && after.status == claim.status)
+      for kind in ["question", "answer", "review", "future"] {
+        #expect(throws: CommentError.self) {
+          _ = try service.comment("AC-1", CommentDraft(body: "Acme", kind: kind))
+        }
+      }
+      #expect(throws: CommentError.self) {
+        _ = try service.comment("AC-1", CommentDraft(body: " "))
       }
     }
   }

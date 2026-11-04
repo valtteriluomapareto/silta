@@ -1,1 +1,0 @@
-{"error":{"code":"invalid","message":"Mentions and --to need me, human:<name> or agent:<tool>:<session>; external parties belong to task block.","next":["silta --ws 'acme' comment --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

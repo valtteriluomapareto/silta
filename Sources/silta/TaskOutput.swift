@@ -69,7 +69,7 @@ enum TaskOutput {
     return lines
   }
 
-  static func detail(_ task: TaskDetails, workspace: String) -> String {
+  static func detail(_ task: TaskDetails) -> String {
     var lines = [summary(task), "Created by: \(task.createdBy)"]
     lines.append("Archived: \(task.archived ? "yes" : "no")")
     if let day = task.followUpAt { lines.append("Follow-up: " + day) }
@@ -86,7 +86,7 @@ enum TaskOutput {
     for link in task.links { lines.append("\(link.rel): \(link.target)") }
     if let comments = task.comments {
       lines.append("\nDiscussion:")
-      lines += comments.map { CommentOutput.detail($0, comments: comments, workspace: workspace) }
+      lines += comments.map { CommentOutput.detail($0, comments: comments) }
     }
     for event in task.timeline ?? [] {
       lines.append(
