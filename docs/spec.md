@@ -876,10 +876,11 @@ silta code ls   <app>[@<ref>] [<dir>]
   and `--fetch`; `@ref` and `--prod` together are invalid. A missing `prod_ref`
   points to workspace configuration.
 - Paths are relative to the app's subpath, or the repo root when none is set. The
-  subpath and the `show`, `log` and `ls` paths are literal. `grep` skips binary files
-  and accepts one relative wildcard pathspec after `--`, but no leading-colon Git
-  magic. Absolute paths and `..` components are invalid. Grep output uses
-  app-relative `path:line:text`; `ls` lists names relative to the requested
+  subpath and the `show`, `log` and `ls` paths are literal; a recovery command puts
+  its options before `--` and the path after it, so a path that begins with `-` parses.
+  `grep` skips binary files and accepts one relative wildcard pathspec after `--`, but
+  no leading-colon Git magic. Absolute paths and `..` components are invalid. Grep
+  output uses app-relative `path:line:text`; `ls` lists names relative to the requested
   directory, with a trailing `/` on directories. No matches in grep or log are an
   empty success. Missing show/ls paths are `not_found`, and so are `show` on a
   directory and `ls` on a file, whose `next` is the matching command. A configured

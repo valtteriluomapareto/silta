@@ -95,6 +95,58 @@ main() {
     echo "Next: inspect $gitdir, then remove the worktree with rm -rf $dir && git worktree prune" >&2
     exit 70
   fi
+
+  # Codex may write this worktree's git dir, but not the repository's common git dir,
+  # so a git operation that stops mid-way can leave state that makes the next git
+  # command refuse to run. Detect it by reading the worktree's git dir; a quit command
+  # clears it without touching the index or the working tree.
+  unfinished=()
+  quit=()
+  sequence=''
+  if [[ -d "$gitdir/sequencer" ]]; then
+    case "$(head -n 1 "$gitdir/sequencer/todo" 2>/dev/null || true)" in
+      pick\ *) sequence='cherry-pick' ;;
+      revert\ *) sequence='revert' ;;
+    esac
+  fi
+  if [[ -f "$gitdir/CHERRY_PICK_HEAD" ]]; then
+    unfinished+=('cherry-pick (CHERRY_PICK_HEAD)')
+    quit+=('cherry-pick --quit')
+  elif [[ "$sequence" == 'cherry-pick' ]]; then
+    unfinished+=('cherry-pick (sequencer)')
+    quit+=('cherry-pick --quit')
+  fi
+  if [[ -f "$gitdir/REVERT_HEAD" ]]; then
+    unfinished+=('revert (REVERT_HEAD)')
+    quit+=('revert --quit')
+  elif [[ "$sequence" == 'revert' ]]; then
+    unfinished+=('revert (sequencer)')
+    quit+=('revert --quit')
+  fi
+  if [[ -f "$gitdir/MERGE_HEAD" ]]; then
+    unfinished+=('merge (MERGE_HEAD)')
+    quit+=('merge --quit')
+  fi
+  if [[ -d "$gitdir/rebase-merge" ]]; then
+    unfinished+=('rebase (rebase-merge)')
+    quit+=('rebase --quit')
+  elif [[ -d "$gitdir/rebase-apply" ]]; then
+    if [[ -f "$gitdir/rebase-apply/applying" ]]; then
+      unfinished+=('am (rebase-apply)')
+      quit+=('am --quit')
+    else
+      unfinished+=('rebase (rebase-apply)')
+      quit+=('rebase --quit')
+    fi
+  fi
+  if (( ${#unfinished[@]} > 0 )); then
+    joined="$(IFS=', '; printf '%s' "${unfinished[*]}")"
+    printf 'codex: unfinished git state in %s: %s.\n' "$dir" "$joined" >&2
+    printf 'codex: Codex cannot clear it because the repository git dir is outside the sandbox; run this before the next resume:\n' >&2
+    for action in "${quit[@]}"; do
+      printf '  git -C %q %s\n' "$dir" "$action" >&2
+    done
+  fi
   exit "$status"
 }
 main "$@"
