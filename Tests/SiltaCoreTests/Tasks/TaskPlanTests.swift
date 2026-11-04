@@ -78,7 +78,7 @@ struct TaskPlanTests {
       }
       #expect(throws: TaskError.self) { _ = try rival.tick("AC-1", step: 1, done: true) }
       try env.db.write {
-        try $0.database.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+        try StorageSchemaTests.requireNewerWriter(in: $0.database)
       }
       #expect(throws: StorageError.schemaTooNew) { _ = try service.plan("AC-1", text: "Wrong") }
       #expect(throws: StorageError.schemaTooNew) {

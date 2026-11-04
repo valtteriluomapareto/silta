@@ -1,0 +1,2 @@
+error: Workspace proposals: ask requires the human's go-ahead before creating a proposed task; ask in chat. Detected agent:codex:acme. [human_only]
+ask human: silta --ws 'acme' task add -F <file> --approved "<the human's words>" -- '-Acme'

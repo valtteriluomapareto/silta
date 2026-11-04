@@ -52,7 +52,7 @@ struct TaskAddCommand: OutputCommand {
       draft,
       directory: URL(
         filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
-    return TaskOutput.receipt(result, quiet: result.ref, approvalUsed: body.allowSecret)
+    return TaskOutput.receipt(result, quiet: result.ref, approvalUsed: result.approvalUsed)
       .reporting(context.taskWorkspace(global.ws))
   }
 }

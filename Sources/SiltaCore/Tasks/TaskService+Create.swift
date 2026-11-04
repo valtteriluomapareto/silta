@@ -5,7 +5,6 @@ extension TaskService {
   /// Creates a task, its initial claim and its links in one transaction.
   /// App work records the current worktree; no-app work never invokes git.
   package func add(_ draft: TaskDraft, directory: URL) async throws -> TaskResult {
-    let command = draft.command + (draft.allowSecret ? " --allow-secret" : "")
     let approval = try approval(
       required: draft.allowSecret, command: draft.command + " '<title>' -F <file> --allow-secret")
     var creation = try prepare(draft, command: draft.command + " '<title>' -F <file>")
@@ -16,8 +15,16 @@ extension TaskService {
       enabled: draft.start && draft.app != nil, completion: false)
     let prepared = creation
     return try environment.db.write { tx in
-      let result = try insert(prepared, workspace: slug, in: tx)
-      try approval?.record(
+      let command = prepared.draft.command + (draft.allowSecret ? " --allow-secret" : "")
+      let retry =
+        "silta --ws " + shellWord(slug) + String(command.dropFirst(5))
+        + (bodyFlag == nil ? "" : " -F <file>")
+      let inserted = try insert(
+        prepared, workspace: slug, retry: (retry, prepared.draft.title), in: tx)
+      var result = inserted.task
+      let used = approval ?? inserted.approval
+      result.approvalUsed = used != nil
+      try used?.record(
         command: audited(command) + " -> " + result.ref, workspace: slug,
         identity: (environment.ids, prepared.at), in: tx)
       return result
@@ -41,11 +48,13 @@ extension TaskService {
       redacted: title.1 || body.1 || source?.1 == true)
   }
 
-  /// Inserts a prepared task; `status` overrides the status its creator and parent imply.
+  /// Inserts prepared work and decides proposal consent in this transaction. Split
+  /// children inherit an already-decided root status without recording extra consent.
   func insert(
     _ creation: TaskCreation, workspace: String, status override: String? = nil,
+    retry: (command: String, title: String?),
     in tx: StorageTransaction
-  ) throws -> TaskResult {
+  ) throws -> (task: TaskResult, approval: HumanApproval?) {
     let draft = creation.draft
     let db = tx.database
     let ws = try Self.workspaceID(workspace, in: db)
@@ -57,8 +66,18 @@ extension TaskService {
     if let app, try Self.repoPath(app: app, in: db) != creation.path {
       throw TaskError.changed(nil)
     }
+    var status = override ?? creationStatus(parent: parent, start: draft.start)
+    var consent: HumanApproval?
+    if override == nil, status == "proposed" {
+      let policy = try WorkspaceSettings.read(workspaceID: ws, in: db).proposals
+      if policy == .ask, approved == nil {
+        throw ActorError.proposalPolicy(
+          command: retry.command, actor: environment.actor, title: retry.title)
+      }
+      consent = try approval(required: approved != nil, command: retry.command)
+      if consent != nil { status = "todo" }
+    }
     let seq = try tx.nextSequence(scope: "task:\(ws)")
-    let status = override ?? creationStatus(parent: parent, start: draft.start)
     let stamp = Self.timestamp(creation.at)
     try db.execute(
       sql: """
@@ -76,9 +95,10 @@ extension TaskService {
     try addLinks(draft, task: id, workspace: ws, at: creation.at, in: db)
     try changed(
       id, kind: "created", body: status, redacted: creation.redacted, at: creation.at, in: tx)
-    return TaskResult(
+    let result = TaskResult(
       ref: "\(try Self.prefix(ws, in: db))-\(seq)", status: status,
       warnings: creation.redacted ? [SecretGuard.warning] : [])
+    return (result, consent)
   }
 
   func creationStatus(parent: TaskDetails?, start: Bool = false) -> String {

@@ -9,41 +9,42 @@ extension TaskService {
     let approval = try approval(
       required: options.allowSecret && !options.dryRun,
       command: options.retryCommand + " --allow-secret")
-    guard !options.delete || !options.dryRun && source != nil else {
-      throw TaskError.invalid("--delete requires a real file and cannot be used with --dry-run.")
-    }
-    let content = try importContent(text, options: options)
-    let parsed = try MarkdownPlan(content.0)
-    if options.split, parsed.steps.count > 10 {
-      throw TaskError.invalid("--split accepts at most 10 steps; keep a checklist or shorten it.")
-    }
+    let (parsed, redacted) = try preparedImport(text, options: options, source: source)
     let preview = try importPreview(parsed, options: options)
-    let warnings = content.1 ? [SecretGuard.warning] : []
+    let warnings = redacted ? [SecretGuard.warning] : []
     if options.dryRun {
       return TaskImportResult(dryRun: true, preview: preview, tasks: [], warnings: warnings)
     }
     let cleanup = try await sourceToDelete(text, options: options, source: source, in: directory)
     let slug = try selected()
-    let creations = try importCreations(parsed, options: options, redacted: content.1)
+    let creations = try importCreations(parsed, options: options, redacted: redacted)
     let result = try environment.db.write { tx in
-      let root = try insert(creations[0], workspace: slug, in: tx)
+      let retry = (
+        "silta --ws " + shellWord(slug) + String(options.retryCommand.dropFirst(5)), nil as String?
+      )
+      let inserted = try insert(creations[0], workspace: slug, retry: retry, in: tx)
+      let root = inserted.task
       var tasks = [root]
       if options.split {
         for var child in creations.dropFirst() {
           child.draft.parent = root.ref
           tasks.append(
-            try insert(child, workspace: slug, status: Self.childStatus(root.status), in: tx))
+            try insert(
+              child, workspace: slug, status: Self.childStatus(root.status), retry: retry, in: tx
+            ).task)
         }
       } else {
         let task = try Self.lookup(root.ref, workspace: slug, in: tx.database)
         try writePlan(parsed.checklist, task: task, redacted: false, at: creations[0].at, in: tx)
       }
-      try approval?.record(
+      let used = approval ?? inserted.approval
+      try used?.record(
         command: options.auditCommand(created: tasks), workspace: slug,
         identity: (environment.ids, creations[0].at), in: tx)
       let actualPreview = try importPreview(parsed, options: options, rootStatus: root.status)
       return TaskImportResult(
-        dryRun: false, preview: actualPreview, tasks: tasks, warnings: warnings)
+        dryRun: false, preview: actualPreview, tasks: tasks, warnings: warnings,
+        approvalUsed: used != nil)
     }
     guard let cleanup else { return result }
     var completed = result
@@ -55,6 +56,20 @@ extension TaskService {
             "Tasks committed; source was retained. Inspect it and remove it manually if safe."))
     }
     return completed
+  }
+
+  private func preparedImport(_ text: String, options: TaskImport, source: URL?) throws
+    -> (MarkdownPlan, Bool)
+  {
+    guard !options.delete || !options.dryRun && source != nil else {
+      throw TaskError.invalid("--delete requires a real file and cannot be used with --dry-run.")
+    }
+    let content = try importContent(text, options: options)
+    let parsed = try MarkdownPlan(content.0)
+    if options.split, parsed.steps.count > 10 {
+      throw TaskError.invalid("--split accepts at most 10 steps; keep a checklist or shorten it.")
+    }
+    return (parsed, content.1)
   }
 
   /// The plan text after the secret guard; a dry run keeps it with `--allow-secret`,

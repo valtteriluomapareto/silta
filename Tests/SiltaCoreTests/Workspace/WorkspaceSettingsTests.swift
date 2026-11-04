@@ -29,7 +29,8 @@ struct WorkspaceSettingsTests {
     } catch let error as WorkspaceError {
       #expect(
         error.message
-          == "line 2: review_gate must be none, any or human; did you mean \(suggested)?")
+          == "line 2: review_gate must be none, any or human; did you mean \(suggested)? "
+          + "Ask the human which policy to use.")
     }
   }
 

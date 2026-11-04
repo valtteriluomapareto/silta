@@ -57,7 +57,7 @@ struct StorageWriteTests {
       clock.advance(milliseconds: 86_400_000)
       let external = try DatabaseQueue(path: store.path)
       try external.write {
-        try $0.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+        try StorageSchemaTests.requireNewerWriter(in: $0)
       }
       var called = false
       #expect(throws: StorageError.schemaTooNew) { try store.write { _ in called = true } }

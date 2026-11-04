@@ -1,0 +1,14 @@
+fixtures: true
+steps:
+  - args: [init, --scan, acme-missing-remote, --json]
+    cwd: fixtures
+    expect: {exit: 0, json: {data.workspace: acme-missing-remote}}
+  - args: [--ws, acme-missing-remote, task, add, Acme requested idea, --approved, Create this Acme task., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: AC-1, data.status: todo}}
+  - args: [--ws, acme-missing-remote, task, start, AC-1, --json]
+    env: {SILTA_ACTOR: 'agent:claude:other'}
+    expect: {exit: 0, json: {data.status: doing}}
+  - args: [--ws, acme-missing-remote, task, add, Acme unsolicited idea, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.status: proposed}}

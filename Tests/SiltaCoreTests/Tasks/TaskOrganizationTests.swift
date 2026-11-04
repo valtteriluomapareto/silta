@@ -21,7 +21,8 @@ struct TaskOrganizationTests {
     var draft = TaskDraft(title: title)
     draft.priority = priority
     draft.start = start
-    return try await service.add(draft, directory: directory)
+    return try await TaskService(environment: service.environment, workspace: service.workspace)
+      .add(draft, directory: directory)
   }
 
   static func counts(_ service: TaskService) throws -> [Int] {

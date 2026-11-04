@@ -232,7 +232,7 @@ extension TaskImportTests {
       let env = try TaskServiceTests.environment(home)
       try TaskServiceTests.setup(env)
       try env.db.write {
-        try $0.database.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+        try StorageSchemaTests.requireNewerWriter(in: $0.database)
       }
       var options = TaskImport()
       options.split = true

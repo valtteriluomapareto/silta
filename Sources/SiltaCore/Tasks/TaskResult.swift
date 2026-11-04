@@ -15,6 +15,9 @@ package struct TaskResult: Encodable, Sendable {
   /// A link's target as `task show` prints it, for its receipt text; never encoded.
   package var target: String?
 
+  /// Whether this write recorded human consent; CLI metadata only, never encoded.
+  package var approvalUsed = false
+
   private enum CodingKeys: String, CodingKey {
     case ref, status
   }

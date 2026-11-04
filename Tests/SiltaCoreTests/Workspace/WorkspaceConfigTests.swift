@@ -136,7 +136,7 @@ struct WorkspaceConfigTests {
         #expect(Array(try #require(aliases.last).utf8) == [195, 169])
       }
       try store.write {
-        try $0.database.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+        try StorageSchemaTests.requireNewerWriter(in: $0.database)
       }
       #expect(throws: StorageError.schemaTooNew) { try Self.apply(Self.minimal, to: store) }
     }

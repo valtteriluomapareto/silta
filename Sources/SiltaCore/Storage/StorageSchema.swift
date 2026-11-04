@@ -21,6 +21,9 @@ enum StorageSchema {
       try db.execute(sql: "ALTER TABLE task ADD COLUMN follow_up_at TEXT")
       try db.execute(sql: "UPDATE meta SET value='3' WHERE key='min_writer_version'")
     }
+    migrator.registerMigration("v4") { db in
+      try db.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+    }
     return migrator
   }
 

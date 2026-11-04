@@ -80,6 +80,9 @@ package struct TaskImportResult: Encodable, Sendable {
   /// Secret policy and postcommit cleanup warnings.
   package var warnings: [OutputWarning] = []
 
+  /// Whether the import recorded consent; never encoded or used by a preview.
+  package var approvalUsed = false
+
   enum CodingKeys: String, CodingKey {
     case preview, tasks
     case dryRun = "dry_run"

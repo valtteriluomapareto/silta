@@ -1,0 +1,2 @@
+error: Workspace acme setting review_gate has unknown stored value "future"; it may come from a newer silta. Ask the human before choosing or changing the policy. [invalid]
+next: silta --ws 'acme' ws show

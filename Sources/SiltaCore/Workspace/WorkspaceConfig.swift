@@ -194,27 +194,37 @@ private struct WorkspaceValidation {
         if value.int == nil || (value.int ?? -1) < 0 {
           problem(value, "\(key) must be a nonnegative integer")
         }
-      } else if key == "review_gate" {
-        validateGate(value)
+      } else if key == "review_gate" || key == "proposals" {
+        validatePolicy(value, key: key)
       } else if value.tag != Tag(.str) || (value.string ?? "").isEmpty {
         problem(value, "\(key) must be a nonempty string")
       }
     }
   }
 
-  mutating func validateGate(_ value: Node) {
-    let words = WorkspaceSettings.ReviewGate.allCases.map(\.rawValue)
-    let accepted = "review_gate must be none, any or human"
+  mutating func validatePolicy(_ value: Node, key: String) {
+    let gate = key == "review_gate"
+    let words =
+      gate
+      ? WorkspaceSettings.ReviewGate.allCases.map(\.rawValue)
+      : WorkspaceSettings.Proposals.allCases.map(\.rawValue)
+    let accepted =
+      gate ? "review_gate must be none, any or human" : "proposals must be triage or ask"
     let text = value.scalar?.string ?? ""
     if ["on", "off", "yes", "no", "true", "false", "y", "n"].contains(text.lowercased()) {
-      problem(
-        value,
-        accepted + ". none: no gate; any: done warns on a changes verdict; "
-          + "human: done needs a human approve. Ask the human which policy to use.")
+      let gloss =
+        gate
+        ? "none: no gate; any: done warns on a changes verdict; human: done needs a human approve."
+        : "triage: proposals wait for triage; ask: ask in chat before proposing."
+      problem(value, accepted + ". " + gloss + " Ask the human which policy to use.")
     } else if value.tag != Tag(.str) || text.isEmpty {
       problem(value, accepted)
     } else if !words.contains(text) {
-      problem(value, accepted + WorkspaceConfig.suggestion(text, among: words))
+      let hint = WorkspaceConfig.suggestion(text, among: words)
+      problem(
+        value,
+        accepted + hint + (hint.isEmpty ? "." : "")
+          + " Ask the human which policy to use.")
     }
   }
 

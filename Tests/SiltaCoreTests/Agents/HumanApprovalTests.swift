@@ -156,7 +156,7 @@ struct HumanApprovalTests {
       }
       #expect(try env.db.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
       try env.db.write {
-        try $0.database.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+        try StorageSchemaTests.requireNewerWriter(in: $0.database)
       }
       #expect(throws: StorageError.schemaTooNew) {
         _ = try service.plan("AC-1", text: "new", allowSecret: true)

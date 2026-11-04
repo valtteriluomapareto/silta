@@ -3,6 +3,9 @@ package enum ActorError: CodedError {
   /// The caller supplies a body-free retry command with safely quoted identifiers.
   case humanOnly(command: String, actor: ActorID)
 
+  /// A proposal policy gate; an add title follows options and the approval placeholder.
+  case proposalPolicy(command: String, actor: ActorID, title: String?)
+
   /// An unblock of tasks that aren't ready, each named with what it still waits on, so
   /// the agent can tell the human why.
   case notReady(command: String, actor: ActorID, waits: [Wait])
@@ -39,7 +42,7 @@ package enum ActorError: CodedError {
   /// Human intervention or corrected approval words are required.
   package var code: ErrorCode {
     switch self {
-    case .humanOnly, .notReady: .humanOnly
+    case .humanOnly, .notReady, .proposalPolicy: .humanOnly
     case .invalidApproval: .invalid
     }
   }
@@ -49,6 +52,10 @@ package enum ActorError: CodedError {
     switch self {
     case .humanOnly(_, let actor):
       return "This command needs the human's go-ahead; ask in chat. \(Self.detected(actor))"
+    case .proposalPolicy(_, let actor, _):
+      return
+        "Workspace proposals: ask requires the human's go-ahead before creating a proposed task; "
+        + "ask in chat. \(Self.detected(actor))"
     case .notReady(_, let actor, let waits):
       return waits.map(\.text).joined(separator: "; ")
         + "; unblocking needs the human's go-ahead, so ask in chat. "
@@ -63,6 +70,11 @@ package enum ActorError: CodedError {
     switch self {
     case .humanOnly(let command, _), .notReady(let command, _, _):
       [command + " --approved \"<the human's words>\""]
+    case .proposalPolicy(let command, _, let title):
+      [
+        command + " --approved \"<the human's words>\""
+          + (title.map { " -- " + shellWord($0) } ?? "")
+      ]
     case .invalidApproval: ["silta --help"]
     }
   }
