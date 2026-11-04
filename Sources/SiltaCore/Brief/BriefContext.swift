@@ -155,7 +155,8 @@ struct BriefContext {
       sql: """
         SELECT edge.*,source.slug AS source,target.slug AS target,service.slug AS service
         FROM edge JOIN app source ON source.id=edge.from_app_id
-        LEFT JOIN app target ON target.id=edge.to_app_id LEFT JOIN service ON service.id=edge.to_service_id
+        LEFT JOIN app target ON target.id=edge.to_app_id
+        LEFT JOIN service ON service.id=edge.to_service_id
         WHERE edge.from_app_id=? OR edge.to_app_id=?
         ORDER BY source.slug,target.slug,service.slug,edge.kind,edge.id
         """, arguments: [id, id])
