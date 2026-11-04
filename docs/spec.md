@@ -579,7 +579,12 @@ going until the list is empty or the human stops it.
   words>"`, with `next_by: human`; a human gets `silta task triage --accept <ref>`,
   with `next_by: agent`, since they run it themselves. An agent may
   drop its own proposal with a result; it cannot drop another actor's proposal.
-- Writes refuse another actor's fresh claim. An expired claim can be reclaimed with
+- Task mutations refuse another actor's fresh claim. Discussion posts are exempt:
+  another actor's discussion never refreshes the holder's heartbeat or task write
+  timestamp. A foreign holder's handoff is refused, with ordinary discussion as the
+  alternative. An unclaimed handoff records context and warns that no claim was
+  released. An owner's handoff releases only its own claim, preserving task status.
+  An expired claim can be reclaimed with
   `start`; each claim compares the complete actor, including session.
 
 **Plans:**
@@ -722,10 +727,21 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 | `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until answered. **Ask in chat first** when the human is there. |
 | `answer` | Reply to a question | The asker can `comment accept AC-12/5`, which resolves the thread |
 | `decision` | A choice and its reason | Shown in `brief`; `--from note:…` cites a meeting |
-| `handoff` | Where I stopped, what's next | Releases the claim. The newest one is shown first in `brief --task`. Template in `silta guide` |
+| `handoff` | Where I stopped, what's next | Releases the author's own claim, preserving status. The newest one is shown first in `brief --task`. Template in `silta guide` |
 
 - Threads: `--reply-to AC-12/3`. `comment resolve|reopen <ref>… [-m …]` takes several
   refs in one call.
+- Questions start threads. An answer requires an open, nondeleted question thread;
+  replying to a reply joins its root. Other replies also require an open,
+  nondeleted root in the same task and workspace.
+- Mentions use `@human:<name>`, `@agent:<tool>:<session>` or `@me` (D33); `--to`
+  accepts the same complete actors or `me`, and may be repeated. A question with no
+  recipients defaults to the detected human (`human:<USER>`), not the calling
+  agent. External parties belong to `task block`, never to `--to` (D35).
+- `task show` shows the newest handoff thread first and unresolved threads with
+  their replies, identifying answered versus resolved questions. Roots and replies
+  sort by creation time then id. Deleted content is a placeholder; an empty deleted
+  thread is omitted. `--timeline` includes full discussion alongside task events.
 - Comments are append-only: the author can soft-delete and post again. There is no
   edit history.
 - A body is at most 8 000 Unicode scalar values. Longer output is summarised, and the
@@ -1250,7 +1266,7 @@ silta task review AC-12 --verdict … [--subject] (-m|-F) [--lines <file|->]   [
 silta task request-review AC-12 --reviewer <actor>   [M2]
 
 # discussion
-silta comment <target> (-m|-F) [--kind question|answer|decision|handoff] [--reply-to <ref>] [--from note:…]   [M1]
+silta comment <target> (-m|-F) [--kind question|answer|decision|handoff] [--reply-to <ref>] [--to <actor>|me] [--from note:…]   [M1]
 silta comment resolve|reopen <ref>… [-m] | comment accept <ref> | comment delete <ref>   [M1]
 silta inbox [--for <actor>|me] [--all] | inbox take <id>   [M1; take M2]
 

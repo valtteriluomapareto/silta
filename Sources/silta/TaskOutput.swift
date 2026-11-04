@@ -32,6 +32,7 @@ enum TaskOutput {
     "branch": .optional(.string), "worktree": .optional(.string), "done_sha": .optional(.string),
     "done_branch": .optional(.string), "done_dirty": .optional(.bool),
     "links": linksShape,
+    "comments": .optional(.array(CommentOutput.shape)),
     "timeline": .optional(
       .array(
         .object([
@@ -68,7 +69,7 @@ enum TaskOutput {
     return lines
   }
 
-  static func detail(_ task: TaskDetails) -> String {
+  static func detail(_ task: TaskDetails, workspace: String) -> String {
     var lines = [summary(task), "Created by: \(task.createdBy)"]
     lines.append("Archived: \(task.archived ? "yes" : "no")")
     if let day = task.followUpAt { lines.append("Follow-up: " + day) }
@@ -83,6 +84,10 @@ enum TaskOutput {
     }
     if let sha = task.doneSHA { lines.append("Commit: \(sha)") }
     for link in task.links { lines.append("\(link.rel): \(link.target)") }
+    if let comments = task.comments {
+      lines.append("\nDiscussion:")
+      lines += comments.map { CommentOutput.detail($0, comments: comments, workspace: workspace) }
+    }
     for event in task.timeline ?? [] {
       lines.append(
         "\(event.at) \(event.actor) \(event.kind)" + (event.body.map { ": " + $0 } ?? ""))

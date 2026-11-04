@@ -77,12 +77,20 @@ struct ProposalPreviewRegressionTests {
     }
   }
 
-  @Test func unknownStoredProposalPolicyRefusesWithoutWrites() async throws {
+  @Test(arguments: [false, true])
+  func unknownStoredProposalPolicyRefusesWithoutWrites(dryRun: Bool) async throws {
     try await withScratchDirectory { home in
       let env = try ProposalPolicyTests.setup(home, policy: "future")
       let before = try ProposalPolicyTests.snapshot(env)
       do {
-        _ = try await TaskService(environment: env).add(TaskDraft(title: "Acme"), directory: home)
+        if dryRun {
+          var options = TaskImport()
+          options.dryRun = true
+          _ = try await TaskService(environment: env).fromPlan(
+            TaskImportTests.text, options: options, directory: home)
+        } else {
+          _ = try await TaskService(environment: env).add(TaskDraft(title: "Acme"), directory: home)
+        }
         Issue.record("unknown proposal policy accepted")
       } catch let error as WorkspaceError {
         #expect(error.code == .invalid)

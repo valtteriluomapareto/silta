@@ -14,6 +14,8 @@ package struct SiltaEnvironment: Sendable {
   package let db: DatabaseStore
   /// Attributes this command and enforces human-only policy.
   package let actor: ActorID
+  /// The human represented by @me, independently of the calling agent.
+  package let human: ActorID
   /// Warnings from assembling the environment, shown with the command's own.
   package let warnings: [OutputWarning]
   /// Records best-effort command diagnostics.
@@ -22,7 +24,8 @@ package struct SiltaEnvironment: Sendable {
   /// Assembles supplied seams without reading process globals or doing I/O.
   package init(
     clock: any Clock, ids: any IDGenerator, git: any GitRunner, home: SiltaHome, db: DatabaseStore,
-    log: any Log, actor: ActorID, warnings: [OutputWarning] = []
+    log: any Log, actor: ActorID, warnings: [OutputWarning] = [],
+    human: ActorID = .human(name: "unknown")
   ) {
     self.clock = clock
     self.ids = ids
@@ -31,6 +34,7 @@ package struct SiltaEnvironment: Sendable {
     self.db = db
     self.log = log
     self.actor = actor
+    self.human = human
     self.warnings = warnings
   }
 
@@ -68,12 +72,15 @@ package struct SiltaEnvironment: Sendable {
       environment: environment, terminal: .system(), git: git,
       directory: URL(filePath: FileManager.default.currentDirectoryPath))
     let deterministicTime = clock is IncrementingClock
+    let human = try ActorID.detect(
+      environment: ["USER": environment["USER"] ?? ""],
+      terminal: .init(stdin: true, stdout: true), session: "human")
     return SiltaEnvironment(
       clock: clock, ids: ids, git: git, home: home,
       db: DatabaseStore(
         home: home.url, clock: clock,
         jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) }),
       log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose), actor: actor,
-      warnings: warnings)
+      warnings: warnings, human: human)
   }
 }

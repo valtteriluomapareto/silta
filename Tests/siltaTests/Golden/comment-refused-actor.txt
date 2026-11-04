@@ -1,0 +1,2 @@
+error: Mentions and --to need me, human:<name> or agent:<tool>:<session>; external parties belong to task block. [invalid]
+next: silta --ws 'acme' comment --help

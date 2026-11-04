@@ -16,6 +16,12 @@ extension UsageError: ErrorExamples {
   }
 }
 
+extension CommentError: ErrorExamples {
+  static var examples: [CommentError] {
+    [.invalid("Use an actor mention."), .missing("AC-1/2"), .foreignHandoff("AC-1")]
+  }
+}
+
 extension InternalError: ErrorExamples {
   struct Sample: Error, CustomStringConvertible {
     var description = "index out of range"
@@ -156,6 +162,7 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
+    CommentError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
   ]
