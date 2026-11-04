@@ -481,7 +481,10 @@ symlinks resolved, case-folded on case-insensitive volumes.
 - Effective override changes are human-only and record an approval atomically.
   Repeating a set, or unsetting an absent override, needs no approval and writes no
   rows. Supplied `--approved` then warns `approval_unused`. Receipts distinguish
-  an actual change from `No override` or `Override already <app>`.
+  an actual change from `No override` or `Override already <app>`. Read-proven
+  no-ops bypass truth writes. If a concurrent change makes a planned mutation
+  redundant after its write opens, no decision, approval or change-log row changes;
+  normal daily-backup bookkeeping may still run.
   Approval retries preserve the workspace and canonical inspected directory.
 - A shallow clone can resolve through earlier rules. Distance inference without
   complete history returns `low`, reason `shallow`, and is never cached.
