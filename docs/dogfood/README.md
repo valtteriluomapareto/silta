@@ -97,6 +97,11 @@ What the script fixes:
   git links. If Codex added any setting outside `codex.*`, or changed a link, it exits
   70: don't run git in that worktree, because git would read that setting outside the
   sandbox. Inspect it, then delete the worktree and run `git worktree prune`.
+- **Interrupted git operations.** `packed-refs.lock` permission errors in Codex runs
+  are expected noise: the repository's common git dir is outside the sandbox. If a run
+  stops inside a cherry-pick, revert, merge, rebase or am, the script reports the
+  leftover markers on stderr and the `--quit` commands that clear them outside the
+  sandbox; run those before the next resume.
 - **Split slices.** When a slice ships in parts, Codex starts and submits the part's
   subtask, and `dogfood-finish.sh` runs on that subtask. A subtask links no issue, so
   the slice issue stays open until its own task is done.
