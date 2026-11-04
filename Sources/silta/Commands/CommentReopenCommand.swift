@@ -16,8 +16,7 @@ struct CommentReopenCommand: OutputCommand {
     let command =
       "silta --ws " + shellWord(workspace) + " comment reopen "
       + refs.map { shellWord(SecretGuard.redacted($0)) }.joined(separator: " ")
-    let explanation = try body.read(
-      actor: context.environment.actor, command: command, approved: global.approved)
+    let explanation = try body.readContent(command: command)
     let result = try TaskService(
       environment: context.environment, workspace: workspace,
       approved: global.approved, bodyFlag: body.flag

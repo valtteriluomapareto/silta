@@ -46,16 +46,21 @@ struct CommentLifecycleTests {
     }
   }
 
-  @Test(arguments: ["codex", "claude"])
+  @Test(arguments: ["codex", "claude", "human"])
   func foreignLifecyclePreservesClaimAndDeleteChecksWholeAuthor(tool: String) async throws {
     try await withScratchDirectory { home in
       let clock = FakeClock(now: TaskServiceTests.now)
       let env = try await CommentTests.setup(home, clock: clock)
       let owner = TaskService(environment: env)
       _ = try owner.comment("AC-1", CommentDraft(body: "Private finding"))
+      let actor: ActorID
+      if tool == "human" {
+        actor = try TaskServiceTests.human()
+      } else {
+        actor = .agent(tool: tool, session: "reviewer")
+      }
       let foreign = TaskService(
-        environment: try TaskServiceTests.environment(
-          home, actor: .agent(tool: tool, session: "reviewer"), clock: clock))
+        environment: try TaskServiceTests.environment(home, actor: actor, clock: clock))
       let before = try owner.show("AC-1")
       clock.advance(milliseconds: 1000)
       _ = try foreign.updateComments(["AC-1/1"], action: .resolve, explanation: "Reviewed")
@@ -190,6 +195,33 @@ extension CommentLifecycleTests {
           ["AC-1/1"], action: .resolve, explanation: String(repeating: "x", count: scalars))
       }
       #expect(try Self.snapshot(env) == before)
+    }
+  }
+}
+
+extension CommentLifecycleTests {
+  @Test func mixedStateBatchChangesOnlyTheOpenRoot() async throws {
+    try await withScratchDirectory { home in
+      let clock = FakeClock(now: TaskServiceTests.now)
+      let env = try await CommentTests.setup(home, clock: clock)
+      let service = TaskService(
+        environment: env, approved: "Keep Acme context", bodyFlag: "-m <text>")
+      var task = TaskDraft(title: "Acme second")
+      task.start = true
+      _ = try await service.add(task, directory: home)
+      for ref in ["AC-1", "AC-2"] { _ = try service.comment(ref, CommentDraft(body: "Finding")) }
+      _ = try service.updateComments(["AC-1/1"], action: .resolve)
+      let before = try service.show("AC-1", timeline: true)
+      clock.advance(milliseconds: 1000)
+      let result = try service.updateComments(
+        ["AC-1/1", "AC-2/1"], action: .resolve, explanation: "Pwd=" + "acme-value",
+        allowSecret: true)
+      #expect(result.created == ["AC-2/2"] && result.approvalUsed)
+      let after = try service.show("AC-1", timeline: true)
+      #expect(after.claimedAt == before.claimedAt && after.updatedAt == before.updatedAt)
+      #expect(after.comments?.count == 1 && after.timeline?.count == before.timeline?.count)
+      #expect(try service.show("AC-2").claimedAt == TaskService.timestamp(clock.now()))
+      #expect(try env.db.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
     }
   }
 }

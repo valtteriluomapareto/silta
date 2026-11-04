@@ -119,11 +119,9 @@ extension CommentLifecycleCommandTests {
       let result = try SiltaBinary.run(
         args + (placeholder ? ["--approved", "<the human's words>"] : []),
         in: scratch, environment: later)
-      withKnownIssue("#13: CLI no-ops request secret consent before reading state") {
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("\"created\":[]") && !result.stdout.contains("acme-value"))
-        #expect(result.stdout.contains("approval_unused") == placeholder)
-      }
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("\"created\":[]") && !result.stdout.contains("acme-value"))
+      #expect(result.stdout.contains("approval_unused") == placeholder)
       #expect(try snapshot() == before)
       let changed = try SiltaBinary.run(
         [
