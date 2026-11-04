@@ -14,8 +14,17 @@ struct ClockTests {
   @Test(arguments: ["2023-11-14T22:13:20.859Z", "2023-11-14T22:13:20.426Z"])
   func taskTimestampRoundsMilliseconds(raw: String) throws {
     let date = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(raw)
-    withKnownIssue("SI-22: The writer truncates the parsed millisecond") {
-      #expect(TaskService.timestamp(date) == raw)
+    #expect(TaskService.timestamp(date) == raw)
+  }
+
+  @Test(arguments: ["1970-01-01T00:00:00", "2023-11-14T22:13:20", "2100-01-01T00:00:00"])
+  func writerRoundTripsEveryMillisecond(base: String) throws {
+    let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    let start = try format.parse(base + ".000Z")
+    for millisecond in 0...999 {
+      let raw = base + String(format: ".%03dZ", millisecond)
+      let date = start.addingTimeInterval(Double(millisecond) / 1000)
+      #expect(utcTimestamp(date) == raw)
     }
   }
 

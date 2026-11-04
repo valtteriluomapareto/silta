@@ -29,21 +29,30 @@ func utcDay(_ date: Date) -> String {
   String(date.formatted(.iso8601).prefix(10))
 }
 
+/// Formats an instant as a canonical UTC timestamp, `YYYY-MM-DDTHH:MM:SS.mmmZ`.
+///
+/// Rounds to the nearest millisecond before formatting. `Date.ISO8601FormatStyle`
+/// truncates fractional seconds, which can write an accepted instant one
+/// millisecond low.
+func utcTimestamp(_ date: Date) -> String {
+  let milliseconds = Int64((date.timeIntervalSince1970 * 1000).rounded())
+  let seconds = Int64((Double(milliseconds) / 1000).rounded(.down))
+  let fraction = milliseconds - seconds * 1000
+  let formatter = ISO8601DateFormatter()
+  formatter.formatOptions = [.withInternetDateTime]
+  let whole = formatter.string(from: Date(timeIntervalSince1970: Double(seconds)))
+  return String(whole.dropLast()) + String(format: ".%03lldZ", fraction)
+}
+
 /// Parses a canonical UTC timestamp, `YYYY-MM-DDTHH:MM:SS.mmmZ`.
 ///
 /// ISO 8601 parsing alone is lenient: it accepts offsets, short fractions and
-/// out-of-range components. Formatting the instant back with `ISO8601DateFormatter`
-/// rejects everything that is not byte-for-byte canonical, while its fractional
-/// seconds survive the round trip. The returned instant comes from the format style
-/// the rest of the core uses to format timestamps.
+/// out-of-range components. A canonical timestamp is one that `utcTimestamp`
+/// writes back byte for byte.
 func utcInstant(_ raw: String) -> Date? {
-  let formatter = ISO8601DateFormatter()
-  formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-  guard let date = formatter.date(from: raw), formatter.string(from: date) == raw else {
-    return nil
-  }
   do {
-    return try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(raw)
+    let date = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(raw)
+    return utcTimestamp(date) == raw ? date : nil
   } catch {
     return nil
   }

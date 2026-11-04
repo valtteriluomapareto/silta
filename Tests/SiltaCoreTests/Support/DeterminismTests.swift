@@ -280,10 +280,8 @@ extension DeterminismTests {
           "SILTA_NOW": raw,
         ], userHome: scratch, temporaryRoots: [], deterministic: true)
       let next = try nextMillisecond(raw)
-      withKnownIssue("SI-22: The writer truncates the parsed millisecond") {
-        #expect(TaskService.timestamp(env.clock.now()) == raw)
-        #expect(TaskService.timestamp(env.clock.now()) == next)
-      }
+      #expect(utcTimestamp(env.clock.now()) == raw)
+      #expect(utcTimestamp(env.clock.now()) == next)
     }
   }
 
