@@ -150,6 +150,57 @@ extension TaskCommandTests {
 }
 
 extension TaskCommandTests {
+  /// The merger finishes a submitted task from the main checkout after the author's
+  /// worktree is gone (D41).
+  @Test func mergerFinishesWithShaAfterTheWorktreeIsRemoved() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = scratch.appending(path: "acme")
+      let git = URL(filePath: "/usr/bin/git")
+      #expect(
+        try SiltaBinary.runProcess(
+          URL(filePath: "/bin/bash"),
+          [
+            ScenarioRunner.repository.appending(path: "scripts/make-fixtures.sh").path,
+            fixtures.path,
+          ], in: scratch
+        ).termination == .exit(0))
+      #expect(
+        try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch).termination == .exit(0))
+      #expect(try SiltaBinary.run(["ws", "use", "acme"], in: scratch).termination == .exit(0))
+      let repo = fixtures.appending(path: "acme-platform", directoryHint: .isDirectory)
+      let tree = scratch.appending(path: "acme-feature", directoryHint: .isDirectory)
+      #expect(
+        try SiltaBinary.runProcess(
+          git, ["-C", repo.path, "worktree", "add", "-q", "-b", "acme-feature", tree.path],
+          in: scratch
+        ).termination == .exit(0))
+      #expect(
+        try SiltaBinary.run(
+          ["task", "add", "Acme app", "--app", "acme-platform-api", "--start"],
+          in: scratch, cwd: tree, environment: Self.actor
+        ).termination == .exit(0))
+      #expect(
+        try SiltaBinary.run(["task", "submit", "AC-1"], in: scratch, environment: Self.actor)
+          .termination == .exit(0))
+      #expect(
+        try SiltaBinary.runProcess(
+          git, ["-C", repo.path, "worktree", "remove", "--force", tree.path], in: scratch
+        ).termination == .exit(0))
+      let head = try SiltaBinary.runProcess(
+        git, ["-C", repo.path, "rev-parse", "HEAD"], in: scratch)
+      let sha = head.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+      let done = try SiltaBinary.run(
+        ["task", "done", "AC-1", "--sha", sha, "-m", "Merged."], in: scratch, cwd: repo,
+        environment: ["SILTA_ACTOR": "agent:claude:merger"])
+      #expect(done.termination == .exit(0))
+      let shown = try SiltaBinary.run(
+        ["task", "show", "AC-1", "--json"], in: scratch, environment: Self.actor)
+      #expect(shown.stdout.contains(#""done_sha":"\#(sha)""#))
+    }
+  }
+}
+
+extension TaskCommandTests {
   @Test func bodyFilesAndConflictingSourcesHaveExplicitFailures() throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)

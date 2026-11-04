@@ -64,6 +64,7 @@ struct TaskGitTests {
     try await withScratchDirectory { home in
       let repo = home.appending(path: "repo", directoryHint: .isDirectory)
       let work = home.appending(path: "worktree", directoryHint: .isDirectory)
+      try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
       let git = ScriptedGitRunner(
         script: Self.script(repo: repo, cwd: work, completion: false)
           + Self.script(repo: repo, cwd: work, completion: true, dirty: true, override: "release"))

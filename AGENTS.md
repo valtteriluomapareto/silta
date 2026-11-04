@@ -132,7 +132,7 @@ Update this line when a stage starts.
 | Stage | Plans and steps | Questions and handoffs | Session start |
 |---|---|---|---|
 | Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
-| DF0 | One task per slice. Find it by the issue's `url:` link in `silta --ws silta task ls --proposed --promoted --archived --json`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F - <<'EOF'`, tick with `task plan <ref> --step N --done`, finish with `task done <ref> -F - <<'EOF'` | Comment on the slice issue | `silta --ws silta task show <ref>` |
+| DF0 | One task per slice. Find it by the issue's `url:` link in `silta --ws silta task ls --proposed --promoted --archived --json`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F - <<'EOF'`, tick each step with `task plan <ref> --step N --done` as soon as it's done. Add subtasks before submitting. When the PR is open, end its description with the draft result and `Friction:` line, then `task submit <ref>`; never `done` before the merge | Comment on the slice issue | `silta --ws silta task show <ref>` |
 | DF1 | as DF0 | `silta comment <task> --kind question` / `--kind handoff` | as DF0 |
 | DF2 | as DF0 | as DF1 | The hook runs `silta brief` |
 
@@ -169,8 +169,12 @@ From DF0 on, every command runs as `silta --ws silta …`:
   proposal, so it counts toward the two proposals per session
   ([spec §11](docs/spec.md#silta-guide)); put anything
   beyond that in the `Friction:` line.
-- **Close the issue.** When a slice's task is done, post its result on the GitHub
-  issue and close the issue.
+- **Finish after the merge.** `task submit` releases the claim. Whoever merges the
+  slice's PR pulls `main`, then runs
+  `silta --ws silta task done <ref> --sha "$(gh pr view <n> --json mergeCommit -q .mergeCommit.oid)" -F - <<'EOF'`
+  from the main checkout, with the PR's draft result and its `Friction:` line. Then
+  they post the result on the GitHub issue and close it. Review findings go back to
+  the author, who runs `task start <ref>` again (D41).
 
 ## Parallel agents and worktrees
 

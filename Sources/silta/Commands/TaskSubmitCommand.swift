@@ -3,7 +3,7 @@ import SiltaCore
 
 struct TaskSubmitCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "submit", abstract: "Submit doing work for review and refresh its claim.")
+    commandName: "submit", abstract: "Submit doing work for review and release its claim.")
 
   static let dataShape = TaskOutput.receiptShape
 
