@@ -169,6 +169,8 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
 - **Task**: a backlog item with plan, result, comments and links.
 - **Comment**: a post on a task or a doc revision. Its kind is one of `comment`,
   `question`, `answer`, `decision` or `handoff`. Threads can be resolved.
+  The asker or current task claimer may accept an answer; acceptance resolves the
+  thread and records the accepting actor.
 - **Review** (M2): a comment with a verdict on a subject (the task's diff, a plan
   revision, or a doc revision), with line comments.
 - **Doc** (M2): a versioned markdown document owned by `silta`.
@@ -733,7 +735,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 |---|---|---|
 | `comment` | General notes | — |
 | `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until a live answer exists or the root is explicitly resolved. **Ask in chat first** when the human is there. |
-| `answer` | Reply to a question | The asker can `comment accept AC-12/5`, which resolves the thread |
+| `answer` | Reply to a question | The asker or current task claimer can `comment accept AC-12/5`, which resolves the thread |
 | `decision` | A choice and its reason | Shown in `brief`; `--from note:…` cites a meeting |
 | `handoff` | Where I stopped, what's next | Releases the author's own claim, preserving status. The newest one is shown first in `brief --task`. Template in `silta guide` |
 
@@ -750,9 +752,10 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - Questions and handoffs are roots. Answers require a live unresolved question;
   comment/decision replies require a live unresolved root. A deleted immediate
   target or root cannot receive public replies. Cross-task/workspace replies refuse.
-- Accept requires the question's exact asker actor/session and a live answer/root.
+- Accept requires the question's exact asker actor/session or current task claimer,
+  and a live answer/root.
   It sets the answer's `accepted` flag and the root's `resolved_at`/`resolved_by`
-  to the asker, recording `accepted <answer-ref>` in the attributed discussion event.
+  to the accepter, recording `accepted <answer-ref>` in the attributed discussion event.
   Repeating that same live acceptance writes nothing. A manually resolved question
   or a different answer selection requires reopen first; deleted posts refuse.
   JSON always includes `accepted`; text identifies accepted answers distinctly.

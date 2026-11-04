@@ -1,1 +1,1 @@
-{"error":{"code":"conflict","message":"Only asker agent:codex:acme can accept an answer; current actor is agent:codex:answerer.","next":["silta --ws 'acme' task show 'AC-1' --timeline"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"Only asker agent:codex:acme or the current task claimer can accept an answer; current actor is agent:codex:answerer.","next":["silta --ws 'acme' comment resolve 'AC-1/1' -m \"<why>\"","silta --ws 'acme' task show 'AC-1' --timeline"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

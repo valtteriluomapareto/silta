@@ -26,7 +26,7 @@ extension TaskService {
     return root["id"]
   }
 
-  /// Selects a live answer as the exact question asker and resolves its thread.
+  /// Selects a live answer as the question asker or current task claimer and resolves its thread.
   /// Repeating the selected live acceptance writes nothing; reopen enables a new selection.
   package func acceptComment(_ ref: String) throws -> CommentMutationResult {
     let workspace = try selected(), at = environment.clock.now()
@@ -37,9 +37,13 @@ extension TaskService {
       guard answer["kind"] as String == "answer", answer["thread_id"] as Int64? != nil,
         root["kind"] as String == "question"
       else { throw CommentError.invalid("Accept an answer ref such as AC-1/2.") }
-      guard root["actor"] as String == environment.actor.description else {
+      guard
+        root["actor"] as String == environment.actor.description
+          || task.claimedBy == environment.actor.description
+      else {
         throw CommentError.wrongAsker(
-          asker: root["actor"], actor: environment.actor.description, task: task.ref)
+          asker: root["actor"], actor: environment.actor.description, task: task.ref,
+          root: root["resolved_at"] as String? == nil ? "\(task.ref)/\(root["seq"] as Int)" : nil)
       }
       try Self.liveThread(answer, root: root, task: task, allowResolved: true)
       let answerRef = "\(task.ref)/\(answer["seq"] as Int)"

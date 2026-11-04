@@ -104,8 +104,12 @@ struct CommentQuestionTests {
         environment: try TaskServiceTests.environment(home, actor: askerActor, clock: clock))
       _ = try Self.post(asker, kind: "question")
       _ = try Self.post(holder, kind: "answer", reply: "AC-1/1")
+      let outsider = TaskService(
+        environment: try TaskServiceTests.environment(
+          home, actor: .agent(tool: tool == "human" ? "codex" : tool, session: "outsider"),
+          clock: clock))
       let before = try holder.show("AC-1"), stable = try CommentLifecycleTests.snapshot(env)
-      #expect(throws: CommentError.self) { _ = try holder.acceptComment("AC-1/2") }
+      #expect(throws: CommentError.self) { _ = try outsider.acceptComment("AC-1/2") }
       #expect(try CommentLifecycleTests.snapshot(env) == stable)
       clock.advance(milliseconds: 1000)
       let result = try asker.acceptComment("task:AC-1/2")
@@ -122,7 +126,7 @@ struct CommentQuestionTests {
       clock.advance(milliseconds: 1000)
       #expect(try asker.acceptComment("AC-1/2").unchanged == ["AC-1/2"])
       #expect(try CommentLifecycleTests.snapshot(env) == accepted)
-      #expect(throws: CommentError.self) { _ = try holder.acceptComment("AC-1/2") }
+      #expect(throws: CommentError.self) { _ = try outsider.acceptComment("AC-1/2") }
       _ = try holder.updateComments(["AC-1/2"], action: .delete)
       #expect(try holder.show("AC-1", timeline: true).timeline?.last?.body == "accepted AC-1/2")
       #expect(throws: CommentError.self) { _ = try asker.acceptComment("AC-1/2") }

@@ -4,7 +4,7 @@ import SiltaCore
 struct CommentAcceptCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "accept",
-    abstract: "Accept an answer as its question's asker and resolve the thread.")
+    abstract: "Accept an answer as the asker or current claimer and resolve the thread.")
   static let dataShape = CommentOutput.mutationShape
   static let workspaceSource = WorkspaceSource.option
 

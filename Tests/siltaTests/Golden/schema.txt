@@ -32,7 +32,7 @@ silta comment  Post task discussion; a claimer's handoff releases its claim.
 silta comment resolve  Resolve discussion threads atomically.
 silta comment reopen  Reopen discussion threads atomically.
 silta comment delete  Soft-delete your own post, retaining its ref and thread.
-silta comment accept  Accept an answer as its question's asker and resolve the thread.
+silta comment accept  Accept an answer as the asker or current claimer and resolve the thread.
 silta brief  Read budgeted local context for the current task.
 details: silta schema <command>
 
