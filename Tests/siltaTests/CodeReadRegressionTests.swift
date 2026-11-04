@@ -183,34 +183,28 @@ extension CodeCommandTests {
       try Data("hit a\n".utf8).write(to: repo.appending(path: ":dir/a.txt"))
       try Data("hit b\n".utf8).write(to: repo.appending(path: "dir/b.txt"))
       try commitAll(repo, scratch)
-      withKnownIssue("a leading colon in the subpath becomes pathspec magic") {
-        let grep = try SiltaBinary.run(
-          ["code", "grep", "colon@HEAD", "hit", "--json"], in: scratch)
-        #expect(try envelope(grep.stdout)["output"] as? String == "a.txt:1:hit a\n")
-      }
+      let grep = try SiltaBinary.run(
+        ["code", "grep", "colon@HEAD", "hit", "--json"], in: scratch)
+      #expect(try envelope(grep.stdout)["output"] as? String == "a.txt:1:hit a\n")
     }
   }
 
   @Test func showingTheAppRootNamesADirectory() throws {
     try withScratchDirectory { scratch in
       _ = try setup(scratch)
-      withKnownIssue("show of the repo root asks the human to fetch") {
-        for path in [".", ""] {
-          let root = try SiltaBinary.run(
-            ["code", "show", "portal", path, "--json"], in: scratch)
-          #expect(root.termination == .exit(2))
-          #expect(root.stdout.contains("is a directory"))
-          #expect(
-            root.stdout.contains(
-              "\"silta --ws 'acme' code ls 'portal@origin/portal' '\(path)'\""))
-        }
+      for path in [".", ""] {
+        let root = try SiltaBinary.run(
+          ["code", "show", "portal", path, "--json"], in: scratch)
+        #expect(root.termination == .exit(2))
+        #expect(root.stdout.contains("is a directory"))
+        #expect(
+          root.stdout.contains(
+            "\"silta --ws 'acme' code ls 'portal@origin/portal' '\(path)'\""))
       }
-      withKnownIssue("show doesn't name a missing subpath") {
-        let missing = try SiltaBinary.run(
-          ["code", "show", "console@origin/portal", "README.md", "--json"], in: scratch)
-        #expect(missing.termination == .exit(2))
-        #expect(missing.stdout.contains("App subpath \\\"apps/console\\\" not found"))
-      }
+      let missing = try SiltaBinary.run(
+        ["code", "show", "console@origin/portal", "README.md", "--json"], in: scratch)
+      #expect(missing.termination == .exit(2))
+      #expect(missing.stdout.contains("App subpath \\\"apps/console\\\" not found"))
     }
   }
 }

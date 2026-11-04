@@ -127,11 +127,7 @@ package struct CodeService {
     case .list where !path.isEmpty: expected = "tree"
     default: return
     }
-    let result = try await run(
-      ["--literal-pathspecs", "ls-tree", "-z", sha, "--", path], selection, operation)
-    guard result.termination == .exit(0) else { throw failure(selection) }
-    let found = CodeRead.text(result.stdout)
-      .split(separator: " ", maxSplits: 2).dropFirst().first
+    let found = try await kind(of: path, sha: sha, selection: selection, operation: operation)
     guard found != expected else { return }
     let shown = operation.path.debugDescription
     let other = { (read: CodeRead) in
@@ -147,7 +143,11 @@ package struct CodeService {
         "Path \(shown) is a file at the selected commit.",
         next: [other(.show(operation.path, lines: nil))])
     default:
-      guard CodeRead.normalized(operation.path).isEmpty else {
+      let subpath = CodeRead.normalized(selection.subpath)
+      guard !subpath.isEmpty,
+        try await kind(of: subpath, sha: sha, selection: selection, operation: operation)
+          != "tree"
+      else {
         throw CodeError.notFound(
           "Path \(shown) not found at selected commit.", next: [other(.list(nil))])
       }
@@ -155,6 +155,18 @@ package struct CodeService {
         "App subpath \(selection.subpath.debugDescription) not found at selected commit.",
         next: ["silta --ws \(shellWord(workspace)) ws show"])
     }
+  }
+
+  /// The object type (`blob`, `tree`, …) at a literal repo path, nil when absent; the
+  /// repo root is a tree.
+  private func kind(
+    of path: String, sha: String, selection: Selection, operation: CodeRead
+  ) async throws -> Substring? {
+    guard !path.isEmpty else { return "tree" }
+    let result = try await run(
+      ["--literal-pathspecs", "ls-tree", "-z", sha, "--", path], selection, operation)
+    guard result.termination == .exit(0) else { throw failure(selection) }
+    return CodeRead.text(result.stdout).split(separator: " ", maxSplits: 2).dropFirst().first
   }
 
   private func decodeSHA(_ bytes: Data, _ selection: Selection) throws -> String {

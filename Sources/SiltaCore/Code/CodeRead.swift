@@ -178,12 +178,14 @@ package enum CodeRead: Sendable {
     String(decoding: bytes, as: UTF8.self)
   }
 
-  /// Escapes the configured subpath so its wildcard characters match only themselves.
-  /// An escaped pathspec matches as a wildcard, not as a directory prefix, so a directory
-  /// also needs its own `/*`.
+  /// Escapes the configured subpath so its wildcard characters, and a leading `:` that
+  /// would start pathspec magic, match only themselves. An escaped pathspec matches as a
+  /// wildcard, not as a directory prefix, so a directory also needs its own `/*`.
   private static func pathspecs(subpath: String, user: String) -> [String] {
     guard !subpath.isEmpty else { return [user.isEmpty ? "." : user] }
-    let literal = subpath.map { "*?[\\".contains($0) ? "\\" + String($0) : String($0) }.joined()
+    let literal =
+      (subpath.hasPrefix(":") ? "\\" : "")
+      + subpath.map { "*?[\\".contains($0) ? "\\" + String($0) : String($0) }.joined()
     return user.isEmpty
       ? [literal + "/*"] : [literal + "/" + user, literal + "/" + user + "/*"]
   }
