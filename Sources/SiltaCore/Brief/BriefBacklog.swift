@@ -12,7 +12,6 @@ struct BriefBacklog {
   func sections(topics requested: [String]) throws -> [BriefSection] {
     let workspace = try TaskService.workspaceID(location.workspace, in: db)
     let visibility = TaskVisibility(actor: actor, at: date, days: archiveDays)
-    try visibility.validateDates(workspace: workspace, in: db)
     var arguments = visibility.arguments
     arguments += ["workspace": workspace, "app": location.app]
     let explicit = try Set(requested.map { try topicID($0, workspace: workspace) })
@@ -28,6 +27,9 @@ struct BriefBacklog {
     let topics = explicit.union(inferred)
     let aliases = try topicRows(topics, workspace: workspace)
     let scope = "(app.slug=:app OR \(topicMatch(topics)))"
+    try TaskVisibility.validateDates(
+      scope: "task.workspace_id=:workspace AND \(scope)",
+      arguments: arguments, in: db)
     let base = """
       FROM task LEFT JOIN app ON app.id=task.app_id
       WHERE task.workspace_id=:workspace AND \(TaskVisibility.sql) AND \(scope)

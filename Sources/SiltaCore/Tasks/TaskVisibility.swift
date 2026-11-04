@@ -6,13 +6,15 @@ struct TaskVisibility {
   static let archiveSQL = """
     CASE WHEN task.archive_override IS NOT NULL THEN task.archive_override='archived'
     WHEN task.status NOT IN ('done','dropped') OR task.closed_at IS NULL THEN 0
-    WHEN julianday(task.closed_at) IS NULL THEN -1
+    WHEN task.closed_at NOT LIKE '%T%' OR julianday(task.closed_at) IS NULL THEN -1
     ELSE julianday(task.closed_at)<julianday(:archive_cutoff) END
     """
-  static let sql = """
+  static let localSQL = """
     (task.status<>'proposed' OR :all_proposals OR task.created_by=:viewer)
     AND (task.external_ref IS NULL OR :promoted)
-    AND (:archived OR (\(archiveSQL))=0)
+    """
+  static let sql = """
+    \(localSQL) AND (:archived OR (\(archiveSQL))=0)
     """
 
   let arguments: StatementArguments
@@ -28,15 +30,13 @@ struct TaskVisibility {
     ]
   }
 
-  func validateDates(workspace: Int64, in db: Database) throws {
-    var values = arguments
-    values += ["workspace": workspace]
+  static func validateDates(scope: String, arguments: StatementArguments, in db: Database) throws {
     if try Bool.fetchOne(
       db,
       sql: """
-        SELECT EXISTS(SELECT 1 FROM task WHERE task.workspace_id=:workspace
-          AND (task.external_ref IS NULL OR :promoted) AND (\(Self.archiveSQL))=-1)
-        """, arguments: values) == true
+        SELECT EXISTS(SELECT 1 FROM task LEFT JOIN app ON app.id=task.app_id
+          WHERE \(scope) AND \(localSQL) AND (\(archiveSQL))=-1)
+        """, arguments: arguments) == true
     {
       throw StorageError.unavailable
     }
