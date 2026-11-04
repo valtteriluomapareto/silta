@@ -72,7 +72,9 @@ final class HookWatchdog: @unchecked Sendable {
 
   func finish(_ entry: LogEntry) {
     var entry = entry
-    if state.withLock({ $0.timedOut }) { entry.warnings.append("hook_timeout") }
+    if state.withLock({ $0.timedOut }), !entry.warnings.contains("hook_timeout") {
+      entry.warnings.append("hook_timeout")
+    }
     let directory = state.withLock {
       $0.record.map { URL(filePath: $0.path).deletingLastPathComponent() }
     }

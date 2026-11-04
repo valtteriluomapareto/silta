@@ -2,6 +2,7 @@
 package struct BriefSection: Encodable, Equatable, Sendable {
   enum TrimPolicy: Equatable, Sendable {
     case atomic, characters
+    case excerpt(marker: String)
     case plan(ref: String, total: Int)
   }
   /// Stable section name.
@@ -11,6 +12,7 @@ package struct BriefSection: Encodable, Equatable, Sendable {
   var policy: TrimPolicy = .atomic
 
   var beforeTask = false
+  var truncated = false
 
   enum CodingKeys: String, CodingKey { case id, text }
 }

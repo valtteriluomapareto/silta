@@ -16,14 +16,3 @@ extension WorkspaceSettings.ReviewGate {
     }
   }
 }
-
-extension WorkspaceSettings.CodingKeys {
-  func gloss(in settings: WorkspaceSettings) throws -> String {
-    switch self {
-    case .proposals: try settings.proposals.gloss
-    case .reviewGate: try settings.reviewGate.gloss
-    case .archiveAfterDays: "days before closed tasks archive"
-    case .staleDays: "days before docs are stale"
-    }
-  }
-}

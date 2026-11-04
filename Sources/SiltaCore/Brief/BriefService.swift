@@ -100,14 +100,20 @@ package struct BriefService {
       }
     }
     if let current, !current.description.isEmpty {
-      sections.append(
-        BriefSection(
-          id: "description",
-          text: "description:\n"
-            + SecretGuard.redacted(current.description).trimmingCharacters(
-              in: .whitespacesAndNewlines) + "\n", policy: .characters))
+      sections.append(description(current, command: command))
     }
     return sections
+  }
+
+  private func description(_ current: TaskDetails, command: String) -> BriefSection {
+    let marker = "(description trimmed; \(command) task show \(current.ref))\n"
+    let text =
+      "description:\n"
+      + SecretGuard.redacted(current.description)
+      .trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+    let section = BriefSection(id: "description", text: text, policy: .excerpt(marker: marker))
+    return BriefBudget.trim([section], characters: 600).sections.first
+      ?? BriefSection(id: "description", text: marker, truncated: true)
   }
 
 }

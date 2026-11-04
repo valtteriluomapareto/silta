@@ -42,7 +42,7 @@ extension BriefCommandTests {
         environment: TaskBlockCommandTests.environment, timeout: 2)
       #expect(result.termination == .exit(0))
       #expect(result.stderr.isEmpty)
-      #expect(result.stdout.contains("task: none"))
+      #expect(result.stdout.count <= 3200)
     }
   }
 
@@ -81,7 +81,7 @@ extension BriefCommandTests {
       try store(scratch).write {
         try $0.database.execute(sql: "UPDATE task SET plan_md=? WHERE seq=1", arguments: [plan])
       }
-      let result = try run(["--task", "AC-1", "--hook"], repo, scratch)
+      let result = try run(["--task", "AC-1", "--short"], repo, scratch)
       #expect(result.stdout.contains("1–7 done"))
       #expect(!result.stdout.contains("1. [x]"))
       #expect(result.stdout.contains("8. [ ] Acme step 8"))

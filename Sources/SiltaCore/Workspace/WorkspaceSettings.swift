@@ -92,6 +92,9 @@ struct WorkspaceSettings: Sendable {
       return Dictionary(
         object.map { key, value in
           let safeKey = SecretGuard.redacted(key)
+          if ["secret", "api_token"].contains(key.lowercased()) {
+            return (safeKey, "[REDACTED:credential]" as Any)
+          }
           let context = key + "=" + (value as? String ?? "stored-value")
           let valueStart = context.index(context.startIndex, offsetBy: key.count + 1)
           if let match = SecretGuard.matches(in: context).first(where: {

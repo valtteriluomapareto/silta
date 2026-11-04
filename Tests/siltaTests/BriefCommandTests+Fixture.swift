@@ -9,6 +9,15 @@ extension BriefCommandTests {
       .replacingOccurrences(of: repo.path.lowercased(), with: "<repo>")
   }
 
+  func hookTimedOut(_ scratch: URL) throws -> Bool {
+    let directory = scratch.appending(path: "silta-home/log")
+    let files = try FileManager.default.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: nil)
+    return try files.filter { $0.pathExtension == "jsonl" }.contains {
+      try String(contentsOf: $0, encoding: .utf8).contains("\"hook_timeout\"")
+    }
+  }
+
   func seedTasks(_ store: DatabaseStore) throws {
     try store.write { tx in
       for (seq, app, actor, branch, status) in [

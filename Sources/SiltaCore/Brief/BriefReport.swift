@@ -34,6 +34,7 @@ package struct BriefReport: Encodable, Sendable {
   }
 
   mutating func trim(tokens: Int) {
+    truncated = sections.contains { $0.truncated }
     let available = max(0, BriefBudget.characters(tokens: tokens) - floor.count - footer.count)
     guard sections.map(\.text.count).reduce(0, +) > available else { return }
     let plan = sections.first { if case .plan = $0.policy { true } else { false } }

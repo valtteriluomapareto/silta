@@ -37,3 +37,20 @@ struct BriefHookGitRunnerTests {
     #expect(notifications.withLock { $0 } == 1)
   }
 }
+
+extension BriefHookGitRunnerTests {
+  @Test(arguments: [false, true], [Int32(0), 2])
+  func processExpiryNotifies(_ expired: Bool, _ exitCode: Int32) {
+    let original = LogEntry(
+      timestamp: Date(timeIntervalSince1970: 1_700_000_000),
+      command: "silta brief", actor: "agent:codex:acme", exitCode: 0, milliseconds: 1499)
+    let output = Rendered(
+      stdout: "Acme context", stderr: "warning", exitCode: exitCode, errorCode: nil)
+    let completed = BriefHookCompletion(rendered: output, entry: original, expired: expired)
+    #expect(completed.entry.warnings.contains("hook_timeout") == expired)
+    #expect(completed.entry.exitCode == 0)
+    #expect(completed.rendered.exitCode == 0)
+    #expect(completed.rendered.stderr.isEmpty)
+    #expect(completed.rendered.stdout == (expired || exitCode != 0 ? "" : "Acme context"))
+  }
+}

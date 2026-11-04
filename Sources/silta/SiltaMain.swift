@@ -48,9 +48,8 @@ enum SiltaMain {
       let timestamp = environment.clock.now()
       let execution = await execute(
         arguments, context: CommandContext(mode: mode, environment: environment))
-      var rendered = execution.rendered
-      let elapsed = started.duration(to: timer.now).components
-      let milliseconds = Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
+      let rendered = execution.rendered
+      let milliseconds = elapsedMilliseconds(started.duration(to: timer.now))
       var entry = LogEntry(
         timestamp: timestamp, command: commandPath(arguments),
         actor: environment.actor.description, exitCode: hookDeadline == nil ? rendered.exitCode : 0,
@@ -61,14 +60,16 @@ enum SiltaMain {
       entry.warnings = rendered.warningCodes
       entry.flags = logFlags(flags)
       let expired = hookDeadline.map { ContinuousClock().now >= $0 } ?? false
-      if expired { watchdog?.timedOut() }
-      if let watchdog { watchdog.finish(entry) } else { environment.log.record(entry) }
-      if hookDeadline != nil,
-        rendered.exitCode != 0 || expired
-      {
-        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+      if hookDeadline != nil {
+        let completion = BriefHookCompletion(rendered: rendered, entry: entry, expired: expired)
+        if let watchdog {
+          watchdog.finish(completion.entry)
+        } else {
+          environment.log.record(completion.entry)
+        }
+        return completion.rendered
       }
-      if hookDeadline != nil { rendered.stderr = "" }
+      environment.log.record(entry)
       return rendered
     } catch {
       if hookDeadline != nil {
@@ -77,6 +78,11 @@ enum SiltaMain {
       if let informational = informationalResult(arguments, mode: mode) { return informational }
       return OutputRouter.render(.failure(error), mode: mode)
     }
+  }
+
+  private static func elapsedMilliseconds(_ duration: Duration) -> Int {
+    let elapsed = duration.components
+    return Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
   }
 
   private static func logFlags(_ flags: Set<String>) -> [String] {

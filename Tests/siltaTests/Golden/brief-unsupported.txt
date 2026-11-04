@@ -1,6 +1,7 @@
 acme / platform / api [high: exact_ref]
 branch: api
 settings: proposals: ask (ask in chat before adding a task)
+settings unsupported: review_gate, archive_after_days (ask the human)
 task: none
 app: api
 AGENTS.md: <repo>/AGENTS.md

@@ -92,6 +92,7 @@ extension BriefCommandTests {
       #expect(text.contains("First result"))
       #expect(!text.contains("Second result"))
       #expect(text.contains(String(repeating: "a", count: 12)))
+      #expect(!text.contains(String(repeating: "a", count: 13)))
       try settings("{\"archive_after_days\":null,\"proposals\":\"ask\"}", scratch)
       let tolerant = try run(["--app", "api", "--json"], repo, scratch)
       #expect(tolerant.termination == .exit(0))

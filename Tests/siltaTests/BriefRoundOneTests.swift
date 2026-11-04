@@ -13,15 +13,17 @@ extension BriefCommandTests {
           sql: "UPDATE task SET description_md=? WHERE seq=2",
           arguments: [String(repeating: "Acme description ", count: 800)])
       }
+      let data = try fixture.data(run(["--task", "AC-2", "--app", "api", "--json"], repo, scratch))
+      #expect(data["truncated"] as? Bool == true)
+      let sections = try #require(data["sections"] as? [[String: String]])
+      #expect(sections.first { $0["id"] == "description" }?["text"]?.count ?? 0 <= 600)
       for mode in [[], ["--short"]] {
         let result = try run(["--task", "AC-2", "--app", "api"] + mode, repo, scratch)
-        withKnownIssue("#16: Long description must preserve rich context") {
-          #expect(result.stdout.contains("app: api\n"))
-          #expect(result.stdout.contains("AGENTS.md:"))
-          #expect(result.stdout.contains("neighbour:"))
-          #expect(result.stdout.contains("open: AC-1"))
-          #expect(result.stdout.contains("description trimmed; silta --ws 'acme' task show AC-2"))
-        }
+        #expect(result.stdout.contains("app: api\n"))
+        #expect(result.stdout.contains("AGENTS.md:"))
+        #expect(result.stdout.contains("neighbour:"))
+        #expect(result.stdout.contains("open: AC-1"))
+        #expect(result.stdout.contains("description trimmed; silta --ws 'acme' task show AC-2"))
       }
     }
   }
@@ -42,7 +44,7 @@ extension BriefCommandTests {
       }
       let result = try run(["--app", "api", "--topic", "PAYMENTS"], repo, scratch)
       #expect(result.stdout.contains("open: AC-100"))
-      #expect(result.stdout.contains("more open;"))
+      #expect(result.stdout.contains("7 more open;"))
       #expect(result.stdout.contains("task ls --app 'api'"))
       #expect(result.stdout.contains("task ls --topic 'billing'"))
     }
@@ -57,12 +59,10 @@ extension BriefCommandTests {
           + "\"review_gate\":\""
           + String(repeating: "x", count: 400) + "\"}", scratch)
       let result = try run([], repo, scratch)
-      withKnownIssue("#16: Unsupported settings need a bounded visible human hint") {
-        #expect(result.stdout.contains("settings unsupported: proposals"))
-        #expect(result.stdout.contains("ask the human"))
-        #expect(!result.stderr.contains("acme-hidden"))
-        #expect(result.stderr.split(separator: "\n").allSatisfy { $0.count < 340 })
-      }
+      #expect(result.stdout.contains("settings unsupported: proposals"))
+      #expect(result.stdout.contains("ask the human"))
+      #expect(!result.stderr.contains("acme-hidden"))
+      #expect(result.stderr.split(separator: "\n").allSatisfy { $0.count < 340 })
     }
   }
 
@@ -184,10 +184,8 @@ extension BriefCommandTests {
       let description = try run(
         ["--task", "AC-2", "--app", "api", "--budget", "200"], repo, scratch)
       #expect(description.stdout.contains("description:\nAcmeDescriptionPrefix"))
-      withKnownIssue("#16: Description recovery must survive partial global trimming") {
-        #expect(
-          description.stdout.contains("(description trimmed; silta --ws 'acme' task show AC-2)"))
-      }
+      #expect(
+        description.stdout.contains("(description trimmed; silta --ws 'acme' task show AC-2)"))
       try store(scratch).write {
         try $0.database.execute(sql: "UPDATE task SET description_md='' WHERE seq=2")
         try $0.database.execute(

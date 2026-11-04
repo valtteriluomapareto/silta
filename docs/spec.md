@@ -1074,26 +1074,33 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
       represented original step and total, including completed summaries. The count
       is replaced by “no steps shown (60 total)” when no step fits; freeform plans
       retain their text and use a marker without counts.
-   4. the task description, trimmed after the plan
+   4. the task description, trimmed after the plan to at most 600 characters,
+      including a complete `task show` marker. Global trimming keeps that marker
+      whole whenever a partial description is displayed. Local capping marks the
+      report truncated and leaves later app context eligible.
    5. (M2) review state and unresolved `changes` threads with their snippets
 3. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
-   the resolved worktree's repo root, including for subpath apps. The pointer does not
+   the resolved worktree's repo root with its on-disk casing, including for subpath apps. The pointer does not
    claim the file exists.
 4. **Neighbours**: edges in and out, ordered by source app, target app, target
    service, kind and edge id. Configured code references produce complete, quoted
    `silta code show …` commands, including ref and line selection. With no usable
-   code references, offer `silta code ls` on the other app; service edges use their
-   source app because a service has no code tree.
+   code references, offer `silta code ls` on the other app. Service edges omit a
+   redundant directory command for the current app. Repeated code commands appear
+   only once; valid references survive unsupported elements in the same list.
 5. **Open tasks** for this app and its topics (top 8), ordered by priority then
-   task sequence ascending. Open statuses are todo, doing, review, blocked and visible
+   task sequence ascending, after explicit-topic matches, which rank first. When
+   the selection exceeds eight, an omitted count includes complete `task ls` commands
+   for the app and canonical selected topics. Open statuses are todo, doing, review, blocked and visible
    proposals (the caller's proposals, or all for a human). Promoted and archived tasks
    are omitted. Topics come from `about` links on visible, unarchived, unpromoted
    tasks assigned to this app. Repeatable `--topic` adds topic slugs or normalized
    aliases. Their matching tasks may belong to other apps; duplicates appear once,
    and topics do not expand recursively. An unknown topic returns `not_found` with
    a workspace-qualified `ws show` command. The current task may also appear here.
-6. **Recently done**: the first line of each result, with `done_sha`, for the last 5
+6. **Recently done**: the first line of each result, with the first 12 characters of `done_sha` when set, for the last 5
    matching tasks, ordered by completion instant then task sequence descending.
+   Empty result text is omitted. Cross-app open rows name their app.
    Promoted and archived tasks are omitted. Brief alone uses the default 14-day
    archive threshold if the stored archive setting is unsupported, with a warning.
 7. **Decisions**: `decision` comments, plus decisions from meeting notes from M3.
@@ -1120,7 +1127,9 @@ JSON contains compact `location` metadata, `settings`, optional `current_task`, 
 Absent location app and branch values encode as `null`. Settings contains only
 supported non-default typed keys (`proposals`, `review_gate`, `archive_after_days`,
 `stale_days`). Unsupported keys or values are omitted and produce a per-key
-`setting_unsupported` warning with the secret-masked raw value. A malformed settings
+`setting_unsupported` warning with a secret-masked preview of at most 160 characters
+plus an ellipsis. Text includes a protected “settings unsupported” hint naming at
+most eight keys (40 characters each) and asking the human; further keys are counted. A malformed settings
 document produces an empty settings object and a warning. This tolerant read does
 not relax write-policy validation.
 

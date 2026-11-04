@@ -34,7 +34,7 @@ extension BriefReportTests {
       candidates: [])
     for budget in 60...120 {
       let plan = BriefPlan.section(
-        "- [ ] first\n- [ ] " + String(repeating: "long ", count: 80), ref: "AC-1", revision: 0)
+        (1...60).map { "- [ ] Acme step \($0)" }.joined(separator: "\n"), ref: "AC-1", revision: 0)
       var report = BriefReport(
         location: BriefLocation(location),
         settings: BriefSettings(
