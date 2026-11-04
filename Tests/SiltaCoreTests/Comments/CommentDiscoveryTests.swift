@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 @testable import SiltaCore
 import SiltaTestSupport
 import Testing
@@ -8,17 +7,14 @@ struct CommentDiscoveryTests {
   @Test func olderHandoffRepliesRemainDiscoverable() async throws {
     try await withScratchDirectory { home in
       let env = try await CommentTests.setup(home)
-      try env.db.write { tx in
-        try tx.database.execute(
-          sql: """
-            INSERT INTO comment(id,uid,task_id,seq,kind,body_md,actor,created_at) VALUES
-            (1,'h1',1,1,'handoff','Earlier context','agent:codex:acme','t'),
-            (2,'h2',1,2,'handoff','Latest context','agent:codex:acme','t');
-            INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,actor,created_at)
-            VALUES('reply',1,3,1,'comment','Reviewer finding','agent:claude:reviewer','t');
-            """)
-      }
       let service = TaskService(environment: env)
+      _ = try service.comment("AC-1", CommentDraft(body: "Earlier context", kind: "handoff"))
+      _ = try service.comment("AC-1", CommentDraft(body: "Latest context", kind: "handoff"))
+      let reviewer = TaskService(
+        environment: try TaskServiceTests.environment(
+          home, actor: .agent(tool: "claude", session: "reviewer")))
+      _ = try reviewer.updateComments(["AC-1/1"], action: .resolve, explanation: "Reviewer finding")
+      _ = try reviewer.updateComments(["AC-1/1"], action: .reopen)
       let shown = try #require(service.show("AC-1").comments)
       #expect(shown.map(\.ref) == ["AC-1/2", "AC-1/1", "AC-1/3"])
       #expect(shown.contains { $0.body == "Reviewer finding" })

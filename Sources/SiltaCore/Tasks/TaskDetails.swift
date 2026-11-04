@@ -97,10 +97,11 @@ package struct TaskDetails: Encodable, Sendable {
   /// Current discussion, or full history when timeline was requested; absent if empty.
   package var comments: [CommentDetails]?
 
-  /// Latest actual claim-release comment for a resumable task; text-view metadata.
+  /// Latest actual claim-release comment for a resumable task.
   package var handedOff: String?
 
   enum CodingKeys: String, CodingKey {
+    case handedOff = "handed_off"
     case ref, title, status, description, plan, result, app, branch, worktree, links, timeline
     case acceptance, priority, archived, waiting, parent, comments
     case createdAt = "created_at"

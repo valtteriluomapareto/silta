@@ -43,8 +43,9 @@ extension TaskService {
     }
   }
 
-  private func insertComment(
-    _ draft: CommentDraft, task: TaskDetails, at: Date, in tx: StorageTransaction
+  func insertComment(
+    _ draft: CommentDraft, task: TaskDetails, root: Int64? = nil, at: Date,
+    in tx: StorageTransaction
   ) throws -> (Int64, Int) {
     if draft.kind == "handoff", let holder = task.claimedBy,
       holder != environment.actor.description
@@ -57,11 +58,11 @@ extension TaskService {
         arguments: [task.id]) ?? 1
     try tx.database.execute(
       sql: """
-        INSERT INTO comment(uid,task_id,seq,kind,body_md,actor,created_at)
-        VALUES(?,?,?,?,?,?,?)
+        INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,actor,created_at)
+        VALUES(?,?,?,?,?,?,?,?)
         """,
       arguments: [
-        try environment.ids.next(at: at), task.id, seq, draft.kind,
+        try environment.ids.next(at: at), task.id, seq, root, draft.kind,
         draft.body, environment.actor.description,
         Self.timestamp(at),
       ])
@@ -69,8 +70,7 @@ extension TaskService {
     return (id, seq)
   }
 
-  private func checkedComment(_ input: CommentDraft, command: String) throws -> (CommentDraft, Bool)
-  {
+  func checkedComment(_ input: CommentDraft, command: String) throws -> (CommentDraft, Bool) {
     guard ["comment", "decision", "handoff"].contains(input.kind) else {
       throw CommentError.invalid("Use comment, decision or handoff.")
     }
@@ -103,7 +103,7 @@ extension TaskService {
     }
   }
 
-  private func touchDiscussion(
+  func touchDiscussion(
     _ task: TaskDetails, handoff: Bool, comment: String, at: Date, in tx: StorageTransaction
   ) throws -> Bool {
     guard task.claimedBy == environment.actor.description else { return false }

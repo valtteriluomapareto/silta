@@ -25,7 +25,13 @@ enum CommandCatalog {
   )] {
     command.configuration.subcommands.filter { $0.configuration.shouldDisplay }.flatMap { sub in
       let name = "\(path) \(sub._commandName)"
-      let here = (sub as? any OutputCommand.Type).map { [($0, name)] } ?? []
+      // A hidden default supplies the group's existing data/argument contract.
+      let output =
+        (sub as? any OutputCommand.Type)
+        ?? (sub.configuration.defaultSubcommand.flatMap {
+          $0.configuration.shouldDisplay ? nil : $0 as? any OutputCommand.Type
+        })
+      let here = output.map { [($0, name)] } ?? []
       return here + walk(sub, path: name)
     }
   }

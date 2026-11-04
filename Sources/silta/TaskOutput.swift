@@ -33,6 +33,7 @@ enum TaskOutput {
     "done_branch": .optional(.string), "done_dirty": .optional(.bool),
     "links": linksShape,
     "comments": .optional(.array(CommentOutput.shape)),
+    "handed_off": .optional(.string),
     "timeline": .optional(
       .array(
         .object([
@@ -92,7 +93,9 @@ enum TaskOutput {
     if let comments = task.comments {
       lines.append("\nDiscussion:")
       lines += comments.map {
-        CommentOutput.detail($0, comments: comments, timeline: task.timeline != nil)
+        CommentOutput.detail(
+          $0, comments: comments, timeline: task.timeline != nil,
+          workspace: task.externalRef == nil ? workspace : nil)
       }
     }
     for event in task.timeline ?? [] {

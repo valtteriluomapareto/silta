@@ -20,7 +20,7 @@ extension CommentError: ErrorExamples {
   static var examples: [CommentError] {
     [
       .invalid("Use a supported kind."), .bodyRequired("silta comment 'AC-1'"),
-      .foreignHandoff("AC-1"),
+      .foreignHandoff("AC-1"), .missing("AC-1/2", "AC-1"), .conflict("Author only.", "AC-1"),
     ]
   }
 }

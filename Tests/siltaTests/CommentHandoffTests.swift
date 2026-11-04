@@ -45,6 +45,7 @@ struct CommentHandoffTests {
       let comments = try #require(data["comments"] as? [[String: Any]])
       #expect(comments.first?["body"] as? String == Self.body)
       #expect(comments.first?["released"] == nil)
+      #expect(data["handed_off"] as? String == "AC-1/1")
       let quiet = try SiltaBinary.run(
         ["comment", "AC-1", "--quiet", "-m", "Context"],
         in: scratch, environment: TaskCommandTests.fixed)
@@ -128,18 +129,22 @@ struct CommentHandoffTests {
         let output = try SiltaBinary.run(
           args + ["task", "show", "AC-1"], in: scratch,
           environment: TaskCommandTests.fixed)
-        #expect(!output.stdout.contains("next: silta"))
+        #expect(!output.stdout.contains("task start "))
+        let raw = try SiltaBinary.run(
+          args + ["task", "show", "AC-1", "--json"], in: scratch,
+          environment: TaskCommandTests.fixed)
+        #expect(try TaskStateRegressionTests.data(raw)["handed_off"] == nil)
       }
     }
   }
 }
 
 extension CommentHandoffTests {
-  @Test(arguments: [1, 2])
-  func fileNewlineTrimsOnlyTheFinalGutter(newlines: Int) throws {
+  @Test(arguments: [1, 2], ["\n", "\r\n", "\u{2028}"])
+  func fileNewlineTrimsOnlyTheFinalGutter(newlines: Int, terminator: String) throws {
     try withScratchDirectory { scratch in
       _ = try Self.setup(scratch)
-      let body = "Acme context" + String(repeating: "\n", count: newlines)
+      let body = "Acme context" + String(repeating: terminator, count: newlines)
       let file = scratch.appending(path: "context.md")
       try body.write(to: file, atomically: true, encoding: .utf8)
       let posted = try SiltaBinary.run(
@@ -148,13 +153,12 @@ extension CommentHandoffTests {
       #expect(posted.termination == .exit(0))
       let shown = try SiltaBinary.run(
         ["task", "show", "AC-1"], in: scratch, environment: TaskCommandTests.fixed)
-      withKnownIssue("#13: A file terminator adds a trailing bare quote line") {
-        #expect(shown.stdout.split(separator: "\n").filter { $0.hasPrefix(">") }.count == newlines)
-      }
+      #expect(shown.stdout.split(separator: "\n").filter { $0.hasPrefix(">") }.count == newlines)
       let raw = try SiltaBinary.run(
         ["task", "show", "AC-1", "--json"], in: scratch,
         environment: TaskCommandTests.fixed)
-      let comments = try #require(try TaskStateRegressionTests.data(raw)["comments"] as? [[String: Any]])
+      let comments = try #require(
+        try TaskStateRegressionTests.data(raw)["comments"] as? [[String: Any]])
       #expect(comments.first?["body"] as? String == body)
     }
   }

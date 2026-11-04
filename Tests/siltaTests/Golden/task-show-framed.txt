@@ -11,3 +11,4 @@ AC-1/1 handoff by agent:codex:acme
 > Next: continue
 > Questions: none
 > Branch/sha: main/abc
+next: silta --ws 'acme' comment resolve 'AC-1/1'

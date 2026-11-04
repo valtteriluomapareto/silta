@@ -6,7 +6,10 @@ Unclaimed (handed off AC-1/3); next: silta --ws 'acme' task start 'AC-1'
 Discussion:
 AC-1/3 handoff by agent:codex:acme
 > API chosen; continue tests.
+next: silta --ws 'acme' comment resolve 'AC-1/3'
 AC-1/1 comment by agent:claude:reviewer
 > Review finding.
+next: silta --ws 'acme' comment resolve 'AC-1/1'
 AC-1/2 comment by agent:codex:acme
 > Use API v2.
+next: silta --ws 'acme' comment resolve 'AC-1/2'
