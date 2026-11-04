@@ -81,6 +81,26 @@ struct WorkspaceConfigTests {
     }
   }
 
+  /// `none` is the opt-out word for non-code work, so it cannot name an app.
+  @Test func noneCannotNameAnApp() {
+    withKnownIssue("#SI-27: none is reserved for non-code work") {
+      let text =
+        Self.minimal + """
+          repos: [{slug: platform}]
+          apps: [{slug: none, repo: platform, ref: origin/main}]
+          """
+      do {
+        _ = try WorkspaceConfig.parse(text)
+        Issue.record("an app named none was accepted")
+      } catch let error as WorkspaceError {
+        #expect(error.code == .invalid)
+        #expect(error.message.contains("none is reserved for non-code work"))
+      } catch {
+        Issue.record("unexpected error: \(error)")
+      }
+    }
+  }
+
   @Test(arguments: [
     "workspace: []", "[]", "workspace: {slug: acme}", "apps: wrong",
     "workspace: {slug: acme, name: Acme, task_prefix: AC, name: Duplicate}",

@@ -264,3 +264,70 @@ extension TaskCommandTests {
     }
   }
 }
+
+extension TaskCommandTests {
+  /// A subtask's inherited app is visible where it matters, `--app none` opts out, and
+  /// a wrong working directory is the agent's mistake to fix.
+  @Test func inheritedAppsAreVisibleAndCanBeOptedOut() throws {
+    withKnownIssue("#SI-27: inherited apps are visible and can be opted out") {
+      try withScratchDirectory { scratch in
+        let fixtures = scratch.appending(path: "acme")
+        #expect(
+          try SiltaBinary.runProcess(
+            URL(filePath: "/bin/bash"),
+            [
+              ScenarioRunner.repository.appending(path: "scripts/make-fixtures.sh").path,
+              fixtures.path,
+            ], in: scratch
+          ).termination == .exit(0))
+        #expect(
+          try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch).termination
+            == .exit(0))
+        #expect(try SiltaBinary.run(["ws", "use", "acme"], in: scratch).termination == .exit(0))
+        let repo = fixtures.appending(path: "acme-platform", directoryHint: .isDirectory)
+        let app = "acme-platform-api"
+        let root = try SiltaBinary.run(
+          ["task", "add", "Acme app work", "--app", app, "--start"], in: scratch, cwd: repo,
+          environment: Self.actor)
+        #expect(root.termination == .exit(0))
+        let inherited = try SiltaBinary.run(
+          ["task", "add", "Acme child", "--parent", "AC-1"], in: scratch, environment: Self.actor)
+        #expect(inherited.termination == .exit(0))
+        Golden.forTests().check(inherited.stdout, "task-add-inherited-app.txt")
+        let shown = try SiltaBinary.run(
+          ["task", "show", "AC-2"], in: scratch, environment: Self.actor)
+        #expect(shown.termination == .exit(0))
+        Golden.forTests().check(shown.stdout, "task-show-inherited-app.txt")
+        let plan = scratch.appending(path: "plan.md")
+        try "# Acme release\n\nContext\n\n- First\n- Second\n".write(
+          to: plan, atomically: true, encoding: .utf8)
+        let preview = try SiltaBinary.run(
+          ["task", "from-plan", plan.path, "--parent", "AC-1", "--split", "--dry-run"],
+          in: scratch, environment: Self.actor)
+        #expect(preview.termination == .exit(0))
+        Golden.forTests().check(preview.stdout, "task-from-plan-inherited-app-preview.txt")
+        let json = try SiltaBinary.run(
+          ["task", "from-plan", plan.path, "--parent", "AC-1", "--split", "--dry-run", "--json"],
+          in: scratch, environment: Self.actor)
+        #expect(json.termination == .exit(0))
+        Golden.forTests().check(json.stdout, "task-from-plan-inherited-app-preview.json")
+        let none = try SiltaBinary.run(
+          ["task", "add", "Acme release", "--parent", "AC-1", "--app", "none"],
+          in: scratch, environment: Self.actor)
+        #expect(none.termination == .exit(0))
+        #expect(none.stdout == "AC-3 todo\n")
+        let nonCode = try SiltaBinary.run(
+          ["task", "show", "AC-3"], in: scratch, environment: Self.actor)
+        #expect(nonCode.termination == .exit(0) && !nonCode.stdout.contains("App:"))
+        let notes = scratch.appending(path: "notes", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: notes, withIntermediateDirectories: true)
+        let refused = try SiltaBinary.run(
+          ["task", "add", "Acme child", "--parent", "AC-1", "--start"], in: scratch, cwd: notes,
+          environment: Self.actor)
+        #expect(refused.termination == .exit(1))
+        #expect(refused.stderr.contains("inherited from AC-1"))
+        #expect(refused.stderr.contains("--app none"))
+      }
+    }
+  }
+}
