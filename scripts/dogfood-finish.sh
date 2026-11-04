@@ -42,11 +42,14 @@ $friction"
 task="$(silta --ws silta task show "$ref" --json 2>&1)" \
   || { echo "finish: silta could not show $ref:" >&2; printf '%s\n' "$task" >&2; exit 1; }
 status="$(/usr/bin/jq -r '.data.status // empty' <<<"$task")"
+# Only app tasks record a commit (spec §8); the result names the merge either way.
+sha_args=()
+[[ -n "$(/usr/bin/jq -r '.data.app // empty' <<<"$task")" ]] && sha_args=(--sha "$sha")
 issue="$(/usr/bin/jq -r '[.data.links[]?.target | select(startswith("url:")) | ltrimstr("url:")
   | select(test("/issues/[0-9]+$"))] | first // empty' <<<"$task")"
 case "$status" in
   done) echo "$ref is already done." ;;
-  review) printf '%s\n' "$result" | silta --ws silta task done "$ref" --sha "$sha" -F - ;;
+  review) printf '%s\n' "$result" | silta --ws silta task done "$ref" ${sha_args[@]+"${sha_args[@]}"} -F - ;;
   *) echo "finish: $ref is ${status:-unreadable}, not review; its author submits it first (D41)." >&2
     exit 1 ;;
 esac
