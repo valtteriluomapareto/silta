@@ -261,7 +261,8 @@ extension DogfoodAutomationTests {
 
   static func fakeFinishTools(
     _ scratch: URL, state: String = "MERGED", body: String, sha: String,
-    status: String = "review", linked: Bool = true, issueState: String = "OPEN"
+    status: String = "review", linked: Bool = true, issueState: String = "OPEN",
+    app: String? = "silta"
   ) throws {
     let tools = scratch.appending(path: "tools")
     let pull = try JSONSerialization.data(withJSONObject: [
@@ -270,7 +271,11 @@ extension DogfoodAutomationTests {
     try pull.write(to: scratch.appending(path: "pull.json"))
     let links: [[String: String]] = linked ? [["rel": "cites", "target": "url:\(issue)"]] : []
     let task = try JSONSerialization.data(withJSONObject: [
-      "ok": true, "data": ["ref": "SI-1", "status": status, "links": links],
+      "ok": true,
+      "data": ["ref": "SI-1", "status": status, "links": links, "app": app as Any].compactMapValues
+      {
+        $0 is NSNull ? nil : $0
+      },
     ])
     try task.write(to: scratch.appending(path: "task.json"))
     let log = shellWord(scratch.appending(path: "calls").path)
@@ -339,6 +344,19 @@ extension DogfoodAutomationTests {
       #expect(log.contains("gh issue close \(Self.issue)"))
       let comment = try Self.log(scratch, "-comment")
       #expect(comment.hasPrefix("Done in #56 (\(sha.prefix(7)))") && comment.hasSuffix(expected))
+    }
+  }
+
+  @Test func finishCompletesAnAppLessTaskWithoutASha() throws {
+    try withScratchDirectory { scratch in
+      let sha = try Self.head(scratch)
+      try Self.fakeFinishTools(
+        scratch, body: "## Draft result\nDone.\nFriction: none\n", sha: sha, app: nil)
+      let result = try Self.finish(scratch)
+      #expect(result.termination == .exit(0))
+      let calls = try Self.log(scratch)
+      #expect(calls.contains("silta --ws silta task done SI-1 -F -") && !calls.contains("--sha"))
+      #expect(try Self.log(scratch, "-result").contains("Merged in #56 (\(sha.prefix(7)))."))
     }
   }
 
