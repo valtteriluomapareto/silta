@@ -55,7 +55,8 @@ struct DogfoodAutomationTests {
   }
 
   static func fakeCodex(
-    _ scratch: URL, output: [String], exit status: Int32 = 0, setting: String? = nil
+    _ scratch: URL, output: [String], exit status: Int32 = 0, setting: String? = nil,
+    then extra: String = ""
   ) throws {
     let calls = shellWord(scratch.appending(path: "codex-calls").path)
     var lines = output.map { "printf '%s\\n' " + shellWord($0) }.joined(separator: "\n")
@@ -73,6 +74,7 @@ struct DogfoodAutomationTests {
         pwd -P > \(calls)-pwd
         cat > \(calls)-stdin
         \(lines)
+        \(extra)
         exit \(status)
 
         """, in: scratch.appending(path: "tools"))
@@ -189,6 +191,25 @@ extension DogfoodAutomationTests {
       #expect(result.termination == .exit(status))
       #expect(result.stdout.hasPrefix("Thread: \(Self.thread)\n"))
       #expect(result.stderr.contains("don't run git") == (status == 70))
+    }
+  }
+}
+
+extension DogfoodAutomationTests {
+  @Test func codexFinishesWhenTheScriptChangesDuringTheRun() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      let path = shellWord(fixture.script.path)
+      // An edit in place while Codex runs shifts the bytes bash has yet to read.
+      try Self.fakeCodex(
+        scratch, output: [Self.started, Self.message("Acme done")],
+        then: "body=\"$(cat \(path))\"; printf '# an edit that shifts every line\\n%s\\n' "
+          + "\"$body\" > \(path)")
+      let log = scratch.appending(path: "run.jsonl").path
+      let result = try Self.run(
+        fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
+      #expect(
+        result.termination == .exit(0) && result.stdout == "Thread: \(Self.thread)\nAcme done\n")
     }
   }
 }
