@@ -117,17 +117,19 @@ struct BriefCommandTests {
       }
       let regular = try run(["--task", "AC-1"], repo, scratch)
       let short = try run(["--task", "AC-1", "--short"], repo, scratch)
+      let before = try hookTimeoutCount(scratch)
       let hook = try run(["--task", "AC-1", "--hook"], repo, scratch)
       #expect(hook.termination == .exit(0) && hook.stderr.isEmpty)
-      if try !hookTimedOut(scratch) { #expect(hook == short) }
+      if try hookTimeoutCount(scratch) == before { #expect(hook == short) }
       #expect(hook.stdout.count <= 3200)
       #expect(short.stdout.count <= 3200)
       #expect(short.stdout.count < regular.stdout.count)
       #expect(try run(["--task", "AC-1", "--short", "--budget", "2500"], repo, scratch) == regular)
+      let explicitBefore = try hookTimeoutCount(scratch)
       let explicitHook = try run(["--task", "AC-1", "--hook", "--budget", "2500"], repo, scratch)
       #expect(explicitHook.termination == .exit(0) && explicitHook.stderr.isEmpty)
       #expect(explicitHook.stdout.count <= 10000)
-      if try !hookTimedOut(scratch) { #expect(explicitHook == regular) }
+      if try hookTimeoutCount(scratch) == explicitBefore { #expect(explicitHook == regular) }
       let value = try fixture.data(run(["--task", "AC-1", "--short", "--json"], repo, scratch))
       #expect(value["truncated"] as? Bool == true)
       let sections = try #require(value["sections"] as? [[String: String]])

@@ -53,10 +53,11 @@ extension BriefCommandTests {
       let repo = try fixture.setup(scratch)
       try fixture.git(["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
       for flags in [["--json"], ["--hook", "--json", "--verbose"], ["--hook"]] {
+        let before = try hookTimeoutCount(scratch)
         let result = try run(flags, repo, scratch)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
-        if flags.contains("--hook"), try hookTimedOut(scratch) { continue }
+        if flags.contains("--hook"), try hookTimeoutCount(scratch) > before { continue }
         let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String]
         if flags.contains("--json") { #expect(result.stdout.contains("ref_missing")) }
         #expect(warnings == ["ref_missing"])

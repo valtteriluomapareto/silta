@@ -71,7 +71,7 @@ struct BriefBacklog {
           substr(task.result_md,1,instr(task.result_md||char(10),char(10))-1) AS result,
           substr(task.done_sha,1,12) AS sha
         \(base) AND task.status='done'
-        ORDER BY julianday(task.closed_at) DESC,task.seq DESC LIMIT 5
+        ORDER BY silta_archive_instant(task.closed_at) DESC,task.seq DESC LIMIT 5
         """, arguments: arguments)
     sections += done.map { doneSection($0, prefix: prefix) }
     return sections

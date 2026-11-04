@@ -6,8 +6,8 @@ struct TaskVisibility {
   static let archiveSQL = """
     CASE WHEN task.archive_override IS NOT NULL THEN task.archive_override='archived'
     WHEN task.status NOT IN ('done','dropped') OR task.closed_at IS NULL THEN 0
-    WHEN task.closed_at NOT LIKE '%T%' OR julianday(task.closed_at) IS NULL THEN -1
-    ELSE julianday(task.closed_at)<julianday(:archive_cutoff) END
+    WHEN silta_archive_instant(task.closed_at) IS NULL THEN -1
+    ELSE silta_archive_instant(task.closed_at)<:archive_cutoff END
     """
   static let localSQL = """
     (task.status<>'proposed' OR :all_proposals OR task.created_by=:viewer)
@@ -26,8 +26,21 @@ struct TaskVisibility {
     arguments = [
       "viewer": actor.description, "all_proposals": proposed || actor.isHuman,
       "promoted": promoted, "archived": archived,
-      "archive_cutoff": TaskService.timestamp(date.addingTimeInterval(-Double(days) * 86400)),
+      "archive_cutoff": date.addingTimeInterval(-Double(days) * 86400).timeIntervalSince1970,
     ]
+  }
+
+  static func register(in db: Database) {
+    db.add(
+      function: DatabaseFunction("silta_archive_instant", argumentCount: 1, pure: true) { values in
+        guard let value = values.first, let text = String.fromDatabaseValue(value) else {
+          return nil
+        }
+        do {
+          return try Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+            .parse(text).timeIntervalSince1970
+        } catch { return nil }
+      })
   }
 
   static func validateDates(scope: String, arguments: StatementArguments, in db: Database) throws {
@@ -54,7 +67,7 @@ struct TaskVisibility {
       arguments: [
         "choice": task.archiveOverride, "status": task.status,
         "closed": task.closedAt,
-        "archive_cutoff": TaskService.timestamp(date.addingTimeInterval(-Double(days) * 86400)),
+        "archive_cutoff": date.addingTimeInterval(-Double(days) * 86400).timeIntervalSince1970,
       ])
     guard let value, value >= 0 else { throw StorageError.unavailable }
     return value == 1
