@@ -559,10 +559,12 @@ going until the list is empty or the human stops it.
   `BEGIN IMMEDIATE` compare-and-set; `branch` and `worktree` only when the task has an
   app.
 - Another session's claim with `claimed_at` under 2 h old → exit 6 `claimed`, naming
-  the holder and the age. For an agent, `next` is `silta task ls --status todo`, to
-  pick other work, and the message names the exact `silta task start <ref> --steal
-  --approved "<the human's words>"` to ask the human about. A human gets `next: silta
-  task start <ref> --steal` (`next_by: agent`).
+  the holder and the age. For an agent, `next` is `silta --ws <workspace> task ls
+  --status todo`, to pick other work, and the message names the exact `silta --ws
+  <workspace> task start <ref> --steal --approved "<the human's words>"` to ask the
+  human about. A human gets `next: silta --ws <workspace> task start <ref> --steal`
+  (`next_by: agent`). The workspace is the task's, so the command still targets it
+  from another selection.
 - Any write by the claimer to the task refreshes `claimed_at`. A `handoff` comment
   and `task submit` release the claim (D41).
 - `--steal` is human-only when it overrides another session's fresh claim. Otherwise

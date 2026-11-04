@@ -12,8 +12,9 @@ extension TaskService {
     let command =
       "silta task edit " + shellWord(ref)
       + (allowSecret ? " --allow-secret" : "")
+    let slug = try selected()
     let before = try show(ref)
-    try validateClaim(before, at: environment.clock.now())
+    try validateClaim(before, workspace: slug, at: environment.clock.now())
     let needed = allowSecret || before.claimedBy != environment.actor.description
     _ = try approval(required: needed, command: command + " -F <file>")
     let original = TaskEditDocument(before)
@@ -29,11 +30,10 @@ extension TaskService {
     }
     let content = safeDocument(safe.map(\.0), from: before)
     let redacted = safe.contains { $0.1 }
-    let slug = try selected()
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       let required = allowSecret || task.claimedBy != environment.actor.description
       let approval = try approval(required: required, command: command + " -F <file>")
       try Self.compareEdit(task, before)
@@ -55,7 +55,7 @@ extension TaskService {
     let at = environment.clock.now()
     return try environment.db.read { db in
       let task = try Self.lookup(before.ref, workspace: slug, in: db)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       let required = allowSecret || task.claimedBy != environment.actor.description
       _ = try approval(required: required, command: command + " -F <file>")
       try Self.compareEdit(task, before)

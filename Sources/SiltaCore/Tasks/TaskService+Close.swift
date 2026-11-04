@@ -35,7 +35,7 @@ extension TaskService {
     let slug = try selected()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       try canClose(task, dropped: dropped)
       try Self.sameRepository(task, before)
       let review = try review(
@@ -96,7 +96,7 @@ extension TaskService {
   private func closable(
     _ task: TaskDetails, dropped: Bool, commit: TaskCommit, audit: String, at date: Date
   ) throws {
-    try validateClaim(task, at: date)
+    try validateClaim(task, workspace: try selected(), at: date)
     try canClose(task, dropped: dropped)
     if commit.sha != nil, task.appID == nil || dropped {
       throw TaskError.invalid("--sha requires an app task completed with done.")

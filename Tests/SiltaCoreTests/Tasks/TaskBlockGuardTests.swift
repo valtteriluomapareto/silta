@@ -18,7 +18,8 @@ struct TaskBlockGuardTests {
         approved: "Take this Acme task")
       #expect(
         throws: TaskError.claimed(
-          "AC-1", holder: TaskServiceTests.agent.description, minutes: 0, human: false)
+          "AC-1", holder: TaskServiceTests.agent.description, minutes: 0, human: false,
+          workspace: "acme")
       ) {
         _ = try other.block("AC-1", TaskBlockTests.input())
       }

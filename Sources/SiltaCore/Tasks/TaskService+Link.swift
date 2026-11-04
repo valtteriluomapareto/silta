@@ -15,7 +15,7 @@ extension TaskService {
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       let target = try TaskLinkTarget.resolve(
         content.0, source: task, workspace: slug, in: tx.database)
       let exists =

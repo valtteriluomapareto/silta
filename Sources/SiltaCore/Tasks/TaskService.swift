@@ -59,11 +59,14 @@ package struct TaskService: Sendable {
     try required ? environment.actor.requireHuman(command: command, approved: approved) : nil
   }
 
-  func validateClaim(_ task: TaskDetails, at date: Date, steal: Bool = false) throws {
+  func validateClaim(
+    _ task: TaskDetails, workspace: String, at date: Date, steal: Bool = false
+  ) throws {
     try Self.mutable(task)
     if !steal, let claim = try foreignClaim(task, at: date) {
       throw TaskError.claimed(
-        task.ref, holder: claim.holder, minutes: claim.minutes, human: environment.actor.isHuman)
+        task.ref, holder: claim.holder, minutes: claim.minutes, human: environment.actor.isHuman,
+        workspace: workspace)
     }
   }
 

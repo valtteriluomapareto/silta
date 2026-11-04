@@ -2,10 +2,10 @@ error: Parent task AC-9 not found. [not_found]
 next: silta task ls
 error: A result is required. [invalid]
 next: silta task add --help
-error: AC-1 is claimed by agent:codex:acme (4 min old); pick other work, or ask the human before stealing it with silta task start AC-1 --steal --approved "<the human's words>". [claimed]
-next: silta task ls --status todo
+error: AC-1 is claimed by agent:codex:acme (4 min old); pick other work, or ask the human before stealing it with silta --ws 'acme' task start AC-1 --steal --approved "<the human's words>". [claimed]
+next: silta --ws 'acme' task ls --status todo
 error: AC-1 is claimed by agent:codex:acme (4 min old); take it over with --steal. [claimed]
-next: silta task start AC-1 --steal
+next: silta --ws 'acme' task start AC-1 --steal
 error: Proposal AC-1 needs human triage; ask in chat before accepting it. [conflict]
 ask human: silta task triage --accept AC-1 --approved "<the human's words>"
 error: Proposal AC-1 needs triage first. [conflict]

@@ -71,7 +71,8 @@ struct TaskPlanTests {
         environment: try TaskServiceTests.environment(
           home, actor: .agent(tool: "codex", session: "rival")))
       #expect(
-        throws: TaskError.claimed("AC-1", holder: env.actor.description, minutes: 0, human: false)
+        throws: TaskError.claimed(
+          "AC-1", holder: env.actor.description, minutes: 0, human: false, workspace: "acme")
       ) {
         _ = try rival.plan("AC-1", text: "Wrong")
       }

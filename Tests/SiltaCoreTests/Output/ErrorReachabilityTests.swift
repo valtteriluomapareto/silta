@@ -87,8 +87,8 @@ extension TaskError: ErrorExamples {
   static var examples: [TaskError] {
     [
       .notFound("parent task AC-9"), .invalid("A result is required."),
-      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: false),
-      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: true),
+      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: false, workspace: "acme"),
+      .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: true, workspace: "acme"),
       .proposal("AC-1", human: false), .proposal("AC-1", human: true),
       .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
       .promoted("AC-1", external: "ado:42"), .edited("AC-1"),

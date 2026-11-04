@@ -19,7 +19,7 @@ extension TaskService {
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       try Self.compareRevision(ifRevision, task: task)
       try writePlan(content.0, task: task, redacted: content.1, at: at, in: tx)
       try approval?.record(
@@ -40,7 +40,7 @@ extension TaskService {
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       try Self.compareRevision(ifRevision, task: task)
       let count = MarkdownPlan.checkboxes(task.plan).count
       guard count > 0, (1...count).contains(step) else {

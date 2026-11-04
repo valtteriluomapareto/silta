@@ -80,7 +80,8 @@ struct TaskServiceTests {
         environment: try Self.environment(
           home, actor: .agent(tool: "codex", session: "other"), clock: clock))
       await #expect(
-        throws: TaskError.claimed("AC-1", holder: Self.agent.description, minutes: 0, human: false)
+        throws: TaskError.claimed(
+          "AC-1", holder: Self.agent.description, minutes: 0, human: false, workspace: "acme")
       ) {
         _ = try await rival.start("AC-1", directory: home)
       }

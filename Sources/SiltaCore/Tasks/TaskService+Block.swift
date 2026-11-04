@@ -20,7 +20,7 @@ extension TaskService {
     let slug = try selected()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       guard ["todo", "doing", "review", "blocked"].contains(task.status) else {
         throw TaskError.transition(task.ref, status: task.status)
       }

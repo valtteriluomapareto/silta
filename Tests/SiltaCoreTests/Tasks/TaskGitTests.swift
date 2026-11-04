@@ -253,7 +253,9 @@ extension TaskGitTests {
         switch change {
         case "repository": .changed("AC-1")
         case "status": .transition("AC-1", status: "done")
-        default: .claimed("AC-1", holder: rival.description, minutes: 0, human: false)
+        default:
+          .claimed(
+            "AC-1", holder: rival.description, minutes: 0, human: false, workspace: "acme")
         }
       let service = TaskService(environment: env)
       await #expect(throws: expected) {

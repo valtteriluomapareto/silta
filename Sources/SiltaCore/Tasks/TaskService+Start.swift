@@ -11,18 +11,18 @@ extension TaskService {
     let command = "silta task start " + shellWord(ref) + " --steal"
     let before = try show(ref)
     let at = environment.clock.now()
-    try validateClaim(before, at: at, steal: steal)
+    let slug = try selected()
+    try validateClaim(before, workspace: slug, at: at, steal: steal)
     try canStart(before)
     _ = try approval(required: steal && foreignClaim(before, at: at) != nil, command: command)
     let git = try await TaskGit.inspect(
       repo: before.repoPath, directory: directory, runner: environment.git,
       enabled: before.appID != nil, completion: false)
-    let slug = try selected()
     return try environment.db.write { tx in
       let task = try Self.decorate(
         Self.lookup(ref, workspace: slug, in: tx.database),
         at: at, in: tx.database)
-      try validateClaim(task, at: at, steal: steal)
+      try validateClaim(task, workspace: slug, at: at, steal: steal)
       try canStart(task)
       let approval = try approval(
         required: steal && foreignClaim(task, at: at) != nil, command: command)
@@ -68,7 +68,7 @@ extension TaskService {
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       guard task.status == "doing" else {
         throw TaskError.transition(task.ref, status: task.status)
       }

@@ -10,7 +10,7 @@ package enum TaskError: CodedError, Equatable {
   case invalid(String)
 
   /// A different actor still owns the claim; a human may steal it, an agent asks first.
-  case claimed(String, holder: String, minutes: Int, human: Bool)
+  case claimed(String, holder: String, minutes: Int, human: Bool, workspace: String)
 
   /// A proposal needs triage first; a human runs it, an agent asks the human.
   case proposal(String, human: Bool)
@@ -97,12 +97,13 @@ package enum TaskError: CodedError, Equatable {
     case .step(let ref, let count):
       "\(ref)'s plan has \(count) checkbox\(count == 1 ? "" : "es"); "
         + "--step N counts them from 1, as task show numbers them."
-    case .claimed(let ref, let holder, let minutes, true):
+    case .claimed(let ref, let holder, let minutes, true, _):
       "\(ref) is claimed by \(holder) (\(minutes) min old); take it over with --steal."
-    case .claimed(let ref, let holder, let minutes, false):
+    case .claimed(let ref, let holder, let minutes, false, let workspace):
       "\(ref) is claimed by \(holder) (\(minutes) min old); pick other work, "
         + "or ask the human before stealing it with "
-        + "silta task start \(ref) --steal --approved \"<the human's words>\"."
+        + "silta --ws \(shellWord(workspace)) task start \(ref) --steal "
+        + "--approved \"<the human's words>\"."
     case .proposal(let ref, let human):
       human
         ? "Proposal \(ref) needs triage first."
@@ -126,8 +127,11 @@ package enum TaskError: CodedError, Equatable {
     switch self {
     case .blocked(let ref, let waiting):
       waiting.ready ? ["silta task unblock \(ref)"] : ["silta task ls --status todo"]
-    case .promoted, .claimed(_, _, _, false): ["silta task ls --status todo"]
-    case .claimed(let ref, _, _, true): ["silta task start \(ref) --steal"]
+    case .promoted: ["silta task ls --status todo"]
+    case .claimed(_, _, _, false, let workspace):
+      ["silta --ws \(shellWord(workspace)) task ls --status todo"]
+    case .claimed(let ref, _, _, true, let workspace):
+      ["silta --ws \(shellWord(workspace)) task start \(ref) --steal"]
     case .edited(let ref): ["silta task show \(ref)"]
     case .proposal(let ref, let human):
       ["silta task triage --accept \(ref)" + (human ? "" : " --approved \"<the human's words>\"")]

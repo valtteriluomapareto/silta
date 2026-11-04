@@ -46,14 +46,12 @@ struct TaskOutputRegressionTests {
         environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
       let own = #expect(throws: TaskError.self) { _ = try human.archive("AC-1") }
       let error = try Self.json(try #require(own))
-      withKnownIssue("SI-19: the claimed refusal's steal command omits the workspace") {
-        #expect(refusal?.next == ["silta --ws 'acme' task ls --status todo"])
-        #expect(
-          refusal?.message.contains(
-            "silta --ws 'acme' task start AC-1 --steal --approved \"<the human's words>\"") == true)
-        #expect(error["next"] as? [String] == ["silta --ws 'acme' task start AC-1 --steal"])
-        #expect(error["next_by"] as? String == "agent")
-      }
+      #expect(refusal?.next == ["silta --ws 'acme' task ls --status todo"])
+      #expect(
+        refusal?.message.contains(
+          "silta --ws 'acme' task start AC-1 --steal --approved \"<the human's words>\"") == true)
+      #expect(error["next"] as? [String] == ["silta --ws 'acme' task start AC-1 --steal"])
+      #expect(error["next_by"] as? String == "agent")
     }
   }
 
