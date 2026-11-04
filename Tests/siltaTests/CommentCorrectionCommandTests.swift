@@ -97,13 +97,7 @@ extension CommentCorrectionCommandTests {
       )
       let shown = try SiltaBinary.run(
         ["task", "show", "AC-1"], in: scratch, environment: TaskCommandTests.fixed)
-      if recipient == "human:acme" {
-        withKnownIssue("#13: non-addressee answers clear human attention") {
-          #expect(!shown.stdout.contains("[answered, unresolved]"))
-        }
-      } else {
-        #expect(shown.stdout.contains("[answered, unresolved]"))
-      }
+      #expect(shown.stdout.contains("[answered, unresolved]") == (recipient == "agent:claude:answerer"))
     }
   }
 }

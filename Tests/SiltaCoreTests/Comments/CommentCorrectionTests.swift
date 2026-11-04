@@ -57,3 +57,17 @@ struct CommentCorrectionTests {
     }
   }
 }
+
+extension CommentCorrectionTests {
+  @Test func humanAnswersQualifyAndDeletedQuestionsDoNot() async throws {
+    try await withScratchDirectory { home in
+      let env = try await CommentTests.setup(home), owner = TaskService(environment: env)
+      _ = try CommentQuestionTests.post(owner, kind: "question", to: ["agent:claude:recipient"])
+      let human = TaskService(environment: try TaskServiceTests.environment(home, actor: .human(name: "acme")))
+      _ = try CommentQuestionTests.post(human, kind: "answer", reply: "AC-1/1")
+      #expect(try owner.show("AC-1").comments?.first?.answered == true)
+      _ = try owner.updateComments(["AC-1/1"], action: .delete)
+      #expect(try owner.show("AC-1").comments?.first?.answered == false)
+    }
+  }
+}

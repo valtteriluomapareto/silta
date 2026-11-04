@@ -16,6 +16,7 @@ extension CommentDetails {
     let data = Data(raw.utf8)
     mentions = (try? JSONDecoder().decode([String].self, from: data)) ?? []  // newer encodings
     accepted = row["accepted"]
+    answered = kind == "question" ? false : nil
     source = (row["source"] as String?).map { "note:" + $0 }
   }
 }
@@ -33,7 +34,20 @@ extension TaskService {
   {
     let rows = try Row.fetchAll(
       db, sql: commentQuery + " WHERE c.task_id=? ORDER BY c.created_at,c.id", arguments: [task.id])
-    if timeline { return rows.map { CommentDetails(row: $0, task: task.ref) } }
+    func details(_ row: Row) -> CommentDetails {
+      var post = CommentDetails(row: row, task: task.ref)
+      if post.kind == "question" {
+        let questionID: Int64 = row["id"], recipients = post.mentions
+        post.answered = !post.deleted && rows.contains { answer in
+          let actor: String = answer["actor"]
+          return answer["thread_id"] as Int64? == questionID
+            && answer["kind"] as String == "answer" && answer["deleted_at"] as String? == nil
+            && (ActorID.parse(actor)?.isHuman == true || recipients.contains(actor))
+        }
+      }
+      return post
+    }
+    if timeline { return rows.map(details) }
     let groups = Dictionary(grouping: rows) { ($0["thread_id"] as Int64?) ?? ($0["id"] as Int64) }
     let latest = rows.last {
       $0["kind"] as String == "handoff" && $0["deleted_at"] as String? == nil
@@ -56,7 +70,7 @@ extension TaskService {
       let replies = groups[root["id"] as Int64, default: []].filter {
         $0["thread_id"] as Int64? != nil
       }
-      return ([root] + replies).map { CommentDetails(row: $0, task: task.ref) }
+      return ([root] + replies).map(details)
     }
   }
 }

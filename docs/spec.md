@@ -734,7 +734,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 | Kind | Use | Behaviour |
 |---|---|---|
 | `comment` | General notes | — |
-| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until a live answer exists or the root is explicitly resolved. **Ask in chat first** when the human is there. |
+| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until a qualifying live answer exists or the root is explicitly resolved. **Ask in chat first** when the human is there. |
 | `answer` | Reply to a question | The asker or current task claimer can `comment accept AC-12/5`, which resolves the thread |
 | `decision` | A choice and its reason | Shown in `brief`; `--from note:…` cites a meeting |
 | `handoff` | Where I stopped, what's next | Releases the author's own claim, preserving status. The newest one is shown first in `brief --task`. Template in `silta guide` |
@@ -749,6 +749,11 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   explanations parse mentions too. `--from note:…` stores a nonempty, control-free
   note citation as a comment `cites` link without accessing the file; JSON exposes
   optional `from`. Citation/recipient metadata must contain no secrets.
+- A question is `answered` only by a live answer from one of its addressees or a
+  human. An agent outside its recipients may contribute an answer without clearing
+  the addressees' attention. JSON includes `answered` for questions (false for a
+  deleted question); text uses the same rule. Answer acceptance remains a separate
+  choice by the asker or current claimer.
 - Questions and handoffs are roots. Answers require a live unresolved question;
   comment/decision replies require a live unresolved root. A deleted immediate
   target or root cannot receive public replies. Cross-task/workspace replies refuse.
@@ -848,8 +853,13 @@ inbox is short and grouped:
   agent asks first, and maps "the rest" only to items it showed.
 
 It lists:
-- open questions mentioning the actor with no live answer; deleting the last live answer
-  restores attention if the root is open, and reopening an unanswered question restores attention
+- live open questions mentioning the actor with no qualifying live answer (an answer
+  by an addressee or human); deleting the last qualifying answer restores attention
+- answers to your live open questions awaiting acceptance, including answers from
+  other agents; the asker must be able to review these without being an answer recipient
+- reopening clears acceptance and restores attention: the asker receives live answers
+  awaiting acceptance, and addressees receive questions without a qualifying answer;
+  deleted question roots never appear in either question category
 - open review requests for the actor's tool (M2)
 - for humans, also: `proposed` tasks, pending doc proposals (M2), and promoted tasks
   needing attention

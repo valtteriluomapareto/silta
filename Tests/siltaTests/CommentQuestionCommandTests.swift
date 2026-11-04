@@ -30,7 +30,7 @@ struct CommentQuestionCommandTests {
       #expect(wrong.termination == .exit(6))
       Golden.forTests().check(wrong.stdout, "comment-accept-refused.json")
       let answered = try run(["task", "show", "AC-1"], third)
-      #expect(answered.stdout.contains("[answered, unresolved]"))
+      #expect(answered.stdout.contains("[unresolved]"))
       #expect(!answered.stdout.contains("next:"))
       let accepted = try run(
         ["comment", "accept", "AC-1/2"] + (json ? ["--json"] : []), asker)
