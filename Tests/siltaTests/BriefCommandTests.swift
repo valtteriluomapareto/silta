@@ -174,10 +174,14 @@ struct BriefCommandTests {
       let started = clock.now
       let result = try SiltaBinary.run(
         ["brief", "--hook", "--json", "--verbose"], in: scratch, cwd: repo,
-        environment: ["SILTA_ACTOR": "agent:codex"], timeout: 2.5)
+        environment: ["SILTA_ACTOR": "agent:codex", "SILTA_NOW": "2023-11-14T22:13:20.000Z"], timeout: 2.5)
       #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
       #expect(started.duration(to: clock.now) < .seconds(2))
       if kind == "git" {
+        let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String]
+        withKnownIssue("#16: Child hook deadline must leave a hook_timeout trace") {
+          #expect(warnings?.contains("hook_timeout") == true)
+        }
         let descriptor = open(fifo.path, O_WRONLY | O_NONBLOCK)
         let failure = errno
         if descriptor >= 0 { close(descriptor) }

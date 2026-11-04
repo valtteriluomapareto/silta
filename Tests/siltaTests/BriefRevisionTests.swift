@@ -6,6 +6,19 @@ import SiltaTestSupport
 import Testing
 
 extension BriefCommandTests {
+  @Test func unsupportedSettingsAreOmittedPerKeyWithRawWarnings() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try settings("{\"review_gate\":\"team\",\"proposals\":\"ask\"}", scratch)
+      let result = try run(["--json"], repo, scratch)
+      let data = try fixture.data(result)
+      withKnownIssue("#16: Unsupported settings must be omitted from typed projection") {
+        #expect(data["settings"] as? [String: String] == ["proposals": "ask"])
+        #expect(result.stdout.contains("team"))
+      }
+    }
+  }
+
   @Test func unsupportedSettingsGoldenKeepsRawTypesAndValidGloss() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)
@@ -157,6 +170,25 @@ extension BriefCommandTests {
       let started = clock.now
       #expect(try run(["--hook"], repo, scratch) == result)
       #expect(started.duration(to: clock.now) < .seconds(2))
+    }
+  }
+}
+
+extension BriefCommandTests {
+  @Test func candidatesAreCompactAndFooterHasNoEmptyLine() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try fixture.git(["checkout", "-q", "from-non-app"], repo, scratch)
+      let result = try run([], repo, scratch)
+      withKnownIssue("#16: Candidates belong on one line") {
+        #expect(result.stdout.components(separatedBy: "candidates:").count == 2)
+      }
+      try seedTasks(store(scratch))
+      try store(scratch).write { try $0.database.execute(sql: "UPDATE task SET plan_md=plan_md||char(10)") }
+      let task = try run(["--task", "AC-1"], repo, scratch)
+      withKnownIssue("#16: Plan trailing newline must not add empty footer line") {
+        #expect(!task.stdout.contains("\n\nmore:"))
+      }
     }
   }
 }

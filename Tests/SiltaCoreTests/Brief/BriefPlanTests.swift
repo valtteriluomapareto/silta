@@ -17,7 +17,9 @@ struct BriefPlanTests {
       """, ref: "AC-1", revision: 2)
     #expect(section.text.contains("1 done\n2. [ ] open"))
     #expect(section.text.contains("3–4 done\n5. [ ] next"))
-    #expect(!section.text.contains("nested"))
+    withKnownIssue("#16: Open nested work under a done parent must remain visible") {
+      #expect(section.text.contains("nested"))
+    }
     #expect(BriefPlan.through(section.text) == 5)
     let trimmed = BriefBudget.trim([section], characters: 58)
     #expect(trimmed.truncated)
