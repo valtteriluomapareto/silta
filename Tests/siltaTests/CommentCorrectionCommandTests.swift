@@ -98,6 +98,10 @@ extension CommentCorrectionCommandTests {
       let shown = try SiltaBinary.run(
         ["task", "show", "AC-1"], in: scratch, environment: TaskCommandTests.fixed)
       #expect(shown.stdout.contains("[answered, unresolved]") == (recipient == "agent:claude:answerer"))
+      _ = try SiltaBinary.run(["comment", "delete", "AC-1/2"], in: scratch,
+        environment: TaskCommandTests.fixed.merging(["SILTA_ACTOR": "agent:claude:answerer"]) { $1 })
+      let deleted = try SiltaBinary.run(["task", "show", "AC-1"], in: scratch, environment: TaskCommandTests.fixed)
+      #expect(deleted.stdout.contains("[unresolved]") && !deleted.stdout.contains("[answered,"))
     }
   }
 }
