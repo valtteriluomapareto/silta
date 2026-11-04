@@ -301,6 +301,7 @@ extension DogfoodLogTests {
       (["ws", "edit", "beta", "-F", yaml.path, "--approved", "Rename Acme Beta"], "beta"),
       (["ws", "ls"], nil),
       (["schema"], nil),
+      (["doctor", "--ws", "absent"], nil),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
     ]

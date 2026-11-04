@@ -1403,6 +1403,34 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     overrides.
   - **Data:** stale claims (over 2 h), backup age, CLI vs app version skew.
 
+  The read-only diagnostic command reports all workspaces; `--ws` does not filter
+  it. `data.checks` contains ordered checks with `id`, `status` (`pass`, `warning`,
+  `fail`, `skipped`), `message` and `next` (inspection or recovery commands).
+  Failures return exit 9 / `env`, `ok:false` and the complete report in `data`;
+  the error's `next` starts at the first failed check. Warnings and skipped checks
+  alone return exit 0. Text mode keeps the report on stdout and errors on stderr,
+  including with `--quiet`. Checks never clear claims, remove overrides, fetch,
+  initialize or migrate. Missing data is a failure with `silta init` as recovery.
+
+  WAL above 64 MiB, missing/invalid fetch timestamps or fetches older than 24 h,
+  and missing/invalid claim timestamps or claims older than 2 h warn. Orphaned
+  overrides (missing `.git` marker) warn; dead registered repo paths fail.
+  Missing, older or writer-incompatible schema metadata fails;
+  pending migrations suggest `silta init`, which explicitly applies them; compatible unknown
+  migrations warn (D32). Checks requiring an incompatible database are skipped.
+  Backup freshness uses published nonempty regular daily backup files, excluding
+  symlinks and pre-migration snapshots: no daily backup, or the latest one older
+  than yesterday in UTC, warns. This checks presence and age, not backup integrity.
+  Each check retains its own `next`; a warning is not permission to repair data.
+
+  Installation checks and `--fix` follow the installer formats when available.
+  Install, index/FTS/index age (M3), and app version skew (M5) checks are explicitly
+  skipped until those surfaces exist; a passing diagnostic run does not certify
+  them. Repo/override checks verify `.git` marker presence, not the usability of a
+  linked worktree's `gitdir` target. Check warnings live in `data.checks`; envelope
+  and command-log warnings describe command/environment warnings. Failures before
+  CLI environment setup are not logged.
+
 ## 20. Testing strategy
 
 | Tier | What | Notes |

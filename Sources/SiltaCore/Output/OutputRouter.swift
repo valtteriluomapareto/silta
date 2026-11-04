@@ -23,6 +23,26 @@ package enum OutputRouter {
   }
 
   private static func success(_ output: CommandOutput, mode: OutputMode) throws -> Rendered {
+    if let error = output.failure {
+      if !mode.json {
+        let rendered = failure(error, mode: mode)
+        return Rendered(
+          stdout: terminated(output.text),
+          stderr: output.warnings.map { "warning: \($0.message) [\($0.code)]\n" }.joined()
+            + rendered.stderr,
+          exitCode: rendered.exitCode, errorCode: error.code,
+          warningCodes: output.warnings.map(\.code))
+      }
+      let envelope = Envelope(
+        ok: false, data: Envelope.AnyData(value: output.data),
+        error: EnvelopeFailure(
+          code: error.code.rawValue, message: error.message, next: error.next,
+          nextBy: error.nextBy.rawValue, retryAfter: error.retryAfter),
+        warnings: output.warnings)
+      return Rendered(
+        stdout: try line(envelope), stderr: "", exitCode: error.code.exitCode,
+        errorCode: error.code, warningCodes: output.warnings.map(\.code))
+    }
     if mode.json {
       let envelope = Envelope(
         ok: true, data: Envelope.AnyData(value: output.data), error: nil,

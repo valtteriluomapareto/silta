@@ -1,0 +1,14 @@
+fail: database.integrity: Database is missing.
+  next: silta init
+skipped: database.foreign_keys: Requires a readable, compatible database.
+skipped: database.schema: Requires a readable, compatible database.
+skipped: database.wal: Requires a readable, compatible database.
+pass: git.version: Git is available at /usr/bin/git.
+skipped: git.repos: Requires a readable, compatible database.
+skipped: git.fetch: Requires a readable, compatible database.
+skipped: git.overrides: Requires a readable, compatible database.
+skipped: data.claims: Requires a readable, compatible database.
+skipped: data.backup: Requires a readable, compatible database.
+skipped: install: Installer diagnostics are not available yet.
+skipped: index: Index diagnostics are not available yet.
+skipped: app.version: App version diagnostics are not available yet.

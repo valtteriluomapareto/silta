@@ -1,0 +1,17 @@
+fixtures: true
+steps:
+  - args: [init, --scan, ., --json]
+    cwd: fixtures
+    expect: {exit: 0, json: {data.workspace: fixtures}}
+  - args: [ws, use, fixtures, --json]
+    expect: {exit: 0, json: {data.workspace: fixtures}}
+  - args: [task, add, Acme diagnostics, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: FI-1, data.status: doing}}
+  - args: [doctor, --ws, absent, --json]
+    expect:
+      exit: 0
+      json: {ok: true, data.checks.0.status: pass, data.checks.8.id: data.claims, data.checks.8.status: pass, data.checks.10.status: skipped}
+  - args: [task, show, FI-1, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 0, json: {data.status: doing, data.claimed_by: 'agent:codex:acme'}}
