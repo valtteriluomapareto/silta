@@ -48,7 +48,7 @@ struct GitRunnerTests {
         "SILTA_HOME": "isolated", "UNRELATED": "preserved",
         "HTTPS_PROXY": "http://proxy.acme.example", "NO_PROXY": "localhost",
         "XDG_CONFIG_HOME": scratch.appending(path: "config").path, "TMPDIR": scratch.path,
-        "GIT_DIR": "ignored", "GIT_SSH_COMMAND": "ignored",
+        "GIT_DIR": "ignored", "GIT_SSH_COMMAND": "ignored", "GIT_NO_LAZY_FETCH": "0",
         "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_COUNT": "1", "GIT_TERMINAL_PROMPT": "1",
         "LC_ALL": "fi_FI.UTF-8",
       ]
@@ -65,7 +65,8 @@ struct GitRunnerTests {
       actual.removeValue(forKey: "__CF_USER_TEXT_ENCODING")
       var expected = inherited.filter { !$0.key.hasPrefix("GIT_") }
       expected.merge([
-        "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
+        "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1",
+        "LC_ALL": "C",
         "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
       ]) { _, fixed in fixed }
       #expect(actual == expected)
@@ -74,15 +75,13 @@ struct GitRunnerTests {
   }
 
   @Test func inheritedEnvironmentCannotEnableLazyFetching() async throws {
-    await withKnownIssue("#11: inheritedEnvironmentCannotEnableLazyFetching") {
-      try await withScratchDirectory { scratch in
-        let runner = SystemGitRunner(
-          executable: "/usr/bin/env",
-          environment: ["GIT_NO_LAZY_FETCH": "0"])
-        let result = try await runner.run(GitRequest(arguments: [], directory: scratch))
-        let text = try #require(String(bytes: result.stdout, encoding: .utf8))
-        #expect(text.split(separator: "\n").contains("GIT_NO_LAZY_FETCH=1"))
-      }
+    try await withScratchDirectory { scratch in
+      let runner = SystemGitRunner(
+        executable: "/usr/bin/env",
+        environment: ["GIT_NO_LAZY_FETCH": "0"])
+      let result = try await runner.run(GitRequest(arguments: [], directory: scratch))
+      let text = try #require(String(bytes: result.stdout, encoding: .utf8))
+      #expect(text.split(separator: "\n").contains("GIT_NO_LAZY_FETCH=1"))
     }
   }
 

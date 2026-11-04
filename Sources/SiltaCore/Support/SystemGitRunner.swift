@@ -23,7 +23,8 @@ package struct SystemGitRunner: GitRunner {
     self.killAfter = killAfter
     var child = environment.filter { !$0.key.hasPrefix("GIT_") }
     child.merge([
-      "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
+      "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1",
+      "LC_ALL": "C",
       "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
     ]) { _, fixed in fixed }
     self.environment = child

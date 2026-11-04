@@ -8,7 +8,7 @@ struct LocationGit {
     let result: GitResult
     do {
       result = try await runner.run(
-        .init(arguments: ["--no-lazy-fetch"] + arguments, directory: directory))
+        .init(arguments: arguments, directory: directory))
     } catch {
       throw LocationError.git
     }
@@ -32,7 +32,7 @@ struct LocationGit {
       result = try await runner.run(
         .init(
           arguments: [
-            "--no-lazy-fetch", "rev-parse", "--path-format=absolute", "--git-common-dir",
+            "rev-parse", "--path-format=absolute", "--git-common-dir",
           ],
           directory: directory))
     } catch { throw LocationError.git }

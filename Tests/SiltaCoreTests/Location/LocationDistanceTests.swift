@@ -165,7 +165,7 @@ struct LocationDistanceTests {
     -> (GitRequest, Result<GitResult, any Error>)
   {
     (
-      .init(arguments: ["--no-lazy-fetch"] + arguments, directory: directory),
+      .init(arguments: arguments, directory: directory),
       .success(.init(termination: .exit(status), stdout: Data((output + "\n").utf8)))
     )
   }
