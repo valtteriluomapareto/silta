@@ -35,7 +35,9 @@ struct LocationDistanceTests {
         let environment = try environment(runner, home: home, store: store)
         let result = try await LocationService(environment: environment).resolve(path: repo)
         #expect(result.reason == (shallow ? "shallow" : "distance"))
-        #expect(result.app == (shallow ? nil : "api"))
+        #expect(result.app == nil)
+        #expect(
+          result.retryCandidates.map(\.app) == (shallow ? ["api", "portal"] : ["portal", "api"]))
         #expect(runner.isExhausted)
         #expect(runner.requests.filter { $0.arguments.contains("rev-list") }.count == count)
       }
@@ -152,7 +154,7 @@ struct LocationDistanceTests {
 
   private func distanceSteps(_ repo: URL) -> [(GitRequest, Result<GitResult, any Error>)] {
     [
-      step(["rev-list", "--count", "aaaaaaaa..aaaaaaaa"], "0", repo),
+      step(["rev-list", "--count", "aaaaaaaa..aaaaaaaa"], "2", repo),
       step(["rev-list", "--count", "aaaaaaaa..aaaaaaaa"], "0", repo),
       step(["rev-list", "--count", "bbbbbbbb..aaaaaaaa"], "1", repo),
       step(["rev-list", "--count", "aaaaaaaa..bbbbbbbb"], "0", repo),

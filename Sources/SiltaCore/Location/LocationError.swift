@@ -1,6 +1,7 @@
 /// Location failures with commands an agent can act on.
 package enum LocationError: CodedError {
   case unregistered
+  case outsideRepository
   case invalidPath
   case git
   case app(String, workspace: String)
@@ -10,7 +11,7 @@ package enum LocationError: CodedError {
   /// Maps registration, selection, configuration and environment failures to the CLI table.
   package var code: ErrorCode {
     switch self {
-    case .unregistered: .unregistered
+    case .unregistered, .outsideRepository: .unregistered
     case .invalidPath: .invalid
     case .git: .env
     case .app: .notFound
@@ -23,6 +24,7 @@ package enum LocationError: CodedError {
   package var message: String {
     switch self {
     case .unregistered: "This path is not in a registered repository."
+    case .outsideRepository: "This path is outside Git. Carry on without Silta."
     case .invalidPath: "Location needs an existing directory."
     case .git: "Could not read git metadata for location; check the local repository."
     case .app(let app, _): "App \(app.debugDescription) was not found in this workspace."
@@ -35,6 +37,7 @@ package enum LocationError: CodedError {
   package var next: [String] {
     switch self {
     case .unregistered: ["silta init --scan <directory>"]
+    case .outsideRepository: ["silta where --help"]
     case .invalidPath: ["silta where --help"]
     case .git: ["silta doctor"]
     case .app(_, let workspace): ["silta --ws \(shellWord(workspace)) ws show"]

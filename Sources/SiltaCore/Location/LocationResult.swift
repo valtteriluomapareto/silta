@@ -22,6 +22,12 @@ package struct LocationResult: Encodable, Sendable {
   package var reason: String
   /// The filtered candidates, sorted by app slug.
   package let candidates: [LocationCandidate]
+  var retryApps: [String]?
+  /// Candidate retries in score order, then unscored candidates by app slug.
+  package var retryCandidates: [LocationCandidate] {
+    guard let retryApps else { return candidates }
+    return retryApps.compactMap { app in candidates.first { $0.app == app } }
+  }
   /// Missing-ref diagnostics, rendered in the envelope rather than data.
   package var warnings: [OutputWarning] = []
 

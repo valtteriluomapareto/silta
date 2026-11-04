@@ -40,6 +40,8 @@ extension LocationService {
     }
     result.app = distance.app
     result.confidence = distance.confidence
+    result.retryApps =
+      distance.ranked + candidates.map(\.app).filter { !distance.ranked.contains($0) }
     if refs.count != candidates.count {
       result.app = nil
       result.confidence = "low"

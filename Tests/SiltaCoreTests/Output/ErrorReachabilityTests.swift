@@ -54,7 +54,7 @@ extension WorkspaceError: ErrorExamples {
 extension LocationError: ErrorExamples {
   static var examples: [LocationError] {
     [
-      .unregistered, .invalidPath, .git, .app("missing", workspace: "acme"),
+      .unregistered, .outsideRepository, .invalidPath, .git, .app("missing", workspace: "acme"),
       .outsideCandidates(["api", "portal"], workspace: "acme", path: "/acme"),
       .changed(workspace: "acme", path: "/acme"),
     ]

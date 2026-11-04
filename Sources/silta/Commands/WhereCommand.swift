@@ -48,12 +48,14 @@ struct WhereCommand: OutputCommand {
       + " [\(result.confidence): \(result.reason)]\n"
       + "branch: \(result.branch ?? "(detached)")\nhead: \(result.head)\n"
     if result.confidence == "low" {
-      text += "candidates: " + result.candidates.map(\.app).joined(separator: ", ") + "\n"
+      let candidates = result.retryCandidates
+      text +=
+        "candidates: " + candidates.map { "\($0.app) (\($0.ref))" }.joined(separator: ", ") + "\n"
       if result.candidates.isEmpty {
         text += "next: silta --ws \(shellWord(result.workspace)) ws show\n"
       }
-      text += result.candidates.map {
-        "next: silta --ws \(shellWord(result.workspace)) where --path \(shellWord(directory.path))"
+      text += candidates.map {
+        "next: silta --ws \(shellWord(result.workspace)) where --path \(shellWord(result.path))"
           + " --app \(shellWord($0.app))\n"
       }.joined()
     }
@@ -65,7 +67,7 @@ struct WhereCommand: OutputCommand {
       } else {
         receipt = "Override \(unset ? "removed" : "set")"
       }
-      text = "\(receipt) for \(directory.resolvingSymlinksInPath().path).\n" + text
+      text = "\(receipt) for \(result.worktree).\n" + text
     }
     return CommandOutput(
       text: text, quiet: quiet, data: result,

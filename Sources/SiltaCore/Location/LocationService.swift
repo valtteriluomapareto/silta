@@ -74,7 +74,13 @@ package struct LocationService {
     candidates: [LocationCandidate], path: URL
   ) throws -> String? {
     if let task {
-      let selected = try TaskService(environment: environment, workspace: repo.workspace).show(task)
+      let selected: TaskDetails
+      do {
+        selected = try TaskService(environment: environment, workspace: repo.workspace).show(task)
+      } catch let error as any CodedError where error.code == .notFound {
+        throw CommandFailure(
+          error: error, next: ["silta --ws " + shellWord(repo.workspace) + " task ls"])
+      }
       if let app = selected.app {
         try validate(app, candidates: candidates, repo: repo, path: path)
         return app
@@ -121,7 +127,7 @@ package struct LocationService {
     }
     let git = LocationGit(runner: environment.git, directory: path)
     guard let common = try await git.commonDirectory() else {
-      throw unregistered(path: path, workspace: workspace)
+      throw LocationError.outsideRepository
     }
     if let workspace { _ = try WorkspaceSelection.resolve(workspace, in: environment.db) }
     let root = try LocationPath.canonical(
