@@ -1,0 +1,2 @@
+error: Workspace acme setting archive_after_days has invalid stored value 1.5. [invalid]
+next: silta --ws 'acme' ws show
