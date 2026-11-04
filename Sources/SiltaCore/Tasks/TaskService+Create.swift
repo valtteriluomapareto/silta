@@ -9,10 +9,10 @@ extension TaskService {
       required: draft.allowSecret, command: draft.command + " '<title>' -F <file> --allow-secret")
     var creation = try prepare(draft, command: draft.command + " '<title>' -F <file>")
     let slug = try selected()
-    creation.path = try appPath(draft.app, workspace: slug)
+    creation = try resolved(creation, workspace: slug)
     creation.git = try await TaskGit.inspect(
       repo: creation.path, directory: directory, runner: environment.git,
-      enabled: draft.start && draft.app != nil, completion: false)
+      enabled: draft.start && creation.app != nil, completion: false)
     let prepared = creation
     return try environment.db.write { tx in
       let command = prepared.draft.command + (draft.allowSecret ? " --allow-secret" : "")
@@ -62,7 +62,12 @@ extension TaskService {
       try Self.named("parent") { try Self.lookup(ref, workspace: workspace, in: db) }
     }
     if let parent { try Self.validateParent(parent) }
-    let app = try draft.app.map { try Self.entity("app", slug: $0, workspace: ws, in: db) }
+    if draft.app == nil, let parent, parent.app != creation.app {
+      throw TaskError.changed(parent.ref)
+    }
+    let app = try (draft.app ?? parent?.app).map {
+      try Self.entity("app", slug: $0, workspace: ws, in: db)
+    }
     if let app, try Self.repoPath(app: app, in: db) != creation.path {
       throw TaskError.changed(nil)
     }
@@ -106,6 +111,24 @@ extension TaskService {
     if start { return "doing" }
     return environment.actor.isHuman || parent?.claimedBy == environment.actor.description
       ? "todo" : "proposed"
+  }
+
+  /// The creation with the app it takes and that app's repository, both resolved
+  /// before any git work so the write can compare against them.
+  func resolved(_ creation: TaskCreation, workspace: String) throws -> TaskCreation {
+    var resolved = creation
+    resolved.app = try appSlug(creation.draft, workspace: workspace)
+    resolved.path = try appPath(resolved.app, workspace: workspace)
+    return resolved
+  }
+
+  /// The app a creation takes: the explicit one, or the parent's when `--app` is absent.
+  private func appSlug(_ draft: TaskDraft, workspace: String) throws -> String? {
+    if let app = draft.app { return app }
+    guard let ref = draft.parent else { return nil }
+    return try environment.db.read { db in
+      try Self.named("parent") { try Self.lookup(ref, workspace: workspace, in: db) }.app
+    }
   }
 
   private func appPath(_ app: String?, workspace: String) throws -> String? {

@@ -31,6 +31,20 @@ struct TaskParentAppTests {
     }
   }
 
+  static func identity(
+    _ repository: URL, directory: URL
+  ) -> (GitRequest, Result<GitResult, any Error>) {
+    (
+      .init(
+        arguments: ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        directory: directory),
+      .success(
+        .init(
+          termination: .exit(0),
+          stdout: Data((repository.path + "/.git\n").utf8)))
+    )
+  }
+
   static func appTask(_ service: TaskService, directory: URL) async throws -> TaskResult {
     var draft = TaskDraft(title: "Acme app work")
     draft.app = "api"
@@ -39,29 +53,29 @@ struct TaskParentAppTests {
   }
 
   @Test func subtaskInheritsTheParentAppAndRecordsItsCommit() async throws {
-    await withKnownIssue("#SI-27: a subtask keeps the app of its parent") {
-      try await withScratchDirectory { home in
-        let repo = home.appending(path: "repo", directoryHint: .isDirectory)
-        let other = home.appending(path: "other", directoryHint: .isDirectory)
-        let git = ScriptedGitRunner(
-          script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
-            + TaskGitTests.script(repo: repo, cwd: repo, completion: true))
-        let env = try TaskServiceTests.environment(home.appending(path: "db"), git: git)
-        try Self.configure(env, repo: repo, other: other)
-        let service = TaskService(environment: env)
-        let root = try await Self.appTask(service, directory: repo)
-        var child = TaskDraft(title: "Acme child")
-        child.parent = root.ref
-        let created = try await service.add(child, directory: repo)
-        #expect(created.status == "todo")
-        let shown = try service.show(created.ref)
-        #expect(shown.app == "api" && shown.repoPath == repo.path && shown.parent == root.ref)
-        let done = try await service.close(
-          created.ref, result: "Done.", directory: repo).result
-        #expect(done.status == "done")
-        #expect(try service.show(created.ref).doneSHA == TaskGitTests.sha)
-        #expect(git.isExhausted)
-      }
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "repo", directoryHint: .isDirectory)
+      let other = home.appending(path: "other", directoryHint: .isDirectory)
+      let git = ScriptedGitRunner(
+        script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
+          + TaskGitTests.script(repo: repo, cwd: repo, completion: true))
+      let env = try TaskServiceTests.environment(home.appending(path: "db"), git: git)
+      try Self.configure(env, repo: repo, other: other)
+      let service = TaskService(environment: env)
+      let root = try await Self.appTask(service, directory: repo)
+      var child = TaskDraft(title: "Acme child")
+      child.parent = root.ref
+      let created = try await service.add(child, directory: repo)
+      #expect(created.status == "todo")
+      let shown = try service.show(created.ref)
+      #expect(shown.app == "api" && shown.repoPath == repo.path && shown.parent == root.ref)
+      let done = try await service.close(
+        created.ref, result: "Done.", directory: repo
+      ).result
+      #expect(done.status == "done")
+      let after = try service.show(created.ref)
+      #expect(after.doneSHA == TaskGitTests.sha)
+      #expect(git.isExhausted)
     }
   }
 
@@ -104,114 +118,106 @@ struct TaskParentAppTests {
 
   @Test(arguments: [false, true])
   func fromPlanTakesTheParentsAppForEveryCreatedTask(split: Bool) async throws {
-    await withKnownIssue("#SI-27: a subtask keeps the app of its parent") {
-      try await withScratchDirectory { home in
-        let repo = home.appending(path: "repo", directoryHint: .isDirectory)
-        let other = home.appending(path: "other", directoryHint: .isDirectory)
-        let env = try TaskServiceTests.environment(home.appending(path: "db"))
-        try Self.configure(env, repo: repo, other: other)
-        let service = TaskService(environment: env)
-        var parent = TaskDraft(title: "Acme parent")
-        parent.app = "api"
-        let root = try await service.add(parent, directory: home)
-        var options = TaskImport()
-        options.parent = root.ref
-        options.split = split
-        let imported = try await service.fromPlan(
-          TaskImportTests.text, options: options, directory: home)
-        #expect(!imported.tasks.isEmpty)
-        for task in imported.tasks {
-          #expect(try service.show(task.ref).app == "api")
-          #expect(try service.show(task.ref).repoPath == repo.path)
-        }
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "repo", directoryHint: .isDirectory)
+      let other = home.appending(path: "other", directoryHint: .isDirectory)
+      let env = try TaskServiceTests.environment(home.appending(path: "db"))
+      try Self.configure(env, repo: repo, other: other)
+      let service = TaskService(environment: env)
+      var parent = TaskDraft(title: "Acme parent")
+      parent.app = "api"
+      let root = try await service.add(parent, directory: home)
+      var options = TaskImport()
+      options.parent = root.ref
+      options.split = split
+      let imported = try await service.fromPlan(
+        TaskImportTests.text, options: options, directory: home)
+      #expect(!imported.tasks.isEmpty)
+      for task in imported.tasks {
+        #expect(try service.show(task.ref).app == "api")
+        #expect(try service.show(task.ref).repoPath == repo.path)
       }
     }
   }
 
   @Test func startedSubtaskFromTheParentsRepositoryRecordsItsWorktree() async throws {
-    await withKnownIssue("#SI-27: a subtask keeps the app of its parent") {
-      try await withScratchDirectory { home in
-        let repo = home.appending(path: "repo", directoryHint: .isDirectory)
-        let other = home.appending(path: "other", directoryHint: .isDirectory)
-        let git = ScriptedGitRunner(
-          script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
-            + TaskGitTests.script(repo: repo, cwd: repo, completion: false))
-        let env = try TaskServiceTests.environment(home.appending(path: "db"), git: git)
-        try Self.configure(env, repo: repo, other: other)
-        let service = TaskService(environment: env)
-        let root = try await Self.appTask(service, directory: repo)
-        var child = TaskDraft(title: "Acme child")
-        child.parent = root.ref
-        child.start = true
-        let created = try await service.add(child, directory: repo)
-        #expect(created.status == "doing")
-        let shown = try service.show(created.ref)
-        #expect(shown.app == "api")
-        #expect(shown.branch == "acme-release" && shown.worktree == repo.path)
-        #expect(shown.claimedBy == TaskServiceTests.agent.description)
-        #expect(git.isExhausted)
-      }
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "repo", directoryHint: .isDirectory)
+      let other = home.appending(path: "other", directoryHint: .isDirectory)
+      let git = ScriptedGitRunner(
+        script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
+          + TaskGitTests.script(repo: repo, cwd: repo, completion: false))
+      let env = try TaskServiceTests.environment(home.appending(path: "db"), git: git)
+      try Self.configure(env, repo: repo, other: other)
+      let service = TaskService(environment: env)
+      let root = try await Self.appTask(service, directory: repo)
+      var child = TaskDraft(title: "Acme child")
+      child.parent = root.ref
+      child.start = true
+      let created = try await service.add(child, directory: repo)
+      #expect(created.status == "doing")
+      let shown = try service.show(created.ref)
+      #expect(shown.app == "api")
+      #expect(shown.branch == "acme-release" && shown.worktree == repo.path)
+      #expect(shown.claimedBy == TaskServiceTests.agent.description)
+      #expect(git.isExhausted)
     }
   }
 
   @Test func startedSubtaskFromAnotherRepositoryIsRefused() async throws {
-    await withKnownIssue("#SI-27: a subtask keeps the app of its parent") {
-      try await withScratchDirectory { home in
-        let repo = home.appending(path: "repo", directoryHint: .isDirectory)
-        let other = home.appending(path: "other", directoryHint: .isDirectory)
-        let git = ScriptedGitRunner(
-          script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
-            + Array(TaskGitTests.script(repo: repo, cwd: other, completion: false).prefix(2)))
-        let env = try TaskServiceTests.environment(home.appending(path: "db"), git: git)
-        try Self.configure(env, repo: repo, other: other)
-        let service = TaskService(environment: env)
-        let root = try await Self.appTask(service, directory: repo)
-        var child = TaskDraft(title: "Acme child")
-        child.parent = root.ref
-        child.start = true
-        await #expect(throws: TaskError.foreignRepo) {
-          _ = try await service.add(child, directory: other)
-        }
-        #expect(try service.list().map(\.ref) == [root.ref])
-        #expect(git.isExhausted)
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "repo", directoryHint: .isDirectory)
+      let other = home.appending(path: "other", directoryHint: .isDirectory)
+      let git = ScriptedGitRunner(
+        script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
+          + [Self.identity(repo, directory: repo), Self.identity(other, directory: other)])
+      let env = try TaskServiceTests.environment(home.appending(path: "db"), git: git)
+      try Self.configure(env, repo: repo, other: other)
+      let service = TaskService(environment: env)
+      let root = try await Self.appTask(service, directory: repo)
+      var child = TaskDraft(title: "Acme child")
+      child.parent = root.ref
+      child.start = true
+      await #expect(throws: TaskError.foreignRepo) {
+        _ = try await service.add(child, directory: other)
       }
+      #expect(try service.list().map(\.ref) == [root.ref])
+      #expect(git.isExhausted)
     }
   }
 
   /// The app the early read saw drives git and the recorded path, so a later change
   /// refuses instead of writing a stale repository binding.
   @Test func parentAppChangedBeforeTheInsertIsRefused() async throws {
-    await withKnownIssue("#SI-27: a subtask keeps the app of its parent") {
-      try await withScratchDirectory { home in
-        let repo = home.appending(path: "repo", directoryHint: .isDirectory)
-        let other = home.appending(path: "other", directoryHint: .isDirectory)
-        let setup = try TaskServiceTests.environment(
-          home.appending(path: "db"), actor: TaskServiceTests.human())
-        try Self.configure(setup, repo: repo, other: other)
-        var parent = TaskDraft(title: "Acme parent")
-        parent.app = "api"
-        let root = try await TaskService(environment: setup).add(parent, directory: home)
-        let git = ScriptedGitRunner(
-          script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
-        ) { request in
-          if request.arguments == ["rev-parse", "--abbrev-ref", "HEAD"] {
-            try setup.db.write {
-              try $0.database.execute(sql: "UPDATE task SET app_id=NULL WHERE seq=1")
-            }
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "repo", directoryHint: .isDirectory)
+      let other = home.appending(path: "other", directoryHint: .isDirectory)
+      let setup = try TaskServiceTests.environment(
+        home.appending(path: "db"), actor: TaskServiceTests.human())
+      try Self.configure(setup, repo: repo, other: other)
+      var parent = TaskDraft(title: "Acme parent")
+      parent.app = "api"
+      let root = try await TaskService(environment: setup).add(parent, directory: home)
+      let git = ScriptedGitRunner(
+        script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
+      ) { request in
+        if request.arguments == ["rev-parse", "--abbrev-ref", "HEAD"] {
+          try setup.db.write {
+            try $0.database.execute(sql: "UPDATE task SET app_id=NULL WHERE seq=1")
           }
         }
-        let service = TaskService(
-          environment: try TaskServiceTests.environment(home.appending(path: "db"), git: git))
-        var child = TaskDraft(title: "Acme child")
-        child.parent = root.ref
-        child.start = true
-        await #expect(throws: TaskError.changed(root.ref)) {
-          _ = try await service.add(child, directory: repo)
-        }
-        #expect(try service.list().map(\.ref) == [root.ref])
-        #expect(try service.show(root.ref).app == nil)
-        #expect(git.isExhausted)
       }
+      let service = TaskService(
+        environment: try TaskServiceTests.environment(home.appending(path: "db"), git: git))
+      var child = TaskDraft(title: "Acme child")
+      child.parent = root.ref
+      child.start = true
+      await #expect(throws: TaskError.changed(root.ref)) {
+        _ = try await service.add(child, directory: repo)
+      }
+      #expect(try service.list().map(\.ref) == [root.ref])
+      #expect(try service.show(root.ref).app == nil)
+      #expect(git.isExhausted)
     }
   }
 

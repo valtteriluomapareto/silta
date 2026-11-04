@@ -15,7 +15,7 @@ package struct TaskDraft: Sendable {
   /// Names a parent task in the selected workspace.
   package var parent: String?
 
-  /// Names an explicit app; absent means non-code work.
+  /// Names an explicit app; absent takes the parent's app, or means non-code work.
   package var app: String?
 
   /// Names existing workspace topics.

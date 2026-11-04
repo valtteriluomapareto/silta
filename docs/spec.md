@@ -531,10 +531,12 @@ uses `-F <file>` when the body came from stdin. A human's request in chat for th
 write is its go-ahead. Proposals that already exist when the setting changes stay in
 triage, or leave the inbox after 14 days as usual.
 
-`--parent` needs an open (not `done` or `dropped`), unpromoted parent. `from-plan
---split` children take the root's status, decided once per import: `todo` under a
-`todo` or `doing` root, `proposed` under a `proposed` one; `--dry-run` shows the same
-(D40). A title is one line without control characters.
+`--parent` needs an open (not `done` or `dropped`), unpromoted parent. A subtask takes
+its parent's app when `--app` is absent, an explicit `--app` overrides it, and this
+holds for every task `from-plan` creates. `from-plan --split` children take the root's
+status, decided once per import: `todo` under a `todo` or `doing` root, `proposed`
+under a `proposed` one; `--dry-run` shows the same (D40). A title is one line without
+control characters.
 A dry run validates or records no approval words and remains ungated. With
 `--approved`, would-be proposals preview `todo` and warn `approval_unused`.
 Under `proposals: ask` without approval, they also preview `todo`, with a warning

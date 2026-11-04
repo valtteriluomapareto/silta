@@ -18,6 +18,7 @@ extension TaskService {
     let cleanup = try await sourceToDelete(text, options: options, source: source, in: directory)
     let slug = try selected()
     let creations = try importCreations(parsed, options: options, redacted: redacted)
+      .map { try resolved($0, workspace: slug) }
     let result = try environment.db.write { tx in
       let retry = (scopedCommand(options.retryCommand, workspace: slug), nil as String?)
       let inserted = try insert(

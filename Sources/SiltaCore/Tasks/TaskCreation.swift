@@ -10,6 +10,9 @@ struct TaskCreation: Sendable {
 
   var path: String?
 
+  /// The app the task takes, explicit or inherited from its parent.
+  var app: String?
+
   var git = TaskGit()
 
   var redacted = false
