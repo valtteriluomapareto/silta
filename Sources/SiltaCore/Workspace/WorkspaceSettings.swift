@@ -18,6 +18,8 @@ struct WorkspaceSettings: Sendable {
     case staleDays = "stale_days"
   }
 
+  static let defaultArchiveAfterDays = 14
+
   private let workspace: String
   let json: String
 
@@ -49,7 +51,7 @@ struct WorkspaceSettings: Sendable {
   }
 
   var archiveAfterDays: Int {
-    get throws { try days(.archiveAfterDays, default: 14) }
+    get throws { try days(.archiveAfterDays, default: Self.defaultArchiveAfterDays) }
   }
 
   var staleDays: Int {

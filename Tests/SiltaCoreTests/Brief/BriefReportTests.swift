@@ -28,20 +28,29 @@ extension BriefReportTests {
 
 extension BriefReportTests {
   @Test func markerBudgetBoundaries() {
-    let location = LocationResult(path: "/acme", worktree: "/acme", workspace: "acme",
-      repo: "platform", branch: "main", head: "a", confidence: "high", reason: "single", candidates: [])
+    let location = LocationResult(
+      path: "/acme", worktree: "/acme", workspace: "acme",
+      repo: "platform", branch: "main", head: "a", confidence: "high", reason: "single",
+      candidates: [])
     for budget in 60...120 {
-      let plan = BriefPlan.section("- [ ] first\n- [ ] " + String(repeating: "long ", count: 80), ref: "AC-1", revision: 0)
-      var report = BriefReport(location: BriefLocation(location),
-        settings: BriefSettings(WorkspaceSettings(workspace: "acme", json: "{}"), workspace: "acme"),
+      let plan = BriefPlan.section(
+        "- [ ] first\n- [ ] " + String(repeating: "long ", count: 80), ref: "AC-1", revision: 0)
+      var report = BriefReport(
+        location: BriefLocation(location),
+        settings: BriefSettings(
+          WorkspaceSettings(workspace: "acme", json: "{}"), workspace: "acme"),
         currentTask: "AC-1", sections: [plan], more: ["silta task show AC-1"], warnings: [])
       report.trim(tokens: budget)
       #expect(report.text.count <= budget * 4)
     }
-    var complete = BriefReport(location: BriefLocation(location),
+    var complete = BriefReport(
+      location: BriefLocation(location),
       settings: BriefSettings(WorkspaceSettings(workspace: "acme", json: "{}"), workspace: "acme"),
-      currentTask: "AC-1", sections: [BriefPlan.section("- [ ] first", ref: "AC-1", revision: 0),
-        BriefSection(id: "later", text: String(repeating: "x", count: 1000))],
+      currentTask: "AC-1",
+      sections: [
+        BriefPlan.section("- [ ] first", ref: "AC-1", revision: 0),
+        BriefSection(id: "later", text: String(repeating: "x", count: 1000)),
+      ],
       more: ["silta task show AC-1"], warnings: [])
     complete.trim(tokens: 100)
     #expect(complete.text.contains("(brief trimmed; see more)"))

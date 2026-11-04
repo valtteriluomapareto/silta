@@ -30,16 +30,14 @@ extension TaskService {
   }
 
   static func isArchived(_ task: TaskDetails, at date: Date, in db: Database) throws -> Bool {
-    if let choice = task.archiveOverride { return choice == "archived" }
-    guard ["done", "dropped"].contains(task.status), let closed = task.closedAt else {
-      return false
-    }
-    let instant: Date
-    do {
-      instant = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(closed)
-    } catch { throw StorageError.unavailable }
-    let days = try WorkspaceSettings.read(workspaceID: task.workspaceID, in: db).archiveAfterDays
-    return instant < date.addingTimeInterval(-Double(days) * 86400)
+    let usesDays =
+      task.archiveOverride == nil && ["done", "dropped"].contains(task.status)
+      && task.closedAt != nil
+    let days =
+      usesDays
+      ? try WorkspaceSettings.read(workspaceID: task.workspaceID, in: db).archiveAfterDays
+      : WorkspaceSettings.defaultArchiveAfterDays
+    return try TaskVisibility.isArchived(task, at: date, days: days, in: db)
   }
 
   /// Records tracker ownership and releases the local claim without changing status.

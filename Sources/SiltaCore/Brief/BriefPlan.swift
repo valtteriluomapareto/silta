@@ -13,7 +13,10 @@ enum BriefPlan {
       let end = index + 1 < boxes.count ? boxes[index + 1].line : lines.count
       let nested = Array(lines[(boxes[index].line + 1)..<end])
       return !MarkdownPlan.visibleLines(nested).contains {
-        nested[$0].firstMatch(of: #/^\s+(?:[-+*]|[0-9]+[.)]) +\[ \] /#) != nil
+        let line = nested[$0]
+        let indentation = line.prefix { $0 == " " || $0 == "\t" }
+        return !indentation.isEmpty
+          && MarkdownPlan.checkbox(String(line.dropFirst(indentation.count)))?.done == false
       }
     }
     var index = 0

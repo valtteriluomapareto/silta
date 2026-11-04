@@ -12,12 +12,11 @@ summary: Acme API
 environment: prod https://api.acme.example
 AGENTS.md: <repo>/AGENTS.md
 neighbour: api -> service:push [uses] Acme push
-next: silta --ws 'acme' code ls 'api'
 neighbour: api -> portal [calls] Acme integration
 next: silta --ws 'acme' code show 'api' 'README.md' --lines 1
 neighbour: portal -> api [calls] Acme caller
 next: silta --ws 'acme' code ls 'portal'
 open: AC-1 [doing, p2] Acme task
-open: AC-2 [doing, p2] Acme task
+open: AC-2 [doing, p2] Acme task (app: portal)
 glossary: messages = messaging, push
 more: silta --ws 'acme' task show AC-2

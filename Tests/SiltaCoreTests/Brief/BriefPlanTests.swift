@@ -38,9 +38,11 @@ struct BriefPlanTests {
 extension BriefPlanTests {
   @Test(arguments: ["-", "*", "+", "1.", "1)"])
   func nestedCheckboxVariants(_ marker: String) {
-    let open = BriefPlan.section("- [x] parent\n  \(marker) [ ] child\n- [ ] next", ref: "AC-1", revision: 0)
+    let open = BriefPlan.section(
+      "- [x] parent\n  \(marker) [ ] child\n- [ ] next", ref: "AC-1", revision: 0)
     #expect(open.text.contains("1. [x] parent\n  \(marker) [ ] child"))
-    let fenced = BriefPlan.section("- [x] parent\n  ```\n  \(marker) [ ] example\n  ```\n- [ ] next", ref: "AC-1", revision: 0)
+    let fenced = BriefPlan.section(
+      "- [x] parent\n  ```\n  \(marker) [ ] example\n  ```\n- [ ] next", ref: "AC-1", revision: 0)
     #expect(fenced.text.contains("1 done\n2. [ ] next"))
     #expect(!fenced.text.contains("example"))
   }

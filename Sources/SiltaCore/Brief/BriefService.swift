@@ -30,7 +30,8 @@ package struct BriefService {
         selected, settings,
         try BriefContext(
           db: db, location: location, actor: environment.actor,
-          date: environment.clock.now(), archiveDays: settings.archiveAfterDays ?? 14
+          date: environment.clock.now(),
+          archiveDays: settings.archiveAfterDays ?? WorkspaceSettings.defaultArchiveAfterDays
         ).sections(topics: topics)
       )
     }

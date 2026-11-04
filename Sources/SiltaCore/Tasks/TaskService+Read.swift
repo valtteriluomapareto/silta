@@ -24,31 +24,52 @@ extension TaskService {
     return try environment.db.read { db in
       let id = try Self.workspaceID(slug, in: db)
       if let on = filter.on { _ = try Self.blocker(on, workspace: slug, in: db) }
+      let visibility = try visibility(filter, workspace: id, in: db)
+      var arguments = visibility.arguments
+      arguments += ["workspace": id]
       return try Row.fetchAll(
         db,
         sql: Self.query + """
-          \nWHERE task.workspace_id=?
+          \nWHERE task.workspace_id=:workspace AND \(TaskVisibility.sql)
           ORDER BY task.priority,task.seq
-          """, arguments: [id]
+          """, arguments: arguments
       ).map { TaskDetails(row: $0) }.filter {
-        let visible =
-          $0.status != "proposed" || filter.proposed || filter.status == "proposed"
-          || environment.actor.isHuman || $0.createdBy == environment.actor.description
-        return visible && ($0.externalRef == nil || filter.promoted)
-          && (filter.status == nil || filter.status == $0.status)
+        (filter.status == nil || filter.status == $0.status)
           && (filter.app == nil || filter.app == $0.app)
           && (!filter.mine || $0.createdBy == environment.actor.description
             || $0.claimedBy == environment.actor.description)
       }.filter { try Self.matchesBlocker(filter.on, task: $0, workspace: slug, in: db) }
         .map { try Self.decorate($0, at: environment.clock.now(), in: db) }.filter {
-          (!($0.archived) || filter.archived)
-            && (filter.topic == nil
-              || $0.links.contains {
-                $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
-              })
+          (filter.topic == nil
+            || $0.links.contains {
+              $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
+            })
         }
 
     }
+  }
+
+  private func visibility(_ filter: TaskFilter, workspace id: Int64, in db: Database) throws
+    -> TaskVisibility
+  {
+    let hasClosed =
+      try Bool.fetchOne(
+        db,
+        sql: """
+          SELECT EXISTS(SELECT 1 FROM task WHERE workspace_id=? AND archive_override IS NULL
+            AND status IN ('done','dropped') AND closed_at IS NOT NULL
+            AND (external_ref IS NULL OR ?))
+          """, arguments: [id, filter.promoted]) == true
+    let days =
+      hasClosed
+      ? try WorkspaceSettings.read(workspaceID: id, in: db).archiveAfterDays
+      : WorkspaceSettings.defaultArchiveAfterDays
+    let visibility = TaskVisibility(
+      actor: environment.actor, at: environment.clock.now(),
+      days: days, proposed: filter.proposed || filter.status == "proposed",
+      promoted: filter.promoted, archived: filter.archived)
+    try visibility.validateDates(workspace: id, in: db)
+    return visibility
   }
 
   /// Reads a task and optionally its event history without creating storage.
