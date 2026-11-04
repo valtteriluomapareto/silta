@@ -269,6 +269,21 @@ struct WhereCommandTests {
 }
 
 extension WhereCommandTests {
+  @Test func delayedCheckoutCannotEstablishBranchCreationOrigin() throws {
+    withKnownIssue("#11: Later checkouts do not establish branch creation") {
+      try withScratchDirectory { scratch in
+        let repo = try setup(scratch)
+        try git(["checkout", "-qB", "release/acme", "master"], repo, scratch)
+        try git(["branch", "delayed-topic", "HEAD"], repo, scratch)
+        try git(["checkout", "-q", "master"], repo, scratch)
+        try git(["checkout", "-q", "delayed-topic"], repo, scratch)
+        let result = try data(run([], repo, scratch))
+        #expect(result["confidence"] as? String == "low")
+        #expect(result["app"] == nil)
+      }
+    }
+  }
+
   @Test func unrelatedCorruptionDoesNotPoisonRegisteredMatch() throws {
     try withScratchDirectory { scratch in
       let repo = try setup(scratch)
