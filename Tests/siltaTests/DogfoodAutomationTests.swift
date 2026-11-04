@@ -123,6 +123,8 @@ struct DogfoodAutomationTests {
         + "\"\(common)/refs\",\"\(common)/logs\",\"\(gitdir)\"]"
       #expect(args.contains(roots))
       #expect(args.contains("approval_policy=\"never\""))
+      #expect(args.contains("model=\"gpt-6.1-sol\""))
+      #expect(args.contains("model_reasoning_effort=\"high\""))
       #expect(args.contains("sandbox_workspace_write.network_access=true"))
       #expect(args.contains("shell_environment_policy.set.SILTA_ACTOR=\"agent:codex\""))
       #expect(

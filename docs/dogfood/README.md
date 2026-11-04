@@ -97,7 +97,8 @@ What the script fixes:
   subtask, and `dogfood-finish.sh` runs on that subtask. A subtask links no issue, so
   the slice issue stays open until its own task is done.
 
-Model and effort come from the maintainer's Codex configuration.
+Driven runs use `gpt-6.1-sol` at `high` effort, set in the script, whatever the
+maintainer's own Codex configuration says.
 
 ## Review friction
 

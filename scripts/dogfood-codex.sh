@@ -38,7 +38,10 @@ while IFS='=' read -r name _; do
   case "$name" in CLAUDE*|CODEX_COMPANION*|SILTA_ACTOR|SILTA_SESSION) unset_args+=(-u "$name") ;; esac
 done < <(env)
 roots="\"${SILTA_HOME:-$HOME/.silta}\",\"$common/objects\",\"$common/refs\",\"$common/logs\",\"$gitdir\""
+# The maintainer's choice for driven runs, independent of their own Codex settings.
 config=(
+  -c 'model="gpt-6.1-sol"'
+  -c 'model_reasoning_effort="high"'
   -c 'approval_policy="never"'
   -c 'sandbox_mode="workspace-write"'
   -c "sandbox_workspace_write.writable_roots=[$roots]"
