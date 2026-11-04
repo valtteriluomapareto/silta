@@ -41,14 +41,19 @@ enum TaskOutput {
         ]))),
   ])
 
+  /// A receipt's text: what changed (`AC-5 archived`) or the status, then an inherited app.
+  static func receiptText(_ result: TaskResult, change: String? = nil) -> String {
+    "\(result.ref) \(change ?? result.status)"
+      + (result.inheritedApp.map { " (app \($0))" } ?? "")
+  }
+
   /// A receipt whose text says what changed (`AC-5 archived`), or the status by default.
   /// `quiet` is what `--quiet` keeps: the ref a write created.
   static func receipt(
     _ result: TaskResult, change: String? = nil, quiet: String = "", approvalUsed: Bool = false
   ) -> CommandOutput {
-    let inherited = result.inheritedApp.map { " (app \($0))" } ?? ""
-    return CommandOutput(
-      text: "\(result.ref) \(change ?? result.status)" + inherited, quiet: quiet, data: result,
+    CommandOutput(
+      text: receiptText(result, change: change), quiet: quiet, data: result,
       warnings: result.warnings, approvalUsed: approvalUsed)
   }
 

@@ -2,6 +2,12 @@ import Darwin
 package import Foundation
 import GRDB
 
+/// What a scan bound: the workspace it created or refreshed, and its naming warnings.
+package struct ScanOutcome: Sendable {
+  package let workspace: String
+  package let warnings: [OutputWarning]
+}
+
 /// Discovers local clones without fetching and binds their machine-local paths.
 package enum RepositoryScan {
   /// Scans roots and two child levels. New workspaces get configuration stubs;
@@ -9,11 +15,11 @@ package enum RepositoryScan {
   package static func scan(
     _ roots: [URL], store: DatabaseStore, git: any GitRunner,
     identity: (ids: any IDGenerator, date: Date), workspace: String? = nil
-  ) async throws -> String {
+  ) async throws -> ScanOutcome {
     guard let first = roots.first else { throw RepoError.scan }
     let slug = workspace ?? first.standardizedFileURL.lastPathComponent.lowercased()
-    let repos = try await discover(roots, git: git)
-    guard Set(repos.map(\.slug)).count == repos.count else { throw RepoError.duplicateSlug }
+    let discovered = try await discover(roots, git: git)
+    var warnings: [OutputWarning] = []
     try store.write { tx in
       do {
         let db = tx.database
@@ -21,6 +27,9 @@ package enum RepositoryScan {
           db,
           sql: "SELECT id FROM workspace WHERE slug=?", arguments: [slug])
         if workspace != nil && existing == nil { throw WorkspaceError.notFound }
+        let repos = try Self.naming(
+          discovered, workspace: existing == nil ? nil : slug, in: db, into: &warnings)
+        guard Set(repos.map(\.slug)).count == repos.count else { throw RepoError.duplicateSlug }
         if existing == nil {
           let config = try configuration(slug: slug, name: first.lastPathComponent, repos: repos)
           try config.apply(in: tx, ids: identity.ids, at: identity.date)
@@ -47,6 +56,70 @@ package enum RepositoryScan {
       } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
         throw WorkspaceError.conflict
       }
+    }
+    return ScanOutcome(workspace: slug, warnings: warnings)
+  }
+
+  /// Repo slugs come from directory names, so a repo named `none` would collide with the
+  /// word that means non-code work. A new workspace names it `none-repo` with a warning;
+  /// an existing one keeps the slug it already stores, so a rescan finds its rows.
+  private static func naming(
+    _ repos: [DiscoveredRepo], workspace: String?, in db: Database,
+    into warnings: inout [OutputWarning]
+  ) throws -> [DiscoveredRepo] {
+    var stored: Set<String> = []
+    if let workspace {
+      stored = Set(
+        try String.fetchAll(
+          db,
+          sql: """
+            SELECT repo.slug
+            FROM repo
+            JOIN workspace ON workspace.id=repo.workspace_id
+            WHERE workspace.slug=?
+            """, arguments: [workspace]))
+    }
+    var taken = Set(repos.map(\.slug))
+    taken.remove(TaskDraft.noneApp)
+    return repos.map { repo in
+      guard repo.slug == TaskDraft.noneApp else { return repo }
+      let slug: String
+      if stored.contains(TaskDraft.noneApp) {
+        slug = TaskDraft.noneApp
+      } else if let kept = Self.storedReservedSlug(in: stored) {
+        slug = kept
+      } else {
+        slug = Self.freeReservedSlug(excluding: taken)
+        warnings.append(
+          OutputWarning(
+            code: "slug_renamed",
+            message: "Repo \(repo.slug) was renamed \(slug) because "
+              + "\(TaskDraft.noneApp) is reserved for non-code work."))
+      }
+      taken.insert(slug)
+      return repo.renamed(slug)
+    }
+  }
+
+  /// The `none-repo` name an existing workspace already stores, if any.
+  private static func storedReservedSlug(in stored: Set<String>) -> String? {
+    var slug = TaskDraft.noneApp + "-repo"
+    var suffix = 2
+    while suffix <= stored.count + 1 {
+      if stored.contains(slug) { return slug }
+      slug = TaskDraft.noneApp + "-repo-\(suffix)"
+      suffix += 1
+    }
+    return nil
+  }
+
+  /// The first `none-repo` name this scan has not given to another repo.
+  private static func freeReservedSlug(excluding taken: Set<String>) -> String {
+    var slug = TaskDraft.noneApp + "-repo"
+    var suffix = 2
+    while taken.contains(slug) {
+      slug = TaskDraft.noneApp + "-repo-\(suffix)"
+      suffix += 1
     }
     return slug
   }
@@ -83,7 +156,8 @@ package enum RepositoryScan {
       let refs = try await output(
         ["for-each-ref", "--format=%(refname:short)", "refs/remotes"], in: main, git: git)
       found[main.path] = DiscoveredRepo(
-        path: main, remote: url, refs: refs.split(separator: "\n").map(String.init))
+        path: main, slug: main.lastPathComponent.lowercased(), remote: url,
+        refs: refs.split(separator: "\n").map(String.init))
     }
     return found.values.sorted { $0.path.path < $1.path.path }
   }
@@ -146,12 +220,15 @@ package enum RepositoryScan {
 private struct DiscoveredRepo: Sendable {
   let path: URL
 
+  let slug: String
+
   let remote: String?
 
   let refs: [String]
 
-  var slug: String {
-    path.lastPathComponent.lowercased()
+  /// The same repo under another config slug.
+  func renamed(_ slug: String) -> DiscoveredRepo {
+    DiscoveredRepo(path: path, slug: slug, remote: remote, refs: refs)
   }
 
   var apps: [[String: String]] {

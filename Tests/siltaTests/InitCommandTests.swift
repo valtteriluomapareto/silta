@@ -74,16 +74,17 @@ struct InitCommandTests {
           ], in: scratch, cwd: repo)
         try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
       }
-      withKnownIssue("#SI-27: a repo named none keeps the scan going") {
-        let scan = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
-        #expect(scan.termination == .exit(0))
-        #expect(scan.stderr.contains("slug_renamed"))
-        #expect(scan.stderr.contains("none-repo"))
-        let shown = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
-        #expect(shown.termination == .exit(0))
-        #expect(shown.stdout.contains("\"slug\":\"none-repo\""))
-        #expect(!shown.stdout.contains("\"slug\":\"none\""))
-      }
+      let scan = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
+      #expect(scan.termination == .exit(0))
+      #expect(scan.stderr.contains("slug_renamed"))
+      #expect(scan.stderr.contains("none-repo"))
+      let shown = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
+      #expect(shown.termination == .exit(0))
+      #expect(shown.stdout.contains("\"slug\":\"none-repo\""))
+      #expect(!shown.stdout.contains("\"slug\":\"none\""))
+      let again = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
+      #expect(again.termination == .exit(0))
+      #expect(again.stderr.isEmpty)
     }
   }
 

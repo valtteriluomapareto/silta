@@ -136,7 +136,9 @@ extension TaskService {
   }
 
   /// App work from another repository, or from above no repository at all. A git that
-  /// cannot run stays an environment error for a human.
+  /// cannot run stays an environment error for a human, unless the current directory is
+  /// outside any worktree: the walk classifies by where the command runs, so a broken git
+  /// used from a non-repository directory reports this refusal rather than `env`.
   private static func outsideRepository(_ error: TaskError, directory: URL) -> Bool {
     error == .foreignRepo || error == .git && !insideWorktree(directory)
   }

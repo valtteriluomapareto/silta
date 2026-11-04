@@ -58,9 +58,7 @@ struct TaskFromPlanCommand: OutputCommand {
     var lines =
       result.dryRun
       ? ["Preview: \(preview.status): \(preview.title)"]
-      : result.tasks.map {
-        "\($0.ref) \($0.status)"
-      }
+      : result.tasks.map { TaskOutput.receiptText($0) }
     if result.dryRun {
       if let app = preview.app { lines.append("App: \(app)") }
       let description = preview.description.trimmingCharacters(in: .newlines)
