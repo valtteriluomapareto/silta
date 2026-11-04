@@ -159,11 +159,17 @@ struct CodeCommandTests {
         scratch)
       let failed = try SiltaBinary.run(["code", "ls", "portal", "--fetch", "--json"], in: scratch)
       #expect(failed.termination == .exit(9))
-      #expect(failed.stdout.contains("repo fetch"))
+      withKnownIssue("a failed --fetch reads as a multi-repo fetch") {
+        #expect(!failed.stdout.contains("Earlier successful repos"))
+        #expect(failed.stdout.contains("without --fetch"))
+        #expect(
+          failed.stdout.contains(
+            "\"next\":[\"silta --ws 'acme' code ls 'portal'\"],\"next_by\":\"agent\""))
+      }
     }
   }
 
-  private func setup(_ scratch: URL) throws -> URL {
+  func setup(_ scratch: URL) throws -> URL {
     let result = try SiltaBinary.runProcess(
       URL(filePath: "/bin/bash"),
       [
@@ -182,6 +188,7 @@ struct CodeCommandTests {
       apps:
         - {slug: portal, repo: platform, ref: origin/portal, prod_ref: origin/portal-prod}
         - {slug: console, repo: platform, ref: origin/api, subpath: apps/console}
+        - {slug: star, repo: platform, ref: origin/api, subpath: "apps/con*"}
       """)
     try store.write { tx in
       try config.apply(
@@ -193,13 +200,28 @@ struct CodeCommandTests {
     return repo
   }
 
-  @discardableResult private func git(_ args: [String], _ repo: URL, _ scratch: URL) throws
+  @discardableResult func git(_ args: [String], _ repo: URL, _ scratch: URL) throws
     -> String
   {
     let result = try SiltaBinary.runProcess(
       URL(filePath: "/usr/bin/git"), args, in: scratch, cwd: repo)
     try #require(result.termination == .exit(0), "\(result.stderr)")
     return result.stdout
+  }
+
+  func commitAll(_ repo: URL, _ scratch: URL) throws {
+    try git(["add", "."], repo, scratch)
+    try git(
+      [
+        "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm",
+        "Add Acme files",
+      ], repo, scratch)
+  }
+
+  func warnings(_ text: String) throws -> [String: String] {
+    let object = try #require(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+    let list = try #require(object["warnings"] as? [[String: String]])
+    return Dictionary(list.map { ($0["code"] ?? "", $0["message"] ?? "") }) { first, _ in first }
   }
 
   private func snapshot(_ repo: URL, _ scratch: URL) throws -> [Data] {
@@ -212,7 +234,7 @@ struct CodeCommandTests {
     ]
   }
 
-  private func envelope(_ text: String) throws -> [String: Any] {
+  func envelope(_ text: String) throws -> [String: Any] {
     let object = try #require(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
     #expect(object["ok"] as? Bool == true, "\(text)")
     return try #require(object["data"] as? [String: Any])

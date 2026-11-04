@@ -140,6 +140,29 @@ struct CodeServiceTests {
     }
   }
 
+  @Test func timeoutsSuggestNarrowingTheRead() async throws {
+    try await withScratchDirectory { home in
+      let store = try setup(home)
+      let git = ScriptedGitRunner(script: [
+        (reads(home)[0].0, .success(.init(termination: .timedOut)))
+      ])
+      let error = await #expect(throws: CodeError.self) { try await read(store, home, git) }
+      withKnownIssue("a timeout suggests repo fetch") {
+        #expect(error?.message.contains("narrow") == true)
+        #expect(error?.next == ["silta code show --help"])
+        #expect(error?.nextBy == .agent)
+      }
+    }
+  }
+
+  @Test func unreadableGrepOutputIsACodeError() {
+    withKnownIssue("grep surfaces SeamError.gitCapture") {
+      #expect(throws: CodeError.self) {
+        try CodeRead.grep("x", pathspec: nil).formatted("garbage", sha: sha, subpath: "")
+      }
+    }
+  }
+
   private func checkEnvironment(_ error: CodeError) {
     #expect(error.code == .env)
     #expect(error.exitCode == 9)
