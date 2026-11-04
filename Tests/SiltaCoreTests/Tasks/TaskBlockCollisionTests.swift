@@ -7,9 +7,9 @@ import Testing
 struct TaskBlockCollisionTests {
   @Test func conflictingSecondLinkUIDRollsBackWholeBlock() async throws {
     try await withScratchDirectory { home in
-      let service = try TaskOrganizationTests.service(home)
+      let seed = TaskServiceTests.agentSeed
+      let service = try TaskOrganizationTests.service(home, seed: seed)
       try await TaskBlockTests.add(service, count: 2, directory: home)
-      let seed = TaskServiceTests.agent.description.utf8.reduce(0) { $0 + UInt64($1) }
       let oracle = SeededIDGenerator(seed: seed)
       for _ in 0..<3 { _ = try oracle.next(at: TaskServiceTests.now) }
       let collision = try oracle.next(at: TaskServiceTests.now)
@@ -26,7 +26,7 @@ struct TaskBlockCollisionTests {
           ])
       }
       let before = try TaskOrganizationTests.counts(service)
-      #expect(throws: StorageError.unavailable) {
+      #expect(throws: StorageError.constraintViolation) {
         _ = try service.block("AC-1", TaskBlockTests.input(["ext:acme", "AC-2"]))
       }
       #expect(try TaskOrganizationTests.counts(service) == before)

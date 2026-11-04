@@ -167,9 +167,10 @@ extension PlanSourceTests {
       var options = TaskImport()
       options.delete = true
       let runner = ScriptedGitRunner(script: steps)
-      let env = try TaskServiceTests.environment(home.appending(path: "db"), git: runner)
+      let env = try TaskServiceTests.environment(
+        home.appending(path: "db"), git: runner, seed: TaskServiceTests.agentSeed)
       try TaskServiceTests.setup(env)
-      let ids = SeededIDGenerator(seed: env.actor.description.utf8.reduce(0) { $0 + UInt64($1) })
+      let ids = SeededIDGenerator(seed: TaskServiceTests.agentSeed)
       _ = try ids.next(at: TaskServiceTests.now)
       _ = try ids.next(at: TaskServiceTests.now)
       let duplicate = try ids.next(at: TaskServiceTests.now)
@@ -182,7 +183,7 @@ extension PlanSourceTests {
             """, arguments: [duplicate, env.actor.description])
       }
       options.split = true
-      await #expect(throws: StorageError.unavailable) {
+      await #expect(throws: StorageError.constraintViolation) {
         _ = try await TaskService(environment: env).fromPlan(
           TaskImportTests.text, options: options, source: source, directory: root)
       }

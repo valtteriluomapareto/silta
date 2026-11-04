@@ -193,7 +193,7 @@ extension ProposalPolicyTests {
       let before = try Self.snapshot(env)
       var options = TaskImport()
       options.split = true
-      await #expect(throws: StorageError.unavailable) {
+      await #expect(throws: StorageError.constraintViolation) {
         _ = try await TaskService(environment: env, approved: "Import Acme work").fromPlan(
           TaskImportTests.text, options: options, directory: home)
       }

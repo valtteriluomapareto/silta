@@ -188,9 +188,9 @@ extension TaskImportTests {
 
   @Test func laterChildCollisionRollsBackTheEntireImport() async throws {
     try await withScratchDirectory { home in
-      let env = try TaskServiceTests.environment(home)
+      let env = try TaskServiceTests.environment(home, seed: TaskServiceTests.agentSeed)
       try TaskServiceTests.setup(env)
-      let ids = SeededIDGenerator(seed: env.actor.description.utf8.reduce(0) { $0 + UInt64($1) })
+      let ids = SeededIDGenerator(seed: TaskServiceTests.agentSeed)
       _ = try ids.next(at: TaskServiceTests.now)
       _ = try ids.next(at: TaskServiceTests.now)
       let duplicate = try ids.next(at: TaskServiceTests.now)
@@ -206,7 +206,7 @@ extension TaskImportTests {
       try Self.text.write(to: source, atomically: true, encoding: .utf8)
       var options = TaskImport()
       options.split = true
-      await #expect(throws: StorageError.unavailable) {
+      await #expect(throws: StorageError.constraintViolation) {
         _ = try await TaskService(environment: env).fromPlan(
           Self.text, options: options, source: source, directory: home)
       }

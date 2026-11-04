@@ -2,6 +2,7 @@ import Foundation
 import GRDB
 @testable import SiltaCore
 import SiltaTestSupport
+import Synchronization
 import Testing
 
 @Suite(.timeLimit(.minutes(1)))
@@ -12,14 +13,37 @@ struct TaskServiceTests {
 
   static func environment(
     _ home: URL, actor: ActorID = agent, clock: FakeClock = FakeClock(now: now),
-    git: any GitRunner = ScriptedGitRunner(script: [])
+    git: any GitRunner = ScriptedGitRunner(script: []), seed: UInt64? = nil
   ) throws -> SiltaEnvironment {
     let location = try SiltaHome.resolve(environment: ["SILTA_HOME": home.path])
     return SiltaEnvironment(
       clock: clock,
-      ids: SeededIDGenerator(seed: actor.description.utf8.reduce(0) { $0 + UInt64($1) }), git: git,
+      ids: SeededIDGenerator(seed: seed ?? Self.nextSeed(for: actor)), git: git,
       home: location,
       db: DatabaseStore(home: home, clock: clock, jitter: { 0 }), log: FakeLog(), actor: actor)
+  }
+
+  /// A reproducible seed for replaying the default agent's generated ids.
+  static let agentSeed: UInt64 = seed(for: agent)
+
+  /// A stable seed for an actor's ids, unlike a byte sum that collides across reordered names.
+  static func seed(for actor: ActorID) -> UInt64 {
+    var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+    for byte in actor.description.utf8 {
+      hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
+    }
+    return hash
+  }
+
+  private static let seedCounter = Mutex<UInt64>(0)
+
+  /// Gives every environment a distinct id sequence, even for the same actor and home.
+  private static func nextSeed(for actor: ActorID) -> UInt64 {
+    let offset = seedCounter.withLock { state in
+      state &+= 1
+      return state
+    }
+    return seed(for: actor) &+ offset
   }
 
   static func setup(_ env: SiltaEnvironment) throws {
@@ -39,11 +63,7 @@ struct TaskServiceTests {
       let clock = FakeClock(now: Self.now)
       let first = try Self.environment(home, clock: clock)
       let second = try Self.environment(home, clock: clock)
-      withKnownIssue("SI-30: environments sharing a seed reuse ids") {
-        let firstID = try? first.ids.next(at: Self.now)
-        let secondID = try? second.ids.next(at: Self.now)
-        #expect(firstID != secondID)
-      }
+      #expect(try first.ids.next(at: Self.now) != second.ids.next(at: Self.now))
     }
   }
 
