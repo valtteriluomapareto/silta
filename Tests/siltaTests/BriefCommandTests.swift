@@ -117,6 +117,9 @@ struct BriefCommandTests {
       }
       let regular = try run(["--task", "AC-1"], repo, scratch)
       let short = try run(["--task", "AC-1", "--short"], repo, scratch)
+      let hook = try run(["--task", "AC-1", "--hook"], repo, scratch)
+      #expect(hook == short)
+      #expect(hook.stdout.count <= 3200)
       #expect(short.stdout.count <= 3200)
       #expect(short.stdout.count < regular.stdout.count)
       #expect(try run(["--task", "AC-1", "--short", "--budget", "2500"], repo, scratch) == regular)
@@ -144,6 +147,9 @@ struct BriefCommandTests {
             "SILTA_ACTOR": "agent:codex:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z",
           ], timeout: 2)
         #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
+        let entry = try DogfoodLogTests.last(scratch)
+        #expect(entry["error_code"] as? String == "busy")
+        #expect(!(entry["warnings"] as? [String] ?? []).contains("hook_timeout"))
       }
     }
   }

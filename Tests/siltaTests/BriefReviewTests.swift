@@ -48,12 +48,12 @@ extension BriefCommandTests {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)
       try fixture.git(["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
-      for flags in [["--json"], ["--hook", "--json", "--verbose"]] {
+      for flags in [["--json"], ["--hook", "--json", "--verbose"], ["--hook"]] {
         let result = try run(flags, repo, scratch)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
         let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String]
-        #expect(result.stdout.contains("ref_missing"))
+        if flags.contains("--json") { #expect(result.stdout.contains("ref_missing")) }
         #expect(warnings == ["ref_missing"])
       }
     }
