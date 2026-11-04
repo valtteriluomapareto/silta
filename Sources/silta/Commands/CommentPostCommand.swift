@@ -35,9 +35,9 @@ struct CommentPostCommand: OutputCommand {
       try body.read(actor: context.environment.actor, command: command, approved: global.approved)
       ?? ""
     let result = try TaskService(
-      environment: context.environment, workspace: global.ws, approved: global.approved,
+      environment: context.environment, workspace: workspace, approved: global.approved,
       bodyFlag: body.flag
-    ).comment(target, draft)
+    ).comment(target, draft, includeWorkspaceInAudit: global.ws != nil)
     return CommandOutput(
       text: result.comment.ref + " " + result.comment.kind
         + (result.released ? "; claim released" : ""), quiet: result.comment.ref,

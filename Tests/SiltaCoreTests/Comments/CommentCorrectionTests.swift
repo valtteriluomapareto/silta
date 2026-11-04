@@ -71,3 +71,21 @@ extension CommentCorrectionTests {
     }
   }
 }
+
+extension CommentCorrectionTests {
+  @Test func resolvedExecutionScopeDoesNotInventAuditFlags() async throws {
+    try await withScratchDirectory { home in
+      let env = try await CommentTests.setup(home)
+      let service = TaskService(environment: env, workspace: "acme", approved: "Retain Acme content", bodyFlag: "-m <text>")
+      var draft = CommentDraft(body: "Acme")
+      draft.allowSecret = true
+      _ = try service.comment("AC-1", draft, includeWorkspaceInAudit: false)
+      _ = try service.comment("AC-1", draft, includeWorkspaceInAudit: true)
+      let commands = try env.db.read { try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY rowid") }
+      #expect(commands == [
+        "silta comment 'AC-1' -m <text> --allow-secret -> AC-1/1",
+        "silta --ws 'acme' comment 'AC-1' -m <text> --allow-secret -> AC-1/2",
+      ])
+    }
+  }
+}

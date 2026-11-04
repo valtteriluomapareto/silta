@@ -6,7 +6,7 @@ import Testing
 
 struct CommentCorrectionCommandTests {
   @Test func bodyReadKeepsTheResolvedWorkspace() throws {
-    withKnownIssue("#13: workspace changes while stdin is read") {
+
 
       try withScratchDirectory { scratch in
         let store = try CommentHandoffTests.setup(scratch)
@@ -48,7 +48,7 @@ struct CommentCorrectionCommandTests {
 
     
   
-    }
+    
   }
 
   @Test func discussionRecoveryAndHistoryRemainDiscoverable() throws {

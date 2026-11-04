@@ -4,7 +4,10 @@ import GRDB
 extension TaskService {
   /// Posts discussion atomically without taking another actor's claim. Own posts
   /// refresh the heartbeat; an own handoff releases it without changing status.
-  package func comment(_ ref: String, _ input: CommentDraft) throws -> CommentResult {
+  /// `includeWorkspaceInAudit` distinguishes an explicit --ws from a resolved default.
+  package func comment(
+    _ ref: String, _ input: CommentDraft, includeWorkspaceInAudit: Bool = true
+  ) throws -> CommentResult {
     let slug = try selected()
     let command = Self.commentCommand(ref, input, workspace: slug)
     let consent = try approval(
@@ -24,7 +27,7 @@ extension TaskService {
       }
       try tx.recordChange(kind: "comment", rowID: id)
       try consent?.record(
-        command: audited(Self.commentCommand(task.ref, input, workspace: workspace))
+        command: audited(Self.commentCommand(task.ref, input, workspace: includeWorkspaceInAudit ? workspace : nil))
           + (draft.allowSecret ? " --allow-secret" : "")
           + " -> \(task.ref)/\(seq)", workspace: slug, identity: (environment.ids, at), in: tx)
       guard
