@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"Workspace acme setting archive_after_days has invalid stored value 1.5.","next":["silta --ws 'acme' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -37,8 +37,9 @@ Setup: install the pinned lint tools (Homebrew's versions differ from CI's):
   export PATH="$(paste -sd: "$T/path"):$PATH"
 
 Steps:
-1. Post your plan on issue #<n> (`gh issue comment <n>`), including what you will
-   NOT build. Then STOP and wait for "go". Don't write code before that.
+1. Record your plan where AGENTS.md's current dogfooding stage requires it,
+   including the out-of-scope work, then get it reviewed before coding. Proceed
+   with authorized work; stop and name any decision that needs the maintainer.
 2. Tests first (coding guidelines, "Test-first flow"). For every safety rule in the
    slice (isolation, limits, refusals), plant a fault once and show its test fails.
    Subprocess and timeout tests get `.timeLimit`.
