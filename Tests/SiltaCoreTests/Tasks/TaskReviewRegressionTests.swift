@@ -113,8 +113,9 @@ struct TaskReviewRegressionTests {
     #expect(error == .constraintViolation)
     #expect(
       error.message
-        == "A write conflicted with existing data; this is likely a Silta bug. "
-        + "Report the command you ran with the output of silta doctor.")
+        == "internal error (bug): a write conflicted with existing data; nothing was saved. "
+        + "Report which silta command failed (not its arguments) and the time, "
+        + "with silta doctor output.")
     #expect(error.next == ["silta doctor"])
     #expect(error.code == .env)
     #expect(error.code.exitCode == 9)

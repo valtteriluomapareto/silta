@@ -142,22 +142,21 @@ struct StorageWriteTests {
     }
   }
 
-  @Test func everyConstraintResultCodeIsItsOwnCodedError() {
-    let codes: [ResultCode] = [
-      .SQLITE_CONSTRAINT, .SQLITE_CONSTRAINT_CHECK, .SQLITE_CONSTRAINT_COMMITHOOK,
+  @Test(
+    arguments: [
+      ResultCode.SQLITE_CONSTRAINT, .SQLITE_CONSTRAINT_CHECK, .SQLITE_CONSTRAINT_COMMITHOOK,
       .SQLITE_CONSTRAINT_FOREIGNKEY, .SQLITE_CONSTRAINT_FUNCTION, .SQLITE_CONSTRAINT_NOTNULL,
       .SQLITE_CONSTRAINT_PRIMARYKEY, .SQLITE_CONSTRAINT_TRIGGER, .SQLITE_CONSTRAINT_UNIQUE,
       .SQLITE_CONSTRAINT_VTAB, .SQLITE_CONSTRAINT_ROWID, .SQLITE_CONSTRAINT_PINNED,
       .SQLITE_CONSTRAINT_DATATYPE,
-    ]
-    for code in codes {
-      let underlying = DatabaseError(
-        resultCode: code, message: "acme-private-value", sql: "acme-private-sql")
-      let error = StorageError.mapped(underlying)
-      #expect(error == .constraintViolation)
-      #expect(!String(reflecting: error).contains("acme-private"))
-      #expect(!error.message.contains("acme-private"))
-    }
+    ])
+  func everyConstraintResultCodeIsItsOwnCodedError(code: ResultCode) {
+    let underlying = DatabaseError(
+      resultCode: code, message: "acme-private-value", sql: "acme-private-sql")
+    let error = StorageError.mapped(underlying)
+    #expect(error == .constraintViolation)
+    #expect(!String(reflecting: error).contains("acme-private"))
+    #expect(!error.message.contains("acme-private"))
   }
 
   @Test func callerCodedErrorIsPreserved() throws {

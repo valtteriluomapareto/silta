@@ -24,8 +24,9 @@ package enum StorageError: CodedError, CaseIterable {
     case .busy: "Database is busy; retry the original invocation once after retry_after_s."
     case .unavailable: "Database is unavailable or read-only."
     case .constraintViolation:
-      "A write conflicted with existing data; this is likely a Silta bug. "
-        + "Report the command you ran with the output of silta doctor."
+      "internal error (bug): a write conflicted with existing data; nothing was saved. "
+        + "Report which silta command failed (not its arguments) and the time, "
+        + "with silta doctor output."
     case .schemaTooNew: "Database requires a newer version of silta."
     case .backupFailed: "Required database backup could not be completed."
     }
