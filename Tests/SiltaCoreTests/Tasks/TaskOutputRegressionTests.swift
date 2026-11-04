@@ -45,7 +45,7 @@ struct TaskOutputRegressionTests {
       #expect(refusal?.message.contains("ask the human before stealing") == true)
       #expect(
         refusal?.message.contains(
-          "silta task start AC-1 --steal --approved \"<the human's words>\"") == true)
+          "silta --ws 'acme' task start AC-1 --steal --approved \"<the human's words>\"") == true)
       let human = TaskService(
         environment: try TaskServiceTests.environment(home, actor: TaskServiceTests.human()))
       let own = #expect(throws: TaskError.self) { _ = try human.archive("AC-1") }

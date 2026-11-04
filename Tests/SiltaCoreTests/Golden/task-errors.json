@@ -1,6 +1,6 @@
 {"error":{"code":"not_found","message":"Parent task AC-9 not found.","next":["silta task ls"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"invalid","message":"A result is required.","next":["silta task add --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
-{"error":{"code":"claimed","message":"AC-1 is claimed by agent:codex:acme (4 min old); pick other work, or ask the human before stealing it with silta task start AC-1 --steal --approved \"<the human's words>\".","next":["silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"claimed","message":"AC-1 is claimed by agent:codex:acme (4 min old); pick other work, or ask the human before stealing it with silta --ws 'acme' task start AC-1 --steal --approved \"<the human's words>\".","next":["silta task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"claimed","message":"AC-1 is claimed by agent:codex:acme (4 min old); take it over with --steal.","next":["silta task start AC-1 --steal"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"conflict","message":"Proposal AC-1 needs human triage; ask in chat before accepting it.","next":["silta task triage --accept AC-1 --approved \"<the human's words>\""],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 {"error":{"code":"conflict","message":"Proposal AC-1 needs triage first.","next":["silta task triage --accept AC-1"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -15,7 +15,8 @@ struct TaskOrganizationGuardTests {
           home,
           actor: .agent(tool: "codex", session: "other")), approved: "Organize this Acme task")
       let failure = TaskError.claimed(
-        "AC-1", holder: TaskServiceTests.agent.description, minutes: 0, human: false)
+        "AC-1", holder: TaskServiceTests.agent.description, minutes: 0, human: false,
+        workspace: "acme")
       var called = false
       #expect(throws: failure) {
         _ = try other.edit("AC-1") { text in
@@ -68,7 +69,8 @@ struct TaskOrganizationGuardTests {
       _ = try await TaskOrganizationTests.add(service, start: true, directory: home)
       let other = ActorID.agent(tool: "codex", session: "other")
       #expect(
-        throws: TaskError.claimed("AC-1", holder: other.description, minutes: 0, human: false)
+        throws: TaskError.claimed(
+          "AC-1", holder: other.description, minutes: 0, human: false, workspace: "acme")
       ) {
         _ = try service.edit("AC-1") { original in
           try service.environment.db.write { tx in

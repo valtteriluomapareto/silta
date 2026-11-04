@@ -12,7 +12,7 @@ extension TaskService {
     let at = environment.clock.now()
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
-      try validateClaim(task, at: at)
+      try validateClaim(task, workspace: slug, at: at)
       try tx.database.execute(
         sql: """
           UPDATE task
@@ -55,13 +55,13 @@ extension TaskService {
         || external.wholeMatch(of: /jira:[A-Z][A-Z0-9]*-[1-9][0-9]*/) != nil
     else { throw TaskError.invalid("Use ado:<id>, gh:<owner>/<repo>#<id> or jira:<KEY>-<id>.") }
     let at = environment.clock.now()
-    try promotable(try show(ref), at: at)
-    let approval = try approval(required: true, command: command)
     let slug = try selected()
+    try promotable(try show(ref), workspace: slug, at: at)
+    let approval = try approval(required: true, command: command)
     return try environment.db.write { tx in
       let task = try Self.decorate(
         Self.lookup(ref, workspace: slug, in: tx.database), at: at, in: tx.database)
-      try promotable(task, at: at)
+      try promotable(task, workspace: slug, at: at)
       try tx.database.execute(
         sql: """
           UPDATE task
@@ -76,8 +76,8 @@ extension TaskService {
     }
   }
 
-  private func promotable(_ task: TaskDetails, at date: Date) throws {
-    try validateClaim(task, at: date)
+  private func promotable(_ task: TaskDetails, workspace: String, at date: Date) throws {
+    try validateClaim(task, workspace: workspace, at: date)
     if task.status == "proposed" {
       throw TaskError.proposal(task.ref, human: environment.actor.isHuman)
     }

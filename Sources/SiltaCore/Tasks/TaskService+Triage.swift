@@ -60,7 +60,7 @@ extension TaskService {
       do { task = try Self.lookup(ref, workspace: workspace, in: db) } catch TaskError.notFound {
         throw TaskReferenceError(ref: ref, missing: true)
       } catch TaskError.invalid { throw TaskReferenceError(ref: ref, missing: false) }
-      try validateClaim(task, at: date)
+      try validateClaim(task, workspace: workspace, at: date)
       guard task.status == "proposed" else {
         throw TaskError.transition(task.ref, status: task.status)
       }
