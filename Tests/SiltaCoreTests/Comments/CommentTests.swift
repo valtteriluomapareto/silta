@@ -133,34 +133,66 @@ struct CommentTests {
     }
   }
 
+  // Stored kinds without a posting command retain forward-reader coverage.
+  static func seedStoredQuestion(_ env: SiltaEnvironment) throws {
+    try env.db.write {
+      try $0.database.execute(
+        sql: """
+          INSERT INTO comment(uid,task_id,seq,kind,body_md,actor,created_at)
+          VALUES('q',1,9,'question','Stored question',?,?);
+          """, arguments: [env.actor.description, TaskService.timestamp(env.clock.now())])
+      try $0.database.execute(
+        sql: """
+          INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,actor,created_at)
+          VALUES('a',1,10,?,'answer','Stored answer',?,?)
+          """,
+        arguments: [
+          $0.database.lastInsertedRowID, env.actor.description,
+          TaskService.timestamp(env.clock.now()),
+        ])
+    }
+  }
+
   @Test func storedDiscussionRemainsReadableAndScoped() async throws {
     try await withScratchDirectory { home in
       let env = try await Self.setup(home)
-      try env.db.write { tx in
-        for (offset, kind) in [
-          "review", "future", "comment", "comment", "comment", "handoff", "handoff", "comment",
-          "question", "answer",
-        ].enumerated() {
-          let seq = offset + 1
-          try tx.database.execute(
+      let service = TaskService(environment: env)
+      for kind in ["review", "future"] {
+        try env.db.write {
+          try $0.database.execute(
             sql: """
-              INSERT INTO comment(id,uid,task_id,seq,kind,body_md,actor,created_at,
-                deleted_at,resolved_at,thread_id)
-              VALUES(?,?,1,?,?,'Hidden if deleted','agent:codex:acme','t',?,?,?)
+              INSERT INTO comment(uid,task_id,seq,kind,body_md,actor,created_at)
+              VALUES(?,1,(SELECT coalesce(max(seq),0)+1 FROM comment),?,'Forward context',?,?)
               """,
-            arguments: [
-              seq, "c\(seq)", seq, kind, [4, 8].contains(seq) ? "x" : nil,
-              seq == 3 ? "x" : nil, seq == 5 ? 4 : seq == 10 ? 9 : nil,
-            ])
+            arguments: [kind, kind, env.actor.description, TaskService.timestamp(env.clock.now())])
         }
       }
-      let service = TaskService(environment: env)
+      _ = try service.comment("AC-1", CommentDraft(body: "Resolved"))
+      _ = try service.updateComments(["AC-1/3"], action: .resolve)
+      _ = try service.comment("AC-1", CommentDraft(body: "Hidden if deleted"))
+      _ = try service.updateComments(["AC-1/4"], action: .resolve, explanation: "Live reply")
+      _ = try service.updateComments(["AC-1/4"], action: .reopen)
+      _ = try service.updateComments(["AC-1/4"], action: .delete)
+      for _ in 0..<2 {
+        _ = try service.comment("AC-1", CommentDraft(body: "Context", kind: "handoff"))
+      }
+      _ = try service.comment("AC-1", CommentDraft(body: "Hidden if deleted"))
+      _ = try service.updateComments(["AC-1/8"], action: .delete)
+      try Self.seedStoredQuestion(env)
       let shown = try #require(service.show("AC-1").comments)
       #expect(
         shown.map(\.ref) == ["AC-1/7", "AC-1/1", "AC-1/2", "AC-1/4", "AC-1/5", "AC-1/9", "AC-1/10"])
       #expect(shown.first { $0.deleted }?.body == "[deleted]")
       #expect(try service.show("AC-1", timeline: true).comments?.count == 10)
       #expect(try service.comment("AC-1", CommentDraft(body: "Next")).comment.ref == "AC-1/11")
+      _ = try service.updateComments(["AC-1/9"], action: .resolve)
+      try env.db.write {
+        try $0.database.execute(sql: "UPDATE comment SET accepted=1 WHERE seq=10")
+      }
+      _ = try service.updateComments(["AC-1/10"], action: .reopen)
+      #expect(
+        try env.db.read { try Int.fetchOne($0, sql: "SELECT accepted FROM comment WHERE seq=10") }
+          == 0)
     }
   }
 }
@@ -217,7 +249,7 @@ extension CommentTests {
       let env = try await Self.setup(home)
       let service = TaskService(environment: env)
       _ = try service.comment("AC-1", CommentDraft(body: "Retained"))
-      try env.db.write { try $0.database.execute(sql: "UPDATE comment SET deleted_at='x'") }
+      _ = try service.updateComments(["AC-1/1"], action: .delete)
       let refs = try await withThrowingTaskGroup(of: String.self) { group in
         for index in 0..<8 {
           group.addTask {

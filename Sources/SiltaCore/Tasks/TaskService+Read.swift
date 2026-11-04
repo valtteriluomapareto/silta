@@ -66,7 +66,17 @@ extension TaskService {
             SELECT body FROM task_event WHERE task_id=? AND kind='claim' ORDER BY id DESC LIMIT 1
             """, arguments: [task.id]), body.hasPrefix("released ")
       {
-        task.handedOff = String(body.dropFirst("released ".count))
+        task.resumeAvailable = true
+        let ref = String(body.dropFirst("released ".count))
+        let live =
+          try Bool.fetchOne(
+            db,
+            sql: """
+              SELECT EXISTS(SELECT 1 FROM comment
+              WHERE task_id=? AND ? || '/' || seq=? AND deleted_at IS NULL)
+              """,
+            arguments: [task.id, task.ref, ref]) ?? false
+        if live { task.handedOff = ref }
       }
       if timeline {
         task.timeline = try Row.fetchAll(

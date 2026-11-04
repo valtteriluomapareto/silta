@@ -24,6 +24,12 @@ struct TaskBody: ParsableArguments {
     if allowSecret {
       try actor.requireHuman(command: command + " --allow-secret -F <file>", approved: approved)
     }
+    return try readContent(command: command)
+  }
+
+  /// Reads content without consent checks; state-dependent writers gate their changed
+  /// transaction instead of asking for permission for a no-op.
+  func readContent(command: String) throws -> String? {
     guard message == nil || file == nil else {
       throw UsageError.invalid(message: "Use either -m or -F, not both.", command: command)
     }

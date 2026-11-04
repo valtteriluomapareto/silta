@@ -9,13 +9,14 @@ extension CommentDetails {
     actor = row["actor"]
     replyTo = (row["root_seq"] as Int?).map { task + "/\($0)" }
     resolvedAt = row["root_resolved_at"] ?? row["resolved_at"]
+    resolvedBy = row["root_resolved_by"] ?? row["resolved_by"]
     createdAt = row["created_at"]
   }
 }
 
 extension TaskService {
   static let commentQuery = """
-    SELECT c.*,r.seq AS root_seq,r.resolved_at AS root_resolved_at
+    SELECT c.*,r.seq AS root_seq,r.resolved_at AS root_resolved_at,r.resolved_by AS root_resolved_by
     FROM comment c LEFT JOIN comment r ON r.id=c.thread_id AND r.task_id=c.task_id
     """
 

@@ -1,0 +1,1 @@
+{"error":{"code":"conflict","message":"Only author agent:codex:acme can delete this comment; current actor is agent:codex:other.","next":["silta --ws 'acme' comment resolve 'AC-1/1'","silta --ws 'acme' task show 'AC-1' --timeline"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

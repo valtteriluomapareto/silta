@@ -272,7 +272,7 @@ extension DogfoodLogTests {
     return [
       (acme + ["task", "add", "Acme work", "--start"], "acme"),
       (acme + ["task", "show", "AC-1"], "acme"),
-      (acme + ["comment", "AC-1", "-m", "Acme discussion"], "acme"),
+    ] + discussionCatalog() + [
       (acme + ["task", "edit", "AC-1", "-F", edit.path], "acme"),
       (acme + ["task", "plan", "AC-1", "-m", "- [ ] Acme step"], "acme"),
       (acme + ["task", "submit", "AC-1"], "acme"),
@@ -306,6 +306,16 @@ extension DogfoodLogTests {
       (acme + ["brief"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
+    ]
+  }
+
+  static func discussionCatalog() -> [(args: [String], workspace: String?)] {
+    let acme = ["--ws", "acme"]
+    return [
+      (acme + ["comment", "AC-1", "-m", "Acme discussion"], "acme"),
+      (acme + ["comment", "resolve", "AC-1/1"], "acme"),
+      (acme + ["comment", "reopen", "AC-1/1"], "acme"),
+      (acme + ["comment", "delete", "AC-1/1"], "acme"),
     ]
   }
 
