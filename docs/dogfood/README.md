@@ -61,7 +61,11 @@ A coordinating agent can run Codex itself instead of asking the maintainer to pa
 prompts:
 
 1. Create Codex's worktree outside the repository, e.g.
-   `git worktree add --detach ~/.codex/worktrees/<slice>/silta origin/main`.
+   `git worktree add --detach ~/.codex/worktrees/<slice>/silta origin/main`. Tell Codex
+   to create each branch with `git switch -c codex/<name> --no-track origin/main`:
+   tracking a remote branch writes `.git/config`, which the sandbox refuses, and the
+   switch then stops halfway. Codex pushes with `git push origin HEAD` and opens PRs
+   with `--head`, so no upstream is needed.
 2. Start Codex with `scripts/dogfood-codex.sh start <worktree> <log> <<'EOF'`, giving
    the slice prompt on stdin. Run it in the background: it returns when Codex's turn
    ends, then prints the thread id and Codex's last message.
