@@ -41,6 +41,10 @@ extension BriefCommandTests {
       let entry = try DogfoodLogTests.last(scratch)
       #expect(entry["exit_code"] as? Int == 0)
       #expect(entry["error_code"] as? String == "not_found")
+      let log = try String(
+        contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"),
+        encoding: .utf8)
+      #expect(log.split(separator: "\n").count == 1)
     }
   }
 

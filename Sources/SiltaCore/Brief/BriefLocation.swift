@@ -23,7 +23,7 @@ package struct BriefLocation: Encodable, Sendable {
     var values = encoder.container(keyedBy: CodingKeys.self)
     try values.encode(workspace, forKey: .workspace)
     try values.encode(repo, forKey: .repo)
-    try values.encodeIfPresent(app, forKey: .app)
+    try values.encode(app, forKey: .app)
     try values.encode(branch, forKey: .branch)
     try values.encode(confidence, forKey: .confidence)
     try values.encode(reason, forKey: .reason)

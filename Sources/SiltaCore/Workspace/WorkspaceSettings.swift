@@ -12,14 +12,14 @@ struct WorkspaceSettings: Sendable {
   }
 
   enum CodingKeys: String, CodingKey, CaseIterable {
+    case proposals
     case reviewGate = "review_gate"
     case archiveAfterDays = "archive_after_days"
     case staleDays = "stale_days"
-    case proposals
   }
 
   private let workspace: String
-  private let json: String
+  let json: String
 
   init(workspace: String, json: String) {
     self.workspace = workspace
@@ -85,7 +85,7 @@ struct WorkspaceSettings: Sendable {
     }
   }
 
-  private static func masked(_ value: Any) -> Any {
+  static func masked(_ value: Any) -> Any {
     if let object = value as? [String: Any] {
       return Dictionary(
         object.map { key, value in

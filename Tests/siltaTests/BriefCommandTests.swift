@@ -50,7 +50,7 @@ struct BriefCommandTests {
       let text = try run(["--task", "AC-2", "--app", "api"], repo, scratch).stdout
       Golden.forTests().check(text, "brief-task.txt")
       #expect(text.contains("app: portal"))
-      #expect(text.contains("1. [x] Acme ready\n2. [ ] Acme next"))
+      #expect(text.contains("1 done\n2. [ ] Acme next"))
       let whereData = try fixture.data(fixture.run([], repo, scratch))
       let brief = try fixture.data(run(["--json"], repo, scratch))
       #expect(
@@ -97,10 +97,10 @@ struct BriefCommandTests {
       let outside = scratch.appending(path: "fixtures/acme-detached")
       #expect(try run(["--hook"], outside, scratch).stdout.isEmpty)
       try settings("{\"proposals\":null}", scratch)
-      #expect(try run([], repo, scratch).termination == .exit(1))
-      #expect(
-        try run(["--hook", "--json", "--verbose"], repo, scratch)
-          == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
+      #expect(try run([], repo, scratch).termination == .exit(0))
+      let unsupported = try run(["--hook", "--json", "--verbose"], repo, scratch)
+      #expect(unsupported.stderr.isEmpty)
+      #expect(unsupported.stdout.contains("setting_unsupported"))
     }
   }
 
@@ -231,43 +231,4 @@ struct BriefCommandTests {
     }
   }
 
-  func seedTasks(_ store: DatabaseStore) throws {
-    try store.write { tx in
-      for (seq, app, actor, branch, status) in [
-        (1, "api", "agent:codex:other", "api", "doing"),
-        (2, "portal", "agent:codex:acme", "elsewhere", "doing"),
-        (3, "api", "agent:codex:acme", "elsewhere", "doing"),
-        (4, "api", "agent:codex:acme", "api", "done"),
-      ] {
-        try tx.database.execute(
-          sql: """
-            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,claimed_by,claimed_at,
-              branch,created_by,created_at,updated_at,plan_md)
-            SELECT ?,workspace_id,?,'Acme task',?,id,?,'2023-11-14T22:13:20.000Z',?,
-              'human:acme','2023-11-14T22:13:20.000Z','2023-11-14T22:13:20.000Z',
-              '- [x] Acme ready
-            - [ ] Acme next'
-            FROM app WHERE slug=?
-            """, arguments: ["acme-\(seq)", seq, status, actor, branch, app])
-      }
-    }
-  }
-
-  func run(_ flags: [String], _ repo: URL, _ scratch: URL) throws -> CLIResult {
-    try SiltaBinary.run(
-      ["brief", "--ws", "acme"] + flags, in: scratch, cwd: repo,
-      environment: ["SILTA_ACTOR": "agent:codex:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
-  }
-
-  func store(_ scratch: URL) -> DatabaseStore {
-    DatabaseStore(
-      home: scratch.appending(path: "silta-home"),
-      clock: FakeClock(now: Date(timeIntervalSince1970: 1_700_000_000)), jitter: { 0 })
-  }
-
-  func settings(_ json: String, _ scratch: URL) throws {
-    try store(scratch).write {
-      try $0.database.execute(sql: "UPDATE workspace SET settings=?", arguments: [json])
-    }
-  }
 }

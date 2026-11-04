@@ -214,8 +214,10 @@ private struct WorkspaceValidation {
     if ["on", "off", "yes", "no", "true", "false", "y", "n"].contains(text.lowercased()) {
       let gloss =
         gate
-        ? "none: no gate; any: done warns on a changes verdict; human: done needs a human approve."
-        : "triage: proposals wait for triage; ask: ask in chat before proposing."
+        ? WorkspaceSettings.ReviewGate.allCases.map { "\($0.rawValue): \($0.gloss)" }.joined(
+          separator: "; ") + "."
+        : WorkspaceSettings.Proposals.allCases.map { "\($0.rawValue): \($0.gloss)" }.joined(
+          separator: "; ") + "."
       problem(value, accepted + ". " + gloss + " Ask the human which policy to use.")
     } else if value.tag != Tag(.str) || text.isEmpty {
       problem(value, accepted)

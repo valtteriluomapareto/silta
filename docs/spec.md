@@ -1045,7 +1045,11 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    1. the latest handoff
    2. unanswered questions, and what the task is blocked on and for how long, with
       the same `next` as a refused `task start`
-   3. the plan with step state
+   3. the plan with step state: completed runs collapse (e.g. `1–7 done`), open
+      steps keep original numbering, and the tail is trimmed. A complete marker
+      such as `(plan trimmed: 32/60; silta --ws acme task show AC-12)` names the last
+      represented original step and total, including completed summaries. Zero
+      means no step fits; freeform plans retain their text and use a marker without counts.
    4. (M2) review state and unresolved `changes` threads with their snippets
 3. **App card**: summary, environments, a pointer to the repo's AGENTS.md.
 4. **Neighbours**: edges in and out, each with a ready `silta code show …` command.
@@ -1065,21 +1069,34 @@ An explicit `--budget` overrides the default selected by `--short` or `--hook`.
 The estimate covers rendered text; JSON syntax overhead is additional. Tiny budgets
 retain the compact location, current task reference, non-default settings and complete
 `more:` commands even when that minimum exceeds the requested budget. Candidate details
-are optional budgeted content in both formats. Recovery commands are kept whole.
+and their complete `brief --app` retries are budgeted before the task line in both
+formats. Empty candidate lists are omitted. Recovery commands and trim markers are
+kept whole; a marker remains even when zero plan lines fit. The normal budget omits
+the redundant `brief --task` retry; short briefs retain it.
 JSON contains compact `location` metadata, `settings`, optional `current_task`, ordered
 `sections` (`id` and trimmed `text`), `more` commands and a `truncated` boolean.
+Absent location app and branch values encode as `null`. Settings is an open object:
+unsupported keys/values retain masked raw JSON without a gloss and produce a
+`setting_unsupported` warning per key. A malformed top-level settings document uses
+an `_invalid` indicator. This tolerant projection does not relax write-policy validation.
 
 Automatic current-task ties use newest claim time (session matches), otherwise newest
 update time (branch matches), then highest task sequence. Only local open, unarchived
-tasks in candidate apps or unbound tasks without a foreign worktree qualify. Task
-selection does not override `where`'s app-confidence rules; explicit `--task` does
-participate in location inference. The task section names its app, including when an
-explicit `--app` selects a different app. Brief masks stored task-body secrets.
+tasks in candidate apps or unbound tasks without a foreign worktree qualify, including
+blocked work. `where` and brief use this same ranked selector. Its selected task app
+is task evidence in location resolution, after explicit app/single-candidate/override
+rules. App cards, neighbours and app backlogs follow resolved `location.app`; the task
+section names its own app, including when an explicit `--app` selects a different app.
+Brief masks stored task-body secrets. Blockers include their follow-up date.
 
 The available core brief omits app/backlog and discussion/inbox sections until their
-ordered additions ship. Hook mode has a 1.5 s process deadline, including environment
+ordered additions ship; the task description joins the richer context addition.
+Hook mode has a 1.5 s process deadline, including environment
 assembly, fails immediately on database contention and never populates `where_cache`.
-Ordinary command logging and SQLite read-side WAL/SHM recreation remain allowed.
+The watchdog appends a best-effort body-free timeout record, then exits without running
+exit handlers. Timeout and completion have exclusive log/output ownership; completion
+cancels the watchdog explicitly before output. Hook log appends are nonblocking and
+skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NONBLOCK`.
 
 ## 13. Indexing and search (M3)
 

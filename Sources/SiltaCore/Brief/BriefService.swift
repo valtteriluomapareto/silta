@@ -18,27 +18,30 @@ package struct BriefService {
       path: path, workspace: workspace, app: app, task: task, cacheWrites: !hook)
     let (current, settings) = try environment.db.read { db in
       let id = try TaskService.workspaceID(location.workspace, in: db)
-      let settings = try BriefSettings(
-        WorkspaceSettings.read(workspaceID: id, in: db), workspace: location.workspace)
-      let selected: TaskDetails?
-      if let task {
-        selected = try TaskService.lookup(task, workspace: location.workspace, in: db)
-      } else {
-        selected = try currentTask(location, app: app, workspaceID: id, in: db)
+      let settings = BriefSettings(
+        try WorkspaceSettings.read(workspaceID: id, in: db), workspace: location.workspace)
+      var selected = try location.currentTask.map {
+        try TaskService.lookup($0.ref, workspace: location.workspace, in: db)
+      }
+      if let current = selected {
+        selected?.waiting = try TaskService.waiting(current, at: environment.clock.now(), in: db)
       }
       return (
-        try selected.map { try TaskService.decorate($0, at: environment.clock.now(), in: db) },
+        selected,
         settings
       )
     }
     let command = "silta --ws " + shellWord(location.workspace)
     let more =
-      current.map { [command + " brief --task " + $0.ref, command + " task show " + $0.ref] }
+      current.map {
+        (budget < 2500 ? [command + " brief --task " + $0.ref] : [])
+          + [command + " task show " + $0.ref]
+      }
       ?? [command + " task ls", command + " ws show"]
     var report = BriefReport(
       location: BriefLocation(location), settings: settings,
       currentTask: current?.ref, sections: sections(location, current: current, command: command),
-      more: more, warnings: location.warnings)
+      more: more, warnings: location.warnings + settings.warnings)
     report.trim(tokens: budget)
     return report
   }
@@ -48,66 +51,40 @@ package struct BriefService {
   {
     var sections: [BriefSection] = []
     if location.confidence == "low" {
-      sections.append(
-        BriefSection(
-          id: "candidates",
-          text: "candidates: "
-            + location.retryCandidates.map { "\($0.app) (\($0.ref))" }.joined(separator: ", ")
-            + "\n"))
+      for candidate in location.retryCandidates {
+        sections.append(
+          BriefSection(
+            id: "candidates",
+            text: "candidates: \(candidate.app) (\(candidate.ref))\n"
+              + "next: \(command) brief --app \(shellWord(candidate.app))\n"))
+      }
     }
     if let current {
       sections.append(
         BriefSection(
           id: "task",
           text:
-            "\(current.status): \(TaskError.shown(current.title)) (app: \(current.app ?? "unbound"))\n"
+            "\(current.status): \(TaskError.shown(current.title)) (app: \(current.app ?? "unbound"))\n",
+          policy: .characters
         ))
       if let waiting = current.waiting {
         let error = TaskError.blocked(current.ref, waiting)
-        let next = error.next.map { command + String($0.dropFirst(5)) }
+        let next = error.next.map { workspaceCommand($0, workspace: location.workspace) }
+        let followUp = current.followUpAt.map { "follow-up: " + $0 + "\n" } ?? ""
         sections.append(
           BriefSection(
             id: "blockers",
             text:
-              error.message + "\n" + waiting.why + "\n" + next.map { "next: " + $0 + "\n" }.joined()
+              error.message + "\n" + waiting.why + "\n" + followUp
+              + next.map { "next: " + $0 + "\n" }.joined()
           ))
       }
       if !current.plan.isEmpty {
-        let plan = SecretGuard.redacted(MarkdownPlan.numbered(current.plan))
         sections.append(
-          BriefSection(
-            id: "plan",
-            text:
-              "plan (revision \(current.planRev)):\n" + plan + (plan.hasSuffix("\n") ? "" : "\n")))
+          BriefPlan.section(current.plan, ref: current.ref, revision: current.planRev))
       }
     }
     return sections
   }
 
-  private func currentTask(
-    _ location: LocationResult, app: String?, workspaceID: Int64, in db: Database
-  ) throws -> TaskDetails? {
-    let candidates = location.candidates.filter { app == nil || app == $0.app }.map(\.id)
-    let slots = candidates.map { _ in "?" }.joined(separator: ",")
-    let row = try Row.fetchOne(
-      db,
-      sql: TaskService.query + """
-        \nWHERE task.workspace_id=? AND task.status IN ('todo','doing','review','blocked')
-          AND task.external_ref IS NULL AND task.archive_override IS NOT 'archived'
-          AND ((task.app_id IS NULL AND (task.worktree IS NULL OR task.worktree=?))
-            OR task.app_id IN (\(slots)))
-          AND (task.claimed_by=? OR task.branch=?)
-        ORDER BY COALESCE(task.claimed_by=?,0) DESC,
-          CASE WHEN task.claimed_by=? THEN task.claimed_at ELSE task.updated_at END DESC,
-          task.seq DESC LIMIT 1
-        """,
-      arguments: StatementArguments(
-        [workspaceID, location.worktree] as [(any DatabaseValueConvertible)?]
-          + candidates.map { $0 as (any DatabaseValueConvertible)? }
-          + [
-            environment.actor.description, location.branch, environment.actor.description,
-            environment.actor.description,
-          ]))
-    return row.map { TaskDetails(row: $0) }
-  }
 }

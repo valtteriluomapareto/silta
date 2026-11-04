@@ -9,29 +9,12 @@ enum BriefHook {
       && !flags.contains("--help") && !flags.contains("--version")
   }
 
-  static func watchdog() -> any DispatchSourceTimer {
-    let timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
-    timer.schedule(deadline: .now() + 1.5)
-    timer.setEventHandler { exit(0) }
-    timer.resume()
-    return timer
-  }
-
   static func environment(
     _ snapshot: [String: String], deterministic: Bool, deadline: ContinuousClock.Instant
   ) async throws -> SiltaEnvironment {
     let git = HookGitRunner(snapshot: snapshot, deadline: deadline)
-    let (actor, warnings) = try await ActorID.resolve(
-      environment: snapshot, terminal: .system(), git: git,
-      directory: URL(filePath: FileManager.default.currentDirectoryPath))
-    var attributed = snapshot
-    attributed["SILTA_ACTOR"] = actor.description
-    let base = try await SiltaEnvironment.system(
-      environment: attributed, deterministic: deterministic)
-    return SiltaEnvironment(
-      clock: base.clock, ids: base.ids, git: git, home: base.home,
-      db: DatabaseStore(home: base.home.url, clock: base.clock, jitter: { 0 }, readBusyTimeout: 0),
-      log: base.log, actor: actor, warnings: warnings)
+    return try await SiltaEnvironment.system(
+      environment: snapshot, deterministic: deterministic, git: git, readBusyTimeout: 0)
   }
 }
 

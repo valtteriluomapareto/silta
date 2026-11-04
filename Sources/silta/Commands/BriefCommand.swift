@@ -12,13 +12,10 @@ struct BriefCommand: OutputCommand {
   static let workspaceSource = WorkspaceSource.option
   static let dataShape = Shape.object([
     "location": .object([
-      "workspace": .string, "repo": .string, "app": .optional(.string), "branch": .any,
+      "workspace": .string, "repo": .string, "app": .any, "branch": .any,
       "confidence": .string, "reason": .string,
     ]),
-    "settings": .object([
-      "proposals": .optional(.string), "review_gate": .optional(.string),
-      "archive_after_days": .optional(.int), "stale_days": .optional(.int),
-    ]),
+    "settings": .any,
     "current_task": .optional(.string),
     "sections": .array(.object(["id": .string, "text": .string])),
     "more": .array(.string), "truncated": .bool,

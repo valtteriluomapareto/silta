@@ -8,8 +8,8 @@ import Testing
 struct WorkspaceSettingsRegressionTests {
   static let gloss =
     "review_gate must be none, any or human. "
-    + "none: no gate; any: done warns on a changes verdict; "
-    + "human: done needs a human approve. Ask the human which policy to use."
+    + "none: no gate; any: warn if latest review requests changes; "
+    + "human: human approval required before done. Ask the human which policy to use."
 
   static func set(_ json: String, in store: DatabaseStore) throws {
     try store.write {

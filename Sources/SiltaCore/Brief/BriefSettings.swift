@@ -1,42 +1,56 @@
-/// Non-default workspace settings. Empty defaults encode as an empty object (D39).
+import Foundation
+
+/// Open JSON object of non-default settings; unsupported keys retain masked raw values.
 package struct BriefSettings: Encodable, Sendable {
-  let proposals: String?
-  let reviewGate: String?
-  let archiveAfterDays: Int?
-  let staleDays: Int?
+  let values: [String: BriefSettingValue]
+  let text: String
+  let warnings: [OutputWarning]
 
-  enum CodingKeys: String, CodingKey {
-    case proposals
-    case reviewGate = "review_gate"
-    case archiveAfterDays = "archive_after_days"
-    case staleDays = "stale_days"
+  init(_ settings: WorkspaceSettings, workspace: String) {
+    do {
+      let document = try JSONSerialization.jsonObject(with: Data(settings.json.utf8))
+      guard let object = document as? [String: Any] else { throw StorageError.unavailable }
+      let raw = try JSONDecoder().decode(
+        [String: BriefSettingValue].self,
+        from: JSONSerialization.data(withJSONObject: WorkspaceSettings.masked(object)))
+      let defaults = WorkspaceSettings(workspace: workspace, json: "{}")
+      var values: [String: BriefSettingValue] = [:]
+      var items: [String] = []
+      var warnings: [OutputWarning] = []
+      let known = WorkspaceSettings.CodingKeys.allCases.map(\.rawValue)
+      for name in known + raw.keys.filter({ !known.contains($0) }).sorted() {
+        guard let value = raw[name] else { continue }
+        do {
+          guard let key = WorkspaceSettings.CodingKeys(rawValue: name) else {
+            throw StorageError.unavailable
+          }
+          let typed = try key.value(in: settings)
+          guard typed != (try key.value(in: defaults)) else { continue }
+          values[name] = typed
+          items.append("\(name): \(typed.text) (\(try key.gloss(in: settings)))")
+        } catch {
+          values[name] = value
+          items.append("\(TaskError.shown(name)): \(value.text)")
+          warnings.append(
+            OutputWarning(
+              code: "setting_unsupported",
+              message: "Unsupported setting \(TaskError.shown(name)); inspect silta ws show "
+                + shellWord(workspace) + "."))
+        }
+      }
+      self.values = values
+      self.text = items.isEmpty ? "" : "settings: " + items.joined(separator: "; ") + "\n"
+      self.warnings = warnings
+    } catch {
+      values = ["_invalid": .string("[invalid settings document]")]
+      text = "settings: [invalid settings document]\n"
+      warnings = [
+        .init(
+          code: "setting_unsupported",
+          message: "Invalid settings document; inspect silta ws show " + shellWord(workspace) + ".")
+      ]
+    }
   }
 
-  init(_ settings: WorkspaceSettings, workspace: String) throws {
-    let defaults = WorkspaceSettings(workspace: workspace, json: "{}")
-    proposals = try settings.proposals == defaults.proposals ? nil : settings.proposals.rawValue
-    reviewGate = try settings.reviewGate == defaults.reviewGate ? nil : settings.reviewGate.rawValue
-    archiveAfterDays =
-      try settings.archiveAfterDays == defaults.archiveAfterDays
-      ? nil : settings.archiveAfterDays
-    staleDays = try settings.staleDays == defaults.staleDays ? nil : settings.staleDays
-  }
-
-  var text: String {
-    var items: [String] = []
-    if let proposals {
-      items.append("proposals: \(proposals) (ask in chat before adding a task)")
-    }
-    if let reviewGate {
-      let gloss =
-        reviewGate == "human"
-        ? "human approval required before done" : "warn if latest review requests changes"
-      items.append("review_gate: \(reviewGate) (\(gloss))")
-    }
-    if let archiveAfterDays {
-      items.append("archive_after_days: \(archiveAfterDays) (days before closed tasks archive)")
-    }
-    if let staleDays { items.append("stale_days: \(staleDays) (days before docs are stale)") }
-    return items.isEmpty ? "" : "settings: " + items.joined(separator: "; ") + "\n"
-  }
+  package func encode(to encoder: any Encoder) throws { try values.encode(to: encoder) }
 }

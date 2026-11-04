@@ -27,10 +27,29 @@ package struct BriefReport: Encodable, Sendable {
   var footer: String { "more: " + more.joined(separator: " | ") + "\n" }
 
   /// Text preserves a compact location, task ref, settings and complete recovery commands.
-  package var text: String { floor + sections.map(\.text).joined() + footer }
+  package var text: String {
+    location.text + sections.filter { $0.id == "candidates" }.map(\.text).joined() + settings.text
+      + "task: \(currentTask ?? "none")\n"
+      + sections.filter { $0.id != "candidates" }.map(\.text).joined() + footer
+  }
 
   mutating func trim(tokens: Int) {
     let available = max(0, BriefBudget.characters(tokens: tokens) - floor.count - footer.count)
-    (sections, truncated) = BriefBudget.trim(sections, characters: available)
+    guard sections.map(\.text.count).reduce(0, +) > available else { return }
+    let plan = sections.first { if case .plan = $0.policy { true } else { false } }
+    func notice(through: Int) -> String {
+      if let plan, case .plan(let ref, let total) = plan.policy {
+        return BriefPlan.marker(
+          ref: ref, total: total, through: through, workspace: location.workspace)
+      }
+      return "(brief trimmed; see more)\n"
+    }
+    // Reserve worst-case step digits, even if no optional line fits.
+    let total = plan.flatMap { if case .plan(_, let total) = $0.policy { total } else { nil } } ?? 0
+    let reserved = notice(through: total).count
+    (sections, truncated) = BriefBudget.trim(sections, characters: max(0, available - reserved))
+    truncated = true
+    let through = sections.filter { $0.id == "plan" }.map { BriefPlan.through($0.text) }.max() ?? 0
+    sections.append(BriefSection(id: "trimmed", text: notice(through: through)))
   }
 }

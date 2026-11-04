@@ -22,7 +22,8 @@ package final class SystemLog: Log {
     try? write(entry)  // best-effort diagnostics must never fail a command
   }
 
-  private func write(_ entry: LogEntry) throws {
+  /// Encodes one body-free daily record outside a timeout handler.
+  package static func prepared(_ entry: LogEntry) throws -> (name: String, data: Data) {
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -30,14 +31,18 @@ package final class SystemLog: Log {
       var container = encoder.singleValueContainer()
       try container.encode(utcTimestamp(date))
     }
-    let data = try encoder.encode(entry) + Data([10])
+    return (utcDay(entry.timestamp) + ".jsonl", try encoder.encode(entry) + Data([10]))
+  }
+
+  private func write(_ entry: LogEntry) throws {
+    let record = try Self.prepared(entry)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let url = directory.appending(path: "\(utcDay(entry.timestamp)).jsonl")
+    let url = directory.appending(path: record.name)
     let descriptor = open(url.path, O_WRONLY | O_CREAT | O_APPEND, 0o600)
     guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
     let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-    try handle.write(contentsOf: data)
-    try verbose?.write(contentsOf: data)
+    try handle.write(contentsOf: record.data)
+    try verbose?.write(contentsOf: record.data)
     try prune(at: entry.timestamp)
   }
 

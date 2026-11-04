@@ -42,7 +42,9 @@ package struct SiltaEnvironment: Sendable {
     userHome: URL? = nil,
     temporaryRoots: [URL]? = nil,
     deterministic: Bool = false,
-    verbose: FileHandle? = nil
+    verbose: FileHandle? = nil,
+    git injectedGit: (any GitRunner)? = nil,
+    readBusyTimeout: TimeInterval = 5
   ) async throws -> SiltaEnvironment {
     let home = try SiltaHome.resolve(
       environment: environment, userHome: userHome, temporaryRoots: temporaryRoots,
@@ -63,7 +65,7 @@ package struct SiltaEnvironment: Sendable {
         ids = SeededIDGenerator(seed: seed)
       }
     }
-    let git = SystemGitRunner(environment: environment)
+    let git: any GitRunner = injectedGit ?? SystemGitRunner(environment: environment)
     let (actor, warnings) = try await ActorID.resolve(
       environment: environment, terminal: .system(), git: git,
       directory: URL(filePath: FileManager.default.currentDirectoryPath))
@@ -72,7 +74,8 @@ package struct SiltaEnvironment: Sendable {
       clock: clock, ids: ids, git: git, home: home,
       db: DatabaseStore(
         home: home.url, clock: clock,
-        jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) }),
+        jitter: { deterministicTime ? 0 : UInt64.random(in: 10...50) },
+        readBusyTimeout: readBusyTimeout),
       log: SystemLog(directory: home.url.appending(path: "log"), verbose: verbose), actor: actor,
       warnings: warnings)
   }
