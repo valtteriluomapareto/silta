@@ -12,9 +12,13 @@ extension DoctorService {
     -> [DoctorCheck]
   {
     let evidence = "/usr/bin/sqlite3 -readonly " + shellWord(store.path)
+    let inspectBackups = backups.count > 0 || !backups.readable
     let recovery =
-      (backups.count > 0 ? [backups.listing] : [])
-      + [evidence + " 'PRAGMA integrity_check;'", evidence + " 'PRAGMA foreign_key_check;'"]
+      (inspectBackups ? [backups.listing] : [])
+      + [
+        evidence + " 'PRAGMA integrity_check;'", evidence + " 'PRAGMA foreign_key_check;'",
+        evidence + " '.schema'",
+      ]
     let missing = !FileManager.default.fileExists(atPath: store.path)
     if missing || !FileManager.default.isReadableFile(atPath: store.path) {
       let first: DoctorCheck
@@ -24,15 +28,18 @@ extension DoctorService {
           message: "Database is missing."
             + (backups.count > 0
               ? " Backups are available; restore is the human's decision."
-              : " Initialize only if no existing data is expected."),
-          next: backups.count > 0 ? [backups.listing] : ["silta init"])
+              : !backups.readable
+                ? " Backup availability is unknown; "
+                  + "the human must decide recovery after inspection."
+                : " Initialize only if no existing data is expected."),
+          next: inspectBackups ? [backups.listing] : ["silta init"])
       } else {
         first = DoctorCheck(
           id: "database.integrity", status: .fail,
           message:
             "Database access is denied by file permissions; "
             + "inspect access before diagnosing corruption.",
-          next: (backups.count > 0 ? [backups.listing] : []) + [
+          next: (inspectBackups ? [backups.listing] : []) + [
             "/bin/ls -l " + shellWord(store.path)
           ])
       }
@@ -41,7 +48,7 @@ extension DoctorService {
     }
     do {
       return try store.read { db in
-        try databaseChecks(db, backups: backups, recovery: recovery, at: now)
+        databaseChecks(db, backups: backups, recovery: recovery, at: now)
       }
     } catch {
       let failure = readFailure(
@@ -72,10 +79,10 @@ extension DoctorService {
 
   private static func databaseChecks(
     _ db: Database, backups: DoctorBackups, recovery: [String], at now: Date
-  ) throws -> [DoctorCheck] {
+  ) -> [DoctorCheck] {
     var checks = integrity(db, recovery: recovery)
     let schemaCheck: DoctorCheck
-    do { schemaCheck = try schema(db) } catch {
+    do { schemaCheck = try schema(db, recovery: recovery) } catch {
       schemaCheck = DoctorCheck(
         id: "database.schema", status: .fail, message: "Schema metadata could not be checked.",
         next: recovery)
@@ -139,14 +146,20 @@ extension DoctorService {
     return checks
   }
 
-  private static func schema(_ db: Database) throws -> DoctorCheck {
+  private static func schema(_ db: Database, recovery: [String]) throws -> DoctorCheck {
     let install = ["<clean-main-checkout>/scripts/install-dev.sh"]
     guard try db.tableExists("meta"), try db.tableExists("grdb_migrations") else {
+      let empty =
+        try Int.fetchOne(
+          db, sql: "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0
       return DoctorCheck(
         id: "database.schema", status: .fail,
-        message:
-          "Schema is uninitialized or incomplete; inspect existing data before initialization.",
-        next: ["silta init"])
+        message: empty
+          ? "Database schema is uninitialized."
+          : "A nonempty database is missing schema metadata; "
+            + "inspect backups and read-only evidence. "
+            + "Restore is the human's decision.",
+        next: empty ? ["silta init"] : recovery)
     }
     guard
       let rawVersion = try String.fetchOne(

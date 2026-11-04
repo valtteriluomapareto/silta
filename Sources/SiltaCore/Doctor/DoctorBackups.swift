@@ -47,15 +47,15 @@ struct DoctorBackups {
   var listing: String { "/bin/ls -l " + shellWord(directory.path) }
 
   func check(expectedDay: String?) -> DoctorCheck {
-    if expectedDay == "" {
-      return DoctorCheck(
-        id: "data.backup", status: .pass,
-        message: "No daily backup yet; the first write creates one.")
-    }
     guard readable else {
       return DoctorCheck(
         id: "data.backup", status: .warning,
         message: "Backup files could not be listed; coverage is unknown.", next: [listing])
+    }
+    if expectedDay == "" {
+      return DoctorCheck(
+        id: "data.backup", status: .pass,
+        message: "No daily backup yet; the first write creates one.")
     }
     guard let expectedDay else {
       return DoctorCheck(

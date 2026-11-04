@@ -1,5 +1,4 @@
 package import Foundation
-import GRDB
 
 /// Diagnoses existing data without initializing, migrating, fetching or repairing it.
 package enum DoctorService {
@@ -69,7 +68,7 @@ package enum DoctorService {
       return DoctorCheck(
         id: "database.wal", status: large ? .warning : .pass,
         message: large
-          ? "WAL exceeds 64 MiB; ask the human to check active database readers."
+          ? "WAL exceeds 64 MiB; inspect active database readers before deciding on repairs."
           : "WAL is at most 64 MiB.",
         next: large ? ["/usr/sbin/lsof " + shellWord(home.appending(path: "silta.db").path)] : [])
     } catch {
