@@ -212,9 +212,15 @@ struct DogfoodAutomationTests {
     }
   }
 
+}
+
+extension DogfoodAutomationTests {
   @Test(arguments: [
     ("CHERRY_PICK_HEAD", "cherry-pick (CHERRY_PICK_HEAD)", "cherry-pick --quit"),
+    ("REVERT_HEAD", "revert (REVERT_HEAD)", "revert --quit"),
+    ("MERGE_HEAD", "merge (MERGE_HEAD)", "merge --quit"),
     ("rebase-merge/", "rebase (rebase-merge)", "rebase --quit"),
+    ("rebase-apply/", "rebase (rebase-apply)", "rebase --quit"),
   ])
   func codexWarnsAboutUnfinishedGitState(marker: String, state: String, action: String) throws {
     try withScratchDirectory { scratch in
@@ -227,13 +233,43 @@ struct DogfoodAutomationTests {
         fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
       let dir = try Self.git(
         ["rev-parse", "--show-toplevel"], in: fixture.worktree, scratch: scratch)
-      withKnownIssue {
-        #expect(result.stderr.contains(state))
-        #expect(result.stderr.contains("git -C \(dir) \(action)"))
-        #expect(result.stderr.contains("cannot clear"))
-      }
+      #expect(result.stderr.contains(state))
+      #expect(result.stderr.contains("git -C \(dir) \(action)"))
+      #expect(result.stderr.contains("cannot clear"))
       #expect(result.termination == .exit(4))
       #expect(result.stdout == "Thread: \(Self.thread)\nAcme done\n")
+    }
+  }
+
+  @Test func codexWarnsAboutAnUnfinishedSequence() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      try Self.fakeCodex(
+        scratch, output: [Self.started, Self.message("Acme done")],
+        then: "gitdir=\"$(git rev-parse --absolute-git-dir)\"; mkdir -p \"$gitdir/sequencer\";"
+          + " printf 'pick acme\\n' > \"$gitdir/sequencer/todo\"")
+      let log = scratch.appending(path: "run.jsonl").path
+      let result = try Self.run(
+        fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.contains("cherry-pick (sequencer)"))
+      #expect(result.stderr.contains("cherry-pick --quit"))
+    }
+  }
+
+  @Test func codexWarnsAboutAnUnfinishedAm() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      try Self.fakeCodex(
+        scratch, output: [Self.started, Self.message("Acme done")],
+        then: "gitdir=\"$(git rev-parse --absolute-git-dir)\";"
+          + " mkdir -p \"$gitdir/rebase-apply\"; touch \"$gitdir/rebase-apply/applying\"")
+      let log = scratch.appending(path: "run.jsonl").path
+      let result = try Self.run(
+        fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.contains("am (rebase-apply)"))
+      #expect(result.stderr.contains("git -C ") && result.stderr.contains(" am --quit"))
     }
   }
 
