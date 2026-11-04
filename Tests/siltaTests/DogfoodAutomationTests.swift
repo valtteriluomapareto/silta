@@ -85,6 +85,13 @@ struct DogfoodAutomationTests {
       .split(separator: "\n").map(String.init)
   }
 
+  /// A command that leaves `marker` in the worktree's git dir, as an interrupted git
+  /// operation would. A trailing slash makes it a directory.
+  static func leaving(_ marker: String) -> String {
+    let path = "\"$(git rev-parse --absolute-git-dir)/\(marker)\""
+    return marker.hasSuffix("/") ? "mkdir -p \(path)" : "touch \(path)"
+  }
+
   static let callerMarkers = [
     "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "SILTA_ACTOR", "SILTA_SESSION",
     "CODEX_COMPANION_SESSION_ID",
@@ -204,6 +211,43 @@ struct DogfoodAutomationTests {
       #expect(started.termination == .exit(1) && started.stdout == "Thread: unknown\n")
     }
   }
+
+  @Test(arguments: [
+    ("CHERRY_PICK_HEAD", "cherry-pick (CHERRY_PICK_HEAD)", "cherry-pick --quit"),
+    ("rebase-merge/", "rebase (rebase-merge)", "rebase --quit"),
+  ])
+  func codexWarnsAboutUnfinishedGitState(marker: String, state: String, action: String) throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      try Self.fakeCodex(
+        scratch, output: [Self.started, Self.message("Acme done")], exit: 4,
+        then: Self.leaving(marker))
+      let log = scratch.appending(path: "run.jsonl").path
+      let result = try Self.run(
+        fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
+      let dir = try Self.git(
+        ["rev-parse", "--show-toplevel"], in: fixture.worktree, scratch: scratch)
+      withKnownIssue {
+        #expect(result.stderr.contains(state))
+        #expect(result.stderr.contains("git -C \(dir) \(action)"))
+        #expect(result.stderr.contains("cannot clear"))
+      }
+      #expect(result.termination == .exit(4))
+      #expect(result.stdout == "Thread: \(Self.thread)\nAcme done\n")
+    }
+  }
+
+  @Test func codexSaysNothingWhenNoGitOperationIsUnfinished() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      try Self.fakeCodex(scratch, output: [Self.started, Self.message("Acme done")])
+      let log = scratch.appending(path: "run.jsonl").path
+      let result = try Self.run(
+        fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.isEmpty)
+    }
+  }
 }
 
 extension DogfoodAutomationTests {
@@ -223,6 +267,20 @@ extension DogfoodAutomationTests {
       #expect(result.termination == .exit(status))
       #expect(result.stdout.hasPrefix("Thread: \(Self.thread)\n"))
       #expect(result.stderr.contains("don't run git") == (status == 70))
+    }
+  }
+
+  @Test func codexSkipsTheWarningWhenTheGitSetupCheckRefused() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      try Self.fakeCodex(
+        scratch, output: [Self.started, Self.message("Acme done")],
+        setting: "core.fsmonitor 'touch acme-pwned'", then: Self.leaving("CHERRY_PICK_HEAD"))
+      let log = scratch.appending(path: "run.jsonl").path
+      let result = try Self.run(
+        fixture.script, ["start", fixture.worktree.path, log], scratch: scratch)
+      #expect(result.termination == .exit(70))
+      #expect(result.stderr.contains("don't run git") && !result.stderr.contains("--quit"))
     }
   }
 }
