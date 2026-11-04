@@ -19,6 +19,9 @@ package struct CommandOutput: Sendable {
   /// successful command that leaves it nil is logged without a workspace.
   package var workspace: String?
 
+  /// A diagnostic failure that retains this output's data and text report.
+  package var failure: (any CodedError)?
+
   /// A result with text, envelope data and warnings.
   package init(
     text: String, quiet: String = "", data: any Encodable & Sendable,

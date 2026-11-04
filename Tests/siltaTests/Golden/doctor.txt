@@ -1,0 +1,22 @@
+pass: database.integrity: SQLite integrity check passed.
+pass: database.foreign_keys: Foreign key check passed.
+pass: database.schema: Schema is compatible with this binary.
+pass: database.wal: WAL is at most 64 MiB.
+pass: git.version: Git is available at /usr/bin/git.
+pass: git.repos: All bound repository paths have a .git marker.
+pass: git.bindings: All repositories have a local binding.
+pass: git.fetch: No stale repository fetches.
+pass: git.overrides: No orphaned worktree overrides.
+pass: data.claims: No claims at least 2 hours old.
+pass: data.backup: No daily backup yet; the first write creates one.
+skipped: install.path: Installer diagnostics are not available yet.
+skipped: install.hook: Installer diagnostics are not available yet.
+skipped: install.skill: Installer diagnostics are not available yet.
+skipped: install.codex_root: Installer diagnostics are not available yet.
+skipped: install.codex_marker: Installer diagnostics are not available yet.
+skipped: index.integrity: Index diagnostics are not available yet.
+skipped: index.foreign_keys: Index diagnostics are not available yet.
+skipped: index.schema: Index diagnostics are not available yet.
+skipped: index.fts: Index diagnostics are not available yet.
+skipped: index.age: Index diagnostics are not available yet.
+skipped: app.version: App version diagnostics are not available yet.

@@ -1,3 +1,4 @@
+import Foundation
 import SiltaCore
 import Testing
 
@@ -139,5 +140,27 @@ struct OutputRouterTests {
     #expect(
       stderr.hasPrefix(
         "error: internal error (bug): " + String(repeating: "x", count: 200) + " [env]\n"))
+  }
+}
+
+extension OutputRouterTests {
+  @Test(arguments: [false, true]) func diagnosticFailureKeepsDataAndWarnings(json: Bool) throws {
+    var output = CommandOutput(
+      text: "report", data: "report", warnings: [OutputWarning(code: "w", message: "careful")])
+    output.failure = Sample(code: .env)
+    let result = OutputRouter.render(.success(output), mode: OutputMode(json: json, quiet: true))
+    #expect(result.exitCode == 9 && result.errorCode == .env)
+    #expect(result.warningCodes == ["w"])
+    if json {
+      let envelope = try #require(
+        JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+      #expect(envelope["ok"] as? Bool == false)
+      #expect(envelope["data"] as? String == "report")
+      #expect((envelope["warnings"] as? [[String: String]])?.first?["code"] == "w")
+      #expect(result.stderr.isEmpty)
+    } else {
+      #expect(result.stdout == "report\n")
+      #expect(result.stderr.hasPrefix("warning: careful [w]\nerror:"))
+    }
   }
 }

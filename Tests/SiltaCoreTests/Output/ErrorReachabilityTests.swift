@@ -116,6 +116,19 @@ extension CommandFailure: ErrorExamples {
   }
 }
 
+extension DoctorFailure: ErrorExamples {
+  static var examples: [DoctorFailure] {
+    [
+      .init(
+        report: DoctorReport(checks: [
+          DoctorCheck(
+            id: "database.integrity", status: .fail, message: "Database is missing.",
+            next: ["silta init"])
+        ]))
+    ]
+  }
+}
+
 extension ActorError: ErrorExamples {
   static var examples: [ActorError] {
     [
@@ -144,7 +157,7 @@ struct ErrorReachabilityTests {
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
     CodeError.self, LocationError.self,
-    CommandFailure.self, TaskReferenceError.self,
+    CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.

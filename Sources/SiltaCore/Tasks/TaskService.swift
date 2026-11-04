@@ -75,6 +75,9 @@ package struct TaskService: Sendable {
     }
   }
 
+  /// Shared expiry boundary for claim ownership and diagnostics.
+  static let claimDuration: TimeInterval = 2 * 60 * 60
+
   /// Another actor's claim under two hours old: the only claim `--steal` overrides.
   func foreignClaim(_ task: TaskDetails, at date: Date) throws -> (holder: String, minutes: Int)? {
     guard let holder = task.claimedBy, holder != environment.actor.description else {
@@ -88,7 +91,7 @@ package struct TaskService: Sendable {
       throw StorageError.unavailable
     }
     let age = max(0, date.timeIntervalSince(instant))
-    return age < 7200 ? (holder, Int(age / 60)) : nil
+    return age < Self.claimDuration ? (holder, Int(age / 60)) : nil
   }
 
   static func mutable(_ task: TaskDetails) throws {

@@ -7,7 +7,7 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct NextCommandTests {
   /// Commands that errors may name before their slice ships. Remove each when it lands.
-  static let planned = ["silta doctor": "S15"]
+  static let planned: [String: String] = [:]
 
   @Test func everySuggestedCommandExists() throws {
     let tests = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

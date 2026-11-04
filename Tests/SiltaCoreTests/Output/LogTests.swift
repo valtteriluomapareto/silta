@@ -105,3 +105,22 @@ struct LogTests {
   }
 
 }
+
+extension LogTests {
+  @Test func retentionKeepsNinetyUTCDaysAndUnrelatedEntries() throws {
+    try withScratchDirectory { directory in
+      let fm = FileManager.default
+      let old = directory.appending(path: "2023-08-16.jsonl")
+      let boundary = directory.appending(path: "2023-08-17.jsonl")
+      let unrelated = directory.appending(path: "notes.jsonl")
+      let folder = directory.appending(path: "2023-01-01.jsonl")
+      let link = directory.appending(path: "2023-01-02.jsonl")
+      for file in [old, boundary, unrelated] { try Data().write(to: file) }
+      try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+      try fm.createSymbolicLink(at: link, withDestinationURL: unrelated)
+      SystemLog(directory: directory).record(entry)
+      #expect(!fm.fileExists(atPath: old.path))
+      for file in [boundary, unrelated, folder, link] { #expect(fm.fileExists(atPath: file.path)) }
+    }
+  }
+}

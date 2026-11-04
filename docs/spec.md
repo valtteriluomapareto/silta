@@ -1133,6 +1133,7 @@ state; the tests check this with golden output.
 - One line per output. Keys are sorted by Unicode code point at every level, so output
   is byte-stable.
 - `warnings` is always present. `retry_after_s` is present only when set.
+- Doctor's unhealthy envelope also carries the full report in `data` alongside `error`.
 - `next_by` says who acts on the `next` commands: by default `human` for `human_only`
   and `env`, otherwise `agent`. An error can override its code's default. A proposal refusal
   shown to an agent is `human`, because its `next` is the human's triage. A code
@@ -1406,7 +1407,99 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     schema versions on both DBs, WAL size, index age.
   - **Git:** git path and version, dead repo paths, stale fetches, orphaned worktree
     overrides.
-  - **Data:** stale claims (over 2 h), backup age, CLI vs app version skew.
+  - **Data:** stale claims (at least 2 h), backup age, CLI vs app version skew.
+
+  The read-only diagnostic command reports all workspaces; `--ws` does not filter
+  it. `data.checks` contains ordered checks with `id`, `status` (`pass`, `warning`,
+  `fail`, `skipped`), `message`, `next`, `next_by` (`agent` or `human`), and
+  `next_omitted`. Each `next` contains at most five distinct recovery entries, in priority
+  order. A dead-repo entry is one human-owned inspection/binding recipe; its
+  commands stay together even when inspection fails. The human chooses and
+  approves the clone directory before running it. `next_omitted` counts remaining
+  entries (including complete per-repo recipes); text prints `+N more`
+  separately, never as an executable command. `next_by` owns every command in that
+  check and determines whether text says `next:` or `ask human:`.
+  Failures return exit 9 / `env`, `ok:false` and the complete report in `data`;
+  the envelope takes `next` and `next_by` from the first failed check. Warnings and
+  skipped checks alone return exit 0. Text mode keeps the report on stdout and
+  errors on stderr, including with `--quiet`. Doctor never clears claims, removes
+  overrides, fetches, initializes or migrates.
+
+  Check ids and their order are a contract: ids are never renamed or removed, only
+  added. New ids may be inserted into the display order; consumers key by id,
+  never by array index. Computed ids absent from the named order remain visible at
+  the end. Unavailable checks retain their own id with status `skipped`:
+
+  | Id (display order) | Check / availability |
+  |---|---|
+  | `database.integrity` | SQLite integrity or operational read failure |
+  | `database.foreign_keys` | Foreign-key integrity |
+  | `database.schema` | Truth schema and writer compatibility |
+  | `database.wal` | File-only WAL size |
+  | `git.version` | Fixed git path and version |
+  | `git.repos` | Bound repository paths |
+  | `git.bindings` | Repositories without a local path |
+  | `git.fetch` | Missing/invalid or stale fetch timestamps on bound repos |
+  | `git.overrides` | Worktree override marker presence |
+  | `data.claims` | Claim expiry |
+  | `data.backup` | File-only backup evidence and recorded daily backup |
+  | `install.path` | Skipped until installer diagnostics |
+  | `install.hook` | Skipped until installer diagnostics |
+  | `install.skill` | Skipped until installer diagnostics |
+  | `install.codex_root` | Skipped until installer diagnostics |
+  | `install.codex_marker` | Skipped until installer diagnostics |
+  | `index.integrity` | Skipped until M3 |
+  | `index.foreign_keys` | Skipped until M3 |
+  | `index.schema` | Skipped until M3 |
+  | `index.fts` | Skipped until M3 |
+  | `index.age` | Skipped until M3 |
+  | `app.version` | Skipped until M5 |
+
+  WAL above 64 MiB warns and suggests inspecting open handles. Claim timestamps
+  missing, invalid or at least 2 h old warn, using the same expiry boundary as task
+  ownership. Fetch timestamps missing/invalid or older than 24 h warn, with separate
+  counts. Unbound repositories warn and suggest workspace-scoped
+  `init --scan <directory>` after the human chooses a clone; they are excluded from
+  fetch checks. Bound dead repo paths fail, are also excluded from fetch checks,
+  and give human-owned `init --scan` recovery paired with path inspection.
+  Orphaned overrides warn. These path
+  checks verify `.git` marker presence, not linked-worktree target usability.
+
+  Missing, older or incompatible schemas fail. Pending known migrations suggest `silta init`; empty databases do so only when
+  backup inventory is readable and contains no published backups; all suggested
+  initialization is human-owned, and missing/empty diagnostics show the resolved
+  database path so the human can confirm the intended `SILTA_HOME`;
+  nonempty databases missing metadata require backup/schema inspection first; real writer incompatibility names
+  the clean-main development install script and requires the human's decision.
+  Compatible unknown migrations warn (D32). Dependent checks on an incompatible
+  database are skipped. Permission and contention failures have operational
+  messages and inspection commands, rather than implying corruption.
+
+  WAL and backup checks always run, even when the truth database is missing or
+  unreadable. Published backup evidence excludes symlinks, empty files, invalid or
+  future dates, and unrelated names. Daily backup presence is checked against
+  `meta.last_backup_day`: blank means the first write has not yet needed a backup;
+  idle time alone does not warn. A recorded daily backup must exist as a nonempty
+  regular file. Pre-migration snapshots are listed as recovery evidence but do not
+  substitute for that daily file. Unreadable metadata leaves coverage unknown.
+  This checks presence, not backup integrity. When backups exist, database-failure
+  recovery starts by listing them; restore is the human's decision. SQLite hints
+  use `-readonly` and are evidence, not repeated repair attempts. Initialization is
+  suggested for a missing or empty database only when backup inspection succeeded and no
+  published backups were found. Unreadable inventory stays unknown and leads to
+  inspection, even if no write has yet required a daily backup.
+  SQLite `.db` snapshot recovery is manual: the human stops all clients, preserves
+  the original home including WAL/SHM files, copies the selected snapshot as
+  `silta.db` into a fresh empty home without old sidecars, and inspects that home
+  with `SILTA_HOME=<fresh-home> silta doctor` before choosing it for use.
+  `silta restore` takes an export directory,
+  not a `.db` file. Unknown backup metadata describes only available files and the
+  unreadable last backup day; it does not itself suggest restoration.
+
+  Installation checks and `--fix` follow installer formats when available.
+  A passing diagnostic run does not certify skipped checks. Check warnings live
+  in `data.checks`; envelope and command-log warnings describe command/environment
+  warnings. Failures before CLI environment setup are not logged.
 
 ## 20. Testing strategy
 
