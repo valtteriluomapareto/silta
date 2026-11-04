@@ -377,7 +377,8 @@ CREATE TABLE source (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   root TEXT NOT NULL, include TEXT NOT NULL, exclude TEXT NOT NULL DEFAULT '[]',
   repo_id INTEGER REFERENCES repo(id));
 
-CREATE TABLE worktree_override (path TEXT PRIMARY KEY, app_id INTEGER NOT NULL REFERENCES app(id),
+CREATE TABLE worktree_override (path TEXT PRIMARY KEY, -- canonical worktree toplevel
+  app_id INTEGER NOT NULL REFERENCES app(id),
   set_by TEXT NOT NULL);                      -- human-only
 
 CREATE TABLE approval (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -420,7 +421,8 @@ symlinks resolved, case-folded on case-insensitive volumes.
    - Then apply the rules below in order. The first rule that picks a single
      candidate wins.
 3. **Single candidate** → done.
-4. **Human override** for this path (`worktree_override`).
+4. **Human override** for the canonical worktree toplevel (`worktree_override`),
+   only when its app remains among the filtered candidates.
 5. **Task link.** A task claimed by this session, or the task whose `branch` equals
    the current branch, gives its `app_id`.
 6. **Exact ref.** The current branch equals an app's `ref` or `prod_ref`, ignoring
@@ -442,7 +444,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|
 | Detached HEAD | Rules 4–5, then 8 against the HEAD sha. `branch: null` |
 | Shallow or partial clone where `rev-list` fails | `low`, reason `shallow` |
-| A candidate ref missing locally (`origin/x` not fetched) | Candidate skipped, warning `ref_missing` |
+| A candidate ref missing locally (`origin/x` not fetched) | Skipped in rules 6–8; configured candidate retained, warning `ref_missing` |
 | Worktree of an unregistered repo | `unregistered` |
 | Branch created from a non-app ref (e.g. `release/2024`) | `low` with candidates, never a silent guess |
 
@@ -450,15 +452,60 @@ symlinks resolved, case-folded on case-insensitive volumes.
 
 ```json
 {"workspace":"acme","repo":"platform","app":"platform-portal","branch":"feature/messages-ui",
- "head":"3f9a1c2","confidence":"high","reason":"upstream","candidates":[…]}
+ "head":"3f9a1c2000000000000000000000000000000000","confidence":"high","reason":"upstream","candidates":[…]}
 ```
 
+- `head` is the full commit SHA, not an abbreviation. `reason` is one of
+  `explicit`, `single`, `override`, `task`, `exact_ref`, `upstream`, `reflog`,
+  `distance`, `non_app_ref`, `shallow` or `unresolved`.
+- Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
+- Outside Git, `where` returns `unregistered` with carry-on guidance and harmless
+  help, without suggesting a scan of the input directory. An unregistered Git
+  repository instead gets a scan command for its canonical toplevel.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
-- `where --set` is human-only.
+- Explicit `--app <slug>` selects a filtered candidate. An app outside the filtered
+  candidates is `ambiguous_location`, with candidate retries. `--task <ref>` selects
+  task evidence before session claims and branch matches (§8). An explicit task
+  must exist even when an earlier rule resolves the app; a valid task does not
+  change the precedence of those rules.
+- `where` itself succeeds at low confidence: no app is selected. Its text shows
+  each candidate's slug and ref, with explicit `--app` retries. When distance ran,
+  retries are ordered by increasing score, then slug for ties; unscored candidates
+  follow by slug. The same order survives a cache hit. Retries keep the canonical
+  inspected directory, while override receipts name the canonical worktree root.
+  Candidate JSON entries are `{"app":"<slug>","ref":"<development ref>"}`,
+  sorted by app slug.
+- `where --set <app>` and `--unset` change the canonical worktree toplevel's
+  override, also when invoked in a subdirectory. The override applies only among
+  that input path's filtered candidates, so a subpath app still wins. Other linked
+  worktrees have separate overrides, including worktrees nested inside the parent.
+  Set accepts any configured app in the matched repository, so a worktree-root
+  approval retry can store a subpath app. The accompanying location report still
+  resolves the inspected path's filtered candidates. Both accept `--path <directory>`.
+- Effective override changes are human-only and record an approval atomically.
+  Repeating a set, or unsetting an absent override, needs no approval and writes no
+  rows. Supplied `--approved` then warns `approval_unused`. Receipts distinguish
+  `Override set to <app>` or `Override removed` from `No override` or
+  `Override already <app>`. Read-proven
+  no-ops bypass truth writes. If a concurrent change makes a planned mutation
+  redundant after its write opens, no decision, approval or change-log row changes;
+  normal daily-backup bookkeeping may still run.
+  Approval retries and recorded approval commands preserve the workspace and name
+  the canonical worktree root, which is the scope of the operation.
+- A shallow clone can resolve through earlier rules. Distance inference without
+  complete history returns `low`, reason `shallow`, and is never cached.
+- A named non-app reflog origin returns `low`, reason `non_app_ref`.
+- Missing development refs produce `ref_missing`. Configured candidates remain
+  available for explicit selection, single-candidate, override and task rules;
+  missing refs are skipped only in the ref-dependent rules (6–8). Distance stays
+  low when missing competitors prevent the strict runner-up comparison.
 - The cache lives in `index.db`, keyed on (path, HEAD sha, hash of candidate ref
   shas). It is written only if the lock is free; it never blocks.
+- Location Git requests set `GIT_NO_LAZY_FETCH=1` to suppress fetching missing
+  promised objects. This is best effort: older Git versions may ignore the
+  variable. Location does not run an explicit fetch.
 
 ## 8. Tasks
 
@@ -768,8 +815,10 @@ silta code ls   <app>[@<ref>] [<dir>]
   backend feature branch). The working tree is never touched.
 - **Git runner:** absolute path to `git` (2.40 or later, for `--attr-source`; the
   pinned toolchain ships 2.54), resolved once and checked by `doctor`; environment
-  `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`; a 10 s timeout per
-  call (fetch 60 s).
+  `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`. Inherited `GIT_*`
+  overrides are removed. Code reads retain normal Git lazy fetching for promised
+  objects in partial clones; only location requests suppress it (§7). A 10 s
+  timeout per call (fetch 60 s).
 - Output carries the resolved sha and depends only on that commit: attributes
   (`.gitattributes`) come from the commit too, never from the clone's working tree.
 - JSON data is `{app, ref, sha, output}`; `output` is UTF-8 text, with bytes that
@@ -842,7 +891,7 @@ silta code ls   <app>[@<ref>] [<dir>]
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need the human's go-ahead (D38): `promote`, `task edit`,
-  `doc edit|accept|reject`, `where --set`, `task triage`, `--steal` over another
+  `doc edit|accept|reject`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
   session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
   `ws edit`, and an agent's `task unblock` of a block that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
@@ -1170,7 +1219,7 @@ silta doctor [--fix]                             [M1]
 silta guide [<topic>] | silta help refs            [M1]
 
 # context
-silta where [--app] [--set <app> | --unset]      [M1]
+silta where [--path <dir>] [--app <app>] [--task <ref>] [--set <app> | --unset]      [M1]
 silta brief [...]                                [M1; docs M2; notes M3]
 silta code show|grep|log|ls <app>[@ref] …        [M1]
 silta search <query> [...]                       [M3]
@@ -1394,7 +1443,9 @@ scriptable and deterministic (D13).
   - A shape `S` is `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`,
     `{"object":{"<field>":S,…}}`, or, as an object field only, `{"optional":S}`. An
     object has exactly its fields. An optional field is absent or has its shape; it's
-    never `null`. Every command's `--json` data matches the shape `schema` publishes
+    never `null`. The required `where.branch` field is a specific exception: a
+    string for an attached branch, `null` for detached HEAD (§7), published as `"any"`.
+    Every command's `--json` data matches the shape `schema` publishes
     for it: each command has a success golden, and a test checks every success
     golden against its command's shape.
   - Text, index: one line per command (`<name>  <abstract>`), then

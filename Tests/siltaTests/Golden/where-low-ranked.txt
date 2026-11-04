@@ -1,0 +1,7 @@
+acme / platform / unresolved [low: distance]
+branch: (detached)
+head: <head>
+candidates: portal (origin/portal), api (origin/api), platform (origin/master)
+next: silta --ws 'acme' where --path '<path>' --app 'portal'
+next: silta --ws 'acme' where --path '<path>' --app 'api'
+next: silta --ws 'acme' where --path '<path>' --app 'platform'

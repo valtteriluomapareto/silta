@@ -1,0 +1,1 @@
+{"error":{"code":"unregistered","message":"This path is not in a registered repository.","next":["silta --ws 'acme' init --scan '<path>'"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

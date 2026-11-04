@@ -23,7 +23,8 @@ package struct SystemGitRunner: GitRunner {
     self.killAfter = killAfter
     var child = environment.filter { !$0.key.hasPrefix("GIT_") }
     child.merge([
-      "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C",
+      "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0",
+      "LC_ALL": "C",
       "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
     ]) { _, fixed in fixed }
     self.environment = child
@@ -77,7 +78,9 @@ package struct SystemGitRunner: GitRunner {
     process.executableURL = URL(filePath: executable)
     process.arguments = request.arguments
     process.currentDirectoryURL = request.directory
-    process.environment = environment
+    var childEnvironment = environment
+    if !request.lazyFetch { childEnvironment["GIT_NO_LAZY_FETCH"] = "1" }
+    process.environment = childEnvironment
     process.standardInput = FileHandle.nullDevice
     process.standardOutput = stdout
     process.standardError = stderr

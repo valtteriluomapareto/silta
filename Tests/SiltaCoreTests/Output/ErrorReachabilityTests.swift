@@ -51,6 +51,16 @@ extension WorkspaceError: ErrorExamples {
   }
 }
 
+extension LocationError: ErrorExamples {
+  static var examples: [LocationError] {
+    [
+      .unregistered, .outsideRepository, .invalidPath, .git, .app("missing", workspace: "acme"),
+      .outsideCandidates(["api", "portal"], workspace: "acme", path: "/acme"),
+      .changed(workspace: "acme", path: "/acme"),
+    ]
+  }
+}
+
 extension CodeError: ErrorExamples {
   static var examples: [CodeError] {
     [
@@ -129,13 +139,12 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
-    CodeError.self,
+    CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
   static let notYetProduced: Set<ErrorCode> = [
-    .unregistered, .ambiguousLocation,
     .leaseTaken, .rateLimited,
   ]
 

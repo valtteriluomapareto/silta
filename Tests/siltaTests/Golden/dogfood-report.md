@@ -56,6 +56,7 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 - `silta task submit`
 - `silta task triage`
 - `silta task unblock`
+- `silta where`
 - `silta ws ls`
 - `silta ws show`
 - `silta ws use`

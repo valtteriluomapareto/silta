@@ -1,0 +1,1 @@
+{"data":{"app":"api","branch":"api","candidates":[{"app":"api","ref":"origin/api"},{"app":"platform","ref":"origin/master"},{"app":"portal","ref":"origin/portal"}],"confidence":"high","head":"e07a45fbad7104e01181181c5164fb0d2fb593c4","reason":"exact_ref","repo":"platform","workspace":"acme"},"ok":true,"schema":1,"warnings":[]}

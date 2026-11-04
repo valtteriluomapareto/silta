@@ -1,0 +1,1 @@
+{"error":{"code":"unregistered","message":"This path is outside Git. Carry on without Silta.","next":["silta where --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

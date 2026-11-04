@@ -86,7 +86,8 @@ package enum ActorID: Equatable, Sendable, CustomStringConvertible {
   }
 
   /// Accepts a human directly, or an agent carrying the human's words from chat.
-  /// Validation happens before command input or storage is opened.
+  /// Performs no input or storage I/O; callers check state-dependent gates inside
+  /// the transaction that performs the mutation.
   @discardableResult
   package func requireHuman(command: String, approved: String? = nil) throws -> HumanApproval? {
     if isHuman { return nil }

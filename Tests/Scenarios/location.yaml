@@ -1,0 +1,23 @@
+fixtures: true
+steps:
+  - args: [init, --scan, ., --json]
+    cwd: fixtures
+    expect: {exit: 0, json: {data.workspace: fixtures}}
+  - args: [--ws, fixtures, where, --json]
+    cwd: fixtures/acme-platform
+    expect: {exit: 0, json: {data.app: acme-platform-api, data.reason: exact_ref}}
+  - args: [--ws, fixtures, where, --json]
+    cwd: fixtures/acme-portal-worktree
+    expect: {exit: 0, json: {data.app: acme-platform-portal, data.reason: exact_ref}}
+  - args: [--ws, fixtures, where, --set, acme-platform, --approved, "Yes, set the platform override", --json]
+    cwd: fixtures/acme-platform
+    env: {SILTA_ACTOR: "agent:codex:acme"}
+    expect: {exit: 0, json: {data.app: acme-platform, data.reason: override}}
+  - args: [--ws, fixtures, where, --json]
+    cwd: fixtures/acme-platform
+    env: {SILTA_ACTOR: "agent:claude:next"}
+    expect: {exit: 0, json: {data.app: acme-platform, data.reason: override}}
+  - args: [--ws, fixtures, where, --unset, --approved, "Yes, remove the platform override", --json]
+    cwd: fixtures/acme-platform
+    env: {SILTA_ACTOR: "agent:claude:next"}
+    expect: {exit: 0, json: {data.app: acme-platform-api, data.reason: exact_ref}}
