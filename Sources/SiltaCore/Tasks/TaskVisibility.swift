@@ -14,18 +14,18 @@ struct TaskVisibility {
     AND (task.external_ref IS NULL OR :promoted)
     """
   static let sql = """
-    \(localSQL) AND (:archived OR (\(archiveSQL))=0)
+    \(localSQL) AND (\(archiveSQL))=0
     """
 
   let arguments: StatementArguments
 
   init(
     actor: ActorID, at date: Date, days: Int, proposed: Bool = false,
-    promoted: Bool = false, archived: Bool = false
+    promoted: Bool = false
   ) {
     arguments = [
       "viewer": actor.description, "all_proposals": proposed || actor.isHuman,
-      "promoted": promoted, "archived": archived,
+      "promoted": promoted,
       "archive_cutoff": date.addingTimeInterval(-Double(days) * 86400).timeIntervalSince1970,
     ]
   }
