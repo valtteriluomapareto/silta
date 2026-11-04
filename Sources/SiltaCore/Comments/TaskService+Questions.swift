@@ -36,7 +36,7 @@ extension TaskService {
       let root = try Self.threadRoot(answer, task: task, in: tx.database)
       guard answer["kind"] as String == "answer", answer["thread_id"] as Int64? != nil,
         root["kind"] as String == "question"
-      else { throw CommentError.invalid("Accept an answer ref such as AC-1/2.") }
+      else { throw CommentError.answerRequired(task.ref) }
       guard
         root["actor"] as String == environment.actor.description
           || task.claimedBy == environment.actor.description

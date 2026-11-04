@@ -27,7 +27,9 @@ extension TaskService {
       }
       try tx.recordChange(kind: "comment", rowID: id)
       try consent?.record(
-        command: audited(Self.commentCommand(task.ref, input, workspace: includeWorkspaceInAudit ? workspace : nil))
+        command: audited(
+          Self.commentCommand(task.ref, input, workspace: includeWorkspaceInAudit ? workspace : nil)
+        )
           + (draft.allowSecret ? " --allow-secret" : "")
           + " -> \(task.ref)/\(seq)", workspace: slug, identity: (environment.ids, at), in: tx)
       guard

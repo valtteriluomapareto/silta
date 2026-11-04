@@ -327,7 +327,7 @@ CREATE TABLE comment (
   anchor TEXT, anchor_sha TEXT, anchor_snippet TEXT,  -- (M2) quoted lines kept for orphaned anchors
   body_md TEXT NOT NULL,
   mentions TEXT NOT NULL DEFAULT '[]',        -- JSON array of actors, parsed from @…
-  accepted INTEGER NOT NULL DEFAULT 0,        -- answer accepted by the asker
+  accepted INTEGER NOT NULL DEFAULT 0,        -- answer accepted by the asker or current task claimer
   actor TEXT NOT NULL,
   resolved_at TEXT, resolved_by TEXT, deleted_at TEXT,
   created_at TEXT NOT NULL,
@@ -766,6 +766,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   Repeating that same live acceptance writes nothing. A manually resolved question
   or a different answer selection requires reopen first; deleted posts refuse.
   JSON always includes `accepted`; text identifies accepted answers distinctly.
+  Giving accept a question or non-answer ref points to the task's full discussion.
 - An answer posted by an agent, including a relay of the human's answer, never
   supplies approval words; human-only commands still follow [§11](#actors-and-sessions).
 - Post findings as roots, not replies to a handoff: the newest handoff thread stays
@@ -775,7 +776,9 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - `task show` shows the newest handoff thread first and unresolved threads with
   their replies, identifying answered versus resolved questions. Roots and replies
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
-  thread is omitted. `--timeline` includes full discussion alongside task events.
+  thread is omitted. The default read also shows `N resolved threads (see --timeline)`
+  when retained resolved roots exist; optional JSON `resolved_threads` reports that
+  count. `--timeline` includes full discussion alongside task events.
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
@@ -794,6 +797,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - Resolve/reopen normalize reply refs to thread roots, deduplicating in first-appearance
   order, atomically across the selected workspace. Deleted roots remain resolvable.
   Any actor may resolve/reopen; only a post's exact author may delete that named post.
+  Wrong-author deletion offers resolve recovery only while the root is open.
   Reopen clears answer acceptance; delete preserves resolution and retained refs.
   An optional explanation appends one ordinary reply per changed root in the same
   transaction, with one consent for the batch. No-ops write nothing, including

@@ -87,7 +87,8 @@ struct CommentReviewCommandTests {
       #expect(
         result.stdout.contains("author agent:codex:acme")
           && result.stdout.contains("current actor is agent:codex:other"))
-      #expect(result.stdout.contains("silta --ws 'acme' comment resolve 'AC-1/1'"))
+      #expect(!result.stdout.contains("comment resolve"))
+      #expect(result.stdout.contains("silta --ws 'acme' task show 'AC-1' --timeline"))
     }
   }
 

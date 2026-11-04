@@ -33,28 +33,25 @@ struct CommentCorrectionTests {
   ])
   func codeExamplesAreNotRecipients(body: String) async throws {
 
+    try await withScratchDirectory { home in
+      let service = TaskService(environment: try await CommentTests.setup(home))
+      #expect(try CommentQuestionTests.post(service, body: body).mentions.isEmpty)
+    }
 
-      try await withScratchDirectory { home in
-        let service = TaskService(environment: try await CommentTests.setup(home))
-        #expect(try CommentQuestionTests.post(service, body: body).mentions.isEmpty)
-      }
-
-    
   }
 
   @Test func malformedRecipientIdentifiesSafeToken() async throws {
 
-      try await withScratchDirectory { home in
-        let service = TaskService(environment: try await CommentTests.setup(home))
-        do {
-          _ = try CommentQuestionTests.post(service, body: "Ask @agent:codex")
-          Issue.record("Tool-only actor accepted")
-        } catch let error as CommentError {
-          #expect(error.message.contains("agent:codex"))
-        }
+    try await withScratchDirectory { home in
+      let service = TaskService(environment: try await CommentTests.setup(home))
+      do {
+        _ = try CommentQuestionTests.post(service, body: "Ask @agent:codex")
+        Issue.record("Tool-only actor accepted")
+      } catch let error as CommentError {
+        #expect(error.message.contains("agent:codex"))
       }
+    }
 
-    
   }
 }
 
@@ -63,7 +60,8 @@ extension CommentCorrectionTests {
     try await withScratchDirectory { home in
       let env = try await CommentTests.setup(home), owner = TaskService(environment: env)
       _ = try CommentQuestionTests.post(owner, kind: "question", to: ["agent:claude:recipient"])
-      let human = TaskService(environment: try TaskServiceTests.environment(home, actor: .human(name: "acme")))
+      let human = TaskService(
+        environment: try TaskServiceTests.environment(home, actor: .human(name: "acme")))
       _ = try CommentQuestionTests.post(human, kind: "answer", reply: "AC-1/1")
       #expect(try owner.show("AC-1").comments?.first?.answered == true)
       _ = try owner.updateComments(["AC-1/1"], action: .delete)
@@ -76,16 +74,20 @@ extension CommentCorrectionTests {
   @Test func resolvedExecutionScopeDoesNotInventAuditFlags() async throws {
     try await withScratchDirectory { home in
       let env = try await CommentTests.setup(home)
-      let service = TaskService(environment: env, workspace: "acme", approved: "Retain Acme content", bodyFlag: "-m <text>")
+      let service = TaskService(
+        environment: env, workspace: "acme", approved: "Retain Acme content", bodyFlag: "-m <text>")
       var draft = CommentDraft(body: "Acme")
       draft.allowSecret = true
       _ = try service.comment("AC-1", draft, includeWorkspaceInAudit: false)
       _ = try service.comment("AC-1", draft, includeWorkspaceInAudit: true)
-      let commands = try env.db.read { try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY rowid") }
-      #expect(commands == [
-        "silta comment 'AC-1' -m <text> --allow-secret -> AC-1/1",
-        "silta --ws 'acme' comment 'AC-1' -m <text> --allow-secret -> AC-1/2",
-      ])
+      let commands = try env.db.read {
+        try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY rowid")
+      }
+      #expect(
+        commands == [
+          "silta comment 'AC-1' -m <text> --allow-secret -> AC-1/1",
+          "silta --ws 'acme' comment 'AC-1' -m <text> --allow-secret -> AC-1/2",
+        ])
     }
   }
 }

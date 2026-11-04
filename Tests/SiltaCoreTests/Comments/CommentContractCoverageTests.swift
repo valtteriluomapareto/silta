@@ -26,21 +26,31 @@ struct CommentContractCoverageTests {
         Issue.record("Secret-shaped recipient accepted")
       } catch let error as CommentError { #expect(!error.message.contains(secret)) }
       #expect(ActorID.parse("agent:codex:s:x") == nil)
-      #expect(throws: CommentError.self) { _ = try CommentQuestionTests.post(service, to: ["agent:codex:s:x"]) }
-      #expect(throws: CommentError.self) { _ = try CommentQuestionTests.post(service, body: "Ask @agent:codex:s:x") }
+      #expect(throws: CommentError.self) {
+        _ = try CommentQuestionTests.post(service, to: ["agent:codex:s:x"])
+      }
+      #expect(throws: CommentError.self) {
+        _ = try CommentQuestionTests.post(service, body: "Ask @agent:codex:s:x")
+      }
     }
   }
 
   @Test func acceptAndReopenRecordChangedRowsAndOwnHeartbeat() async throws {
     try await withScratchDirectory { home in
       let clock = FakeClock(now: TaskServiceTests.now)
-      let env = try await CommentTests.setup(home, clock: clock), service = TaskService(environment: env)
+      let env = try await CommentTests.setup(home, clock: clock),
+        service = TaskService(environment: env)
       _ = try CommentQuestionTests.post(service, kind: "question")
       _ = try CommentQuestionTests.post(service, kind: "answer", reply: "AC-1/1")
       func changes() throws -> [Int64] {
-        try env.db.read { try Int64.fetchAll($0, sql: "SELECT row_id FROM change_log WHERE kind='comment' ORDER BY seq") }
+        try env.db.read {
+          try Int64.fetchAll(
+            $0, sql: "SELECT row_id FROM change_log WHERE kind='comment' ORDER BY seq")
+        }
       }
-      let ids = try env.db.read { try Int64.fetchAll($0, sql: "SELECT id FROM comment ORDER BY seq") }
+      let ids = try env.db.read {
+        try Int64.fetchAll($0, sql: "SELECT id FROM comment ORDER BY seq")
+      }
       try #require(ids.count == 2)
       let before = try changes().count
       clock.advance(milliseconds: 1000)

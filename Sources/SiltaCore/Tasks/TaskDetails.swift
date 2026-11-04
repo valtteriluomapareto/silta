@@ -97,6 +97,9 @@ package struct TaskDetails: Encodable, Sendable {
   /// Current discussion, or full history when timeline was requested; absent if empty.
   package var comments: [CommentDetails]?
 
+  /// Count of retained resolved roots, included in the default read when nonzero.
+  package var resolvedThreads: Int?
+
   /// Latest actual claim-release comment for a resumable task.
   package var handedOff: String?
 
@@ -105,6 +108,7 @@ package struct TaskDetails: Encodable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case handedOff = "handed_off"
+    case resolvedThreads = "resolved_threads"
     case ref, title, status, description, plan, result, app, branch, worktree, links, timeline
     case acceptance, priority, archived, waiting, parent, comments
     case createdAt = "created_at"

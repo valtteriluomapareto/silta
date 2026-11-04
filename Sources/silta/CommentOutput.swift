@@ -41,7 +41,8 @@ enum CommentOutput {
     let resolution = post.resolvedBy.map { "resolved by " + $0 } ?? "resolved"
     if post.kind == "question" {
       text +=
-        " [" + (post.answered == true ? "answered, " : "") + (post.resolvedAt == nil ? "unresolved" : resolution)
+        " [" + (post.answered == true ? "answered, " : "")
+        + (post.resolvedAt == nil ? "unresolved" : resolution)
         + "]"
     }
     if post.kind != "question", post.resolvedAt != nil { text += " [" + resolution + "]" }

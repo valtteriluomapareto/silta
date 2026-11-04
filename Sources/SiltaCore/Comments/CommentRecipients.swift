@@ -9,9 +9,13 @@ enum CommentRecipients {
       #"(?<![A-Za-z0-9_])@(?:me(?=$|[^A-Za-z0-9_])|human:|agent:)[^\s`*<>()\[\]{},;!?"']*"#
     let expression = try NSRegularExpression(pattern: pattern)
     let visible = try prose(body)
-    let mentions = expression.matches(in: visible, range: NSRange(visible.startIndex..., in: visible))
-      .compactMap { Range($0.range, in: visible) }
-      .map { String(visible[$0].dropFirst()).trimmingCharacters(in: CharacterSet(charactersIn: ".:")) }
+    let mentions = expression.matches(
+      in: visible, range: NSRange(visible.startIndex..., in: visible)
+    )
+    .compactMap { Range($0.range, in: visible) }
+    .map {
+      String(visible[$0].dropFirst()).trimmingCharacters(in: CharacterSet(charactersIn: ".:"))
+    }
     let tokens = input + mentions
     let actors = try tokens.map { token -> String in
       if token == "me" { return human.description }
@@ -27,7 +31,8 @@ enum CommentRecipients {
 
   private static func prose(_ body: String) throws -> String {
     var fence: (Character, Int)?
-    let lines = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map { line in
+    let parts = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+    let lines = parts.map { line in
       let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
       if let (marker, length) = fence {
         let run = trimmed.prefix(while: { $0 == marker })
@@ -38,7 +43,10 @@ enum CommentRecipients {
       }
       if let marker = trimmed.first, marker == "`" || marker == "~" {
         let length = trimmed.prefix(while: { $0 == marker }).count
-        if length >= 3 { fence = (marker, length); return "" }
+        if length >= 3 {
+          fence = (marker, length)
+          return ""
+        }
       }
       return String(line)
     }.joined(separator: "\n")

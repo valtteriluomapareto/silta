@@ -38,12 +38,14 @@ extension TaskService {
       var post = CommentDetails(row: row, task: task.ref)
       if post.kind == "question" {
         let questionID: Int64 = row["id"], recipients = post.mentions
-        post.answered = !post.deleted && rows.contains { answer in
-          let actor: String = answer["actor"]
-          return answer["thread_id"] as Int64? == questionID
-            && answer["kind"] as String == "answer" && answer["deleted_at"] as String? == nil
-            && (ActorID.parse(actor)?.isHuman == true || recipients.contains(actor))
-        }
+        post.answered =
+          !post.deleted
+          && rows.contains { answer in
+            let actor: String = answer["actor"]
+            return answer["thread_id"] as Int64? == questionID
+              && answer["kind"] as String == "answer" && answer["deleted_at"] as String? == nil
+              && (ActorID.parse(actor)?.isHuman == true || recipients.contains(actor))
+          }
       }
       return post
     }

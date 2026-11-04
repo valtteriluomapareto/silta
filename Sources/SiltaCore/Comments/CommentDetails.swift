@@ -18,7 +18,7 @@ package struct CommentDetails: Encodable, Sendable {
   package let resolvedBy: String?
   /// Sorted complete recipients, including explicit targets and body mentions.
   package let mentions: [String]
-  /// Whether the asker selected this answer.
+  /// Whether the asker or current claimer selected this answer.
   package let accepted: Bool
   /// Whether a live question has a live answer from an addressee or human.
   package var answered: Bool?

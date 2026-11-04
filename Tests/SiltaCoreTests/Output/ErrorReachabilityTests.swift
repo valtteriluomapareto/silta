@@ -19,7 +19,8 @@ extension UsageError: ErrorExamples {
 extension CommentError: ErrorExamples {
   static var examples: [CommentError] {
     [
-      .invalid("Use a supported kind."), .bodyRequired("silta comment 'AC-1'"),
+      .invalid("Use a supported kind."), .answerRequired("AC-1"),
+      .bodyRequired("silta comment 'AC-1'"),
       .foreignHandoff("AC-1"), .missing("AC-1/2", "AC-1"),
       .wrongAuthor(
         author: "agent:codex:acme", actor: "agent:codex:other", root: "AC-1/1", task: "AC-1"),
