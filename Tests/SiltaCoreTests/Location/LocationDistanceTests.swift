@@ -69,6 +69,38 @@ struct LocationDistanceTests {
     }
   }
 
+  @Test func mutationThatRacesIntoNoOpNeedsNoApprovalOrChangeRow() async throws {
+    await withKnownIssue("#11: mutationThatRacesIntoNoOpNeedsNoApprovalOrChangeRow") {
+      try await withScratchDirectory { home in
+        let (repo, store) = try setup(home)
+        let runner = ScriptedGitRunner(
+          script: commonSteps(repo),
+          beforeRequest: { request in
+            if request.arguments.contains("--verify"), request.arguments.last == "HEAD" {
+              try store.write { tx in
+                try tx.database.execute(
+                  sql: """
+                    INSERT INTO worktree_override(path,app_id,set_by)
+                    SELECT ?,id,'human:acme' FROM app WHERE slug='api'
+                    """, arguments: [repo.path])
+                try tx.recordChange(kind: "worktree_override", rowID: 1)
+              }
+            }
+          })
+        let service = LocationService(
+          environment: try environment(runner, home: home, store: store))
+        let result = try await service.override(path: repo, app: "api")
+        #expect(!result.approvalUsed)
+        #expect(result.result.app == "api")
+        try store.read { (db: Database) throws in
+          #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == 0)
+          #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM worktree_override") == 1)
+          #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM change_log") == 2)
+        }
+      }
+    }
+  }
+
   private func setup(_ home: URL) throws -> (URL, DatabaseStore) {
     let original = home.appending(path: "repo")
     try FileManager.default.createDirectory(
