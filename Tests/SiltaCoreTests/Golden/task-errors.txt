@@ -20,6 +20,10 @@ error: Could not read the UTF-8 body file; check its path and permissions. [inva
 next: silta task add --help
 error: Use a worktree and commit from the task's registered repository. [invalid]
 next: silta task add --help
+error: App api lives in /acme/api (inherited from AC-3); run this from that repository, or pass --app none for non-code work. [invalid]
+next: silta task add --help
+error: App api lives in /acme/api; run this from that repository, or pass --app none for non-code work. [invalid]
+next: silta task add --help
 error: A human approval is required; ask a human to approve or use done --force. [gate]
 next: silta task show AC-1
 error: AC-1 is read-only; work in tracker ado:42. [read_only_promoted]
@@ -30,7 +34,7 @@ error: AC-1 is blocked, waiting on ext:acme for 2 d. [blocked]
 next: silta task ls --status todo
 error: AC-2 is blocked, waiting on task:AC-1 for 1 d. [blocked]
 next: silta task unblock AC-2
-error: Task repository information changed; re-read before retrying. [conflict]
+error: AC-1's app changed during the write; re-read before retrying. [conflict]
 next: silta task show AC-1
 error: AC-1 has plan revision 2; re-read before replacing it. [stale_rev]
 next: silta task show AC-1

@@ -46,8 +46,9 @@ enum TaskOutput {
   static func receipt(
     _ result: TaskResult, change: String? = nil, quiet: String = "", approvalUsed: Bool = false
   ) -> CommandOutput {
-    CommandOutput(
-      text: "\(result.ref) \(change ?? result.status)", quiet: quiet, data: result,
+    let inherited = result.inheritedApp.map { " (app \($0))" } ?? ""
+    return CommandOutput(
+      text: "\(result.ref) \(change ?? result.status)" + inherited, quiet: quiet, data: result,
       warnings: result.warnings, approvalUsed: approvalUsed)
   }
 
@@ -72,6 +73,7 @@ enum TaskOutput {
 
   static func detail(_ task: TaskDetails, workspace: String) -> String {
     var lines = [summary(task), "Created by: \(task.createdBy)"]
+    if let app = task.app { lines.append("App: \(app)") }
     lines.append("Archived: \(task.archived ? "yes" : "no")")
     if let day = task.followUpAt { lines.append("Follow-up: " + day) }
     if let claim = task.claimedBy { lines.append("Claimed by: \(claim)") }

@@ -62,6 +62,9 @@ package struct TaskImportPreview: Encodable, Sendable {
   /// The root task's intended creation status.
   package let status: String
 
+  /// The app the created tasks take, when the import inherits one from its parent.
+  package let app: String?
+
   /// The parsed top-level steps in source order.
   package let steps: [TaskImportStep]
 }

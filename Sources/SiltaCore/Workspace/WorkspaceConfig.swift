@@ -171,6 +171,9 @@ private struct WorkspaceValidation {
         problem(entry[key] ?? entry, "invalid \(key)")
       }
     }
+    if section == "apps", entry["slug"]?.string == TaskDraft.noneApp {
+      problem(entry["slug"] ?? entry, "invalid slug: none is reserved for non-code work")
+    }
     if let lifecycle = entry["lifecycle"]?.string,
       !["active", "legacy", "dead"].contains(lifecycle)
     {

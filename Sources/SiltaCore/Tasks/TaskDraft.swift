@@ -1,5 +1,8 @@
 /// Values supplied when creating a task; no writes happen during construction.
 package struct TaskDraft: Sendable {
+  /// The `--app` word that chooses non-code work instead of an app.
+  package static let noneApp = "none"
+
   /// The required task title.
   package var title: String
 
@@ -15,7 +18,7 @@ package struct TaskDraft: Sendable {
   /// Names a parent task in the selected workspace.
   package var parent: String?
 
-  /// Names an explicit app; absent takes the parent's app, or means non-code work.
+  /// Names an explicit app, or `none` for non-code work; absent takes the parent's app.
   package var app: String?
 
   /// Names existing workspace topics.

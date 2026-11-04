@@ -10,7 +10,7 @@ struct TaskFromPlanCommand: OutputCommand {
   static let dataShape = Shape.object([
     "dry_run": .bool,
     "preview": .object([
-      "title": .string, "description": .string, "status": .string,
+      "title": .string, "description": .string, "status": .string, "app": .optional(.string),
       "steps": .array(
         .object(["title": .string, "description": .string, "status": .optional(.string)])),
     ]), "tasks": .array(TaskOutput.receiptShape),
@@ -22,7 +22,8 @@ struct TaskFromPlanCommand: OutputCommand {
 
   @Argument(help: "UTF-8 Markdown file, or - for stdin (the default).") var file = "-"
 
-  @Option(help: "The existing parent task reference.") var parent: String?
+  @Option(help: "The existing parent task reference; created tasks inherit its app.")
+  var parent: String?
 
   @Flag(help: "Create at most ten subtasks instead of a checklist.") var split = false
 
@@ -61,6 +62,7 @@ struct TaskFromPlanCommand: OutputCommand {
         "\($0.ref) \($0.status)"
       }
     if result.dryRun {
+      if let app = preview.app { lines.append("App: \(app)") }
       let description = preview.description.trimmingCharacters(in: .newlines)
       if !description.isEmpty { lines += ["", description] }
       lines += ["", split ? "Subtasks:" : "Checklist:"]

@@ -10,9 +10,7 @@ extension TaskService {
     var creation = try prepare(draft, command: draft.command + " '<title>' -F <file>")
     let slug = try selected()
     creation = try resolved(creation, workspace: slug)
-    creation.git = try await TaskGit.inspect(
-      repo: creation.path, directory: directory, runner: environment.git,
-      enabled: draft.start && creation.app != nil, completion: false)
+    creation.git = try await inspected(creation, draft: draft, directory: directory)
     let prepared = creation
     return try environment.db.write { tx in
       let command = prepared.draft.command + (draft.allowSecret ? " --allow-secret" : "")
@@ -65,7 +63,7 @@ extension TaskService {
     if draft.app == nil, let parent, parent.app != creation.app {
       throw TaskError.changed(parent.ref)
     }
-    let app = try (draft.app ?? parent?.app).map {
+    let app = try creation.app.map {
       try Self.entity("app", slug: $0, workspace: ws, in: db)
     }
     if let app, try Self.repoPath(app: app, in: db) != creation.path {
@@ -101,10 +99,17 @@ extension TaskService {
     try addLinks(draft, task: id, workspace: ws, at: creation.at, in: db)
     try changed(
       id, kind: "created", body: status, redacted: creation.redacted, at: creation.at, in: tx)
-    let result = TaskResult(
-      ref: "\(try Self.prefix(ws, in: db))-\(seq)", status: status,
-      warnings: creation.redacted ? [SecretGuard.warning] : [])
-    return (result, consent)
+    return (try created(creation, seq: seq, status: status, workspace: ws, in: db), consent)
+  }
+
+  /// The created task's receipt; an inherited app is named in its text, not its data.
+  private func created(
+    _ creation: TaskCreation, seq: Int64, status: String, workspace: Int64, in db: Database
+  ) throws -> TaskResult {
+    TaskResult(
+      ref: "\(try Self.prefix(workspace, in: db))-\(seq)", status: status,
+      warnings: creation.redacted ? [SecretGuard.warning] : [],
+      inheritedApp: creation.draft.app == nil ? creation.app : nil)
   }
 
   func creationStatus(parent: TaskDetails?, start: Bool = false) -> String {
@@ -113,21 +118,67 @@ extension TaskService {
       ? "todo" : "proposed"
   }
 
+  /// Git values for the worktree; app work outside the app's repository is refused with
+  /// the app named and where it came from.
+  private func inspected(
+    _ creation: TaskCreation, draft: TaskDraft, directory: URL
+  ) async throws -> TaskGit {
+    do {
+      return try await TaskGit.inspect(
+        repo: creation.path, directory: directory, runner: environment.git,
+        enabled: draft.start && creation.app != nil, completion: false)
+    } catch let error as TaskError where Self.outsideRepository(error, directory: directory) {
+      guard let app = creation.app, let path = creation.path else { throw error }
+      throw TaskError.outsideAppRepo(
+        app, repo: path,
+        origin: draft.app == nil ? draft.parent.map { "inherited from \($0)" } : nil)
+    }
+  }
+
+  /// App work from another repository, or from above no repository at all. A git that
+  /// cannot run stays an environment error for a human.
+  private static func outsideRepository(_ error: TaskError, directory: URL) -> Bool {
+    error == .foreignRepo || error == .git && !insideWorktree(directory)
+  }
+
+  /// Whether a worktree root is at or above `directory`; both `.git` forms mark one.
+  private static func insideWorktree(_ directory: URL) -> Bool {
+    var url = directory.standardizedFileURL
+    while url.pathComponents.count > 1 {
+      if FileManager.default.fileExists(atPath: url.appending(path: ".git").path) { return true }
+      url = url.deletingLastPathComponent()
+    }
+    return false
+  }
+
   /// The creation with the app it takes and that app's repository, both resolved
   /// before any git work so the write can compare against them.
   func resolved(_ creation: TaskCreation, workspace: String) throws -> TaskCreation {
     var resolved = creation
-    resolved.app = try appSlug(creation.draft, workspace: workspace)
+    let parent = try parent(creation.draft, workspace: workspace)
+    resolved.app = appSlug(creation.draft, parent: parent)
     resolved.path = try appPath(resolved.app, workspace: workspace)
     return resolved
   }
 
-  /// The app a creation takes: the explicit one, or the parent's when `--app` is absent.
-  private func appSlug(_ draft: TaskDraft, workspace: String) throws -> String? {
-    if let app = draft.app { return app }
+  /// The parent a creation names, validated before git runs so a closed parent fails
+  /// as a parent error.
+  private func parent(_ draft: TaskDraft, workspace: String) throws -> TaskDetails? {
     guard let ref = draft.parent else { return nil }
     return try environment.db.read { db in
-      try Self.named("parent") { try Self.lookup(ref, workspace: workspace, in: db) }.app
+      let parent = try Self.named("parent") { try Self.lookup(ref, workspace: workspace, in: db) }
+      try Self.validateParent(parent)
+      return parent
+    }
+  }
+
+  /// The app a creation takes: an explicit one (`none` means non-code work), or the
+  /// parent's when `--app` is absent.
+  private func appSlug(_ draft: TaskDraft, parent: TaskDetails?) -> String? {
+    switch draft.app {
+    case nil: return parent?.app
+    case TaskDraft.noneApp?: return nil
+    case let app?: return app
     }
   }
 

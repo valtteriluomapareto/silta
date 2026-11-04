@@ -103,7 +103,9 @@ extension TaskError: ErrorExamples {
       .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: false, workspace: "acme"),
       .claimed("AC-1", holder: "agent:codex:acme", minutes: 4, human: true, workspace: "acme"),
       .proposal("AC-1", human: false), .proposal("AC-1", human: true),
-      .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo, .gate("AC-1"),
+      .transition("AC-1", status: "done"), .git, .repository, .input, .foreignRepo,
+      .outsideAppRepo("api", repo: "/acme/api", origin: "inherited from AC-3"),
+      .outsideAppRepo("api", repo: "/acme/api", origin: nil), .gate("AC-1"),
       .promoted("AC-1", external: "ado:42"), .edited("AC-1"),
       .blocked(
         "AC-1", TaskWaiting(on: ["ext:acme"], ageDays: 2, why: "Acme", ready: false, dropped: [])),

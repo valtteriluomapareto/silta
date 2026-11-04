@@ -33,6 +33,10 @@ package enum TaskError: CodedError, Equatable {
   /// The current worktree or requested commit belongs to another repository.
   case foreignRepo
 
+  /// App work runs outside the app's repository; `origin` says where the app came
+  /// from, such as "inherited from AC-3".
+  case outsideAppRepo(String, repo: String, origin: String?)
+
   /// A configured review gate has not been met.
   case gate(String)
 
@@ -70,7 +74,7 @@ package enum TaskError: CodedError, Equatable {
     case .promoted: .readOnlyPromoted
     case .edited: .conflict
     case .notFound: .notFound
-    case .invalid, .foreignRepo, .input, .step: .invalid
+    case .invalid, .foreignRepo, .outsideAppRepo, .input, .step: .invalid
     case .claimed: .claimed
     case .proposal, .transition, .changed, .blockedPromotion: .conflict
     case .git, .repository: .env
@@ -115,10 +119,16 @@ package enum TaskError: CodedError, Equatable {
     case .input: "Could not read the UTF-8 body file; check its path and permissions."
     case .git: "Git could not report the task's worktree or commit; ask a human to check git."
     case .foreignRepo: "Use a worktree and commit from the task's registered repository."
+    case .outsideAppRepo(let app, let repo, let origin):
+      "App \(app) lives in \(repo)"
+        + (origin.map { " (\($0))" } ?? "")
+        + "; run this from that repository, or pass --app none for non-code work."
     case .gate: "A human approval is required; ask a human to approve or use done --force."
     case .staleRev(let ref, let actual):
       "\(ref) has plan revision \(actual); re-read before replacing it."
-    case .changed: "Task repository information changed; re-read before retrying."
+    case .changed(let ref):
+      ref.map { "\($0)'s app changed during the write; re-read before retrying." }
+        ?? "Task repository information changed; re-read before retrying."
     }
   }
 
@@ -142,7 +152,7 @@ package enum TaskError: CodedError, Equatable {
       what.hasPrefix("app ") || what.hasPrefix("topic ") ? ["silta ws show"] : ["silta task ls"]
     case .step(let ref, 0): ["silta task plan \(ref) -F -"]
     case .step(let ref, _): ["silta task show \(ref)"]
-    case .invalid, .foreignRepo, .input: ["silta task add --help"]
+    case .invalid, .foreignRepo, .outsideAppRepo, .input: ["silta task add --help"]
     case .repository: ["silta init --help"]
     case .git: ["silta doctor"]
     }
