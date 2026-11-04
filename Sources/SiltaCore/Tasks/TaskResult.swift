@@ -15,6 +15,9 @@ package struct TaskResult: Encodable, Sendable {
   /// A link's target as `task show` prints it, for its receipt text; never encoded.
   package var target: String?
 
+  /// The app this creation inherited from its parent, for its receipt text; never encoded.
+  package var inheritedApp: String?
+
   /// Whether this write recorded human consent; CLI metadata only, never encoded.
   package var approvalUsed = false
 

@@ -53,10 +53,10 @@ struct RepositoryScanTests {
       let candidate = try Self.path(repo)
       let git = ScriptedGitRunner(script: depth <= 2 ? Self.script(candidate) : [])
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      let slug = try await RepositoryScan.scan(
+      let outcome = try await RepositoryScan.scan(
         [root], store: store, git: git,
         identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
-      #expect(slug == "acme")
+      #expect(outcome.workspace == "acme")
       #expect(git.isExhausted)
       #expect(
         try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo") }

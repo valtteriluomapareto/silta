@@ -531,10 +531,14 @@ uses `-F <file>` when the body came from stdin. A human's request in chat for th
 write is its go-ahead. Proposals that already exist when the setting changes stay in
 triage, or leave the inbox after 14 days as usual.
 
-`--parent` needs an open (not `done` or `dropped`), unpromoted parent. `from-plan
---split` children take the root's status, decided once per import: `todo` under a
-`todo` or `doing` root, `proposed` under a `proposed` one; `--dry-run` shows the same
-(D40). A title is one line without control characters.
+`--parent` needs an open (not `done` or `dropped`), unpromoted parent. A subtask takes
+its parent's app when `--app` is absent; `--app none` gives it no app for non-code work,
+and an explicit `--app <slug>` overrides both. Every task `from-plan` creates inherits
+the same way, since it has no `--app`. The creation receipt names an inherited app, and
+`task show` prints `App: <slug>`. `from-plan --split` children take the root's
+status, decided once per import: `todo` under a `todo` or `doing` root, `proposed`
+under a `proposed` one; `--dry-run` shows the same (D40). A title is one line without
+control characters.
 A dry run validates or records no approval words and remains ungated. With
 `--approved`, would-be proposals preview `todo` and warn `approval_unused`.
 Under `proposals: ask` without approval, they also preview `todo`, with a warning
@@ -614,7 +618,7 @@ going until the list is empty or the human stops it.
     headings become steps.
   - By default the steps become the plan's checklist. `--split` makes them subtasks
     instead (at most 10, or it refuses).
-  - `--dry-run` prints what would be created.
+  - `--dry-run` prints what would be created, including any inherited app.
   - **It never deletes by default.** `--delete` deletes only an *untracked* file
     inside the current worktree, and only after the transaction commits. Files under
     harness directories such as `~/.claude/plans` are never deleted.
@@ -632,7 +636,8 @@ going until the list is empty or the human stops it.
 
 **Non-code work** is an ordinary task: releases, store submissions, contracts,
 waiting on someone. A task with no app records no branch or worktree on `start`, so
-`done` records no commit for it; `--no-sha` covers the rest.
+`done` records no commit for it; `--no-sha` covers the rest. `--app none` keeps a
+subtask of an app task non-code, and no app slug may be `none`.
 
 **Blockers and dependencies (D35).** A task can wait on another task, on an outside
 party (a customer, an app store), or on something at a URL such as a tracker item.
@@ -1310,7 +1315,7 @@ silta code show|grep|log|ls <app>[@ref] …        [M1]
 silta search <query> [...]                       [M3]
 
 # tasks
-silta task add "title" [-m|-F] [--start] [--parent AC-3] [--app] [--topic …] [--priority n] [--from note:…]   [M1]
+silta task add "title" [-m|-F] [--start] [--parent AC-3] [--app <slug>|none] [--topic …] [--priority n] [--from note:…]   [M1]
 silta task ls [--status] [--app] [--topic] [--on <ref>] [--mine] [--proposed] [--promoted] [--archived]   [M1] summaries
 silta task show AC-12 [--timeline]               [M1] default: header, plan+steps, handoff, open questions, unresolved threads
 silta task edit AC-12 [-F <file> | --print]      [M1] human-only: one markdown file, in $EDITOR or from -F; --print reads it

@@ -41,13 +41,19 @@ enum TaskOutput {
         ]))),
   ])
 
+  /// A receipt's text: what changed (`AC-5 archived`) or the status, then an inherited app.
+  static func receiptText(_ result: TaskResult, change: String? = nil) -> String {
+    "\(result.ref) \(change ?? result.status)"
+      + (result.inheritedApp.map { " (app \($0))" } ?? "")
+  }
+
   /// A receipt whose text says what changed (`AC-5 archived`), or the status by default.
   /// `quiet` is what `--quiet` keeps: the ref a write created.
   static func receipt(
     _ result: TaskResult, change: String? = nil, quiet: String = "", approvalUsed: Bool = false
   ) -> CommandOutput {
     CommandOutput(
-      text: "\(result.ref) \(change ?? result.status)", quiet: quiet, data: result,
+      text: receiptText(result, change: change), quiet: quiet, data: result,
       warnings: result.warnings, approvalUsed: approvalUsed)
   }
 
@@ -72,6 +78,7 @@ enum TaskOutput {
 
   static func detail(_ task: TaskDetails, workspace: String) -> String {
     var lines = [summary(task), "Created by: \(task.createdBy)"]
+    if let app = task.app { lines.append("App: \(app)") }
     lines.append("Archived: \(task.archived ? "yes" : "no")")
     if let day = task.followUpAt { lines.append("Follow-up: " + day) }
     if let claim = task.claimedBy { lines.append("Claimed by: \(claim)") }

@@ -22,15 +22,16 @@ struct InitCommand: OutputCommand {
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let env = context.environment
-    let workspace: String?
+    let outcome: ScanOutcome?
     if scan.isEmpty {
       try env.db.initialize()
-      workspace = nil
+      outcome = nil
     } else {
-      workspace = try await RepositoryScan.scan(
+      outcome = try await RepositoryScan.scan(
         scan.map { URL(filePath: $0) }, store: env.db,
         git: env.git, identity: (env.ids, env.clock.now()), workspace: global.ws)
     }
+    let workspace = outcome?.workspace
     let edit =
       (workspace.map { "silta ws edit '" + $0 + "'" } ?? "silta ws edit")
       + " -F <file> --approved \"<the human's words>\""
@@ -38,7 +39,8 @@ struct InitCommand: OutputCommand {
     if let workspace { text += "\nnext: silta ws use '\(workspace)'" }
     text += "\nask human: \(edit)"
     var output = CommandOutput(
-      text: text, data: InitData(workspace: workspace, next: [edit], nextBy: "human"))
+      text: text, data: InitData(workspace: workspace, next: [edit], nextBy: "human"),
+      warnings: outcome?.warnings ?? [])
     output.workspace = workspace
     return output
   }

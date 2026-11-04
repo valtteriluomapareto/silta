@@ -18,6 +18,7 @@ extension TaskService {
     let cleanup = try await sourceToDelete(text, options: options, source: source, in: directory)
     let slug = try selected()
     let creations = try importCreations(parsed, options: options, redacted: redacted)
+      .map { try resolved($0, workspace: slug) }
     let result = try environment.db.write { tx in
       let retry = (scopedCommand(options.retryCommand, workspace: slug), nil as String?)
       let inserted = try insert(
@@ -40,14 +41,22 @@ extension TaskService {
       try used?.record(
         command: options.auditCommand(created: tasks), workspace: slug,
         identity: (environment.ids, creations[0].at), in: tx)
-      let actualPreview = try importPreview(parsed, options: options, rootStatus: root.status)
+      let actualPreview = try importPreview(
+        parsed, options: options, rootStatus: root.status, app: creations[0].app)
       return TaskImportResult(
         dryRun: false, preview: actualPreview, tasks: tasks, warnings: warnings,
         approvalUsed: used != nil)
     }
-    guard let cleanup else { return result }
+    return await finished(result, source: cleanup)
+  }
+
+  /// Removes a safely checked source after commit, warning when it was retained.
+  private func finished(_ result: TaskImportResult, source: PlanSource?) async
+    -> TaskImportResult
+  {
+    guard let source else { return result }
     var completed = result
-    if !(await cleanup.removeIfUnchanged(runner: environment.git)) {
+    if !(await source.removeIfUnchanged(runner: environment.git)) {
       completed.warnings.append(
         OutputWarning(
           code: "source_retained",
@@ -74,7 +83,9 @@ extension TaskService {
     }
     if approved != nil || policy == .ask {
       result = TaskImportResult(
-        dryRun: true, preview: try importPreview(plan, options: options, rootStatus: "todo"),
+        dryRun: true,
+        preview: try importPreview(
+          plan, options: options, rootStatus: "todo", app: preview.app),
         tasks: [], warnings: warnings)
     }
     if approved == nil, policy == .ask {
@@ -110,7 +121,7 @@ extension TaskService {
   }
 
   private func importPreview(
-    _ plan: MarkdownPlan, options: TaskImport, rootStatus: String? = nil
+    _ plan: MarkdownPlan, options: TaskImport, rootStatus: String? = nil, app: String? = nil
   ) throws -> TaskImportPreview {
     let task =
       try rootStatus == nil
@@ -119,6 +130,7 @@ extension TaskService {
     let status = rootStatus ?? creationStatus(parent: task)
     return TaskImportPreview(
       title: plan.title, description: plan.description, status: status,
+      app: app ?? task?.app,
       steps: plan.steps.map {
         TaskImportStep(
           title: $0.title, description: $0.description,

@@ -22,7 +22,8 @@ struct TaskAddCommand: OutputCommand {
 
   @Option(help: "The parent task reference.") var parent: String?
 
-  @Option(help: "The explicit app slug; omitted means non-code work.") var app: String?
+  @Option(help: "The app slug, or none for non-code work; omitted takes the parent's app.")
+  var app: String?
 
   var appSlug: String? { app }
 
