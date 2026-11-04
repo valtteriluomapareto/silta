@@ -8,6 +8,10 @@
 # The prompt comes from stdin. Codex's JSONL events go to <log>. The command returns
 # when Codex's turn ends, then prints the thread id and Codex's last message and exits
 # with Codex's status.
+#
+# DOGFOOD_MODEL picks the model: unset is gpt-6.1-sol; fireworks:<model id> (for example
+# fireworks:accounts/fireworks/models/deepseek-v4p1-flash-1017) runs that Fireworks model
+# through Codex's sandbox and needs FIREWORKS_API_KEY. Effort is high either way.
 set -euo pipefail
 # The whole body is one function, so bash parses it before running any of it: a run
 # lasts hours, and the file may change on disk meanwhile (a pull, an edit).
@@ -41,15 +45,27 @@ main() {
     case "$name" in CLAUDE*|CODEX_COMPANION*|SILTA_ACTOR|SILTA_SESSION) unset_args+=(-u "$name") ;; esac
   done < <(env)
   roots="\"${SILTA_HOME:-$HOME/.silta}\",\"$common/objects\",\"$common/refs\",\"$common/logs\",\"$gitdir\""
-  # The maintainer's choice for driven runs, independent of their own Codex settings.
+  # The maintainer's choices for driven runs, independent of their own Codex settings.
+  model=(-c 'model="gpt-6.1-sol"')
+  case "${DOGFOOD_MODEL:-}" in
+    '') ;;
+    fireworks:?*)
+      [[ -n "${FIREWORKS_API_KEY:-}" ]] || { echo 'codex: fireworks models need FIREWORKS_API_KEY.' >&2; exit 1; }
+      model=(
+        -c 'model_provider="fireworks"'
+        -c 'model_providers.fireworks={name="Fireworks",base_url="https://api.fireworks.ai/inference/v1",env_key="FIREWORKS_API_KEY",wire_api="responses"}'
+        -c "model=\"${DOGFOOD_MODEL#fireworks:}\""
+      ) ;;
+    *) echo "codex: DOGFOOD_MODEL must be unset or fireworks:<model id>." >&2; exit 1 ;;
+  esac
   config=(
-    -c 'model="gpt-6.1-sol"'
+    "${model[@]}"
     -c 'model_reasoning_effort="high"'
     -c 'approval_policy="never"'
     -c 'sandbox_mode="workspace-write"'
     -c "sandbox_workspace_write.writable_roots=[$roots]"
     -c 'sandbox_workspace_write.network_access=true'
-    -c 'shell_environment_policy.exclude=["CLAUDE*","CODEX_COMPANION*","SILTA_ACTOR","SILTA_SESSION"]'
+    -c 'shell_environment_policy.exclude=["CLAUDE*","CODEX_COMPANION*","SILTA_ACTOR","SILTA_SESSION","FIREWORKS_API_KEY"]'
     -c 'shell_environment_policy.set.SILTA_ACTOR="agent:codex"'
   )
   if [[ -z "$thread" ]]; then

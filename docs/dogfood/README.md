@@ -98,7 +98,11 @@ What the script fixes:
   the slice issue stays open until its own task is done.
 
 Driven runs use `gpt-6.1-sol` at `high` effort, set in the script, whatever the
-maintainer's own Codex configuration says.
+maintainer's own Codex configuration says. With
+`DOGFOOD_MODEL=fireworks:<model id>` and `FIREWORKS_API_KEY` set, the run uses that
+Fireworks model through Codex's Responses API support instead, in the same sandbox;
+Codex's shell commands never see the key. Verified with
+`accounts/fireworks/models/deepseek-v4p1-flash-1017`.
 
 ## Review friction
 
