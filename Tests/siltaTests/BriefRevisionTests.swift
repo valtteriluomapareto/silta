@@ -12,10 +12,8 @@ extension BriefCommandTests {
       try settings("{\"review_gate\":\"team\",\"proposals\":\"ask\"}", scratch)
       let result = try run(["--json"], repo, scratch)
       let data = try fixture.data(result)
-      withKnownIssue("#16: Unsupported settings must be omitted from typed projection") {
-        #expect(data["settings"] as? [String: String] == ["proposals": "ask"])
-        #expect(result.stdout.contains("team"))
-      }
+      #expect(data["settings"] as? [String: String] == ["proposals": "ask"])
+      #expect(result.stdout.contains("team"))
     }
   }
 
@@ -26,9 +24,10 @@ extension BriefCommandTests {
       try settings(
         "{\"review_gate\":\"team\",\"archive_after_days\":null,\"proposals\":\"ask\"}", scratch)
       let text = try run([], repo, scratch)
-      Golden.forTests().check(text.stdout, "brief-unsupported.txt")
+      Golden.forTests().check(normalizeBrief(text.stdout, repo), "brief-unsupported.txt")
       #expect(text.stderr.contains("setting_unsupported"))
-      Golden.forTests().check(try run(["--json"], repo, scratch).stdout, "brief-unsupported.json")
+      Golden.forTests().check(
+        normalizeBrief(try run(["--json"], repo, scratch).stdout, repo), "brief-unsupported.json")
     }
   }
 
@@ -180,15 +179,13 @@ extension BriefCommandTests {
       let repo = try fixture.setup(scratch)
       try fixture.git(["checkout", "-q", "from-non-app"], repo, scratch)
       let result = try run([], repo, scratch)
-      withKnownIssue("#16: Candidates belong on one line") {
-        #expect(result.stdout.components(separatedBy: "candidates:").count == 2)
-      }
+      #expect(result.stdout.components(separatedBy: "candidates:").count == 2)
       try seedTasks(store(scratch))
-      try store(scratch).write { try $0.database.execute(sql: "UPDATE task SET plan_md=plan_md||char(10)") }
-      let task = try run(["--task", "AC-1"], repo, scratch)
-      withKnownIssue("#16: Plan trailing newline must not add empty footer line") {
-        #expect(!task.stdout.contains("\n\nmore:"))
+      try store(scratch).write {
+        try $0.database.execute(sql: "UPDATE task SET plan_md=plan_md||char(10)")
       }
+      let task = try run(["--task", "AC-1"], repo, scratch)
+      #expect(!task.stdout.contains("\n\nmore:"))
     }
   }
 }

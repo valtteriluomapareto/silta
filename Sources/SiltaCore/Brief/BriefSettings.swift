@@ -1,56 +1,81 @@
 import Foundation
 
-/// Open JSON object of non-default settings; unsupported keys retain masked raw values.
+/// Typed non-default settings. Unsupported keys are omitted and diagnosed independently.
 package struct BriefSettings: Encodable, Sendable {
-  let values: [String: BriefSettingValue]
-  let text: String
-  let warnings: [OutputWarning]
+  var proposals: String?
+  var reviewGate: String?
+  var archiveAfterDays: Int?
+  var staleDays: Int?
+  var text = ""
+  var warnings: [OutputWarning] = []
+
+  enum CodingKeys: String, CodingKey {
+    case proposals, reviewGate = "review_gate"
+    case archiveAfterDays = "archive_after_days", staleDays = "stale_days"
+  }
 
   init(_ settings: WorkspaceSettings, workspace: String) {
     do {
-      let document = try JSONSerialization.jsonObject(with: Data(settings.json.utf8))
-      guard let object = document as? [String: Any] else { throw StorageError.unavailable }
-      let raw = try JSONDecoder().decode(
-        [String: BriefSettingValue].self,
-        from: JSONSerialization.data(withJSONObject: WorkspaceSettings.masked(object)))
-      let defaults = WorkspaceSettings(workspace: workspace, json: "{}")
-      var values: [String: BriefSettingValue] = [:]
+      guard
+        let raw = try JSONSerialization.jsonObject(with: Data(settings.json.utf8)) as? [String: Any]
+      else { throw StorageError.unavailable }
       var items: [String] = []
-      var warnings: [OutputWarning] = []
+      let defaults = WorkspaceSettings(workspace: workspace, json: "{}")
       let known = WorkspaceSettings.CodingKeys.allCases.map(\.rawValue)
       for name in known + raw.keys.filter({ !known.contains($0) }).sorted() {
-        guard let value = raw[name] else { continue }
         do {
           guard let key = WorkspaceSettings.CodingKeys(rawValue: name) else {
             throw StorageError.unavailable
           }
-          let typed = try key.value(in: settings)
-          guard typed != (try key.value(in: defaults)) else { continue }
-          values[name] = typed
-          items.append("\(name): \(typed.text) (\(try key.gloss(in: settings)))")
+          guard raw[name] != nil else { continue }
+          guard let value = try read(key, from: settings, defaults: defaults) else { continue }
+          items.append("\(name): \(value) (\(try key.gloss(in: settings)))")
         } catch {
-          values[name] = value
-          items.append("\(TaskError.shown(name)): \(value.text)")
+          let preview = try WorkspaceConfig.json(
+            WorkspaceSettings.masked([name: raw[name] ?? NSNull()]))
           warnings.append(
-            OutputWarning(
+            .init(
               code: "setting_unsupported",
-              message: "Unsupported setting \(TaskError.shown(name)); inspect silta ws show "
-                + shellWord(workspace) + "."))
+              message: "Unsupported setting \(TaskError.shown(preview)); inspect silta --ws "
+                + shellWord(workspace) + " ws show."))
         }
       }
-      self.values = values
-      self.text = items.isEmpty ? "" : "settings: " + items.joined(separator: "; ") + "\n"
-      self.warnings = warnings
+      text = items.isEmpty ? "" : "settings: " + items.joined(separator: "; ") + "\n"
     } catch {
-      values = ["_invalid": .string("[invalid settings document]")]
-      text = "settings: [invalid settings document]\n"
       warnings = [
         .init(
           code: "setting_unsupported",
-          message: "Invalid settings document; inspect silta ws show " + shellWord(workspace) + ".")
+          message: "Invalid settings document; inspect silta --ws " + shellWord(workspace)
+            + " ws show.")
       ]
     }
   }
+  private mutating func read(
+    _ key: WorkspaceSettings.CodingKeys, from settings: WorkspaceSettings,
+    defaults: WorkspaceSettings
+  ) throws -> String? {
+    switch key {
+    case .proposals:
+      let typed = try settings.proposals
+      guard typed != (try defaults.proposals) else { return nil }
+      proposals = typed.rawValue
+      return typed.rawValue
+    case .reviewGate:
+      let typed = try settings.reviewGate
+      guard typed != (try defaults.reviewGate) else { return nil }
+      reviewGate = typed.rawValue
+      return typed.rawValue
+    case .archiveAfterDays:
+      let typed = try settings.archiveAfterDays
+      guard typed != (try defaults.archiveAfterDays) else { return nil }
+      archiveAfterDays = typed
+      return String(typed)
+    case .staleDays:
+      let typed = try settings.staleDays
+      guard typed != (try defaults.staleDays) else { return nil }
+      staleDays = typed
+      return String(typed)
+    }
+  }
 
-  package func encode(to encoder: any Encoder) throws { try values.encode(to: encoder) }
 }

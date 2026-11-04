@@ -10,5 +10,7 @@ package struct BriefSection: Encodable, Equatable, Sendable {
   package var text: String
   var policy: TrimPolicy = .atomic
 
+  var beforeTask = false
+
   enum CodingKeys: String, CodingKey { case id, text }
 }

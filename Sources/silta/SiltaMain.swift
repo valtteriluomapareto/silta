@@ -37,7 +37,8 @@ enum SiltaMain {
       let environment: SiltaEnvironment
       if let hookDeadline {
         environment = try await BriefHook.environment(
-          snapshot, deterministic: flags.contains("--deterministic"), deadline: hookDeadline)
+          snapshot, deterministic: flags.contains("--deterministic"), deadline: hookDeadline,
+          watchdog: watchdog)
       } else {
         environment = try await SiltaEnvironment.system(
           environment: snapshot, deterministic: flags.contains("--deterministic"),
@@ -58,13 +59,12 @@ enum SiltaMain {
       entry.app = execution.scope.app
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
-      entry.flags = [
-        "--approved", "--json", "--quiet", "--deterministic", "--verbose", "--help", "--version",
-      ]
-      .filter { flags.contains($0) }
+      entry.flags = logFlags(flags)
+      let expired = hookDeadline.map { ContinuousClock().now >= $0 } ?? false
+      if expired { watchdog?.timedOut() }
       if let watchdog { watchdog.finish(entry) } else { environment.log.record(entry) }
-      if let hookDeadline,
-        rendered.exitCode != 0 || ContinuousClock().now >= hookDeadline
+      if hookDeadline != nil,
+        rendered.exitCode != 0 || expired
       {
         return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
       }
@@ -77,6 +77,13 @@ enum SiltaMain {
       if let informational = informationalResult(arguments, mode: mode) { return informational }
       return OutputRouter.render(.failure(error), mode: mode)
     }
+  }
+
+  private static func logFlags(_ flags: Set<String>) -> [String] {
+    return [
+      "--approved", "--json", "--quiet", "--deterministic", "--verbose", "--help", "--version",
+    ]
+    .filter { flags.contains($0) }
   }
 
   /// Configuration failures must not obstruct help or version discovery.

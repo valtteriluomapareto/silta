@@ -17,14 +17,14 @@ struct BriefCommandTests {
         let flags = suffix == "json" ? ["--json"] : []
         let first = try run(flags, repo, scratch)
         #expect(first.termination == .exit(0), "\(first.stderr)")
-        Golden.forTests().check(first.stdout, "brief.\(suffix)")
+        Golden.forTests().check(normalizeBrief(first.stdout, repo), "brief.\(suffix)")
         #expect(try first == run(flags, repo, scratch))
       }
       try settings(
         "{\"proposals\":\"triage\",\"review_gate\":\"none\","
           + "\"archive_after_days\":14,\"stale_days\":90}",
         scratch)
-      Golden.forTests().check(try run([], repo, scratch).stdout, "brief.txt")
+      Golden.forTests().check(normalizeBrief(try run([], repo, scratch).stdout, repo), "brief.txt")
       try settings("{\"proposals\":\"ask\"}", scratch)
       for mode in [[], ["--short"], ["--hook"]] {
         let result = try run(mode + ["--budget", "1"], repo, scratch)
@@ -48,7 +48,7 @@ struct BriefCommandTests {
       #expect(try chosen(["--task", "AC-1"]) == "AC-1")
       #expect(try chosen(["--app", "portal"]) == "AC-2")
       let text = try run(["--task", "AC-2", "--app", "api"], repo, scratch).stdout
-      Golden.forTests().check(text, "brief-task.txt")
+      Golden.forTests().check(normalizeBrief(text, repo), "brief-task.txt")
       #expect(text.contains("app: portal"))
       #expect(text.contains("1 done\n2. [ ] Acme next"))
       let whereData = try fixture.data(fixture.run([], repo, scratch))
@@ -174,14 +174,13 @@ struct BriefCommandTests {
       let started = clock.now
       let result = try SiltaBinary.run(
         ["brief", "--hook", "--json", "--verbose"], in: scratch, cwd: repo,
-        environment: ["SILTA_ACTOR": "agent:codex", "SILTA_NOW": "2023-11-14T22:13:20.000Z"], timeout: 2.5)
+        environment: ["SILTA_ACTOR": "agent:codex", "SILTA_NOW": "2023-11-14T22:13:20.000Z"],
+        timeout: 2.5)
       #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
       #expect(started.duration(to: clock.now) < .seconds(2))
       if kind == "git" {
         let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String]
-        withKnownIssue("#16: Child hook deadline must leave a hook_timeout trace") {
-          #expect(warnings?.contains("hook_timeout") == true)
-        }
+        #expect(warnings?.contains("hook_timeout") == true)
         let descriptor = open(fifo.path, O_WRONLY | O_NONBLOCK)
         let failure = errno
         if descriptor >= 0 { close(descriptor) }

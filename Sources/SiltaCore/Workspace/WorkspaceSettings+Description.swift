@@ -18,15 +18,6 @@ extension WorkspaceSettings.ReviewGate {
 }
 
 extension WorkspaceSettings.CodingKeys {
-  func value(in settings: WorkspaceSettings) throws -> BriefSettingValue {
-    switch self {
-    case .proposals: .string(try settings.proposals.rawValue)
-    case .reviewGate: .string(try settings.reviewGate.rawValue)
-    case .archiveAfterDays: .integer(try settings.archiveAfterDays)
-    case .staleDays: .integer(try settings.staleDays)
-    }
-  }
-
   func gloss(in settings: WorkspaceSettings) throws -> String {
     switch self {
     case .proposals: try settings.proposals.gloss

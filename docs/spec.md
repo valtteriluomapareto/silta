@@ -1068,16 +1068,34 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    1. the latest handoff
    2. unanswered questions, and what the task is blocked on and for how long, with
       the same `next` as a refused `task start`
-   3. the plan with step state: completed runs collapse (e.g. `1–7 done`), open
-      steps keep original numbering, and the tail is trimmed. A complete marker
+   3. the plan with step state: completed runs collapse (e.g. `1–7 done`) unless they contain open nested
+      work. Open steps keep original numbering, and the tail is trimmed. A complete marker
       such as `(plan trimmed: 32/60; silta --ws acme task show AC-12)` names the last
-      represented original step and total, including completed summaries. Zero
-      means no step fits; freeform plans retain their text and use a marker without counts.
-   4. (M2) review state and unresolved `changes` threads with their snippets
-3. **App card**: summary, environments, a pointer to the repo's AGENTS.md.
-4. **Neighbours**: edges in and out, each with a ready `silta code show …` command.
-5. **Open tasks** for this app and its topics (top 8).
-6. **Recently done**: the first line of each result, with `done_sha`, for the last 5.
+      represented original step and total, including completed summaries. The count
+      is replaced by “no steps shown (60 total)” when no step fits; freeform plans
+      retain their text and use a marker without counts.
+   4. the task description, trimmed after the plan
+   5. (M2) review state and unresolved `changes` threads with their snippets
+3. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
+   the resolved worktree's repo root, including for subpath apps. The pointer does not
+   claim the file exists.
+4. **Neighbours**: edges in and out, ordered by source app, target app, target
+   service, kind and edge id. Configured code references produce complete, quoted
+   `silta code show …` commands, including ref and line selection. With no usable
+   code references, offer `silta code ls` on the other app; service edges use their
+   source app because a service has no code tree.
+5. **Open tasks** for this app and its topics (top 8), ordered by priority then
+   task sequence ascending. Open statuses are todo, doing, review, blocked and visible
+   proposals (the caller's proposals, or all for a human). Promoted and archived tasks
+   are omitted. Topics come from `about` links on visible, unarchived, unpromoted
+   tasks assigned to this app. Repeatable `--topic` adds topic slugs or normalized
+   aliases. Their matching tasks may belong to other apps; duplicates appear once,
+   and topics do not expand recursively. An unknown topic returns `not_found` with
+   a workspace-qualified `ws show` command. The current task may also appear here.
+6. **Recently done**: the first line of each result, with `done_sha`, for the last 5
+   matching tasks, ordered by completion instant then task sequence descending.
+   Promoted and archived tasks are omitted. Brief alone uses the default 14-day
+   archive threshold if the stored archive setting is unsupported, with a warning.
 7. **Decisions**: `decision` comments, plus decisions from meeting notes from M3.
 8. **Docs** (M2): titles, plus stale flags.
 9. **Glossary**: aliases of the topics shown.
@@ -1095,13 +1113,16 @@ retain the compact location, current task reference, non-default settings and co
 and their complete `brief --app` retries are budgeted before the task line in both
 formats. Empty candidate lists are omitted. Recovery commands and trim markers are
 kept whole; a marker remains even when zero plan lines fit. The normal budget omits
-the redundant `brief --task` retry; short briefs retain it.
+the redundant `brief --task` retry; short briefs retain it, preserving explicit
+app and topic selections. Candidate retries retain task and topic selections too.
 JSON contains compact `location` metadata, `settings`, optional `current_task`, ordered
 `sections` (`id` and trimmed `text`), `more` commands and a `truncated` boolean.
-Absent location app and branch values encode as `null`. Settings is an open object:
-unsupported keys/values retain masked raw JSON without a gloss and produce a
-`setting_unsupported` warning per key. A malformed top-level settings document uses
-an `_invalid` indicator. This tolerant projection does not relax write-policy validation.
+Absent location app and branch values encode as `null`. Settings contains only
+supported non-default typed keys (`proposals`, `review_gate`, `archive_after_days`,
+`stale_days`). Unsupported keys or values are omitted and produce a per-key
+`setting_unsupported` warning with the secret-masked raw value. A malformed settings
+document produces an empty settings object and a warning. This tolerant read does
+not relax write-policy validation.
 
 Automatic current-task ties use newest claim time (session matches), otherwise newest
 update time (branch matches), then highest task sequence. Only local open, unarchived
@@ -1112,13 +1133,14 @@ rules. App cards, neighbours and app backlogs follow resolved `location.app`; th
 section names its own app, including when an explicit `--app` selects a different app.
 Brief masks stored task-body secrets. Blockers include their follow-up date.
 
-The available core brief omits app/backlog and discussion/inbox sections until their
-ordered additions ship; the task description joins the richer context addition.
+Discussion/inbox sections remain omitted until their ordered addition ships.
 Hook mode has a 1.5 s process deadline, including environment
 assembly, fails immediately on database contention and never populates `where_cache`.
 The watchdog appends a best-effort body-free timeout record, then exits without running
 exit handlers. Timeout and completion have exclusive log/output ownership; completion
-cancels the watchdog explicitly before output. Hook log appends are nonblocking and
+cancels the watchdog explicitly before output. A child Git deadline is recorded as
+`hook_timeout` even when it finishes before the process deadline. Hook log appends are
+nonblocking and
 skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NONBLOCK`.
 
 ## 13. Indexing and search (M3)

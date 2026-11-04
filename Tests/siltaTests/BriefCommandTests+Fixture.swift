@@ -4,6 +4,11 @@ import SiltaCore
 import SiltaTestSupport
 
 extension BriefCommandTests {
+  func normalizeBrief(_ text: String, _ repo: URL) -> String {
+    text.replacingOccurrences(of: repo.path, with: "<repo>")
+      .replacingOccurrences(of: repo.path.lowercased(), with: "<repo>")
+  }
+
   func seedTasks(_ store: DatabaseStore) throws {
     try store.write { tx in
       for (seq, app, actor, branch, status) in [
