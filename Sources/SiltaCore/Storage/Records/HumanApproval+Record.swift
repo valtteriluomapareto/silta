@@ -16,7 +16,7 @@ extension HumanApproval {
         """,
       arguments: [
         try ids.next(at: date), workspace, actor.description, command, words,
-        date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true)),
+        utcTimestamp(date),
       ])
     try tx.recordChange(kind: "approval", rowID: tx.database.lastInsertedRowID)
   }

@@ -45,7 +45,7 @@ package struct TaskService: Sendable {
   }
 
   static func timestamp(_ date: Date) -> String {
-    date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    utcTimestamp(date)
   }
 
   func checked(_ text: String, allow: Bool, command: String) throws -> (String, Bool) {

@@ -23,13 +23,12 @@ package final class SystemLog: Log {
   }
 
   private func write(_ entry: LogEntry) throws {
-    let formatter = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     encoder.dateEncodingStrategy = .custom { date, encoder in
       var container = encoder.singleValueContainer()
-      try container.encode(date.formatted(formatter))
+      try container.encode(utcTimestamp(date))
     }
     let data = try encoder.encode(entry) + Data([10])
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

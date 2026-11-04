@@ -1,5 +1,5 @@
 import Foundation
-import SiltaCore
+@testable import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -266,6 +266,30 @@ struct DeterminismTests {
         }
       }
     }
+  }
+
+}
+
+extension DeterminismTests {
+  @Test(arguments: ["2023-11-14T22:13:20.859Z", "2023-11-14T22:13:20.426Z"])
+  func canonicalMillisecondNowIsAccepted(raw: String) async throws {
+    try await withScratchDirectory { scratch in
+      let env = try await SiltaEnvironment.system(
+        environment: [
+          "SILTA_HOME": scratch.appending(path: "data").path,
+          "SILTA_NOW": raw,
+        ], userHome: scratch, temporaryRoots: [], deterministic: true)
+      let next = try nextMillisecond(raw)
+      #expect(utcTimestamp(env.clock.now()) == raw)
+      #expect(utcTimestamp(env.clock.now()) == next)
+    }
+  }
+
+  private func nextMillisecond(_ raw: String) throws -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let date = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(raw)
+    return formatter.string(from: date.addingTimeInterval(0.001))
   }
 
 }

@@ -27,7 +27,7 @@ package enum RepositoryFetch {
             WHERE repo_id=? AND path=?
             """,
           arguments: [
-            date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true)), path.id,
+            utcTimestamp(date), path.id,
             path.path.path,
           ])
         try tx.recordChange(kind: "repo", rowID: path.id)
