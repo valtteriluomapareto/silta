@@ -85,7 +85,7 @@ struct TaskServiceTests {
         _ = try await rival.start("AC-1", directory: home)
       }
       clock.advance(milliseconds: 7_199_000)
-      _ = try service.submit("AC-1")
+      _ = try service.plan("AC-1", text: "- [ ] Acme")
       #expect(try service.show("AC-1").claimedAt == Self.timestamp(clock.now()))
       clock.advance(milliseconds: 7_199_000)
       await #expect(throws: TaskError.self) { _ = try await rival.start("AC-1", directory: home) }
@@ -99,6 +99,28 @@ struct TaskServiceTests {
         environment: try Self.environment(home, actor: Self.human(), clock: clock))
       _ = try await human.start("AC-1", steal: true, directory: home)
       #expect(try service.show("AC-1").claimedBy == "human:acme")
+    }
+  }
+
+  /// Submitting hands the task to review, so whoever merges can finish it at once.
+  @Test func submitReleasesTheClaimForTheReviewer() async throws {
+    try await withScratchDirectory { home in
+      let clock = FakeClock(now: Self.now)
+      let env = try Self.environment(home, clock: clock)
+      try Self.setup(env)
+      var draft = TaskDraft(title: "Review")
+      draft.start = true
+      let service = TaskService(environment: env)
+      _ = try await service.add(draft, directory: home)
+      _ = try service.submit("AC-1")
+      let reviewer = TaskService(
+        environment: try Self.environment(
+          home, actor: .agent(tool: "claude", session: "reviewer"), clock: clock))
+      await withKnownIssue("submit keeps the author's claim") {
+        #expect(try service.show("AC-1").claimedBy == nil)
+        let closed = try await reviewer.close("AC-1", result: "Merged.", directory: home)
+        #expect(closed.result.status == "done")
+      }
     }
   }
 
