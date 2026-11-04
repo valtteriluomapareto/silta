@@ -8,114 +8,186 @@ import Testing
 @Suite(.timeLimit(.minutes(2)))
 struct DogfoodAutomationTests {
   static let thread = "01a1a667-5c3b-7cb3-8760-7f29fd86a2a5"
+  static let started = "{\"type\":\"thread.started\",\"thread_id\":\"\(thread)\"}"
 
-  static func script(_ name: String) -> String {
-    DogfoodReportTests.root.appending(path: "scripts/\(name)").path
+  static func message(_ text: String) -> String {
+    "{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"\(text)\"}}"
   }
 
-  static func git(_ arguments: [String], scratch: URL) throws -> String {
+  static func git(_ arguments: [String], in directory: URL, scratch: URL) throws -> String {
     let result = try SiltaBinary.runProcess(
-      URL(filePath: "/usr/bin/git"), ["-C", DogfoodReportTests.root.path] + arguments,
-      in: scratch)
+      URL(filePath: "/usr/bin/git"),
+      ["-c", "user.name=Acme", "-c", "user.email=acme@example.com", "-C", directory.path]
+        + arguments, in: scratch)
+    #expect(result.termination == .exit(0), "git \(arguments): \(result.stderr)")
     return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   static func run(
-    _ script: String, _ arguments: [String], scratch: URL, environment: [String: String] = [:]
+    _ script: URL, _ arguments: [String], scratch: URL, environment: [String: String] = [:]
   ) throws -> CLIResult {
     try SiltaBinary.runProcess(
-      URL(filePath: "/bin/bash"), [Self.script(script)] + arguments, in: scratch,
+      URL(filePath: "/bin/bash"), [script.path] + arguments, in: scratch,
       environment: ["PATH": scratch.appending(path: "tools").path + ":/usr/bin:/bin"]
         .merging(environment) { _, new in new })
   }
 
-  static func fakeCodex(_ scratch: URL, exit status: Int32 = 0) throws {
-    let calls = scratch.appending(path: "codex-calls")
+  /// A scratch repository holding a copy of the Codex script, and a linked worktree of it.
+  struct CodexRepository {
+    let script: URL
+    let repo: URL
+    let worktree: URL
+  }
+
+  static func codexRepository(_ scratch: URL) throws -> CodexRepository {
+    let repo = scratch.appending(path: "acme", directoryHint: .isDirectory)
+    let worktree = scratch.appending(path: "acme-codex", directoryHint: .isDirectory)
+    let script = repo.appending(path: "scripts/dogfood-codex.sh")
+    try FileManager.default.createDirectory(
+      at: script.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.copyItem(
+      at: DogfoodReportTests.root.appending(path: "scripts/dogfood-codex.sh"), to: script)
+    _ = try git(["init", "-q", "-b", "main"], in: repo, scratch: scratch)
+    _ = try git(["add", "."], in: repo, scratch: scratch)
+    _ = try git(["commit", "-q", "-m", "Acme"], in: repo, scratch: scratch)
+    _ = try git(["worktree", "add", "-q", "--detach", worktree.path], in: repo, scratch: scratch)
+    return CodexRepository(script: script, repo: repo, worktree: worktree)
+  }
+
+  static func fakeCodex(_ scratch: URL, output: [String], exit status: Int32 = 0) throws {
+    let calls = shellWord(scratch.appending(path: "codex-calls").path)
+    let lines = output.map { "printf '%s\\n' " + shellWord($0) }.joined(separator: "\n")
     try DogfoodReportTests.tool(
       "codex",
       text: """
         #!/bin/bash
-        printf '%s\\n' "$@" > \(shellWord(calls.path))-args
-        env | sed 's/=.*//' | sort > \(shellWord(calls.path))-env
-        cat > \(shellWord(calls.path))-stdin
-        echo '{"type":"thread.started","thread_id":"\(thread)"}'
-        echo '{"type":"item.completed","item":{"type":"agent_message","text":"Acme plan first"}}'
-        echo '{"type":"item.completed","item":{"type":"agent_message","text":"Acme done"}}'
+        printf '%s\\n' "$@" > \(calls)-args
+        env | sed 's/=.*//' | sort > \(calls)-env
+        pwd -P > \(calls)-pwd
+        cat > \(calls)-stdin
+        \(lines)
         exit \(status)
 
         """, in: scratch.appending(path: "tools"))
   }
 
-  @Test func codexRunsAsCodexWithTheSandboxAndReportsItsThread() throws {
+  static func calls(_ scratch: URL, _ name: String) throws -> [String] {
+    try String(contentsOf: scratch.appending(path: "codex-calls-\(name)"), encoding: .utf8)
+      .split(separator: "\n").map(String.init)
+  }
+
+  static let callerMarkers = [
+    "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "SILTA_ACTOR", "SILTA_SESSION",
+    "CODEX_COMPANION_SESSION_ID",
+  ]
+
+  @Test(arguments: [false, true])
+  func codexRunsAsCodexInItsWorktreeWithTheSandbox(resume: Bool) throws {
     try withScratchDirectory { scratch in
-      try Self.fakeCodex(scratch, exit: 3)
-      let log = scratch.appending(path: "run.jsonl")
+      let fixture = try Self.codexRepository(scratch)
+      let (script, repo, worktree) = (fixture.script, fixture.repo, fixture.worktree)
+      try Self.fakeCodex(
+        scratch, output: [Self.started, Self.message("Acme plan"), Self.message("Acme done")],
+        exit: 3)
+      let log = scratch.appending(path: "run.jsonl").path
+      let arguments =
+        resume ? ["resume", worktree.path, Self.thread, log] : ["start", worktree.path, log]
       let result = try Self.run(
-        "dogfood-codex.sh", ["start", DogfoodReportTests.root.path, log.path], scratch: scratch,
-        environment: [
-          "CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "acme", "SILTA_ACTOR": "agent:claude:acme",
-          "SILTA_SESSION": "acme", "CODEX_COMPANION_SESSION_ID": "acme",
-        ])
+        script, arguments, scratch: scratch,
+        environment: Dictionary(uniqueKeysWithValues: Self.callerMarkers.map { ($0, "acme") }))
       #expect(result.termination == .exit(3))
       #expect(result.stdout == "Thread: \(Self.thread)\nAcme done\n")
-      let calls = scratch.appending(path: "codex-calls")
-      let env = try String(contentsOf: URL(filePath: calls.path + "-env"), encoding: .utf8)
-      for name in [
-        "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "SILTA_ACTOR", "SILTA_SESSION",
-        "CODEX_COMPANION_SESSION_ID",
-      ] {
-        #expect(!env.split(separator: "\n").contains(Substring(name)))
-      }
-      let args = try String(contentsOf: URL(filePath: calls.path + "-args"), encoding: .utf8)
-        .split(separator: "\n").map(String.init)
-      let home = scratch.appending(path: "home").path
-      let common = try Self.git(
-        ["rev-parse", "--path-format=absolute", "--git-common-dir"], scratch: scratch)
-      #expect(Array(args.prefix(2)) == ["exec", "--json"] && args.last == "-")
+      let env = try Self.calls(scratch, "env")
+      #expect(Self.callerMarkers.allSatisfy { !env.contains($0) })
+      let dir = try Self.git(["rev-parse", "--show-toplevel"], in: worktree, scratch: scratch)
+      #expect(try Self.calls(scratch, "pwd") == [dir])
+      let args = try Self.calls(scratch, "args")
       #expect(
-        args.contains("sandbox_workspace_write.writable_roots=[\"\(home)/.silta\",\"\(common)\"]"))
+        Array(args.prefix(resume ? 4 : 2))
+          == (resume ? ["exec", "resume", Self.thread, "--json"] : ["exec", "--json"]))
+      #expect(args.last == "-" && args.contains("-C") == !resume)
+      let common = try Self.git(
+        ["rev-parse", "--path-format=absolute", "--git-common-dir"], in: repo, scratch: scratch)
+      let gitdir = try Self.git(
+        ["rev-parse", "--absolute-git-dir"], in: worktree, scratch: scratch)
+      let siltaHome = scratch.appending(path: "silta-home").path
+      let roots =
+        "sandbox_workspace_write.writable_roots=[\"\(siltaHome)\",\"\(common)/objects\","
+        + "\"\(common)/refs\",\"\(common)/logs\",\"\(gitdir)\"]"
+      #expect(args.contains(roots))
+      #expect(args.contains("approval_policy=\"never\""))
       #expect(args.contains("sandbox_workspace_write.network_access=true"))
+      #expect(args.contains("shell_environment_policy.set.SILTA_ACTOR=\"agent:codex\""))
       #expect(
         args.contains {
           $0.hasPrefix("shell_environment_policy.exclude=") && $0.contains("CLAUDE*")
         })
-      let dir = args.firstIndex(of: "-C").map { args[$0 + 1] }
-      #expect(dir == DogfoodReportTests.root.resolvingSymlinksInPath().path)
     }
   }
 
-  @Test func codexResumesOnlyAnExactThread() throws {
+  @Test func codexRefusesTheMainCheckoutAndInexactThreads() throws {
     try withScratchDirectory { scratch in
-      try Self.fakeCodex(scratch)
+      let fixture = try Self.codexRepository(scratch)
+      let (script, repo, worktree) = (fixture.script, fixture.repo, fixture.worktree)
+      try Self.fakeCodex(scratch, output: [Self.started])
       let log = scratch.appending(path: "run.jsonl").path
+      for arguments in [
+        ["start", repo.path, log], ["start", scratch.path, log],
+        ["resume", worktree.path, "--last", log],
+        ["resume", worktree.path, String(repeating: "-", count: 36), log],
+        ["resume", Self.thread, log],
+      ] {
+        let result = try Self.run(script, arguments, scratch: scratch)
+        #expect(result.termination == .exit(1), "\(arguments)")
+      }
       #expect(
-        try Self.run("dogfood-codex.sh", ["resume", "--last", log], scratch: scratch).termination
-          == .exit(1))
-      #expect(
-        try Self.run("dogfood-codex.sh", ["start", scratch.path, log], scratch: scratch)
-          .termination == .exit(1))
-      let result = try Self.run("dogfood-codex.sh", ["resume", Self.thread, log], scratch: scratch)
-      #expect(result.termination == .exit(0) && result.stdout.hasPrefix("Thread: \(Self.thread)\n"))
-      let args = try String(
-        contentsOf: scratch.appending(path: "codex-calls-args"), encoding: .utf8
-      ).split(separator: "\n").map(String.init)
-      #expect(Array(args.prefix(4)) == ["exec", "resume", Self.thread, "--json"])
+        !FileManager.default.fileExists(atPath: scratch.appending(path: "codex-calls-args").path))
     }
   }
 
-  static func fakeFinishTools(_ scratch: URL, state: String, body: String, sha: String) throws {
+  @Test func codexOutputSurvivesUnreadableLinesAndAMissingThreadEvent() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      let (script, worktree) = (fixture.script, fixture.worktree)
+      try Self.fakeCodex(
+        scratch, output: ["warning: not JSON", Self.message("Acme done"), "{\"type\":"], exit: 2)
+      let log = scratch.appending(path: "run.jsonl").path
+      let resumed = try Self.run(
+        script, ["resume", worktree.path, Self.thread, log], scratch: scratch)
+      #expect(resumed.termination == .exit(2))
+      #expect(resumed.stdout == "Thread: \(Self.thread)\nAcme done\n")
+      try Self.fakeCodex(scratch, output: [], exit: 1)
+      let started = try Self.run(script, ["start", worktree.path, log], scratch: scratch)
+      #expect(started.termination == .exit(1) && started.stdout == "Thread: unknown\n")
+    }
+  }
+}
+
+extension DogfoodAutomationTests {
+  static let issue = "https://example.com/acme/issues/7"
+
+  static func finish(_ scratch: URL) throws -> CLIResult {
+    try run(
+      DogfoodReportTests.root.appending(path: "scripts/dogfood-finish.sh"), ["SI-1", "56"],
+      scratch: scratch)
+  }
+
+  static func head(_ scratch: URL) throws -> String {
+    try git(["rev-parse", "HEAD"], in: DogfoodReportTests.root, scratch: scratch)
+  }
+
+  static func fakeFinishTools(
+    _ scratch: URL, state: String = "MERGED", body: String, sha: String,
+    status: String = "review", linked: Bool = true, issueState: String = "OPEN"
+  ) throws {
     let tools = scratch.appending(path: "tools")
     let pull = try JSONSerialization.data(withJSONObject: [
       "state": state, "mergeCommit": ["oid": sha], "body": body,
     ])
     try pull.write(to: scratch.appending(path: "pull.json"))
-    let issue = "https://example.com/acme/issues/7"
+    let links: [[String: String]] = linked ? [["rel": "cites", "target": "url:\(issue)"]] : []
     let task = try JSONSerialization.data(withJSONObject: [
-      "ok": true,
-      "data": [
-        "ref": "SI-1", "status": "review",
-        "links": [["rel": "cites", "target": "url:\(issue)"]],
-      ],
+      "ok": true, "data": ["ref": "SI-1", "status": status, "links": links],
     ])
     try task.write(to: scratch.appending(path: "task.json"))
     let log = shellWord(scratch.appending(path: "calls").path)
@@ -126,7 +198,7 @@ struct DogfoodAutomationTests {
         echo "gh $*" >> \(log)
         case "$1 $2" in
           'pr view') cat \(shellWord(scratch.appending(path: "pull.json").path)) ;;
-          'issue view') echo OPEN ;;
+          'issue view') echo \(issueState) ;;
           'issue comment') printf '%s\\n' "$5" > \(log)-comment ;;
           'issue close') ;;
           *) exit 98 ;;
@@ -147,31 +219,40 @@ struct DogfoodAutomationTests {
         """, in: tools)
   }
 
-  @Test func finishUsesTheMergeCommitAndTheDraftResult() throws {
+  static func log(_ scratch: URL, _ suffix: String = "") throws -> String {
+    let file = scratch.appending(path: "calls" + suffix)
+    guard FileManager.default.fileExists(atPath: file.path) else { return "" }
+    return try String(contentsOf: file, encoding: .utf8)
+  }
+
+  @Test(arguments: [
+    (
+      "## Summary\r\nAcme.\r\n\r\n## Draft result\r\n\r\nImplemented Acme.\r\nFriction: none\r\n",
+      "Implemented Acme.\n"
+    ),
+    (
+      "## Draft Result\nImplemented Acme.\n\nFriction: none\n\n🤖 Generated with Acme\n",
+      "Implemented Acme.\n"
+    ),
+    (
+      "## Draft result\nImplemented Acme.\nFriction: none\n## Notes\nNot part.\n",
+      "Implemented Acme.\n"
+    ),
+    ("## Draft result\nFriction: none\n", ""),
+  ])
+  func finishUsesTheMergeCommitAndTheDraftResult(body: String, text: String) throws {
     try withScratchDirectory { scratch in
-      let sha = try Self.git(["rev-parse", "HEAD"], scratch: scratch)
-      let body = """
-        ## Summary\r
-        Acme location.\r
-        \r
-        ## Draft result\r
-        \r
-        Implemented the Acme slice.\r
-        Friction: none\r
-        \r
-        """
-      try Self.fakeFinishTools(scratch, state: "MERGED", body: body, sha: sha)
-      let result = try Self.run("dogfood-finish.sh", ["SI-1", "56"], scratch: scratch)
+      let sha = try Self.head(scratch)
+      try Self.fakeFinishTools(scratch, body: body, sha: sha)
+      let result = try Self.finish(scratch)
       #expect(
         result.termination == .exit(0) && result.stdout.contains("Next: scripts/install-dev.sh"))
-      let calls = scratch.appending(path: "calls").path
-      let expected =
-        "Implemented the Acme slice.\nMerged in #56 (\(sha.prefix(7))).\nFriction: none\n"
-      #expect(try String(contentsOf: URL(filePath: calls + "-result"), encoding: .utf8) == expected)
-      let log = try String(contentsOf: URL(filePath: calls), encoding: .utf8)
+      let expected = text + "Merged in #56 (\(sha.prefix(7))).\nFriction: none\n"
+      #expect(try Self.log(scratch, "-result") == expected)
+      let log = try Self.log(scratch)
       #expect(log.contains("silta --ws silta task done SI-1 --sha \(sha) -F -"))
-      #expect(log.contains("gh issue close https://example.com/acme/issues/7"))
-      let comment = try String(contentsOf: URL(filePath: calls + "-comment"), encoding: .utf8)
+      #expect(log.contains("gh issue close \(Self.issue)"))
+      let comment = try Self.log(scratch, "-comment")
       #expect(comment.hasPrefix("Done in #56 (\(sha.prefix(7)))") && comment.hasSuffix(expected))
     }
   }
@@ -179,27 +260,57 @@ struct DogfoodAutomationTests {
   @Test(arguments: [
     ("OPEN", "## Draft result\nDone.\nFriction: none\n"),
     ("MERGED", "## Draft result\nDone without friction.\n"),
-    ("MERGED", "## Summary\nNo draft.\n"),
+    ("MERGED", "## Summary\nNo draft.\nFriction: none\n"),
   ])
-  func finishRefusesAnUnmergedPRAndAMissingFrictionLine(state: String, body: String) throws {
+  func finishRefusesAnUnmergedPRAndAMissingDraft(state: String, body: String) throws {
     try withScratchDirectory { scratch in
-      try Self.fakeFinishTools(
-        scratch, state: state, body: body,
-        sha: try Self.git(["rev-parse", "HEAD"], scratch: scratch))
-      let result = try Self.run("dogfood-finish.sh", ["SI-1", "56"], scratch: scratch)
-      #expect(result.termination == .exit(1))
-      let log = try String(contentsOf: scratch.appending(path: "calls"), encoding: .utf8)
-      #expect(!log.contains("silta") && !log.contains("issue"))
+      try Self.fakeFinishTools(scratch, state: state, body: body, sha: try Self.head(scratch))
+      let result = try Self.finish(scratch)
+      #expect(result.termination == .exit(1) && result.stderr.hasPrefix("finish: "))
+      let calls = try Self.log(scratch)
+      #expect(!calls.contains("silta") && !calls.contains("issue"))
     }
   }
 
   @Test func finishNeedsTheMergeCommitLocally() throws {
     try withScratchDirectory { scratch in
       try Self.fakeFinishTools(
-        scratch, state: "MERGED", body: "## Draft result\nDone.\nFriction: none\n",
+        scratch, body: "## Draft result\nDone.\nFriction: none\n",
         sha: String(repeating: "a", count: 40))
-      let result = try Self.run("dogfood-finish.sh", ["SI-1", "56"], scratch: scratch)
+      let result = try Self.finish(scratch)
       #expect(result.termination == .exit(1) && result.stderr.contains("Next: git pull"))
+      let calls = try Self.log(scratch)
+      #expect(!calls.contains("silta"))
+    }
+  }
+
+  @Test(arguments: ["doing", "todo", "blocked"])
+  func finishOnlyCompletesASubmittedTask(status: String) throws {
+    try withScratchDirectory { scratch in
+      try Self.fakeFinishTools(
+        scratch, body: "## Draft result\nDone.\nFriction: none\n", sha: try Self.head(scratch),
+        status: status)
+      let result = try Self.finish(scratch)
+      #expect(result.termination == .exit(1) && result.stderr.contains("not review"))
+      let calls = try Self.log(scratch)
+      #expect(!calls.contains("task done"))
+    }
+  }
+
+  @Test func finishRerunsSkipWhatIsAlreadyDone() throws {
+    try withScratchDirectory { scratch in
+      let body = "## Draft result\nDone.\nFriction: none\n"
+      try Self.fakeFinishTools(
+        scratch, body: body, sha: try Self.head(scratch), status: "done", issueState: "CLOSED")
+      let closed = try Self.finish(scratch)
+      #expect(closed.termination == .exit(0) && closed.stdout.contains("already done"))
+      #expect(closed.stdout.contains("already closed"))
+      let calls = try Self.log(scratch)
+      #expect(!calls.contains("task done") && !calls.contains("issue close"))
+      try Self.fakeFinishTools(
+        scratch, body: body, sha: try Self.head(scratch), status: "done", linked: false)
+      let unlinked = try Self.finish(scratch)
+      #expect(unlinked.termination == .exit(0) && unlinked.stdout.contains("links no GitHub issue"))
     }
   }
 }

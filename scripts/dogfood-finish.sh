@@ -21,29 +21,34 @@ sha="$(/usr/bin/jq -er '.mergeCommit.oid' <<<"$pull")"
 git merge-base --is-ancestor "$sha" HEAD 2>/dev/null \
   || { echo "finish: this checkout lacks merge commit ${sha:0:7}." >&2; echo 'Next: git pull' >&2; exit 1; }
 
-# The draft result is everything under "## Draft result" up to the next heading.
-draft="$(/usr/bin/jq -r '.body' <<<"$pull" | tr -d '\r' | awk '
-  /^## / { inside = ($0 ~ /^## Draft result[[:space:]]*$/); next }
-  inside { print }')"
-draft="$(printf '%s\n' "$draft" | sed -e '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
-friction="$(printf '%s\n' "$draft" | tail -n 1)"
-[[ "$friction" == Friction:* ]] || {
-  echo "finish: PR #$pr's \"## Draft result\" must end with a Friction: line." >&2
+# The draft result runs from "## Draft result" through its last Friction: line, so a
+# trailer after it, or a later heading, is left out.
+section="$(/usr/bin/jq -r '.body' <<<"$pull" | tr -d '\r' | awk '
+  /^## / { inside = (tolower($0) ~ /^## draft result[[:space:]]*$/); if (inside) found = 1; next }
+  inside { print }
+  END { if (!found) exit 3 }')" \
+  || { echo "finish: PR #$pr has no \"## Draft result\" section; ask its author to add one." >&2; exit 1; }
+friction="$(printf '%s\n' "$section" | grep '^Friction:' | tail -n 1 || true)"
+[[ -n "$friction" ]] || {
+  echo "finish: PR #$pr's draft result has no Friction: line; ask its author to add one." >&2
   exit 1
 }
-result="$(printf '%s\n' "$draft" | sed '$d')
-Merged in #$pr (${sha:0:7}).
+body="$(printf '%s\n' "$section" | awk -v last="$(printf '%s\n' "$section" | grep -n '^Friction:' | tail -n 1 | cut -d: -f1)" \
+  'NR < last && (started || NF) { started = 1; print }')"
+result="${body:+$body
+}Merged in #$pr (${sha:0:7}).
 $friction"
 
-task="$(silta --ws silta task show "$ref" --json)"
+task="$(silta --ws silta task show "$ref" --json 2>&1)" \
+  || { echo "finish: silta could not show $ref:" >&2; printf '%s\n' "$task" >&2; exit 1; }
 status="$(/usr/bin/jq -r '.data.status // empty' <<<"$task")"
 issue="$(/usr/bin/jq -r '[.data.links[]?.target | select(startswith("url:")) | ltrimstr("url:")
   | select(test("/issues/[0-9]+$"))] | first // empty' <<<"$task")"
 case "$status" in
   done) echo "$ref is already done." ;;
-  review | doing | todo)
-    printf '%s\n' "$result" | silta --ws silta task done "$ref" --sha "$sha" -F - ;;
-  *) echo "finish: $ref is ${status:-unreadable}; ask the maintainer." >&2; exit 1 ;;
+  review) printf '%s\n' "$result" | silta --ws silta task done "$ref" --sha "$sha" -F - ;;
+  *) echo "finish: $ref is ${status:-unreadable}, not review; its author submits it first (D41)." >&2
+    exit 1 ;;
 esac
 if [[ -z "$issue" ]]; then
   echo "finish: $ref links no GitHub issue; nothing to close."

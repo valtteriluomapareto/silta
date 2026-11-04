@@ -63,20 +63,32 @@ prompts:
 1. Create Codex's worktree outside the repository, e.g.
    `git worktree add --detach ~/.codex/worktrees/<slice>/silta origin/main`.
 2. Start Codex with `scripts/dogfood-codex.sh start <worktree> <log> <<'EOF'`, giving
-   the slice prompt on stdin. It prints the thread id and Codex's last message.
-3. Poll `silta --ws silta task show <ref>` every 5 minutes until the task is in
-   `review`; then review the PR and post a `Review:` comment.
-4. Send review rounds to the same session with
-   `scripts/dogfood-codex.sh resume <thread> <log> <<'EOF'`.
-5. After the merge, run `scripts/dogfood-finish.sh <ref> <pr>`.
+   the slice prompt on stdin. Run it in the background: it returns when Codex's turn
+   ends, then prints the thread id and Codex's last message.
+3. That return is the signal, not polling. Check `silta --ws silta task show <ref>`:
+   `review` means a PR is ready, and Codex's last message says what it did or needs.
+   Review the PR and post a `Review:` comment with `gh pr comment`.
+4. Send each review round to the same session with
+   `scripts/dogfood-codex.sh resume <worktree> <thread> <log> <<'EOF'`. It runs in the
+   same worktree, so Silta sees the same actor and session.
+5. After the merge, run `scripts/dogfood-finish.sh <ref> <pr>`, then
+   `scripts/install-dev.sh`.
 
-The script removes the caller's agent markers and session variables, so Silta records
-Codex as `agent:codex:<session>`, and Codex never sees them. Codex runs with
-`approval_policy=never`, a workspace-write sandbox with network access, and write
-access to `~/.silta` and the repository's git directory. Model and effort come from
-the maintainer's Codex configuration. Codex stops instead of asking for approval, so
-anything that needs the maintainer comes back in its last message, and the
-coordinating agent relays it in one chat message.
+What the script fixes:
+- **Identity.** It removes the caller's agent markers, session variables and tokens,
+  and sets `SILTA_ACTOR=agent:codex`, so Silta records `agent:codex:<session>`.
+- **Sandbox.** Codex runs with `approval_policy=never` in a workspace-write sandbox
+  with network access. It may write its worktree, `SILTA_HOME` (default `~/.silta`),
+  the repository's git objects, refs and logs, and its own worktree's git directory.
+  It can't write git hooks or config, which would run outside the sandbox, so it
+  pushes with `git push origin HEAD`, not `-u`. `scripts/verify.sh` turns off
+  SwiftPM's and SwiftLint's own sandbox and cache when `CODEX_SANDBOX` is set.
+- **Approvals.** Codex has no chat with the maintainer, and approval words relayed in a
+  prompt never count (D38). So Codex never runs human-only commands in this mode: it
+  stops and names them in its last message. The coordinating agent asks the maintainer
+  in chat and runs them itself with `--approved "<their exact words>"`.
+
+Model and effort come from the maintainer's Codex configuration.
 
 ## Review friction
 

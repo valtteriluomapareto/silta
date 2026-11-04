@@ -110,11 +110,19 @@ struct ControlPlaneTests {
 
   @Test func deterministicFlagReachesEnvironmentAndInvalidOverridesAreCoded() throws {
     try withScratchDirectory { scratch in
-      // A home outside every temporary root, even when the checkout itself is in /tmp.
+      // A home outside every temporary root: the package's .build, unless the checkout
+      // is itself in /tmp, then the user's caches (which a sandbox may not let us write).
+      let name = "silta-test-home-\(UUID().uuidString)"
+      let build = DogfoodReportTests.root.appending(path: ".build/\(name)")
       let caches = try FileManager.default.url(
-        for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-      let home = caches.appending(path: "silta-test-home-\(UUID().uuidString)")
-      try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+      ).appending(path: name)
+      let usable = try [build, caches].first { candidate in
+        try !SiltaHome.resolve(environment: ["SILTA_HOME": candidate.path]).permitsDeterminism
+          && (try? FileManager.default.createDirectory(  // unwritable: try the next one
+            at: candidate, withIntermediateDirectories: true)) != nil
+      }
+      let home = try #require(usable)
       defer { try? FileManager.default.removeItem(at: home) }  // test scratch cleanup
       let environment = ["SILTA_NOW": "bad", "SILTA_HOME": home.path]
       let disabled = try SiltaBinary.run(

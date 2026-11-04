@@ -1,59 +1,62 @@
 #!/usr/bin/env bash
-# Run Codex non-interactively for a dogfood slice, as Codex rather than as the caller.
+# Run Codex non-interactively in its worktree for a dogfood slice, as Codex rather
+# than as the caller.
 #
-#   scripts/dogfood-codex.sh start <worktree> <log>   < prompt
-#   scripts/dogfood-codex.sh resume <thread> <log>    < prompt
+#   scripts/dogfood-codex.sh start <worktree> <log>            < prompt
+#   scripts/dogfood-codex.sh resume <worktree> <thread> <log>  < prompt
 #
-# The prompt comes from stdin. Codex's JSONL events go to <log>. On exit the script
-# prints the thread id and Codex's last message, and exits with Codex's status.
+# The prompt comes from stdin. Codex's JSONL events go to <log>. The command returns
+# when Codex's turn ends, then prints the thread id and Codex's last message and exits
+# with Codex's status.
 set -euo pipefail
 [[ -x /usr/bin/jq ]] || { echo 'codex: /usr/bin/jq is missing; it ships with macOS 15 or later.' >&2; exit 1; }
 command -v codex >/dev/null || { echo 'codex: missing codex on PATH.' >&2; exit 1; }
-usage='usage: dogfood-codex.sh start <worktree> <log> | resume <thread> <log>; prompt on stdin'
-[[ $# -eq 3 ]] || { echo "$usage" >&2; exit 1; }
-mode="$1" target="$2" log="$3"
-[[ ! -t 0 ]] || { echo 'codex: pass the prompt on stdin.' >&2; exit 1; }
-
-root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
-common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
-case "$mode" in
-  start)
-    [[ -d "$target" ]] || { echo "codex: no directory $target." >&2; exit 1; }
-    dir="$(cd "$target" && pwd -P)"
-    [[ "$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" == "$common" ]] \
-      || { echo "codex: $dir is not a worktree of $root." >&2; exit 1; }
-    ;;
-  resume)
-    [[ "$target" =~ ^[0-9a-f-]{36}$ ]] || { echo "codex: $target is not a thread id." >&2; exit 1; }
-    ;;
+usage='usage: dogfood-codex.sh start <worktree> <log> | resume <worktree> <thread> <log>; prompt on stdin'
+case "${1:-} $#" in
+  'start 3') target="$2" thread='' log="$3" ;;
+  'resume 4') target="$2" thread="$3" log="$4"
+    [[ "$thread" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || { echo "codex: $thread is not a thread id." >&2; exit 1; } ;;
   *) echo "$usage" >&2; exit 1 ;;
 esac
 
+# Codex works only in a linked worktree of this repository, never in the main checkout.
+root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
+[[ -d "$target" ]] || { echo "codex: no directory $target." >&2; exit 1; }
+dir="$(cd "$target" && pwd -P)"
+gitdir="$(git -C "$dir" rev-parse --absolute-git-dir 2>/dev/null || true)"
+[[ "$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" == "$common" \
+  && "$gitdir" != "$common" ]] \
+  || { echo "codex: $dir is not a linked worktree of $root." >&2; exit 1; }
+
 # The caller's agent markers would make Silta record Codex as the caller (spec §11),
-# and its session tokens are not Codex's to see. Both the launch environment and
-# Codex's shell policy drop them; resume reuses the thread's shell environment.
+# and its session tokens are not Codex's to see: the launch environment keeps them from
+# the Codex process, the shell policy from its commands. Git may write objects, refs and
+# this worktree's own git directory, but not hooks or config, which run outside Codex.
 unset_args=()
 while IFS='=' read -r name _; do
   case "$name" in CLAUDE*|CODEX_COMPANION*|SILTA_ACTOR|SILTA_SESSION) unset_args+=(-u "$name") ;; esac
 done < <(env)
+roots="\"${SILTA_HOME:-$HOME/.silta}\",\"$common/objects\",\"$common/refs\",\"$common/logs\",\"$gitdir\""
 config=(
   -c 'approval_policy="never"'
   -c 'sandbox_mode="workspace-write"'
-  -c "sandbox_workspace_write.writable_roots=[\"$HOME/.silta\",\"$common\"]"
+  -c "sandbox_workspace_write.writable_roots=[$roots]"
   -c 'sandbox_workspace_write.network_access=true'
   -c 'shell_environment_policy.exclude=["CLAUDE*","CODEX_COMPANION*","SILTA_ACTOR","SILTA_SESSION"]'
+  -c 'shell_environment_policy.set.SILTA_ACTOR="agent:codex"'
 )
-if [[ "$mode" == start ]]; then
+if [[ -z "$thread" ]]; then
   command=(codex exec --json "${config[@]}" -C "$dir" -)
 else
-  command=(codex exec resume "$target" --json "${config[@]}" -)
+  command=(codex exec resume "$thread" --json "${config[@]}" -)
 fi
 status=0
-env ${unset_args[@]+"${unset_args[@]}"} "${command[@]}" >"$log" || status=$?
+(cd "$dir" && env ${unset_args[@]+"${unset_args[@]}"} "${command[@]}") >"$log" || status=$?
 
-thread="$(/usr/bin/jq -r 'select(.type == "thread.started") | .thread_id' "$log" | head -n 1)"
-[[ -n "$thread" || "$mode" == start ]] || thread="$target"
-printf 'Thread: %s\n' "${thread:-unknown}"
-/usr/bin/jq -rs '[.[] | select(.type == "item.completed" and .item.type == "agent_message")
+# Lines that aren't JSON, such as a truncated last event, are skipped.
+started="$(/usr/bin/jq -rR 'fromjson? | select(.type == "thread.started") | .thread_id' "$log" | head -n 1)"
+printf 'Thread: %s\n' "${started:-${thread:-unknown}}"
+/usr/bin/jq -rRn '[inputs | fromjson? | select(.type == "item.completed" and .item.type == "agent_message")
   | .item.text] | last // empty' "$log"
 exit "$status"
