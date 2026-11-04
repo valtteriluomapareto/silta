@@ -136,6 +136,38 @@ struct DogfoodAutomationTests {
     }
   }
 
+  @Test func codexRunsAFireworksModelInTheSameSandbox() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.codexRepository(scratch)
+      try Self.fakeCodex(scratch, output: [Self.started, Self.message("Acme done")])
+      let log = scratch.appending(path: "run.jsonl").path
+      let model = "accounts/fireworks/models/acme-flash"
+      for (environment, status) in [
+        (["DOGFOOD_MODEL": "fireworks:\(model)"], 1 as Int32),
+        (["DOGFOOD_MODEL": "acme:\(model)", "FIREWORKS_API_KEY": "acme-key"], 1),
+        (["DOGFOOD_MODEL": "fireworks:\(model)", "FIREWORKS_API_KEY": "acme-key"], 0),
+      ] {
+        let result = try Self.run(
+          fixture.script, ["start", fixture.worktree.path, log], scratch: scratch,
+          environment: environment)
+        #expect(result.termination == .exit(status), "\(environment)")
+      }
+      let args = try Self.calls(scratch, "args")
+      #expect(args.contains("model=\"\(model)\"") && !args.contains("model=\"gpt-6.1-sol\""))
+      #expect(args.contains("model_provider=\"fireworks\""))
+      #expect(
+        args.contains {
+          $0.hasPrefix("model_providers.fireworks=") && $0.contains("FIREWORKS_API_KEY")
+        })
+      #expect(args.contains("model_reasoning_effort=\"high\""))
+      #expect(
+        args.contains {
+          $0.hasPrefix("shell_environment_policy.exclude=") && $0.contains("FIREWORKS_API_KEY")
+        })
+      #expect(try Self.calls(scratch, "env").contains("FIREWORKS_API_KEY"))
+    }
+  }
+
   @Test func codexRefusesTheMainCheckoutAndInexactThreads() throws {
     try withScratchDirectory { scratch in
       let fixture = try Self.codexRepository(scratch)
