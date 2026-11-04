@@ -116,11 +116,9 @@ struct TaskServiceTests {
       let reviewer = TaskService(
         environment: try Self.environment(
           home, actor: .agent(tool: "claude", session: "reviewer"), clock: clock))
-      await withKnownIssue("submit keeps the author's claim") {
-        #expect(try service.show("AC-1").claimedBy == nil)
-        let closed = try await reviewer.close("AC-1", result: "Merged.", directory: home)
-        #expect(closed.result.status == "done")
-      }
+      #expect(try service.show("AC-1").claimedBy == nil)
+      let closed = try await reviewer.close("AC-1", result: "Merged.", directory: home)
+      #expect(closed.result.status == "done")
     }
   }
 

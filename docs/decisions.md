@@ -28,6 +28,7 @@ They're summarised here so every decision has one index.
   Human decisions are never stored only in the derived file.
 - **D9: Every write has an actor with a session.** Unknown callers are agents, never
   humans.
+  - ↳ update (D41): `task submit`, like a handoff, releases the claim.
 - **D10: Agent-facing contracts are tested like an API**, across harnesses and
   models.
 
@@ -512,3 +513,16 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
       `next_by: agent`.
     - Why: each was a `next` the caller couldn't usefully run: an unblock that is
       refused while the block is open, or a human told to ask themselves.
+
+## DF0 follow-up (2026-11-04)
+
+- **D41: A slice is done when it merges; `submit` hands it to review.**
+  - `task submit` (doing → review) releases the claim. Whoever reviews and merges
+    finishes the task with `task done <ref> --sha <merge commit>`, then closes the
+    issue. Review findings go back to the author, who reclaims with `task start`.
+  - Agents tick plan steps as they finish them, not in a batch at the end, so
+    `task show --timeline` shows progress.
+  - Why: the first DF0 slice (S8, SI-7) ran `done` and closed its issue while its PR
+    waited for review. `done` is terminal, so review findings would have had nowhere
+    to go. And with the author's claim kept through review, the merging session got
+    `claimed` for up to 2 h.
