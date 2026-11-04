@@ -57,6 +57,8 @@ extension CodeError: ErrorExamples {
       .invalid("Use a relative path.", command: "silta code show"),
       .notFound("Git ref missing.", next: ["silta --ws acme ws show"]),
       .git(repo: "platform", workspace: "acme"),
+      .timeout(command: "silta code grep"),
+      .fetch(repo: "platform", retry: "silta --ws acme code ls api"),
     ]
   }
 }

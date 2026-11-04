@@ -4,3 +4,7 @@ error: Git ref missing. [not_found]
 next: silta --ws 'acme' ws show
 error: Could not read code in "platform"; check the local clone and git environment. [env]
 ask human: silta --ws 'acme' repo fetch 'platform'
+error: Git took longer than 10 s; narrow the read and retry. [env]
+next: silta code grep --help
+error: Could not fetch "platform"; check network access and noninteractive git credentials, or read the cached ref without --fetch. [env]
+next: silta --ws 'acme' code ls 'api'

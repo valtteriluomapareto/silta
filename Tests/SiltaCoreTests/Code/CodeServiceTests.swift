@@ -9,14 +9,24 @@ struct CodeServiceTests {
   private let sha = String(repeating: "a", count: 40)
 
   @Test func lineRangesPreserveLineEndingsAndTruncate() throws {
+    let unreadable = CodeError.git(repo: "platform", workspace: "acme")
+    let show = { (lines: String, text: String) in
+      try CodeRead.show("file", lines: lines).formatted(
+        text, sha: sha, subpath: "", unreadable: unreadable)
+    }
+    #expect(try show("2-2", "one\r\ntwo\r\n").output == "two\r\n")
+    #expect(try show("2", "one\ntwo").output == "two")
+    let past = try show("2-20", "one\ntwo\n")
+    #expect(past.output == "two\n")
+    #expect(past.warnings.map(\.code) == ["lines_past_eof"])
+    #expect(try show("3-20", "one\ntwo\n").output == "")
     #expect(
-      try CodeRead.show("file", lines: "2-20").formatted("one\r\ntwo\r\n", sha: sha, subpath: "")
-        == "two\r\n")
-    #expect(
-      try CodeRead.show("file", lines: "2-20").formatted("one\ntwo", sha: sha, subpath: "") == "two"
-    )
-    #expect(
-      try CodeRead.show("file", lines: "3-20").formatted("one\ntwo\n", sha: sha, subpath: "") == "")
+      try show("1-1", "").warnings.map(\.message) == [
+        "\"file\" has 0 lines; --lines 1-1 goes past the end."
+      ])
+    for invalid in ["0", "1-", "-1", "2-1", "+1", "1-2-3", "a"] {
+      #expect(throws: CodeError.self) { try show(invalid, "one\n") }
+    }
   }
 
   @Test func errorsHaveGoldenRecoveryCommands() {
@@ -24,6 +34,8 @@ struct CodeServiceTests {
       .invalid("Use an app-relative path.", command: "silta code show"),
       .notFound("Git ref missing.", next: ["silta --ws 'acme' ws show"]),
       .git(repo: "platform", workspace: "acme"),
+      .timeout(command: "silta code grep"),
+      .fetch(repo: "platform", retry: "silta --ws 'acme' code ls 'api'"),
     ]
     for json in [false, true] {
       let rendered = errors.map { OutputRouter.render(.failure($0), mode: .init(json: json)) }
@@ -69,7 +81,7 @@ struct CodeServiceTests {
     }
   }
 
-  @Test(arguments: [GitTermination.timedOut, .signal(9), .exit(128)])
+  @Test(arguments: [GitTermination.signal(9), .exit(128)])
   func gitFaultsAndFailedFetchStopWithoutWriting(termination: GitTermination) async throws {
     try await withScratchDirectory { home in
       let store = try setup(home)
@@ -93,7 +105,10 @@ struct CodeServiceTests {
           .success(.init(termination: termination))
         )
       ])
-      await #expect(throws: RepoError.self) { try await read(store, home, fetch, fetch: true) }
+      let error = await #expect(throws: CodeError.self) {
+        try await read(store, home, fetch, fetch: true)
+      }
+      #expect(error?.next == ["silta --ws 'acme' code show 'api' 'README.md'"])
       #expect(fetch.isExhausted)
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT fetched_at FROM repo_path") } == nil)
@@ -147,19 +162,16 @@ struct CodeServiceTests {
         (reads(home)[0].0, .success(.init(termination: .timedOut)))
       ])
       let error = await #expect(throws: CodeError.self) { try await read(store, home, git) }
-      withKnownIssue("a timeout suggests repo fetch") {
-        #expect(error?.message.contains("narrow") == true)
-        #expect(error?.next == ["silta code show --help"])
-        #expect(error?.nextBy == .agent)
-      }
+      #expect(error?.message.contains("narrow") == true)
+      #expect(error?.next == ["silta code show --help"])
+      #expect(error?.nextBy == .agent)
     }
   }
 
   @Test func unreadableGrepOutputIsACodeError() {
-    withKnownIssue("grep surfaces SeamError.gitCapture") {
-      #expect(throws: CodeError.self) {
-        try CodeRead.grep("x", pathspec: nil).formatted("garbage", sha: sha, subpath: "")
-      }
+    #expect(throws: CodeError.self) {
+      try CodeRead.grep("x", pathspec: nil).formatted(
+        "garbage", sha: sha, subpath: "", unreadable: .git(repo: "platform", workspace: "acme"))
     }
   }
 
@@ -209,7 +221,8 @@ struct CodeServiceTests {
       (
         .init(
           arguments: [
-            "--no-pager", "-c", "format.pretty=medium", "show", "--format=", "--no-color",
+            "--no-pager", "-c", "format.pretty=medium", "--attr-source=" + sha, "show",
+            "--format=", "--no-color",
             "--no-ext-diff", "--no-textconv",
             sha + ":README.md",
           ], directory: home),

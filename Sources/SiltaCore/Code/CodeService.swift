@@ -23,13 +23,14 @@ package struct CodeService {
   ) async throws -> CodeResult {
     try operation.validate()
     let parts = target.split(separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
-    guard let app = parts.first, !app.isEmpty,
+    guard let first = parts.first, !first.isEmpty,
       parts.count == 1 || (!parts[1].isEmpty && !prod), !target.contains("\0")
     else {
       throw CodeError.invalid(
         "Use app[@ref], or app with --prod.", command: "silta code \(operation.verb)")
     }
-    let selection = try select(String(app))
+    let app = String(first)
+    let selection = try select(app)
     try operation.validate(subpath: selection.subpath)
     let ref = parts.count == 2 ? String(parts[1]) : (prod ? selection.prod : selection.ref)
     let configuration = "silta --ws \(shellWord(workspace)) ws show"
@@ -38,112 +39,153 @@ package struct CodeService {
         "App \(app.debugDescription) has no prod_ref.", next: [configuration])
     }
     if fetch {
-      _ = try await RepositoryFetch.fetch(
-        selection.repo, workspace: workspace, store: store, git: git, at: date)
+      do {
+        _ = try await RepositoryFetch.fetch(
+          selection.repo, workspace: workspace, store: store, git: git, at: date)
+      } catch RepoError.fetch {
+        throw CodeError.fetch(
+          repo: selection.repo,
+          retry: operation.command(workspace: workspace, target: target, prod: prod))
+      }
     }
-    let sha = try await resolve(ref, selection: selection)
-    let path = CodeRead.normalized(selection.subpath + "/" + operation.path)
-    let output = try await content(
-      operation, sha: sha, path: path, selection: selection, target: String(app) + "@" + ref)
-    let warnings = fetch ? [] : stale(selection)
-    return CodeResult(app: String(app), ref: ref, sha: sha, output: output, warnings: warnings)
+    let sha = try await resolve(ref, app: app, selection: selection, operation: operation)
+    let (output, warnings) = try await content(
+      operation, sha: sha, selection: selection, target: app + "@" + ref)
+    let immutable = [40, 64].contains(ref.count) && ref.allSatisfy(\.isHexDigit)
+    return CodeResult(
+      app: app, ref: ref, sha: sha, output: output,
+      warnings: (fetch || immutable ? [] : stale(selection)) + warnings)
   }
 
-  private func resolve(_ ref: String, selection: Selection) async throws -> String {
-    let directory = URL(filePath: selection.path, directoryHint: .isDirectory)
-    let failure = CodeError.git(repo: selection.repo, workspace: workspace)
-    let resolved = try await run(
-      ["rev-parse", "--verify", "--quiet", "--end-of-options", ref + "^{commit}"],
-      directory: directory, failure: failure)
-    if resolved.termination == .exit(1) {
+  /// Resolves `ref` to a commit. A ref git rejects or can't find is `not_found`; when its
+  /// `origin/` counterpart resolves, the error suggests repeating the read with that ref.
+  private func resolve(
+    _ ref: String, app: String, selection: Selection, operation: CodeRead
+  ) async throws -> String {
+    let peel = { (ref: String) in
+      ["rev-parse", "--verify", "--quiet", "--end-of-options", ref + "^{commit}"]
+    }
+    let resolved = try await run(peel(ref), selection, operation)
+    switch resolved.termination {
+    case .exit(0): return try decodeSHA(resolved.stdout, selection)
+    case .exit(1):
       // A ref can exist even when its commit object is unavailable.
       let unpeeled = try await run(
-        ["rev-parse", "--verify", "--quiet", "--end-of-options", ref],
-        directory: directory, failure: failure)
+        ["rev-parse", "--verify", "--quiet", "--end-of-options", ref], selection, operation)
       if unpeeled.termination == .exit(0) {
-        let object = try decodeSHA(unpeeled.stdout, failure: failure)
-        let exists = try await run(
-          ["cat-file", "-e", object + "^{}"], directory: directory, failure: failure)
-        guard exists.termination == .exit(0) else { throw failure }
+        let object = try decodeSHA(unpeeled.stdout, selection)
+        let exists = try await run(["cat-file", "-e", object + "^{}"], selection, operation)
+        guard exists.termination == .exit(0) else { throw failure(selection) }
       } else if unpeeled.termination != .exit(1) {
-        throw failure
+        throw failure(selection)
       }
-      throw CodeError.notFound(
-        "Commit for Git ref \(ref.debugDescription) not found.",
-        next: [
+    case .exit(128):
+      // Git rejects a ref it can't parse, such as `main@{999}`, as it rejects a broken clone.
+      let clone = try await run(["rev-parse", "--git-dir"], selection, operation)
+      guard clone.termination == .exit(0) else { throw failure(selection) }
+    default: throw failure(selection)
+    }
+    let remote = "origin/" + ref
+    let suggestion = try await run(peel(remote), selection, operation)
+    throw CodeError.notFound(
+      "Commit for Git ref \(ref.debugDescription) not found.",
+      next: suggestion.termination == .exit(0)
+        ? [operation.command(workspace: workspace, target: app + "@" + remote, prod: false)]
+        : [
           "silta --ws \(shellWord(workspace)) repo fetch \(shellWord(selection.repo))",
           "silta --ws \(shellWord(workspace)) ws show",
         ])
-    }
-    guard resolved.termination == .exit(0) else { throw failure }
-    return try decodeSHA(resolved.stdout, failure: failure)
   }
 
   private func content(
-    _ operation: CodeRead, sha: String, path: String, selection: Selection, target: String
-  ) async throws -> String {
-    let failure = CodeError.git(repo: selection.repo, workspace: workspace)
-    try await requirePath(operation, sha: sha, path: path, selection: selection, target: target)
+    _ operation: CodeRead, sha: String, selection: Selection, target: String
+  ) async throws -> (output: String, warnings: [OutputWarning]) {
+    try await requirePath(operation, sha: sha, selection: selection, target: target)
     let result = try await run(
-      operation.arguments(sha: sha, path: path),
-      directory: URL(filePath: selection.path, directoryHint: .isDirectory),
-      failure: failure)
+      operation.arguments(sha: sha, subpath: selection.subpath), selection, operation)
     if result.termination != .exit(0) {
       switch operation {
       case .grep where result.termination == .exit(1): break
       case .grep where result.stderr.starts(with: Data("fatal: -e option,".utf8)):
-        throw CodeError.invalid("Invalid Git basic regular expression.", command: "silta code grep")
-      default: throw failure
+        throw CodeError.invalid("Invalid extended regular expression.", command: "silta code grep")
+      default: throw failure(selection)
       }
     }
-    guard let output = String(bytes: result.stdout, encoding: .utf8) else { throw failure }
-    return try operation.formatted(output, sha: sha, subpath: selection.subpath)
+    return try operation.formatted(
+      CodeRead.text(result.stdout), sha: sha, subpath: selection.subpath,
+      unreadable: failure(selection))
   }
 
+  /// Checks that a shown path is a file and a listed one a directory, naming what was found.
   private func requirePath(
-    _ operation: CodeRead, sha: String, path: String,
-    selection: Selection, target: String
+    _ operation: CodeRead, sha: String, selection: Selection, target: String
   ) async throws {
-    let type: String
+    let path = CodeRead.normalized(selection.subpath + "/" + operation.path)
+    let expected: Substring
     switch operation {
-    case .show: type = "blob"
-    case .list where !path.isEmpty: type = "tree"
+    case .show: expected = "blob"
+    case .list where !path.isEmpty: expected = "tree"
     default: return
     }
-    let failure = CodeError.git(repo: selection.repo, workspace: workspace)
     let result = try await run(
-      ["--literal-pathspecs", "ls-tree", "-z", sha, "--", path],
-      directory: URL(filePath: selection.path, directoryHint: .isDirectory), failure: failure)
-    guard result.termination == .exit(0), let output = String(bytes: result.stdout, encoding: .utf8)
-    else { throw failure }
-    guard output.split(separator: " ", maxSplits: 2).dropFirst().first == Substring(type) else {
+      ["--literal-pathspecs", "ls-tree", "-z", sha, "--", path], selection, operation)
+    guard result.termination == .exit(0) else { throw failure(selection) }
+    let found = CodeRead.text(result.stdout)
+      .split(separator: " ", maxSplits: 2).dropFirst().first
+    guard found != expected else { return }
+    let shown = operation.path.debugDescription
+    let other = { (read: CodeRead) in
+      read.command(workspace: workspace, target: target, prod: false)
+    }
+    switch found {
+    case "tree":
       throw CodeError.notFound(
-        "Path \(operation.path.debugDescription) not found at selected commit.",
-        next: ["silta --ws \(shellWord(workspace)) code ls \(shellWord(target))"])
+        "Path \(shown) is a directory at the selected commit.",
+        next: [other(.list(operation.path))])
+    case "blob":
+      throw CodeError.notFound(
+        "Path \(shown) is a file at the selected commit.",
+        next: [other(.show(operation.path, lines: nil))])
+    default:
+      guard CodeRead.normalized(operation.path).isEmpty else {
+        throw CodeError.notFound(
+          "Path \(shown) not found at selected commit.", next: [other(.list(nil))])
+      }
+      throw CodeError.notFound(
+        "App subpath \(selection.subpath.debugDescription) not found at selected commit.",
+        next: ["silta --ws \(shellWord(workspace)) ws show"])
     }
   }
 
-  private func decodeSHA(_ bytes: Data, failure: CodeError) throws -> String {
-    guard let value = String(bytes: bytes, encoding: .utf8) else { throw failure }
-    let sha = value.trimmingCharacters(in: .newlines)
-    guard [40, 64].contains(sha.count), sha.allSatisfy({ $0.isHexDigit }) else { throw failure }
+  private func decodeSHA(_ bytes: Data, _ selection: Selection) throws -> String {
+    let sha = (String(bytes: bytes, encoding: .utf8) ?? "").trimmingCharacters(in: .newlines)
+    guard [40, 64].contains(sha.count), sha.allSatisfy({ $0.isHexDigit }) else {
+      throw failure(selection)
+    }
     return sha
   }
 
+  private func failure(_ selection: Selection) -> CodeError {
+    .git(repo: selection.repo, workspace: workspace)
+  }
+
+  /// Runs git in the selected clone. `format.pretty` from the user's configuration is
+  /// read even beside an explicit `--format`, and an invalid value fails the read, so it
+  /// is pinned.
   private func run(
-    _ arguments: [String], directory: URL,
-    failure: CodeError
+    _ arguments: [String], _ selection: Selection, _ operation: CodeRead
   ) async throws -> GitResult {
     let result: GitResult
     do {
       result = try await git.run(
         .init(
-          arguments: ["--no-pager", "-c", "format.pretty=medium"] + arguments, directory: directory)
-      )
-    } catch { throw failure }
+          arguments: ["--no-pager", "-c", "format.pretty=medium"] + arguments,
+          directory: URL(filePath: selection.path, directoryHint: .isDirectory)))
+    } catch { throw failure(selection) }
     switch result.termination {
     case .exit: return result
-    default: throw failure
+    case .timedOut: throw CodeError.timeout(command: "silta code " + operation.verb)
+    case .signal: throw failure(selection)
     }
   }
 

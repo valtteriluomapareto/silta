@@ -159,13 +159,11 @@ struct CodeCommandTests {
         scratch)
       let failed = try SiltaBinary.run(["code", "ls", "portal", "--fetch", "--json"], in: scratch)
       #expect(failed.termination == .exit(9))
-      withKnownIssue("a failed --fetch reads as a multi-repo fetch") {
-        #expect(!failed.stdout.contains("Earlier successful repos"))
-        #expect(failed.stdout.contains("without --fetch"))
-        #expect(
-          failed.stdout.contains(
-            "\"next\":[\"silta --ws 'acme' code ls 'portal'\"],\"next_by\":\"agent\""))
-      }
+      #expect(!failed.stdout.contains("Earlier successful repos"))
+      #expect(failed.stdout.contains("without --fetch"))
+      #expect(
+        failed.stdout.contains(
+          "\"next\":[\"silta --ws 'acme' code ls 'portal'\"],\"next_by\":\"agent\""))
     }
   }
 
