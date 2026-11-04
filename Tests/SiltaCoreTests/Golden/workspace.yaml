@@ -1,5 +1,5 @@
 workspace: {"name":"Acme (example)","slug":"acme","task_prefix":"AC"}
-settings: {"archive_after_days":14,"review_gate":"none","stale_days":90}
+settings: {"archive_after_days":14,"proposals":"triage","review_gate":"none","stale_days":90}
 repos:
   - {"slug":"mobile"}
   - {"slug":"pdf-service"}

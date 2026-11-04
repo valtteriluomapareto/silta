@@ -532,6 +532,11 @@ triage, or leave the inbox after 14 days as usual.
 --split` children take the root's status, decided once per import: `todo` under a
 `todo` or `doing` root, `proposed` under a `proposed` one; `--dry-run` shows the same
 (D40). A title is one line without control characters.
+A dry run validates or records no approval words and remains ungated. With
+`--approved`, would-be proposals preview `todo` and warn `approval_unused`.
+Under `proposals: ask` without approval, they also preview `todo`, with a warning
+that the real run needs the human's go-ahead in chat and creates `todo`. Split
+children preview the same status; refusals and consent warnings name the task count.
 
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
 just created; `--status proposed` lists everyone's (it implies `--proposed`). Promoted
@@ -1733,7 +1738,12 @@ Each operation validates only the setting it uses. An invalid stored value retur
 `invalid`, naming the workspace, key and a bounded, secret-masked value preview,
 with `next: silta --ws <ws> ws show`. The editing view displays malformed or
 non-object settings as an invalid YAML value for human repair; reading never resets
-them. Unchanged editing input is still validated.
+them. Whole-document corruption names `settings`, and previews mask nested credentials
+without breaking JSON delimiters. Masked keys that collide get a fixed diagnostic
+placeholder. An unknown stored policy may belong to a newer
+Silta; ask the human before choosing or changing it. Unchanged editing input is still validated.
+The proposals-policy migration raises the writer floor for the whole database,
+including workspaces using the default; older writers must update before writing (D32).
 
 | Key | Values (default first) | Effect | Added in |
 |---|---|---|---|
@@ -1751,7 +1761,7 @@ when it ships.
 
 ```yaml
 workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }
-settings: { review_gate: "none", archive_after_days: 14, stale_days: 90 }
+settings: { review_gate: "none", archive_after_days: 14, stale_days: 90, proposals: "triage" }
 repos:
   - { slug: "platform", remote: "git@example.com:acme/platform.git" }   # several apps on branches
   - { slug: "mobile" }

@@ -82,7 +82,7 @@ struct TaskFromPlanCommand: OutputCommand {
       text: shown,
       quiet: result.dryRun ? shown : result.tasks.map(\.ref).joined(separator: "\n"),
       data: result, warnings: result.warnings + unused,
-      approvalUsed: allowSecret && !result.dryRun
+      approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
   }
 

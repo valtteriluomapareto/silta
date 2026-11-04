@@ -3,14 +3,19 @@ import Foundation
 /// Transaction-local policy with independent typed reads. Only absent keys default.
 /// Unrelated settings are left undecoded, including values written by newer binaries.
 struct WorkspaceSettings: Sendable {
-  enum ReviewGate: String, Decodable, CaseIterable, Sendable {
+  enum ReviewGate: String, CaseIterable, Sendable {
     case none, any, human
+  }
+
+  enum Proposals: String, CaseIterable, Sendable {
+    case triage, ask
   }
 
   enum CodingKeys: String, CodingKey, CaseIterable {
     case reviewGate = "review_gate"
     case archiveAfterDays = "archive_after_days"
     case staleDays = "stale_days"
+    case proposals
   }
 
   private let workspace: String
@@ -22,7 +27,25 @@ struct WorkspaceSettings: Sendable {
   }
 
   var reviewGate: ReviewGate {
-    get throws { try value(.reviewGate, default: .none) }
+    get throws {
+      let word: String = try value(.reviewGate, default: ReviewGate.none.rawValue)
+      guard let gate = ReviewGate(rawValue: word) else {
+        throw WorkspaceError.unknownSetting(
+          workspace, key: "review_gate", value: try WorkspaceConfig.json(Self.masked(word)))
+      }
+      return gate
+    }
+  }
+
+  var proposals: Proposals {
+    get throws {
+      let word: String = try value(.proposals, default: Proposals.triage.rawValue)
+      guard let policy = Proposals(rawValue: word) else {
+        throw WorkspaceError.unknownSetting(
+          workspace, key: "proposals", value: try WorkspaceConfig.json(Self.masked(word)))
+      }
+      return policy
+    }
   }
 
   var archiveAfterDays: Int {
@@ -42,29 +65,43 @@ struct WorkspaceSettings: Sendable {
   }
 
   private func value<T: Decodable>(_ key: CodingKeys, default fallback: T) throws -> T {
-    var stored = json
+    let document: Any
     do {
-      guard
-        let values = try JSONSerialization.jsonObject(
-          with: Data(json.utf8), options: .fragmentsAllowed) as? [String: Any]
-      else { throw WorkspaceError.setting(workspace, key: key.rawValue, value: stored) }
-      guard let raw = values[key.rawValue] else { return fallback }
-      let options: JSONSerialization.WritingOptions = [.fragmentsAllowed, .sortedKeys]
-      let bytes = try JSONSerialization.data(withJSONObject: raw, options: options)
-      let displayed: Data
-      if let text = raw as? String {
-        displayed = try JSONSerialization.data(
-          withJSONObject: SecretGuard.redacted(text), options: options)
-      } else {
-        displayed = bytes
-      }
-      guard let preview = String(data: displayed, encoding: .utf8) else {
-        throw WorkspaceError.setting(workspace, key: key.rawValue, value: stored)
-      }
-      stored = preview
+      document = try JSONSerialization.jsonObject(with: Data(json.utf8), options: .fragmentsAllowed)
+    } catch {
+      throw WorkspaceError.setting(workspace, key: "settings", value: "\"[REDACTED:invalid-json]\"")
+    }
+    guard let values = document as? [String: Any] else {
+      throw WorkspaceError.setting(
+        workspace, key: "settings", value: try WorkspaceConfig.json(Self.masked(document)))
+    }
+    guard let raw = values[key.rawValue] else { return fallback }
+    do {
+      let bytes = try JSONSerialization.data(withJSONObject: raw, options: .fragmentsAllowed)
       return try JSONDecoder().decode(T.self, from: bytes)
     } catch {
-      throw WorkspaceError.setting(workspace, key: key.rawValue, value: stored)
+      throw WorkspaceError.setting(
+        workspace, key: key.rawValue, value: try WorkspaceConfig.json(Self.masked(raw)))
     }
+  }
+
+  private static func masked(_ value: Any) -> Any {
+    if let object = value as? [String: Any] {
+      return Dictionary(
+        object.map { key, value in
+          let safeKey = SecretGuard.redacted(key)
+          let context = key + "=" + (value as? String ?? "stored-value")
+          let valueStart = context.index(context.startIndex, offsetBy: key.count + 1)
+          if let match = SecretGuard.matches(in: context).first(where: {
+            $0.range.lowerBound < valueStart
+          }) {
+            return (safeKey, "[REDACTED:\(match.rule)]" as Any)
+          }
+          return (safeKey, masked(value))
+        }, uniquingKeysWith: { _, _ in "[REDACTED:duplicate-key]" as Any })
+    }
+    if let array = value as? [Any] { return array.map(masked) }
+    if let text = value as? String { return SecretGuard.redacted(text) }
+    return value
   }
 }

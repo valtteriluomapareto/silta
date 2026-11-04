@@ -1,0 +1,1 @@
+{"data":{"dry_run":true,"preview":{"description":"Context\n\n","status":"todo","steps":[{"description":"\n","status":"todo","title":"First"},{"description":"","status":"todo","title":"Second"}],"title":"Acme"},"tasks":[]},"ok":true,"schema":1,"warnings":[{"code":"approval_unused","message":"A dry run records nothing, so --approved was not used; no approval stored."}]}
