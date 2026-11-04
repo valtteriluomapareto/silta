@@ -18,5 +18,10 @@ for tool in swift-format swiftlint; do
 done
 
 swift-format lint --strict --recursive --configuration .swift-format.json "${paths[@]}"
-swiftlint lint --strict --quiet --config .swiftlint.yml
+# SwiftLint caches under ~/Library/Caches, which Codex's sandbox (CODEX_SANDBOX) can't write.
+cache=()
+if [[ -n "${CODEX_SANDBOX:-}" ]]; then
+  cache=(--no-cache)
+fi
+swiftlint lint --strict --quiet --config .swiftlint.yml ${cache[@]+"${cache[@]}"}
 echo "lint: passed"

@@ -37,9 +37,17 @@ SILTA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/silta-verify.XXXXXX")"
 export SILTA_HOME
 trap 'rm -rf "$SILTA_HOME"' EXIT
 
+# SwiftPM sandboxes manifest builds, which macOS refuses inside another sandbox such as
+# Codex's seatbelt (it sets CODEX_SANDBOX). That outer sandbox already confines the build.
+swiftpm=()
+if [[ -n "${CODEX_SANDBOX:-}" ]]; then
+  swiftpm=(--disable-sandbox)
+fi
+
 step "build (warnings as errors)"
 # Dependencies come only from Package.resolved (D18): fail instead of re-resolving.
-swift build --build-tests --only-use-versions-from-resolved-file -Xswiftc -warnings-as-errors
+swift build ${swiftpm[@]+"${swiftpm[@]}"} --build-tests --only-use-versions-from-resolved-file \
+  -Xswiftc -warnings-as-errors
 
 step "test"
 if [[ "$mode" == full ]]; then
@@ -47,7 +55,7 @@ if [[ "$mode" == full ]]; then
 fi
 log="$(mktemp "${TMPDIR:-/tmp}/silta-test-log.XXXXXX")"
 set +e
-swift test --skip-build 2>&1 | tee "$log"
+swift test ${swiftpm[@]+"${swiftpm[@]}"} --skip-build 2>&1 | tee "$log"
 status=${PIPESTATUS[0]}
 set -e
 if (( status != 0 )); then

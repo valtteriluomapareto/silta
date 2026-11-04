@@ -55,6 +55,50 @@ runs before that choice; it does not implement those policies itself.
 Follow the DF0 rules in [AGENTS.md](../../AGENTS.md#dogfooding). Questions and
 handoffs stay on the slice issue until DF1.
 
+## Drive Codex from another agent
+
+A coordinating agent can run Codex itself instead of asking the maintainer to paste
+prompts:
+
+1. Create Codex's worktree outside the repository, e.g.
+   `git worktree add --detach ~/.codex/worktrees/<slice>/silta origin/main`.
+2. Start Codex with `scripts/dogfood-codex.sh start <worktree> <log> <<'EOF'`, giving
+   the slice prompt on stdin. Run it in the background: it returns when Codex's turn
+   ends, then prints the thread id and Codex's last message.
+3. That return is the signal, not polling. Check `silta --ws silta task show <ref>`:
+   `review` means a PR is ready, and Codex's last message says what it did or needs.
+   Review the PR and post a `Review:` comment with `gh pr comment`.
+4. Send each review round to the same session with
+   `scripts/dogfood-codex.sh resume <worktree> <thread> <log> <<'EOF'`. It runs in the
+   same worktree, so Silta sees the same actor and session.
+5. After the merge, run `scripts/dogfood-finish.sh <ref> <pr>`, then
+   `scripts/install-dev.sh`.
+
+What the script fixes:
+- **Identity.** It removes the caller's agent markers, session variables and tokens,
+  and sets `SILTA_ACTOR=agent:codex`, so Silta records `agent:codex:<session>`.
+- **Sandbox.** Codex runs with `approval_policy=never` in a workspace-write sandbox
+  with network access. It may write its worktree, `SILTA_HOME` (default `~/.silta`),
+  the repository's git objects, refs and logs, and its own worktree's git directory.
+  It can't write git hooks or config, which would run outside the sandbox, so it
+  pushes with `git push origin HEAD`, not `-u`. `scripts/verify.sh` turns off
+  SwiftPM's and SwiftLint's own sandbox and cache when `CODEX_SANDBOX` is set.
+- **Approvals.** Codex has no chat with the maintainer, and approval words relayed in a
+  prompt never count (D38). So Codex never runs human-only commands in this mode: it
+  stops and names them in its last message. The coordinating agent asks the maintainer
+  in chat and runs them itself with `--approved "<their exact words>"`. A command that
+  acts on Codex's own claim, such as `task start --steal`, runs from Codex's worktree
+  with `SILTA_ACTOR=agent:codex`, so the claim stays Codex's.
+- **Git setup.** After each run the script checks the worktree's `config.worktree` and
+  git links. If Codex added any setting outside `codex.*`, or changed a link, it exits
+  70: don't run git in that worktree, because git would read that setting outside the
+  sandbox. Inspect it, then delete the worktree and run `git worktree prune`.
+- **Split slices.** When a slice ships in parts, Codex starts and submits the part's
+  subtask, and `dogfood-finish.sh` runs on that subtask. A subtask links no issue, so
+  the slice issue stays open until its own task is done.
+
+Model and effort come from the maintainer's Codex configuration.
+
 ## Review friction
 
 Once per wave, and at least every 60 days, an agent runs
