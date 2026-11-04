@@ -13,7 +13,7 @@ struct WhereCommandTests {
         ("master", "platform", "exact_ref"), ("api", "api", "exact_ref"),
         ("api-prod", "api", "exact_ref"), ("portal-prod", "portal", "exact_ref"),
         ("renamed", "platform", "reflog"), ("rebased", "portal", "reflog"),
-        ("non-app", "platform", "reflog"), ("from-non-app", "", "non_app_ref"),
+        ("non-app", "platform", "reflog"), ("from-non-app", "", "origin_unknown"),
       ] {
         try git(["checkout", "-q", branch], repo, scratch)
         let result = try run([], repo, scratch)
@@ -270,17 +270,16 @@ struct WhereCommandTests {
 
 extension WhereCommandTests {
   @Test func delayedCheckoutCannotEstablishBranchCreationOrigin() throws {
-    withKnownIssue("#11: Later checkouts do not establish branch creation") {
-      try withScratchDirectory { scratch in
-        let repo = try setup(scratch)
-        try git(["checkout", "-qB", "release/acme", "master"], repo, scratch)
-        try git(["branch", "delayed-topic", "HEAD"], repo, scratch)
-        try git(["checkout", "-q", "master"], repo, scratch)
-        try git(["checkout", "-q", "delayed-topic"], repo, scratch)
-        let result = try data(run([], repo, scratch))
-        #expect(result["confidence"] as? String == "low")
-        #expect(result["app"] == nil)
-      }
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      try git(["checkout", "-qB", "release/acme", "master"], repo, scratch)
+      try git(["branch", "delayed-topic", "HEAD"], repo, scratch)
+      try git(["checkout", "-q", "master"], repo, scratch)
+      try git(["checkout", "-q", "delayed-topic"], repo, scratch)
+      let result = try data(run([], repo, scratch))
+      #expect(result["confidence"] as? String == "low")
+      #expect(result["app"] == nil)
+      #expect(result["reason"] as? String == "origin_unknown")
     }
   }
 
@@ -308,7 +307,7 @@ extension WhereCommandTests {
       try git(["checkout", "-qb", "implicit-topic"], repo, scratch)
       let result = try data(run([], repo, scratch))
       #expect(result["confidence"] as? String == "low")
-      #expect(result["reason"] as? String == "non_app_ref")
+      #expect(result["reason"] as? String == "origin_unknown")
       #expect(result["app"] == nil)
     }
   }

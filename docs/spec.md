@@ -467,9 +467,12 @@ symlinks resolved, case-folded on case-insensitive volumes.
   Approval retries preserve the workspace and canonical target path.
 - A shallow clone can resolve through earlier rules. Distance inference without
   complete history returns `low`, reason `shallow`, and is never cached.
-- A known non-app reflog origin returns `low`, reason `non_app_ref`. When branch
-  creation records `HEAD`, a matching checkout in HEAD's reflog supplies the source.
-  Missing development refs are skipped, with `ref_missing`, before any selection rule.
+- A named non-app reflog origin returns `low`, reason `non_app_ref`. A creation
+  entry naming `HEAD` cannot establish a source: a later checkout may have the same
+  SHA. When earlier rules do not resolve it, return `low`, reason `origin_unknown`,
+  instead of inferring an app from that checkout or from distance. With no creation
+  entry, distance scoring remains available.
+- Missing development refs are skipped, with `ref_missing`, before any selection rule.
 - The cache lives in `index.db`, keyed on (path, HEAD sha, hash of candidate ref
   shas). It is written only if the lock is free; it never blocks.
 
