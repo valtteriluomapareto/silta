@@ -38,13 +38,8 @@ extension TaskService {
     do {
       instant = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(closed)
     } catch { throw StorageError.unavailable }
-    let raw =
-      try String.fetchOne(
-        db, sql: "SELECT settings FROM workspace WHERE id=?",
-        arguments: [task.workspaceID]) ?? "{}"
-    let settings = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any]
-    let days = (settings?["archive_after_days"] as? Double) ?? 14
-    return instant < date.addingTimeInterval(-days * 86400)
+    let days = try WorkspaceSettings.read(workspaceID: task.workspaceID, in: db).archiveAfterDays
+    return instant < date.addingTimeInterval(-Double(days) * 86400)
   }
 
   /// Records tracker ownership and releases the local claim without changing status.

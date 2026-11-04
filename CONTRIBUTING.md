@@ -34,8 +34,9 @@ guards still run.
 
 1. **Issue or slice.** Work starts from a slice in the active plan, or from a GitHub
    issue that names one.
-2. **Plan.** Anything beyond a small fix gets a written plan: in the issue, or in
-   `docs/plans/` using the template.
+2. **Plan.** Anything beyond a small fix gets a written plan. Follow the current
+   [dogfooding stage](AGENTS.md#dogfooding) for its location; larger plans use
+   `docs/plans/` and its template.
 3. **Plan review.** Three independent reviewer subagents (Architect, Tester,
    Pragmatism) review the plan, using [`skills/persona-review`](skills/persona-review/SKILL.md).
    A fourth, Agent experience, joins when the change touches agent-facing output.

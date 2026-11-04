@@ -1722,11 +1722,17 @@ noninteractively, and network/authentication failures ask a human to repair the 
 
 `ws use <slug>` records the current workspace. With no workspace yet, a human's
 `ws edit` opens starter YAML. Otherwise it edits the explicit or current workspace.
-An unchanged file or nonzero editor exit makes no changes; validation problems are
+An unchanged valid file or nonzero editor exit makes no changes; validation problems are
 reopened as comments above the YAML.
 
 **Settings (D39).** Only keys that are set are stored; reads fill in the defaults.
 Values are words, never YAML booleans.
+
+Each operation validates only the setting it uses. An invalid stored value returns
+`invalid`, naming the workspace, key and a bounded, secret-masked value preview,
+with `next: silta --ws <ws> ws show`. The editing view displays malformed or
+non-object settings as an invalid YAML value for human repair; reading never resets
+them. Unchanged editing input is still validated.
 
 | Key | Values (default first) | Effect | Added in |
 |---|---|---|---|

@@ -46,7 +46,7 @@ extension WorkspaceError: ErrorExamples {
   static var examples: [WorkspaceError] {
     [
       .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"), .conflict,
-      .editor, .input,
+      .editor, .input, .setting("acme", key: "review_gate", value: "\"robot\""),
     ]
   }
 }

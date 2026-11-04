@@ -31,8 +31,9 @@ Silta is usable every day:
 - **GitHub** records the same dependencies as "blocked by" links, and the slices are
   sub-issues of #1.
 
-**How to work a slice:** pick any open slice whose blockers are closed. Then post its
-plan on the issue and get it reviewed (`skills/persona-review`) before coding.
+**How to work a slice:** pick any open slice whose blockers are closed. Record its
+plan in the place required by the current [dogfooding stage](../../AGENTS.md#dogfooding)
+and get it reviewed (`skills/persona-review`) before coding.
 
 **Shared files** need coordination, and their owner is named:
 - `Package.swift`: S1
@@ -98,7 +99,7 @@ GitHub issue (label `dogfood`), a `silta guide` text fix, or nothing.
 ## Validation
 
 - Every slice runs `scripts/verify.sh quick`.
-- S3, CP, S7, S10, S12 and S14 also run `full`.
+- S3, CP, S7, S10, S11, S12 and S14 also run `full`.
 - What M1 still won't prove: behaviour with models other than Claude and Codex, which
   comes in the M4 eval matrix.
 
