@@ -51,14 +51,7 @@ package struct SiltaEnvironment: Sendable {
     var ids: any IDGenerator = SystemIDGenerator()
     if home.permitsDeterminism {
       if let raw = environment["SILTA_NOW"] {
-        let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
-        let date: Date
-        do {
-          date = try format.parse(raw)
-        } catch {
-          throw SeamError.invalidNow
-        }
-        guard date.formatted(format) == raw, date.timeIntervalSince1970 >= 0 else {
+        guard let date = utcInstant(raw), date.timeIntervalSince1970 >= 0 else {
           throw SeamError.invalidNow
         }
         clock = IncrementingClock(start: date)

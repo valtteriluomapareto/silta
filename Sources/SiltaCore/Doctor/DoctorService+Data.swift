@@ -98,11 +98,7 @@ extension DoctorService {
   }
 
   private static func age(_ raw: String?, at now: Date) -> TimeInterval? {
-    guard let raw else { return nil }
-    let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
-    do {
-      let date = try format.parse(raw)
-      return date.formatted(format) == raw ? now.timeIntervalSince(date) : nil
-    } catch { return nil }
+    guard let raw, let date = utcInstant(raw) else { return nil }
+    return now.timeIntervalSince(date)
   }
 }

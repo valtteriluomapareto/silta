@@ -179,9 +179,7 @@ struct DoctorServiceTests {
       let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
       let at = try format.parse(claimedAt).addingTimeInterval(29 * 60)
       let report = await inspect(home, at: at)
-      withKnownIssue("SI-22: The fractional-second round trip rejects valid milliseconds") {
-        #expect(report.checks.first { $0.id == "data.claims" }?.status == .pass)
-      }
+      #expect(report.checks.first { $0.id == "data.claims" }?.status == .pass)
     }
   }
 

@@ -274,15 +274,13 @@ extension DeterminismTests {
   @Test(arguments: ["2023-11-14T22:13:20.859Z", "2023-11-14T22:13:20.426Z"])
   func canonicalMillisecondNowIsAccepted(raw: String) async throws {
     try await withScratchDirectory { scratch in
-      await withKnownIssue("SI-22: The fractional-second round trip rejects valid milliseconds") {
-        let env = try await SiltaEnvironment.system(
-          environment: [
-            "SILTA_HOME": scratch.appending(path: "data").path,
-            "SILTA_NOW": raw,
-          ], userHome: scratch, temporaryRoots: [], deterministic: true)
-        let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
-        #expect(abs(env.clock.now().timeIntervalSince(try format.parse(raw))) < 0.0005)
-      }
+      let env = try await SiltaEnvironment.system(
+        environment: [
+          "SILTA_HOME": scratch.appending(path: "data").path,
+          "SILTA_NOW": raw,
+        ], userHome: scratch, temporaryRoots: [], deterministic: true)
+      let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+      #expect(abs(env.clock.now().timeIntervalSince(try format.parse(raw))) < 0.0005)
     }
   }
 
