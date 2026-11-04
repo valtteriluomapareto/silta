@@ -7,6 +7,7 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct LocationDistanceTests {
   @Test func hookBriefUsesFreshCacheWithoutCreatingOrUpdatingIt() async throws {
+    // SQLite may recreate WAL/SHM sidecars; truth rows and derived cache contents stay unchanged.
     try await withScratchDirectory { home in
       let (repo, store) = try setup(home)
       let common =

@@ -8,7 +8,8 @@ struct SiltaCommand: ParsableCommand {
     version: SiltaVersion.current,
     subcommands: [
       SchemaCommand.self, WsCommand.self, InitCommand.self, RepoCommand.self, TaskCommand.self,
-      CodeCommand.self, WhereCommand.self, DoctorCommand.self, CommentCommand.self, BriefCommand.self,
+      CodeCommand.self, WhereCommand.self, DoctorCommand.self, CommentCommand.self,
+      BriefCommand.self,
     ]
   )
 

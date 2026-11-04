@@ -51,6 +51,10 @@ extension BriefCommandTests {
             """)
       }
       #expect(try fixture.data(run(["--json"], repo, scratch))["current_task"] as? String == "AC-2")
+      try store.write {
+        try $0.database.execute(sql: "UPDATE task SET claimed_by=NULL,branch='api'")
+      }
+      #expect(try fixture.data(run(["--json"], repo, scratch))["current_task"] as? String == "AC-1")
     }
   }
 

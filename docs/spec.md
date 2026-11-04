@@ -1443,7 +1443,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - ms; busy retries, git calls and git ms join when the first command counts them
   - warnings
 
-  `workspace` is set only for commands that act on a workspace: `task *`,
+  `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
   `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`, and a successful `init --scan`.
   - A successful command logs the workspace it resolved and acted on (`--ws`, its
     slug argument, or the current workspace), or the one `init --scan` or `ws edit`
@@ -1462,6 +1462,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   A suppressed hook failure logs its actual process exit status of 0 while retaining
   the underlying `error_code`. Hook output never writes diagnostics to stderr.
+  Watchdog timeout records carry `hook_timeout` and omit workspace until one can be
+  validated. The dogfood report counts these as untagged lines; raw `--ws` values
+  are never used to attribute a timeout.
 
   Evals and the dogfood report read these logs (§21, §22.1).
 - **`silta doctor [--fix]`** checks:
