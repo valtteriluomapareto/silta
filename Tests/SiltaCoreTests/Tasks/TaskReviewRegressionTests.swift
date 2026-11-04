@@ -65,10 +65,9 @@ struct TaskReviewRegressionTests {
 
   @Test func requiredLinkUIDCollisionRollsBackTaskCreation() async throws {
     try await withScratchDirectory { home in
-      let env = try TaskServiceTests.environment(home)
+      let env = try TaskServiceTests.environment(home, seed: TaskServiceTests.agentSeed)
       try TaskServiceTests.setup(env)
-      let ids = SeededIDGenerator(
-        seed: TaskServiceTests.agent.description.utf8.reduce(0) { $0 + UInt64($1) })
+      let ids = SeededIDGenerator(seed: TaskServiceTests.agentSeed)
       _ = try ids.next(at: TaskServiceTests.now)
       let linkUID = try ids.next(at: TaskServiceTests.now)
       try env.db.write { tx in
@@ -95,8 +94,11 @@ struct TaskReviewRegressionTests {
       }
       var draft = TaskDraft(title: "New task")
       draft.topics = ["release"]
-      await #expect(throws: StorageError.unavailable) {
+      do {
         _ = try await TaskService(environment: env).add(draft, directory: home)
+        Issue.record("Expected a unique-constraint failure")
+      } catch let error as StorageError {
+        Self.expectConstraintViolation(error, value: linkUID, actor: env.actor.description)
       }
       #expect(try env.db.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 1)
       #expect(
@@ -105,5 +107,26 @@ struct TaskReviewRegressionTests {
         } == 2)
     }
 
+  }
+
+  static func expectConstraintViolation(_ error: StorageError, value: String, actor: String) {
+    #expect(error == .constraintViolation)
+    #expect(
+      error.message
+        == "internal error (bug): a write conflicted with existing data; nothing was saved. "
+        + "Report which silta command failed (not its arguments) and the time, "
+        + "with silta doctor output.")
+    #expect(error.next == ["silta doctor"])
+    #expect(error.code == .env)
+    #expect(error.code.exitCode == 9)
+    #expect(error.code.nextBy == .human)
+    let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
+    let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
+    for output in [text.stderr, json.stdout] {
+      #expect(!output.contains("INSERT"))
+      #expect(!output.contains("UNIQUE"))
+      #expect(!output.contains(value))
+      #expect(!output.contains(actor))
+    }
   }
 }

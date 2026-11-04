@@ -6,6 +6,8 @@ package enum StorageError: CodedError, CaseIterable {
   case busy
   /// The database could not be opened, read or written.
   case unavailable
+  /// A write violated a database constraint, so Silta generated conflicting state.
+  case constraintViolation
   /// The database requires a newer binary or contains unknown migrations.
   case schemaTooNew
   /// A required complete backup could not be created or installed.
@@ -21,6 +23,10 @@ package enum StorageError: CodedError, CaseIterable {
     switch self {
     case .busy: "Database is busy; retry the original invocation once after retry_after_s."
     case .unavailable: "Database is unavailable or read-only."
+    case .constraintViolation:
+      "internal error (bug): a write conflicted with existing data; nothing was saved. "
+        + "Report which silta command failed (not its arguments) and the time, "
+        + "with silta doctor output."
     case .schemaTooNew: "Database requires a newer version of silta."
     case .backupFailed: "Required database backup could not be completed."
     }
@@ -39,7 +45,13 @@ package enum StorageError: CodedError, CaseIterable {
   /// Maps operational errors without retaining their SQL or potentially private messages.
   package static func mapped(_ error: any Error) -> StorageError {
     if let error = error as? StorageError { return error }
-    if let error = error as? DatabaseError, error.resultCode == .SQLITE_BUSY { return .busy }
+    if let error = error as? DatabaseError {
+      switch error.resultCode {
+      case .SQLITE_BUSY: return .busy
+      case .SQLITE_CONSTRAINT: return .constraintViolation
+      default: break
+      }
+    }
     return .unavailable
   }
 }

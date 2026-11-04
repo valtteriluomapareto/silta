@@ -9,6 +9,11 @@ error: Database is unavailable or read-only. [env]
 ask human: silta doctor
 {"error":{"code":"env","message":"Database is unavailable or read-only.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
+## constraintViolation
+error: internal error (bug): a write conflicted with existing data; nothing was saved. Report which silta command failed (not its arguments) and the time, with silta doctor output. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"internal error (bug): a write conflicted with existing data; nothing was saved. Report which silta command failed (not its arguments) and the time, with silta doctor output.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
 ## schemaTooNew
 error: Database requires a newer version of silta. [env]
 ask human: update silta

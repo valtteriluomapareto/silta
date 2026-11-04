@@ -29,13 +29,13 @@ struct TaskBlockReviewTests {
 
   @Test func linkOrderAndUIDAssignmentFollowInputOrder() async throws {
     try await withScratchDirectory { home in
-      let service = try TaskOrganizationTests.service(home)
+      let seed = TaskServiceTests.agentSeed
+      let service = try TaskOrganizationTests.service(home, seed: seed)
       try await TaskBlockTests.add(service, directory: home)
       let refs = (0..<12).map { "ext:acme-\($0)" }
       _ = try service.block("AC-1", TaskBlockTests.input(refs + [refs[0]]))
       let details = try service.show("AC-1")
       #expect(details.links.map(\.target) == refs)
-      let seed = TaskServiceTests.agent.description.utf8.reduce(0) { $0 + UInt64($1) }
       let expected = SeededIDGenerator(seed: seed)
       _ = try expected.next(at: TaskServiceTests.now)
       let uids = try refs.map { _ in try expected.next(at: TaskServiceTests.now) }

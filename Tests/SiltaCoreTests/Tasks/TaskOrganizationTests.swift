@@ -6,10 +6,10 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct TaskOrganizationTests {
-  static func service(_ home: URL, clock: FakeClock = FakeClock(now: TaskServiceTests.now)) throws
-    -> TaskService
-  {
-    let env = try TaskServiceTests.environment(home, clock: clock)
+  static func service(
+    _ home: URL, clock: FakeClock = FakeClock(now: TaskServiceTests.now), seed: UInt64? = nil
+  ) throws -> TaskService {
+    let env = try TaskServiceTests.environment(home, clock: clock, seed: seed)
     try TaskServiceTests.setup(env)
     return TaskService(environment: env, approved: "Organize the Acme backlog")
   }
