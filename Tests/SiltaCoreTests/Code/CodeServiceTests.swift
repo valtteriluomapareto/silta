@@ -108,7 +108,7 @@ struct CodeServiceTests {
       let error = await #expect(throws: CodeError.self) {
         try await read(store, home, fetch, fetch: true)
       }
-      #expect(error?.next == ["silta --ws 'acme' code show 'api' 'README.md'"])
+      #expect(error?.next == ["silta --ws 'acme' code show 'api' -- 'README.md'"])
       #expect(fetch.isExhausted)
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT fetched_at FROM repo_path") } == nil)

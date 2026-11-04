@@ -152,17 +152,22 @@ package enum CodeRead: Sendable {
   }
 
   /// Repeats this read for `target` as a shell-quoted command.
-  func command(workspace: String, target: String, prod: Bool) -> String {
+  ///
+  /// A literal path may begin with `-`, and an option after `--` would be read as a
+  /// path, so options come first and every path follows a `--` separator.
+  package func command(workspace: String, target: String, prod: Bool) -> String {
     var words = ["silta", "--ws", shellWord(workspace), "code", verb, shellWord(target)]
     if prod { words.append("--prod") }
     switch self {
     case .show(let path, let lines):
-      words += [shellWord(path)] + (lines.map { ["--lines", $0] } ?? [])
+      if let lines { words += ["--lines", lines] }
+      words += ["--", shellWord(path)]
     case .grep(let pattern, let pathspec):
       words += ["--", shellWord(pattern)] + (pathspec.map { [shellWord($0)] } ?? [])
     case .log(let path, let count):
-      words += (path.map { [shellWord($0)] } ?? []) + ["-n", String(count)]
-    case .list(let path): words += path.map { [shellWord($0)] } ?? []
+      words += ["-n", String(count)] + (path.map { ["--", shellWord($0)] } ?? [])
+    case .list(let path):
+      words += path.map { ["--", shellWord($0)] } ?? []
     }
     return words.joined(separator: " ")
   }
