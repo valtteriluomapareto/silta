@@ -22,9 +22,10 @@ The first milestone (M1, daily use) is in progress; its slices are in
 stage is in [`AGENTS.md`](AGENTS.md#dogfooding).
 
 The CLI has these commands today: `init`, `ws`, `repo fetch`, `where`, `code`,
-`task`, `comment`, `brief`, `doctor`, `schema` and `guide`. Run `silta --help` for
-the list and `silta guide` for the agent manual. Not built yet: the inbox, agent
-install, export and restore (spec §16 marks each command's milestone).
+`task`, `comment`, `inbox` (discussion only so far), `brief`, `doctor`, `schema` and
+`guide`. Run `silta --help` for the list and `silta guide` for the agent manual. Not
+built yet: agent install, export and restore (spec §16 marks each command's
+milestone).
 
 ## Install
 
