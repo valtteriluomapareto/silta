@@ -29,6 +29,9 @@ struct TaskVisibilityInstantTests {
     "2023-02-29T00:00:00.000Z", "2023-13-01T00:00:00.000Z", "2023-11-14T24:00:00.000Z",
     "2023-11-14T22:60:00.000Z", "2023-11-14T22:13:20Z", "2023-11-14T22:13:20.000+01:00",
     "1599-12-31T00:00:00.000Z", "2023-11-14 22:13:20.000Z", "2023-11-1４T22:13:20.000Z",
+    // Every separator position, each of which the fast path would otherwise read past.
+    "2023/11-14T22:13:20.000Z", "2023-11/14T22:13:20.000Z", "2023-11-14T22-13:20.000Z",
+    "2023-11-14T22:13-20.000Z", "2023-11-14T22:13:20,000Z", "2023-11-14T22:13:20.000z",
   ])
   func nonCanonicalTextTakesTheFormatter(_ text: String) {
     #expect(TaskVisibility.canonicalInstant(text) == nil)
