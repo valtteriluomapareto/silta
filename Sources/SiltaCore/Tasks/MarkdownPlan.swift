@@ -105,7 +105,7 @@ package struct MarkdownPlan: Sendable {
       throw TaskError.invalid("--step must name an existing top-level checkbox (numbered from 1).")
     }
     let index = boxes[step - 1].line
-    guard let opening = lines[index].firstIndex(of: "[") else { throw StorageError.unavailable }
+    guard let opening = lines[index].firstIndex(of: "[") else { throw StorageError.internalMisuse }
     let mark = lines[index].index(after: opening)
     lines[index].replaceSubrange(mark...mark, with: done ? "x" : " ")
     return lines.joined(separator: "\n")

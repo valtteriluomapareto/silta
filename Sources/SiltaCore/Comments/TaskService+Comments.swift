@@ -35,7 +35,7 @@ extension TaskService {
       guard
         let row = try Row.fetchOne(
           tx.database, sql: Self.commentQuery + " WHERE c.id=?", arguments: [id])
-      else { throw StorageError.unavailable }
+      else { throw StorageError.internalMisuse }
       var warnings = redacted ? [SecretGuard.warning] : []
       if draft.kind == "handoff", task.claimedBy == nil {
         warnings.append(
@@ -64,7 +64,7 @@ extension TaskService {
         arguments: [task.id]) ?? 1
     guard
       let recipients = String(bytes: try JSONEncoder().encode(draft.recipients), encoding: .utf8)
-    else { throw StorageError.unavailable }
+    else { throw StorageError.internalMisuse }
     try tx.database.execute(
       sql: """
         INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,mentions,actor,created_at)

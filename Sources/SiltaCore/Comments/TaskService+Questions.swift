@@ -86,7 +86,7 @@ extension TaskService {
     guard
       let row = try Row.fetchOne(
         db, sql: commentQuery + " WHERE c.id=? AND c.task_id=?", arguments: [root, task.id])
-    else { throw StorageError.unavailable }
+    else { throw StorageError.corrupt }
     return row
   }
 
