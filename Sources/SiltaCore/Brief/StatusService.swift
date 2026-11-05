@@ -16,10 +16,6 @@ package struct StatusService {
   /// `not_found` for an unknown explicit workspace and location's other failures.
   package func resolve(path: URL, workspace slug: String?) async throws -> StatusReport {
     var report = StatusReport()
-    guard FileManager.default.fileExists(atPath: environment.db.path) else {
-      if let slug { throw WorkspaceError.unknown(slug) }
-      return report
-    }
     let workspace: String
     do {
       let location = try await LocationService(environment: environment).resolve(

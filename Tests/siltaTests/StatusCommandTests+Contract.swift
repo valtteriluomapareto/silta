@@ -13,17 +13,17 @@ extension StatusCommandTests {
       let initialized = try SiltaBinary.runProcess(
         URL(filePath: "/usr/bin/git"), ["init", "-q"], in: scratch, cwd: repo)
       try #require(initialized.termination == .exit(0), "\(initialized.stderr)")
-      try withKnownIssue("SI-57/8: no database returns before checking Git") {
-        for args in [[], ["status"], ["--quiet"]] {
-          let result = try Self.silta(args, scratch, cwd: repo)
-          #expect(
-            result
-              == CLIResult(
-                termination: .exit(0), stdout: "No workspace here; next: silta where\n",
-                stderr: ""),
-            "\(args)")
-        }
+      for args in [[], ["status"], ["--quiet"]] {
+        let result = try Self.silta(args, scratch, cwd: repo)
+        #expect(
+          result
+            == CLIResult(
+              termination: .exit(0), stdout: "No workspace here; next: silta where\n",
+              stderr: ""),
+          "\(args)")
       }
+      let unknown = try Self.silta(["--ws", "nope", "--json"], scratch, cwd: repo)
+      #expect(unknown.termination == .exit(2) && unknown.stdout.contains("\"not_found\""))
       let json = try Self.silta(["--json"], scratch, cwd: repo)
       Golden.forTests().check(json.stdout, "status-none.json")
       let home = scratch.appending(path: "silta-home")
