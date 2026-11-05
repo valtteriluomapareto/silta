@@ -8,7 +8,7 @@ right now, and where to stop.
 Copy the block, fill in the `<…>`, and delete lines that don't apply.
 
 ```text
-Work slice <Sn> "<title>" (GitHub issue #<n>) in this repo.
+Work slice <Sn> "<title>" (GitHub issue #<n>, Silta task <SI-n>) in this repo.
 
 Read AGENTS.md first; it is the single source of truth. Then read issue #<n>,
 docs/coding-guidelines.md (especially §9 Simplicity), and <spec sections, D#>.
@@ -49,7 +49,8 @@ Steps:
    | Rule | Followed? | Evidence |
    with one row each for: acceptance tests, §9 Simplicity, CodedError, doc comments,
    test-first and planted faults, size budget, shared files.
-5. You may push the branch and open the PR. Don't merge it.
+5. You may push the branch and open the PR, then run `task submit` as AGENTS.md's
+   dogfooding stage says. Don't merge it.
 ```
 
 After the plan comes back, review it with the persona review (the Pragmatism persona
