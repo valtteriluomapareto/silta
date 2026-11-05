@@ -137,7 +137,10 @@ quietly diverge.
   may share the file.
 - **CLI commands** are named `<Noun><Verb>Command`, e.g. `TaskAddCommand`,
   `WhereCommand`, one per file under `Sources/silta/Commands/`.
-- **Tests mirror the source folders.** Test types are named `<Subject>Tests`.
+- **Tests mirror the source folders.** `SiltaCoreTests` mirrors `SiltaCore`'s
+  feature folders. `siltaTests` is flat, because `Sources/silta` has no feature
+  folders; its files group by name prefix (`Task…`, `Brief…`, `Where…`). Test types
+  are named `<Subject>Tests`.
 
 ## 6. Tests (D26)
 
