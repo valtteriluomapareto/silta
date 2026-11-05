@@ -59,3 +59,32 @@ struct AgentsStopSettingsTests {
     }
   }
 }
+
+extension AgentsStopSettingsTests {
+  @Test(arguments: [false, true], ["Stop", "SessionStart"])
+  func userEventAddedBetweenHookInstallsSurvives(existingFile: Bool, event: String) throws {
+    try withScratchDirectory { scratch in
+      if existingFile { try AgentsInstallTests.write("{}", ".claude/settings.json", in: scratch) }
+      let first = event == "Stop" ? "--hook" : "--stop-hook"
+      let second = event == "Stop" ? "--stop-hook" : "--hook"
+      _ = try AgentsInstallTests.apply(["install", "--claude", first], in: scratch)
+      var settings = try GuideContractTests.object(
+        AgentsInstallTests.read(".claude/settings.json", in: scratch))
+      var hooks = try #require(settings["hooks"] as? [String: Any])
+      hooks[event] = [Any]()
+      settings["hooks"] = hooks
+      let file = scratch.appending(path: "home/.claude/settings.json")
+      try JSONSerialization.data(withJSONObject: settings, options: .sortedKeys).write(to: file)
+      _ = try AgentsInstallTests.apply(["install", "--claude", second], in: scratch)
+      _ = try AgentsInstallTests.apply(["uninstall", "--claude"], in: scratch)
+      let text =
+        FileManager.default.fileExists(atPath: file.path)
+        ? try String(contentsOf: file, encoding: .utf8) : "{}"
+      let restored = try GuideContractTests.object(text) as NSDictionary
+      let expected: NSDictionary = ["hooks": [event: [Any]()]]
+      withKnownIssue("Inherited container provenance must not adopt a user event array") {
+        #expect(restored == expected)
+      }
+    }
+  }
+}
