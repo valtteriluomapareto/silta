@@ -126,14 +126,15 @@ through. Fix the change, or propose a decision first.
 ## Dogfooding
 
 Silta is built with Silta as soon as it can be (spec §22.1, D20). **Current stage:
-DF0** (since 2026-11-04, after [setup with the maintainer](docs/dogfood/README.md)).
+DF1** (since 2026-11-05; DF0 began 2026-11-04 after
+[setup with the maintainer](docs/dogfood/README.md)).
 Update this line when a stage starts.
 
 | Stage | Plans and steps | Questions and handoffs | Session start |
 |---|---|---|---|
 | Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
 | DF0 | One task per slice. Find it by the issue's `url:` link in `silta --ws silta task ls --proposed --promoted --archived --json`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F - <<'EOF'`, tick each step with `task plan <ref> --step N --done` as soon as it's done. Add subtasks before submitting. When the PR is open, end its description with a `## Draft result` section: the result as it should read once merged, ending with the `Friction:` line. Then `task submit <ref>`; never `done` before the merge. Back on a task in `review`, read the latest `Review:` comment (`gh pr view <n> --comments`), fix it on the same PR, update the draft result, and submit again | Comment on the slice issue | `silta --ws silta task show <ref>` |
-| DF1 | as DF0 | `silta comment <task> --kind question` / `--kind handoff` | as DF0 |
+| DF1 | as DF0, but review rounds arrive as Silta threads (see **Reviews** below) | `silta --ws silta comment <ref> --kind question --to <actor> -F -` / `--kind handoff -F -`; answer with `--kind answer --reply-to <question ref>`; the asker accepts with `comment accept <answer ref>` | as DF0 |
 | DF2 | as DF0 | as DF1 | The hook runs `silta brief` |
 
 From DF0 on, every command runs as `silta --ws silta …`:
@@ -153,7 +154,7 @@ From DF0 on, every command runs as `silta --ws silta …`:
   (`silta --ws silta task show <ref> --json` names it as `worktree`) with the same
   tool, or name
   `silta --ws silta task start <ref> --steal --approved "<the human's words>"` to the
-  maintainer. Until DF1, tell the other session in a comment on the slice issue.
+  maintainer. Tell the other session with a `silta --ws silta comment` on the task.
 - **Work for the human.** Follow [spec §11](docs/spec.md#silta-guide) until
   `silta guide` ships. Put everything you need from the maintainer in one chat
   message. For a human-only command, name the exact command, wait for their yes,
@@ -172,9 +173,16 @@ From DF0 on, every command runs as `silta --ws silta …`:
   proposal, so it counts toward the two proposals per session
   ([spec §11](docs/spec.md#silta-guide)); put anything
   beyond that in the `Friction:` line.
-- **Reviews are PR comments** (`gh pr comment`). Each starts with
-  `Review: changes (round N)` or `Review: approve`. Changes go back to the author,
-  who runs `task start <ref>` again (D41); after `approve` the merger finishes.
+- **Reviews run as Silta threads.** The reviewer posts each finding as its own root
+  comment (`silta --ws silta comment <ref> -F -`), never as a reply to a handoff, and
+  one PR comment `Review: changes (round N)` that points to
+  `silta --ws silta task show <ref>`. Changes go back to the author, who runs
+  `task start <ref>` again (D41) and answers every open thread with one reply
+  (`--reply-to <root ref>`): what changed and the name of the test that proves it,
+  not a commit hash. The author never resolves review threads; the reviewer resolves
+  them (`comment resolve <ref>… -m`) once the follow-up review confirms the fix.
+  Approval stays a PR comment starting `Review: approve`; then the merger finishes.
+  Questions for a human who is in the chat are asked there, not as Silta questions.
 - **Finish after the merge.** `task submit` releases the claim. Whoever merges the
   slice's PR pulls `main`, then runs `scripts/dogfood-finish.sh <ref> <pr>` and
   `scripts/install-dev.sh` from the main checkout. The script runs `task done` with
