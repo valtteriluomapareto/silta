@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct ProposalCommandTests {
   @Test(arguments: [false, true], [false, true])
   func previewDescribesAuthorizedOutcome(approved: Bool, json: Bool) throws {

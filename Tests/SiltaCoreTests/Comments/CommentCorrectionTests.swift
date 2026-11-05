@@ -16,7 +16,10 @@ struct CommentCorrectionTests {
         environment: try TaskServiceTests.environment(
           home, actor: .agent(tool: "claude", session: "resumed"), clock: clock))
       _ = try await resumed.start("AC-1", directory: home)
-      _ = try CommentQuestionTests.post(resumed, kind: "answer", reply: "AC-1/1")
+      let answerer = TaskService(
+        environment: try TaskServiceTests.environment(
+          home, actor: .agent(tool: "claude", session: "answerer"), clock: clock))
+      _ = try CommentQuestionTests.post(answerer, kind: "answer", reply: "AC-1/1")
       clock.advance(milliseconds: 1000)
       _ = try resumed.acceptComment("AC-1/3")
       let shown = try resumed.show("AC-1", timeline: true)

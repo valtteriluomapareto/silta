@@ -1,0 +1,2 @@
+error: Directory name "My Projects" is not a valid workspace slug; use letters, digits, _ or -, starting and ending with a letter or digit, or choose one with --slug. [invalid]
+next: silta init --scan '<scratch>/My Projects' --slug <slug>

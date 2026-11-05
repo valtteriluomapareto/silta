@@ -38,9 +38,17 @@ extension TaskService {
         root["kind"] as String == "question"
       else { throw CommentError.answerRequired(task.ref) }
       guard
-        root["actor"] as String == environment.actor.description
-          || task.claimedBy == environment.actor.description
+        Self.canAcceptAnswer(
+          answer["actor"], asker: root["actor"], claimer: task.claimedBy,
+          caller: environment.actor.description)
       else {
+        if answer["actor"] as String == environment.actor.description,
+          task.claimedBy == environment.actor.description
+        {
+          throw CommentError.unavailable(
+            "A claimer cannot accept its own answer to another actor's question.",
+            task: task.ref, reopen: nil)
+        }
         throw CommentError.wrongAsker(
           asker: root["actor"], actor: environment.actor.description, task: task.ref,
           root: root["resolved_at"] as String? == nil ? "\(task.ref)/\(root["seq"] as Int)" : nil)
@@ -65,6 +73,12 @@ extension TaskService {
       _ = try touchDiscussion(task, handoff: false, comment: answerRef, at: at, in: tx)
       return result
     }
+  }
+
+  static func canAcceptAnswer(_ author: String, asker: String, claimer: String?, caller: String)
+    -> Bool
+  {
+    asker == caller || (claimer == caller && author != caller)
   }
 
   private static func threadRoot(_ post: Row, task: TaskDetails, in db: Database) throws -> Row {
