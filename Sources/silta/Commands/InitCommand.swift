@@ -15,9 +15,8 @@ struct InitCommand: OutputCommand {
       validation as `ws edit`. --prefix works without --slug, and --slug also names the \
       workspace. On a scan, --ws rescans an existing workspace, matching its slug without \
       regard to case, instead of naming a new one, so it accepts neither option. A clone \
-      named none is stored as none-repo, because that word means non-code work; a scan \
-      that would take that name from a clone the workspace still binds is refused with \
-      both paths.
+      whose directory name normalizes to none is refused, because none means non-code \
+      work, and the conflict names its path.
 
       Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC
       """)
@@ -84,8 +83,7 @@ struct InitCommand: OutputCommand {
     if let workspace { text += "\nnext: silta ws use '\(workspace)'" }
     text += "\nask human: \(edit)"
     var output = CommandOutput(
-      text: text, data: InitData(workspace: workspace, next: [edit], nextBy: "human"),
-      warnings: outcome?.warnings ?? [])
+      text: text, data: InitData(workspace: workspace, next: [edit], nextBy: "human"))
     output.workspace = workspace
     return output
   }

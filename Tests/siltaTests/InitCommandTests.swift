@@ -68,35 +68,54 @@ struct InitCommandTests {
     #expect(result.termination == .exit(0))
   }
 
-  /// A scanned repo named `none` takes a free slug with a warning, and the rest of the
-  /// scan still creates the workspace, because `none` means non-code work.
-  @Test func scanningARepoNamedNoneRenamesItAndKeepsTheScanGoing() throws {
+  /// A clone named `none` is refused with its path, because that slug means non-code
+  /// work, and the scan writes nothing.
+  @Test func aRepoNamedNoneIsRefusedWithItsPath() throws {
     try withScratchDirectory { scratch in
       let root = scratch.appending(path: "acme")
-      for name in ["none", "other"] {
-        let repo = root.appending(path: name)
-        try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
-        try Self.git(["init", "-q", "-b", "main"], in: scratch, cwd: repo)
-        try Data("Acme\n".utf8).write(to: repo.appending(path: "readme"))
-        try Self.git(["add", "."], in: scratch, cwd: repo)
-        try Self.git(
-          [
-            "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm",
-            "Acme",
-          ], in: scratch, cwd: repo)
-        try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
+      try Self.makeRepo(root.appending(path: "none"), in: scratch)
+      try Self.makeRepo(root.appending(path: "none-repo"), in: scratch)
+      let refused = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
+      #expect(refused.termination == .exit(6))
+      #expect(refused.stdout.contains("\"code\":\"conflict\""))
+      #expect(refused.stdout.contains("--app none"))
+      #expect(
+        refused.stdout.lowercased().contains(root.appending(path: "none").path.lowercased()))
+      #expect(try SiltaBinary.run(["ws", "ls"], in: scratch).stdout.contains("No workspaces"))
+    }
+  }
+
+  /// A `.none` clone added beside repos already named `none-repo` and `none-repo-2` is
+  /// refused on rescan, and both keep their binding and their code.
+  @Test func aRepoNamedNoneIsRefusedOnRescanWithoutTouchingTheWorkspace() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "scan")
+      let literal = root.appending(path: "none-repo")
+      let legacy = root.appending(path: "none-repo-2")
+      try Self.makeRepo(literal, in: scratch)
+      try Self.commit(literal, "Acme literal clone B", in: scratch)
+      try Self.makeRepo(legacy, in: scratch)
+      try Self.commit(legacy, "Acme legacy clone C", in: scratch)
+      let created = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK"], in: scratch)
+      #expect(created.termination == .exit(0), "\(created.stderr)")
+      let before = try SiltaBinary.run(["--ws", "Work", "ws", "show"], in: scratch).stdout
+
+      let hidden = scratch.appending(path: "moved/.none")
+      try Self.makeRepo(hidden, in: scratch)
+      try Self.commit(hidden, "Acme reserved clone A", in: scratch)
+      let refused = try SiltaBinary.run(
+        ["--ws", "Work", "init", "--scan", hidden.path, "--json"], in: scratch)
+      #expect(refused.termination == .exit(6))
+      #expect(refused.stdout.contains("\"code\":\"conflict\""))
+      #expect(refused.stdout.contains("--app none"))
+      #expect(try SiltaBinary.run(["--ws", "Work", "ws", "show"], in: scratch).stdout == before)
+      for (repo, text) in [("none-repo", "literal clone B"), ("none-repo-2", "legacy clone C")] {
+        let shown = try SiltaBinary.run(
+          ["--ws", "Work", "code", "show", repo, "--", "README.md"], in: scratch)
+        #expect(shown.termination == .exit(0), "\(shown.stderr)")
+        #expect(shown.stdout.contains(text))
       }
-      let scan = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
-      #expect(scan.termination == .exit(0))
-      #expect(scan.stderr.contains("slug_renamed"))
-      #expect(scan.stderr.contains("none-repo"))
-      let shown = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
-      #expect(shown.termination == .exit(0))
-      #expect(shown.stdout.contains("\"slug\":\"none-repo\""))
-      #expect(!shown.stdout.contains("\"slug\":\"none\""))
-      let again = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
-      #expect(again.termination == .exit(0))
-      #expect(again.stderr.isEmpty)
     }
   }
 
@@ -285,113 +304,6 @@ struct InitCommandTests {
 }
 
 extension InitCommandTests {
-  /// Two clones that both normalize to the reserved `none` are refused before the
-  /// reserved alias can tell them apart, and nothing is created.
-  @Test func reservedRepoSlugsThatNormalizeAlikeAreRefused() throws {
-    try withScratchDirectory { scratch in
-      let root = scratch.appending(path: "scan")
-      try Self.makeRepo(root.appending(path: "none"), in: scratch)
-      try Self.makeRepo(root.appending(path: ".none"), in: scratch)
-      let refused = try SiltaBinary.run(
-        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK", "--json"], in: scratch)
-      #expect(refused.termination == .exit(6))
-      #expect(refused.stdout.contains("\"code\":\"conflict\""))
-      let list = try SiltaBinary.run(["ws", "ls"], in: scratch)
-      #expect(list.stdout.contains("No workspaces"))
-    }
-  }
-
-  /// A `none` clone is stored as `none-repo`; moving it and rescanning only its new
-  /// path repoints that repo, and no other repo's path changes.
-  @Test func aMovedReservedCloneRepointsOnlyItsPath() throws {
-    try withScratchDirectory { scratch in
-      let root = scratch.appending(path: "old")
-      let hidden = root.appending(path: ".none")
-      try Self.makeRepo(hidden, in: scratch)
-      try Self.commit(hidden, "Acme reserved clone A", in: scratch)
-      let other = root.appending(path: "other")
-      try Self.makeRepo(other, in: scratch)
-      try Self.commit(other, "Acme other clone B", in: scratch)
-      let created = try SiltaBinary.run(
-        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK"], in: scratch)
-      #expect(created.termination == .exit(0), "\(created.stderr)")
-      #expect(created.stderr.contains("none-repo"))
-      #expect(
-        try SiltaBinary.run(
-          ["--ws", "Work", "code", "show", "none-repo", "--", "README.md"],
-          in: scratch
-        ).stdout.contains("reserved clone A"))
-
-      let moved = scratch.appending(path: "new/.none")
-      try FileManager.default.createDirectory(
-        at: moved.deletingLastPathComponent(), withIntermediateDirectories: true)
-      try FileManager.default.moveItem(at: hidden, to: moved)
-      let rescanned = try SiltaBinary.run(
-        ["--ws", "Work", "init", "--scan", moved.path], in: scratch)
-      #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
-      let reserved = try SiltaBinary.run(
-        ["--ws", "Work", "code", "show", "none-repo", "--", "README.md"], in: scratch)
-      #expect(reserved.termination == .exit(0), "\(reserved.stderr)")
-      #expect(reserved.stdout.contains("reserved clone A"))
-      let untouched = try SiltaBinary.run(
-        ["--ws", "Work", "code", "show", "other", "--", "README.md"], in: scratch)
-      #expect(untouched.termination == .exit(0), "\(untouched.stderr)")
-      #expect(untouched.stdout.contains("other clone B"))
-    }
-  }
-
-  /// A `none` clone takes `none-repo`; when the workspace binds that name to a clone
-  /// that still exists, the scan refuses, names both paths, and its `next` runs.
-  @Test func aReservedNameBoundToALiveCloneIsRefused() throws {
-    try withScratchDirectory { scratch in
-      let root = scratch.appending(path: "scan")
-      let literal = root.appending(path: "none-repo")
-      try Self.makeRepo(literal, in: scratch)
-      try Self.commit(literal, "Acme literal clone B", in: scratch)
-      let created = try SiltaBinary.run(
-        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK"], in: scratch)
-      #expect(created.termination == .exit(0), "\(created.stderr)")
-      let before = try SiltaBinary.run(["--ws", "Work", "ws", "show"], in: scratch).stdout
-
-      let hidden = scratch.appending(path: "other/.none")
-      try Self.makeRepo(hidden, in: scratch)
-      try Self.commit(hidden, "Acme reserved clone A", in: scratch)
-      let refused = try SiltaBinary.run(
-        ["--ws", "Work", "init", "--scan", hidden.path, "--json"], in: scratch)
-      #expect(refused.termination == .exit(6))
-      #expect(refused.stdout.contains("\"code\":\"conflict\""))
-      let shown = refused.stdout.lowercased()
-      #expect(shown.contains(hidden.path.lowercased()))
-      #expect(shown.contains(literal.path.lowercased()))
-      #expect(try SiltaBinary.run(["--ws", "Work", "ws", "show"], in: scratch).stdout == before)
-      #expect(
-        try SiltaBinary.run(
-          ["--ws", "Work", "code", "show", "none-repo", "--", "README.md"],
-          in: scratch
-        ).stdout.contains("literal clone B"))
-
-      let next = try Self.nextCommand(refused.stdout)
-      #expect(next.lowercased().contains(literal.path.lowercased()))
-      let followed = try Self.runNext(next, in: scratch)
-      #expect(followed.termination == .exit(0), "\(followed.stderr)")
-    }
-  }
-
-  /// A `none` clone and a literal `none-repo` clone would share one slug, so a scan
-  /// that sees both is refused and writes nothing.
-  @Test func aNoneAndALiteralNoneRepoCannotShareOneScan() throws {
-    try withScratchDirectory { scratch in
-      let root = scratch.appending(path: "scan")
-      try Self.makeRepo(root.appending(path: ".none"), in: scratch)
-      try Self.makeRepo(root.appending(path: "none-repo"), in: scratch)
-      let refused = try SiltaBinary.run(
-        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK", "--json"], in: scratch)
-      #expect(refused.termination == .exit(6))
-      #expect(refused.stdout.contains("\"code\":\"conflict\""))
-      #expect(try SiltaBinary.run(["ws", "ls"], in: scratch).stdout.contains("No workspaces"))
-    }
-  }
-
   /// An invalid slug's refusal keeps the supplied prefix; running the printed command
   /// then refuses that prefix and its own `next` completes the scan.
   @Test func anInvalidSlugRefusalKeepsTheSuppliedPrefix() throws {

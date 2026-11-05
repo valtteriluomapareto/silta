@@ -468,27 +468,6 @@ extension ScanNamingTests {
     }
   }
 
-  /// Two directories that both normalize to the reserved `none` are a duplicate
-  /// before any remapping can give them different names.
-  @Test func reservedSlugsThatNormalizeAlikeAreRefused() async throws {
-    try await withScratchDirectory { home in
-      let root = home.appending(path: "scan")
-      let none = root.appending(path: "none")
-      let hidden = root.appending(path: ".none")
-      var script: [(GitRequest, Result<GitResult, any Error>)] = []
-      for directory in [none, hidden].sorted(by: { $0.path < $1.path }) {
-        script += RepositoryScanTests.script(try Self.clone(directory), listed: directory)
-      }
-      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      await #expect(throws: RepoError.duplicateSlug) {
-        _ = try await Self.create(
-          [root], slug: "work", prefix: "WK", store: store,
-          git: ScriptedGitRunner(script: script))
-      }
-      #expect(try WorkspaceSelection.list(in: store).isEmpty)
-    }
-  }
-
   /// A directory that is only punctuation, or only a dot, still becomes a repo slug.
   @Test(arguments: [(".hidden", "hidden"), ("___", "repo")])
   func boundaryDirectoryNamesNormalizeIntoASlug(_ name: String, _ slug: String) async throws {

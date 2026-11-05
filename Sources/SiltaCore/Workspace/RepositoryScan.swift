@@ -2,10 +2,9 @@ import Darwin
 package import Foundation
 import GRDB
 
-/// What a scan bound: the workspace it created or refreshed, and its naming warnings.
+/// What a scan bound: the workspace it created or refreshed.
 package struct ScanOutcome: Sendable {
   package let workspace: String
-  package let warnings: [OutputWarning]
 }
 
 /// How a scan treats an existing workspace.
@@ -34,21 +33,18 @@ package enum RepositoryScan {
     let directory = first.standardizedFileURL.lastPathComponent
     let naming = try naming(target, directory: directory, roots: paths)
     let discovered = try await discover(roots, git: git)
-    var warnings: [OutputWarning] = []
     let request = ScanRequest(
       target: target, choice: ScanChoice(target), slug: naming.slug,
       chosenPrefix: naming.prefix, directory: directory, roots: paths, repos: discovered,
       identity: identity)
     let workspace = try store.write { tx in
-      try apply(tx, request: request, warnings: &warnings)
+      try apply(tx, request: request)
     }
-    return ScanOutcome(workspace: workspace, warnings: warnings)
+    return ScanOutcome(workspace: workspace)
   }
 
   /// Creates or refreshes the workspace and binds every discovered clone in one write.
-  private static func apply(
-    _ tx: StorageTransaction, request: ScanRequest, warnings: inout [OutputWarning]
-  ) throws -> String {
+  private static func apply(_ tx: StorageTransaction, request: ScanRequest) throws -> String {
     do {
       let db = tx.database
       let existing = try existingWorkspace(request.slug, in: db)
@@ -59,14 +55,13 @@ package enum RepositoryScan {
       }
       if case .rescan = request.target, existing == nil { throw WorkspaceError.notFound }
       let workspace = existing.map { $0["slug"] as String } ?? request.slug
+      if let reserved = request.repos.first(where: { $0.slug == TaskDraft.noneApp }) {
+        throw ScanError.reservedSlug(path: reserved.path.path)
+      }
       guard Set(request.repos.map(\.slug)).count == request.repos.count else {
         throw RepoError.duplicateSlug
       }
-      let repos = try naming(
-        request.repos, workspace: existing == nil ? nil : workspace, in: db, into: &warnings)
-      // Remapping can give two clones in one scan the same name; never let a rewrite
-      // bind both to one row or write a configuration with duplicate repo slugs.
-      guard Set(repos.map(\.slug)).count == repos.count else { throw RepoError.duplicateSlug }
+      let repos = request.repos
       if existing == nil {
         let prefix = try creationPrefix(request, in: db)
         let config = try configuration(
@@ -210,55 +205,6 @@ extension RepositoryScan {
     ).map { (repo: $0["repo"] as String, workspace: $0["workspace"] as String) }
   }
 
-  /// Repo slugs come from directory names, so a repo named `none` would collide with the
-  /// word that means non-code work. Such a repo is always stored as `none-repo`; a
-  /// workspace that binds that name to a clone that still exists keeps it, so the scan
-  /// refuses instead of taking the name from the other clone. A binding whose clone is
-  /// gone is a moved clone, and the rescan repoints it.
-  private static func naming(
-    _ repos: [DiscoveredRepo], workspace: String?, in db: Database,
-    into warnings: inout [OutputWarning]
-  ) throws -> [DiscoveredRepo] {
-    guard let index = repos.firstIndex(where: { $0.slug == TaskDraft.noneApp }) else {
-      return repos
-    }
-    let slug = TaskDraft.noneApp + "-repo"
-    let path = repos[index].path.path
-    var named = repos
-    named[index] = repos[index].renamed(slug)
-    if let workspace, let bound = try registeredPath(of: slug, workspace: workspace, in: db) {
-      if bound == path { return named }
-      if isClone(at: bound) {
-        throw ScanError.reservedRepoBound(path: path, bound: bound, workspace: workspace)
-      }
-    }
-    warnings.append(
-      OutputWarning(
-        code: "slug_renamed",
-        message: "Repo \(TaskDraft.noneApp) was renamed \(slug) because "
-          + "\(TaskDraft.noneApp) is reserved for non-code work."))
-    return named
-  }
-
-  /// The path a workspace binds to `slug`, if any.
-  private static func registeredPath(
-    of slug: String, workspace: String, in db: Database
-  ) throws -> String? {
-    try String.fetchOne(
-      db,
-      sql: """
-        SELECT repo_path.path
-        FROM repo_path
-        JOIN repo ON repo.id=repo_path.repo_id
-        JOIN workspace ON workspace.id=repo.workspace_id
-        WHERE workspace.slug=? AND repo.slug=?
-        """, arguments: [workspace, slug])
-  }
-
-  private static func isClone(at path: String) -> Bool {
-    FileManager.default.fileExists(atPath: URL(filePath: path).appending(path: ".git").path)
-  }
-
   private static func discover(_ roots: [URL], git: any GitRunner) async throws -> [DiscoveredRepo]
   {
     var candidates: Set<String> = []
@@ -379,11 +325,6 @@ private struct DiscoveredRepo: Sendable {
   let remote: String?
 
   let refs: [String]
-
-  /// The same repo under another config slug.
-  func renamed(_ slug: String) -> DiscoveredRepo {
-    DiscoveredRepo(path: path, slug: slug, remote: remote, refs: refs)
-  }
 
   var apps: [[String: String]] {
     var apps: [[String: String]] = []

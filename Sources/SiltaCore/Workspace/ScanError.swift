@@ -70,14 +70,13 @@ package enum ScanError: CodedError, Equatable {
   /// Another workspace already binds the clone's path.
   case repoPathTaken(repo: String, path: String, workspace: String)
 
-  /// A `none` clone always takes `none-repo`, and the workspace binds that name to a
-  /// clone that still exists at `bound`.
-  case reservedRepoBound(path: String, bound: String, workspace: String)
+  /// A clone's slug is `none`, the word that means non-code work.
+  case reservedSlug(path: String)
 
   package var code: ErrorCode {
     switch self {
     case .invalidSlug, .invalidPrefix: .invalid
-    case .slugExists, .prefixTaken, .repoPathTaken, .reservedRepoBound: .conflict
+    case .slugExists, .prefixTaken, .repoPathTaken, .reservedSlug: .conflict
     }
   }
 
@@ -120,11 +119,10 @@ package enum ScanError: CodedError, Equatable {
       return "Repo \(repo.debugDescription) is already registered to workspace "
         + "\(workspace.debugDescription); scan a clone that belongs to this workspace, or rescan "
         + "the one that holds it."
-    case .reservedRepoBound(let path, let bound, let workspace):
-      return "Clone at \(path.debugDescription) would take repo \(TaskDraft.noneApp)-repo, but "
-        + "workspace \(workspace.debugDescription) binds that name to \(bound.debugDescription); "
-        + "scan the clone the workspace holds, or remove that repo in ws edit before scanning "
-        + "this one."
+    case .reservedSlug(let path):
+      return "Clone at \(path.debugDescription) has the repo slug \(TaskDraft.noneApp), which "
+        + "means non-code work in --app \(TaskDraft.noneApp); give the clone's directory a "
+        + "different name and scan again."
     }
   }
 
@@ -144,8 +142,7 @@ package enum ScanError: CodedError, Equatable {
       return [command(roots: roots, ScanChoice.slug(choice), "--prefix <prefix>")]
     case .repoPathTaken(_, let path, let workspace):
       return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(path))"]
-    case .reservedRepoBound(_, let bound, let workspace):
-      return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(bound))"]
+    case .reservedSlug: return ["silta init --help"]
     }
   }
 
