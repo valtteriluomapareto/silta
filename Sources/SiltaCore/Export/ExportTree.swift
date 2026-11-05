@@ -175,6 +175,7 @@ private struct Reader {
     guard values["ref"] == ref, values["seq"].map({ "\(prefix)-\($0)" }) == ref else {
       throw ExportTree.invalid("\(path) names another task")
     }
+    var rank = 0
     let records = try self.lines("tasks/\(ref).jsonl").map { line in
       guard
         let data = line.data(using: .utf8),
@@ -183,6 +184,12 @@ private struct Reader {
         let table = object["table"] as? String,
         let keys = ExportFormat.records.first(where: { $0.table == table })?.keys
       else { throw ExportTree.invalid("tasks/\(ref).jsonl has a row of no known table") }
+      // Record groups come in format order: plan revisions, events, comments, requests.
+      let next = ExportFormat.records.firstIndex { $0.table == table } ?? 0
+      guard next >= rank else {
+        throw ExportTree.invalid("tasks/\(ref).jsonl has \(table) rows out of order")
+      }
+      rank = next
       return try row(line, keys: keys, in: "tasks/\(ref).jsonl")
     }
     return ExportTask(

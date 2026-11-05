@@ -1300,8 +1300,10 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   first.
 - **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
-  keyed by `uid`; display refs are included for readability. Absolute paths are never
-  written: `repo_path` is machine-local.
+  keyed by `uid`; display refs are included for readability. Machine-local state is
+  never written: repo paths, worktree overrides and task worktrees. Values the user
+  configured or that record an approval, such as a source `root` or an approval's
+  command, are written as stored, paths included, so a restore is exact.
 
   ```
   <root>/<workspace>/
@@ -1369,9 +1371,10 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     human to decide. A target that overlaps a registered repo is refused, so workspace
     data never lands in a code repo. Exports are serialised, each reading its
     snapshot under the lock, so the last one written is the latest state. The new
-    tree is staged next to the old one and swapped in, so a reader sees one tree or
-    the other, never a mix; a volume without an atomic swap moves the old tree aside
-    first. The tree is owned by export: edits to it are overwritten by the next
+    tree is staged in a directory of export's own next to the target, created under a
+    unique name, and swapped in, so a reader sees one tree or the other, never a mix;
+    a volume without an atomic swap moves the old tree aside first. Export removes
+    nothing it did not create; a crash can leave its hidden work directory behind. The tree is owned by export: edits to it are overwritten by the next
     export.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace.

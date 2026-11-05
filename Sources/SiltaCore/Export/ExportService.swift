@@ -16,8 +16,8 @@ package struct ExportResult: Encodable, Sendable {
 package enum ExportService {
   /// Writes `<root>/<workspace>` from one read transaction. The target must be absent,
   /// empty or a previous export, and outside every registered repo; it is replaced by
-  /// a staged tree in one swap, under a lock in `home` that serialises exports. Throws `ExportError`, `StorageError` or
-  /// `WorkspaceError`; on failure the target is as it was.
+  /// a staged tree in one swap, under a lock in `home` that serialises exports. Throws
+  /// `ExportError`, `StorageError` or `WorkspaceError`; on failure the target is as it was.
   package static func export(
     workspace slug: String, to root: URL, store: DatabaseStore, home: URL
   ) throws -> ExportResult {
@@ -53,48 +53,48 @@ package enum ExportService {
     }
     try checkTarget(target, workspace: slug)
     do {
-      try publish(files, to: target, staging: root.appending(path: ".\(slug).staging"))
+      try publish(files, to: target, prefix: ".\(slug).export-")
     } catch {
       throw failed
     }
     return ExportResult(workspace: slug, path: target.path, files: files.count)
   }
 
-  /// Writes `files` into a fresh staging directory next to `target`, then swaps it in;
-  /// the previous tree, if any, is removed afterwards. A volume without an atomic swap
-  /// (exFAT, SMB) moves the previous tree aside first and puts it back on failure.
-  private static func publish(_ files: [String: Data], to target: URL, staging: URL) throws {
+  /// Writes `files` into a work directory of its own next to `target`, created with a
+  /// unique name, then swaps the tree in; the previous tree goes with the work directory.
+  /// Nothing else is removed. A volume without an atomic swap (exFAT, SMB) moves the
+  /// previous tree aside first and puts it back on failure.
+  private static func publish(_ files: [String: Data], to target: URL, prefix: String) throws {
     let fm = FileManager.default
-    let previous = staging.appendingPathExtension("previous")
-    do {
-      for leftover in [staging, previous] where fm.fileExists(atPath: leftover.path) {
-        try fm.removeItem(at: leftover)
-      }
-      for (path, data) in files {
-        let file = staging.appending(path: path)
-        try fm.createDirectory(
-          at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: file)
-      }
-      if !fm.fileExists(atPath: target.path) {
-        guard rename(staging.path, target.path) == 0 else { throw SwapFailure() }
-      } else if renamex_np(staging.path, target.path, UInt32(RENAME_SWAP)) != 0 {
-        guard errno == ENOTSUP || errno == EINVAL, rename(target.path, previous.path) == 0 else {
-          throw SwapFailure()
-        }
-        guard rename(staging.path, target.path) == 0 else {
-          _ = rename(previous.path, target.path)
-          throw SwapFailure()
-        }
-        try? fm.removeItem(at: previous)  // best-effort cleanup of the replaced tree
-      }
-    } catch {
-      try? fm.removeItem(at: staging)  // best-effort cleanup; the target is untouched
-      throw error
+    let work = try ownDirectory(in: target.deletingLastPathComponent(), prefix: prefix)
+    defer { try? fm.removeItem(at: work) }  // best-effort cleanup of this run's own directory
+    let staging = work.appending(path: "tree")
+    let previous = work.appending(path: "previous")
+    for (path, data) in files {
+      let file = staging.appending(path: path)
+      try fm.createDirectory(
+        at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try data.write(to: file)
     }
-    // After a swap the staging directory holds the previous tree; a leftover is
-    // replaced next time.
-    try? fm.removeItem(at: staging)  // best-effort cleanup
+    if !fm.fileExists(atPath: target.path) {
+      guard rename(staging.path, target.path) == 0 else { throw SwapFailure() }
+    } else if renamex_np(staging.path, target.path, UInt32(RENAME_SWAP)) != 0 {
+      guard errno == ENOTSUP || errno == EINVAL, rename(target.path, previous.path) == 0 else {
+        throw SwapFailure()
+      }
+      guard rename(staging.path, target.path) == 0 else {
+        _ = rename(previous.path, target.path)
+        throw SwapFailure()
+      }
+    }
+  }
+
+  /// A new directory under `parent` that no one else has: `mkdtemp` creates it exclusively.
+  private static func ownDirectory(in parent: URL, prefix: String) throws -> URL {
+    var template = Array(parent.appending(path: prefix + "XXXXXX").path.utf8CString)
+    let created = template.withUnsafeMutableBufferPointer { mkdtemp($0.baseAddress) }
+    guard created != nil else { throw SwapFailure() }
+    return URL(filePath: String(cString: template), directoryHint: .isDirectory)
   }
 
   private struct SwapFailure: Error {}  // guard:allow-error mapped to unwritable by export
