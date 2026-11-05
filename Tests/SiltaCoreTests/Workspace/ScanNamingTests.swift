@@ -15,6 +15,9 @@ struct InvalidName {
   let flag: String
 
   let shown: String
+
+  /// Whether the refusal comes before discovery runs.
+  let early: Bool
 }
 
 @Suite(.timeLimit(.minutes(1)))
@@ -247,26 +250,33 @@ struct ScanNamingTests {
   @Test func invalidNamesFailAndNameTheFix() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      let none = ScriptedGitRunner(script: [])
       let cases = [
         InvalidName(
           slug: "My Projects", prefix: nil, directory: "acme", flag: "--slug",
-          shown: "My Projects"),
-        InvalidName(slug: nil, prefix: "A_", directory: "acme", flag: "--prefix", shown: "A_"),
+          shown: "My Projects", early: true),
+        InvalidName(
+          slug: nil, prefix: "A_", directory: "acme", flag: "--prefix", shown: "A_",
+          early: true),
         InvalidName(
           slug: nil, prefix: nil, directory: "My Projects", flag: "--slug",
-          shown: "My Projects"),
+          shown: "My Projects", early: true),
         InvalidName(
           slug: nil, prefix: nil, directory: ".hidden", flag: "--slug",
-          shown: ".hidden"),
-        InvalidName(slug: nil, prefix: nil, directory: "a_b", flag: "--prefix", shown: "a_b"),
+          shown: ".hidden", early: true),
+        InvalidName(
+          slug: nil, prefix: nil, directory: "a_b", flag: "--prefix", shown: "a_b",
+          early: false),
       ]
       for testCase in cases {
         let root = home.appending(path: testCase.directory)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let clone = try Self.clone(root.appending(path: "clone"))
+        let git =
+          testCase.early
+          ? ScriptedGitRunner(script: [])
+          : ScriptedGitRunner(script: RepositoryScanTests.script(clone))
         let error = await Self.refusal {
           _ = try await Self.create(
-            [root], slug: testCase.slug, prefix: testCase.prefix, store: store, git: none)
+            [root], slug: testCase.slug, prefix: testCase.prefix, store: store, git: git)
         }
         #expect(error?.code == .invalid)
         #expect(error?.message.contains("letters, digits, _ or -") == true)
@@ -276,8 +286,8 @@ struct ScanNamingTests {
           error?.next == [
             "silta init --scan \(shellWord(root.path)) \(testCase.flag) \(placeholder)"
           ])
+        if testCase.early { #expect(git.requests.isEmpty) }
       }
-      #expect(none.isExhausted)
       #expect(try WorkspaceSelection.list(in: store).isEmpty)
     }
   }
@@ -288,19 +298,25 @@ extension ScanNamingTests {
   @Test func anInvalidRepoDirectoryNamesTheCloneAndItsFix() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      let root = home.appending(path: "acme")
-      let path = try Self.clone(root.appending(path: "My Projects"))
-      let error = await Self.refusal {
-        _ = try await Self.create(
-          [root], store: store,
-          git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
+      for (name, suggestion) in [
+        ("My Projects", "my-projects"), (".hidden", "hidden"), ("___", "repo"),
+      ] {
+        let root = home.appending(path: "scan-\(suggestion)")
+        let clone = root.appending(path: name)
+        let candidate = try Self.clone(clone)
+        let error = await Self.refusal {
+          _ = try await Self.create(
+            [root], store: store,
+            git: ScriptedGitRunner(script: RepositoryScanTests.script(candidate, listed: clone)))
+        }
+        #expect(error?.code == .invalid)
+        #expect(error?.message.contains("Repo directory \(name.debugDescription)") == true)
+        #expect(error?.message.contains(suggestion) == true)
+        #expect(error?.next.first?.hasPrefix("mv ") == true)
+        #expect(error?.next.first?.contains(clone.path) == true)
+        #expect(error?.next.first?.hasSuffix("/\(suggestion)'") == true)
+        #expect(error?.nextBy == .human)
       }
-      #expect(error?.code == .invalid)
-      #expect(error?.message.contains("Repo directory") == true)
-      #expect(error?.message.contains("my-projects") == true)
-      #expect(error?.next.first?.hasPrefix("mv ") == true)
-      #expect(error?.next.first?.contains(path.path) == true)
-      #expect(error?.nextBy == .human)
       #expect(try WorkspaceSelection.list(in: store).isEmpty)
     }
   }
@@ -345,9 +361,80 @@ extension ScanNamingTests {
       #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
     }
   }
+
+  /// A scan root that is itself a clone with an unusable name: `--slug` cannot rename
+  /// it, so the rename comes first and the follow-up scans the renamed path.
+  @Test func aScanRootThatIsARepoRenamesItThenScansTheNewPath() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let root = home.appending(path: "My Projects")
+      try FileManager.default.createDirectory(
+        at: root.appending(path: ".git"), withIntermediateDirectories: true)
+      let renamed = home.appending(path: "my-projects")
+      let scan = "silta init --scan \(shellWord(renamed.path))"
+      let cases: [(ScanTarget, String)] = [
+        (.derived, scan),
+        (.named(slug: "work", prefix: nil), scan + " --slug work"),
+        (.named(slug: nil, prefix: "WK"), scan + " --prefix WK"),
+        (.rescan("acme"), scan + " --ws 'acme'"),
+      ]
+      for (target, followUp) in cases {
+        let error = await Self.refusal {
+          _ = try await RepositoryScan.scan(
+            [root], target: target, store: store, git: ScriptedGitRunner(script: []),
+            identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+        }
+        #expect(error?.code == .invalid)
+        #expect(error?.message.contains("Repo directory \"My Projects\"") == true)
+        #expect(error?.next == ["mv \(shellWord(root.path)) \(shellWord(renamed.path))", followUp])
+        #expect(error?.nextBy == .human)
+      }
+      #expect(try WorkspaceSelection.list(in: store).isEmpty)
+    }
+  }
 }
 
 extension ScanNamingTests {
+  /// A prefix derived from `--slug` names the slug as its source, not the directory.
+  @Test func aPrefixDerivedFromAChosenSlugNamesTheSlug() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let root = home.appending(path: "zed")
+      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+      let error = await Self.refusal {
+        _ = try await Self.create(
+          [root], slug: "x-y", store: store, git: ScriptedGitRunner(script: []))
+      }
+      #expect(error?.code == .invalid)
+      #expect(
+        error?.message.contains("Slug \"x-y\" gives the invalid task prefix \"X-\"") == true)
+      #expect(error?.message.contains("Directory name") == false)
+      #expect(
+        error?.next == [
+          "silta init --scan \(shellWord(root.path)) --slug x-y --prefix <prefix>"
+        ])
+    }
+  }
+
+  /// A no-option scan finds a workspace whose stored spelling differs in case, and
+  /// keeps that spelling.
+  @Test func aNoOptionRescanFindsAWorkspaceSpelledDifferently() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let repo = home.appending(path: "acme")
+      let path = try Self.clone(repo)
+      _ = try await Self.create(
+        [repo], slug: "ACME", store: store,
+        git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
+      let again = try await Self.create(
+        [repo], store: store, git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
+      #expect(again.workspace == "ACME")
+      #expect(try Self.workspaces(store) == ["ACME:ACME:AC"])
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == path.path)
+    }
+  }
+
   /// `--prefix` alone cannot name an existing workspace: the refusal says the
   /// option is for a new workspace and puts the rescan first.
   @Test func prefixOnlyOnAnExistingWorkspaceSaysItAppliesToANewOne() async throws {

@@ -99,6 +99,35 @@ struct InitCommandTests {
     return fixtures
   }
 
+  /// Makes `repo` a clone with a main branch and an `origin/main` ref.
+  static func makeRepo(_ repo: URL, in scratch: URL) throws {
+    try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+    try Self.git(["init", "-q", "-b", "main"], in: scratch, cwd: repo)
+    try Data("Acme\n".utf8).write(to: repo.appending(path: "readme"))
+    try Self.git(["add", "."], in: scratch, cwd: repo)
+    try Self.git(
+      ["-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm", "Acme"],
+      in: scratch, cwd: repo)
+    try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
+  }
+
+  /// The first `next` command a JSON refusal printed.
+  static func nextCommand(_ stdout: String) throws -> String {
+    let object = try #require(
+      try JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any])
+    let error = try #require(object["error"] as? [String: Any])
+    let next = try #require(error["next"] as? [String])
+    return try #require(next.first)
+  }
+
+  /// Runs a printed `next` through a shell, the way an agent's shell would.
+  static func runNext(_ command: String, in scratch: URL) throws -> CLIResult {
+    let products = try SiltaBinary.url().deletingLastPathComponent().path
+    return try SiltaBinary.runProcess(
+      URL(filePath: "/bin/bash"), ["-c", command], in: scratch, cwd: scratch,
+      environment: ["PATH": "\(products):/usr/bin:/bin:/usr/sbin:/sbin"])
+  }
+
   /// The wiring: both options reach the workspace row, and the slug names it.
   @Test func chosenSlugAndPrefixNameANewWorkspace() throws {
     for json in [false, true] {
@@ -149,22 +178,20 @@ struct InitCommandTests {
     }
   }
 
+  /// `--prefix` alone cannot name an existing workspace; the refusal's first `next`
+  /// rescans it, and that command works.
   @Test func prefixOnAnExistingDefaultWorkspaceIsRefused() throws {
     try withScratchDirectory { scratch in
       let fixtures = try Self.fixtures(scratch)
       let first = try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
       #expect(first.termination == .exit(0))
-      let before = try SiltaBinary.run(["ws", "show", "acme"], in: scratch)
-      #expect(before.termination == .exit(0))
       let again = try SiltaBinary.run(
         ["init", "--scan", fixtures.path, "--prefix", "WK", "--json"], in: scratch)
       #expect(again.termination == .exit(6))
-      #expect(again.stdout.contains("\"code\":\"conflict\""))
-      #expect(again.stdout.contains("acme"))
-      #expect(again.stdout.contains("--prefix applies only to a new workspace"))
-      #expect(again.stdout.contains("--ws 'acme'"))
-      #expect(!again.stdout.contains("choosing its name"))
-      #expect(try SiltaBinary.run(["ws", "show", "acme"], in: scratch).stdout == before.stdout)
+      let next = try Self.nextCommand(again.stdout)
+      #expect(next.hasSuffix("--ws 'acme'"))
+      let rescanned = try Self.runNext(next, in: scratch)
+      #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
     }
   }
 
@@ -202,8 +229,7 @@ struct InitCommandTests {
   @Test func anInvalidDerivedNameNamesTheFlagAndItsNextWorks() throws {
     try withScratchDirectory { scratch in
       for directory in ["My Projects", ".hidden"] {
-        try FileManager.default.createDirectory(
-          at: scratch.appending(path: directory), withIntermediateDirectories: true)
+        try Self.makeRepo(scratch.appending(path: directory).appending(path: "acme"), in: scratch)
         let result = try SiltaBinary.run(
           ["init", "--scan", directory, "--json"], in: scratch, cwd: scratch)
         #expect(result.termination == .exit(1))
@@ -217,9 +243,14 @@ struct InitCommandTests {
       Self.checked(
         try SiltaBinary.run(["init", "--scan", "My Projects"], in: scratch, cwd: scratch).stderr,
         "init-scan-invalid-slug.txt", scratch: scratch)
-      let fixed = try SiltaBinary.run(
-        ["init", "--scan", "My Projects", "--slug", "my-projects"], in: scratch, cwd: scratch)
+      let refused = try SiltaBinary.run(
+        ["init", "--scan", "My Projects", "--json"], in: scratch, cwd: scratch)
+      let next = try Self.nextCommand(refused.stdout)
+      let fixed = try Self.runNext(
+        next.replacingOccurrences(of: "<slug>", with: "my-projects"), in: scratch)
       #expect(fixed.termination == .exit(0))
+      let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(list.stdout.contains("\"slug\":\"my-projects\""))
     }
   }
 
@@ -245,6 +276,9 @@ struct InitCommandTests {
       let line = try #require(
         refused.stderr.split(separator: "\n").first { $0.hasPrefix("ask human: mv ") })
       let command = line.dropFirst("ask human: ".count)
+      let paths = command.split(separator: "'").map(String.init).filter { $0.hasPrefix("/") }
+      #expect(paths.count == 2)
+      #expect(paths.allSatisfy { $0.hasPrefix(scratch.path) })
       let moved = try SiltaBinary.runProcess(
         URL(filePath: "/bin/bash"), ["-c", String(command)], in: scratch)
       #expect(moved.termination == .exit(0))
@@ -272,6 +306,100 @@ struct InitCommandTests {
       let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
       #expect(list.stdout.contains("\"slug\":\"a_b\""))
       #expect(list.stdout.contains("\"task_prefix\":\"AB\""))
+    }
+  }
+
+  /// A scan root that is itself a clone with an unusable name: the first `next`
+  /// renames it, the second scans the renamed path, and both stay under the scratch
+  /// directory.
+  @Test func aRepoRootRefusalRenamesItThenScansTheNewPath() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "My Projects")
+      try Self.makeRepo(root, in: scratch)
+      let refused = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
+      #expect(refused.termination == .exit(1))
+      #expect(refused.stderr.contains("Repo directory \"My Projects\""))
+      let commands = refused.stderr.split(separator: "\n")
+        .filter { $0.hasPrefix("ask human: ") }
+        .map { String($0.dropFirst("ask human: ".count)) }
+      #expect(commands.count == 2)
+      let rename = try #require(commands.first)
+      #expect(rename.hasPrefix("mv "))
+      let paths = rename.split(separator: "'").map(String.init).filter { $0.hasPrefix("/") }
+      #expect(paths.count == 2)
+      #expect(paths.allSatisfy { $0.hasPrefix(scratch.path) })
+      let moved = try Self.runNext(rename, in: scratch)
+      #expect(moved.termination == .exit(0), "\(moved.stderr)")
+      let rescanned = try Self.runNext(try #require(commands.last), in: scratch)
+      #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
+      let shown = try SiltaBinary.run(["ws", "show", "my-projects", "--json"], in: scratch)
+      #expect(shown.termination == .exit(0))
+      #expect(shown.stdout.contains("\"slug\":\"my-projects\""))
+    }
+  }
+
+  /// Each naming refusal keeps the options already given, so running its first `next`
+  /// lands on the workspace the caller asked for.
+  @Test func everyNamingRefusalsNextKeepsTheChosenSlug() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      #expect(try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
+        .termination == .exit(0))
+      let cases: [
+        (
+          arguments: [String], keeps: String, placeholder: String, replacement: String,
+          created: String, prefix: String, exit: Int32
+        )
+      ] = [
+        (["--slug", "acorn"], "--slug acorn", "<prefix>", "WK", "acorn", "WK", 6),
+        (["--slug", "bad-slug", "--prefix", "A_"], "--slug bad-slug", "<prefix>", "WM",
+          "bad-slug", "WM", 1),
+        (["--slug", "My Projects", "--prefix", "WX"], "--prefix WX", "<slug>", "fine", "fine",
+          "WX", 1),
+        (["--slug", "acme", "--prefix", "WZ"], "--prefix WZ", "<another-slug>", "other", "other",
+          "WZ", 6),
+      ]
+      for (index, testCase) in cases.enumerated() {
+        let root = scratch.appending(path: "refusal-\(index)")
+        try Self.makeRepo(root.appending(path: "api"), in: scratch)
+        let refused = try SiltaBinary.run(
+          ["init", "--scan", root.path, "--json"] + testCase.arguments, in: scratch)
+        #expect(refused.termination == .exit(testCase.exit), "\(testCase.arguments)")
+        let next = try Self.nextCommand(refused.stdout)
+        #expect(next.contains(testCase.keeps), "\(testCase.arguments): \(next)")
+        let fixed = try Self.runNext(
+          next.replacingOccurrences(of: testCase.placeholder, with: testCase.replacement),
+          in: scratch)
+        #expect(fixed.termination == .exit(0), "\(testCase.arguments): \(fixed.stderr)")
+        let shown = try SiltaBinary.run(
+          ["ws", "show", testCase.created, "--json"], in: scratch)
+        #expect(shown.termination == .exit(0), "\(testCase.arguments)")
+        #expect(shown.stdout.contains("\"task_prefix\":\"\(testCase.prefix)\""))
+      }
+    }
+  }
+
+  /// The path-conflict refusal's `next` rescans the holding workspace, and it works.
+  @Test func theRepoPathRefusalNamesARescanThatWorks() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      #expect(try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
+        .termination == .exit(0))
+      let refused = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, "--slug", "other", "--json"], in: scratch)
+      #expect(refused.termination == .exit(6))
+      let next = try Self.nextCommand(refused.stdout)
+      #expect(next.hasPrefix("silta --ws 'acme' init --scan "))
+      let rescanned = try Self.runNext(next, in: scratch)
+      #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
+    }
+  }
+
+  @Test func initHelpSaysAScanMatchesTheWorkspaceWithoutRegardToCase() throws {
+    try withScratchDirectory { scratch in
+      let help = try SiltaBinary.run(["init", "--help"], in: scratch)
+      #expect(help.termination == .exit(0))
+      #expect(help.stdout.contains("without regard to case"))
     }
   }
 }

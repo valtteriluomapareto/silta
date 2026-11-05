@@ -15,7 +15,7 @@ struct RepositoryScanTests {
   }
 
   static func script(
-    _ candidate: URL, main: URL? = nil, refs: String = refs,
+    _ candidate: URL, main: URL? = nil, listed: URL? = nil, refs: String = refs,
     remote: GitResult = .init(
       termination: .exit(0), stdout: Data("git@example.com:acme/platform.git\n".utf8))
   )
@@ -28,7 +28,9 @@ struct RepositoryScanTests {
       (
         .init(arguments: ["worktree", "list", "--porcelain", "-z"], directory: candidate),
         .success(
-          .init(termination: .exit(0), stdout: Data("worktree \(main.path)\0HEAD acme\0\0".utf8)))
+          .init(
+            termination: .exit(0),
+            stdout: Data("worktree \((listed ?? main).path)\0HEAD acme\0\0".utf8)))
       ),
       (.init(arguments: ["remote", "get-url", "origin"], directory: main), .success(remote)),
       (
