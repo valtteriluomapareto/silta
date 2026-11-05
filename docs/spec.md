@@ -1080,17 +1080,113 @@ silta code ls   <app>[@<ref>] [<dir>]
 
 ### `silta agents install`
 
-Writes idempotent marker blocks, after showing a diff and asking first.
+Writes idempotent, content-hashed ownership blocks. Preview is the default (also
+`--dry-run`), with only the changed spans, target paths and a confirmation token;
+unrelated configuration is omitted. `--apply <token>` confirms that exact preview
+without a TTY prompt. Changes to source bytes, file modes, target selection or paths
+invalidate the token (`conflict`, exit 6); run the same preview again. Never combine
+`--dry-run` and `--apply`. JSON data is `{applied, token, changes: [{path, diff}]}`.
+
+Default selection is Claude and Codex. `--claude` or `--codex` restricts both install
+and uninstall; unselected paths are never inspected. The shared Claude skill starts
+with YAML name/description frontmatter and contains the versioned `silta guide`.
+Uninstall removes only unedited ownership, retaining unrelated Markdown/TOML bytes,
+JSON values, permissions and empty user files. Ownership remains recognizable if
+`SILTA_HOME` changes.
+Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
+nonregular/multiply linked files and files over 1 MiB are refused before writes.
+Permission preservation uses refusal rather than copying security metadata: nonempty
+file ACLs, extended attributes other than OS-managed com.apple.provenance, file flags
+and special mode bits refuse. Inheritable ACLs on selected parent directories also
+refuse before any selected write. Existing files must belong to the current effective
+user and match their parent directory's group, which a replacement inherits. Accepted
+uid/gid and POSIX modes are bound to confirmation; adding unsupported metadata after
+preview refuses. OS-managed provenance is not copied or treated as access permissions.
+
+Targets come from explicit absolute `HOME`; a selected harness's nonmatching
+`CODEX_HOME` or `CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. Unselected
+overrides are ignored. The Codex grant uses the
+effective `SILTA_HOME`. The conservative TOML editor supports bare single-line
+keys/tables and refuses existing user-owned writable-root definitions or ambiguous
+syntax. Supported values are JSON-compatible strings, finite numbers, booleans and
+arrays, and single-quoted literal strings; inline comments, dates, multiline values
+and inline tables are refused. Duplicate/conflicting names refuse across the
+complete document, including the owned table. Dotted assignments, arrays of tables
+and reopening an implicitly introduced parent table require manual integration. It never changes sandbox mode, trust or authentication. A human must inspect
+such refusals; there is no overwrite flag. Configuring a root does not prove it is
+effective in a managed harness (D42).
+
+Installers serialize with an advisory lock on HOME and preflight all selected
+targets. Public diffs are extracted from validated owned spans; unrelated text never becomes diff context. An owned TOML table retains its insertion offset.
+Each file replacement is atomic; multiple replacements are not one
+transaction. An I/O failure names the failing target/cause and completed paths, asks
+the human to inspect permissions/structure, then offers a fresh preview/retry;
+there is no rollback or process-crash guarantee. An unrelated editor does not honor
+the installer lock. Hook runtime must be installed before settings that reference it.
 
 | Target | Content |
 |---|---|
 | `~/.claude/skills/silta/SKILL.md` | The skill (outline below). OpenCode reads it too unless it's disabled. |
 | `~/.claude/CLAUDE.md` block | 5 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
-| Claude Code **SessionStart hook** | `silta brief --hook`: short, no indexing, 1.5 s timeout, silent if unregistered. It also exports `SILTA_SESSION`. |
-| Claude Code **Stop hook** (optional; D42, live run unverified) | `silta session check`: if this session holds a claim with writes since its last handoff, ask the agent to leave a handoff before stopping |
+| Claude Code **SessionStart hook** (`--hook`) | `silta agents session-start` consumes hook JSON, exports `SILTA_SESSION`, then runs the short bounded brief; silent if unregistered or on error. |
+| Claude Code **Stop hook** (`--stop-hook`; D42, live run unverified) | `silta agents stop` consumes hook JSON and asks for handoff on fresh own claims with writes since handoff; loop continuations skip |
 | `~/.codex/AGENTS.md` block | The same 5 lines |
-| `~/.codex/config.toml` | Adds `~/.silta` to the sandbox's writable roots (`sandbox_workspace_write.writable_roots`; D42, live run unverified), so Codex can write |
+| `~/.codex/config.toml` | Adds the effective `SILTA_HOME` (default `~/.silta`) to `sandbox_workspace_write.writable_roots` (D42, live run unverified) |
 | Permissions (optional) | Deny tracker writes, e.g. `Bash(az boards work-item create*)`, `Bash(gh issue create*)` |
+
+`--hook` opts into Claude SessionStart; `--stop-hook` adds Stop and requires
+SessionStart for tool attribution. Both require selected Claude. With default target
+selection they retain Claude+Codex; Codex-only with either flag is invalid. Installing
+`--hook` preserves Stop; installing without either flag leaves settings unread.
+Uninstall selected Claude removes both unedited owned groups;
+omit hook flags on uninstall. Preview retries retain operation, selection and hook flags.
+The hook command is included in the binary; settings are written last. It needs `silta`
+on the harness PATH. Its installed shell command suppresses failed executable output and
+returns zero, retaining successful brief text. Live harness loading and propagation remain
+unverified and pending installer acceptance (D42).
+
+Settings merge preserves unknown JSON values semantically; whitespace/key order may
+normalize. It accepts duplicate-free objects/arrays with strings, null, booleans and
+integers within ±(2^53−1); other numbers are refused before writes instead of rounding.
+Only selected events' structure is inspected; unknown event shapes remain intact.
+Edited, duplicate or mixed owned groups refuse. File, hooks-object and event-array
+provenance preserve even preexisting empty containers. Event-array preexistence takes
+priority over inherited file/hooks provenance when hooks are installed separately,
+including user containers added between installs. Preview shows only owned group deltas,
+while its token still binds every original byte and file mode. There is no overwrite flag.
+
+The SessionStart protocol reads at most 64 KiB of stdin. Its 1.5 s process deadline
+covers input, decoding, export and brief execution. A valid session is appended as an
+export to `CLAUDE_ENV_FILE`, preserving existing exports even without a final newline.
+The file must be absolute under HOME or an OS temporary root, with no symlink below
+that anchor; it must be regular and singly linked, and the resulting file must fit
+1 MiB. A missing leaf may be created privately. Exports use an advisory file lock;
+an incomplete append is neutralized to blank lines without truncating another
+hook's later data. Missing/unsafe ENV_FILE or malformed input silently succeeds
+without context; the installed instructions tell the agent to run `silta brief` when
+the hook printed none. Live propagation to Claude's later shell commands is unverified.
+
+`silta session check` reads all workspaces without initializing or migrating storage.
+Its JSON data is `{"tasks":[{"workspace":"acme","ref":"AC-1"}]}`; text lists scoped
+`silta --ws <workspace> comment <ref> --kind handoff -F -` commands. A task needs
+handoff only while this exact actor holds a fresh doing claim (under two hours),
+without promotion, and has meaningful own writes since its last own handoff.
+Creation and claiming alone do not count. Plan/step/task changes, discussion posts
+and discussion state changes do. Repeating start does not erase earlier writes;
+old-comment deletion is audited in the same transaction. Own event IDs after the
+last handoff event (including a context-only unclaimed handoff) and own comment
+sequences after the last handoff are compared
+separately, so equal timestamps do not hide work. Older claim-release markers remain
+recognized. A historical unclaimed handoff without an audit event may conservatively
+request one extra handoff. Foreign and expired claims are omitted.
+
+Stop uses the same query under the bounded hook gateway. If needed it emits raw
+Claude `{"decision":"block","reason":"..."}` JSON with at most five scoped handoff
+commands and `silta session check` for more. `stop_hook_active=true` skips to avoid
+a continuation loop. Missing/unavailable stores and malformed input silently succeed;
+Stop does not require or write ENV_FILE. It uses the payload's validated session for
+attribution. Live continuation behavior remains unverified; follow the
+[isolated harness acceptance](dogfood/agents-acceptance.md) outside the coding sandbox.
 
 ### `silta guide`
 

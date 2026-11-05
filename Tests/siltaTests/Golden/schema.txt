@@ -36,6 +36,9 @@ silta comment accept  Accept an answer as the asker or current claimer and resol
 silta brief  Read budgeted local context for the current task.
 silta inbox  Read current local attention without marking it read.
 silta guide  Read the agent manual, or one topic.
+silta agents install  Preview owned harness edits; confirm with --apply <token>.
+silta agents uninstall  Preview removal of selected, unedited Silta ownership.
+silta session check  Read fresh own claims needing handoff across all workspaces.
 silta status  Print a one-line status: workspace, app, inbox count and your claimed tasks.
 silta export  Write one workspace as a deterministic text tree for backup and diff.
 silta restore  Replace a workspace from an export tree (human-only, except --dry-run).

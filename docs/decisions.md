@@ -590,3 +590,22 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     directories; no real harness configuration was changed. Installation,
     uninstall/dry-run fidelity and one real run per harness belong to the installer
     acceptance. SQLite extension support remains an independent open question.
+  - ↳ 2026-11-05: Installer acceptance and actual installed-command tests use isolated
+    HOME/SILTA_HOME. Optional Stop implies SessionStart to propagate the harness
+    session; it emits a bounded scoped handoff recipe and skips active continuations.
+    Session check compares own event IDs and comment sequences after own handoff,
+    never timestamps; repeated start cannot erase writes. Discussion deletion is
+    audited atomically without another task change-log row. The
+    [outside acceptance procedure](dogfood/agents-acceptance.md) disables automatic
+    Codex temporary grants and includes denied sibling and post-uninstall controls.
+    Fresh file-backed Codex authentication and a separate claude.ai profile avoid
+    copying credentials; actual grants, propagation, continuation and discovery remain
+    unverified until that procedure runs.
+  - ↳ 2026-11-05: Installer permission retention uses conservative refusal rather
+    than security-metadata copying: file ACLs, unsupported xattrs/flags/mode bits,
+    nonpreservable ownership and inheritable parent ACLs refuse before writes.
+    OS-managed provenance is not treated as access permissions. Supported uid/gid
+    and POSIX modes bind confirmation. Public configuration diffs come only from
+    validated ownership spans, independently of placement, and an owned TOML table
+    retains its offset. Namespace validation stays a documented conservative subset
+    rather than adding a general TOML parser dependency.
