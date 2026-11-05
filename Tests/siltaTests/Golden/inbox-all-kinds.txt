@@ -1,5 +1,5 @@
-agent:codex:acme discussion attention
-Scope: discussion only; proposals, blockers and promoted attention are not included.
+agent:codex:acme attention
+Scope: current local attention; tracker status is not refreshed.
 AC-1/2 question on AC-1 by agent:claude:other
 > Second?
 next: silta --ws 'acme' comment 'AC-1' --kind answer --reply-to 'AC-1/2' -F <file>
