@@ -102,7 +102,7 @@ extension RestoreWriter {
     let highest = tree.tasks.compactMap { Int64($0.row.value("seq") ?? "") }.max() ?? 0
     let next =
       [stored, tree.workspace.value("next_task_seq").flatMap { Int64($0) }, highest + 1]
-      .compactMap { $0 }.max() ?? 1
+      .compactMap { $0 }.max() ?? highest + 1
     guard stored != nil || !tree.tasks.isEmpty || tree.workspace.value("next_task_seq") != nil
     else { return }
     try db.execute(

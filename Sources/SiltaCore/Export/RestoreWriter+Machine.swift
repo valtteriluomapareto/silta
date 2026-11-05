@@ -88,16 +88,9 @@ extension RestoreWriter {
   }
 
   /// The workspace read back must render as the tree does, with the current schema, the
-  /// counter that never rewinds, and the merged approvals, which hold every one of the
-  /// tree's.
+  /// counter that never rewinds, and the merged approvals.
   func check() throws {
     let after = try ExportSnapshot.read(db, workspace: slug)
-    let stored = Set(after.approvals.compactMap { $0.value("uid") })
-    if let missing = tree.approvals.compactMap({ $0.value("uid") }).first(where: {
-      !stored.contains($0)
-    }) {
-      throw ExportError.invalidTree("approval \(missing) did not survive restoring")
-    }
     var expected = tree
     expected.schema = after.schema
     expected.workspace = tree.workspace.replacing(

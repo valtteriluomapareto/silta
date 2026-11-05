@@ -1401,26 +1401,34 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   holds `manifest.json`; the workspace comes from the tree, and a `--ws` naming
   another one is refused.
   - It is human-only, except `--dry-run`: it replaces the workspace's settings, which
-    only the human changes (D39). An agent's approved run records its approval, naming
-    the manifest's sha256.
+    only the human changes (D39). The dry run ends with the command to approve,
+    carrying `--manifest <sha>`, the first 12 hex digits of the manifest's sha256; a run
+    given `--manifest` refuses any other tree, so the human approves the tree they saw.
+    An agent's approved run records its approval, naming that prefix.
   - It checks the manifest checksums first and refuses partial or tampered trees,
     then everything the form doesn't show: integer values, settings as `ws edit`
-    accepts them, unique uids, references that resolve inside the tree, no parent
-    cycles. A database of a newer schema or with docs in the workspace is refused, and
-    so is a tree whose uid, task prefix or row uids another workspace holds.
+    accepts them, unique uids, slugs, aliases, plan revisions and comment seqs,
+    references that resolve inside the tree, no parent cycles. A database of a newer
+    schema or with docs in the workspace is refused, and so is a tree whose uid, task
+    prefix, row uids or approval uids another workspace holds.
   - The replace happens in one transaction, and nothing is written on failure. The
     workspace keeps its row; its other rows are deleted and the tree's inserted.
     Approvals are never deleted: the tree's are added when missing. The task counter
-    never rewinds, so refs already cited are never reused. Before committing, the
-    workspace is read back and must render as the tree does.
+    never rewinds, so task refs already cited are never reused. Comment refs of
+    comments the restore removes can be reused; the dry run lists their tasks as
+    changed. Before committing, the workspace is read back and must render as the tree
+    does.
   - Repo paths and worktree overrides stay for repos and apps the tree keeps, and a
     task's worktree while its claim and branch are unchanged. Other repo paths are
     re-resolved with `silta init --scan`.
-  - Replacing a workspace first takes `backups/silta-<day>-before-restore-<ms>.db`; a
-    refusal found inside the transaction may leave it.
+  - Replacing a workspace first takes `backups/silta-<day>-before-restore-<ms>.db`,
+    which counts toward the 7 backups kept; a refusal found inside the transaction may
+    leave it.
   - `--dry-run` runs the same transaction and rolls it back, so it finds every
-    refusal the real run would. It reports what would change: tasks removed or
-    changed since the export, settings, approvals added and claims replaced.
+    refusal the real run would. It never changes a workspace, though like any write it
+    may create the database and take the day's backup. It reports what would change:
+    tasks removed or changed since the export, row counts of the other tables,
+    settings, approvals added and claims replaced.
   - A tree of an older schema restores the columns later migrations added at their
     defaults.
   - It is **not** a merge, and not a sharing mechanism (Q3).
@@ -1579,7 +1587,7 @@ silta inbox [--for <actor>|me] [--all] | inbox take <id>   [M1; take M2]
 silta doc new|ls|show|edit|propose|accept|reject|verify|archive …   [M2]
 
 # maintenance
-silta export [--to <root>] [--commit] | restore <dir> [--dry-run] | backup     [M1]
+silta export [--to <root>] [--commit] | restore <dir> [--dry-run] [--manifest <sha>] | backup     [M1]
 silta index [--rebuild] | verify [--fix-tasks]   [M3]
 silta import --from dex|beads|backlog-md <path>  [M4]
 silta open [AC-12]                               [M5] open Silta.app

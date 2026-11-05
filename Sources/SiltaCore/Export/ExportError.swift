@@ -17,18 +17,26 @@ package enum ExportError: CodedError, Equatable {
   case otherWorkspace(tree: String, given: String, directory: String)
   /// The tree clashes with another workspace in this database.
   case restoreConflict(String)
+  /// The tree's manifest is not the one the human approved.
+  case manifestChanged(approved: String, directory: String)
 
   /// Target and repo refusals leave the choice of directory to the human.
   package var code: ErrorCode {
     switch self {
-    case .notAnExport, .restoreConflict: .conflict
+    case .notAnExport, .restoreConflict, .manifestChanged: .conflict
     case .insideRepo, .invalidTree, .notATree, .otherWorkspace: .invalid
     case .unsupported, .unwritable: .env
     }
   }
 
-  /// The human chooses another directory; nothing an agent changes in the call helps.
-  package var nextBy: NextBy { .human }
+  /// The human chooses another directory or tree; a dry run the agent may run itself
+  /// is the agent's.
+  package var nextBy: NextBy {
+    switch self {
+    case .notATree(_, _, .some), .otherWorkspace, .manifestChanged: .agent
+    default: .human
+    }
+  }
 
   /// What was refused, with the path it concerns.
   package var message: String {
@@ -51,6 +59,9 @@ package enum ExportError: CodedError, Equatable {
       "The tree holds workspace \(tree), not \(given); nothing was restored."
     case .restoreConflict(let reason):
       "The tree clashes with this database: \(reason). Nothing was restored."
+    case .manifestChanged(let approved, _):
+      "The tree is not the one approved (manifest \(approved)); it changed since the dry run. "
+        + "Nothing was restored."
     }
   }
 
@@ -74,6 +85,8 @@ package enum ExportError: CodedError, Equatable {
     case .otherWorkspace(let tree, _, let directory):
       [workspaceCommand("silta restore " + shellWord(directory) + " --dry-run", workspace: tree)]
     case .restoreConflict: ["silta ws ls"]
+    case .manifestChanged(_, let directory):
+      ["silta restore " + shellWord(directory) + " --dry-run"]
     }
   }
 }

@@ -20,6 +20,7 @@ struct RestoreCommand: OutputCommand {
     "approvals_added": .int,
     "claims_replaced": .array(.object(["task": .string, "actor": .string])),
     "repos_without_path": .array(.string), "snapshot": .optional(.string),
+    "rows": .array(.object(["table": .string, "before": .int, "after": .int])),
   ])
 
   static let workspaceSource = WorkspaceSource.none
@@ -31,6 +32,12 @@ struct RestoreCommand: OutputCommand {
 
   @Flag(help: "Check and report the restore, then roll it back.")
   var dryRun = false
+
+  @Option(
+    help: ArgumentHelp(
+      "The manifest sha256 prefix the dry run printed; a different tree is refused.",
+      valueName: "sha"))
+  var manifest: String?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let environment = context.environment
@@ -45,10 +52,11 @@ struct RestoreCommand: OutputCommand {
       dryRun
       ? nil
       : try environment.actor.requireHuman(
-        command: "silta restore " + shellWord(directory.path), approved: global.approved)
+        command: "silta restore " + shellWord(directory.path)
+          + (manifest.map { " --manifest " + shellWord($0) } ?? ""), approved: global.approved)
     let report = try RestoreService.restore(
       RestoreRequest(
-        directory: directory, workspace: global.ws, manifest: nil, approval: approval,
+        directory: directory, workspace: global.ws, manifest: manifest, approval: approval,
         dryRun: dryRun),
       store: environment.db, home: environment.home.url,
       identity: (environment.ids, environment.clock.now()))
@@ -75,6 +83,12 @@ struct RestoreCommand: OutputCommand {
     }
     refs("Removed since the export", report.removed)
     refs("Changed since the export", report.changed)
+    if !report.rows.isEmpty {
+      lines.append(
+        "Other rows: "
+          + report.rows.map { "\($0.table) \($0.before) -> \($0.after)" }.joined(separator: ", ")
+          + ".")
+    }
     if !report.settings.isEmpty {
       lines.append(
         "Settings: "
@@ -83,13 +97,22 @@ struct RestoreCommand: OutputCommand {
     }
     if report.approvalsAdded > 0 { lines.append("Approvals added: \(report.approvalsAdded).") }
     refs("Claims replaced", report.claimsReplaced.map { "\($0.task) (\($0.actor))" })
-    if let snapshot = report.snapshot { lines.append("Before-restore snapshot: \(snapshot).") }
+    if let snapshot = report.snapshot {
+      lines.append(
+        "Before-restore snapshot: \(snapshot); to go back, open it as silta.db in an empty "
+          + "SILTA_HOME, export \(report.workspace) there and restore that export.")
+    }
     if !report.reposWithoutPath.isEmpty {
       lines.append(
         "Repos without a local path: \(report.reposWithoutPath.joined(separator: ", ")); run "
           + workspaceCommand("silta init --scan <clone dir>…", workspace: report.workspace) + ".")
     }
-    if dry { lines.append("Dry run: nothing was written.") }
+    if dry {
+      lines.append("Dry run: the workspace was not changed.")
+      lines.append(
+        "ask human: silta restore " + shellWord(directory) + " --manifest "
+          + report.manifestSHA256.prefix(12) + " --approved \"<the human's words>\"")
+    }
     return lines.joined(separator: "\n")
   }
 }

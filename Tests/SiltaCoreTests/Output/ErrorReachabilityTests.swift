@@ -200,6 +200,7 @@ extension ExportError: ErrorExamples {
       .notATree(path: "/tmp/silta-2023-11-14.db", reason: "it is a file", child: nil),
       .otherWorkspace(tree: "acme", given: "beta", directory: "/tmp/acme-notes/acme"),
       .restoreConflict("workspace beta already has the tree's task prefix"),
+      .manifestChanged(approved: "a1b2c3d4e5f6", directory: "/tmp/acme-notes/acme"),
     ]
   }
 }

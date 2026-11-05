@@ -59,6 +59,19 @@ struct RestoreWriter {
       "environment": "app_id IN (SELECT id FROM app WHERE workspace_id IS ?)",
       "comment": "task_id IN (SELECT id FROM task WHERE workspace_id IS ?)",
     ]
+    let approvals =
+      "["
+      + tree.approvals.compactMap { $0.value("uid") }.map(ExportFormat.quote)
+      .joined(separator: ",") + "]"
+    if let uid = try String.fetchOne(
+      db,
+      sql: """
+        SELECT uid FROM approval WHERE uid IN (SELECT value FROM json_each(?))
+        AND workspace IS NOT ?
+        """, arguments: [approvals, slug])
+    {
+      throw ExportError.restoreConflict("approval uid \(uid) belongs to another workspace")
+    }
     for (table, list) in uids.sorted(by: { $0.key < $1.key }) where !list.isEmpty {
       let mine = ownership[table] ?? "workspace_id IS ?"
       let json = "[" + list.map(ExportFormat.quote).joined(separator: ",") + "]"
@@ -73,8 +86,18 @@ struct RestoreWriter {
     }
   }
 
-  /// Deletes the workspace's rows, approvals aside, and inserts the tree's.
+  /// Deletes the workspace's rows, approvals aside, and inserts the tree's. A rule of
+  /// the database the validation didn't foresee refuses the tree rather than failing as
+  /// a storage error.
   mutating func replace() throws {
+    do {
+      try replaceRows()
+    } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
+      throw ExportError.invalidTree("it breaks a uniqueness or reference rule of the database")
+    }
+  }
+
+  private mutating func replaceRows() throws {
     let kept = try machineRows()
     let old = try removedIDs()
     if let workspace { try delete(workspace) }

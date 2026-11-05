@@ -49,7 +49,9 @@ package enum RestoreService {
     }
     try RestoreValidation(tree: tree, slug: slug).run()
     let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
-    try store.initialize()
+    if let manifest = request.manifest, manifest.isEmpty || !digest.hasPrefix(manifest) {
+      throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
+    }
     let milliseconds = Int64(identity.date.timeIntervalSince1970 * 1000)
     let snapshot = "silta-\(utcDay(identity.date))-before-restore-\(milliseconds).db"
     return try store.write(rollingBack: dryRun) { tx in
@@ -142,6 +144,7 @@ private struct RestoreValidation {
     for row in tree.approvals { try add("approval", row) }
     try references(uids)
     try parents()
+    try naturalKeys()
   }
 
   private func settings() throws {
@@ -219,6 +222,28 @@ private struct RestoreValidation {
         }
       } else {
         try resolve(to, ExportFormat.linkTables[link.value("to_kind") ?? ""] ?? "", from: "link")
+      }
+    }
+  }
+
+  /// Keys the database holds unique besides uids: slugs, aliases, plan revisions and
+  /// comment seqs per task.
+  private func naturalKeys() throws {
+    func unique(_ keys: [String], _ what: String) throws {
+      var seen: Set<String> = []
+      if let repeated = keys.first(where: { !seen.insert($0).inserted }) {
+        throw ExportError.invalidTree("\(what) \(repeated) appears twice")
+      }
+    }
+    for (section, format) in zip(tree.sections, ExportFormat.sections) {
+      try unique(section.rows.compactMap { $0.value("slug") }, "\(format.table) slug")
+      try unique(section.rows.compactMap { $0.value("alias") }, "topic alias")
+    }
+    for task in tree.tasks {
+      for table in ["task_plan_rev", "comment"] {
+        let key = table == "comment" ? "seq" : "rev"
+        let values = task.records.filter { $0.value("table") == table }.compactMap { $0.value(key) }
+        try unique(values, "\(task.ref) \(table) \(key)")
       }
     }
   }

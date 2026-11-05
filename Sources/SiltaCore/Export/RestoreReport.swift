@@ -126,10 +126,28 @@ extension RestoreReport {
       workspace: workspace, dryRun: dryRun, created: current == nil,
       sameUID: current.map { $0.workspace.value("uid") == tree.workspace.value("uid") } ?? true,
       manifestSHA256: digest, tasks: Counts(before: existing.count, after: tree.tasks.count),
-      removed: removed, changed: changed, rows: [],
+      removed: removed, changed: changed, rows: rowCounts(current, tree),
       settings: settingChanges(
         current?.workspace.value("settings"), tree.workspace.value("settings")),
       approvalsAdded: 0, claimsReplaced: claims, reposWithoutPath: [], snapshot: nil)
+  }
+
+  /// Row counts of the tables outside the tasks that differ.
+  private static func rowCounts(_ current: ExportSnapshot?, _ tree: ExportSnapshot) -> [RowCount] {
+    func counts(_ snapshot: ExportSnapshot?) -> [(String, Int)] {
+      zip(
+        ExportFormat.sections,
+        snapshot?.sections ?? tree.sections.map { .init(name: $0.name, rows: []) }
+      )
+      .map { ($0.table, $1.rows.count) }
+        + [
+          ("link", snapshot?.links.count ?? 0),
+          ("alias_decision", snapshot?.aliasDecisions.count ?? 0),
+        ]
+    }
+    return zip(counts(current), counts(tree)).compactMap { before, after in
+      before.1 == after.1 ? nil : RowCount(table: before.0, before: before.1, after: after.1)
+    }
   }
 
   private static func settingChanges(_ before: String?, _ after: String?) -> [SettingChange] {
