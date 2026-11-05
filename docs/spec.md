@@ -1399,9 +1399,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     a volume without an atomic swap moves the old tree aside first, and puts it back,
     or keeps it and names it, when the new one can't take its place. Export removes
     only the target it replaces and its own work directory, and keeps that directory
-    when the replaced tree turns out to hold a file export didn't write. A work
-    directory it doesn't remove, including one a crash left, is reported in the
-    command's warnings for the human. An entry export can't read refuses the target.
+    when the replaced tree turns out to hold a file export didn't write. Work
+    directories are hidden siblings of the target, `.<workspace>.export-XXXXXX`; each
+    one export doesn't remove, including one a crash left, is an `export_leftover`
+    warning saying why it is there, on success and on failure alike, and so is a root
+    export can't list. An entry export can't read refuses the target. When even the
+    no-swap fallback can't move the previous tree back, the error names where it is
+    kept and its `next` moves it back only while the target is still absent.
     The tree is owned by export: edits to it are overwritten by the next export.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace.

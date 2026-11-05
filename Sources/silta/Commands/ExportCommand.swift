@@ -9,7 +9,9 @@ struct ExportCommand: OutputCommand {
     discussion:
       "The tree goes to <root>/<workspace>. It replaces only an absent, empty or previously "
       + "exported directory, never one inside a registered repo. Repo paths and worktrees are "
-      + "not written; configured values are written as stored.")
+      + "not written; configured values are written as stored. It stages in a hidden "
+      + ".<workspace>.export-XXXXXX next to the tree; one it can't remove, or a crash left, is "
+      + "an export_leftover warning for the human. Unreadable entries refuse the target.")
 
   static let dataShape = Shape.object(["workspace": .string, "path": .string, "files": .int])
 

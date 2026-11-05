@@ -1,8 +1,8 @@
 /// Export failures. Each leaves the target as it was (spec §15), except `previousKept`,
 /// which says where the previous tree is.
 package enum ExportError: CodedError, Equatable {
-  /// The target exists but is not exactly a previous export; `entry` is the first file
-  /// that shows it.
+  /// The target exists but is not exactly a previous export; `entry` says why, e.g.
+  /// "it holds README.md".
   case notAnExport(path: String, entry: String, workspace: String)
   /// The export root lies inside a registered repo.
   case insideRepo(path: String, repo: String, workspace: String)
@@ -32,7 +32,7 @@ package enum ExportError: CodedError, Equatable {
   package var message: String {
     switch self {
     case .notAnExport(let path, let entry, _):
-      "\(path) is not a silta export: it holds \(entry). "
+      "\(path) is not a silta export: \(entry). "
         + "Export replaces only a previous export, so it changed nothing."
     case .insideRepo(let path, let repo, _):
       "\(path) overlaps the registered repo \(repo); workspace data never goes into a code repo, "
@@ -43,7 +43,8 @@ package enum ExportError: CodedError, Equatable {
       "The export could not be written under \(path); the previous export, if any, is unchanged."
     case .previousKept(let path, let target, _):
       "The new export could not replace \(target), and the previous export could not be "
-        + "moved back; it is kept at \(path)."
+        + "moved back; it is kept at \(path), next to the new tree. Move it back only while "
+        + "\(target) is absent; if another export has put a tree there since, keep that one."
     case .invalidTree(let reason):
       "Not an unchanged silta export tree: \(reason)."
     }
@@ -61,7 +62,8 @@ package enum ExportError: CodedError, Equatable {
       ]
     case .unwritable(_, let workspace):
       [workspaceCommand("silta export --to <writable directory>", workspace: workspace)]
-    case .previousKept(let path, let target, _): ["mv " + shellWord(path) + " " + shellWord(target)]
+    case .previousKept(let path, let target, _):
+      ["[ ! -e \(shellWord(target)) ] && mv \(shellWord(path)) \(shellWord(target))"]
     case .unsupported: ["update silta"]
     case .invalidTree: ["silta export"]
     }

@@ -33,11 +33,11 @@ struct ExportLeftoverTests {
       })
   }
 
-  /// SI-54/29: the printed `next` is safe while the target is back, and restores the
+  /// The printed `next` is safe while the target is back, and restores the
   /// previous tree while it is absent.
   @Test(arguments: [false, true])
   func previousKeptNextIsSafeWhetherOrNotTheTargetCameBack(_ recreate: Bool) throws {
-    try withKnownIssue("SI-54/29: next is an unguarded mv") {
+    do {
       try withScratchDirectory { scratch in
         let prepared = try ExportPublishTests.changeAndPrepare(scratch)
         let target = prepared.root.appending(path: "acme")
@@ -63,11 +63,11 @@ struct ExportLeftoverTests {
     }
   }
 
-  /// SI-54/30: a kept work directory says where the replaced tree is and what export
-  /// did not write; M7b: the fallback checks the replaced tree too.
+  /// A kept work directory says where the replaced tree is and what export did not
+  /// write, after an atomic swap and after the fallback alike.
   @Test(arguments: [true, false])
   func aKeptTreeNamesTheFileExportDidNotWrite(_ atomic: Bool) throws {
-    try withKnownIssue("SI-54/30 and M7b: no reason, and no check after the fallback") {
+    do {
       try withScratchDirectory { scratch in
         let prepared = try ExportPublishTests.changeAndPrepare(scratch)
         let appearing = ExportMoves(swap: { from, to in
@@ -86,7 +86,7 @@ struct ExportLeftoverTests {
     }
   }
 
-  /// M8: a work directory that can't be removed is reported.
+  /// A work directory that can't be removed is reported.
   @Test func aWorkDirectoryThatCannotBeRemovedIsReported() throws {
     try withScratchDirectory { scratch in
       let prepared = try ExportPublishTests.changeAndPrepare(scratch)
@@ -101,9 +101,9 @@ struct ExportLeftoverTests {
     }
   }
 
-  /// SI-54/30: leftovers are reported with a failure too.
+  /// Leftovers are reported with a failure too.
   @Test func aFailureStillReportsLeftovers() throws {
-    try withKnownIssue("SI-54/30: failures drop leftovers") {
+    do {
       try withScratchDirectory { scratch in
         let prepared = try ExportPublishTests.changeAndPrepare(scratch)
         let leftover = prepared.root.appending(path: ".acme.export-a1b2c3")
@@ -121,9 +121,9 @@ struct ExportLeftoverTests {
     }
   }
 
-  /// SI-54/30: a root export can't list is reported, not taken as having no leftovers.
+  /// A root export can't list is reported, not taken as having no leftovers.
   @Test func anUnlistableRootIsReported() throws {
-    try withKnownIssue("SI-54/30: unlistable root skipped") {
+    do {
       try withScratchDirectory { scratch in
         let home = scratch.appending(path: "home")
         let store = try ExportFixture.make(home)
@@ -140,10 +140,10 @@ struct ExportLeftoverTests {
     }
   }
 
-  /// SI-54/30: refusals name their real cause.
+  /// Refusals name their real cause.
   @Test(arguments: ["manifest", "target"])
   func unreadableTargetsAreRefusedForTheRightCause(_ what: String) throws {
-    try withKnownIssue("SI-54/30: wrong cause") {
+    do {
       try withScratchDirectory { scratch in
         let home = scratch.appending(path: "home")
         let store = try ExportFixture.make(home)

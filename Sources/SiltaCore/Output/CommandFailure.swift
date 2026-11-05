@@ -1,5 +1,5 @@
 /// Retains a coded failure while applying the CLI's body-free recovery instructions.
-package struct CommandFailure: CodedError {
+package struct CommandFailure: WarnedFailure {
   /// Preserves the original error's scripting category.
   package let code: ErrorCode
 
@@ -15,12 +15,16 @@ package struct CommandFailure: CodedError {
   /// Preserves who acts on the original `next` commands.
   package let nextBy: NextBy
 
+  /// Preserves the original failure's warnings.
+  package let warnings: [OutputWarning]
+
   /// Captures only public diagnostics and the corrected recovery commands.
   package init(error: any CodedError, next: [String]) {
     code = error.code
     message = error.message
     retryAfter = error.retryAfter
     nextBy = error.nextBy
+    warnings = (error as? any WarnedFailure)?.warnings ?? []
     self.next = next
   }
 }
