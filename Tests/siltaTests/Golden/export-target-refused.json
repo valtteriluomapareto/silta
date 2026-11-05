@@ -1,1 +1,1 @@
-{"error":{"code":"conflict","message":"<scratch>/work/notes/acme is not a silta export: it holds README.md. Export replaces only a previous export, so it changed nothing.","next":["silta export --to <empty or export directory>"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"<scratch>/work/notes/acme is not a silta export: it holds README.md. Export replaces only a previous export, so it changed nothing.","next":["silta --ws 'acme' export --to <empty or export directory>"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

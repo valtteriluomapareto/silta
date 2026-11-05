@@ -79,13 +79,13 @@ struct ExportServiceTests {
   }
 
   enum TargetShape: CaseIterable, CustomTestStringConvertible {
-    case unrelatedDirectory, gitRepository, extraFile, missingListedFile, plainFile, noFormatKey
+    case unrelatedDirectory, gitRepository, extraFile, plainFile, noFormatKey, otherWorkspace
 
     var testDescription: String { "\(self)" }
 
     var startsFromExport: Bool {
       switch self {
-      case .extraFile, .missingListedFile, .noFormatKey: true
+      case .extraFile, .noFormatKey, .otherWorkspace: true
       default: false
       }
     }
@@ -102,8 +102,13 @@ struct ExportServiceTests {
         try Data("ref: refs/heads/main\n".utf8).write(to: target.appending(path: ".git/HEAD"))
       case .extraFile:
         try Data("hand edit".utf8).write(to: target.appending(path: "tasks/NOTES.md"))
-      case .missingListedFile:
-        try fm.removeItem(at: target.appending(path: "links.jsonl"))
+      case .otherWorkspace:
+        let manifest = target.appending(path: "manifest.json")
+        let text = try String(contentsOf: manifest, encoding: .utf8)
+        try Data(
+          text.replacingOccurrences(of: #""workspace": "acme""#, with: #""workspace": "beta""#)
+            .utf8
+        ).write(to: manifest)
       case .plainFile:
         try fm.createDirectory(
           at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -111,6 +116,39 @@ struct ExportServiceTests {
       case .noFormatKey:
         try Data("{}\n".utf8).write(to: target.appending(path: "manifest.json"))
       }
+    }
+  }
+
+  /// A previous export with a listed file deleted is still export's own tree.
+  @Test func previousExportMissingAFileIsReplaced() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let root = scratch.appending(path: "exports")
+      _ = try Self.export(store, home, to: root)
+      try FileManager.default.removeItem(at: root.appending(path: "acme/links.jsonl"))
+      _ = try Self.export(store, home, to: root)
+      ExportTreeTests.expectSame(
+        try Self.tree(root.appending(path: "acme")), try ExportTreeTests.golden("acme"))
+    }
+  }
+
+  /// A root outside every repo whose `<root>/<workspace>` is itself a registered repo.
+  @Test func targetThatIsARegisteredRepoIsRefused() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let repo = scratch.appending(path: "code/acme")
+      try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+      try DatabaseQueue(path: store.path).write {
+        try $0.execute(
+          sql: "UPDATE repo_path SET path=? WHERE repo_id=1",
+          arguments: [try LocationPath.canonical(repo).path])
+      }
+      #expect(throws: ExportError.self) {
+        try Self.export(store, home, to: scratch.appending(path: "code"))
+      }
+      #expect(try FileManager.default.contentsOfDirectory(atPath: repo.path).isEmpty)
     }
   }
 

@@ -159,6 +159,22 @@ struct ExportCommandTests {
     }
   }
 
+  /// A quoted `~` reaches silta unexpanded; it is refused rather than made a directory.
+  @Test func unexpandedTildeIsRefused() throws {
+    try withScratchDirectory { scratch in
+      try Self.seed(scratch)
+      for to in ["~/notes", "~"] {
+        let result = try SiltaBinary.run(
+          ["--ws", "acme", "export", "--to", to, "--json"], in: scratch)
+        #expect(result.termination == .exit(1))
+        #expect(result.stdout.contains(#""code":"invalid""#))
+      }
+      #expect(
+        try FileManager.default.contentsOfDirectory(atPath: scratch.appending(path: "work").path)
+          .isEmpty)
+    }
+  }
+
   @Test func refusalOfANonExportTargetIsForTheHuman() throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)
@@ -167,7 +183,8 @@ struct ExportCommandTests {
       try Data("Acme".utf8).write(to: target.appending(path: "README.md"))
       for json in [false, true] {
         let result = try SiltaBinary.run(
-          ["--ws", "acme", "export", "--to", "notes"] + (json ? ["--json"] : []), in: scratch)
+          ["--ws", "acme", "export", "--to", "notes"] + (json ? ["--json"] : []), in: scratch,
+          environment: ["SILTA_ACTOR": "agent:codex:acme"])
         #expect(result.termination == .exit(6))
         Golden.forTests().check(
           Self.masked(json ? result.stdout : result.stderr, scratch),

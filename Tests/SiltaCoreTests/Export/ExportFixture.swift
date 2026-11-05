@@ -206,5 +206,41 @@ enum ExportFixture {
       (?,'01HZAPRV0000000000000OTHR','other','agent:codex:acme','silta ws edit','ok',
         '2023-11-14T22:28:00.000Z')
       """, [1 + o, 2 + o, 3 + o, 4 + o])
+    try insertOther(db, offset: o, other: other)
+  }
+
+  /// A row in every exported table for the other workspace, each carrying `OTHR`, so a
+  /// query missing its workspace filter shows up in Acme's tree.
+  private static func insertOther(_ db: Database, offset o: Int64, other: Int64) throws {
+    let id = 50 + o
+    try db.execute(
+      sql: """
+        INSERT INTO repo(id,uid,workspace_id,slug) VALUES(:id,'01HZREPO0000000000000OTHR',:ws,'othr');
+        INSERT INTO app(id,uid,workspace_id,slug,name,repo_id,ref)
+          VALUES(:id,'01HZAPP00000000000000OTHR',:ws,'othr','OTHR app',:id,'main');
+        INSERT INTO environment(id,uid,app_id,name) VALUES(:id,'01HZENV00000000000000OTHR',:id,'OTHR');
+        INSERT INTO service(id,uid,workspace_id,slug,name)
+          VALUES(:id,'01HZSVC00000000000000OTHR',:ws,'othr','OTHR service');
+        INSERT INTO edge(id,uid,workspace_id,from_app_id,to_service_id,kind,summary)
+          VALUES(:id,'01HZEDGE0000000000000OTHR',:ws,:id,:id,'calls','OTHR edge');
+        INSERT INTO topic(id,uid,workspace_id,slug,name)
+          VALUES(:id,'01HZTOPC0000000000000OTHR',:ws,'othr','OTHR topic');
+        INSERT INTO topic_alias(workspace_id,topic_id,alias) VALUES(:ws,:id,'othr-alias');
+        INSERT INTO source(id,uid,workspace_id,kind,root,include)
+          VALUES(:id,'01HZSRC00000000000000OTHR',:ws,'notes','OTHR','[]');
+        INSERT INTO task_plan_rev(id,task_id,rev,body_md,actor,created_at)
+          VALUES(:id,:task,1,'OTHR plan','human:other','2023-11-14T22:00:00.000Z');
+        INSERT INTO comment(id,uid,task_id,seq,kind,body_md,actor,created_at)
+          VALUES(:id,'01HZCMNT0000000000000OTHR',:task,1,'comment','OTHR comment','human:other',
+            '2023-11-14T22:00:00.000Z');
+        INSERT INTO review_request(id,task_id,reviewer,subject,requested_by,created_at)
+          VALUES(:id,:task,'agent:claude','OTHR','human:other','2023-11-14T22:00:00.000Z');
+        INSERT INTO link(id,uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,created_by,
+          created_at)
+          VALUES(:id,'01HZLINK0000000000000OTHR',:ws,'task',:task,'cites','url','https://OTHR',
+            'human:other','2023-11-14T22:00:00.000Z');
+        INSERT INTO alias_decision(workspace_id,note_ref,topic_id,decision,actor,created_at)
+          VALUES(:ws,'note:OTHR.md',:id,'accepted','human:other','2023-11-14T22:00:00.000Z');
+        """, arguments: ["id": id, "ws": other, "task": 3 + o])
   }
 }

@@ -167,7 +167,8 @@ struct ExportTreeTests {
   @Test func escapingCorpusRoundTrips() throws {
     let corpus = [
       "quote \" and backslash \\", "line\nbreak", "crlf\r\nend", "tab\there", "soh\u{1}x",
-      "del\u{7F}", "nel\u{85}", "ls\u{2028}ps\u{2029}", "bom\u{FEFF}", "nonchar\u{FFFE}\u{FFFF}",
+      "del\u{7F}", "c1\u{9F}", "nel\u{85}", "ls\u{2028}ps\u{2029}", "bom\u{FEFF}",
+      "nonchar\u{FFFE}\u{FFFF}",
       "emoji 🧭", "no", "on", "0123", "~", "- [ ] item", "e\u{301}", "#comment", "{a: b}",
       "/slash/",
     ]
@@ -195,6 +196,17 @@ struct ExportTreeTests {
         #expect(object["words"]?.utf8.elementsEqual(corpus[index].utf8) == true, "\(corpus[index])")
         #expect(!line.contains("\u{2028}") && !line.contains("\u{85}") && !line.contains("\u{1}"))
       }
+      let raw = text(try #require(files["approvals.jsonl"]))
+      for scalar in [
+        "\u{1}", "\u{7F}", "\u{85}", "\u{9F}", "\u{2028}", "\u{2029}", "\u{FEFF}", "\u{FFFE}",
+        "\u{FFFF}", "\r", "\t",
+      ] as [Unicode.Scalar] {
+        #expect(
+          !raw.unicodeScalars.contains(scalar), "U+\(String(scalar.value, radix: 16)) unescaped")
+      }
+      for spelled in [#"ls\u2028ps\u2029"#, #"bom\uFEFF"#, #"c1\u009F"#, #"crlf\r\nend"#] {
+        #expect(raw.contains(spelled), "\(spelled)")
+      }
       let snapshot = try ExportTree.parse(files)
       let task = try #require(snapshot.tasks.first { $0.ref == "AC-2" })
       #expect(
@@ -202,6 +214,22 @@ struct ExportTreeTests {
       #expect(
         task.row.value("plan_md")?.utf8.elementsEqual(corpus.joined(separator: "\n").utf8) == true)
       Self.expectSame(snapshot.files(), files)
+    }
+  }
+
+  /// A tree names its schema; one this binary doesn't know is refused, and an older
+  /// one it knows is read (spec §15).
+  @Test func readerChecksTheTreeSchema() throws {
+    try withScratchDirectory { scratch in
+      let store = try ExportFixture.make(scratch)
+      var files = try Self.render(store)
+      let manifest = text(try #require(files["manifest.json"]))
+      files["manifest.json"] = Data(
+        manifest.replacingOccurrences(of: #""schema": "v4""#, with: #""schema": "v3""#).utf8)
+      #expect(try ExportTree.parse(files).schema == "v3")
+      files["manifest.json"] = Data(
+        manifest.replacingOccurrences(of: #""schema": "v4""#, with: #""schema": "v99""#).utf8)
+      #expect(throws: StorageError.schemaTooNew) { try ExportTree.parse(files) }
     }
   }
 

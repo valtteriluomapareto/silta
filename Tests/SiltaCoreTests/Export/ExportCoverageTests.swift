@@ -207,8 +207,7 @@ struct ExportCoverageTests {
       let files = try ExportTreeTests.render(store)
       let text = files.values.map { (String(bytes: $0, encoding: .utf8) ?? "") }.joined()
       for absent in ExportFixture.machinePaths + [
-        "/private/", "Other work", "01HZTASK0000000000000OTHR", "01HZAPRV0000000000000NULL",
-        "01HZAPRV0000000000000OTHR", "01HZOTHR00000000000000WS02",
+        "/private/", "Other work", "OTHR", "othr", "01HZAPRV0000000000000NULL",
       ] {
         #expect(!text.contains(absent), "\(absent)")
       }
