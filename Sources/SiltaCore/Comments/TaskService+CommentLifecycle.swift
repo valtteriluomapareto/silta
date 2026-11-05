@@ -109,7 +109,7 @@ extension TaskService {
           let found = try Row.fetchOne(
             db, sql: Self.commentQuery + " WHERE c.id=? AND c.task_id=?",
             arguments: [root, task.id])
-        else { throw StorageError.unavailable }
+        else { throw StorageError.corrupt }
         row = found
       }
       if seen.insert(row["id"]).inserted { targets.append((task, row)) }

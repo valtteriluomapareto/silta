@@ -36,10 +36,12 @@ package final class DatabaseStore: Sendable {
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         let descriptor = Darwin.open(
           home.appending(path: "migration.lock").path, O_CREAT | O_RDWR, 0o600)
-        guard descriptor >= 0 else { throw StorageError.unavailable }
+        guard descriptor >= 0 else { throw StorageError.fileFailure(errno, at: home.path) }
         defer { close(descriptor) }
         // Covers WAL setup and discovery as well as migration execution across processes.
-        guard flock(descriptor, LOCK_EX) == 0 else { throw StorageError.unavailable }
+        guard flock(descriptor, LOCK_EX) == 0 else {
+          throw StorageError.fileFailure(errno, at: home.path)
+        }
         defer { flock(descriptor, LOCK_UN) }
         var config = Configuration()
         config.prepareDatabase { TaskVisibility.register(in: $0) }
@@ -60,9 +62,7 @@ package final class DatabaseStore: Sendable {
           return pending
         }
         try queue.writeWithoutTransaction { db in
-          guard try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL") == "wal" else {
-            throw StorageError.unavailable
-          }
+          try Self.requireWAL(try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL"))
         }
         if let pending {
           // A name that already exists (a retry at the same instant) refuses, never replaces.
@@ -77,7 +77,7 @@ package final class DatabaseStore: Sendable {
         cached = queue
       }
     } catch {
-      throw StorageError.mapped(error)
+      throw StorageError.mapped(error, at: path)
     }
   }
 
@@ -88,19 +88,19 @@ package final class DatabaseStore: Sendable {
   package func write<T>(_ body: (StorageTransaction) throws -> T) throws -> T {
     do {
       try initialize()
-      guard let queue = writer.withLock({ $0 }) else { throw StorageError.unavailable }
+      guard let queue = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
       let backup = StorageBackup(home: home)
       let result = try withStorageRetry(clock: clock, jitter: jitter) {
         try queue.write { db in
           try Self.checkWriterVersion(db)
           // WAL lock acquisition alone does not prove the main file is writable.
           guard FileManager.default.isWritableFile(atPath: path) else {
-            throw StorageError.unavailable
+            throw StorageError.accessDenied
           }
           let day = utcDay(clock.now())
           let previous = try String.fetchOne(
             db, sql: "SELECT value FROM meta WHERE key='last_backup_day'")
-          guard let previous else { throw StorageError.unavailable }
+          guard let previous else { throw StorageError.corrupt }
           if previous != day {
             _ = try backup.snapshot(name: "silta-\(day).db", reuseExisting: true)
             try db.execute(
@@ -114,15 +114,20 @@ package final class DatabaseStore: Sendable {
     } catch let error as any CodedError {
       throw error
     } catch {
-      throw StorageError.mapped(error)
+      throw StorageError.mapped(error, at: path)
     }
+  }
+
+  /// Reads require WAL; a filesystem that silently keeps another journal mode is unusable.
+  static func requireWAL(_ mode: String?) throws {
+    guard mode == "wal" else { throw StorageError.walRefused }
   }
 
   /// Refuses when a migration raised `min_writer_version` past this binary's.
   private static func checkWriterVersion(_ db: Database) throws {
     let version = try Int.fetchOne(
       db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-    guard let version else { throw StorageError.unavailable }
+    guard let version else { throw StorageError.corrupt }
     guard version <= writerVersion else { throw StorageError.schemaTooNew }
   }
 
@@ -152,7 +157,7 @@ package final class DatabaseStore: Sendable {
     } catch let error as any CodedError {
       throw error
     } catch {
-      throw StorageError.mapped(error)
+      throw StorageError.mapped(error, at: path)
     }
   }
 }

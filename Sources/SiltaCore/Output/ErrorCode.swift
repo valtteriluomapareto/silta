@@ -39,8 +39,8 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
   case gate
   /// Too many writes in a short time.
   case rateLimited = "rate_limited"
-  /// The environment is broken: schema too new, read-only DB, git missing, no network,
-  /// or a bug in Silta.
+  /// The environment is broken: a corrupt, read-only, missing, full or otherwise failed
+  /// database, schema too new, git missing, no network, or a bug in Silta.
   case env
 
   /// The process exit status for this code.

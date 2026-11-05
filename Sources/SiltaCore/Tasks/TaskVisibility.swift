@@ -122,7 +122,7 @@ struct TaskVisibility {
         "closed": task.closedAt,
         "archive_cutoff": date.addingTimeInterval(-Double(days) * 86400).timeIntervalSince1970,
       ])
-    guard let value, value >= 0 else { throw StorageError.unavailable }
+    guard let value, value >= 0 else { throw StorageError.corrupt }
     return value == 1
   }
 }
