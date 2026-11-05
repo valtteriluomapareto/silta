@@ -35,6 +35,7 @@ silta comment delete  Soft-delete your own post, retaining its ref and thread.
 silta comment accept  Accept an answer as the asker or current claimer and resolve the thread.
 silta brief  Read budgeted local context for the current task.
 silta inbox  Read current discussion attention without marking it read.
+silta guide  Read the agent manual, or one topic.
 details: silta schema <command>
 
 global flags:
