@@ -108,7 +108,7 @@ struct InboxCorrectionCommandTests {
       #expect(items.map { $0["kind"] as? String } == ["question", "answer", "discussion"])
       #expect(items[1]["reply_to"] as? String == "AC-1/1")
       #expect(items[2]["post_kind"] as? String == "decision")
-      #expect(text.stdout.contains("clears on your next write to AC-1"))
+      #expect(text.stdout.contains("clears on the claimer's next write to AC-1"))
       for _ in 0..<9 { _ = try run(["comment", "AC-1", "-m", "Context"], foreign) }
       let twelve = try TaskStateRegressionTests.data(run(["inbox", "--json"], owner))
       #expect((twelve["items"] as? [Any])?.count == 12)

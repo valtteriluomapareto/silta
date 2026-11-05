@@ -9,42 +9,42 @@ next: silta --ws 'acme' comment accept 'AC-1/3'
 AC-1/4 discussion (decision) on AC-1 by agent:claude:other
 > Decision
 >
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/5 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/6 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/7 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/8 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/9 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/10 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/11 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/12 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 AC-1/13 discussion (comment) on AC-1 by agent:claude:other
 > Context
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline
 1 more: silta --ws 'acme' inbox --for 'agent:codex:acme' --all

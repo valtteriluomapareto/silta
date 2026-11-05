@@ -809,7 +809,11 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - Resolve/reopen normalize reply refs to thread roots, deduplicating in first-appearance
   order, atomically across the selected workspace. Deleted roots remain resolvable.
   Any actor may resolve/reopen; only a post's exact author may delete that named post.
-  Wrong-author deletion offers resolve recovery only while the root is open.
+  Unauthorized acceptance and wrong-author deletion offer read-only task history.
+  An empty explanation on a resolve batch containing another actor's question also
+  offers task history for every selected task, without suggesting dropping the
+  explanation and closing the question. Explicit resolve remains available under
+  the confirmation rule above; the refusal itself supplies no confirmation.
   Reopen clears answer acceptance; delete preserves resolution and retained refs.
   An optional explanation appends one ordinary reply per changed root in the same
   transaction, with one consent for the batch. No-ops write nothing, including

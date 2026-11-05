@@ -55,7 +55,9 @@ struct InboxCommand: OutputCommand {
     if let relayers = item.relayedBy {
       lines.append("Agent answers awaiting confirmation from: " + relayers.joined(separator: ", "))
     }
-    if item.kind == "discussion" { lines.append("clears on your next write to " + item.task) }
+    if item.kind == "discussion" {
+      lines.append("clears on the claimer's next write to " + item.task)
+    }
     lines += item.next.map { "next: " + $0 }
     return lines.joined(separator: "\n")
   }

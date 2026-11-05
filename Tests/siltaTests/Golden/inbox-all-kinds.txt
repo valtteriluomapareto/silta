@@ -9,5 +9,5 @@ next: silta --ws 'acme' comment accept 'AC-1/3'
 AC-1/4 discussion (decision) on AC-1 by agent:claude:other
 > Decision
 >
-clears on your next write to AC-1
+clears on the claimer's next write to AC-1
 next: silta --ws 'acme' task show 'AC-1' --timeline

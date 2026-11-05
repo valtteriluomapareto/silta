@@ -101,12 +101,10 @@ struct CommentRecoverySafetyTests {
       let expected =
         ["silta --ws 'acme' task show 'AC-1' --timeline"]
         + (batch ? ["silta --ws 'acme' task show 'AC-2' --timeline"] : [])
-      withKnownIssue("SI-37/53: refusal recovery closes another actor's question") {
-        #expect(next == expected)
-        #expect(after == before)
-        #expect(afterRows == stable)
-        #expect(!(error["message"] as? String ?? "").contains("omit -m"))
-      }
+      #expect(next == expected)
+      #expect(after == before)
+      #expect(afterRows == stable)
+      #expect(!(error["message"] as? String ?? "").contains("omit -m"))
     }
   }
 
@@ -130,10 +128,8 @@ struct CommentRecoverySafetyTests {
       _ = try Self.run(["comment", "AC-1", "-m", "Addressed"], in: home, actor: holder)
       let cleared = try TaskStateRegressionTests.data(Self.run(args + ["--json"], in: home))
       #expect((cleared["items"] as? [Any])?.isEmpty == true)
-      withKnownIssue("SI-37/19 and /54: foreign-target text names the caller's write") {
-        #expect(text.contains("clears on the claimer's next write to AC-1"))
-        #expect(!text.contains("clears on your next write"))
-      }
+      #expect(text.contains("clears on the claimer's next write to AC-1"))
+      #expect(!text.contains("clears on your next write"))
     }
   }
 
