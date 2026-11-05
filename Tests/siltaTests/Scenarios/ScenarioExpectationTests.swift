@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)), .tags(.slow), .enabled(if: slowTestsEnabled()))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)), .tags(.slow), .enabled(if: slowTestsEnabled()))
 struct ScenarioExpectationTests {
   @Test func scalarExpectationsRejectMissingPathsAndTypeMismatches() throws {
     try withScratchDirectory { scratch in

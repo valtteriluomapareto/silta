@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(2)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(2)))
 struct CodeCommandTests {
   @Test func unusualNamesAndBinaryFilesHaveUsablePaths() throws {
     try withScratchDirectory { scratch in

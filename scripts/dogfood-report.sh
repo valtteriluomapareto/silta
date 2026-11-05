@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # Summarize one workspace; emit Markdown after every read succeeds.
-# Without --ws: the silta workspace, printed for a reviewed commit under docs/dogfood/reports.
-# With --ws: any workspace, written privately under $SILTA_HOME/reports/<slug>/.
+#
+#   scripts/dogfood-report.sh [--ws <slug>] [--since YYYY-MM-DD]
+#
+# Without --ws: the silta workspace, printed for a reviewed commit; without --since,
+# the newest report in docs/dogfood/reports/ sets the start day.
+# With --ws: any workspace, written privately under $SILTA_HOME/reports/<slug>/,
+# whose newest report sets the start day.
+# Reads SILTA_HOME (default ~/.silta). See "Review friction" in docs/dogfood/README.md.
 set -euo pipefail
 fail() { echo "dogfood-report: $*" >&2; exit 1; }
 usage='usage: scripts/dogfood-report.sh [--ws <slug>] [--since YYYY-MM-DD]'

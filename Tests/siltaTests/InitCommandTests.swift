@@ -13,7 +13,7 @@ private struct Refusal {
   let exit: Int32
 }
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct InitCommandTests {
   @Test func bareInitCreatesOnlyDatabaseAndPointsToHumanEdit() throws {
     try withScratchDirectory { scratch in

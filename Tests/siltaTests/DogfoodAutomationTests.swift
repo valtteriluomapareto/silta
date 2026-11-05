@@ -5,7 +5,7 @@ import Testing
 
 /// The scripts that drive Codex and finish merged slices, run against fake `codex`,
 /// `gh` and `silta` executables that record their calls.
-@Suite(.timeLimit(.minutes(2)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(2)))
 struct DogfoodAutomationTests {
   static let thread = "01a1a667-5c3b-7cb3-8760-7f29fd86a2a5"
   static let started = "{\"type\":\"thread.started\",\"thread_id\":\"\(thread)\"}"

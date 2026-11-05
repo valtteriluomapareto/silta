@@ -2,6 +2,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct SiltaCommandTests {
   @Test func versionPrintsTheVersionConstant() throws {
     let result = try withScratchDirectory { try SiltaBinary.run(["--version"], in: $0) }

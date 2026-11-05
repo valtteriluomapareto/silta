@@ -300,6 +300,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     at rots, and the agents' work with it.
   - ↳ update (D39): the ask-list is fixed; a workspace's `ask_about: short` shortens
     it.
+  - ↳ update (2026-11-05): discussion recovery preserves human confirmation rather
+    than turning an agent's answer into acceptance authority. The display rules in
+    [spec §8.1](spec.md#81-discussion-and-reviews) also treat unfinished fences as
+    prose so incomplete examples cannot silently redirect questions, and count only
+    hidden resolved history so a visible handoff does not imply missing work.
 - **D38: The human works through agents.**
   - The human talks to an agent, which runs `silta` for them. They don't use the CLI
     themselves. The Mac app (M5) is their own surface and counts as `human:*`.
