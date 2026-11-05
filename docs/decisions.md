@@ -269,6 +269,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     reviews it before a pull request adds it under `docs/dogfood/reports/` (§22.1).
     Only commands that act on a workspace record it in their log line, and the app
     only when the command names it with `--app` (§19).
+  - ↳ update (2026-11-05, DF3): `--ws <slug>` reports on any workspace and writes the
+    report under `$SILTA_HOME/reports/<slug>/`, beside the database, never into a
+    repository or a PR; the date-named reports there are its `--since` state. Without
+    `--ws` the `silta` flow above is unchanged. Only a hand-written summary in Silta's
+    own words leaves the machine ([DF3 plan](plans/df3-real-workspace.md)).
   - Why: the logs were collected but nothing read them, and friction depended on
     agents volunteering it.
 - **D37: The human's attention is the budget.**
