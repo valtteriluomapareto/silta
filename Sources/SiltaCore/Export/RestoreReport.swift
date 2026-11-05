@@ -44,6 +44,21 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
     package var after: Int
   }
 
+  /// The ref the next task gets, before and after: the counter never rewinds, so a
+  /// restore of an older or a moved tree can move it. Nil when there is no counter.
+  package struct TaskRef: Encodable, Equatable, Sendable {
+    /// The ref a task added now would get.
+    package var before: String?
+    /// The ref a task added after the restore would get.
+    package var after: String?
+
+    /// The two refs.
+    package init(before: String?, after: String?) {
+      self.before = before
+      self.after = after
+    }
+  }
+
   /// A live claim the restore replaces.
   package struct Claim: Encodable, Equatable, Sendable {
     /// The task ref as it is now.
@@ -78,6 +93,8 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
   package var rows: [RowCount]
   /// Settings whose values differ.
   package var settings: [SettingChange]
+  /// The task ref the next task gets, before and after.
+  package var nextTaskRef: TaskRef
   /// Approval rows the tree adds.
   package var approvalsAdded: Int
   /// Claims that change or disappear.
@@ -90,6 +107,7 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
   enum CodingKeys: String, CodingKey {
     case workspace, created, tasks, removed, changed, rows, settings, snapshot
     case dryRun = "dry_run"
+    case nextTaskRef = "next_task_ref"
     case sameUID = "same_uid"
     case manifestSHA256 = "manifest_sha256"
     case approvalsAdded = "approvals_added"
@@ -129,7 +147,20 @@ extension RestoreReport {
       removed: removed, changed: changed, rows: rowCounts(current, tree),
       settings: settingChanges(
         current?.workspace.value("settings"), tree.workspace.value("settings")),
+      nextTaskRef: taskRefs(current, tree),
       approvalsAdded: 0, claimsReplaced: claims, reposWithoutPath: [], snapshot: nil)
+  }
+
+  /// The task refs before and after: the counter takes the highest of what the database
+  /// holds, what the tree holds and one past the tree's last task.
+  private static func taskRefs(_ current: ExportSnapshot?, _ tree: ExportSnapshot) -> TaskRef {
+    let prefix = tree.workspace.value("task_prefix") ?? ""
+    func ref(_ next: Int64?) -> String? {
+      next.map { "\(prefix)-\($0)" }
+    }
+    let stored = current?.workspace.value("next_task_seq").flatMap { Int64($0) }
+    return TaskRef(
+      before: ref(stored), after: ref(RestoreWriter.nextTaskSeq(stored: stored, tree: tree)))
   }
 
   /// Row counts of the tables outside the tasks that differ.

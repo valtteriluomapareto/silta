@@ -119,6 +119,11 @@ private struct RestoreValidation {
   let tree: ExportSnapshot
   let slug: String
 
+  /// A refusal of the tree, naming the workspace to export again on its machine.
+  func invalid(_ reason: String) -> ExportError {
+    .invalidTree(reason: reason, workspace: slug)
+  }
+
   func run() throws {
     try settings()
     var uids: [String: Set<String>] = [:]
@@ -126,7 +131,7 @@ private struct RestoreValidation {
       try integers(row, in: table)
       guard let uid = row.value("uid") else { return }
       guard uids[table, default: []].insert(uid).inserted else {
-        throw ExportError.invalidTree("\(table) uid \(uid) appears twice")
+        throw invalid("\(table) uid \(uid) appears twice")
       }
     }
     try integers(tree.workspace, in: "workspace")
@@ -149,11 +154,11 @@ private struct RestoreValidation {
     let json = tree.workspace.value("settings") ?? "{}"
     let parsed = try? JSONSerialization.jsonObject(with: Data(json.utf8))  // refused below
     guard let object = parsed as? [String: Any] else {
-      throw ExportError.invalidTree("settings are not a JSON object")
+      throw invalid("settings are not a JSON object")
     }
     let known = Set(WorkspaceSettings.CodingKeys.allCases.map(\.rawValue))
     if let unknown = Set(object.keys).subtracting(known).sorted().first {
-      throw ExportError.invalidTree("settings have the unknown key \(unknown)")
+      throw invalid("settings have the unknown key \(unknown)")
     }
     let settings = WorkspaceSettings(workspace: slug, json: json)
     do {
@@ -162,14 +167,14 @@ private struct RestoreValidation {
       _ = try settings.archiveAfterDays
       _ = try settings.staleDays
     } catch let error as WorkspaceError {
-      throw ExportError.invalidTree("settings: \(error.message)")
+      throw invalid("settings: \(error.message)")
     }
   }
 
   private func integers(_ row: ExportRow, in table: String) throws {
     for field in row.fields where ExportFormat.integerKeys.contains(field.key) {
       guard Int64(field.value) != nil else {
-        throw ExportError.invalidTree("\(table) \(field.key) \(field.value) is not an integer")
+        throw invalid("\(table) \(field.key) \(field.value) is not an integer")
       }
     }
   }
@@ -177,7 +182,7 @@ private struct RestoreValidation {
   private func references(_ uids: [String: Set<String>]) throws {
     func resolve(_ uid: String?, _ table: String, from: String) throws {
       guard let uid, !uids[table, default: []].contains(uid) else { return }
-      throw ExportError.invalidTree("\(from) names \(table) \(uid), which the tree doesn't hold")
+      throw invalid("\(from) names \(table) \(uid), which the tree doesn't hold")
     }
     var rows: [(String, ExportRow)] = zip(tree.sections, ExportFormat.sections).flatMap { pair in
       pair.0.rows.map { (pair.1.table, $0) }
@@ -193,7 +198,7 @@ private struct RestoreValidation {
         task.records.compactMap { $0.value("table") == "comment" ? $0.value("uid") : nil })
       for record in task.records {
         if let thread = record.value("thread"), !comments.contains(thread) {
-          throw ExportError.invalidTree(
+          throw invalid(
             "a comment of \(task.ref) threads under \(thread), not on that task")
         }
       }
@@ -207,7 +212,7 @@ private struct RestoreValidation {
       })
     for link in tree.links {
       guard link.value("from") != nil, (link.value("to") == nil) != (link.value("to_ext") == nil)
-      else { throw ExportError.invalidTree("link \(link.value("uid") ?? "") has a missing end") }
+      else { throw invalid("link \(link.value("uid") ?? "") has a missing end") }
       try resolve(
         link.value("from"), ExportFormat.linkTables[link.value("from_kind") ?? ""] ?? "",
         from: "link")
@@ -215,7 +220,7 @@ private struct RestoreValidation {
       if link.value("to_kind") == "task_plan_rev" {
         guard revisions.contains("\(to)@\(link.value("to_rev") ?? "")") else {
           let revision = link.value("to_rev") ?? ""
-          throw ExportError.invalidTree(
+          throw invalid(
             "a link names plan revision \(revision) of \(to), which the tree doesn't hold")
         }
       } else {
@@ -230,7 +235,7 @@ private struct RestoreValidation {
     func unique(_ keys: [String], _ what: String) throws {
       var seen: Set<String> = []
       if let repeated = keys.first(where: { !seen.insert($0).inserted }) {
-        throw ExportError.invalidTree("\(what) \(repeated) appears twice")
+        throw invalid("\(what) \(repeated) appears twice")
       }
     }
     for (section, format) in zip(tree.sections, ExportFormat.sections) {
@@ -255,7 +260,7 @@ private struct RestoreValidation {
       var next = task.row.value("uid")
       while let uid = next {
         guard seen.insert(uid).inserted else {
-          throw ExportError.invalidTree("\(task.ref) is its own ancestor")
+          throw invalid("\(task.ref) is its own ancestor")
         }
         next = parent[uid] ?? nil
       }

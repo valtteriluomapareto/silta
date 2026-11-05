@@ -102,7 +102,8 @@ extension RestoreWriter {
     if let path = Set(want.keys).union(got.keys).filter({ want[$0] != got[$0] }).min(
       by: ExportSnapshot.byteOrder)
     {
-      throw ExportError.invalidTree("\(path) does not come back the same after restoring")
+      throw ExportError.invalidTree(
+        reason: "\(path) does not come back the same after restoring", workspace: slug)
     }
   }
 }

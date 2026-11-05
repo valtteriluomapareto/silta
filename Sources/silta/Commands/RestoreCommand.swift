@@ -17,6 +17,7 @@ struct RestoreCommand: OutputCommand {
     "removed": .array(.string), "changed": .array(.string),
     "settings": .array(
       .object(["key": .string, "before": .optional(.string), "after": .optional(.string)])),
+    "next_task_ref": .object(["before": .optional(.string), "after": .optional(.string)]),
     "approvals_added": .int,
     "claims_replaced": .array(.object(["task": .string, "actor": .string])),
     "repos_without_path": .array(.string), "snapshot": .optional(.string),
@@ -66,6 +67,12 @@ struct RestoreCommand: OutputCommand {
     ).reporting(report.workspace)
   }
 
+  /// The task ref the next task gets, when the restore moves it.
+  static func counterLine(_ ref: RestoreReport.TaskRef) -> String? {
+    guard ref.before != ref.after else { return nil }
+    return "Next task ref: \(ref.before ?? "unset") -> \(ref.after ?? "unset")."
+  }
+
   static func text(_ report: RestoreReport, directory: String) -> String {
     let dry = report.dryRun
     let verb = report.created ? "create" : "replace"
@@ -95,6 +102,7 @@ struct RestoreCommand: OutputCommand {
           + report.settings.map { "\($0.key) \($0.before ?? "unset") -> \($0.after ?? "unset")" }
           .joined(separator: "; ") + ".")
     }
+    if let ref = counterLine(report.nextTaskRef) { lines.append(ref) }
     if report.approvalsAdded > 0 { lines.append("Approvals added: \(report.approvalsAdded).") }
     refs("Claims replaced", report.claimsReplaced.map { "\($0.task) (\($0.actor))" })
     if let snapshot = report.snapshot {

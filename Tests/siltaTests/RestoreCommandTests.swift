@@ -139,7 +139,8 @@ struct RestoreCommandTests {
         refused.stderr.split(separator: "\n").first {
           $0.hasPrefix("ask human: ") || $0.hasPrefix("next: ")
         })
-      let command = recovery
+      let command =
+        recovery
         .replacingOccurrences(of: "ask human: ", with: "")
         .replacingOccurrences(of: "next: ", with: "")
       let path = try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"

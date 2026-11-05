@@ -96,7 +96,8 @@ struct RestoreWriter {
     do {
       try replaceRows()
     } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
-      throw ExportError.invalidTree("it breaks a uniqueness or reference rule of the database")
+      throw ExportError.invalidTree(
+        reason: "it breaks a uniqueness or reference rule of the database", workspace: slug)
     }
   }
 

@@ -13,8 +13,9 @@ package enum ExportError: CodedError, Equatable {
   /// The new tree could not be put in place and the previous one could not be moved
   /// back; it is kept at `path`.
   case previousKept(path: String, target: String, workspace: String)
-  /// A tree is not byte for byte what export writes, or doesn't hold together.
-  case invalidTree(String)
+  /// A tree is not byte for byte what export writes, or doesn't hold together;
+  /// `workspace` is the tree's, when its manifest names one.
+  case invalidTree(reason: String, workspace: String?)
   /// The restore input is not an export tree; `child` is one inside it that is.
   case notATree(path: String, reason: String, child: String?)
   /// The tree's workspace is not the one `--ws` named.
@@ -59,7 +60,7 @@ package enum ExportError: CodedError, Equatable {
       "The new export could not replace \(target), and the previous export could not be "
         + "moved back; it is kept at \(path), next to the new tree. Move it back only while "
         + "\(target) is absent; if another export has put a tree there since, keep that one."
-    case .invalidTree(let reason):
+    case .invalidTree(let reason, _):
       "Not an unchanged silta export tree: \(reason). Nothing was restored."
     case .notATree(let path, let reason, _):
       "\(path) is not an export tree: \(reason)."
@@ -88,10 +89,20 @@ package enum ExportError: CodedError, Equatable {
     case .previousKept(let path, let target, _):
       ["[ ! -e \(shellWord(target)) ] && mv \(shellWord(path)) \(shellWord(target))"]
     case .unsupported: ["update silta"]
-    case .invalidTree: ["silta export  # again, on the machine the tree came from"]
+    case .invalidTree(_, let workspace):
+      [
+        workspace.map {
+          workspaceCommand(
+            "silta export  # again, on the machine the tree came from", workspace: $0)
+        } ?? "silta --ws <the tree's workspace> export"
+          + "  # again, on the machine the tree came from"
+      ]
     case .notATree(let path, _, let child):
       child.map { ["silta restore " + shellWord(path + "/" + $0) + " --dry-run"] }
-        ?? ["silta export  # on the source machine; restore its <root>/<workspace>"]
+        ?? [
+          "silta --ws <the tree's workspace> export"
+            + "  # on the source machine; restore its <root>/<workspace>"
+        ]
     case .otherWorkspace(let tree, _, let directory):
       [workspaceCommand("silta restore " + shellWord(directory) + " --dry-run", workspace: tree)]
     case .restoreConflict: ["silta ws ls"]

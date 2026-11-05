@@ -1564,7 +1564,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     refusal the real run would. It never changes a workspace, though like any write it
     may create the database and take the day's backup. It reports what would change:
     tasks removed or changed since the export, row counts of the other tables,
-    settings, approvals added and claims replaced.
+    settings, the ref the next task would get, approvals added and claims replaced.
   - A tree of an older schema restores the columns later migrations added at their
     defaults.
   - It is **not** a merge, and not a sharing mechanism (Q3).

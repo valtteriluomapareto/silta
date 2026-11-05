@@ -34,7 +34,7 @@ extension RestoreWriter {
 
   func id(_ uid: String, in table: String) throws -> Int64 {
     guard let id = ids[table]?[uid] else {
-      throw ExportError.invalidTree("\(uid) names no \(table) of the tree")
+      throw ExportError.invalidTree(reason: "\(uid) names no \(table) of the tree", workspace: slug)
     }
     return id
   }
@@ -75,7 +75,8 @@ extension RestoreWriter {
       if let target = link.value("to") {
         if toKind == "task_plan_rev" {
           guard let revision = revisions["\(target)@\(link.value("to_rev") ?? "")"] else {
-            throw ExportError.invalidTree("a link names a plan revision the tree doesn't hold")
+            throw ExportError.invalidTree(
+              reason: "a link names a plan revision the tree doesn't hold", workspace: slug)
           }
           to = revision
         } else {
@@ -95,17 +96,22 @@ extension RestoreWriter {
     }
   }
 
-  /// The task counter never rewinds: refs already cited are never reused.
+  /// The task counter never rewinds: refs already cited are never reused. Nil when the
+  /// database holds none and the tree has nothing to count.
+  static func nextTaskSeq(stored: Int64?, tree: ExportSnapshot) -> Int64? {
+    let highest = tree.tasks.compactMap { Int64($0.row.value("seq") ?? "") }.max() ?? 0
+    guard stored != nil || !tree.tasks.isEmpty || tree.workspace.value("next_task_seq") != nil
+    else { return nil }
+    return [stored, tree.workspace.value("next_task_seq").flatMap { Int64($0) }, highest + 1]
+      .compactMap { $0 }.max() ?? highest + 1
+  }
+
+  /// Writes the counter the next task ref is taken from.
   func counter(workspace: Int64) throws {
     let scope = "task:\(workspace)"
     let stored = try Int64.fetchOne(
       db, sql: "SELECT next FROM seq_counter WHERE scope=?", arguments: [scope])
-    let highest = tree.tasks.compactMap { Int64($0.row.value("seq") ?? "") }.max() ?? 0
-    let next =
-      [stored, tree.workspace.value("next_task_seq").flatMap { Int64($0) }, highest + 1]
-      .compactMap { $0 }.max() ?? highest + 1
-    guard stored != nil || !tree.tasks.isEmpty || tree.workspace.value("next_task_seq") != nil
-    else { return }
+    guard let next = Self.nextTaskSeq(stored: stored, tree: tree) else { return }
     try db.execute(
       sql: """
         INSERT INTO seq_counter(scope,next) VALUES(?,?)
