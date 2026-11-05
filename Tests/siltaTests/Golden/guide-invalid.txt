@@ -1,2 +1,2 @@
-error: Unknown guide topic; see the topic list in help. [invalid]
+error: Unknown guide topic 'nope'; use an exact topic: when, start, recipes, human, questions, blocked, handoff, reviews, refusals, refs, output. [invalid]
 next: silta guide --help

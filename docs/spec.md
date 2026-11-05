@@ -183,14 +183,11 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
 
 ### 5.1 Reference grammar
 
-One grammar everywhere: in arguments, in `--json`, and in `[[…]]` links inside
-bodies. A bare task id is accepted wherever a task is expected.
-
 | Ref | Example | Notes |
 |---|---|---|
 | Task | `AC-12` | `task:AC-12` is also accepted |
 | Comment | `AC-12/3` | the 3rd comment on AC-12 |
-| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | |
+| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring waits for M2 |
 | App, topic | `app:platform-api`, `topic:messaging` | |
 | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
 | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
@@ -199,7 +196,7 @@ bodies. A bare task id is accepted wherever a task is expected.
 | URL | `url:https://dev.azure.com/…` | |
 | External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor (D35) |
 
-`silta help refs` prints this table. The parser has golden tests (§20).
+`silta guide refs` prints this table. Reference examples are checked against the core resolver.
 
 ## 6. Data model
 
@@ -1030,9 +1027,9 @@ Writes idempotent marker blocks, after showing a diff and asking first.
 | `~/.claude/skills/silta/SKILL.md` | The skill (outline below). OpenCode reads it too unless it's disabled. |
 | `~/.claude/CLAUDE.md` block | 5 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
 | Claude Code **SessionStart hook** | `silta brief --hook`: short, no indexing, 1.5 s timeout, silent if unregistered. It also exports `SILTA_SESSION`. |
-| Claude Code **Stop hook** (optional, to verify) | `silta session check`: if this session holds a claim with writes since its last handoff, ask the agent to leave a handoff before stopping |
+| Claude Code **Stop hook** (optional; D42, live run unverified) | `silta session check`: if this session holds a claim with writes since its last handoff, ask the agent to leave a handoff before stopping |
 | `~/.codex/AGENTS.md` block | The same 5 lines |
-| `~/.codex/config.toml` | Adds `~/.silta` to the sandbox's writable roots (key name to verify), so Codex can write |
+| `~/.codex/config.toml` | Adds `~/.silta` to the sandbox's writable roots (`sandbox_workspace_write.writable_roots`; D42, live run unverified), so Codex can write |
 | Permissions (optional) | Deny tracker writes, e.g. `Bash(az boards work-item create*)`, `Bash(gh issue create*)` |
 
 ### `silta guide`
@@ -1040,11 +1037,13 @@ Writes idempotent marker blocks, after showing a diff and asking first.
 The full agent manual, printed by the binary and versioned with it, so Codex,
 OpenCode and others get the same text as the skill. `silta guide <topic>` prints one
 section. Topics are `when`, `start`, `recipes`, `human`, `questions`, `blocked`,
-`handoff`, `reviews`, `refusals` and `output`, also listed in `guide --help`.
-An unknown topic returns `invalid` with `next: silta guide --help`.
-Guide JSON data is `{text, topics}`; reference help JSON data is `{text}`. Text
+`handoff`, `reviews`, `refusals`, `refs` and `output`, also listed in `guide --help`.
+Topic names match exactly (case-sensitive). An unknown topic returns `invalid`,
+naming the rejected topic and valid topics, with `next: silta guide --help`.
+Guide JSON data is `{text, topics, topic}`: `topic` is the selected string or null
+for the full manual, and `topics` always lists every available topic. Text
 includes its terminating newline in both modes. `--quiet` preserves these reads.
-Neither command opens the truth database or changes harness configuration; ordinary
+The guide never opens the truth database or changes harness configuration; ordinary
 command logging still applies. Native `silta help [command…]` remains available.
 The manual labels workflows unavailable in the binary instead of teaching them as
 runnable commands. The text is the same in every workspace: a setting that changes
@@ -1066,8 +1065,7 @@ settings (D39). It covers:
   - Decide and record: make the choice, add a `decision` comment and carry on, unless
     it is one of these. Ask about: changing the scope; a new dependency; a public
     API, schema or migration; anything another app or the customer sees; deleting
-    what you didn't create; anything irreversible; money. If `brief` shows
-    `ask_about: short` (D39), ask only about the last four.
+    what you didn't create; anything irreversible; money. The guide includes conditional rules only for supported settings.
   - When you need the human, put everything in one message: approvals, proposals to
     triage, questions. Never drip them one at a time.
   - Human-only commands: name the exact commands in your message, and after the human
@@ -1087,7 +1085,10 @@ settings (D39). It covers:
   - "What needs me?" means `silta inbox --for me`, relayed as one short message with
     the choices to make.
   - "Work the backlog": see §8, Working the backlog.
-- **Questions:** ask in chat; record in silta only if blocked beyond this session.
+- **Questions:** ask in chat; record only when blocked beyond this session. Use
+  `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
+  current claimer can `comment accept` an answer. Answer only as an addressee or
+  to relay the human's chat answer; never accept your own answer to `@me`.
 - **Blocked:** a question to the human doesn't block the task. If the human can
   answer, ask in chat, even about the customer. If only
   someone outside can (`ext:`) or another task must land first, keep doing what you
@@ -1097,8 +1098,10 @@ settings (D39). It covers:
   into repo files or plans.
 - **Handoff:** always before stopping. Template: state, next step, open questions,
   branch and sha.
-- **Reviews (M2):** `inbox` → `inbox take` → `task diff` → one `task review` with a
-  lines file → reply, then a batch `comment resolve`.
+- **Reviews:** submit, read task discussion and reply to each finding with
+  `--reply-to`, naming the change and proving test. Authors do not resolve findings
+  unless assigned that responsibility. The M2 inbox/take/diff/review workflow is
+  labelled unavailable in the current manual.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
   `--steal`, `where --set`, `promote` or `--allow-secret` on your own initiative, only
   with the human's words through `--approved`. Never create tracker items or plan
@@ -1354,7 +1357,7 @@ arguments.
 - `--quiet` hides a write's receipt text. It still prints data: the refs a write
   created (`task add`; `task from-plan`, one per line, and a `--dry-run`'s preview),
   and the whole output of reads (`task ls`, `task show`, `task edit --print`, `ws
-  ls`, `ws show`, `schema`). Warnings and errors still show; with `--json` it changes
+  ls`, `ws show`, `schema`, `guide`). Warnings and errors still show; with `--json` it changes
   nothing.
 - `--json` and `--quiet` may come before or after the subcommand.
 - `--help` and `--version` print plain text to stdout and exit 0, even with `--json`.
@@ -1393,7 +1396,7 @@ silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] c
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
 silta doctor [--fix]                             [M1]
-silta guide [<topic>] | silta help refs            [M1]
+silta guide [<topic>] (including refs)            [M1]
 
 # context
 silta where [--path <dir>] [--app <app>] [--task <ref>] [--set <app> | --unset]      [M1]
@@ -1720,7 +1723,8 @@ scriptable and deterministic (D13).
     `{"help"?,"kind":"flag"|"option"|"positional","names":[…],"repeating","required","value_name"?}`;
     a positional's name is `<value_name>`.
   - A shape `S` is `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`,
-    `{"object":{"<field>":S,…}}`, or, as an object field only, `{"optional":S}`. An
+    `{"object":{"<field>":S,…}}`, `{"nullable":S}` (a value or JSON null), or,
+    as an object field only, `{"optional":S}`. An
     object has exactly its fields. An optional field is absent or has its shape; it's
     never `null`. The required `where.branch` field is a specific exception: a
     string for an attached branch, `null` for detached HEAD (§7), published as `"any"`.
@@ -1970,8 +1974,10 @@ tasks with `source` links.
    - Still unverified in real harnesses: Codex env-marker stability and effective
      writable roots; Claude environment propagation and Stop-hook behavior;
      OpenCode child-process env marker and skill discovery.
-   - Documented: `exec --json`, the legacy writable-roots key, `CLAUDE_ENV_FILE`
-     and Stop blocking (D42).
+   - Documented (D42): `sandbox_workspace_write.writable_roots`, `CLAUDE_ENV_FILE`
+     and Stop blocking; live runs remain unverified.
+   - Observed in CLI help (D42): Codex `exec --json` emits JSONL and `--add-dir`
+     adds writable directories.
    - whether the system SQLite allows loadable extensions (for vectors later)
 6. **Tracker mirror depth** in M4: is reading status and title enough?
 7. **Turso:** revisit at 1.0, or when a Swift binding appears.

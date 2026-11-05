@@ -543,7 +543,7 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
 ## Agent harness evidence (2026-11-05)
 
 - **D42: Distinguish documented harness support from live acceptance.**
-  - [OpenAI configuration reference](https://developers.openai.com/codex/config-reference/)
+  - [OpenAI configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
     documents `sandbox_workspace_write.writable_roots` as an array of additional
     paths for workspace-write mode. It also lists newer permission profiles; this
     does not establish the effective policy in the desktop app or a managed run.

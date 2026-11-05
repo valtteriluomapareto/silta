@@ -73,9 +73,6 @@ extension SiltaMain {
   static func parsed(_ arguments: [String]) -> (
     path: String, command: any ParsableCommand.Type
   ) {
-    if ReferenceHelpCommand.arguments(in: arguments) != nil {
-      return ("silta help refs", ReferenceHelpCommand.self)
-    }
     let arguments = withoutApprovalValues(arguments)
     var path = ["silta"]
     var command: any ParsableCommand.Type = SiltaCommand.self

@@ -1,0 +1,15 @@
+# Reference grammar
+Bare task ids are accepted wherever a task is expected. The grammar is used in arguments and JSON. [[links]] in bodies are not yet resolved. Parsing a reference does not imply its target exists or is supported by a command.
+
+| Ref | Example | Notes |
+|---|---|---|
+| Task | `AC-12` | `task:AC-12` is also accepted |
+| Comment | `AC-12/3` | the 3rd comment on AC-12 |
+| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring waits for M2 |
+| App, topic | `app:platform-api`, `topic:messaging` | |
+| Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
+| Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
+| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject; CLI resolution waits for the M2 subject producer |
+| Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
+| URL | `url:https://dev.azure.com/…` | |
+| External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor (D35) |

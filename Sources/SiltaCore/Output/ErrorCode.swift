@@ -66,6 +66,11 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
     }
   }
 
+  /// A shared guide/schema row with the code's default recovery actor and advice.
+  package var helpLine: String {
+    "\(rawValue)  exit \(exitCode), next by \(nextBy.rawValue): \(agentShould)"
+  }
+
   /// What an agent should do on this code: the "Agent should" column of spec §16.
   package var agentShould: String {
     switch self {

@@ -6,65 +6,63 @@ import Testing
 
 struct GuideRecipeTests {
   @Test func everyPrintedRecipeExecutes() throws {
-    withKnownIssue("SI-34/10–24: reviewed guide contract") {
-      try withScratchDirectory { scratch in
-        let fixture = try GuideRecipeFixture(scratch)
-        let guide = try fixture.run(["guide"]).stdout
-        let blocks = Self.blocks(guide)
-        try #require(blocks.count == 7)
-        #expect(blocks[2].contains("silta task submit AC-12"))
-        for index in [0, 1, 3, 4, 5, 6, 2] {
-          if index == 4 {
-            _ = try fixture.run([
-              "task", "add", "Acme external dependency", "--start", "--app", "none",
-            ])
-          }
-          let target = index == 4 ? "AC-3" : "AC-1"
-          if index == 1 {
-            let dry = "silta task from-plan /tmp/acme-plan.md --dry-run"
-            let parts = blocks[index].components(separatedBy: dry)
-            try #require(parts.count == 2)
-            try fixture.shell(parts[0], task: target)
-            let before = try fixture.taskCount()
-            try fixture.shell(dry, task: target)
-            #expect(try fixture.taskCount() == before)
-            try fixture.shell(parts[1], task: target)
-          } else {
-            try fixture.shell(blocks[index], task: target)
-          }
-          if index == 5 {
-            let task = try GuideReviewTests.data(fixture.run(["task", "show", target, "--json"]))
-            #expect(task["claimed_by"] == nil)
-            #expect(task["status"] as? String == "doing")
-            let comments = try #require(task["comments"] as? [[String: Any]])
-            #expect(comments.contains { $0["kind"] as? String == "handoff" })
-          }
+    try withScratchDirectory { scratch in
+      let fixture = try GuideRecipeFixture(scratch)
+      let guide = try fixture.run(["guide"]).stdout
+      let blocks = Self.blocks(guide)
+      try #require(blocks.count == 7)
+      #expect(blocks[2].contains("silta task submit AC-12"))
+      for index in [0, 1, 3, 4, 5, 6, 2] {
+        if index == 4 {
+          _ = try fixture.run([
+            "task", "add", "Acme external dependency", "--start", "--app", "none",
+          ])
         }
-        let task = try GuideReviewTests.data(fixture.run(["task", "show", "AC-1", "--json"]))
-        #expect(task["status"] as? String == "done")
-        #expect((task["result"] as? String)?.contains("What was done:") == true)
+        let target = index == 4 ? "AC-3" : "AC-1"
+        if index == 1 {
+          let dry = try #require(
+            blocks[index].components(separatedBy: "\n").first {
+              $0.contains("--dry-run")
+            })
+          let parts = blocks[index].components(separatedBy: dry)
+          try #require(parts.count == 2)
+          try fixture.shell(parts[0], task: target)
+          let before = try fixture.taskCount()
+          try fixture.shell(dry, task: target)
+          #expect(try fixture.taskCount() == before)
+          try fixture.shell(parts[1], task: target)
+        } else {
+          try fixture.shell(blocks[index], task: target)
+        }
+        if index == 5 {
+          let task = try GuideReviewTests.data(fixture.run(["task", "show", target, "--json"]))
+          #expect(task["claimed_by"] == nil)
+          #expect(task["status"] as? String == "doing")
+          let comments = try #require(task["comments"] as? [[String: Any]])
+          #expect(comments.contains { $0["kind"] as? String == "handoff" })
+        }
       }
+      let task = try GuideReviewTests.data(fixture.run(["task", "show", "AC-1", "--json"]))
+      #expect(task["status"] as? String == "done")
+      #expect((task["result"] as? String)?.contains("What was done:") == true)
     }
   }
 
   @Test func inlineCommandsParse() throws {
-    withKnownIssue("SI-34/10–24: reviewed guide contract") {
-      try withScratchDirectory { scratch in
-        let fixture = try GuideRecipeFixture(scratch)
-        let guide = try fixture.run(["guide"]).stdout
-        let catalog = try GuideReviewTests.data(fixture.run(["schema", "--json"]))
-        let names = try #require(catalog["commands"] as? [[String: Any]]).compactMap {
-          $0["name"] as? String
-        }
-        let spans = guide.components(separatedBy: "`")
-        for index in stride(from: 1, to: spans.count, by: 2) where spans[index].hasPrefix("silta ")
-        {
-          let command = spans[index].replacingOccurrences(of: "<topic>", with: "human")
-            .replacingOccurrences(of: "<cmd>", with: "guide")
-            .replacingOccurrences(of: "<[^>]+>", with: "example", options: .regularExpression)
-          #expect(names.contains { command == $0 || command.hasPrefix($0 + " ") }, "\(command)")
-          try fixture.shell(command + " --help", task: "AC-1")
-        }
+    try withScratchDirectory { scratch in
+      let fixture = try GuideRecipeFixture(scratch)
+      let guide = try fixture.run(["guide"]).stdout
+      let catalog = try GuideReviewTests.data(fixture.run(["schema", "--json"]))
+      let names = try #require(catalog["commands"] as? [[String: Any]]).compactMap {
+        $0["name"] as? String
+      }
+      let spans = guide.components(separatedBy: "`")
+      for index in stride(from: 1, to: spans.count, by: 2) where spans[index].hasPrefix("silta ") {
+        let command = spans[index].replacingOccurrences(of: "<topic>", with: "human")
+          .replacingOccurrences(of: "<cmd>", with: "guide")
+          .replacingOccurrences(of: "<[^>]+>", with: "example", options: .regularExpression)
+        #expect(names.contains { command == $0 || command.hasPrefix($0 + " ") }, "\(command)")
+        try fixture.shell(command + " --help", task: "AC-1")
       }
     }
   }

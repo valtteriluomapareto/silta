@@ -63,7 +63,7 @@ package struct SchemaDocument: Encodable, Sendable {
   private var tail: String {
     "\nglobal flags:\n" + globalArguments.map(\.line).joined() + "\nerror codes:\n"
       + ErrorCode.allCases.map {
-        "  \($0.rawValue)  exit \($0.exitCode), next by \($0.nextBy.rawValue): \($0.agentShould)\n"
+        "  \($0.helpLine)\n"
       }.joined() + "An error's own next_by can override its code's default.\n"
   }
 }

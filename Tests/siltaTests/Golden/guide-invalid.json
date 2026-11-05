@@ -1,1 +1,1 @@
-{"error":{"code":"invalid","message":"Unknown guide topic; see the topic list in help.","next":["silta guide --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"Unknown guide topic 'nope'; use an exact topic: when, start, recipes, human, questions, blocked, handoff, reviews, refusals, refs, output.","next":["silta guide --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

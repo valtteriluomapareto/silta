@@ -11,6 +11,9 @@ package enum ShapeCheck {
     case let name as String:
       return matches(value, name) ? [] : ["\(path): expected \(name), got \(describe(value))"]
     case let wrapper as [String: Any]:
+      if let wrapped = wrapper["nullable"] {
+        return value is NSNull ? [] : violations(of: value, against: wrapped, at: path)
+      }
       if let element = wrapper["array"] {
         guard let items = value as? [Any] else { return ["\(path): expected an array"] }
         return items.enumerated().flatMap {

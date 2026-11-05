@@ -95,12 +95,7 @@ enum SiltaMain {
   /// Configuration failures must not obstruct help or version discovery.
   static func informationalResult(_ arguments: [String], mode: OutputMode) -> Rendered? {
     do {
-      var command: any ParsableCommand
-      if let referenceArguments = ReferenceHelpCommand.arguments(in: arguments) {
-        command = try ReferenceHelpCommand.parseAsRoot(referenceArguments)
-      } else {
-        command = try SiltaCommand.parseAsRoot(arguments)
-      }
+      var command = try SiltaCommand.parseAsRoot(arguments)
       guard !(command is any OutputCommand) else { return nil }
       try command.run()
       return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
@@ -115,11 +110,7 @@ enum SiltaMain {
     let mode = context.mode
     var command: any ParsableCommand
     do {
-      if let referenceArguments = ReferenceHelpCommand.arguments(in: arguments) {
-        command = try ReferenceHelpCommand.parseAsRoot(referenceArguments)
-      } else {
-        command = try SiltaCommand.parseAsRoot(arguments)
-      }
+      command = try SiltaCommand.parseAsRoot(arguments)
     } catch {
       let store = context.environment.db
       let scope =

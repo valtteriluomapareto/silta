@@ -26,12 +26,7 @@ struct GuideReferenceTests {
           "AC-12", text: (1...18).map { "Acme \(revision) line \($0)" }.joined(separator: "\n"))
       }
       let source = try service.show("AC-12")
-      let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().deletingLastPathComponent()
-      let spec = try String(contentsOf: root.appending(path: "docs/spec.md"), encoding: .utf8)
-      let section = try #require(spec.components(separatedBy: "### 5.1 Reference grammar").last)
-        .components(separatedBy: "## 6.")[0]
-      let rows = section.split(separator: "\n").filter { $0.hasPrefix("| ") }.dropFirst()
+      let rows = try Self.referenceRows()
       try service.environment.db.read { db in
         for row in rows {
           let columns = row.split(separator: "|", omittingEmptySubsequences: false)
@@ -58,4 +53,14 @@ struct GuideReferenceTests {
       }
     }
   }
+  private static func referenceRows() throws -> [String] {
+    let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+      .deletingLastPathComponent().deletingLastPathComponent()
+    let spec = try String(contentsOf: root.appending(path: "docs/spec.md"), encoding: .utf8)
+    let section = try #require(spec.components(separatedBy: "### 5.1 Reference grammar").last)
+      .components(separatedBy: "## 6.")[0]
+    return section.split(separator: "\n").filter { $0.hasPrefix("| ") }.dropFirst()
+      .map(String.init)
+  }
+
 }
