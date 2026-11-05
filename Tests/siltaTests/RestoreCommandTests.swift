@@ -116,4 +116,71 @@ struct RestoreCommandTests {
       #expect(result.stdout.contains(#""code":"invalid""#))
     }
   }
+
+  /// A damaged tree is refused with a command that names the tree's workspace; followed
+  /// with another workspace current, it re-exports the right one.
+  @Test func damagedTreeRecoveryNamesTheTreesWorkspace() throws {
+    try withScratchDirectory { scratch in
+      try Self.exported(scratch)
+      try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path).write { db in
+        try db.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix)
+            VALUES('01HZOTHR00000000000000WS02','other','Other','OT')
+            """)
+      }
+      let use = try SiltaBinary.run(["ws", "use", "other"], in: scratch)
+      #expect(use.termination == .exit(0), "\(use.stderr)")
+      try Data("tampered\n".utf8).write(
+        to: scratch.appending(path: "work/out/acme/tasks/AC-1.md"))
+      let refused = try SiltaBinary.run(["restore", "out/acme", "--dry-run"], in: scratch)
+      #expect(refused.termination == .exit(1))
+      let recovery = try #require(
+        refused.stderr.split(separator: "\n").first {
+          $0.hasPrefix("ask human: ") || $0.hasPrefix("next: ")
+        })
+      let command = recovery
+        .replacingOccurrences(of: "ask human: ", with: "")
+        .replacingOccurrences(of: "next: ", with: "")
+      let path = try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
+      let followed = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", command], in: scratch,
+        environment: ["PATH": path])
+      #expect(followed.termination == .exit(0), "\(followed.stderr)")
+      let manifest = scratch.appending(path: "silta-home/exports/acme/manifest.json")
+      #expect(
+        try String(contentsOf: manifest, encoding: .utf8).contains(#""workspace": "acme""#))
+    }
+  }
+
+  /// The dry run shows the task counter, so the human sees future refs move.
+  @Test func dryRunShowsTheTaskCounter() throws {
+    try withScratchDirectory { scratch in
+      try ExportCommandTests.seed(scratch)
+      try Self.setCounter(scratch, to: 50)
+      let export = try SiltaBinary.run(["--ws", "acme", "export", "--to", "out"], in: scratch)
+      #expect(export.termination == .exit(0), "\(export.stderr)")
+      try Self.setCounter(scratch, to: 2)
+      let dry = try SiltaBinary.run(
+        ["restore", "out/acme", "--dry-run"], in: scratch, environment: Self.agent)
+      #expect(dry.termination == .exit(0), "\(dry.stderr)")
+      Golden.forTests().check(Self.masked(dry.stdout, scratch), "restore-dry-run-counter.txt")
+      try Self.setCounter(scratch, to: 100)
+      let kept = try SiltaBinary.run(
+        ["restore", "out/acme", "--dry-run", "--json"], in: scratch, environment: Self.agent)
+      #expect(kept.termination == .exit(0), "\(kept.stderr)")
+      Golden.forTests().check(
+        Self.masked(kept.stdout, scratch), "restore-dry-run-counter-kept.json")
+    }
+  }
+
+  static func setCounter(_ scratch: URL, to next: Int) throws {
+    try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path).write { db in
+      try db.execute(
+        sql: """
+          UPDATE seq_counter SET next=?
+          WHERE scope='task:'||(SELECT id FROM workspace WHERE slug='acme')
+          """, arguments: [next])
+    }
+  }
 }

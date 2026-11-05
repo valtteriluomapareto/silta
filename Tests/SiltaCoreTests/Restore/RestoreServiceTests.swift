@@ -23,12 +23,24 @@ struct RestoreServiceTests {
     }
   }
 
+  /// Restoring one workspace keeps every machine-local row, the other workspace's
+  /// included: export never writes those, so only a direct check can see them go.
   @Test func restoresInPlaceKeepingMachineRowsAndOtherWorkspaces() throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "a")
       let store = try ExportFixture.make(home)
       let before = try ExportTreeTests.render(store)
       let other = try ExportTreeTests.render(store, "other")
+      try DatabaseQueue(path: store.path).write { db in
+        try db.execute(
+          sql: """
+            INSERT INTO repo_path(repo_id,path,fetched_at)
+            SELECT id, ?, '2023-11-14T22:00:00.000Z' FROM repo
+            WHERE uid='01HZREPO0000000000000OTHR';
+            INSERT INTO worktree_override(path,app_id,set_by)
+            SELECT ?, id, 'human:other' FROM app WHERE uid='01HZAPP00000000000000OTHR'
+            """, arguments: [Self.otherRepoPath, Self.otherOverride])
+      }
       let tree = try RestoreSupport.exportTree(store, to: scratch.appending(path: "tree"))
       let report = try RestoreSupport.restore(tree, into: store, home: home)
       #expect(!report.created && report.sameUID)
@@ -39,22 +51,41 @@ struct RestoreServiceTests {
         snapshot.hasPrefix(home.appending(path: "backups/silta-2023-11-14-before-restore-").path))
       ExportTreeTests.expectSame(try ExportTreeTests.render(store), before)
       ExportTreeTests.expectSame(try ExportTreeTests.render(store, "other"), other)
-      let (id, paths, overrides, worktree, next) = try store.read { db in
+      let (id, paths, overrides, worktree, next, otherPaths, otherOverrides) = try store.read {
+        db in
         (
           try Int64.fetchOne(db, sql: "SELECT id FROM workspace WHERE slug='acme'"),
           try String.fetchAll(db, sql: "SELECT path FROM repo_path ORDER BY path"),
-          try String.fetchAll(db, sql: "SELECT path FROM worktree_override"),
+          try String.fetchAll(db, sql: "SELECT path FROM worktree_override ORDER BY path"),
           try String.fetchOne(db, sql: "SELECT worktree FROM task WHERE seq=2"),
-          try Int.fetchOne(db, sql: "SELECT next FROM seq_counter WHERE scope='task:1'")
+          try Int.fetchOne(db, sql: "SELECT next FROM seq_counter WHERE scope='task:1'"),
+          try String.fetchAll(
+            db,
+            sql: """
+              SELECT p.path FROM repo_path p JOIN repo r ON r.id=p.repo_id
+              JOIN workspace w ON w.id=r.workspace_id WHERE w.slug='other'
+              """),
+          try String.fetchAll(
+            db,
+            sql: """
+              SELECT o.path FROM worktree_override o JOIN app a ON a.id=o.app_id
+              JOIN workspace w ON w.id=a.workspace_id WHERE w.slug='other'
+              """)
         )
       }
       #expect(id == 1)
-      #expect(paths == [ExportFixture.machinePaths[0]])
-      #expect(overrides == [ExportFixture.machinePaths[1]])
+      #expect(paths == [ExportFixture.machinePaths[0], Self.otherRepoPath].sorted())
+      #expect(overrides == [ExportFixture.machinePaths[1], Self.otherOverride].sorted())
+      #expect(otherPaths == [Self.otherRepoPath])
+      #expect(otherOverrides == [Self.otherOverride])
       #expect(worktree == ExportFixture.machinePaths[2])
       #expect(next == 11)
     }
   }
+
+  /// The other workspace's machine-local paths.
+  static let otherRepoPath = "/private/other/thumbnails"
+  static let otherOverride = "/private/other/api-wt"
 
   /// Seeded workspaces of every shape round-trip byte for byte, into a fresh home and
   /// in place. A failure names its seed.
