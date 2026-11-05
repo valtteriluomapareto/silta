@@ -155,6 +155,34 @@ struct SecretGuardTests {
     #expect(SecretGuard.redacted("token " + Self.legacyPAT) == "token [REDACTED:azure_pat]")
   }
 
+  // Every permitted character, so narrowing the alphabet cannot silently drop one.
+  @Test(arguments: Array("abcdefghijklmnopqrstuvwxyz0123456789"))
+  func legacyPATsCoverTheWholeAlphabet(character: Character) {
+    let token = String(repeating: "a", count: 51) + String(character)
+    #expect(token.count == 52)
+    #expect(SecretGuard.redacted("token " + token) == "token [REDACTED:azure_pat]")
+  }
+
+  // One uppercase letter is enough to make 52 characters an identifier, not a PAT.
+  @Test(arguments: Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  func oneUppercaseLetterMakesALongIdentifierClean(letter: Character) {
+    let identifier =
+      String(repeating: "a", count: 25) + String(letter) + String(repeating: "a", count: 26)
+    #expect(identifier.count == 52)
+    #expect(SecretGuard.matches(in: identifier).isEmpty)
+    #expect(SecretGuard.redacted(identifier) == identifier)
+  }
+
+  // Mixed case on both sides of AZDO must survive the current-format branch at both offsets.
+  @Test(arguments: [75, 76])
+  func currentPATsAcceptMixedCase(prefixLength: Int) {
+    let prefix = String((0..<prefixLength).map { $0.isMultiple(of: 2) ? "Q" : "q" })
+    let suffix = String((0..<(80 - prefixLength)).map { $0.isMultiple(of: 2) ? "R" : "7" })
+    let token = prefix + "AZDO" + suffix
+    #expect(token.count == 84)
+    #expect(SecretGuard.redacted("token " + token) == "token [REDACTED:azure_pat]")
+  }
+
   @Test func vendorTokenInsideARefStillRedacts() {
     let token = "AK" + "IA" + String(repeating: "Q", count: 16)
     let input = "doc:" + token
