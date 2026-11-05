@@ -1,0 +1,17 @@
+human:acme attention
+Scope: current local attention; tracker status is not refreshed.
+ext:acme follow-up due 2023-11-14
+  AC-1: Acme
+  waiting on: ext:acme
+  ask: Choose API
+  follow-up: 2023-11-14
+next: silta --ws 'acme' task ls --status todo
+next: silta --ws 'acme' task show 'AC-1'
+AC-2 proposal by agent:codex:acme
+  AC-2: Acme idea
+next: ask human: Accept or drop AC-2? After approval: silta --ws 'acme' task triage --accept 'AC-2' --approved "<the human's words>"; or silta --ws 'acme' task triage --drop 'AC-2' --approved "<the human's words>"
+next: silta --ws 'acme' task show 'AC-2'
+AC-3 promoted; change it in its tracker
+  AC-3: Acme tracked
+  tracker: ado:42
+next: silta --ws 'acme' task show 'AC-3'

@@ -38,7 +38,9 @@ struct CommentRecoverySafetyTests {
     }
   }
 
-  static func questionAfterHandoff(_ home: URL) throws -> DatabaseStore {
+  static func questionAfterHandoff(_ home: URL, asker: String = "human:acme") throws
+    -> DatabaseStore
+  {
     let store = try TaskCommandTests.setup(home)
     for args in [
       ["task", "add", "Acme", "--start"],
@@ -49,7 +51,8 @@ struct CommentRecoverySafetyTests {
       try #require(try run(args, in: home).termination == .exit(0))
     }
     try store.write {
-      try $0.database.execute(sql: "UPDATE comment SET actor='human:acme' WHERE seq IN (1,3)")
+      try $0.database.execute(
+        sql: "UPDATE comment SET actor=? WHERE seq IN (1,3)", arguments: [asker])
     }
     try #require(
       try run(["comment", "AC-1", "--kind", "handoff", "-m", "Continue"], in: home).termination
@@ -58,13 +61,14 @@ struct CommentRecoverySafetyTests {
     return store
   }
 
-  @Test(arguments: [
-    "accept", "delete-root", "delete-reply", "empty-resolve", "empty-resolve-reply",
-    "empty-batch-first", "empty-batch-last",
-  ])
-  func refusalNextCannotCloseSomeoneElsesQuestion(mode: String) throws {
+  @Test(
+    arguments: [
+      "accept", "delete-root", "delete-reply", "empty-resolve", "empty-resolve-reply",
+      "empty-batch-first", "empty-batch-last",
+    ], ["human:acme", "agent:claude:asker", "agent:codex:other"])
+  func refusalNextCannotCloseSomeoneElsesQuestion(mode: String, asker: String) throws {
     try withScratchDirectory { home in
-      let store = try Self.questionAfterHandoff(home)
+      let store = try Self.questionAfterHandoff(home, asker: asker)
       let batch = mode.hasPrefix("empty-batch")
       if batch {
         try #require(
@@ -83,7 +87,7 @@ struct CommentRecoverySafetyTests {
           ["comment", "resolve"]
           + (batch ? refs : [mode == "empty-resolve-reply" ? "AC-1/2" : "AC-1/1"]) + ["-m", ""]
       }
-      let pendingArgs = ["--ws", "acme", "inbox", "--for", "human:acme", "--json"]
+      let pendingArgs = ["--ws", "acme", "inbox", "--for", asker, "--json"]
       let before = try Self.run(pendingArgs, in: home).stdout
       try #require(before.contains("AC-1/2"))
       let stable = try Self.snapshot(store)
