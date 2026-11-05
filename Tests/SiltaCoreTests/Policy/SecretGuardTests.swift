@@ -39,6 +39,7 @@ struct SecretGuardTests {
       Sample(rule: "anthropic", text: anthropicKey()),
       Sample(rule: "anthropic", text: anthropicKey(tag: "admin01")),
       Sample(rule: "anthropic", text: anthropicKey(tag: "oat01")),
+      Sample(rule: "anthropic", text: "sk-" + "ant-" + String(repeating: "Q", count: 95)),
       Sample(
         rule: "jwt",
         text: "ey" + "JhY21lIjp0cnVlfQ.eyJhY21lIjoxfQ." + String(repeating: "q", count: 32)),
@@ -53,16 +54,6 @@ struct SecretGuardTests {
   // Lowercase letters and digits: the alphabet both maintained Azure DevOps PAT
   // detectors match, so the fixture looks like a real legacy token.
   static var legacyPAT: String { String(repeating: "acme7zq3", count: 6) + "acme" }
-
-  // A synthetic key in the shape Anthropic's keys share: `sk-ant-`, a kind and version
-  // tag, a dash, then a base64url body. A current API key's body is 95 characters ending
-  // in `AA`; `length` counts the whole body. The prefix is split so this file holds no
-  // contiguous key.
-  static func anthropicKey(tag: String = "api03", length: Int = 95) -> String {
-    let alphabet = Array("Qz7-x_Rk")
-    let body = String((0..<(length - 2)).map { alphabet[$0 % alphabet.count] }) + "AA"
-    return "sk-" + "ant-" + tag + "-" + body
-  }
 
   static var keyBlock: String {
     "-----BE" + "GIN RSA PRIVATE KEY-----\n" + String(repeating: "Q", count: 64)
@@ -196,57 +187,6 @@ struct SecretGuardTests {
     #expect(SecretGuard.redacted("token " + token) == "token [REDACTED:azure_pat]")
   }
 
-  // The whole key goes, wherever it sits; surrounding punctuation and quotes stay.
-  @Test func anthropicKeysRedactWholeInContext() {
-    let key = Self.anthropicKey()
-    for (input, expected) in [
-      ("ANTHROPIC_API_KEY=" + key, "ANTHROPIC_API_KEY=[REDACTED:anthropic]"),
-      ("export ANTHROPIC_API_KEY='" + key + "'", "export ANTHROPIC_API_KEY='[REDACTED:anthropic]'"),
-      ("x-api-key: " + key + "\n", "x-api-key: [REDACTED:anthropic]\n"),
-      ("The key " + key + ". Rotate it.", "The key [REDACTED:anthropic]. Rotate it."),
-      ("`" + key + "`", "`[REDACTED:anthropic]`"),
-      ("note:" + key, "note:[REDACTED:anthropic]"),
-    ] {
-      #expect(SecretGuard.redacted(input) == expected)
-    }
-  }
-
-  // Every base64url symbol at either end of the body, so narrowing the alphabet or
-  // stopping short of the last character cannot leave part of a key behind.
-  @Test(arguments: Array("AZaz09-_"))
-  func anthropicKeysCoverTheBodyAlphabet(symbol: Character) {
-    let body = String(repeating: "Q", count: 94)
-    for key in [
-      "sk-" + "ant-api03-" + String(symbol) + body,
-      "sk-" + "ant-api03-" + body + String(symbol),
-    ] {
-      #expect(SecretGuard.redacted("token " + key + " end") == "token [REDACTED:anthropic] end")
-    }
-  }
-
-  // A key is at least 80 body characters; anything shorter is a fragment, not a key.
-  @Test func anthropicBodiesShorterThanAKeyAreFragments() {
-    #expect(SecretGuard.redacted(Self.anthropicKey(length: 80)) == "[REDACTED:anthropic]")
-    let fragment = Self.anthropicKey(length: 79)
-    #expect(SecretGuard.matches(in: fragment).isEmpty)
-  }
-
-  // Talking about the prefix, quoting a masked hint or a short fragment, and naming
-  // things after it are prose, not keys.
-  @Test(arguments: [
-    "Anthropic keys start with sk-ant- and SecretGuard should catch them.",
-    "sk-ant", "sk-ant-", "sk-ant-api03-", "sk-ant-…", "sk-ant-api03-…AA",
-    "sk-ant-api03-Qz7x", "sk-ant-api03-Qz7-x_RkQz7-x_RkAA",
-    "sk-ant-admin01-key-format-notes-for-the-secret-guard",
-    "skAntApi03KeysAreRedactedFromCommentBodiesAndRecipientsBeforeStorage",
-    "sk_ant_api03_keys_are_redacted_from_comment_bodies_and_recipients_before_storage",
-    "testAnthropicKeysInCommentBodiesAndRecipientsAreRedactedBeforeTheyReachStorage",
-  ])
-  func anthropicProseIsNotASecret(text: String) {
-    #expect(SecretGuard.matches(in: text).isEmpty)
-    #expect(SecretGuard.redacted(text) == text)
-  }
-
   @Test func vendorTokenInsideARefStillRedacts() {
     let token = "AK" + "IA" + String(repeating: "Q", count: 16)
     let input = "doc:" + token
@@ -352,5 +292,77 @@ struct SecretGuardTests {
     let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
     let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
     Golden.forTests().check(text.stderr + json.stdout, "secret-error.txt")
+  }
+}
+
+extension SecretGuardTests {
+  // A synthetic key in the shape Anthropic's keys share: `sk-ant-`, a kind and version
+  // tag, a dash, then a base64url body. A current API key's body is 95 characters ending
+  // in `AA`; `length` counts the whole body. The prefix is split so this file holds no
+  // contiguous key.
+  static func anthropicKey(tag: String = "api03", length: Int = 95) -> String {
+    let alphabet = Array("Qz7-x_Rk")
+    let body = String((0..<(length - 2)).map { alphabet[$0 % alphabet.count] }) + "AA"
+    return "sk-" + "ant-" + tag + "-" + body
+  }
+
+  // The whole key goes, wherever it sits; surrounding punctuation and quotes stay.
+  @Test func anthropicKeysRedactWholeInContext() {
+    let key = Self.anthropicKey()
+    for (input, expected) in [
+      ("ANTHROPIC_API_KEY=" + key, "ANTHROPIC_API_KEY=[REDACTED:anthropic]"),
+      ("export ANTHROPIC_API_KEY='" + key + "'", "export ANTHROPIC_API_KEY='[REDACTED:anthropic]'"),
+      ("x-api-key: " + key + "\n", "x-api-key: [REDACTED:anthropic]\n"),
+      ("The key " + key + ". Rotate it.", "The key [REDACTED:anthropic]. Rotate it."),
+      ("`" + key + "`", "`[REDACTED:anthropic]`"),
+      ("note:" + key, "note:[REDACTED:anthropic]"),
+      ("{\"log\":\"line1\\n" + key + "\"}", "{\"log\":\"line1\\n[REDACTED:anthropic]\"}"),
+      ("key%3D" + key, "key%3D[REDACTED:anthropic]"),
+      ("_" + key, "_[REDACTED:anthropic]"),
+      ("token " + Self.anthropicKey(length: 200) + " end", "token [REDACTED:anthropic] end"),
+    ] {
+      #expect(SecretGuard.redacted(input) == expected)
+    }
+  }
+
+  // Every base64url symbol at either end of the body, so narrowing the alphabet or
+  // stopping short of the last character cannot leave part of a key behind.
+  @Test(arguments: Array("AZaz09-_"))
+  func anthropicKeysCoverTheBodyAlphabet(symbol: Character) {
+    let body = String(repeating: "Q", count: 94)
+    for key in [
+      "sk-" + "ant-api03-" + String(symbol) + body,
+      "sk-" + "ant-api03-" + body + String(symbol),
+    ] {
+      #expect(SecretGuard.redacted("token " + key + " end") == "token [REDACTED:anthropic] end")
+    }
+  }
+
+  // At least 80 characters after the prefix make a key, whatever the tag; anything
+  // shorter is a fragment.
+  @Test func anthropicKeysNeedEightyCharactersAfterThePrefix() {
+    for tag in ["", "api03-"] {
+      let body = String(repeating: "Q", count: 80 - tag.count)
+      #expect(SecretGuard.redacted("sk-" + "ant-" + tag + body) == "[REDACTED:anthropic]")
+      let fragment = "sk-" + "ant-" + tag + body.dropLast()
+      #expect(SecretGuard.matches(in: fragment).isEmpty)
+    }
+  }
+
+  // Talking about the prefix, quoting a masked hint or a short fragment, and naming
+  // things after it are prose, not keys. A slug with 80 or more characters after
+  // `sk-ant-` is redacted, which is the safe side.
+  @Test(arguments: [
+    "Anthropic keys start with sk-ant- and SecretGuard should catch them.",
+    "sk-ant", "sk-ant-", "sk-ant-api03-", "sk-ant-…", "sk-ant-api03-…AA",
+    "sk-ant-api03-Qz7x", "sk-ant-api03-Qz7-x_RkQz7-x_RkAA",
+    "sk-ant-admin01-key-format-notes-for-the-secret-guard",
+    "skAntApi03KeysAreRedactedFromCommentBodiesAndRecipientsBeforeStorage",
+    "sk_ant_api03_keys_are_redacted_from_comment_bodies_and_recipients_before_storage",
+    "testAnthropicKeysInCommentBodiesAndRecipientsAreRedactedBeforeTheyReachStorage",
+  ])
+  func anthropicProseIsNotASecret(text: String) {
+    #expect(SecretGuard.matches(in: text).isEmpty)
+    #expect(SecretGuard.redacted(text) == text)
   }
 }

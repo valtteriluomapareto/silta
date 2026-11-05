@@ -295,32 +295,34 @@ extension CommentQuestionTests {
     try await withScratchDirectory { home in
       let env = try await CommentTests.setup(home), service = TaskService(environment: env)
       let key = SecretGuardTests.anthropicKey()
-      var draft = CommentDraft(body: "Rotate " + key + " today.")
-      let posted = try service.comment("AC-1", draft)
+      // Any surviving piece counts as a leak, not only the whole key.
+      let pieces = ["sk-" + "ant-", String(key.suffix(24)), String(key.dropFirst(40).prefix(24))]
+      let leaks = { (text: String) in pieces.contains { text.contains($0) } }
+      let posted = try service.comment("AC-1", CommentDraft(body: "Rotate " + key + " today."))
       #expect(posted.comment.body == "Rotate [REDACTED:anthropic] today.")
       #expect(posted.warnings == [SecretGuard.warning])
       let stable = try CommentLifecycleTests.snapshot(env)
-      for (recipients, body, source) in [
-        (["human:" + key], "Acme", nil),
-        (["agent:claude:" + key], "Acme", nil),
-        ([], "Ask @agent:claude:" + key, nil),
-        ([], "Acme", "note:" + key),
-        ([], "Acme", "note:notes/" + key + ".md"),
-      ] as [([String], String, String?)] {
-        draft = CommentDraft(body: body, kind: "question")
-        draft.recipients = recipients
-        draft.source = source
+      var drafts = [CommentDraft(body: "Ask @agent:claude:" + key, kind: "question")]
+      for recipient in ["human:" + key, "agent:claude:" + key] {
+        drafts.append(CommentDraft(body: "Acme", kind: "question"))
+        drafts[drafts.count - 1].recipients = [recipient]
+      }
+      for source in ["note:" + key, "note:notes/" + key + ".md"] {
+        drafts.append(CommentDraft(body: "Acme", kind: "question"))
+        drafts[drafts.count - 1].source = source
+      }
+      for draft in drafts {
         do {
           _ = try service.comment("AC-1", draft)
           Issue.record("Accepted a key in comment metadata")
         } catch let error as CommentError {
           #expect(error.code == .invalid)
-          let echoed = (error.message + error.next.joined()).contains(key)
+          let echoed = leaks(error.message + error.next.joined(separator: " "))
           #expect(!echoed)
         }
       }
       #expect(try CommentLifecycleTests.snapshot(env) == stable)
-      let leaked = stable.contains { $0.contains(key) }
+      let leaked = stable.contains(where: leaks)
       #expect(!leaked)
     }
   }
