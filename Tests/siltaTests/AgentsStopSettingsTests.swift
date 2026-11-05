@@ -82,9 +82,7 @@ extension AgentsStopSettingsTests {
         ? try String(contentsOf: file, encoding: .utf8) : "{}"
       let restored = try GuideContractTests.object(text) as NSDictionary
       let expected: NSDictionary = ["hooks": [event: [Any]()]]
-      withKnownIssue("Inherited container provenance must not adopt a user event array") {
-        #expect(restored == expected)
-      }
+      #expect(restored == expected)
     }
   }
 }

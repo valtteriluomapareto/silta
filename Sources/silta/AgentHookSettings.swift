@@ -24,7 +24,7 @@ enum AgentHookSettings {
       guard hooks[event] == nil || hooks[event] is [[String: Any]] else { try refusal() }
       var groups = hooks[event] as? [[String: Any]] ?? []
       let initial: Origin =
-        newFile ? .file : newHooks ? .hooks : hooks[event] == nil ? .event : .keep
+        hooks[event] != nil ? .keep : newFile ? .file : newHooks ? .hooks : .event
       let ownership = try ownership(groups, event: event, origin: initial, refusal: refusal)
       if uninstall {
         guard let found = ownership.index else { continue }

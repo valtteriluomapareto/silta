@@ -1084,7 +1084,9 @@ normalize. It accepts duplicate-free objects/arrays with strings, null, booleans
 integers within ±(2^53−1); other numbers are refused before writes instead of rounding.
 Only selected events' structure is inspected; unknown event shapes remain intact.
 Edited, duplicate or mixed owned groups refuse. File, hooks-object and event-array
-provenance preserve even preexisting empty containers. Preview shows only owned group deltas,
+provenance preserve even preexisting empty containers. Event-array preexistence takes
+priority over inherited file/hooks provenance when hooks are installed separately,
+including user containers added between installs. Preview shows only owned group deltas,
 while its token still binds every original byte and file mode. There is no overwrite flag.
 
 The SessionStart protocol reads at most 64 KiB of stdin. Its 1.5 s process deadline
