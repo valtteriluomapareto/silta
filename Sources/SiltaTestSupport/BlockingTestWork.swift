@@ -21,13 +21,14 @@ private final class BlockingTestExecutor: TaskExecutor {
   }
 }
 
-/// Runs synchronous test bodies without occupying cooperative executor workers.
+/// Admits test functions before their deadlines, then runs synchronous case bodies
+/// without occupying cooperative executor workers.
 package struct BlockingTestScope: TestTrait, SuiteTrait, TestScoping {
   package init() {}
   package var isRecursive: Bool { true }
 
   package func scopeProvider(for test: Test, testCase: Test.Case?) -> Self? {
-    guard !test.isSuite, testCase != nil else { return nil }
+    guard !test.isSuite else { return nil }
     return self
   }
 
@@ -35,6 +36,11 @@ package struct BlockingTestScope: TestTrait, SuiteTrait, TestScoping {
     for test: Test, testCase: Test.Case?,
     performing function: @concurrent @Sendable () async throws -> Void
   ) async throws {
+    // Function admission precedes Swift Testing's case timers.
+    if testCase == nil {
+      try await BlockingTestAdmissions.shared.run(function)
+      return
+    }
     try await withTaskExecutorPreference(BlockingTestExecutor.shared) {
       try await function()
     }
@@ -44,4 +50,28 @@ package struct BlockingTestScope: TestTrait, SuiteTrait, TestScoping {
 extension Trait where Self == BlockingTestScope {
   /// Keeps blocking test bodies outside the cooperative pool.
   package static var blockingTestWork: Self { Self() }
+}
+
+private actor BlockingTestAdmissions {
+  static let shared = BlockingTestAdmissions()
+  private var running = 0
+  private var waiting: [CheckedContinuation<Void, Never>] = []
+
+  func run(_ body: @concurrent @Sendable () async throws -> Void) async throws {
+    try Task.checkCancellation()
+    if running == 8 {
+      await withCheckedContinuation { waiting.append($0) }
+    } else {
+      running += 1
+    }
+    defer {
+      if waiting.isEmpty {
+        running -= 1
+      } else {
+        waiting.removeFirst().resume()
+      }
+    }
+    try Task.checkCancellation()
+    try await body()
+  }
 }
