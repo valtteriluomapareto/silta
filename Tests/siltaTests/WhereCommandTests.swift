@@ -206,12 +206,7 @@ struct WhereCommandTests {
   }
 
   func setup(_ scratch: URL) throws -> URL {
-    let fixture = try SiltaBinary.runProcess(
-      URL(filePath: "/bin/bash"),
-      [
-        ScenarioRunner.repository.appending(path: "scripts/make-fixtures.sh").path,
-        scratch.appending(path: "fixtures").path,
-      ], in: scratch)
+    let fixture = try AcmeFixtures.make(at: scratch.appending(path: "fixtures"), in: scratch)
     try #require(fixture.termination == .exit(0), "\(fixture.stderr)")
     let repo = scratch.appending(path: "fixtures/acme-platform")
     let config = try WorkspaceConfig.parse(

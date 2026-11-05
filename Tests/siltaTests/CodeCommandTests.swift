@@ -168,12 +168,7 @@ struct CodeCommandTests {
   }
 
   func setup(_ scratch: URL) throws -> URL {
-    let result = try SiltaBinary.runProcess(
-      URL(filePath: "/bin/bash"),
-      [
-        ScenarioRunner.repository.appending(path: "scripts/make-fixtures.sh").path,
-        scratch.appending(path: "fixtures").path,
-      ], in: scratch)
+    let result = try AcmeFixtures.make(at: scratch.appending(path: "fixtures"), in: scratch)
     try #require(result.termination == .exit(0), "\(result.stderr)")
     let repo = scratch.appending(path: "fixtures/acme-platform")
     let store = DatabaseStore(

@@ -55,6 +55,40 @@ struct FixtureTests {
     }
   }
 
+  /// Tests get a relocated copy of one template per process; it must behave like a fresh
+  /// run of the script at its own path.
+  @Test func copiedFixturesMatchAFreshRun() throws {
+    try withScratchDirectory { scratch in
+      let fresh = scratch.appending(path: "fresh")
+      let made = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/bash"), [AcmeFixtures.script.path, fresh.path], in: scratch)
+      try #require(made.termination == .exit(0), "\(made.stderr)")
+      let copy = scratch.appending(path: "copy")
+      let copied = try AcmeFixtures.make(at: copy, in: scratch)
+      try #require(copied.termination == .exit(0), "\(copied.stderr)")
+      let commands = [
+        ["show-ref"], ["remote", "-v"], ["worktree", "list", "--porcelain"],
+        ["status", "--porcelain", "--branch"], ["log", "-g", "--format=%gs", "HEAD"],
+        ["config", "--local", "--list"], ["fsck", "--no-progress"],
+      ]
+      for repo in [
+        "acme-platform", "acme-portal-worktree", "acme-detached", "acme-shallow",
+        "acme-missing-remote",
+      ] {
+        for command in commands {
+          let expected = try git(command, at: fresh.appending(path: repo), scratch: scratch)
+          let actual = try git(command, at: copy.appending(path: repo), scratch: scratch)
+          #expect(
+            actual.replacing(copy.path, with: "<root>")
+              == expected.replacing(fresh.path, with: "<root>"), "\(repo): git \(command)")
+        }
+      }
+      #expect(
+        try git(["show-ref"], at: copy.appending(path: "acme-origin.git"), scratch: scratch)
+          == git(["show-ref"], at: fresh.appending(path: "acme-origin.git"), scratch: scratch))
+    }
+  }
+
   @Test func occupiedFixtureDestinationIsPreservedAndRunnerReportsFailure() throws {
     try withScratchDirectory { scratch in
       let destination = scratch.appending(path: "fixtures")

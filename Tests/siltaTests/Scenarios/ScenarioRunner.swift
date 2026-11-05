@@ -106,10 +106,7 @@ enum ScenarioRunner {
   }
 
   private static func fixtures(in scratch: URL) throws {
-    let script = repository.appending(path: "scripts/make-fixtures.sh")
-    let result = try SiltaBinary.runProcess(
-      URL(filePath: "/bin/bash"),
-      [script.path, scratch.appending(path: "fixtures").path], in: scratch)
+    let result = try AcmeFixtures.make(at: scratch.appending(path: "fixtures"), in: scratch)
     guard result.termination == .exit(0) else {
       throw ScenarioFailure(
         description: "fixture generation failed: \(result.termination)\n\(result.stderr)")

@@ -38,11 +38,8 @@ struct InitCommandTests {
 
   @Test func fixtureScanFetchAndPathOnlyRescan() throws {
     try withScratchDirectory { scratch in
-      let root = ScenarioRunner.repository
       let fixtures = scratch.appending(path: "acme")
-      let generated = try SiltaBinary.runProcess(
-        URL(filePath: "/bin/bash"),
-        [root.appending(path: "scripts/make-fixtures.sh").path, fixtures.path], in: scratch)
+      let generated = try AcmeFixtures.make(at: fixtures, in: scratch)
       #expect(generated.termination == .exit(0))
       let scan = try SiltaBinary.run(["init", "--scan", fixtures.path, "--json"], in: scratch)
       #expect(scan.termination == .exit(0))
@@ -102,10 +99,7 @@ struct InitCommandTests {
 
   static func fixtures(_ scratch: URL) throws -> URL {
     let fixtures = scratch.appending(path: "acme")
-    let generated = try SiltaBinary.runProcess(
-      URL(filePath: "/bin/bash"),
-      [ScenarioRunner.repository.appending(path: "scripts/make-fixtures.sh").path, fixtures.path],
-      in: scratch)
+    let generated = try AcmeFixtures.make(at: fixtures, in: scratch)
     #expect(generated.termination == .exit(0))
     return fixtures
   }
