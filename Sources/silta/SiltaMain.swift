@@ -52,7 +52,7 @@ enum SiltaMain {
       let rendered = execution.rendered
       let milliseconds = elapsedMilliseconds(started.duration(to: timer.now))
       var entry = LogEntry(
-        timestamp: timestamp, command: commandPath(arguments),
+        timestamp: timestamp, command: execution.command ?? commandPath(arguments),
         actor: environment.actor.description, exitCode: hookDeadline == nil ? rendered.exitCode : 0,
         milliseconds: milliseconds)
       entry.workspace = execution.scope.workspace
@@ -141,18 +141,28 @@ enum SiltaMain {
       output.warnings = context.environment.warnings + output.warnings
       return CommandExecution(
         rendered: OutputRouter.render(.success(output), mode: mode),
-        scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store))
+        scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store),
+        command: loggedPath(arguments, outputCommand))
     } catch let error as any CodedError {
       let recovered = recovery(
         error, command: outputCommand, arguments: arguments, context: context)
       return CommandExecution(
         rendered: OutputRouter.render(.failure(recovered), mode: mode),
-        scope: CommandScope.failure(outputCommand, store: store))
+        scope: CommandScope.failure(outputCommand, store: store),
+        command: loggedPath(arguments, outputCommand))
     } catch {
       return CommandExecution(
         rendered: OutputRouter.render(.failure(error), mode: mode),
-        scope: CommandScope.failure(outputCommand, store: store))
+        scope: CommandScope.failure(outputCommand, store: store),
+        command: loggedPath(arguments, outputCommand))
     }
+  }
+
+  /// The name the log gives a command: the root's default command, which bare `silta`
+  /// runs, keeps the name `silta schema` lists for it (spec §19).
+  static func loggedPath(_ arguments: [String], _ command: any OutputCommand) -> String {
+    let path = commandPath(arguments)
+    return path == "silta" ? path + " " + type(of: command)._commandName : path
   }
 
   /// Keeps recovery tied to the failed command and intended workspace.
