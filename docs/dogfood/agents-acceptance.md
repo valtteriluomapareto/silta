@@ -1,8 +1,8 @@
 # Isolated agent-harness acceptance
 
-Run outside the coding sandbox, in an interactive terminal, after building the
-final installer/SessionStart/Stop changes. These are CLI checks; no real harness
-configuration is installed. Every command below uses fresh HOME and SILTA_HOME.
+Run outside the coding sandbox, in an interactive terminal, from a checkout
+containing all installer/SessionStart/Stop changes. Harness configuration stays
+inside a fresh temporary HOME; Silta data uses a separate temporary SILTA_HOME.
 Keep the temporary directories until you have recorded the result. Never copy
 existing configuration or credentials into them.
 
@@ -28,6 +28,7 @@ h() {
     XDG_CACHE_HOME="$si35_home/.cache" TMPDIR="${TMPDIR:-/tmp}" \
     PATH="$si35_path" TERM="${TERM:-xterm-256color}" "$@"
 }
+h swift build --only-use-versions-from-resolved-file -Xswiftc -warnings-as-errors
 mkdir -p "$si35_home/.codex" "$si35_home/.claude" "$si35_fixture/acme/platform"
 printf 'cli_auth_credentials_store = "file"\n' > "$si35_home/.codex/config.toml"
 h /usr/bin/git -C "$si35_fixture/acme/platform" init -q -b main
