@@ -23,7 +23,8 @@ struct StorageFailureClassTests {
     (ResultCode.SQLITE_IOERR_WRITE, .ioFailure),
     (ResultCode.SQLITE_NOLFS, .ioFailure),
     (ResultCode.SQLITE_FULL, .diskFull),
-    (ResultCode.SQLITE_IOERR_ACCESS, .accessDenied),
+    (ResultCode.SQLITE_IOERR_ACCESS, .ioFailure),
+    (ResultCode.SQLITE_IOERR_AUTH, .accessDenied),
     (ResultCode.SQLITE_IOERR_NOMEM, .resourceExhausted),
     (ResultCode.SQLITE_CORRUPT, .corrupt),
     (ResultCode.SQLITE_CORRUPT_VTAB, .corrupt),
@@ -39,6 +40,7 @@ struct StorageFailureClassTests {
     (ResultCode.SQLITE_MISMATCH, .internalMisuse),
     (ResultCode.SQLITE_MISUSE, .internalMisuse),
     (ResultCode.SQLITE_RANGE, .internalMisuse),
+    (ResultCode.SQLITE_NOTFOUND, .internalMisuse),
     (ResultCode.SQLITE_CONSTRAINT, .constraintViolation),
     (ResultCode.SQLITE_CONSTRAINT_UNIQUE, .constraintViolation),
   ])
@@ -67,6 +69,8 @@ struct StorageFailureClassTests {
     #expect(StorageError.mapped(POSIXError(.ENOENT)) == .cannotOpen)
     #expect(StorageError.mapped(POSIXError(.ENOLCK)) == .locked)
     #expect(StorageError.mapped(POSIXError(.EMFILE)) == .resourceExhausted)
+    #expect(StorageError.mapped(POSIXError(.ENFILE)) == .resourceExhausted)
+    #expect(StorageError.mapped(POSIXError(.ENOMEM)) == .resourceExhausted)
     #expect(StorageError.mapped(POSIXError(.EIO)) == .ioFailure)
   }
 
@@ -211,11 +215,11 @@ struct StorageFailureClassTests {
     }
   }
 
-  @Test func missingChangeSequenceIsInternalMisuse() throws {
+  @Test func missingChangeSequenceIsCorrupt() throws {
     try withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)
       try store.initialize()
-      #expect(throws: StorageError.internalMisuse) {
+      #expect(throws: StorageError.corrupt) {
         try store.write { transaction in
           try transaction.database.execute(sql: "DELETE FROM meta WHERE key='change_seq'")
           try transaction.recordChange(kind: "acme", rowID: 1)
@@ -227,6 +231,102 @@ struct StorageFailureClassTests {
   @Test func refusedWALJournalModeIsItsOwnClass() {
     #expect(throws: StorageError.walRefused) { try DatabaseStore.requireWAL("delete") }
     #expect(throws: StorageError.walRefused) { try DatabaseStore.requireWAL(nil) }
+  }
+
+  @Test func resourceExhaustionMessageCoversFileDescriptors() {
+    let message = StorageError.resourceExhausted.message
+    #expect(message.contains("memory"))
+    #expect(message.contains("open file"))
+  }
+
+  @Test func malformedStoredCloseDateIsCorruptInListAndShow() async throws {
+    try await withScratchDirectory { home in
+      let env = try TaskServiceTests.environment(home)
+      try TaskServiceTests.setup(env)
+      let service = TaskService(environment: env)
+      var draft = TaskDraft(title: "Acme")
+      draft.start = true
+      let created = try await service.add(draft, directory: home)
+      try env.db.write { transaction in
+        try transaction.database.execute(
+          sql: "UPDATE task SET status='done',closed_at='malformed' WHERE id=1")
+      }
+      #expect(throws: StorageError.corrupt) { _ = try service.list() }
+      #expect(throws: StorageError.corrupt) { _ = try service.show(created.ref) }
+    }
+  }
+
+  @Test func malformedStoredBlockEventIsCorrupt() {
+    #expect(throws: StorageError.corrupt) { _ = try TaskBlockEvent.decode("not json") }
+    #expect(throws: StorageError.corrupt) {
+      _ = try TaskBlockEvent.decode(#"{"on":[],"why":1}"#)
+    }
+  }
+
+  @Test func everyDanglingLinkTargetGuardIsCorrupt() throws {
+    try withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      try store.initialize()
+      var orphanedComment: Int64 = 0
+      try store.write { transaction in
+        try transaction.database.execute(sql: "PRAGMA ignore_check_constraints=ON")
+        try transaction.database.execute(
+          sql: """
+            INSERT INTO comment(uid,task_id,doc_rev_id,seq,kind,body_md,actor,created_at)
+            VALUES('acme-orphan',NULL,NULL,1,'note','acme','human:acme','2026-01-01T00:00:00.000Z')
+            """)
+        orphanedComment = transaction.database.lastInsertedRowID
+      }
+      try store.read { db in
+        let missingID = Row(["to_kind": "task", "to_id": nil, "to_ext": nil, "anchor": nil])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(missingID, in: db)
+        }
+
+        let missingEntity = Row(["to_kind": "doc", "to_id": 9999, "to_ext": nil, "anchor": nil])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(missingEntity, in: db)
+        }
+
+        let missingPlanRevision = Row([
+          "to_kind": "task_plan_rev", "to_id": 9999, "to_ext": nil, "anchor": nil,
+        ])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(missingPlanRevision, in: db)
+        }
+
+        let missingComment = Row(["to_kind": "comment", "to_id": 9999, "to_ext": nil, "anchor": nil])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(missingComment, in: db)
+        }
+
+        let orphanedCommentRow = Row([
+          "to_kind": "comment", "to_id": orphanedComment, "to_ext": nil, "anchor": nil,
+        ])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(orphanedCommentRow, in: db)
+        }
+
+        let missingTask = Row(["to_kind": "task", "to_id": 9999, "to_ext": nil, "anchor": nil])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(missingTask, in: db)
+        }
+
+        let missingDocumentRevision = Row([
+          "to_kind": "doc_rev", "to_id": 9999, "to_ext": nil, "anchor": nil,
+        ])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(missingDocumentRevision, in: db)
+        }
+
+        let unknownKind = Row([
+          "to_kind": "acme-unknown", "to_id": 1, "to_ext": nil, "anchor": nil,
+        ])
+        #expect(throws: StorageError.corrupt) {
+          _ = try TaskLinkTarget.render(unknownKind, in: db)
+        }
+      }
+    }
   }
 
   private func chmod(_ permissions: Int, _ url: URL) throws {

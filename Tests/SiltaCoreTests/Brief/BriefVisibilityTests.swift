@@ -41,8 +41,8 @@ struct BriefVisibilityTests {
       try base.db.write {
         try $0.database.execute(sql: "UPDATE task SET closed_at='bad' WHERE seq=4")
       }
-      #expect(throws: StorageError.self) { _ = try TaskService(environment: base).list() }
-      #expect(throws: StorageError.self) {
+      #expect(throws: StorageError.corrupt) { _ = try TaskService(environment: base).list() }
+      #expect(throws: StorageError.corrupt) {
         _ = try base.db.read {
           try BriefBacklog(
             db: $0, location: location, actor: TaskServiceTests.agent,
