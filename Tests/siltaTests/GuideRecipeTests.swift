@@ -35,16 +35,18 @@ struct GuideRecipeTests {
           try fixture.shell(blocks[index], task: target)
         }
         if index == 5 {
-          let task = try GuideReviewTests.data(fixture.run(["task", "show", target, "--json"]))
+          let task = try GuideContractTests.data(fixture.run(["task", "show", target, "--json"]))
           #expect(task["claimed_by"] == nil)
           #expect(task["status"] as? String == "doing")
           let comments = try #require(task["comments"] as? [[String: Any]])
           #expect(comments.contains { $0["kind"] as? String == "handoff" })
         }
       }
-      let task = try GuideReviewTests.data(fixture.run(["task", "show", "AC-1", "--json"]))
+      let task = try GuideContractTests.data(fixture.run(["task", "show", "AC-1", "--json"]))
       #expect(task["status"] as? String == "done")
       #expect((task["result"] as? String)?.contains("What was done:") == true)
+      let imported = try GuideContractTests.data(fixture.run(["task", "show", "AC-2", "--json"]))
+      #expect(imported["status"] as? String == "proposed")
     }
   }
 
@@ -52,17 +54,18 @@ struct GuideRecipeTests {
     try withScratchDirectory { scratch in
       let fixture = try GuideRecipeFixture(scratch)
       let guide = try fixture.run(["guide"]).stdout
-      let catalog = try GuideReviewTests.data(fixture.run(["schema", "--json"]))
-      let names = try #require(catalog["commands"] as? [[String: Any]]).compactMap {
-        $0["name"] as? String
-      }
       let spans = guide.components(separatedBy: "`")
       for index in stride(from: 1, to: spans.count, by: 2) where spans[index].hasPrefix("silta ") {
-        let command = spans[index].replacingOccurrences(of: "<topic>", with: "human")
+        var command = spans[index].replacingOccurrences(of: "<topic>", with: "human")
           .replacingOccurrences(of: "<cmd>", with: "guide")
           .replacingOccurrences(of: "<[^>]+>", with: "example", options: .regularExpression)
-        #expect(names.contains { command == $0 || command.hasPrefix($0 + " ") }, "\(command)")
-        try fixture.shell(command + " --help", task: "AC-1")
+        command = command.replacingOccurrences(of: " --help", with: "")
+        // This inline command names the family; supply its required title.
+        if command == "silta task add" { command += " 'Acme proposal' --app none" }
+        let result = try fixture.execute(command + " --json", task: "AC-1")
+        let root = try GuideContractTests.object(result.stdout)
+        let error = root["error"] as? [String: Any]
+        #expect(error?["code"] as? String != "usage", "\(command): \(result.stdout)")
       }
     }
   }
@@ -94,19 +97,23 @@ private struct GuideRecipeFixture {
   }
 
   func shell(_ text: String, task: String) throws {
+    let result = try execute(text, task: task)
+    #expect(result.termination == .exit(0), "\(text)\n\(result.stdout)\(result.stderr)")
+    #expect(!result.stderr.contains("handoff_unclaimed"))
+  }
+
+  func execute(_ text: String, task: String) throws -> CLIResult {
     let script = text.replacingOccurrences(of: "AC-12", with: task)
       .replacingOccurrences(of: "platform-api", with: "console")
       .replacingOccurrences(of: "src/Auth.swift", with: "README.md")
       .replacingOccurrences(of: "'Auth'", with: "'Acme'")
       .replacingOccurrences(of: "/tmp/acme-plan.md", with: shellWord(plan.path))
       .replacingOccurrences(of: "<commit-sha>", with: sha)
-    let result = try SiltaBinary.runProcess(
+    return try SiltaBinary.runProcess(
       URL(filePath: "/bin/sh"), ["-ec", script], in: scratch, cwd: repo,
       environment: TaskCommandTests.actor.merging([
         "PATH": try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
       ]) { $1 })
-    #expect(result.termination == .exit(0), "\(script)\n\(result.stdout)\(result.stderr)")
-    #expect(!result.stderr.contains("handoff_unclaimed"))
   }
 
   func taskCount() throws -> Int {

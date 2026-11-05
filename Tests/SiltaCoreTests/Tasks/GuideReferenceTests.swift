@@ -30,29 +30,56 @@ struct GuideReferenceTests {
       try service.environment.db.read { db in
         for row in rows {
           let columns = row.split(separator: "|", omittingEmptySubsequences: false)
-          let examples = columns[2].split(separator: "`")
-          for index in stride(from: 1, to: examples.count, by: 2) {
-            let example = String(examples[index])
-            if example.hasPrefix("diff:") || example.hasPrefix("#-") {
-              #expect(columns[3].contains("M2"))
-              let full =
-                example.hasPrefix("#-") ? "diff:lib/push/categories.dart" + example : example
-              #expect(
-                throws: TaskError.invalid(
-                  "Diff references need a review subject; CLI review subjects are unavailable.")
-              ) {
-                _ = try TaskLinkTarget.resolve(full, source: source, workspace: "acme", in: db)
-              }
-            } else if example.hasPrefix("ext:") {
-              #expect(try TaskService.blocker(example, workspace: "acme", in: db).kind == "ext")
-            } else {
-              _ = try TaskLinkTarget.resolve(example, source: source, workspace: "acme", in: db)
-            }
+          let kinds = try #require(
+            Self.kinds[String(columns[1]).trimmingCharacters(in: .whitespaces)])
+          let examples = Self.refs(columns[2])
+          #expect(examples.count == kinds.count)
+          for (example, kind) in zip(examples, kinds) {
+            try Self.check(example, kind: kind, notes: columns[3], source: source, db: db)
+          }
+          for note in Self.refs(columns[3]) where !["code:", "@<ref>", "@n", "-"].contains(note) {
+            try Self.check(
+              note, kind: try #require(kinds.first), notes: columns[3], source: source, db: db)
           }
         }
       }
     }
   }
+  private static let kinds = [
+    "Task": ["task"], "Comment": ["comment"],
+    "Doc / revision / comment": ["doc", "doc_rev", "comment"],
+    "App, topic": ["app", "topic"], "Code": ["code"],
+    "Plan lines": ["task_plan_rev", "task"], "Diff lines": ["diff", "diff"],
+    "Note": ["note"], "URL": ["url"], "External party": ["ext"],
+  ]
+
+  private static func refs(_ column: Substring) -> [String] {
+    let parts = column.split(separator: "`")
+    return stride(from: 1, to: parts.count, by: 2).map { String(parts[$0]) }
+  }
+
+  private static func check(
+    _ ref: String, kind: String, notes: Substring,
+    source: TaskDetails, db: Database
+  ) throws {
+    if kind == "diff" {
+      #expect(notes.contains("M2"))
+      let full = ref.hasPrefix("#-") ? "diff:lib/push/categories.dart" + ref : ref
+      #expect(
+        throws: TaskError.invalid(
+          "Diff references need a review subject; CLI review subjects are unavailable.")
+      ) {
+        _ = try TaskLinkTarget.resolve(full, source: source, workspace: "acme", in: db)
+      }
+    } else {
+      let target =
+        try kind == "ext"
+        ? TaskService.blocker(ref, workspace: "acme", in: db)
+        : TaskLinkTarget.resolve(ref, source: source, workspace: "acme", in: db)
+      #expect(target.kind == kind, "\(ref) must resolve as \(kind)")
+    }
+  }
+
   private static func referenceRows() throws -> [String] {
     let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
