@@ -11,6 +11,7 @@ struct SiltaCommand: ParsableCommand {
       CodeCommand.self, WhereCommand.self, DoctorCommand.self, CommentCommand.self,
       BriefCommand.self, InboxCommand.self, GuideCommand.self, AgentsCommand.self,
       SessionCommand.self, StatusCommand.self,
+      ExportCommand.self,
     ],
     // Bare `silta` prints the status line; help, version and usage errors stay the root's.
     defaultSubcommand: StatusCommand.self

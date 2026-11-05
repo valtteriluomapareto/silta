@@ -255,6 +255,11 @@ struct DogfoodLogTests {
 }
 
 extension DogfoodLogTests {
+  /// Export, after the rest of the catalog.
+  static func exportCatalog() -> [(args: [String], workspace: String?)] {
+    [(["--ws", "acme", "export", "--to", "exports"], "acme")]
+  }
+
   /// One successful call per `silta schema` command, chained in one home whose current
   /// workspace is beta, with the workspace each log line must name.
   static func catalog(_ scratch: URL) throws -> [(args: [String], workspace: String?)] {
@@ -307,7 +312,7 @@ extension DogfoodLogTests {
       (acme + ["inbox"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"), (acme + ["status"], "acme"),
-    ] + integrationCatalog()
+    ] + integrationCatalog() + exportCatalog()
   }
 
   static func integrationCatalog() -> [(args: [String], workspace: String?)] {
