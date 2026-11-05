@@ -1094,8 +1094,6 @@ JSON values, permissions and empty user files. Ownership remains recognizable if
 `SILTA_HOME` changes.
 Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
 nonregular/multiply linked files and files over 1 MiB are refused before writes.
-Rendered files must also fit that limit, so installation never creates a file that
-its next preview or uninstall cannot read.
 Permission preservation uses refusal rather than copying security metadata: nonempty
 file ACLs, extended attributes other than OS-managed com.apple.provenance, file flags
 and special mode bits refuse. Inheritable ACLs on selected parent directories also
