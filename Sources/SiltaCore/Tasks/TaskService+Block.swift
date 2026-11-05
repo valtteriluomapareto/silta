@@ -84,7 +84,7 @@ extension TaskService {
       guard
         let uid = try String.fetchOne(
           db, sql: "SELECT uid FROM task WHERE id=?", arguments: [row["to_id"] as Int64])
-      else { throw StorageError.unavailable }
+      else { throw StorageError.corrupt }
       return uid
     }
   }

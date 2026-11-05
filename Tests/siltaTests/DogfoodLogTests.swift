@@ -257,6 +257,11 @@ struct DogfoodLogTests {
 extension DogfoodLogTests {
   /// One successful call per `silta schema` command, chained in one home whose current
   /// workspace is beta, with the workspace each log line must name.
+  /// Export, after the rest of the catalog.
+  static func exportCatalog() -> [(args: [String], workspace: String?)] {
+    [(["--ws", "acme", "export", "--to", "exports"], "acme")]
+  }
+
   static func catalog(_ scratch: URL) throws -> [(args: [String], workspace: String?)] {
     let edit = scratch.appending(path: "edit.md")
     let sections = [
@@ -307,7 +312,7 @@ extension DogfoodLogTests {
       (acme + ["inbox"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
-    ] + [(["guide"], nil), (acme + ["export", "--to", "exports"], "acme")]
+    ] + [(["guide"], nil), (acme + ["status"], "acme")] + exportCatalog()
   }
 
   static func discussionCatalog() -> [(args: [String], workspace: String?)] {

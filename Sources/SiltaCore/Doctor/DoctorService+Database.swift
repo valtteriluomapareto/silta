@@ -53,7 +53,7 @@ extension DoctorService {
       }
     } catch {
       let failure = readFailure(
-        StorageError.mapped(error), path: store.path, recovery: recovery,
+        StorageError.mapped(error, at: store.path), path: store.path, recovery: recovery,
         hasBackups: backups.count > 0)
       return [failure] + skipped(["database.foreign_keys", "database.schema"] + dependentIDs)
         + [backups.check(expectedDay: nil)]
@@ -63,19 +63,69 @@ extension DoctorService {
   static func readFailure(_ error: StorageError, path: String, recovery: [String], hasBackups: Bool)
     -> DoctorCheck
   {
-    if error == .busy {
+    let evidence = "/bin/ls -l " + shellWord(path)
+    switch error {
+    case .busy, .locked:
       return DoctorCheck(
         id: "database.integrity", status: .fail,
-        message: "Database is busy; inspect open handles, then retry once.",
+        message: error == .busy
+          ? "Database is busy; inspect open handles, then retry once."
+          : "Database is locked; inspect open handles, then retry once.",
         next: ["/usr/sbin/lsof " + shellWord(path)])
+    case .accessDenied:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "Database access is denied by file permissions or a read-only file or directory; "
+          + "inspect access and the resolved database path.",
+        next: recovery + [evidence], nextBy: .human)
+    case .corrupt:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "SQLite reports the database is corrupt or is not a SQLite database; "
+          + "inspect backups and read-only evidence; restore is the human's decision.",
+        next: recovery, nextBy: .human)
+    case .diskFull, .ioFailure, .walRefused:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "Database file could not be read or written because of a filesystem failure; "
+          + "inspect free space and the resolved database path.",
+        next: recovery, nextBy: .human)
+    default:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "Database could not be opened or read."
+          + (hasBackups
+            ? " Backups are available; restore is the human's decision."
+            : " Inspect the read-only evidence before deciding recovery."),
+        next: recovery)
     }
-    return DoctorCheck(
-      id: "database.integrity", status: .fail,
-      message: "Database could not be opened or read."
-        + (hasBackups
-          ? " Backups are available; restore is the human's decision."
-          : " Inspect the read-only evidence before deciding recovery."),
-      next: recovery)
+  }
+
+  /// Persisted rows the read and write paths refuse to interpret as valid Silta state.
+  private static func storedDataProblems(_ db: Database) throws -> [String] {
+    guard try db.tableExists("meta"), try db.tableExists("task") else { return [] }
+    var problems: [String] = []
+    let unreadable =
+      try Int.fetchOne(
+        db,
+        sql: """
+          SELECT count(*) FROM task
+          WHERE status IN ('done','dropped') AND closed_at IS NOT NULL
+            AND silta_archive_instant(closed_at) IS NULL
+            AND coalesce(archive_override,'')<>'archived'
+          """) ?? 0
+    if unreadable > 0 {
+      problems.append("\(unreadable) stored task close timestamp(s) cannot be read")
+    }
+    let required = ["change_seq", "last_backup_day"]
+    let present = Set(
+      try String.fetchAll(
+        db, sql: "SELECT key FROM meta WHERE key IN ('change_seq','last_backup_day')"))
+    let missing = required.filter { !present.contains($0) }
+    if !missing.isEmpty {
+      problems.append("required metadata \(missing.joined(separator: ", ")) is missing")
+    }
+    return problems
   }
 
   private static func databaseChecks(
@@ -119,15 +169,18 @@ extension DoctorService {
   private static func integrity(_ db: Database, recovery: [String]) -> [DoctorCheck] {
     var checks: [DoctorCheck] = []
     do {
-      let valid = try String.fetchAll(db, sql: "PRAGMA integrity_check") == ["ok"]
+      let structural = try String.fetchAll(db, sql: "PRAGMA integrity_check") == ["ok"]
+      let problems =
+        (structural ? [] : ["SQLite integrity check failed"])
+        + (try storedDataProblems(db))
       checks.append(
         DoctorCheck(
-          id: "database.integrity", status: valid ? .pass : .fail,
-          message: valid
+          id: "database.integrity", status: problems.isEmpty ? .pass : .fail,
+          message: problems.isEmpty
             ? "SQLite integrity check passed."
-            : "SQLite integrity check failed; inspect backups and read-only evidence. "
+            : problems.joined(separator: "; ") + "; inspect backups and read-only evidence. "
               + "Restore is the human's decision.",
-          next: valid ? [] : recovery))
+          next: problems.isEmpty ? [] : recovery))
     } catch {
       checks.append(
         DoctorCheck(

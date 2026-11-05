@@ -36,6 +36,7 @@ silta comment accept  Accept an answer as the asker or current claimer and resol
 silta brief  Read budgeted local context for the current task.
 silta inbox  Read current local attention without marking it read.
 silta guide  Read the agent manual, or one topic.
+silta status  Print a one-line status: workspace, app, inbox count and your claimed tasks.
 silta export  Write one workspace as a deterministic text tree for backup and diff.
 details: silta schema <command>
 

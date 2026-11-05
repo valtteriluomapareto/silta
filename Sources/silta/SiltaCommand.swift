@@ -9,8 +9,11 @@ struct SiltaCommand: ParsableCommand {
     subcommands: [
       SchemaCommand.self, WsCommand.self, InitCommand.self, RepoCommand.self, TaskCommand.self,
       CodeCommand.self, WhereCommand.self, DoctorCommand.self, CommentCommand.self,
-      BriefCommand.self, InboxCommand.self, GuideCommand.self, ExportCommand.self,
-    ]
+      BriefCommand.self, InboxCommand.self, GuideCommand.self, StatusCommand.self,
+      ExportCommand.self,
+    ],
+    // Bare `silta` prints the status line; help, version and usage errors stay the root's.
+    defaultSubcommand: StatusCommand.self
   )
 
   @OptionGroup var global: GlobalOptions

@@ -32,7 +32,7 @@ extension BriefReportTests {
       path: "/acme", worktree: "/acme", workspace: "acme",
       repo: "platform", branch: "main", head: "a", confidence: "high", reason: "single",
       candidates: [])
-    for budget in 60...120 {
+    for budget in 0...200 {
       let plan = BriefPlan.section(
         (1...60).map { "- [ ] Acme step \($0)" }.joined(separator: "\n"), ref: "AC-1", revision: 0)
       var report = BriefReport(
@@ -40,8 +40,17 @@ extension BriefReportTests {
         settings: BriefSettings(
           WorkspaceSettings(workspace: "acme", json: "{}"), workspace: "acme"),
         currentTask: "AC-1", sections: [plan], more: ["silta task show AC-1"], warnings: [])
+      let marker =
+        [0, 60].map {
+          BriefPlan.marker(ref: "AC-1", total: 60, through: $0, workspace: "acme").count
+        }.max() ?? 0
+      let minimum = report.floor.count + report.footer.count + marker
       report.trim(tokens: budget)
-      #expect(report.text.count <= budget * 4)
+      #expect(report.text.count <= max(budget * 4, minimum), "budget \(budget)")
+      // Once any plan text fits, the reserve must keep the whole report inside the budget.
+      if report.text.contains("plan (revision 0):") {
+        #expect(report.text.count <= budget * 4, "budget \(budget) with steps")
+      }
     }
     var complete = BriefReport(
       location: BriefLocation(location),

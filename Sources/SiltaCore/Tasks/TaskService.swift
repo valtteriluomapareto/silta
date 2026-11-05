@@ -83,12 +83,12 @@ package struct TaskService: Sendable {
     guard let holder = task.claimedBy, holder != environment.actor.description else {
       return nil
     }
-    guard let raw = task.claimedAt else { throw StorageError.unavailable }
+    guard let raw = task.claimedAt else { throw StorageError.corrupt }
     let instant: Date
     do {
       instant = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(raw)
     } catch {
-      throw StorageError.unavailable
+      throw StorageError.corrupt
     }
     let age = max(0, date.timeIntervalSince(instant))
     return age < Self.claimDuration ? (holder, Int(age / 60)) : nil

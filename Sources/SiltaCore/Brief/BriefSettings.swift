@@ -18,7 +18,7 @@ package struct BriefSettings: Encodable, Sendable {
     do {
       guard
         let raw = try JSONSerialization.jsonObject(with: Data(settings.json.utf8)) as? [String: Any]
-      else { throw StorageError.unavailable }
+      else { throw StorageError.corrupt }
       let defaults = WorkspaceSettings(workspace: workspace, json: "{}")
       let known = WorkspaceSettings.CodingKeys.allCases.map(\.rawValue)
       var items: [String] = []

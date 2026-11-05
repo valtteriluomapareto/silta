@@ -1190,49 +1190,77 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    irreversible steps, money)`. Trimming never cuts it. `--json` always has a `settings` object, empty when all are default
    (D39).
 2. **Current task** (chosen as in §8):
-   1. the latest handoff
-   2. unanswered questions, and what the task is blocked on and for how long, with
-      the same `next` as a refused `task start`
+   1. the newest live handoff, chosen as `task show` chooses it (creation time then
+      id; still shown once resolved, and then labelled `resolved`), with its ref,
+      author and time. Its body is secret-masked, then quoted line by line with `> `,
+      and capped at 15% of the budget's characters with a whole
+      `(handoff trimmed; silta --ws acme task show AC-12)` marker.
+   2. the caller's own inbox items on this task (see Inbox below), at most three;
+      then one `questions: N open (M answered)` line counting the task's live
+      unresolved questions, whoever they address. `task show` in `more:` has their
+      text. Then what the task is blocked on and for how long, with the same `next`
+      as a refused `task start`
    3. the plan with step state: completed runs collapse (e.g. `1–7 done`) unless they contain open nested
       work. Open steps keep original numbering, and the tail is trimmed. A complete marker
       such as `(plan trimmed: 32/60; silta --ws acme task show AC-12)` names the last
       represented original step and total, including completed summaries. The count
       is replaced by “no steps shown (60 total)” when no step fits; freeform plans
       retain their text and use a marker without counts.
-   4. the task description, trimmed after the plan to at most 600 characters,
-      including a complete `task show` marker. Global trimming keeps that marker
+   4. the task description, trimmed after the plan to at most 600 characters, or 6%
+      of a larger budget's characters (rounded down), including a complete
+      `task show` marker. Global trimming keeps that marker
       whole whenever a partial description is displayed. Local capping marks the
       report truncated and leaves later app context eligible.
    5. (M2) review state and unresolved `changes` threads with their snippets
-3. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
+3. **Inbox**: the caller's own attention, read in the brief's snapshot as
+   `silta inbox` reads it (same categories, order, eligibility and `next` commands,
+   without the 12-item cap; proposals older than 14 days stay out) at the brief's one
+   clock reading.
+   Omitted when the caller has none. A header
+   `inbox: N items for <actor> (M on this task)` counts every item and those shown
+   under the current task; then at most three items not on the current task. A post
+   item is `<kind> <ref> on <task> by <author>:` (an answer adds `to <question ref>`, a
+   claimed-task `discussion` item its post kind), its body masked, cut to 200
+   characters and quoted, then a `(trimmed; … task show <task> --timeline)` marker
+   when cut and `clears on your next write to <task>` for a discussion item. A grouped
+   or task-pointer item (ready, re-plan, due, proposal, promoted) is
+   `<kind> <task refs>[ on <target>][ due <day>][ by <author>]:` with at most three
+   quoted `<ref>: <title>` lines. Every item ends with its `next:` lines; a command
+   an earlier item printed is not repeated. When the caller has any item, `more:`
+   adds `silta --ws acme inbox`, which no trim removes.
+4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
    the resolved worktree's repo root with its on-disk casing, including for subpath apps. The pointer does not
    claim the file exists.
-4. **Neighbours**: edges in and out, ordered by source app, target app, target
+5. **Neighbours**: edges in and out, ordered by source app, target app, target
    service, kind and edge id. Configured code references produce complete, quoted
    `silta code show …` commands, including ref and line selection. With no usable
    code references, offer `silta code ls` on the other app. Service edges omit a
    redundant directory command for the current app. Repeated code commands appear
    only once; valid references survive unsupported elements in the same list.
-5. **Open tasks** for this app and its topics (top 8), ordered by priority then
+6. **Open tasks** for this app and its topics (top 8), ordered by priority then
    task sequence ascending, after explicit-topic matches, which rank first. When
-   the selection exceeds eight, an omitted count includes complete `task ls` commands
-   for the app and canonical selected topics. Open statuses are todo, doing, review, blocked and visible
+   the selection exceeds eight, an omitted count is followed by one `next:` line per
+   complete `task ls` command, for the app and canonical selected topics. Open statuses are todo, doing, review, blocked and visible
    proposals (the caller's proposals, or all for a human). Promoted and archived tasks
    are omitted. Topics come from `about` links on visible, unarchived, unpromoted
    tasks assigned to this app. Repeatable `--topic` adds topic slugs or normalized
    aliases. Their matching tasks may belong to other apps; duplicates appear once,
    and topics do not expand recursively. An unknown topic returns `not_found` with
    a workspace-qualified `ws show` command. The current task may also appear here.
-6. **Recently done**: the first line of each result, with the first 12 characters of `done_sha` when set, for the last 5
+7. **Recently done**: the first line of each result, with the first 12 characters of `done_sha` when set, for the last 5
    matching tasks, ordered by completion instant then task sequence descending.
    Empty result text is omitted. Cross-app open rows name their app.
    Promoted and archived tasks are omitted. Brief alone uses the default 14-day
    archive threshold if the stored archive setting is unsupported, with a warning.
-7. **Decisions**: `decision` comments, plus decisions from meeting notes from M3.
-8. **Docs** (M2): titles, plus stale flags.
-9. **Glossary**: aliases of the topics shown.
+   A task whose `closed_at` cannot be read is left out of open and done rows, even
+   when an archive override keeps it, and a
+   body-free `closed_at_unreadable` warning counts such tasks; it never fails the brief.
+8. **Decisions** (not yet shown): `decision` comments, plus decisions from meeting notes from M3.
+9. **Docs** (M2): titles, plus stale flags.
+10. **Glossary**: aliases of the topics shown.
 
-Output ends with `more: silta brief --task AC-15 | silta task show AC-15 | silta guide`.
+Output ends with one `more:` line per complete command, e.g. `more: silta brief --task AC-15`
+then `more: silta task show AC-15`; no line joins commands, so none reads as a pipe.
 
 `--hook` mode never indexes, never fetches, uses `where_cache` when it's fresh, and
 prints nothing on error or timeout. Brief is deterministic for the same DB and git
@@ -1267,10 +1295,10 @@ rules. App cards, neighbours and app backlogs follow resolved `location.app`; th
 section names its own app, including when an explicit `--app` selects a different app.
 Brief masks stored task-body secrets. Blockers include their follow-up date.
 
-Discussion/inbox sections remain omitted until their ordered addition ships.
 Hook mode has a 1.5 s process deadline, including environment
 assembly, fails immediately on database contention and never populates `where_cache`.
-The watchdog appends a best-effort body-free timeout record, then exits without running
+A strict, zero-leeway watchdog timer alone owns that deadline; output can follow it only
+by that timer's latency. The watchdog appends a best-effort body-free timeout record, then exits without running
 exit handlers. Timeout and completion have exclusive log/output ownership; completion
 cancels the watchdog explicitly before output. A child Git deadline is recorded as
 `hook_timeout` even when it finishes before the process deadline. Hook log appends are
@@ -1430,7 +1458,27 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - Shell completion is generated by ArgumentParser, with dynamic completion of task
   ids and app slugs.
 - `silta` with no arguments prints a one-line status: workspace, app, inbox count, and
-  my claimed tasks.
+  my claimed tasks. It runs `silta status`, the root's default command, so `--help`,
+  `-h`, `help`, `--version` and usage errors behave as before, also when the
+  environment is broken:
+  - `workspace acme, app api, inbox 3, claimed AC-12 AC-14`. The workspace is `--ws`,
+    else the registered repository's (§7), else the current one. The app is
+    `(unresolved)` at low confidence, and the line then ends `; next: silta where`;
+    it is `(unregistered)` outside a registered repository of that workspace.
+    `inbox` counts the caller's own `silta inbox` items, the omitted ones included
+    (no `--all`); `claimed` lists, in task order, the tasks whose claim is the
+    caller's exact actor, or `none`.
+  - When no workspace resolves (no `--ws`, registered repository, current workspace
+    or database), it prints `No workspace here; next: silta where` inside an
+    unregistered Git repository, else `No workspace here; next: silta ws ls`, and
+    exits 0. An unknown `--ws` is `not_found`; other location failures are reported
+    as by `where`, and location warnings are left to `where`.
+  - `--json` data is `{"location","workspace"?,"app"?,"inbox"?,"claimed"?}`:
+    `location` is `resolved`, `unresolved` or `unregistered`; `workspace`, `inbox`
+    and `claimed` (`[{"ref","title"}]`) appear together when a workspace resolves,
+    and `app` when it resolved. `--quiet` prints the same line.
+  - It is a read: it never fetches, initializes, migrates or writes `index.db` (a
+    fresh `where` cache may be reused), and writes nothing but its log line (§19).
 
 **JSON envelope:**
 
@@ -1523,7 +1571,7 @@ run.
 | 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken`, `blocked` | Re-read, then decide; don't steal, and don't unblock while blockers are open |
 | 7 | `gate` | Request a review or ask the human |
 | 8 | `rate_limited` | Wait for `retry_after_s`, or summarise |
-| 9 | `env` (schema too new, read-only DB, git missing, no network, a bad `SILTA_*` variable) | Report the printed fix to the human |
+| 9 | `env` (a corrupt, read-only, missing, full or otherwise failed database, schema too new, git missing, no network, a bad `SILTA_*` variable) | Report the printed fix to the human |
 
 **Commands.** The milestone that ships each one is in brackets.
 
@@ -1537,6 +1585,7 @@ silta doctor [--fix]                             [M1]
 silta guide [<topic>] (including refs)            [M1]
 
 # context
+silta [status]                                   [M1] one-line status; bare `silta` runs it
 silta where [--path <dir>] [--app <app>] [--task <ref>] [--set <app> | --unset]      [M1]
 silta brief [...]                                [M1; docs M2; notes M3]
 silta code show|grep|log|ls <app>[@ref] …        [M1]
@@ -1581,8 +1630,9 @@ chosen `--slug` and `--prefix` keep their
 case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
 starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
 (`AC-1`). A repo's slug is its directory name normalized — lowercased, other characters
-to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. The
-DF3 onboarding scans only the chosen clones:
+to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. A clone whose slug is
+`none` is refused, because that word means non-code work, and the conflict names its path.
+The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 
 ## 17. Storage, concurrency, technology
@@ -1700,7 +1750,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - warnings
 
   `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
-  `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`, and a successful `init --scan`.
+  `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`, `status` (logged as
+  `silta status` also when bare `silta` runs it), and a successful `init --scan`.
   - A successful command logs the workspace it resolved and acted on (`--ws`, its
     slug argument, or the current workspace), or the one `init --scan` or `ws edit`
     created. It is the command's own resolution, so a command that reports none is
@@ -1754,7 +1805,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   | Id (display order) | Check / availability |
   |---|---|
-  | `database.integrity` | SQLite integrity or operational read failure |
+  | `database.integrity` | SQLite or stored-value integrity, or operational read failure |
   | `database.foreign_keys` | Foreign-key integrity |
   | `database.schema` | Truth schema and writer compatibility |
   | `database.wal` | File-only WAL size |
@@ -1828,7 +1879,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 | Tier | What | Notes |
 |---|---|---|
 | Unit | Ref parser, actor matrix, secret corpus, brief budgeting, plan parser, `where` scoring | Fake `Clock` and fake `GitRunner` |
-| Fixture git | `scripts/make-fixtures.sh` builds repos | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
+| Fixture git | `scripts/make-fixtures.sh` builds repos once per test process; tests get relocated copies (`AcmeFixtures`) | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
 | Multi-process stress | Spawns the built binary | 20 writers × 200 adds: no duplicate seq. N concurrent `start`: exactly one claimer. Concurrent first-open migration. Concurrent lazy index: one indexer. p95 latency recorded. |
 | Golden CLI | Text, `--json` and exit codes for every command | Includes every error code's message and `next` hint |
 | Round-trip | Property test | `export(restore(export(db))) == export(db)`, byte-identical. Tampered and partial trees are rejected with nothing written. |
@@ -2184,10 +2235,11 @@ characters to `-`, trimmed, and `repo` when nothing remains — so `My Projects`
 repo `my-projects`. That slug is only an identifier: the real path is stored as the
 machine-local repo path, so nothing on disk is renamed and worktrees and path aliases
 resolve to their canonical main clone as they are. Two directories that normalize to one
-slug are a duplicate, checked on the normalized names before any rename. A clone named
-`none`, the word that means non-code work, is stored as `none-repo`, or the next free
-`none-repo-N` when another clone in the scan normalizes to that name; the same clone keeps
-its stored name on every full or partial rescan. A task prefix another workspace holds, or
+slug are a duplicate, checked on the normalized names before anything is written. A clone named
+`none`, the word that means non-code work in `--app none`, is a reserved repo slug, so a
+clone whose directory name normalizes to it is refused: the conflict names the clone's
+path and asks for a different directory name rather than renaming it. Nothing is written
+and no stored path moves. A task prefix another workspace holds, or
 a clone path another workspace already binds, is a conflict that names the holder and a
 command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
 or master provides a default app when its ref is not already represented.
