@@ -29,12 +29,10 @@ package struct RestoreRequest: Sendable {
 /// Replaces one workspace from an export tree (spec §15).
 package enum RestoreService {
   /// Restores the tree in `request.directory`, the `<root>/<workspace>` that holds
-  /// `manifest.json`.
-  /// The tree is read and validated before the write; the replace, its self-check and
-  /// `approval`'s row then happen in one transaction, rolled back for `dryRun`. A real
-  /// run that replaces a workspace first takes a before-restore snapshot. `expected` is the `--ws` the caller
-  /// named, if any. Throws `ExportError` or `StorageError`; on failure the database is
-  /// as it was.
+  /// `manifest.json`. The tree is read and validated before the write; the replace, its
+  /// self-check and the approval's row then happen in one transaction, rolled back for a
+  /// dry run. A real run that replaces a workspace first takes a before-restore snapshot.
+  /// Throws `ExportError` or `StorageError`; on failure the database is as it was.
   package static func restore(
     _ request: RestoreRequest, store: DatabaseStore, home: URL,
     identity: (ids: any IDGenerator, date: Date)
@@ -216,9 +214,9 @@ private struct RestoreValidation {
       guard let to = link.value("to") else { continue }
       if link.value("to_kind") == "task_plan_rev" {
         guard revisions.contains("\(to)@\(link.value("to_rev") ?? "")") else {
+          let revision = link.value("to_rev") ?? ""
           throw ExportError.invalidTree(
-            "a link names plan revision \(link.value("to_rev") ?? "") of \(to), which the tree doesn't hold"
-          )
+            "a link names plan revision \(revision) of \(to), which the tree doesn't hold")
         }
       } else {
         try resolve(to, ExportFormat.linkTables[link.value("to_kind") ?? ""] ?? "", from: "link")

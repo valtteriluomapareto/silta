@@ -22,9 +22,10 @@ extension RestoreWriter {
           ExportFormat.integerKeys.contains(field.key) ? Int64(field.value) : field.value)
       }
     }
+    let placeholders = columns.map { _ in "?" }.joined(separator: ",")
     try db.execute(
       sql:
-        "INSERT INTO \(table)(\(columns.joined(separator: ","))) VALUES(\(columns.map { _ in "?" }.joined(separator: ",")))",
+        "INSERT INTO \(table)(\(columns.joined(separator: ","))) VALUES(\(placeholders))",
       arguments: StatementArguments(values))
     let rowID = db.lastInsertedRowID
     if let uid = row.value("uid") { ids[table, default: [:]][uid] = rowID }

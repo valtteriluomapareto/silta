@@ -60,7 +60,10 @@ struct RestoreCommandTests {
           sql: "UPDATE task SET title='Renamed', claimed_by='agent:claude:other' WHERE seq=1")
         try db.execute(
           sql:
-            "INSERT INTO service(uid,workspace_id,slug,name) VALUES('01HZSVCLATER',1,'later','Later')"
+            """
+            INSERT INTO service(uid,workspace_id,slug,name)
+            VALUES('01HZSVCLATER',1,'later','Later')
+            """
         )
       }
       let dry = try SiltaBinary.run(

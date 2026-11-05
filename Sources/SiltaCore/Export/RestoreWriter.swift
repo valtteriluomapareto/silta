@@ -78,7 +78,10 @@ struct RestoreWriter {
       if let uid = try String.fetchOne(
         db,
         sql:
-          "SELECT uid FROM \(table) WHERE uid IN (SELECT value FROM json_each(?)) AND NOT (\(mine))",
+          """
+          SELECT uid FROM \(table) WHERE uid IN (SELECT value FROM json_each(?))
+          AND NOT (\(mine))
+          """,
         arguments: [json, workspace])
       {
         throw ExportError.restoreConflict("\(table) uid \(uid) belongs to another workspace")
