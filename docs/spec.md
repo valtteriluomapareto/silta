@@ -1209,7 +1209,9 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
       report truncated and leaves later app context eligible.
    5. (M2) review state and unresolved `changes` threads with their snippets
 3. **Inbox**: the caller's own attention, read in the brief's snapshot as
-   `silta inbox` reads it (same categories, order and `next` commands, uncapped).
+   `silta inbox` reads it (same categories, order, eligibility and `next` commands,
+   without the 12-item cap; proposals older than 14 days stay out) at the brief's one
+   clock reading.
    Omitted when the caller has none. A header
    `inbox: N items for <actor> (M on this task)` counts every item and those shown
    under the current task; then at most three items not on the current task. A post
@@ -1246,7 +1248,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    Empty result text is omitted. Cross-app open rows name their app.
    Promoted and archived tasks are omitted. Brief alone uses the default 14-day
    archive threshold if the stored archive setting is unsupported, with a warning.
-   A task whose `closed_at` cannot be read is left out of open and done rows, and a
+   A task whose `closed_at` cannot be read is left out of open and done rows, even
+   when an archive override keeps it, and a
    body-free `closed_at_unreadable` warning counts such tasks; it never fails the brief.
 8. **Decisions** (not yet shown): `decision` comments, plus decisions from meeting notes from M3.
 9. **Docs** (M2): titles, plus stale flags.
