@@ -1038,6 +1038,13 @@ Uninstall removes only unedited ownership, retaining unrelated bytes, permission
 and empty user files. Ownership remains recognizable if `SILTA_HOME` changes.
 Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
 nonregular/multiply linked files and files over 1 MiB are refused before writes.
+Permission preservation uses refusal rather than copying security metadata: nonempty
+file ACLs, extended attributes other than OS-managed com.apple.provenance, file flags
+and special mode bits refuse. Inheritable ACLs on selected parent directories also
+refuse before any selected write. Existing files must belong to the current effective
+user and match their parent directory's group, which a replacement inherits. Accepted
+uid/gid and POSIX modes are bound to confirmation; adding unsupported metadata after
+preview refuses. OS-managed provenance is not copied or treated as access permissions.
 
 Targets come from explicit absolute `HOME`; a selected harness's nonmatching
 `CODEX_HOME` or `CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. Unselected
@@ -1046,12 +1053,15 @@ effective `SILTA_HOME`. The conservative TOML editor supports bare single-line
 keys/tables and refuses existing user-owned writable-root definitions or ambiguous
 syntax. Supported values are JSON-compatible strings, finite numbers, booleans and
 arrays, and single-quoted literal strings; inline comments, dates, multiline values
-and inline tables are refused. It never changes sandbox mode, trust or authentication. A human must inspect
+and inline tables are refused. Duplicate/conflicting names refuse across the
+complete document, including the owned table. Dotted assignments, arrays of tables
+and reopening an implicitly introduced parent table require manual integration. It never changes sandbox mode, trust or authentication. A human must inspect
 such refusals; there is no overwrite flag. Configuring a root does not prove it is
 effective in a managed harness (D42).
 
 Installers serialize with an advisory lock on HOME and preflight all selected
-targets. Each file replacement is atomic; multiple replacements are not one
+targets. Public diffs are extracted from validated owned spans; unrelated text never becomes diff context. An owned TOML table retains its insertion offset.
+Each file replacement is atomic; multiple replacements are not one
 transaction. An I/O failure names the failing target/cause and completed paths, asks
 the human to inspect permissions/structure, then offers a fresh preview/retry;
 there is no rollback or process-crash guarantee. An unrelated editor does not honor

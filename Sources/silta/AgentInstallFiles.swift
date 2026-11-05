@@ -4,6 +4,12 @@ import SiltaCore
 
 /// Relative descriptor traversal never follows a harness-directory symlink.
 final class AgentInstallFiles {
+  struct Snapshot: Equatable {
+    let data: Data?
+    let mode: UInt16
+    let security: String
+  }
+
   let home: String
   let preview: String
   private let root: Int32
@@ -54,42 +60,51 @@ final class AgentInstallFiles {
 
   private func directory(_ path: String, create: Bool) throws -> Int32? {
     var fd = dup(root)
+    guard fd >= 0 else { throw refusal(path, "cannot inspect parent directory") }
+    var retained = false
+    defer { if !retained { Darwin.close(fd) } }
+    try AgentInstallSecurity.directory(fd) { throw refusal(path, "inheritable parent ACL") }
     for component in path.split(separator: "/").dropLast() {
       let name = String(component)
       var child = openat(fd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
       if child < 0, errno == ENOENT, create {
         guard mkdirat(fd, name, 0o700) == 0 || errno == EEXIST else {
-          Darwin.close(fd)
           throw refusal(path, "cannot create parent directory")
         }
         child = openat(fd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
       }
-      let missing = child < 0 && errno == ENOENT
-      Darwin.close(fd)
       if child < 0 {
-        if missing && !create { return nil }
+        if errno == ENOENT && !create { return nil }
         throw refusal(path, "unsafe or inaccessible parent directory")
       }
+      Darwin.close(fd)
       fd = child
+      try AgentInstallSecurity.directory(fd) { throw refusal(path, "inheritable parent ACL") }
     }
+    retained = true
     return fd
   }
 
-  func read(_ path: String) throws -> (Data?, UInt16) {
-    guard let parent = try directory(path, create: false) else { return (nil, 0o600) }
+  func read(_ path: String) throws -> Snapshot {
+    guard let parent = try directory(path, create: false) else {
+      return .init(data: nil, mode: 0o600, security: "")
+    }
     defer { Darwin.close(parent) }
     let fd = openat(
       parent, URL(filePath: path).lastPathComponent, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
-    if fd < 0, errno == ENOENT { return (nil, 0o600) }
+    if fd < 0, errno == ENOENT { return .init(data: nil, mode: 0o600, security: "") }
     guard fd >= 0 else { throw refusal(path, "cannot safely open file") }
     let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     var info = stat()
     guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
       info.st_nlink == 1, info.st_size <= 1_048_576
     else { throw refusal(path, "expected one regular file of at most 1 MiB") }
+    let security = try AgentInstallSecurity.file(fd, parent: parent, info: info) {
+      throw refusal(path, "unsupported security metadata")
+    }
     let data = try handle.readToEnd() ?? Data()
     guard String(data: data, encoding: .utf8) != nil else { throw refusal(path, "invalid UTF-8") }
-    return (data, info.st_mode & 0o777)
+    return .init(data: data, mode: info.st_mode & 0o777, security: security)
   }
 
   func apply(_ edits: [AgentInstallPlan.Edit]) throws {
@@ -98,8 +113,8 @@ final class AgentInstallFiles {
     do {
       for edit in edits {
         active = edit.path
-        let (data, mode) = try read(edit.path)
-        guard data == edit.before, mode == edit.mode else {
+        let expected = Snapshot(data: edit.before, mode: edit.mode, security: edit.security)
+        guard try read(edit.path) == expected else {
           throw refusal(edit.path, "changed since preview")
         }
       }
@@ -142,6 +157,14 @@ final class AgentInstallFiles {
       }
       let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: false)
       try handle.write(contentsOf: data)
+      var info = stat()
+      guard fstat(fd, &info) == 0 else { throw refusal(edit.path, "cannot inspect replacement") }
+      let security = try AgentInstallSecurity.file(fd, parent: parent, info: info) {
+        throw refusal(edit.path, "unsupported replacement security metadata")
+      }
+      guard edit.before == nil || security == edit.security else {
+        throw refusal(edit.path, "replacement ownership differs")
+      }
       guard fchmod(fd, edit.mode) == 0, fsync(fd) == 0,
         renameat(parent, temporary, parent, name) == 0
       else { throw refusal(edit.path, "cannot commit replacement") }

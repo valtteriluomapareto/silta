@@ -4,6 +4,8 @@ import Foundation
 struct AgentOwnedBlock {
   let outside: String
   let owned: Bool
+  let span: String
+  private let ownsTable: Bool
   private let origin: String
   private let start: String
   private let end: String
@@ -13,6 +15,7 @@ struct AgentOwnedBlock {
 
   init(_ original: String, toml: Bool, existed: Bool, refusal: () throws -> Never) throws {
     self.toml = toml
+    if toml, !AgentTOML.acceptsDocument(original) { try refusal() }
     start = toml ? "\n# silta:begin " : "\n<!-- silta:begin "
     end = toml ? "# silta:end\n" : "<!-- silta:end -->\n"
     seal = toml ? "\n" : " -->\n"
@@ -20,6 +23,8 @@ struct AgentOwnedBlock {
     var origin = existed ? "keep" : "new"
     var offset = text.count
     var hadOwnership = false
+    var span = ""
+    var ownsTable = false
     if let begin = text.range(of: start), let finish = text.range(of: end),
       begin.upperBound < finish.lowerBound,
       let header = text.range(of: seal, range: begin.upperBound..<finish.lowerBound)
@@ -31,9 +36,11 @@ struct AgentOwnedBlock {
       guard AgentInstallPlan.hash(Data((origin + ":" + owned).utf8)) == fields[0] else {
         try refusal()
       }
-      if toml, owned.hasPrefix("[sandbox_workspace_write]\n") {
+      ownsTable = toml && owned.hasPrefix("[sandbox_workspace_write]\n")
+      if ownsTable {
         try Self.validateTableTail(String(text[finish.upperBound...]), refusal: refusal)
       }
+      span = String(text[begin.lowerBound..<finish.upperBound])
       offset = text.distance(from: text.startIndex, to: begin.lowerBound)
       text.removeSubrange(begin.lowerBound..<finish.upperBound)
       hadOwnership = true
@@ -43,6 +50,8 @@ struct AgentOwnedBlock {
     self.origin = origin
     self.offset = offset
     self.owned = hadOwnership
+    self.span = span
+    self.ownsTable = ownsTable
   }
 
   func render(_ body: String, refusal: () throws -> Never) throws -> String {
@@ -50,7 +59,11 @@ struct AgentOwnedBlock {
     var insertion = text.index(text.startIndex, offsetBy: offset)
     var content = body
     if toml {
-      if let tableEnd = try tomlTableEnd(refusal: refusal) {
+      let tableEnd = try tomlTableEnd(refusal: refusal)
+      if ownsTable {
+        guard tableEnd == nil else { try refusal() }
+        content = "[sandbox_workspace_write]\n" + body
+      } else if let tableEnd {
         insertion = tableEnd
       } else {
         insertion = text.endIndex

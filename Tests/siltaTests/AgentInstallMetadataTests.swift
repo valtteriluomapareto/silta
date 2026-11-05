@@ -13,14 +13,16 @@ struct AgentInstallMetadataTests {
 
   static func snapshot(_ scratch: URL) throws -> [String: String] {
     var result: [String: String] = [:]
-    for path in paths {
+    for path in paths + ["", ".claude", ".claude/skills", ".claude/skills/silta", ".codex"] {
       let file = scratch.appending(path: "home/" + path)
-      guard FileManager.default.fileExists(atPath: file.path) else {
+      var directory = ObjCBool(false)
+      guard FileManager.default.fileExists(atPath: file.path, isDirectory: &directory) else {
         result[path] = "absent"
         continue
       }
-      let bytes = try Data(contentsOf: file).base64EncodedString()
-      let permissions = try command("/bin/ls", ["-lenO", file.path], in: scratch)
+      let bytes =
+        directory.boolValue ? "directory" : try Data(contentsOf: file).base64EncodedString()
+      let permissions = try command("/bin/ls", ["-ldneO", file.path], in: scratch)
       let attributes = try command("/usr/bin/xattr", ["-l", file.path], in: scratch)
       #expect(permissions.termination == .exit(0) && attributes.termination == .exit(0))
       result[path] = bytes + permissions.stdout + attributes.stdout
@@ -44,6 +46,7 @@ struct AgentInstallMetadataTests {
         "/usr/bin/xattr", ["-w", "com.acme.silta-security", "Acme-private-metadata", file.path],
         in: scratch)
     case "special": result = try command("/bin/chmod", ["1644", file.path], in: scratch)
+    case "ownership": result = try command("/usr/bin/chgrp", ["everyone", file.path], in: scratch)
     case "flags": result = try command("/usr/bin/chflags", ["nodump", file.path], in: scratch)
     default:
       result = try command(
@@ -56,7 +59,9 @@ struct AgentInstallMetadataTests {
     #expect(result.termination == .exit(0), "\(result.stderr)")
   }
 
-  @Test(arguments: ["acl", "write-acl", "xattr", "special", "flags", "inherited"], [false, true])
+  @Test(
+    arguments: ["acl", "write-acl", "xattr", "special", "flags", "inherited", "ownership"],
+    [false, true])
   func securityMetadataRefusesBeforeAnySelectedWrite(kind: String, afterPreview: Bool) throws {
     try withScratchDirectory { scratch in
       try AgentsInstallTests.write(
@@ -77,10 +82,9 @@ struct AgentInstallMetadataTests {
         result = try AgentsInstallTests.run(["install", "--apply", apply, "--json"], in: scratch)
       }
       let after = try Self.snapshot(scratch)
-      withKnownIssue(
-        "Unsupported security metadata must refuse in preflight, including after preview"
-      ) {
-        #expect(result.termination == .exit(6) && before == after)
+      #expect(result.termination == .exit(6) && before == after)
+      if kind == "xattr", !afterPreview {
+        Golden.forTests().check(result.stdout, "agents-install-metadata.json")
       }
     }
   }

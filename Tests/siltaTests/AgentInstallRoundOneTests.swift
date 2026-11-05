@@ -22,9 +22,7 @@ struct AgentInstallRoundOneTests {
       let original = try Self.seeded(scratch)
       let result = try AgentsInstallTests.run(["install", "--codex", "--json"], in: scratch)
       let changes = try AgentsInstallTests.data(result)["changes"] as? [[String: String]]
-      withKnownIssue("Owned TOML table must retain its offset and keep private text off output") {
-        #expect(changes == [] && !result.stdout.contains(Self.sentinel))
-      }
+      #expect(changes == [] && !result.stdout.contains(Self.sentinel))
       #expect(try AgentsInstallTests.read(Self.path, in: scratch) == original)
     }
   }
@@ -38,11 +36,7 @@ struct AgentInstallRoundOneTests {
         [operation, "--codex"] + (json ? ["--json"] : []), in: scratch, environment: environment)
       #expect(result.termination == .exit(0))
       let privateOutput = (result.stdout + result.stderr).contains(Self.sentinel)
-      if operation == "install" {
-        withKnownIssue("Only owned spans may enter a preview") { #expect(!privateOutput) }
-      } else {
-        #expect(!privateOutput)
-      }
+      #expect(!privateOutput)
     }
   }
 
@@ -56,9 +50,7 @@ struct AgentInstallRoundOneTests {
     try withScratchDirectory { scratch in
       try AgentsInstallTests.write(text, Self.path, in: scratch)
       let result = try AgentsInstallTests.run(["install", "--json"], in: scratch)
-      withKnownIssue("Duplicate/conflicting TOML definitions must refuse") {
-        #expect(result.termination == .exit(6))
-      }
+      #expect(result.termination == .exit(6))
       #expect(try AgentsInstallTests.read(Self.path, in: scratch) == text)
       #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "home/.claude").path))
     }
