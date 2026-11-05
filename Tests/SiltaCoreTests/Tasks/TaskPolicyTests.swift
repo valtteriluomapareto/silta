@@ -145,7 +145,7 @@ extension TaskPolicyTests {
         try env.db.write {
           try $0.database.execute(sql: "UPDATE task SET claimed_at=?", arguments: [timestamp])
         }
-        await #expect(throws: StorageError.unavailable) {
+        await #expect(throws: StorageError.corrupt) {
           _ = try await rival.start("AC-1", directory: home)
         }
       }

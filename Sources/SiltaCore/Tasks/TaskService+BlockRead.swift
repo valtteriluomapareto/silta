@@ -41,12 +41,12 @@ extension TaskService {
           AND id>COALESCE((SELECT MAX(id) FROM task_event WHERE task_id=? AND kind='unblock'),0)
         ORDER BY id
         """, arguments: [task.id, task.id])
-    guard let first = events.first, let last = events.last else { throw StorageError.unavailable }
+    guard let first = events.first, let last = events.last else { throw StorageError.corrupt }
     let began: Date
     do {
       began = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(
         first["created_at"])
-    } catch { throw StorageError.unavailable }
+    } catch { throw StorageError.corrupt }
     let latest = try TaskBlockEvent.decode(last["body"])
     var ready = !links.isEmpty
     var dropped: [String] = []
@@ -62,7 +62,7 @@ extension TaskService {
         let blocker = try Row.fetchOne(
           db, sql: "SELECT status,external_ref FROM task WHERE id=?",
           arguments: [link["to_id"] as Int64])
-      else { throw StorageError.unavailable }
+      else { throw StorageError.corrupt }
       if (blocker["status"] as String) == "dropped" { dropped.append(ref) }
       if (blocker["status"] as String) != "done" || (blocker["external_ref"] as String?) != nil {
         ready = false
@@ -90,7 +90,7 @@ extension TaskService {
         let blocker = try Row.fetchOne(
           db, sql: "SELECT status,external_ref FROM task WHERE id=?",
           arguments: [link["to_id"] as Int64])
-      else { throw StorageError.unavailable }
+      else { throw StorageError.corrupt }
       let bare = String(ref.dropFirst("task:".count))
       if (blocker["status"] as String) == "dropped" {
         dropped.append(bare)

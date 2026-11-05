@@ -1540,7 +1540,7 @@ run.
 | 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken`, `blocked` | Re-read, then decide; don't steal, and don't unblock while blockers are open |
 | 7 | `gate` | Request a review or ask the human |
 | 8 | `rate_limited` | Wait for `retry_after_s`, or summarise |
-| 9 | `env` (schema too new, read-only DB, git missing, no network, a bad `SILTA_*` variable) | Report the printed fix to the human |
+| 9 | `env` (a corrupt, read-only, missing, full or otherwise failed database, schema too new, git missing, no network, a bad `SILTA_*` variable) | Report the printed fix to the human |
 
 **Commands.** The milestone that ships each one is in brackets.
 
@@ -1774,7 +1774,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   | Id (display order) | Check / availability |
   |---|---|
-  | `database.integrity` | SQLite integrity or operational read failure |
+  | `database.integrity` | SQLite or stored-value integrity, or operational read failure |
   | `database.foreign_keys` | Foreign-key integrity |
   | `database.schema` | Truth schema and writer compatibility |
   | `database.wal` | File-only WAL size |

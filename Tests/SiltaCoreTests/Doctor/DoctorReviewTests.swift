@@ -219,6 +219,25 @@ struct DoctorReviewTests {
     #expect(check.nextBy == .agent)
   }
 
+  @Test func corruptReadNamesCorruption() {
+    let check = DoctorService.readFailure(
+      .corrupt, path: "/acme/silta.db", recovery: ["/bin/ls -l '/acme/silta.db'"],
+      hasBackups: false)
+    #expect(check.message.contains("corrupt"))
+    #expect(check.nextBy == .human)
+    #expect(!check.next.isEmpty)
+  }
+
+  @Test func readOnlyReadIsNotCalledCorruption() {
+    let check = DoctorService.readFailure(
+      .accessDenied, path: "/acme/silta.db", recovery: ["/bin/ls -l '/acme/silta.db'"],
+      hasBackups: false)
+    #expect(check.message.contains("permission"))
+    #expect(!check.message.contains("corrupt"))
+    #expect(check.next.contains("/bin/ls -l '/acme/silta.db'"))
+    #expect(check.nextBy == .human)
+  }
+
   @Test func realBtreeCorruptionReturnsFailedIntegrityRows() async throws {
     try await withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)
@@ -260,5 +279,48 @@ struct DoctorReviewTests {
     try queue.writeWithoutTransaction { try $0.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)") }
     try queue.close()
     return result
+  }
+}
+
+extension DoctorReviewTests {
+  @Test func malformedStoredCloseDateFailsDoctor() async throws {
+    try await withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      try store.initialize()
+      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
+      try store.write { transaction in
+        try transaction.database.execute(
+          sql: """
+            INSERT INTO task(uid,workspace_id,seq,title,status,created_by,
+              created_at,updated_at,closed_at,archive_override)
+            VALUES('acme-done',1,1,'Acme','done','human:acme',
+              '2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z','malformed',NULL),
+            ('acme-kept',1,2,'Acme kept','done','human:acme',
+              '2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z','malformed','kept')
+            """)
+      }
+      let report = await inspect(home)
+      let check = try #require(report.checks.first { $0.id == "database.integrity" })
+      #expect(check.status == .fail)
+      #expect(check.message.contains("2 stored task close timestamp(s) cannot be read"))
+      #expect(check.next.contains { $0.contains("sqlite3") && $0.contains("-readonly") })
+      #expect(DoctorFailure(report: report).code == .env)
+    }
+  }
+
+  @Test func missingChangeSequenceFailsDoctor() async throws {
+    try await withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      try store.initialize()
+      try store.write { transaction in
+        try transaction.database.execute(sql: "DELETE FROM meta WHERE key='change_seq'")
+      }
+      let report = await inspect(home)
+      let check = try #require(report.checks.first { $0.id == "database.integrity" })
+      #expect(check.status == .fail)
+      #expect(check.message.contains("change_seq"))
+      #expect(check.next.contains { $0.contains("sqlite3") && $0.contains("-readonly") })
+      #expect(DoctorFailure(report: report).code == .env)
+    }
   }
 }
