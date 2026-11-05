@@ -5,6 +5,19 @@ enum BriefBudget {
     tokens > Int.max / 4 ? Int.max : tokens * 4
   }
 
+  /// `percent` of `characters`, rounded down without overflow.
+  static func share(_ percent: Int, of characters: Int) -> Int {
+    characters / 100 * percent + characters % 100 * percent / 100
+  }
+
+  /// Applies a section's local cap; a cut keeps its whole marker and marks the report
+  /// truncated while later sections stay eligible for the global budget.
+  static func capped(_ section: BriefSection, characters: Int) -> BriefSection {
+    guard case .excerpt(let marker) = section.policy else { return section }
+    return trim([section], characters: characters).sections.first
+      ?? BriefSection(id: section.id, text: marker, truncated: true)
+  }
+
   static func trim(_ sections: [BriefSection], characters: Int)
     -> (sections: [BriefSection], truncated: Bool)
   {

@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 struct BriefVisibilityTests {
   @Test func backlogVisibilityParity() throws {
@@ -27,7 +28,7 @@ struct BriefVisibilityTests {
           try BriefBacklog(
             db: $0, location: location, actor: actor, date: TaskServiceTests.now,
             archiveDays: WorkspaceSettings.defaultArchiveAfterDays
-          ).sections(topics: [])
+          ).sections(topics: []).sections
         }
         let refs = sections.filter { ["open_tasks", "recently_done"].contains($0.id) }
           .compactMap {
@@ -42,14 +43,14 @@ struct BriefVisibilityTests {
         try $0.database.execute(sql: "UPDATE task SET closed_at='bad' WHERE seq=4")
       }
       #expect(throws: StorageError.corrupt) { _ = try TaskService(environment: base).list() }
-      #expect(throws: StorageError.corrupt) {
-        _ = try base.db.read {
-          try BriefBacklog(
-            db: $0, location: location, actor: TaskServiceTests.agent,
-            date: TaskServiceTests.now, archiveDays: 14
-          ).sections(topics: [])
-        }
+      let skipped = try base.db.read {
+        try BriefBacklog(
+          db: $0, location: location, actor: TaskServiceTests.agent,
+          date: TaskServiceTests.now, archiveDays: 14
+        ).sections(topics: [])
       }
+      #expect(skipped.warnings.map(\.code) == ["closed_at_unreadable"])
+      #expect(!skipped.sections.contains { $0.text.contains("AC-4") })
     }
   }
   private func seed(_ store: DatabaseStore, cutoff: String) throws {
@@ -133,7 +134,7 @@ extension BriefVisibilityTests {
         try BriefBacklog(
           db: $0, location: location, actor: env.actor,
           date: TaskServiceTests.now, archiveDays: 14
-        ).sections(topics: [])
+        ).sections(topics: []).sections
       }
       #expect(sections.first { $0.id == "recently_done" }?.text.hasPrefix("done: AC-4") == true)
     }

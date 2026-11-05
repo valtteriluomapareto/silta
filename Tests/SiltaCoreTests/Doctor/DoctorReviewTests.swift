@@ -292,15 +292,17 @@ extension DoctorReviewTests {
         try transaction.database.execute(
           sql: """
             INSERT INTO task(uid,workspace_id,seq,title,status,created_by,
-              created_at,updated_at,closed_at)
+              created_at,updated_at,closed_at,archive_override)
             VALUES('acme-done',1,1,'Acme','done','human:acme',
-              '2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z','malformed')
+              '2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z','malformed',NULL),
+            ('acme-kept',1,2,'Acme kept','done','human:acme',
+              '2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z','malformed','kept')
             """)
       }
       let report = await inspect(home)
       let check = try #require(report.checks.first { $0.id == "database.integrity" })
       #expect(check.status == .fail)
-      #expect(check.message.contains("close timestamp"))
+      #expect(check.message.contains("2 stored task close timestamp(s) cannot be read"))
       #expect(check.next.contains { $0.contains("sqlite3") && $0.contains("-readonly") })
       #expect(DoctorFailure(report: report).code == .env)
     }

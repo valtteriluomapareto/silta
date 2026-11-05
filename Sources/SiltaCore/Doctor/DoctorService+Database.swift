@@ -110,8 +110,9 @@ extension DoctorService {
         db,
         sql: """
           SELECT count(*) FROM task
-          WHERE archive_override IS NULL AND status IN ('done','dropped')
-            AND closed_at IS NOT NULL AND silta_archive_instant(closed_at) IS NULL
+          WHERE status IN ('done','dropped') AND closed_at IS NOT NULL
+            AND silta_archive_instant(closed_at) IS NULL
+            AND coalesce(archive_override,'')<>'archived'
           """) ?? 0
     if unreadable > 0 {
       problems.append("\(unreadable) stored task close timestamp(s) cannot be read")

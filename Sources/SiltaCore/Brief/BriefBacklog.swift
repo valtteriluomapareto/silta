@@ -9,7 +9,10 @@ struct BriefBacklog {
   let date: Date
   let archiveDays: Int
 
-  func sections(topics requested: [String]) throws -> [BriefSection] {
+  /// Rows whose `closed_at` cannot be read are left out, and a body-free warning counts them.
+  func sections(topics requested: [String]) throws
+    -> (sections: [BriefSection], warnings: [OutputWarning])
+  {
     let workspace = try TaskService.workspaceID(location.workspace, in: db)
     let visibility = TaskVisibility(actor: actor, at: date, days: archiveDays)
     var arguments = visibility.arguments
@@ -27,23 +30,39 @@ struct BriefBacklog {
     let topics = explicit.union(inferred)
     let aliases = try topicRows(topics, workspace: workspace)
     let scope = "(app.slug=:app OR \(topicMatch(topics)))"
-    try TaskVisibility.validateDates(
+    let unreadable = try TaskVisibility.unreadableDates(
       scope: "task.workspace_id=:workspace AND \(scope)",
       arguments: arguments, in: db)
-    let base = """
-      FROM task LEFT JOIN app ON app.id=task.app_id
-      WHERE task.workspace_id=:workspace AND \(TaskVisibility.sql) AND \(scope)
+    let warnings =
+      unreadable == 0
+      ? []
+      : [
+        OutputWarning(
+          code: "closed_at_unreadable",
+          message:
+            "Left out \(unreadable) \(unreadable == 1 ? "task" : "tasks") with an unreadable closed_at."
+        )
+      ]
+    // The status filter comes first so rows of other statuses skip the archive function.
+    let base = { (status: String) in
       """
+      FROM task LEFT JOIN app ON app.id=task.app_id
+      WHERE \(status) AND task.workspace_id=:workspace AND \(TaskVisibility.sql) AND \(scope)
+      """
+    }
     let prefix =
       try String.fetchOne(
         db, sql: "SELECT task_prefix FROM workspace WHERE id=?", arguments: [workspace]) ?? ""
-    return try taskSections(
-      base: base, arguments: arguments, explicit: explicit,
-      prefix: prefix, aliases: aliases) + glossary(rows: aliases)
+    return (
+      try taskSections(
+        base: base, arguments: arguments, explicit: explicit,
+        prefix: prefix, aliases: aliases) + glossary(rows: aliases),
+      warnings
+    )
   }
 
   private func taskSections(
-    base: String, arguments: StatementArguments,
+    base: (String) -> String, arguments: StatementArguments,
     explicit: Set<Int64>, prefix: String, aliases: [Row]
   ) throws -> [BriefSection] {
     let open = "task.status IN ('proposed','todo','doing','review','blocked')"
@@ -51,18 +70,19 @@ struct BriefBacklog {
       db,
       sql: """
         SELECT task.seq,task.title,task.status,task.priority,app.slug AS app
-        \(base) AND \(open)
+        \(base(open))
         ORDER BY (\(topicMatch(explicit))) DESC,task.priority,task.seq LIMIT 8
         """, arguments: arguments)
     var sections = rows.map { openSection($0, prefix: prefix) }
     let count =
-      try Int.fetchOne(db, sql: "SELECT count(*) \(base) AND \(open)", arguments: arguments) ?? 0
+      try Int.fetchOne(db, sql: "SELECT count(*) \(base(open))", arguments: arguments) ?? 0
     if count > rows.count {
       let commands = listCommands(rows: aliases)
       sections.append(
         BriefSection(
           id: "open_more",
-          text: "\(count - rows.count) more open; " + commands.joined(separator: " | ") + "\n"))
+          text: "\(count - rows.count) more open:\n"
+            + commands.map { "next: " + $0 + "\n" }.joined()))
     }
     let done = try Row.fetchAll(
       db,
@@ -70,7 +90,7 @@ struct BriefBacklog {
         SELECT task.seq,
           substr(task.result_md,1,instr(task.result_md||char(10),char(10))-1) AS result,
           substr(task.done_sha,1,12) AS sha
-        \(base) AND task.status='done'
+        \(base("task.status='done' AND " + TaskVisibility.readableOverrideSQL))
         ORDER BY silta_archive_instant(task.closed_at) DESC,task.seq DESC LIMIT 5
         """, arguments: arguments)
     sections += done.map { doneSection($0, prefix: prefix) }

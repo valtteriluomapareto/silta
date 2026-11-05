@@ -144,8 +144,35 @@ workspace and excludes its own actor's calls and approvals.
   proposal shows what still waits. The first report's numbers are mostly the setup
   triage. Questions and inbox measurements are `n/a` until S11.
 
-Generate into a temporary file **outside** the reports directory, so a newly
-created filename cannot change the default range. Review it with the maintainer,
-then add it as `docs/dogfood/reports/<Until date>.md` through a PR. Decide whether
-findings need an issue, guide correction or no change. The script neither saves a
-report nor creates issues.
+**Private report (DF3).** `scripts/dogfood-report.sh --ws <slug>` reports on any
+workspace, `silta` included, and keeps it on this machine:
+
+- It refuses a slug that is no workspace identifier (letters, digits, `_` or `-`,
+  starting and ending with a letter or digit) before reading anything.
+- It writes `$SILTA_HOME/reports/<slug>/<Until date>.md` (file `0600`, any folder it
+  creates `0700`) and prints only that path. A slug longer than 255 bytes, too long
+  for a folder name, gets a folder named by its first 200 characters, a `.` and a
+  hash.
+- It refuses to write when that folder, followed through symlinks, is inside a git
+  work tree (any parent holds a `.git` entry), even where the repository ignores the
+  database: set `SILTA_HOME` outside every repository. It checks before reading and
+  again on the resolved folder just before writing. `reports/` and
+  `reports/<slug>/` must be real directories, not symlinks, and the report is
+  published with `link(2)`, which refuses anything already at its path (a file, a
+  directory or a symlink) instead of following it. Without `--since`, the newest report in that
+  folder supplies the date. It never replaces a report: a second run on the same day
+  is refused, so move the earlier one away first if you mean to regenerate it.
+- Outside `silta`, the friction section says it isn't collected: the `Friction:` line
+  and `dogfood` tasks are this workspace's rules (D36).
+- Untagged log lines count in every workspace's report, as above; they hold only
+  command names and counts.
+
+Never copy a private report into a repository, an issue or a PR. What may leave the
+machine is a summary written by hand from it
+([DF3 plan](../plans/df3-real-workspace.md#data-and-privacy)).
+
+**The `silta` report.** Without `--ws`, generate into a temporary file **outside**
+the reports directory, so a newly created filename cannot change the default range.
+Review it with the maintainer, then add it as `docs/dogfood/reports/<Until date>.md`
+through a PR. Decide whether findings need an issue, guide correction or no change.
+Without `--ws` the script neither saves a report nor creates issues.
