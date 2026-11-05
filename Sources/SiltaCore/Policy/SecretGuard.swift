@@ -1,7 +1,7 @@
 /// Pure, pinned secret scanning and redaction. Callers decide whether a write is allowed.
 package enum SecretGuard {
   /// Rule-set version; changes deliberately with detection behavior.
-  package static let version = 2
+  package static let version = 3
 
   /// Body-free warning for a successful redacted write.
   package static let warning = OutputWarning(
@@ -87,6 +87,13 @@ package enum SecretGuard {
       ),
       ("slack", /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/),
       ("google", /\bAIza[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/),
+      // Anthropic documents only the `sk-ant-` prefix its key kinds share. Current keys
+      // follow it with a kind and version tag such as `api03-` and a 95-character
+      // base64url body. Any 80 or more base64url characters after the prefix count, so
+      // untagged or unknown kinds are caught while prose and fragments stay readable.
+      // No leading word boundary: escaped newlines (`\nsk-ant-…`) and URL-encoded
+      // assignments (`%3Dsk-ant-…`) put a word character right before the prefix.
+      ("anthropic", /sk-ant-[A-Za-z0-9_-]{80,}/),
       ("jwt", /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}(?![A-Za-z0-9_-])/),
       ("hetu", /\b[0-9]{6}[+\-ABCDEFYXWVU][0-9]{3}[0-9A-Y]\b/),
     ]
