@@ -141,6 +141,9 @@ quietly diverge.
   feature folders. `siltaTests` is flat, because `Sources/silta` has no feature
   folders; its files group by name prefix (`Task…`, `Brief…`, `Where…`). Test types
   are named `<Subject>Tests`.
+- **Test files are named after their subject**, not after a review round or a
+  regression (`BriefRoundOneTests`, `TaskInputRegressionTests`). A split file of one
+  suite is `<Suite>+<Topic>.swift`, like `BriefCommandTests+Fixture.swift`.
 
 ## 6. Tests (D26)
 
