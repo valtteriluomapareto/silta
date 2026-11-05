@@ -191,11 +191,11 @@ struct GuideCommandTests {
       let recipeBlocks = blocks(guide.stdout)
       let handoffBlocks = blocks(handoff.stdout)
       try #require(recipeBlocks.count == 3)
-      try #require(handoffBlocks.count == 1)
+      try #require(handoffBlocks.count == 2)
       let plan = scratch.appending(path: "acme-plan.md")
       try "# Acme follow-up\n- [ ] Inspect API\n".write(to: plan, atomically: true, encoding: .utf8)
       for script in [
-        recipeBlocks[0], recipeBlocks[1], handoffBlocks[0],
+        recipeBlocks[0], recipeBlocks[1], handoffBlocks[0], handoffBlocks[1],
         "silta task submit AC-12\n" + recipeBlocks[2],
       ] {
         let concrete = script.replacingOccurrences(of: "AC-12", with: "AC-1")
@@ -221,15 +221,15 @@ struct GuideCommandTests {
   @Test func referenceHelpHasUsableUsageAndVersion() throws {
     try withScratchDirectory { scratch in
       let help = try SiltaBinary.run(["help", "refs", "--help"], in: scratch)
-      withKnownIssue("SI-34/4: reference help must name its usable route") {
-        #expect(help.stdout.contains("USAGE: silta help refs"))
-      }
+
+      #expect(help.stdout.contains("USAGE: silta help refs"))
+
       let version = try SiltaBinary.run(["--version"], in: scratch)
       for args in [["help", "refs", "--version"], ["--version", "help", "refs"]] {
         let actual = try SiltaBinary.run(args, in: scratch)
-        withKnownIssue("SI-34/4: reference help inherits the version contract") {
-          #expect(actual == version)
-        }
+
+        #expect(actual == version)
+
       }
     }
   }
@@ -254,9 +254,9 @@ struct GuideCommandTests {
       #expect(result.termination == .exit(0))
       let shown = try SiltaBinary.run(["task", "show", "AC-1", "--json"], in: scratch)
       let task = try #require(try object(shown.stdout)["data"] as? [String: Any])
-      withKnownIssue("SI-34/5: stopping after handoff must leave the claim released") {
-        #expect(task["claimed_by"] == nil)
-      }
+
+      #expect(task["claimed_by"] == nil)
+
     }
   }
 

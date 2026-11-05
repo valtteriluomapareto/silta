@@ -39,9 +39,9 @@ struct GuideCommand: OutputCommand {
       text: """
         # When to use Silta
         Use Silta for cross-repo work, another app or backend, branch-as-app repos, plans, \
-        handoffs, review requests and meeting decisions. Trivial single-repo edits need no task. \
-        Keep plans and results in Silta, never in PLAN.md or other repo plan files; never create \
-        tracker items yourself.
+        handoffs, review requests and meeting decisions. Trivial single-repo edits need no \
+        task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; \
+        never create tracker items yourself.
         """ + "\n"),
     Section(
       topic: "start",
@@ -50,10 +50,10 @@ struct GuideCommand: OutputCommand {
         If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. \
         Once you choose a task, run `silta brief --task AC-12`, then `silta task start AC-12`. \
         Text is the default; use --json only to parse output.
-        For "work the backlog", run `silta task ls --status todo`, optionally with --app. Start \
-        the first task; skip subtasks whose parent another session claims and skip claimed \
-        tasks. Finish with a result before starting the next; continue until empty or the human \
-        stops you.
+        For "work the backlog", run `silta task ls --status todo`, optionally with --app. \
+        Start the first task; skip subtasks whose parent another session claims and skip \
+        claimed tasks. Finish with a result before starting the next; continue until empty or \
+        the human stops you.
         """ + "\n"),
     Section(
       topic: "recipes",
@@ -108,45 +108,53 @@ struct GuideCommand: OutputCommand {
         Put all approvals, proposals to triage and questions in one message. For human-only \
         commands, name the exact commands, wait for yes, then run only those commands with \
         --approved "<their words>". Never invent approval words.
-        Usually propose nothing; never more than two proposals per session, only ideas you would \
-        bet the human wants. `task add --start` is only for work the human requested. If asked \
-        to add work for later, use their words with --approved so it becomes todo without \
-        triage.
-        If brief shows proposals: ask, do not propose: name each idea and its exact `silta task \
-        add` command in your message, then add only the approved ideas with --approved. Without \
-        a human, list ideas under "What's left" in a handoff/result, never in a question, TODO \
-        comment or file.
-        When no answer can come, leave pending commands in a handoff and pick other work; do not \
-        wait. Persistent questions to @me and `silta inbox --for me` are not available in this \
-        version. Until they ship, relay known pending choices in one short message.
+        Usually propose nothing; never more than two proposals per session, only ideas you \
+        would bet the human wants. `task add --start` is only for work the human requested. If \
+        asked to add work for later, use their words with --approved so it becomes todo \
+        without triage.
+        If brief shows proposals: ask, do not propose: name each idea and its exact `silta \
+        task add` command in your message, then add only the approved ideas with --approved. \
+        Without a human, list ideas under "What's left" in a handoff/result, never in a \
+        question, TODO comment or file.
+        When no answer can come, leave a question for @me listing pending commands, write a \
+        handoff and pick other work; do not wait. Under proposals: ask, keep unapproved ideas \
+        in the handoff/result instead of that question. `silta inbox --for me` is not \
+        available in this version; relay known pending choices in one short message.
         """ + "\n"),
     Section(
       topic: "questions",
       text: """
         # Questions
-        Ask in chat. Record a question only when blocked beyond this session; until question \
-        comments ship, record the pending question and exact commands in your handoff.
+        Ask in chat. Record a question only when blocked beyond this session. Questions \
+        default to @me; name recipients explicitly when needed:
+        ```sh
+        silta comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'
+        ```
+        Answer with --kind answer and --reply-to <question-ref>. The asker or current task \
+        claimer can accept an answer with `silta comment accept <answer-ref>`. An answer \
+        comment never supplies approval words for a human-only command.
         """ + "\n"),
     Section(
       topic: "blocked",
       text: """
         # Blocked
         A question to the human does not block a task. Ask in chat if the human can answer, \
-        including questions about the customer. If only an external party (ext:acme) or another \
-        task can unblock you, keep doing useful work; block only when none remains.
+        including questions about the customer. If only an external party (ext:acme) or \
+        another task can unblock you, keep doing useful work; block only when none remains.
         ```sh
         silta task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'
         ```
         Silta sends nothing: tell the human exactly what to ask whom, leave a handoff and pick \
-        other work. Never unblock with open blockers without the human's approval, and never put \
-        "waiting for" into repo files or plans.
+        other work. Never unblock with open blockers without the human's approval, and never \
+        put "waiting for" into repo files or plans.
         """ + "\n"),
     Section(
       topic: "handoff",
       text: """
         # Handoff
-        Always leave a handoff before stopping. It releases your claim while preserving status. \
-        Use the actual branch and sha; the next session reads the task and starts it again.
+        Always leave a handoff before stopping. It releases your claim while preserving \
+        status. Use the actual branch and sha; the next session reads the task and starts it \
+        again.
         ```sh
         silta comment AC-12 --kind handoff -F - <<'HANDOFF'
         State: API inspected; implementation remains.
@@ -154,6 +162,9 @@ struct GuideCommand: OutputCommand {
         Open questions: none.
         Branch and sha: feature/acme-sign-in at <commit-sha>.
         HANDOFF
+        ```
+        In the next session, resume with:
+        ```sh
         silta task show AC-12
         silta task start AC-12
         ```
@@ -163,19 +174,21 @@ struct GuideCommand: OutputCommand {
       text: """
         # Reviews
         Use `silta task submit AC-12` to request review. Read discussion with `silta task show \
-        AC-12`. Record what changed and the proving test with `silta comment AC-12 -m 'Changed \
-        the validation; SignInTests proves it.'`. Threaded replies are not available in this \
-        version. Do not resolve review threads yourself unless assigned that responsibility.
-        The M2 inbox take, task diff and task review workflow is not available in this version.
+        AC-12`. Reply to the actual finding ref with `silta comment AC-12 --reply-to AC-12/3 \
+        -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the \
+        proving test. Do not resolve review threads yourself unless assigned that \
+        responsibility.
+        The M2 inbox take, task diff and task review workflow is not available in this \
+        version.
         """ + "\n"),
     Section(
       topic: "refusals",
       text: """
         # Refusals
         Read the error's code, next_by and next commands. A command's next_by can override the \
-        code default. Never use --force, --steal, where --set, promote or --allow-secret on your \
-        own initiative; name the command and obtain the human's words with --approved first. \
-        Never create tracker items or repo plan files.
+        code default. Never use --force, --steal, where --set, promote or --allow-secret on \
+        your own initiative; name the command and obtain the human's words with --approved \
+        first. Never create tracker items or repo plan files.
         """ + "\n"
           + ErrorCode.allCases.map { "\($0.rawValue) (exit \($0.exitCode)): \($0.agentShould)\n" }
           .joined()),

@@ -42,10 +42,14 @@ Ask about scope changes, a new dependency, a public API/schema/migration, anythi
 Put all approvals, proposals to triage and questions in one message. For human-only commands, name the exact commands, wait for yes, then run only those commands with --approved "<their words>". Never invent approval words.
 Usually propose nothing; never more than two proposals per session, only ideas you would bet the human wants. `task add --start` is only for work the human requested. If asked to add work for later, use their words with --approved so it becomes todo without triage.
 If brief shows proposals: ask, do not propose: name each idea and its exact `silta task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under "What's left" in a handoff/result, never in a question, TODO comment or file.
-When no answer can come, leave pending commands in a handoff and pick other work; do not wait. Persistent questions to @me and `silta inbox --for me` are not available in this version. Until they ship, relay known pending choices in one short message.
+When no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under proposals: ask, keep unapproved ideas in the handoff/result instead of that question. `silta inbox --for me` is not available in this version; relay known pending choices in one short message.
 
 # Questions
-Ask in chat. Record a question only when blocked beyond this session; until question comments ship, record the pending question and exact commands in your handoff.
+Ask in chat. Record a question only when blocked beyond this session. Questions default to @me; name recipients explicitly when needed:
+```sh
+silta comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'
+```
+Answer with --kind answer and --reply-to <question-ref>. The asker or current task claimer can accept an answer with `silta comment accept <answer-ref>`. An answer comment never supplies approval words for a human-only command.
 
 # Blocked
 A question to the human does not block a task. Ask in chat if the human can answer, including questions about the customer. If only an external party (ext:acme) or another task can unblock you, keep doing useful work; block only when none remains.
@@ -63,12 +67,15 @@ Next step: implement sign-in and run the verification checks.
 Open questions: none.
 Branch and sha: feature/acme-sign-in at <commit-sha>.
 HANDOFF
+```
+In the next session, resume with:
+```sh
 silta task show AC-12
 silta task start AC-12
 ```
 
 # Reviews
-Use `silta task submit AC-12` to request review. Read discussion with `silta task show AC-12`. Record what changed and the proving test with `silta comment AC-12 -m 'Changed the validation; SignInTests proves it.'`. Threaded replies are not available in this version. Do not resolve review threads yourself unless assigned that responsibility.
+Use `silta task submit AC-12` to request review. Read discussion with `silta task show AC-12`. Reply to the actual finding ref with `silta comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility.
 The M2 inbox take, task diff and task review workflow is not available in this version.
 
 # Refusals

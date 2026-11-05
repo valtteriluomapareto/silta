@@ -4,7 +4,8 @@ import SiltaCore
 /// Reference grammar, reached through the literal `help refs` route.
 struct ReferenceHelpCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "refs", abstract: "Read the reference grammar.")
+    commandName: "refs", abstract: "Read the reference grammar.",
+    usage: "silta help refs [<options>]", version: SiltaVersion.current)
   static let dataShape = Shape.object(["text": .string])
   static let workspaceSource = WorkspaceSource.none
   @OptionGroup var global: GlobalOptions
