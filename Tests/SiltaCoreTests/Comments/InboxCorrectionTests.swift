@@ -121,6 +121,16 @@ struct InboxCorrectionTests {
       #expect(attention.first?.post.ref == "AC-1/1")
       #expect(attention.first?.task.ref == "AC-1")
       #expect(try CommentLifecycleTests.snapshot(env) == before)
+      for status in ["done", "dropped"] {
+        try env.db.write {
+          try $0.database.execute(
+            sql: """
+              UPDATE task SET status=?,archive_override='archived',claimed_by=NULL,claimed_at=NULL
+              """,
+            arguments: [status])
+        }
+        #expect(try owner.inbox(for: "human:acme", all: true).items.count == 13)
+      }
     }
   }
 }
