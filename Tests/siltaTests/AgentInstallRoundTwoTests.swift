@@ -52,9 +52,7 @@ struct AgentInstallRoundTwoTests {
     try withScratchDirectory { scratch in
       try AgentsInstallTests.write(
         String(repeating: "A", count: Self.limit), ".codex/AGENTS.md", in: scratch)
-      withKnownIssue("SI-45/40: rendered output exceeds readable limit") {
-        try Self.refusesWithoutWrites(["install"], in: scratch, reason: "rendered file exceeds")
-      }
+      try Self.refusesWithoutWrites(["install"], in: scratch, reason: "rendered file exceeds")
     }
   }
 
@@ -75,9 +73,7 @@ struct AgentInstallRoundTwoTests {
       #expect(original.utf8.count + overhead == Self.limit + excess)
       try AgentsInstallTests.write(original, path, in: scratch)
       if excess == 1 {
-        withKnownIssue("SI-45/40: multibyte rendered boundary") {
-          try Self.refusesWithoutWrites(["install"], in: scratch, reason: "rendered file exceeds")
-        }
+        try Self.refusesWithoutWrites(["install"], in: scratch, reason: "rendered file exceeds")
       } else {
         let before = try Self.snapshot(scratch)
         #expect(try AgentsInstallTests.apply(["install"], in: scratch).termination == .exit(0))
@@ -114,10 +110,8 @@ struct AgentInstallRoundTwoTests {
         ["install", "--codex", "--apply", token], in: scratch)
       #expect(applied.termination == .exit(0))
       let unchanged = try AgentsInstallTests.read(".codex/config.toml", in: scratch)
-      withKnownIssue("SI-45/41: user-table comment relocates existing grant") {
-        #expect(data["changes"] as? [[String: String]] == [])
-        #expect(unchanged == original)
-      }
+      #expect(data["changes"] as? [[String: String]] == [])
+      #expect(unchanged == original)
     }
   }
 
@@ -149,9 +143,7 @@ struct AgentInstallRoundTwoTests {
           of: #"# silta:begin [0-9a-f]{64}:"#, with: "# silta:begin <digest>:",
           options: .regularExpression)
       }
-      withKnownIssue("SI-45/41: updates relocate existing user-table grant") {
-        #expect(normalize(updated) == normalize(expected))
-      }
+      #expect(normalize(updated) == normalize(expected))
     }
   }
 
@@ -162,9 +154,7 @@ struct AgentInstallRoundTwoTests {
       let changed = original.replacingOccurrences(
         of: Self.table, with: Self.table + "[private_scope]\n")
       try AgentsInstallTests.write(changed, ".codex/config.toml", in: scratch)
-      withKnownIssue("SI-45/41: grant changed scope is accepted") {
-        try Self.refusesWithoutWrites([operation], in: scratch, reason: "edited or ambiguous")
-      }
+      try Self.refusesWithoutWrites([operation], in: scratch, reason: "edited or ambiguous")
     }
   }
 }

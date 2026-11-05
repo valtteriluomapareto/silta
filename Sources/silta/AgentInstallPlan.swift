@@ -29,6 +29,9 @@ struct AgentInstallPlan {
       let after = try target.replace(
         old, existed: before != nil, uninstall: uninstall,
         refusal: { throw files.refusal(path, "edited or ambiguous ownership/configuration") })
+      guard after.utf8.count <= AgentInstallFiles.maximumBytes else {
+        throw files.refusal(path, "rendered file exceeds the 1 MiB readable limit")
+      }
       fingerprint.append(Data(path.utf8))
       fingerprint.append(Data("\(mode):\(security):\(before?.count ?? -1):".utf8))
       fingerprint.append(before ?? Data())

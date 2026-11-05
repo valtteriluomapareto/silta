@@ -39,6 +39,8 @@ struct AgentOwnedBlock {
       ownsTable = toml && owned.hasPrefix("[sandbox_workspace_write]\n")
       if ownsTable {
         try Self.validateTableTail(String(text[finish.upperBound...]), refusal: refusal)
+      } else if toml {
+        try Self.validateGrantScope(String(text[..<begin.lowerBound]), refusal: refusal)
       }
       span = String(text[begin.lowerBound..<finish.upperBound])
       offset = text.distance(from: text.startIndex, to: begin.lowerBound)
@@ -64,7 +66,7 @@ struct AgentOwnedBlock {
         guard tableEnd == nil else { try refusal() }
         content = "[sandbox_workspace_write]\n" + body
       } else if let tableEnd {
-        insertion = tableEnd
+        if !owned { insertion = tableEnd }
       } else {
         insertion = text.endIndex
         content = "[sandbox_workspace_write]\n" + body
@@ -75,6 +77,13 @@ struct AgentOwnedBlock {
       + seal + content + end
     text.insert(contentsOf: block, at: insertion)
     return text
+  }
+
+  private static func validateGrantScope(_ prefix: String, refusal: () throws -> Never) throws {
+    let section = prefix.components(separatedBy: "\n").map {
+      $0.trimmingCharacters(in: .whitespaces)
+    }.last { $0.hasPrefix("[") }
+    guard section == "[sandbox_workspace_write]" else { try refusal() }
   }
 
   private static func validateTableTail(_ tail: String, refusal: () throws -> Never) throws {

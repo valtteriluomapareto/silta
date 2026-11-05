@@ -4,6 +4,7 @@ import SiltaCore
 
 /// Relative descriptor traversal never follows a harness-directory symlink.
 final class AgentInstallFiles {
+  static let maximumBytes = 1_048_576
   struct Snapshot: Equatable {
     let data: Data?
     let mode: UInt16
@@ -97,7 +98,7 @@ final class AgentInstallFiles {
     let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     var info = stat()
     guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
-      info.st_nlink == 1, info.st_size <= 1_048_576
+      info.st_nlink == 1, info.st_size <= Self.maximumBytes
     else { throw refusal(path, "expected one regular file of at most 1 MiB") }
     let security = try AgentInstallSecurity.file(fd, parent: parent, info: info) {
       throw refusal(path, "unsupported security metadata")
