@@ -52,8 +52,9 @@ runs before that choice; it does not implement those policies itself.
 
 ## Work a slice
 
-Follow the DF0 rules in [AGENTS.md](../../AGENTS.md#dogfooding). Questions and
-handoffs stay on the slice issue until DF1.
+Follow the current stage's rules in [AGENTS.md](../../AGENTS.md#dogfooding). Since
+DF1, questions, handoffs and review findings are `silta comment` threads on the
+task; GitHub keeps the PR, its `Review:` pointer comment and the slice issue.
 
 ## Drive Codex from another agent
 
@@ -71,8 +72,10 @@ prompts:
    ends, then prints the thread id and Codex's last message.
 3. That return is the signal, not polling. Check `silta --ws silta task show <ref>`:
    `review` means a PR is ready, and Codex's last message says what it did or needs.
-   Review the PR and post a `Review:` comment with `gh pr comment`.
-4. Send each review round to the same session with
+   Review the PR, post each finding as a Silta thread on the task and a `Review:`
+   pointer comment on the PR (see Reviews in AGENTS.md).
+4. Send each review round to the same session, telling it to answer the open
+   threads in `task show`, with
    `scripts/dogfood-codex.sh resume <worktree> <thread> <log> <<'EOF'`. It runs in the
    same worktree, so Silta sees the same actor and session.
 5. After the merge, run `scripts/dogfood-finish.sh <ref> <pr>`, then
