@@ -1,0 +1,4 @@
+Would restore acme from <scratch>/work/out/acme (manifest <sha>): would replace the workspace.
+Tasks: 2 -> 1.
+Removed since the export: AC-2.
+Dry run: nothing was written.

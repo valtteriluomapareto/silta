@@ -1,0 +1,4 @@
+Restored acme from <scratch>/work/out/acme (manifest <sha>): replaced the workspace.
+Tasks: 2 -> 1.
+Removed since the export: AC-2.
+Before-restore snapshot: <scratch>/silta-home/backups/silta-2023-11-14-before-restore-<ms>.db.
