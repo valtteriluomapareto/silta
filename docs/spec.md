@@ -1434,7 +1434,7 @@ run.
 
 ```
 # setup & health
-silta init [--scan <dir>…]                       [M1] create DB; discover repos, worktrees, branch-apps; open YAML
+silta init [--scan <dir>…] [--slug <slug>] [--prefix <prefix>]   [M1] create DB; discover repos, worktrees, branch-apps; open YAML
 silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] config as YAML (validated on save, "did you mean"); -F for agents
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
@@ -1479,6 +1479,16 @@ silta index [--rebuild] | verify [--fix-tasks]   [M3]
 silta import --from dex|beads|backlog-md <path>  [M4]
 silta open [AC-12]                               [M5] open Silta.app
 ```
+
+`init --scan` options name only a new workspace, so they are refused together with
+`--ws`, which rescans an existing one and matches its slug without regard to case. A
+chosen `--slug` and `--prefix` keep their
+case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
+starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
+(`AC-1`). A repo's slug is its directory name normalized — lowercased, other characters
+to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. The
+DF3 onboarding scans only the chosen clones:
+`silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 
 ## 17. Storage, concurrency, technology
 
@@ -2057,9 +2067,35 @@ repo paths are excluded from this view. A `workspace` change-log event invalidat
 that workspace's complete configuration, including omitted children.
 
 `init --scan` discovers repos at the root and at most two child levels, without fetching.
-The first directory's lowercased name is the workspace slug and its first two letters
-uppercase are the task prefix. Remote `X`/`X-prod` pairs create app stubs with a prod ref;
-main or master provides a default app when its ref is not already represented.
+A new workspace's slug is the first directory's lowercased name unless `--slug` names
+another, and `--slug` also names the workspace; without it the first directory's name
+does. Its task prefix is the slug's first two letters uppercased unless `--prefix`
+names another; a message about a derived prefix names where it came from, the slug when
+`--slug` was given and the directory otherwise. Chosen values keep their case and use the
+identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
+naming options refreshes an existing workspace, so a stored prefix that the directory
+cannot derive stays, and it finds that workspace by slug without regard to case, as does
+`--ws`. When `--slug` or `--prefix` is given and that slug already names a workspace, the
+scan is refused, saying that a rescan only refreshes the repos already registered there;
+with `--slug` it offers another slug first and the rescan second, with `--prefix` alone
+the rescan first and another slug second. Slug and prefix clashes compare
+case-insensitively. Every refusal's `next` repeats the naming options already given, so
+following it never lands on a different workspace. Options without `--scan` are refused.
+`--slug` and `--prefix` are invalid with `--ws`, which rescans. A directory name that is
+not a valid workspace slug, or does not yield a valid prefix, fails with an error that
+names `--slug` or `--prefix` as the fix and carries the scanned roots in a runnable
+`next`. A repo's slug is its clone directory's name normalized — lowercased, other
+characters to `-`, trimmed, and `repo` when nothing remains — so `My Projects` is the
+repo `my-projects`. That slug is only an identifier: the real path is stored as the
+machine-local repo path, so nothing on disk is renamed and worktrees and path aliases
+resolve to their canonical main clone as they are. Two directories that normalize to one
+slug are a duplicate, checked on the normalized names before any rename. A clone named
+`none`, the word that means non-code work, is stored as `none-repo`, or the next free
+`none-repo-N` when another clone in the scan normalizes to that name; the same clone keeps
+its stored name on every full or partial rescan. A task prefix another workspace holds, or
+a clone path another workspace already binds, is a conflict that names the holder and a
+command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
+or master provides a default app when its ref is not already represented.
 Worktrees and path aliases resolve to one canonical main clone. Initial scans create
 configuration; rescans only refresh local paths for registered repo slugs and preserve
 edited configuration. `--ws` targets an existing workspace for path rebinding.

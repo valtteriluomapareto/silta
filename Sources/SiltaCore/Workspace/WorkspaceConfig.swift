@@ -81,6 +81,11 @@ package struct WorkspaceConfig {
     return keys.map { node[$0]?.string ?? "" }.joined(separator: "\n")
   }
 
+  /// The identifier shape shared by workspace, repo, app and topic slugs and task prefixes.
+  package static func isValidIdentifier(_ value: String) -> Bool {
+    value.wholeMatch(of: /[A-Za-z0-9]+(?:[A-Za-z0-9_-]*[A-Za-z0-9])?/) != nil
+  }
+
   fileprivate static func suggestion(_ value: String, among candidates: [String]) -> String {
     let ranked = candidates.sorted().map { ($0, distance(value, $0)) }
     guard let best = ranked.min(by: { $0.1 < $1.1 }), best.1 <= 2 else { return "" }
@@ -165,9 +170,7 @@ private struct WorkspaceValidation {
     }
     validateValues(entry)
     for key in ["slug", "task_prefix"] {
-      if let value = entry[key]?.string,
-        value.wholeMatch(of: /[A-Za-z0-9]+(?:[A-Za-z0-9_-]*[A-Za-z0-9])?/) == nil
-      {
+      if let value = entry[key]?.string, !WorkspaceConfig.isValidIdentifier(value) {
         problem(entry[key] ?? entry, "invalid \(key)")
       }
     }
