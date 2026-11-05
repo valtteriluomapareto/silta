@@ -7,7 +7,7 @@ import Testing
 @Suite(.blockingTestWork)
 struct InboxCorrectionCommandTests {
   static let scope =
-    "Scope: discussion only; proposals, blockers and promoted attention are not included."
+    "Scope: current local attention; tracker status is not refreshed."
 
   @Test func selfAcceptanceRefusalHasReadOnlyRecovery() throws {
     try withScratchDirectory { scratch in
@@ -46,7 +46,7 @@ struct InboxCorrectionCommandTests {
       let empty = try run(["inbox", "--for", "me"])
       let raw = try TaskStateRegressionTests.data(run(["inbox", "--for", "me", "--json"]))
       #expect(empty.stdout.contains(Self.scope))
-      #expect(raw["scope"] as? String == "discussion")
+      #expect(raw["scope"] as? String == "local")
       _ = try run(["comment", "AC-1", "--kind", "question", "-m", "Which API?"])
       _ = try run([
         "comment", "AC-1", "--kind", "answer", "--reply-to", "AC-1/1", "-m", "Human said v2.",

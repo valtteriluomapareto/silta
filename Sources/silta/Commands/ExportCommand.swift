@@ -8,7 +8,8 @@ struct ExportCommand: OutputCommand {
     abstract: "Write one workspace as a deterministic text tree for backup and diff.",
     discussion:
       "The tree goes to <root>/<workspace>. It replaces only an absent, empty or previously "
-      + "exported directory, never one inside a registered repo. Machine paths are not written.")
+      + "exported directory, never one inside a registered repo. Repo paths and worktrees are "
+      + "not written; configured values are written as stored.")
 
   static let dataShape = Shape.object(["workspace": .string, "path": .string, "files": .int])
 

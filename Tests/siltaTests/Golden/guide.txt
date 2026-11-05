@@ -45,7 +45,7 @@ Human-only gates: `task promote`; task edit except your claimed task; doc edit/a
 Before `restore`, run it with --dry-run and show the human its lines: it replaces the workspace and drops work done after the export. Never edit an export tree.
 Usually propose nothing; never more than two proposals per session, only ideas you would bet the human wants. `task add --start` is only for work the human requested. When the human asked in this chat to add the task for later, pass their words as --approved so it becomes todo without triage (D39); do not ask again.
 If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under "What's left" in a handoff/result, never in a question, TODO comment or file.
-When no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. `inbox --for me` is not available in this version; relay known pending choices in one short message.
+When no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. For "what needs me?", run `silta inbox --for me` and relay the displayed choices in one short message. Apply "the rest" only to proposals you showed; ask before running triage.
 
 # Questions
 Ask in chat. Record a question only when blocked beyond this session. Questions default to @me; name recipients explicitly when needed:

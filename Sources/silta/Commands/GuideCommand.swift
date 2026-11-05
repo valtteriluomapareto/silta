@@ -139,8 +139,9 @@ struct GuideCommand: OutputCommand {
         question, TODO comment or file.
         When no answer can come, leave a question for @me listing pending commands, write a \
         handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved \
-        ideas in the handoff/result instead of that question. `inbox --for me` is not \
-        available in this version; relay known pending choices in one short message.
+        ideas in the handoff/result instead of that question. For "what needs me?", run \
+        `silta inbox --for me` and relay the displayed choices in one short message. \
+        Apply "the rest" only to proposals you showed; ask before running triage.
         """ + "\n"),
     Section(
       topic: "questions",
