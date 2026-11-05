@@ -5,7 +5,10 @@ import SiltaCore
 enum BriefHook {
   static func requested(_ arguments: [String]) -> Bool {
     let flags = SiltaMain.withoutApprovalValues(arguments).prefix { $0 != "--" }
-    return SiltaMain.commandPath(arguments) == "silta brief" && flags.contains("--hook")
+    let path = SiltaMain.commandPath(arguments)
+    return
+      (path == "silta brief" && flags.contains("--hook")
+      || path == "silta agents session-start" || path == "silta agents stop")
       && !flags.contains("--help") && !flags.contains("--version")
   }
 

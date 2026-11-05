@@ -44,6 +44,7 @@ a plan ships:
 
 ## Dogfooding
 
-[Setup and daily workflow](dogfood/README.md), [workspace YAML](dogfood/workspace.yaml)
-and [reviewed reports](dogfood/reports/README.md). Setup was completed on 2026-11-04;
+[Setup and daily workflow](dogfood/README.md), [workspace YAML](dogfood/workspace.yaml),
+[isolated harness acceptance](dogfood/agents-acceptance.md) and
+[reviewed reports](dogfood/reports/README.md). Setup was completed on 2026-11-04;
 the current stage is in [`AGENTS.md`](../AGENTS.md#dogfooding).

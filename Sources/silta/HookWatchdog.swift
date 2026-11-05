@@ -12,11 +12,15 @@ final class HookWatchdog: @unchecked Sendable {
     var phase = Phase.armed
     var record: (path: String, data: Data)?
   }
+  private let command: String
+  private let flags: [String]
   private let state = Mutex(State())
   private let timer: any DispatchSourceTimer
   private let finished = DispatchSemaphore(value: 0)
 
-  init() {
+  init(command: String, flags: [String]) {
+    self.command = command
+    self.flags = flags
     // The only process-deadline owner: a strict timer without leeway.
     timer = DispatchSource.makeTimerSource(flags: .strict, queue: .global(qos: .userInteractive))
     let budget = BriefHookDeadline.budget.components
@@ -43,10 +47,10 @@ final class HookWatchdog: @unchecked Sendable {
   private func prepare(home: URL, actor: ActorID, at timestamp: Date) {
     do {
       var entry = LogEntry(
-        timestamp: timestamp, command: "silta brief",
+        timestamp: timestamp, command: command,
         actor: actor.description, exitCode: 0,
         milliseconds: Int(BriefHookDeadline.budget / .milliseconds(1)))
-      entry.flags = ["--hook"]
+      entry.flags = flags
       entry.errorCode = .env
       entry.warnings = ["hook_timeout"]
       let record = try SystemLog.prepared(entry)

@@ -7,6 +7,15 @@ protocol ErrorExamples: CodedError {
   static var examples: [Self] { get }
 }
 
+extension AgentInstallError: ErrorExamples {
+  static var examples: [AgentInstallError] {
+    [
+      .init(.conflict, "Preview changed.", next: ["silta agents install"]),
+      .init(.env, "Cannot write HOME.", next: ["silta agents install --help"], human: true),
+    ]
+  }
+}
+
 extension UsageError: ErrorExamples {
   static var examples: [UsageError] {
     [
@@ -229,7 +238,7 @@ struct ErrorReachabilityTests {
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
     ScanError.self, CommentError.self,
     CodeError.self, LocationError.self,
-    CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
+    CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,
     ExportError.self, ExportFailure.self,
   ]
 

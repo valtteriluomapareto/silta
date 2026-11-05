@@ -25,12 +25,7 @@ struct GuideCommand: OutputCommand {
           + topics.joined(separator: ", ") + ".",
         command: "silta guide")
     }
-    let text = selected.map { section in
-      section.text
-        + (section.topic == "output"
-          ? "Topics: " + topics.joined(separator: ", ") + ". Read one with `silta guide <topic>`.\n"
-          : "")
-    }.joined(separator: "\n")
+    let text = Self.render(selected)
     return CommandOutput(
       text: text, quiet: text, data: GuideManual(text: text, topics: topics, topic: topic))
   }
@@ -183,7 +178,8 @@ struct GuideCommand: OutputCommand {
         # Handoff
         Always leave a handoff before stopping. It releases your claim while preserving \
         status. Use the actual branch and sha; the next session reads the task and starts it \
-        again.
+        again. Run `silta session check` to find fresh own claims needing handoff across all \
+        workspaces; follow each printed scoped command with the handoff body on stdin.
         ```sh
         silta comment AC-12 --kind handoff -F - <<'HANDOFF'
         State: API inspected; implementation remains.
@@ -261,4 +257,19 @@ private struct GuideManual: Encodable, Sendable {
   let text: String
   let topics: [String]
   let topic: String?
+}
+
+extension GuideCommand {
+  static func manual() -> String {
+    render(sections)
+  }
+
+  private static func render(_ selected: [Section]) -> String {
+    selected.map { section in
+      section.text
+        + (section.topic == "output"
+          ? "Topics: " + sections.map(\.topic).joined(separator: ", ")
+            + ". Read one with `silta guide <topic>`.\n" : "")
+    }.joined(separator: "\n")
+  }
 }
