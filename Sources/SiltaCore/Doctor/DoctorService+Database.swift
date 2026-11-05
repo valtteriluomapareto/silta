@@ -53,7 +53,7 @@ extension DoctorService {
       }
     } catch {
       let failure = readFailure(
-        StorageError.mapped(error), path: store.path, recovery: recovery,
+        StorageError.mapped(error, at: store.path), path: store.path, recovery: recovery,
         hasBackups: backups.count > 0)
       return [failure] + skipped(["database.foreign_keys", "database.schema"] + dependentIDs)
         + [backups.check(expectedDay: nil)]
@@ -63,19 +63,42 @@ extension DoctorService {
   static func readFailure(_ error: StorageError, path: String, recovery: [String], hasBackups: Bool)
     -> DoctorCheck
   {
-    if error == .busy {
+    let evidence = "/bin/ls -l " + shellWord(path)
+    switch error {
+    case .busy, .locked:
       return DoctorCheck(
         id: "database.integrity", status: .fail,
-        message: "Database is busy; inspect open handles, then retry once.",
+        message: error == .busy
+          ? "Database is busy; inspect open handles, then retry once."
+          : "Database is locked; inspect open handles, then retry once.",
         next: ["/usr/sbin/lsof " + shellWord(path)])
+    case .accessDenied:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "Database access is denied by file permissions or a read-only file or directory; "
+          + "inspect access and the resolved database path.",
+        next: recovery + [evidence], nextBy: .human)
+    case .corrupt:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "SQLite reports the database is corrupt or is not a SQLite database; "
+          + "inspect backups and read-only evidence; restore is the human's decision.",
+        next: recovery, nextBy: .human)
+    case .diskFull, .ioFailure, .walRefused:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "Database file could not be read or written because of a filesystem failure; "
+          + "inspect free space and the resolved database path.",
+        next: recovery, nextBy: .human)
+    default:
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "Database could not be opened or read."
+          + (hasBackups
+            ? " Backups are available; restore is the human's decision."
+            : " Inspect the read-only evidence before deciding recovery."),
+        next: recovery)
     }
-    return DoctorCheck(
-      id: "database.integrity", status: .fail,
-      message: "Database could not be opened or read."
-        + (hasBackups
-          ? " Backups are available; restore is the human's decision."
-          : " Inspect the read-only evidence before deciding recovery."),
-      next: recovery)
   }
 
   private static func databaseChecks(

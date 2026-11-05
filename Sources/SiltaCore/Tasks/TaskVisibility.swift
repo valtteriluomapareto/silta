@@ -51,7 +51,7 @@ struct TaskVisibility {
           WHERE \(scope) AND \(localSQL) AND (\(archiveSQL))=-1)
         """, arguments: arguments) == true
     {
-      throw StorageError.unavailable
+      throw StorageError.internalMisuse
     }
   }
 
@@ -69,7 +69,7 @@ struct TaskVisibility {
         "closed": task.closedAt,
         "archive_cutoff": date.addingTimeInterval(-Double(days) * 86400).timeIntervalSince1970,
       ])
-    guard let value, value >= 0 else { throw StorageError.unavailable }
+    guard let value, value >= 0 else { throw StorageError.internalMisuse }
     return value == 1
   }
 }

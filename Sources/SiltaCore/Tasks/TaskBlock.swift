@@ -58,14 +58,14 @@ struct TaskBlockEvent: Codable {
     let encoder = JSONEncoder()
     encoder.outputFormatting = .sortedKeys
     guard let text = String(bytes: try encoder.encode(self), encoding: .utf8) else {
-      throw StorageError.unavailable
+      throw StorageError.internalMisuse
     }
     return text
   }
 
   static func decode(_ body: String) throws -> Self {
     do { return try JSONDecoder().decode(Self.self, from: Data(body.utf8)) } catch {
-      throw StorageError.unavailable
+      throw StorageError.corrupt
     }
   }
 

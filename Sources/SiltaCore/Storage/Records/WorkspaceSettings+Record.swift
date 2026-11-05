@@ -7,7 +7,7 @@ extension WorkspaceSettings {
     guard
       let row = try Row.fetchOne(
         db, sql: "SELECT slug,settings FROM workspace WHERE id=?", arguments: [workspaceID])
-    else { throw StorageError.unavailable }
+    else { throw StorageError.corrupt }
     return WorkspaceSettings(workspace: row["slug"], json: row["settings"])
   }
 }

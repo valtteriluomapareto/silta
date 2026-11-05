@@ -219,6 +219,25 @@ struct DoctorReviewTests {
     #expect(check.nextBy == .agent)
   }
 
+  @Test func corruptReadNamesCorruption() {
+    let check = DoctorService.readFailure(
+      .corrupt, path: "/acme/silta.db", recovery: ["/bin/ls -l '/acme/silta.db'"],
+      hasBackups: false)
+    #expect(check.message.contains("corrupt"))
+    #expect(check.nextBy == .human)
+    #expect(!check.next.isEmpty)
+  }
+
+  @Test func readOnlyReadIsNotCalledCorruption() {
+    let check = DoctorService.readFailure(
+      .accessDenied, path: "/acme/silta.db", recovery: ["/bin/ls -l '/acme/silta.db'"],
+      hasBackups: false)
+    #expect(check.message.contains("permission"))
+    #expect(!check.message.contains("corrupt"))
+    #expect(check.next.contains("/bin/ls -l '/acme/silta.db'"))
+    #expect(check.nextBy == .human)
+  }
+
   @Test func realBtreeCorruptionReturnsFailedIntegrityRows() async throws {
     try await withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)

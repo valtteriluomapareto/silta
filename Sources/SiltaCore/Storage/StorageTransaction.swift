@@ -14,7 +14,7 @@ package struct StorageTransaction {
           INSERT INTO seq_counter(scope,next) VALUES(?,2)
           ON CONFLICT(scope) DO UPDATE SET next=next+1 RETURNING next-1
           """, arguments: [scope])
-    else { throw StorageError.unavailable }
+    else { throw StorageError.internalMisuse }
     return value
   }
 
@@ -26,7 +26,7 @@ package struct StorageTransaction {
         sql: """
           UPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='change_seq' RETURNING value
           """)
-    else { throw StorageError.unavailable }
+    else { throw StorageError.internalMisuse }
     try database.execute(
       sql: "INSERT INTO change_log(seq,kind,row_id) VALUES(?,?,?)", arguments: [seq, kind, rowID])
   }

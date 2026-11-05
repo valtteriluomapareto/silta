@@ -4,10 +4,56 @@ retry after: 5s
 next: silta doctor
 {"error":{"code":"busy","message":"Database is busy; retry the original invocation once after retry_after_s.","next":["silta doctor"],"next_by":"agent","retry_after_s":5},"ok":false,"schema":1,"warnings":[]}
 
-## unavailable
-error: Database is unavailable or read-only. [env]
+## locked
+error: Database is locked by another connection; retry the original invocation once after retry_after_s. [busy]
+retry after: 5s
+next: silta doctor
+{"error":{"code":"busy","message":"Database is locked by another connection; retry the original invocation once after retry_after_s.","next":["silta doctor"],"next_by":"agent","retry_after_s":5},"ok":false,"schema":1,"warnings":[]}
+
+## accessDenied
+error: Database access is denied by file permissions or a read-only file or directory. [env]
 ask human: silta doctor
-{"error":{"code":"env","message":"Database is unavailable or read-only.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Database access is denied by file permissions or a read-only file or directory.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## cannotOpen
+error: Database file could not be opened; it may be missing or its directory may not exist. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database file could not be opened; it may be missing or its directory may not exist.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## ioFailure
+error: Database file could not be read or written because of a filesystem I/O error. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database file could not be read or written because of a filesystem I/O error.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## diskFull
+error: Database write failed because the disk is full or over its quota. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database write failed because the disk is full or over its quota.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## walRefused
+error: Database could not be switched to WAL journal mode; its filesystem may not support it. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database could not be switched to WAL journal mode; its filesystem may not support it.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## corrupt
+error: Database is corrupt: SQLite reported corruption or a stored value or reference cannot be read. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database is corrupt: SQLite reported corruption or a stored value or reference cannot be read.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## resourceExhausted
+error: Database engine ran out of memory or a value exceeded SQLite's size limit. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database engine ran out of memory or a value exceeded SQLite's size limit.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## internalMisuse
+error: internal error (bug): Silta made an invalid database call; nothing was saved. Report which silta command failed (not its arguments) and the time, with silta doctor output. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"internal error (bug): Silta made an invalid database call; nothing was saved. Report which silta command failed (not its arguments) and the time, with silta doctor output.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## unknown
+error: Storage failed for an unrecognized reason. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Storage failed for an unrecognized reason.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## constraintViolation
 error: internal error (bug): a write conflicted with existing data; nothing was saved. Report which silta command failed (not its arguments) and the time, with silta doctor output. [env]

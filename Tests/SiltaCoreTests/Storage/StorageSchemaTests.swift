@@ -23,9 +23,9 @@ struct StorageSchemaTests {
       let home = scratch.appending(path: "data")
       let store = Self.store(home)
       #expect(!FileManager.default.fileExists(atPath: home.path))
-      #expect(throws: StorageError.unavailable) { try store.read { _ in () } }
+      #expect(throws: StorageError.cannotOpen) { try store.read { _ in () } }
       #expect(!FileManager.default.fileExists(atPath: home.path))
-      #expect(throws: StorageError.unavailable) { try Self.store(scratch).read { _ in () } }
+      #expect(throws: StorageError.cannotOpen) { try Self.store(scratch).read { _ in () } }
       #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "silta.db").path))
       let environment = try await SiltaEnvironment.system(
         environment: ["SILTA_HOME": home.path], userHome: scratch)
@@ -100,7 +100,7 @@ struct StorageSchemaTests {
           uid: "acme-duplicate", slug: "acme", name: "Acme", taskPrefix: "OTHER")
         #expect(throws: DatabaseError.self) { try duplicate.insert(db) }
       }
-      #expect(throws: StorageError.unavailable) {
+      #expect(throws: StorageError.accessDenied) {
         try store.read { db in try db.execute(sql: "DELETE FROM workspace") }
       }
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 1)
