@@ -263,6 +263,123 @@ struct RepositoryScanTests {
     }
   }
 
+  @Test func chosenSlugAndPrefixNameANewWorkspace() async throws {
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "acme")
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let outcome = try await RepositoryScan.scan(
+        [repo], store: store,
+        git: ScriptedGitRunner(script: Self.script(try Self.path(repo))),
+        identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant),
+        slug: "work", prefix: "WK")
+      #expect(outcome.workspace == "work")
+      #expect(
+        try store.read {
+          try Row.fetchOne($0, sql: "SELECT slug,task_prefix FROM workspace").map {
+            ($0["slug"] as String, $0["task_prefix"] as String)
+          }
+        } == ("work", "WK"))
+    }
+  }
+
+  @Test func prefixWithoutSlugKeepsTheDirectorySlug() async throws {
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "acme")
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      _ = try await RepositoryScan.scan(
+        [repo], store: store,
+        git: ScriptedGitRunner(script: Self.script(try Self.path(repo))),
+        identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant), prefix: "WK")
+      #expect(
+        try store.read {
+          try Row.fetchOne($0, sql: "SELECT slug,task_prefix FROM workspace").map {
+            ($0["slug"] as String, $0["task_prefix"] as String)
+          }
+        } == ("acme", "WK"))
+    }
+  }
+
+  @Test func defaultNamingStillComesFromTheFirstDirectory() async throws {
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "Acme")
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      _ = try await RepositoryScan.scan(
+        [repo], store: store,
+        git: ScriptedGitRunner(script: Self.script(try Self.path(repo))),
+        identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+      #expect(
+        try store.read {
+          try Row.fetchOne($0, sql: "SELECT slug,task_prefix FROM workspace").map {
+            ($0["slug"] as String, $0["task_prefix"] as String)
+          }
+        } == ("acme", "AC"))
+    }
+  }
+
+  @Test func chosenSlugOfAnExistingWorkspaceIsRefusedWithoutChanges() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
+      let before = try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") }
+      let repo = home.appending(path: "new")
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      for (slug, prefix) in [("acme", nil), (nil, "WK")] as [(String?, String?)] {
+        await #expect(throws: ScanNamingError.slugExists("acme")) {
+          try await RepositoryScan.scan(
+            [repo], store: store,
+            git: ScriptedGitRunner(script: Self.script(try Self.path(repo))),
+            identity: (SeededIDGenerator(seed: 2), WorkspaceConfigTests.instant),
+            slug: slug, prefix: prefix)
+        }
+        #expect(try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") } == before)
+      }
+      #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
+    }
+  }
+
+  @Test func invalidNamesFailBeforeDiscovery() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let git = ScriptedGitRunner(script: [])
+      await #expect(throws: ScanNamingError.invalidSlug("My Projects", derived: false)) {
+        try await RepositoryScan.scan(
+          [home.appending(path: "acme")], store: store, git: git,
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant),
+          slug: "My Projects")
+      }
+      await #expect(throws: ScanNamingError.invalidPrefix("A_", derived: false)) {
+        try await RepositoryScan.scan(
+          [home.appending(path: "acme")], store: store, git: git,
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant), prefix: "A_")
+      }
+      await #expect(throws: ScanNamingError.invalidSlug("My Projects", derived: true)) {
+        try await RepositoryScan.scan(
+          [home.appending(path: "My Projects")], store: store, git: git,
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+      }
+      await #expect(throws: ScanNamingError.invalidSlug(".hidden", derived: true)) {
+        try await RepositoryScan.scan(
+          [home.appending(path: ".hidden")], store: store, git: git,
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+      }
+      await #expect(throws: ScanNamingError.invalidPrefix("A_", derived: true)) {
+        try await RepositoryScan.scan(
+          [home.appending(path: "a_b")], store: store, git: git,
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+      }
+      #expect(git.isExhausted)
+      #expect(try WorkspaceSelection.list(in: store).isEmpty)
+      #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+  }
+
 }
 
 extension RepositoryScanTests {
