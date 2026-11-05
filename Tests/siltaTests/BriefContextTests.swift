@@ -34,7 +34,7 @@ extension BriefCommandTests {
       #expect(!open.contains("AC-3"))
       #expect(open.components(separatedBy: "AC-2").count == 2)
       #expect(result.stdout.contains("glossary: messages = messaging, push"))
-      #expect(result.stdout.contains("code show 'api' 'README.md' --lines 1"))
+      #expect(result.stdout.contains("code show 'api' --lines 1 -- 'README.md'"))
       #expect(result.stdout.contains("code ls 'portal'"))
       #expect(result.stdout.contains("service:push"))
       #expect(!result.stdout.contains("code ls 'api'"))

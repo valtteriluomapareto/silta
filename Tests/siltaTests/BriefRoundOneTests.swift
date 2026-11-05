@@ -78,7 +78,7 @@ extension BriefCommandTests {
             """)
       }
       let result = try run(["--task", "AC-2", "--app", "api"], repo, scratch)
-      #expect(result.stdout.contains("code show 'api' 'README.md' --lines 1"))
+      #expect(result.stdout.contains("code show 'api' --lines 1 -- 'README.md'"))
       #expect(!result.stdout.contains("code ls 'api'"))
       #expect(result.stdout.contains("open: AC-2 [doing, p2] Acme task (app: portal)"))
       #expect(result.stdout.contains("done: AC-4\n"))
