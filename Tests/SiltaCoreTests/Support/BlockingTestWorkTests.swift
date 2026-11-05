@@ -14,6 +14,16 @@ private final class SingleTestWorker: TaskExecutor {
 }
 
 struct BlockingTestScopeTests {
+  @Test func runnerScopesStayCooperative() throws {
+    let test = try #require(Test.current)
+    #expect(!test.isParameterized)
+    withKnownIssue("Outer test scope inherits the blocking executor") {
+      #expect(BlockingTestScope().scopeProvider(for: test, testCase: nil) == nil)
+    }
+    let testCase = try #require(Test.Case.current)
+    #expect(BlockingTestScope().scopeProvider(for: test, testCase: testCase) != nil)
+  }
+
   @Test func scopedProcessAllowsSingleWorkerProgress() async throws {
     try await checkScopedProcessProgress()
   }
