@@ -5,7 +5,9 @@ import SiltaTestSupport
 import Testing
 
 struct InboxTests {
-  @Test(arguments: ["human:acme", "agent:claude:recipient", "agent:codex:outsider"])
+  @Test(arguments: [
+    "human:acme", "human:visitor", "agent:claude:recipient", "agent:codex:outsider",
+  ])
   func sharedAnsweredAndAcceptanceFollowLiveState(answerer: String) async throws {
     try await withScratchDirectory { home in
       let clock = FakeClock(now: TaskServiceTests.now)
@@ -37,7 +39,7 @@ struct InboxTests {
       _ = try successor.updateComments(["AC-1/1"], action: .reopen)
       #expect(try successor.inbox().items.map(\.ref) == ["AC-1/2"])
       _ = try responder.updateComments(["AC-1/2"], action: .delete)
-      #expect(try owner.show("AC-1").comments?.first?.answered == false)
+      #expect(try owner.show("AC-1").comments?.first { $0.ref == "AC-1/1" }?.answered == false)
       #expect(try owner.inbox(for: "human:acme").items.map(\.ref) == ["AC-1/1"])
       _ = try owner.updateComments(["AC-1/1"], action: .delete)
       #expect(try owner.inbox(for: "human:acme").items.isEmpty)
@@ -47,7 +49,8 @@ struct InboxTests {
   @Test func claimedDiscussionUsesStrictOwnWriteBoundaryAndReadsNeverWrite() async throws {
     try await withScratchDirectory { home in
       let clock = FakeClock(now: TaskServiceTests.now)
-      let env = try await CommentTests.setup(home, clock: clock), owner = TaskService(environment: env)
+      let env = try await CommentTests.setup(home, clock: clock),
+        owner = TaskService(environment: env)
       let other = TaskService(
         environment: try TaskServiceTests.environment(
           home, actor: .agent(tool: "codex", session: "other"), clock: clock))
@@ -70,10 +73,32 @@ struct InboxTests {
       _ = try owner.plan("AC-1", text: "Work")
       #expect(try owner.inbox().items.isEmpty)
       clock.advance(milliseconds: 1)
+      _ = try other.comment("AC-1", CommentDraft(body: "Delete this"))
+      #expect(try owner.inbox().items.map(\.ref) == ["AC-1/4"])
+      _ = try other.updateComments(["AC-1/4"], action: .delete)
+      #expect(try owner.inbox().items.isEmpty)
       _ = try owner.comment("AC-1", CommentDraft(body: "Own"))
       #expect(try owner.inbox().items.isEmpty)
       _ = try other.updateComments(["AC-1/3"], action: .delete)
       #expect(try owner.inbox().items.isEmpty)
+    }
+  }
+
+  @Test func creationTimeThenStoredIDOrdersAcrossTasks() async throws {
+    try await withScratchDirectory { home in
+      let clock = FakeClock(now: TaskServiceTests.now)
+      let env = try await CommentTests.setup(home, clock: clock),
+        owner = TaskService(environment: env)
+      var task = TaskDraft(title: "Other")
+      task.start = true
+      _ = try await owner.add(task, directory: home)
+      let question = CommentDraft(body: "Ask", kind: "question")
+      clock.advance(milliseconds: 10)
+      _ = try owner.comment("AC-2", question)
+      _ = try owner.comment("AC-1", question)
+      clock.advance(milliseconds: -1)
+      _ = try owner.comment("AC-1", question)
+      #expect(try owner.inbox(for: "me").items.map(\.ref) == ["AC-1/2", "AC-2/1", "AC-1/1"])
     }
   }
 
@@ -91,13 +116,17 @@ struct InboxTests {
       for _ in 0..<13 { _ = try other.comment("AC-1", question) }
       let result = try owner.inbox()
       #expect(result.items.map(\.ref) == (3...14).map { "AC-1/\($0)" })
-      #expect(result.remaining == 2 && result.more == "silta --ws 'acme' inbox --for 'agent:codex:acme' --all")
+      #expect(
+        result.remaining == 2
+          && result.more == "silta --ws 'acme' inbox --for 'agent:codex:acme' --all")
       let all = try owner.inbox(all: true)
       #expect(all.items.map(\.ref) == (3...15).map { "AC-1/\($0)" } + ["AC-1/2"])
       #expect(all.remaining == 0 && all.more == nil)
       #expect(try owner.inbox(for: "agent:codex:another").items.isEmpty)
       try env.db.write {
-        try $0.database.execute(sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('other','other','Other','OT')")
+        try $0.database.execute(
+          sql:
+            "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('other','other','Other','OT')")
       }
       #expect(try TaskService(environment: env, workspace: "other").inbox().items.isEmpty)
       try env.db.write { try $0.database.execute(sql: "UPDATE task SET external_ref='ado:42'") }
@@ -108,7 +137,8 @@ struct InboxTests {
   @Test func closedFencePreservesFollowingMentionAndResolvedHandoffCounts() async throws {
     try await withScratchDirectory { home in
       let owner = TaskService(environment: try await CommentTests.setup(home))
-      let draft = CommentDraft(body: "```\n@human:hidden\n```\nAsk @agent:claude:reader", kind: "question")
+      let draft = CommentDraft(
+        body: "```\n@human:hidden\n```\nAsk @agent:claude:reader", kind: "question")
       #expect(try owner.comment("AC-1", draft).comment.mentions == ["agent:claude:reader"])
       _ = try owner.comment("AC-1", CommentDraft(body: "Resume", kind: "handoff"))
       _ = try owner.updateComments(["AC-1/2"], action: .resolve)

@@ -3,6 +3,7 @@ import GRDB
 
 extension CommentDetails {
   init(row: Row, task: String) {
+    id = row["id"]
     ref = task + "/\(row["seq"] as Int)"
     kind = row["kind"]
     deleted = row["deleted_at"] as String? != nil
@@ -34,18 +35,12 @@ extension TaskService {
   {
     let rows = try Row.fetchAll(
       db, sql: commentQuery + " WHERE c.task_id=? ORDER BY c.created_at,c.id", arguments: [task.id])
+    let posts = rows.map { CommentDetails(row: $0, task: task.ref) }
+    let postsByRoot = Dictionary(grouping: posts) { $0.replyTo ?? $0.ref }
     func details(_ row: Row) -> CommentDetails {
       var post = CommentDetails(row: row, task: task.ref)
       if post.kind == "question" {
-        let questionID: Int64 = row["id"], recipients = post.mentions
-        post.answered =
-          !post.deleted
-          && rows.contains { answer in
-            let actor: String = answer["actor"]
-            return answer["thread_id"] as Int64? == questionID
-              && answer["kind"] as String == "answer" && answer["deleted_at"] as String? == nil
-              && (ActorID.parse(actor)?.isHuman == true || recipients.contains(actor))
-          }
+        post.answered = post.isAnswered(by: postsByRoot[post.ref, default: []])
       }
       return post
     }

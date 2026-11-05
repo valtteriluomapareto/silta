@@ -755,7 +755,9 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   human. An agent outside its recipients may contribute an answer without clearing
   the addressees' attention. JSON includes `answered` for questions (false for a
   deleted question); text uses the same rule. Answer acceptance remains a separate
-  choice by the asker or current claimer.
+  choice by the asker or current claimer. After confirming a human's answer in chat,
+  the claimer accepts an agent's relay, or the relaying agent explicitly resolves
+  the question with `comment resolve <ref> -m <explanation>`.
 - Questions and handoffs are roots. Answers require a live unresolved question;
   comment/decision replies require a live unresolved root. A deleted immediate
   target or root cannot receive public replies. Cross-task/workspace replies refuse.
@@ -778,7 +780,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
   thread is omitted. The default read also shows `N resolved threads (see --timeline)`
   when retained resolved roots exist; optional JSON `resolved_threads` reports that
-  count. `--timeline` includes full discussion alongside task events.
+  count, including a displayed resolved handoff. `--timeline` includes full discussion alongside task events.
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
@@ -860,11 +862,24 @@ inbox is short and grouped:
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
   agent asks first, and maps "the rest" only to items it showed.
 
+**Available M1 discussion query:** grouped blockers, proposals and promoted attention
+are not yet included. Discussion categories are questions, then answers awaiting
+acceptance, then claimed-task discussion, oldest first within each category with
+stored post id breaking time ties. Each live post appears once, with question/answer
+attention taking precedence over claimed-task discussion. The cap applies after
+ordering; JSON has `actor`, `items`, `remaining` and optional `more`. Each item has
+`kind`, `ref`, `task`, `author`, `body`, `created_at` and `next` commands qualified
+with the selected workspace. Actions are alternatives: after confirming a human's
+answer, the claimer accepts or the relayer resolves with an explanation. Acceptance
+is offered only when the caller is the asker or current claimer; other callers get
+explicit resolution. Promoted tasks are omitted because local discussion mutations
+refuse; `--all` does not include them.
+
 It lists:
 - live open questions mentioning the actor with no qualifying live answer (an answer
   by an addressee or human); deleting the last qualifying answer restores attention
-- answers to your live open questions awaiting acceptance, including answers from
-  other agents; the asker must be able to review these without being an answer recipient
+- live answers to open questions awaiting acceptance reach the asker **or the current
+  claimer**, including answers from other agents, independently of answer recipients
 - reopening clears acceptance and restores attention: the asker receives live answers
   awaiting acceptance, and addressees receive questions without a qualifying answer;
   deleted question roots never appear in either question category
@@ -873,8 +888,9 @@ It lists:
   needing attention
 - for humans, also: blocked tasks that are ready to unblock, have a dropped blocker
   ("re-plan"), or have reached their follow-up day, each with its `next` (D35)
-- for agent sessions: new comments by others on tasks they claim, since their last
-  write there
+- for agent sessions: all live post kinds by others on tasks they claim, including
+  resolved threads, strictly newer than the holder's own last write (`claimed_at`);
+  foreign writes and reads do not advance this attention boundary
 
 ## 9. Docs (M2)
 
