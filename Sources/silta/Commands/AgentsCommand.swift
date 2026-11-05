@@ -7,6 +7,7 @@ struct AgentsCommand: ParsableCommand {
     commandName: "agents", abstract: "Preview and safely apply harness integration.",
     subcommands: [
       AgentsInstallCommand.self, AgentsUninstallCommand.self, AgentsSessionStartCommand.self,
+      AgentsStopCommand.self,
     ])
   @OptionGroup var global: GlobalOptions
 }
@@ -20,18 +21,22 @@ struct AgentInstallOptions: ParsableArguments {
   var apply: String?
   @Flag(help: "Install Claude SessionStart; uninstall removes owned hooks without this flag.")
   var hook = false
+  @Flag(help: "Install Claude Stop handoff checks and the required SessionStart hook.")
+  var stopHook = false
 
   func execute(_ context: CommandContext, uninstall: Bool) throws -> CommandOutput {
     let command = "silta agents " + (uninstall ? "uninstall" : "install")
-    guard !hook || (!uninstall && (claude || !codex)) else {
+    guard !(hook || stopHook) || (!uninstall && (claude || !codex)) else {
       throw UsageError.invalid(
-        message: "--hook requires selected Claude during install; "
+        message: "--hook/--stop-hook require selected Claude during install; "
           + "uninstall removes all selected owned hooks without hook flags.", command: command)
     }
     guard !dryRun || apply == nil else {
       throw UsageError.invalid(message: "Choose --dry-run or --apply <token>.", command: command)
     }
-    let selected = (claude ? " --claude" : "") + (codex ? " --codex" : "") + (hook ? " --hook" : "")
+    let selected =
+      (claude ? " --claude" : "") + (codex ? " --codex" : "") + (hook ? " --hook" : "")
+      + (stopHook ? " --stop-hook" : "")
     let preview = command + selected
     let files = try AgentInstallFiles(
       preview: preview, claude: claude || !codex, codex: codex || !claude)
@@ -39,11 +44,11 @@ struct AgentInstallOptions: ParsableArguments {
     var targets = try AgentInstallTarget.selected(
       claude: claude || !codex, codex: codex || !claude,
       root: context.environment.home.url.path)
-    if claude || !codex, hook || uninstall {
+    if claude || !codex, hook || stopHook || uninstall {
       targets.append(
         AgentInstallTarget(
           path: ".claude/settings.json", body: "", whole: false,
-          settings: true))
+          settings: true, stopHook: stopHook))
     }
     let plan = try AgentInstallPlan(files: files, targets: targets, uninstall: uninstall)
     if let apply {
@@ -71,7 +76,8 @@ struct AgentsInstallCommand: OutputCommand {
       + "ACLs, non-provenance extended attributes, file flags, special mode bits and ownership "
       + "that replacement cannot retain are refused before writes. "
       + "Replacements are atomic per file, not across files; a failure lists completed paths. "
-      + "--hook opts into SessionStart; no hook flag leaves settings unread during install. "
+      + "--hook opts into SessionStart; --stop-hook adds Stop and requires SessionStart. "
+      + "No hook flag leaves settings unread during install. "
       + "Hook JSON must have no duplicate keys and only exact safe-integer numbers; "
       + "other numeric forms require manual integration. Uninstall removes selected owned hooks. "
       + "Real harness acceptance is separate from installation.")

@@ -4,12 +4,23 @@ import SiltaCore
 
 /// The shared process deadline is armed before this gateway can read stdin.
 enum AgentHook {
-  static func environment(_ snapshot: [String: String]) throws -> [String: String] {
-    let input = try JSONDecoder().decode(AgentHookInput.self, from: readInput())
-    guard ActorID.parse("agent:claude:" + input.sessionID) != nil,
-      let file = snapshot["CLAUDE_ENV_FILE"], !file.isEmpty
-    else { throw SeamError.invalidSession }
-    try export(input.sessionID, file: file, snapshot: snapshot)
+  static func environment(_ snapshot: [String: String], stop: Bool = false) throws -> [String:
+    String]
+  {
+    let data = try readInput()
+    let input = try JSONDecoder().decode(AgentHookInput.self, from: data)
+    if stop, try JSONDecoder().decode(AgentStopInput.self, from: data).active == true {
+      throw SeamError.invalidSession
+    }
+    guard ActorID.parse("agent:claude:" + input.sessionID) != nil else {
+      throw SeamError.invalidSession
+    }
+    if !stop {
+      guard let file = snapshot["CLAUDE_ENV_FILE"], !file.isEmpty else {
+        throw SeamError.invalidSession
+      }
+      try export(input.sessionID, file: file, snapshot: snapshot)
+    }
     var environment = snapshot
     environment["SILTA_SESSION"] = input.sessionID
     environment["CLAUDECODE"] = "1"
@@ -101,4 +112,9 @@ enum AgentHook {
 private struct AgentHookInput: Decodable {
   let sessionID: String
   enum CodingKeys: String, CodingKey { case sessionID = "session_id" }
+}
+
+private struct AgentStopInput: Decodable {
+  let active: Bool?
+  enum CodingKeys: String, CodingKey { case active = "stop_hook_active" }
 }

@@ -88,8 +88,11 @@ enum SiltaMain {
     String]
   {
     let snapshot = ProcessInfo.processInfo.environment
-    return commandPath(arguments) == "silta agents session-start" && hook
-      ? try AgentHook.environment(snapshot) : snapshot
+    let path = commandPath(arguments)
+    if hook && (path == "silta agents session-start" || path == "silta agents stop") {
+      return try AgentHook.environment(snapshot, stop: path == "silta agents stop")
+    }
+    return snapshot
   }
 
   private static func elapsedMilliseconds(_ duration: Duration) -> Int {

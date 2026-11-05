@@ -145,7 +145,10 @@ extension TaskService {
   func touchDiscussion(
     _ task: TaskDetails, handoff: Bool, comment: String, at: Date, in tx: StorageTransaction
   ) throws -> Bool {
-    guard task.claimedBy == environment.actor.description else { return false }
+    guard task.claimedBy == environment.actor.description else {
+      if handoff { try event("handoff", task: task.id, body: comment, at: at, in: tx) }
+      return false
+    }
     try tx.database.execute(
       sql: "UPDATE task SET claimed_by=?,claimed_at=?,updated_at=? WHERE id=?",
       arguments: [

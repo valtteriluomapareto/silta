@@ -307,7 +307,14 @@ extension DogfoodLogTests {
       (acme + ["inbox"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"), (acme + ["status"], "acme"),
-    ] + [(["guide"], nil), (["agents", "install"], nil), (["agents", "uninstall"], nil)]
+    ] + integrationCatalog()
+  }
+
+  static func integrationCatalog() -> [(args: [String], workspace: String?)] {
+    [
+      (["guide"], nil), (["agents", "install"], nil), (["agents", "uninstall"], nil),
+      (["session", "check"], nil),
+    ]
   }
 
   static func discussionCatalog() -> [(args: [String], workspace: String?)] {
