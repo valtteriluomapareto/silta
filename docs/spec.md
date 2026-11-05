@@ -523,7 +523,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|---|
 | Human | `task add` | `todo` |
 | Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
-| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
+| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --parent AC-3` (with or without `--split`) | `todo` |
 | Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it. With the setting `proposals: ask` (D39), human-only instead: the agent asks in chat first |
 | Agent, with the human's go-ahead (D39) | a write that would be `proposed`, with `--approved` | `todo`, under either setting |
 
@@ -1134,9 +1134,12 @@ settings (D39). It covers:
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
   - Proposals: usually none; never more than two per session, and only what you'd bet
-    the human wants. `task add --start` is only for work the human asked for. If
-    the human asked you to add a task for later, pass their words as `--approved`,
-    so it becomes `todo` without triage (D39).
+    the human wants. `task add --start` is only for work the human asked for. A
+    subtask of a task you still claim (`task add --parent AC-12`) starts as `todo`
+    and is not a proposal (§8), so it needs no `--approved`; passing it only warns
+    `approval_unused`. `submit`, `block` and a handoff release the claim, and a
+    subtask added after that is a proposal again. If the human asked you to add a task for later, pass their
+    words as `--approved`, so it becomes `todo` without triage (D39).
   - If `brief` shows `proposals: ask` (D39): don't propose. Name each idea and its
     `silta task add` command in your message, and add the ones the human wants with
     `--approved`. With no human present, list ideas under "what's left" in the
