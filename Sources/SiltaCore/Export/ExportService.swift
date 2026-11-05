@@ -94,7 +94,9 @@ package enum ExportService {
     var template = Array(parent.appending(path: prefix + "XXXXXX").path.utf8CString)
     let created = template.withUnsafeMutableBufferPointer { mkdtemp($0.baseAddress) }
     guard created != nil else { throw SwapFailure() }
-    return URL(filePath: String(cString: template), directoryHint: .isDirectory)
+    let path = String(
+      decoding: template.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    return URL(filePath: path, directoryHint: .isDirectory)
   }
 
   private struct SwapFailure: Error {}  // guard:allow-error mapped to unwritable by export
