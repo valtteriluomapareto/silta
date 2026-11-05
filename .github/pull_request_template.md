@@ -36,3 +36,7 @@
 - [ ] Plan and board (`docs/plans/`, `docs/README.md`)
 - [ ] `AGENTS.md` / `CONTRIBUTING.md`
 - [ ] No documentation changes needed
+
+<!-- For a slice tracked in Silta: the result as it should read once merged, ending
+     with a "Friction: …" line (AGENTS.md, Dogfooding). Delete the section otherwise. -->
+## Draft result

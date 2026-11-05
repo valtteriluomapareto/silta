@@ -1,7 +1,7 @@
-/// Discussion attention for one complete actor, computed without read markers.
+/// Current local attention for one complete actor, computed without read markers.
 package struct InboxResult: Encodable, Sendable {
-  /// Included attention categories; excluded human work must not be inferred empty.
-  package let scope = "discussion"
+  /// Scope of locally available attention, without refreshed tracker status.
+  package let scope = "local"
   /// Actor whose attention was queried.
   package let actor: String
   /// Ordered, deduplicated attention items, capped unless all were requested.

@@ -10,8 +10,9 @@ Don't leave the contradiction in place.
 Silta is a local context hub and backlog for coding agents: a Swift core library
 (`SiltaCore`), a CLI (`silta`) that agents call through their shell, and later a
 macOS app. The design is in [`docs/spec.md`](docs/spec.md). **Status: M1 in
-progress; the package skeleton builds.** The first milestone (M1) is broken into slices in
-[`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md).
+progress.** The first milestone (M1) is broken into slices in
+[`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md). What each target and
+folder holds is in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
 
 ## Where to find what
 
@@ -25,6 +26,7 @@ progress; the package skeleton builds.** The first milestone (M1) is broken into
 | Building, testing, linting, merging | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | Reviewing a plan or an implementation | [`skills/persona-review/SKILL.md`](skills/persona-review/SKILL.md) |
 | Handing a slice to another agent | [`docs/agent-brief.md`](docs/agent-brief.md) |
+| Using Silta on this repo, driving Codex, friction reports | [`docs/dogfood/README.md`](docs/dogfood/README.md) |
 | Finding any other doc | [`docs/README.md`](docs/README.md) |
 
 ## Verify ladder
@@ -155,8 +157,8 @@ From DF0 on, every command runs as `silta --ws silta …`:
   tool, or name
   `silta --ws silta task start <ref> --steal --approved "<the human's words>"` to the
   maintainer. Tell the other session with a `silta --ws silta comment` on the task.
-- **Work for the human.** Follow [spec §11](docs/spec.md#silta-guide) until
-  `silta guide` ships. Put everything you need from the maintainer in one chat
+- **Work for the human.** Follow `silta guide human`
+  ([spec §11](docs/spec.md#silta-guide)). Put everything you need from the maintainer in one chat
   message. For a human-only command, name the exact command, wait for their yes,
   and run it with `--approved "<their exact words>"`. Never write those words
   yourself. A run started by another agent

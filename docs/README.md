@@ -3,13 +3,17 @@
 | Audience | Where |
 |---|---|
 | Agents working in this repo | [`../AGENTS.md`](../AGENTS.md) |
+| What Silta is, install | [`../README.md`](../README.md) |
 | Contributors (commands, workflow) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | Product and technical design | [`spec.md`](spec.md) |
 | Why things are the way they are | [`decisions.md`](decisions.md) |
-| How Swift code is written | [`coding-guidelines.md`](coding-guidelines.md) |
-| Plans and their lifecycle | [`plans/README.md`](plans/README.md) |
+| How Swift code is written, and what each target and folder holds | [`coding-guidelines.md`](coding-guidelines.md) |
+| Plans and their lifecycle | [`plans/README.md`](plans/README.md), [`plans/_template.md`](plans/_template.md) |
 | Reviewing plans and implementations | [`../skills/persona-review/SKILL.md`](../skills/persona-review/SKILL.md) |
 | Briefing another agent on a slice | [`agent-brief.md`](agent-brief.md) |
+| Building Silta with Silta | [`dogfood/README.md`](dogfood/README.md) (below) |
+| Pull requests and slice issues | [`../.github/pull_request_template.md`](../.github/pull_request_template.md), [`../.github/ISSUE_TEMPLATE/slice.yml`](../.github/ISSUE_TEMPLATE/slice.yml) |
+| The agent manual, as agents read it | `silta guide`; its text is in `Sources/silta/Commands/GuideCommand.swift` (spec §11) |
 
 ## What to update when behaviour changes
 
@@ -19,7 +23,10 @@
 | The data model or a migration | `spec.md` §6, and add a new migration (never edit a shipped one) |
 | A design choice or trade-off | `decisions.md`: a new D# entry, or a dated "↳ update" under the old one |
 | Scope or order of work | The active plan and the board below |
-| A guard | Its self-test in `scripts/tests/`, and the invariant list in `AGENTS.md` |
+| A guard | Its self-test in `scripts/tests/`, the invariant list in `AGENTS.md`, and the `run-guards.sh` row in `CONTRIBUTING.md` |
+| A script's arguments or environment | Its header comment |
+| A target or a `SiltaCore` feature folder | The layout table in `coding-guidelines.md` §5 |
+| The dogfooding stage | The stage line in `AGENTS.md` |
 
 ## Active plans
 
@@ -38,5 +45,5 @@ a plan ships:
 ## Dogfooding
 
 [Setup and daily workflow](dogfood/README.md), [workspace YAML](dogfood/workspace.yaml)
-and [reviewed reports](dogfood/reports/README.md). Setup does not activate until the
-maintainer completes it with an agent after the tooling PR merges.
+and [reviewed reports](dogfood/reports/README.md). Setup was completed on 2026-11-04;
+the current stage is in [`AGENTS.md`](../AGENTS.md#dogfooding).
