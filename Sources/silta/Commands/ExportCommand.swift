@@ -16,11 +16,19 @@ struct ExportCommand: OutputCommand {
 
   @OptionGroup var global: GlobalOptions
 
-  @Option(help: "The export root; defaults to $SILTA_HOME/exports.")
+  @Option(
+    help: ArgumentHelp(
+      "The export root; the tree goes to <root>/<workspace>. Defaults to $SILTA_HOME/exports.",
+      valueName: "root"))
   var to: String?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let environment = context.environment
+    if let to, to == "~" || to.hasPrefix("~/") {
+      throw UsageError.invalid(
+        message: "--to \(to) starts with an unexpanded ~; pass an absolute path",
+        command: "silta export")
+    }
     let workspace = try context.workspace(global.ws)
     let root =
       to.map { URL(filePath: $0, directoryHint: .isDirectory, relativeTo: .currentDirectory()) }

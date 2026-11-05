@@ -2,13 +2,13 @@
 package enum ExportError: CodedError, Equatable {
   /// The target exists but is not exactly a previous export; `entry` is the first file
   /// that shows it.
-  case notAnExport(path: String, entry: String)
+  case notAnExport(path: String, entry: String, workspace: String)
   /// The export root lies inside a registered repo.
-  case insideRepo(path: String, repo: String)
+  case insideRepo(path: String, repo: String, workspace: String)
   /// The workspace holds data this binary can't export yet.
   case unsupported(String)
   /// The tree could not be written under the root.
-  case unwritable(path: String)
+  case unwritable(path: String, workspace: String)
   /// A tree is not byte for byte what export writes.
   case invalidTree(String)
 
@@ -27,28 +27,34 @@ package enum ExportError: CodedError, Equatable {
   /// What was refused, with the path it concerns.
   package var message: String {
     switch self {
-    case .notAnExport(let path, let entry):
+    case .notAnExport(let path, let entry, _):
       "\(path) is not a silta export: it holds \(entry). "
         + "Export replaces only a previous export, so it changed nothing."
-    case .insideRepo(let path, let repo):
-      "\(path) is inside the registered repo \(repo); workspace data never goes into a code repo, "
+    case .insideRepo(let path, let repo, _):
+      "\(path) overlaps the registered repo \(repo); workspace data never goes into a code repo, "
         + "so export changed nothing."
     case .unsupported(let what):
       "This workspace has \(what), which this version of silta can't export; nothing was written."
-    case .unwritable(let path):
+    case .unwritable(let path, _):
       "The export could not be written under \(path); the previous export, if any, is unchanged."
     case .invalidTree(let reason):
       "Not an unchanged silta export tree: \(reason)."
     }
   }
 
-  /// A directory the human picks, or a newer binary.
+  /// A directory the human picks, for the same workspace, or a newer binary.
   package var next: [String] {
     switch self {
-    case .notAnExport: ["silta export --to <empty or export directory>"]
-    case .insideRepo: ["silta export --to <directory outside registered repos>"]
+    case .notAnExport(_, _, let workspace):
+      [workspaceCommand("silta export --to <empty or export directory>", workspace: workspace)]
+    case .insideRepo(_, _, let workspace):
+      [
+        workspaceCommand(
+          "silta export --to <directory outside registered repos>", workspace: workspace)
+      ]
+    case .unwritable(_, let workspace):
+      [workspaceCommand("silta export --to <writable directory>", workspace: workspace)]
     case .unsupported: ["update silta"]
-    case .unwritable: ["silta export --to <writable directory>"]
     case .invalidTree: ["silta export"]
     }
   }

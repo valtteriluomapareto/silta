@@ -16,8 +16,10 @@ They're summarised here so every decision has one index.
 - **D3: Deterministic export** to a text tree for backup and diff. `restore` replaces
   a workspace.
   - ↳ update (2026-11-05, S14 plan review): the tree is format 1 of spec §15, and it
-    ships with a strict reader that accepts only bytes export would write, so the
-    format is proven lossless before restore uses it. Export refuses rather than
+    ships with a strict reader that accepts only the bytes export would write (the
+    form; restore checks references), so the format is proven lossless before
+    restore uses it. A tree names its schema: an older one is read with later keys at
+    their defaults, a newer one is refused. Export refuses rather than
     drops: a database with unknown migrations (D32), docs until their export exists.
     It writes only into an absent, empty or previously exported directory outside
     every registered repo, staged and swapped so a reader never sees a mixed tree.

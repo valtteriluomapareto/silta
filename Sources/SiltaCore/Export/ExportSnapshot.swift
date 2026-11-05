@@ -1,4 +1,3 @@
-import CryptoKit
 package import Foundation
 import GRDB
 
@@ -141,8 +140,8 @@ package struct ExportSnapshot: Equatable, Sendable {
       ExportFormat.quote($0) + ": " + ExportFormat.quote(String(counts[$0] ?? 0))
     }.joined(separator: ", ")
     let entries = files.keys.sorted(by: Self.byteOrder).map { path in
-      let digest = SHA256.hash(data: files[path] ?? Data()).map { String(format: "%02x", $0) }
-      return "    {\"path\": \(ExportFormat.quote(path)), \"sha256\": \"\(digest.joined())\"}"
+      let digest = ExportFormat.sha256(files[path] ?? Data())
+      return "    {\"path\": \(ExportFormat.quote(path)), \"sha256\": \"\(digest)\"}"
     }
     return """
       {

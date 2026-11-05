@@ -1,4 +1,3 @@
-import CryptoKit
 package import Foundation
 package import GRDB
 
@@ -10,25 +9,25 @@ package enum ExportTree {
     try ExportSnapshot.read(db, workspace: slug).files()
   }
 
-  /// Parses a tree. The manifest must list exactly the other files with their sha256,
-  /// and rendering the parsed snapshot must give back every file byte for byte, so
-  /// anything export would not have written is `ExportError.invalidTree`.
+  /// Parses a tree. The manifest must name a schema this binary knows and list exactly
+  /// the other files with their sha256, and rendering the parsed snapshot must give
+  /// back every file byte for byte, so a tree export would not have written is
+  /// `ExportError.invalidTree` and one of a newer schema `StorageError.schemaTooNew`.
+  /// This checks the form; whether rows reference each other is left to the caller.
   package static func parse(_ files: [String: Data]) throws -> ExportSnapshot {
-    let manifest = try Manifest(files[ExportFormat.manifestFile])
+    let manifest = try ExportManifest(files[ExportFormat.manifestFile])
+    guard StorageSchema.migrator.migrations.contains(manifest.schema) else {
+      throw StorageError.schemaTooNew
+    }
     let present = Set(files.keys).subtracting([ExportFormat.manifestFile])
-    if let extra = present.subtracting(manifest.files.keys).sorted(by: ExportSnapshot.byteOrder)
-      .first
-    {
+    if let extra = present.subtracting(manifest.files.keys).min(by: ExportSnapshot.byteOrder) {
       throw invalid("\(extra) is not in the manifest")
     }
-    if let missing = Set(manifest.files.keys).subtracting(present).sorted(
-      by: ExportSnapshot.byteOrder
-    ).first {
-      throw invalid("\(missing) is missing")
-    }
     for (path, digest) in manifest.files.sorted(by: { ExportSnapshot.byteOrder($0.key, $1.key) }) {
-      let actual = SHA256.hash(data: files[path] ?? Data()).map { String(format: "%02x", $0) }
-      guard actual.joined() == digest else { throw invalid("\(path) does not match its sha256") }
+      guard let data = files[path] else { throw invalid("\(path) is missing") }
+      guard ExportFormat.sha256(data) == digest else {
+        throw invalid("\(path) does not match its sha256")
+      }
     }
     var reader = Reader(files: files)
     let (workspace, sections) = try reader.workspace()
@@ -45,14 +44,9 @@ package enum ExportTree {
         ExportFormat.aliasDecisionsFile, keys: ExportFormat.aliasDecisionKeys),
       approvals: try reader.jsonl(ExportFormat.approvalsFile, keys: ExportFormat.approvalKeys))
     let rendered = snapshot.files()
-    for path in files.keys.sorted(by: ExportSnapshot.byteOrder) where rendered[path] != files[path]
+    if let path = files.keys.filter({ rendered[$0] != files[$0] }).min(by: ExportSnapshot.byteOrder)
     {
       throw invalid("\(path) is not in the form export writes")
-    }
-    if let extra = Set(rendered.keys).subtracting(files.keys).sorted(by: ExportSnapshot.byteOrder)
-      .first
-    {
-      throw invalid("\(extra) is missing")
     }
     return snapshot
   }
@@ -60,8 +54,10 @@ package enum ExportTree {
   static func invalid(_ reason: String) -> ExportError { .invalidTree(reason) }
 }
 
-private struct Manifest {
+/// The parts of `manifest.json` the reader and the target check need.
+struct ExportManifest {
   var schema: String
+  var workspace: String
   var files: [String: String]
 
   init(_ data: Data?) throws {
@@ -75,16 +71,12 @@ private struct Manifest {
       throw ExportTree.invalid("format \(format) is not format \(ExportFormat.version)")
     }
     guard let schema = object["schema"] as? String,
+      let workspace = object["workspace"] as? String,
       let list = object["files"] as? [[String: String]]
     else { throw ExportTree.invalid("manifest.json is not a format manifest") }
     self.schema = schema
-    files = [:]
-    for entry in list {
-      guard let path = entry["path"], let digest = entry["sha256"], files[path] == nil else {
-        throw ExportTree.invalid("manifest.json lists a file twice or without a hash")
-      }
-      files[path] = digest
-    }
+    self.workspace = workspace
+    files = Dictionary(list.map { ($0["path"] ?? "", $0["sha256"] ?? "") }) { first, _ in first }
   }
 }
 
@@ -111,9 +103,6 @@ private struct Reader {
       let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)),  // refused below
       let values = object as? [String: String]
     else { throw ExportTree.invalid("\(path) has a row that is not an object of strings") }
-    if let unknown = Set(values.keys).subtracting(keys).sorted().first {
-      throw ExportTree.invalid("\(path) has an unknown key \(unknown)")
-    }
     return ExportRow(keys: keys, values: values)
   }
 
@@ -154,11 +143,9 @@ private struct Reader {
   func frontmatter(_ lines: inout ArraySlice<String>, in path: String) throws -> [String: String] {
     guard lines.popFirst() == "---" else { throw ExportTree.invalid("\(path) has no frontmatter") }
     var values: [String: String] = [:]
-    let bodies = Set(ExportFormat.bodies.map(\.key))
     while let line = lines.popFirst(), line != "---" {
       guard let colon = line.range(of: ": "),
         case let key = String(line[..<colon.lowerBound]),
-        ExportFormat.taskKeys.contains(key), !bodies.contains(key), values[key] == nil,
         let value = try? JSONSerialization.jsonObject(  // refused below
           with: Data(line[colon.upperBound...].utf8), options: .fragmentsAllowed) as? String
       else { throw ExportTree.invalid("\(path) has an invalid frontmatter line") }

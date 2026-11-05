@@ -192,9 +192,9 @@ extension ActorError: ErrorExamples {
 extension ExportError: ErrorExamples {
   static var examples: [ExportError] {
     [
-      .notAnExport(path: "/tmp/acme-notes/acme", entry: "README.md"),
-      .insideRepo(path: "/tmp/acme/platform/exports", repo: "platform"),
-      .unsupported("docs"), .unwritable(path: "/tmp/acme-notes"),
+      .notAnExport(path: "/tmp/acme-notes/acme", entry: "README.md", workspace: "acme"),
+      .insideRepo(path: "/tmp/acme/platform/exports/acme", repo: "platform", workspace: "acme"),
+      .unsupported("docs"), .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
       .invalidTree("links.jsonl does not match its sha256"),
     ]
   }

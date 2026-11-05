@@ -11,10 +11,11 @@ extension ExportSnapshot {
     guard try migrator.hasCompletedMigrations(db), let schema = migrator.migrations.last else {
       throw StorageError.unavailable
     }
-    guard
-      let id = try Int64.fetchOne(
-        db, sql: "SELECT id FROM workspace WHERE slug=?", arguments: [slug])
-    else { throw WorkspaceError.unknown(slug) }
+    guard let found = try Row.fetchOne(db, sql: Query.workspace, arguments: [slug]) else {
+      throw WorkspaceError.unknown(slug)
+    }
+    let id: Int64 = found["id"]
+    let workspace = try ExportRow(keys: ExportFormat.workspaceKeys, row: found)
     if try Bool.fetchOne(
       db, sql: "SELECT EXISTS(SELECT 1 FROM doc WHERE workspace_id=?)", arguments: [id])
       == true
@@ -31,11 +32,6 @@ extension ExportSnapshot {
         try ExportRow(keys: keys, row: $0)
       }
     }
-    guard
-      let workspace = try Row.fetchOne(db, sql: Query.workspace, arguments: [id]).map({
-        try ExportRow(keys: ExportFormat.workspaceKeys, row: $0)
-      })
-    else { throw WorkspaceError.unknown(slug) }
     let sections = try zip(ExportFormat.sections, Query.sections).map { format, sql in
       Section(name: format.name, rows: try rows(sql, format.keys))
     }
@@ -62,9 +58,9 @@ extension ExportSnapshot {
 /// foreign keys mapped to the target's uid under the format's key.
 private enum Query {
   static let workspace = """
-    SELECT uid, slug, name, task_prefix, settings,
+    SELECT id, uid, slug, name, task_prefix, settings,
       (SELECT next FROM seq_counter WHERE scope='task:'||workspace.id) AS next_task_seq
-    FROM workspace WHERE id=?
+    FROM workspace WHERE slug=?
     """
 
   static let sections = [
@@ -111,7 +107,7 @@ private enum Query {
       t.created_at, t.updated_at, t.closed_at, t.follow_up_at
     FROM task t JOIN workspace w ON w.id=t.workspace_id LEFT JOIN task p ON p.id=t.parent_id
       LEFT JOIN app a ON a.id=t.app_id
-    WHERE t.workspace_id=? ORDER BY t.id
+    WHERE t.workspace_id=? ORDER BY t.seq
     """
 
   private static let ofWorkspace = "task_id IN (SELECT id FROM task WHERE workspace_id=?)"

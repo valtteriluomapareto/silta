@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Format 1 keys and layout (spec §15), shared by rendering and the reader.
@@ -112,6 +113,11 @@ enum ExportFormat {
   /// `{"key": "value", …}`.
   static func line(_ row: ExportRow) -> String {
     "{" + row.fields.map { quote($0.key) + ": " + quote($0.value) }.joined(separator: ", ") + "}"
+  }
+
+  /// Lowercase hex SHA-256 of `data`, as the manifest lists it.
+  static func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
   /// One row per line, each ending with a newline; empty for no rows.

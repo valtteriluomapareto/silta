@@ -1317,18 +1317,19 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   - **Values.** Every value is a double-quoted string, integers in decimal; a NULL
     column is left out. Only `"`, `\`, controls (U+0000–U+001F, U+007F–U+009F),
     U+2028, U+2029, U+FEFF, U+FFFE and U+FFFF are escaped: `\"`, `\\`, `\n`, `\r`,
-    `\t`, else `\uXXXX`. So a row is at once a JSON object and a YAML flow mapping,
-    `{"key": "value", …}` with `", "` and `": "` separators. JSON-array columns and
-    `settings` are written as their stored text.
+    `\t`, else `\uXXXX` with uppercase hex. So a row is at once a JSON object and a
+    YAML flow mapping, `{"key": "value", …}` with `", "` and `": "` separators.
+    JSON-array columns and `settings` are written as their stored text. SQLite text
+    as Silta reads it ends at U+0000, so values never hold it.
   - **Keys and references.** Keys are the column names, in schema order, `uid`
     first. A foreign key is written as its target's `uid` under the column name
     without `_id` (`repo`, `app`, `parent`, `thread`, `topic`, `from_app`, `to_app`,
     `to_service`). Integer ids and `workspace_id` are never written; the file implies
     the workspace or the task.
-  - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), so
-    the bytes don't depend on integer ids. Files in byte order of their path. Every
-    file ends with a newline, and every listed file is always present: a file with no
-    rows is empty.
+  - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), and
+    tasks by `seq`, so the bytes don't depend on integer ids. Files in byte order of
+    their path. Every listed file is always present; a file with no rows is empty, and
+    any other file ends with a newline.
   - **`workspace.yaml`:** a `workspace:` row (`uid`, `slug`, `name`, `task_prefix`,
     `settings`, `next_task_seq`), then the sections `repos`, `apps`, `environments`,
     `services`, `edges`, `topics`, `topic_aliases` and `sources`, each `<name>:`
@@ -1337,27 +1338,41 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     first, then `uid` and schema order, without the four bodies), `---`, then
     `## Description`, `## Plan`, `## Acceptance`, and `## Result` when the result is
     not NULL. Each body sits between two fence lines of `~`, longer than any run of
-    `~` in the task's bodies and at least three.
+    `~` in the task's bodies and at least three: heading, fence, the body, a newline,
+    fence.
   - **`tasks/<ref>.jsonl`:** one row per line, `table` first: `task_plan_rev`, then
     `task_event`, `comment` and `review_request` rows.
   - **`links.jsonl`:** `from` and `to` are the uids of the linked rows; a link to a
-    plan revision names the task's uid in `to` and the revision in `to_rev`.
+    plan revision names the task's uid in `to` and the revision in `to_rev`, the key
+    right after `to`.
   - **`approvals.jsonl`:** the approval rows whose workspace is this one. Approvals
     with no workspace aren't exported.
-  - **`manifest.json`:** `format`, `schema` (the last applied migration),
-    `workspace`, `counts` (rows per table) and `files` (`path` and `sha256` of every
-    other file), written by the same emitter, one entry per line.
+  - **`manifest.json`:** a JSON object, two-space indented, one key per line:
+    `format`, `schema` (the last applied migration), `workspace`, `counts` (rows per
+    exported table, on one line in byte order of table name) and `files`, one
+    `{"path": …, "sha256": …}` entry per line (lowercase hex) for every other file, in
+    path order.
+  - **Schema.** A tree names its schema. A reader accepts a schema it knows and
+    refuses a newer one (`env`, update silta). A key added by a later migration is
+    absent from an older tree and reads as its column default; a change that can't be
+    read that way takes a new format number. The reader checks the form, byte for
+    byte; restore checks the references.
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq`.
   - **Refusals, with nothing written:** a database with migrations this binary
     doesn't know; a workspace with docs, until docs export ships with docs (M2).
-  - **Target.** `--to` defaults to `$SILTA_HOME/exports`. Export replaces
-    `<root>/<workspace>/` only when it is absent or a previous export, holding
-    exactly the files its manifest lists (`.DS_Store` aside); anything else is
-    refused for the human to decide. A root inside a registered repo is refused, so
-    workspace data never lands in a code repo. The new tree is staged next to the
-    old one and swapped in, so a reader sees one tree or the other, never a mix. The
-    tree is owned by export: edits to it are overwritten by the next export.
+  - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
+    from the working directory, and an unexpanded `~` is refused. Export replaces
+    `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous
+    export: a format 1 manifest naming the workspace, and no file it doesn't list
+    (`.DS_Store` aside; listed files may be missing). Anything else is refused for the
+    human to decide. A target that overlaps a registered repo is refused, so workspace
+    data never lands in a code repo. Exports are serialised, each reading its
+    snapshot under the lock, so the last one written is the latest state. The new
+    tree is staged next to the old one and swapped in, so a reader sees one tree or
+    the other, never a mix; a volume without an atomic swap moves the old tree aside
+    first. The tree is owned by export: edits to it are overwritten by the next
+    export.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace.
   - It checks the manifest checksums first and refuses partial or tampered trees.

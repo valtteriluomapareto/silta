@@ -133,12 +133,14 @@ struct ExportServiceTests {
     }
   }
 
-  /// A root outside every repo whose `<root>/<workspace>` is itself a registered repo.
-  @Test func targetThatIsARegisteredRepoIsRefused() throws {
+  /// A root outside every repo whose `<root>/<workspace>` is, or holds, a registered
+  /// repo; an empty one would otherwise pass the target check and be swapped away.
+  @Test(arguments: ["code/acme", "code/acme/api"])
+  func targetThatIsARegisteredRepoIsRefused(_ repoPath: String) throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "home")
       let store = try ExportFixture.make(home)
-      let repo = scratch.appending(path: "code/acme")
+      let repo = scratch.appending(path: repoPath)
       try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
       try DatabaseQueue(path: store.path).write {
         try $0.execute(

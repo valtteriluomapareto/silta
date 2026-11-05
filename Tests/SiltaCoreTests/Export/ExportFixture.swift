@@ -215,10 +215,12 @@ enum ExportFixture {
     let id = 50 + o
     try db.execute(
       sql: """
-        INSERT INTO repo(id,uid,workspace_id,slug) VALUES(:id,'01HZREPO0000000000000OTHR',:ws,'othr');
+        INSERT INTO repo(id,uid,workspace_id,slug)
+          VALUES(:id,'01HZREPO0000000000000OTHR',:ws,'othr');
         INSERT INTO app(id,uid,workspace_id,slug,name,repo_id,ref)
           VALUES(:id,'01HZAPP00000000000000OTHR',:ws,'othr','OTHR app',:id,'main');
-        INSERT INTO environment(id,uid,app_id,name) VALUES(:id,'01HZENV00000000000000OTHR',:id,'OTHR');
+        INSERT INTO environment(id,uid,app_id,name)
+          VALUES(:id,'01HZENV00000000000000OTHR',:id,'OTHR');
         INSERT INTO service(id,uid,workspace_id,slug,name)
           VALUES(:id,'01HZSVC00000000000000OTHR',:ws,'othr','OTHR service');
         INSERT INTO edge(id,uid,workspace_id,from_app_id,to_service_id,kind,summary)
