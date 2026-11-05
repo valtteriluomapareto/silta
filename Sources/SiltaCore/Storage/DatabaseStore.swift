@@ -85,7 +85,11 @@ package final class DatabaseStore: Sendable {
   /// three times. The closure must perform database-only work: a rolled-back attempt
   /// can run again.
   /// Checks writer compatibility and completes the required daily snapshot before calling the body.
-  package func write<T>(_ body: (StorageTransaction) throws -> T) throws -> T {
+  /// With `rollingBack`, the body's result is returned and its transaction rolled back.
+  package func write<T>(rollingBack: Bool = false, _ body: (StorageTransaction) throws -> T)
+    throws -> T
+  {
+    var kept: T?
     do {
       try initialize()
       guard let queue = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
@@ -106,17 +110,27 @@ package final class DatabaseStore: Sendable {
             try db.execute(
               sql: "UPDATE meta SET value=? WHERE key='last_backup_day'", arguments: [day])
           }
-          return try body(StorageTransaction(database: db))
+          let value = try body(StorageTransaction(database: db))
+          guard !rollingBack else {
+            kept = value
+            throw RollBack()
+          }
+          return value
         }
       }
       try? backup.prune()  // best-effort retention cannot invalidate a committed write
       return result
+    } catch is RollBack {
+      guard let kept else { throw StorageError.internalMisuse }  // set before every RollBack
+      return kept
     } catch let error as any CodedError {
       throw error
     } catch {
       throw StorageError.mapped(error, at: path)
     }
   }
+
+  private struct RollBack: Error {}  // guard:allow-error ends a rolled-back write in this file
 
   /// Reads require WAL; a filesystem that silently keeps another journal mode is unusable.
   static func requireWAL(_ mode: String?) throws {

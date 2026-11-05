@@ -255,9 +255,12 @@ struct DogfoodLogTests {
 }
 
 extension DogfoodLogTests {
-  /// Export, after the rest of the catalog.
+  /// Export, then a dry-run restore of that export, after the rest of the catalog.
   static func exportCatalog() -> [(args: [String], workspace: String?)] {
-    [(["--ws", "acme", "export", "--to", "exports"], "acme")]
+    [
+      (["--ws", "acme", "export", "--to", "exports"], "acme"),
+      (["--ws", "acme", "restore", "exports/acme", "--dry-run"], "acme"),
+    ]
   }
 
   /// One successful call per `silta schema` command, chained in one home whose current

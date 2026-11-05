@@ -84,6 +84,44 @@ enum ExportFormat {
 
   static let approvalKeys = ["uid", "actor", "command", "words", "created_at"]
 
+  /// Keys whose values are integers in decimal.
+  static let integerKeys: Set<String> = [
+    "seq", "priority", "plan_rev", "is_primary", "done_dirty", "rev", "accepted",
+    "next_task_seq", "to_rev",
+  ]
+
+  /// A key written as another row's uid: the column it fills and the table that uid names.
+  struct Reference {
+    let column: String
+    let table: String
+
+    init(_ column: String, _ table: String) {
+      self.column = column
+      self.table = table
+    }
+  }
+
+  /// Per table, the keys written as uids; link ends are resolved through their kinds.
+  static let references: [String: [String: Reference]] = [
+    "app": ["repo": Reference("repo_id", "repo")],
+    "environment": ["app": Reference("app_id", "app")],
+    "edge": [
+      "from_app": Reference("from_app_id", "app"), "to_app": Reference("to_app_id", "app"),
+      "to_service": Reference("to_service_id", "service"),
+    ],
+    "topic_alias": ["topic": Reference("topic_id", "topic")],
+    "source": ["repo": Reference("repo_id", "repo")],
+    "task": ["parent": Reference("parent_id", "task"), "app": Reference("app_id", "app")],
+    "comment": ["thread": Reference("thread_id", "comment")],
+    "alias_decision": ["topic": Reference("topic_id", "topic")],
+  ]
+
+  /// Link kinds whose ends are owned rows named by uid, and the table each names.
+  static let linkTables = [
+    "task": "task", "comment": "comment", "app": "app", "topic": "topic",
+    "task_plan_rev": "task_plan_rev",
+  ]
+
   static let workspaceFile = "workspace.yaml"
   static let linksFile = "links.jsonl"
   static let aliasDecisionsFile = "alias_decisions.jsonl"

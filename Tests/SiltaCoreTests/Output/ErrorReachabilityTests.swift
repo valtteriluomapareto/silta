@@ -205,7 +205,12 @@ extension ExportError: ErrorExamples {
       .notAnExport(path: "/tmp/acme-notes/acme", entry: "it holds README.md", workspace: "acme"),
       .insideRepo(path: "/tmp/acme/platform/exports/acme", repo: "platform", workspace: "acme"),
       .unsupported("docs"), .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
-      .invalidTree("links.jsonl does not match its sha256"),
+      .invalidTree(reason: "links.jsonl does not match its sha256", workspace: "acme"),
+      .notATree(path: "/tmp/acme-notes", reason: "it has no manifest.json", child: "acme"),
+      .notATree(path: "/tmp/silta-2023-11-14.db", reason: "it is a file", child: nil),
+      .otherWorkspace(tree: "acme", given: "beta", directory: "/tmp/acme-notes/acme"),
+      .restoreConflict("workspace beta already has the tree's task prefix"),
+      .manifestChanged(approved: "a1b2c3d4e5f6", directory: "/tmp/acme-notes/acme"),
       .previousKept(
         path: "/tmp/acme-notes/.acme.export-abc123/previous", target: "/tmp/acme-notes/acme",
         workspace: "acme"),

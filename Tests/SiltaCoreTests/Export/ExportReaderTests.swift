@@ -43,17 +43,24 @@ struct ExportReaderTests {
         text(try #require(files["tasks/AC-2.md"])).replacingOccurrences(
           of: "Waiting.", with: "Waiting!"
         ).utf8)
-      #expect(throws: ExportError.invalidTree("tasks/AC-2.md does not match its sha256")) {
+      #expect(
+        throws: ExportError.invalidTree(
+          reason: "tasks/AC-2.md does not match its sha256", workspace: "acme")
+      ) {
         try ExportTree.parse(changed)
       }
       var missing = files
       missing["links.jsonl"] = nil
-      #expect(throws: ExportError.invalidTree("links.jsonl is missing")) {
+      #expect(throws: ExportError.invalidTree(reason: "links.jsonl is missing", workspace: "acme"))
+      {
         try ExportTree.parse(missing)
       }
       var extra = files
       extra["notes.md"] = Data()
-      #expect(throws: ExportError.invalidTree("notes.md is not in the manifest")) {
+      #expect(
+        throws: ExportError.invalidTree(
+          reason: "notes.md is not in the manifest", workspace: "acme")
+      ) {
         try ExportTree.parse(extra)
       }
     }

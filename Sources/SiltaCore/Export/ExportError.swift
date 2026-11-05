@@ -13,20 +13,35 @@ package enum ExportError: CodedError, Equatable {
   /// The new tree could not be put in place and the previous one could not be moved
   /// back; it is kept at `path`.
   case previousKept(path: String, target: String, workspace: String)
-  /// A tree is not byte for byte what export writes.
-  case invalidTree(String)
+  /// A tree is not byte for byte what export writes, or doesn't hold together;
+  /// `workspace` is the tree's, when its manifest names one.
+  case invalidTree(reason: String, workspace: String?)
+  /// The restore input is not an export tree; `child` is one inside it that is.
+  case notATree(path: String, reason: String, child: String?)
+  /// The tree's workspace is not the one `--ws` named.
+  case otherWorkspace(tree: String, given: String, directory: String)
+  /// The tree clashes with another workspace in this database.
+  case restoreConflict(String)
+  /// The tree's manifest is not the one the human approved.
+  case manifestChanged(approved: String, directory: String)
 
   /// Target and repo refusals leave the choice of directory to the human.
   package var code: ErrorCode {
     switch self {
-    case .notAnExport: .conflict
-    case .insideRepo, .invalidTree: .invalid
+    case .notAnExport, .restoreConflict, .manifestChanged: .conflict
+    case .insideRepo, .invalidTree, .notATree, .otherWorkspace: .invalid
     case .unsupported, .unwritable, .previousKept: .env
     }
   }
 
-  /// The human chooses another directory; nothing an agent changes in the call helps.
-  package var nextBy: NextBy { .human }
+  /// The human chooses another directory or tree; a dry run the agent may run itself
+  /// is the agent's.
+  package var nextBy: NextBy {
+    switch self {
+    case .notATree(_, _, .some), .otherWorkspace, .manifestChanged: .agent
+    default: .human
+    }
+  }
 
   /// What was refused, with the path it concerns.
   package var message: String {
@@ -45,8 +60,17 @@ package enum ExportError: CodedError, Equatable {
       "The new export could not replace \(target), and the previous export could not be "
         + "moved back; it is kept at \(path), next to the new tree. Move it back only while "
         + "\(target) is absent; if another export has put a tree there since, keep that one."
-    case .invalidTree(let reason):
-      "Not an unchanged silta export tree: \(reason)."
+    case .invalidTree(let reason, _):
+      "Not an unchanged silta export tree: \(reason). Nothing was restored."
+    case .notATree(let path, let reason, _):
+      "\(path) is not an export tree: \(reason)."
+    case .otherWorkspace(let tree, let given, _):
+      "The tree holds workspace \(tree), not \(given); nothing was restored."
+    case .restoreConflict(let reason):
+      "The tree clashes with this database: \(reason). Nothing was restored."
+    case .manifestChanged(let approved, _):
+      "The tree is not the one approved (manifest \(approved)); it changed since the dry run. "
+        + "Nothing was restored."
     }
   }
 
@@ -65,7 +89,25 @@ package enum ExportError: CodedError, Equatable {
     case .previousKept(let path, let target, _):
       ["[ ! -e \(shellWord(target)) ] && mv \(shellWord(path)) \(shellWord(target))"]
     case .unsupported: ["update silta"]
-    case .invalidTree: ["silta export"]
+    case .invalidTree(_, let workspace):
+      [
+        workspace.map {
+          workspaceCommand(
+            "silta export  # again, on the machine the tree came from", workspace: $0)
+        } ?? "silta --ws <the tree's workspace> export"
+          + "  # again, on the machine the tree came from"
+      ]
+    case .notATree(let path, _, let child):
+      child.map { ["silta restore " + shellWord(path + "/" + $0) + " --dry-run"] }
+        ?? [
+          "silta --ws <the tree's workspace> export"
+            + "  # on the source machine; restore its <root>/<workspace>"
+        ]
+    case .otherWorkspace(let tree, _, let directory):
+      [workspaceCommand("silta restore " + shellWord(directory) + " --dry-run", workspace: tree)]
+    case .restoreConflict: ["silta ws ls"]
+    case .manifestChanged(_, let directory):
+      ["silta restore " + shellWord(directory) + " --dry-run"]
     }
   }
 }
