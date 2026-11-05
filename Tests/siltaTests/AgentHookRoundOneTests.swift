@@ -33,15 +33,12 @@ struct AgentHookRoundOneTests {
         kind == "success"
         ? "Acme brief\n\n"
         : kind == "line" ? "Acme brief\n" : kind == "text" ? "Acme λ %% brief." : ""
-      let run: () throws -> Void = {
-        let result = try SiltaBinary.runProcess(
-          URL(filePath: "/bin/sh"), ["-c", command], in: scratch,
-          environment: ["PATH": bin.path + ":/usr/bin:/bin"])
-        #expect(result.termination == .exit(0))
-        #expect(result.stderr.isEmpty)
-        #expect(result.stdout == expected)
-      }
-      try run()
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", command], in: scratch,
+        environment: ["PATH": bin.path + ":/usr/bin:/bin"])
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.isEmpty)
+      #expect(result.stdout == expected)
     }
   }
 
@@ -55,27 +52,62 @@ struct AgentHookRoundOneTests {
       #expect(
         try AgentsInstallTests.apply(["install", "--claude", "--hook"], in: scratch).termination
           == .exit(0))
-      let command = try AgentsHookTests.command("SessionStart", in: scratch)
-      let marker = try #require(command.range(of: "# silta:session-start:v1:"))
-      let legacy = "silta agents session-start " + command[marker.lowerBound...]
-      var root = try GuideContractTests.object(
-        AgentsInstallTests.read(".claude/settings.json", in: scratch))
-      var hooks = try #require(root["hooks"] as? [String: Any])
-      var groups = try #require(hooks["SessionStart"] as? [[String: Any]])
-      var handlers = try #require(groups[0]["hooks"] as? [[String: Any]])
-      handlers[0]["command"] = legacy
-      groups[0]["hooks"] = handlers
-      hooks["SessionStart"] = groups
-      root["hooks"] = hooks
-      let bytes = try JSONSerialization.data(withJSONObject: root)
-      try AgentsInstallTests.write(
-        try #require(String(data: bytes, encoding: .utf8)), ".claude/settings.json", in: scratch)
+      let legacy = try Self.writeLegacySettings(in: scratch)
       #expect(
         try AgentsInstallTests.apply(
           uninstall ? ["uninstall", "--claude"] : ["install", "--claude", "--hook"], in: scratch
         ).termination == .exit(0))
-      if !uninstall {
+      if uninstall {
+        let path = scratch.appending(path: "home/.claude/settings.json").path
+        if initial == "absent" {
+          #expect(!FileManager.default.fileExists(atPath: path))
+        } else {
+          let restored = try GuideContractTests.object(
+            AgentsInstallTests.read(".claude/settings.json", in: scratch))
+          #expect(
+            NSDictionary(dictionary: restored).isEqual(to: try GuideContractTests.object(initial)))
+        }
+      } else {
         #expect(try AgentsHookTests.command("SessionStart", in: scratch) != legacy)
+      }
+    }
+  }
+
+  private static func writeLegacySettings(in scratch: URL, edit: String = "") throws -> String {
+    let command = try AgentsHookTests.command("SessionStart", in: scratch)
+    let marker = try #require(command.range(of: "# silta:session-start:v1:"))
+    let legacy = "silta agents session-start " + command[marker.lowerBound...]
+    var root = try GuideContractTests.object(
+      AgentsInstallTests.read(".claude/settings.json", in: scratch))
+    var hooks = try #require(root["hooks"] as? [String: Any])
+    var groups = try #require(hooks["SessionStart"] as? [[String: Any]])
+    var handlers = try #require(groups[0]["hooks"] as? [[String: Any]])
+    handlers[0]["command"] = legacy + (edit == "edited" ? " edited" : "")
+    if edit == "mixed" { handlers.append(["type": "command", "command": "echo Acme"]) }
+    groups[0]["hooks"] = handlers
+    if edit == "duplicate" { groups.append(groups[0]) }
+    hooks["SessionStart"] = groups
+    root["hooks"] = hooks
+    let bytes = try JSONSerialization.data(withJSONObject: root)
+    try AgentsInstallTests.write(
+      try #require(String(data: bytes, encoding: .utf8)), ".claude/settings.json", in: scratch)
+    return legacy
+  }
+
+  @Test(arguments: ["edited", "mixed", "duplicate"])
+  func modifiedLegacyGroupsRefuseBeforeWrites(kind: String) throws {
+    try withScratchDirectory { scratch in
+      #expect(
+        try AgentsInstallTests.apply(["install", "--claude", "--hook"], in: scratch).termination
+          == .exit(0))
+      _ = try Self.writeLegacySettings(in: scratch, edit: kind)
+      let before = try AgentsInstallTests.read(".claude/settings.json", in: scratch)
+      for args in [["install", "--claude", "--hook"], ["uninstall", "--claude"]] {
+        let result = try AgentsInstallTests.run(args + ["--json"], in: scratch)
+        #expect(result.termination == .exit(6))
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains("silta agents " + args[0]))
+        #expect(try AgentsInstallTests.read(".claude/settings.json", in: scratch) == before)
       }
     }
   }
