@@ -16,7 +16,7 @@ struct BriefHookGitRunnerTests {
     let scripted = ScriptedGitRunner(script: [(bounded, .success(.init(termination: termination)))])
     let notifications = Mutex(0)
     let runner = BriefHookGitRunner(
-      runner: scripted, deadline: BriefHookDeadlineTests.Elapsed(milliseconds: 0).deadline,
+      runner: scripted, deadline: BriefHookDeadlineTests.deadline(0),
       onTimeout: { notifications.withLock { $0 += 1 } })
     let result = try await runner.run(request)
     #expect(result.termination == termination)
@@ -28,7 +28,7 @@ struct BriefHookGitRunnerTests {
     let scripted = ScriptedGitRunner(script: [])
     let notifications = Mutex(0)
     let runner = BriefHookGitRunner(
-      runner: scripted, deadline: BriefHookDeadlineTests.Elapsed(milliseconds: 1000).deadline,
+      runner: scripted, deadline: BriefHookDeadlineTests.deadline(1000),
       onTimeout: { notifications.withLock { $0 += 1 } })
     let result = try await runner.run(
       .init(arguments: ["status"], directory: URL(filePath: "/acme")))

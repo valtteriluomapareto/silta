@@ -35,7 +35,6 @@ fi
 
 SILTA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/silta-verify.XXXXXX")"
 export SILTA_HOME
-trap 'rm -rf "$SILTA_HOME"' EXIT
 
 # SwiftPM sandboxes manifest builds, which macOS refuses inside another sandbox such as
 # Codex's seatbelt (it sets CODEX_SANDBOX). That outer sandbox already confines the build.
@@ -52,6 +51,7 @@ swift build ${swiftpm[@]+"${swiftpm[@]}"} --build-tests --only-use-versions-from
 run_tests() {
   local test_log
   local test_exit
+  rm -f "$last_test_log"
   test_log="$(mktemp "${TMPDIR:-/tmp}/silta-test-log.XXXXXX")"
   set +e
   swift test ${swiftpm[@]+"${swiftpm[@]}"} --skip-build "$@" 2>&1 | tee "$test_log"
@@ -66,19 +66,32 @@ run_tests() {
     echo "verify ${mode}: no tests ran" >&2
     return 1
   fi
-  rm -f "$test_log"
+  last_test_log="$test_log"
 }
+last_test_log=""
+trap 'rm -rf "$SILTA_HOME"; rm -f "$last_test_log"' EXIT
 
 step "test"
 if [[ "$mode" == full ]]; then
   export SILTA_SLOW_TESTS=1
-  run_tests
+  SILTA_DEADLINE_TESTS='' run_tests
   # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
   # parallel suite skips them; they run here alone and one at a time.
   step "wall-clock deadlines (isolated, serial)"
   SILTA_DEADLINE_TESTS=1 run_tests --no-parallel --filter 'WallClock'
+  # Skipped tests still count as run, so a broken gate would otherwise pass silently.
+  if grep -q ' skipped' "$last_test_log"; then
+    echo "verify ${mode}: a wall-clock deadline test was skipped" >&2
+    exit 1
+  fi
+  for suite in WallClockHookTests WallClockGitTests; do
+    if ! grep -q "Suite ${suite} passed" "$last_test_log"; then
+      echo "verify ${mode}: ${suite} did not run" >&2
+      exit 1
+    fi
+  done
 else
-  run_tests
+  SILTA_DEADLINE_TESTS='' run_tests
 fi
 
 echo

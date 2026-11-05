@@ -23,3 +23,17 @@ package final class FakeClock: SiltaCore.Clock {
     instant.withLock { $0.addTimeInterval(Double(milliseconds) / 1000) }
   }
 }
+
+/// Monotonic elapsed time that only the test advances, for deadline decisions.
+package final class FakeElapsed: Sendable {
+  private let value: Mutex<Duration>
+
+  /// Fixes the initial elapsed time.
+  package init(milliseconds: Int) {
+    value = Mutex(.milliseconds(milliseconds))
+  }
+  /// Returns the elapsed time without advancing it.
+  package func now() -> Duration {
+    value.withLock { $0 }
+  }
+}
