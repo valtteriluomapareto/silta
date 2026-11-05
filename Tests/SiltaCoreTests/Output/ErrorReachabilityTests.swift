@@ -102,15 +102,29 @@ extension RepoError: ErrorExamples {
 extension ScanError: ErrorExamples {
   static var examples: [ScanError] {
     [
-      .invalidSlug("My Projects", derived: false, directory: "acme", roots: ["acme"]),
-      .invalidSlug("my projects", derived: true, directory: "My Projects", roots: ["My Projects"]),
-      .invalidPrefix("A_", derived: false, directory: "acme", roots: ["acme"]),
-      .invalidPrefix("A-", derived: true, directory: "a-team", roots: ["a-team"]),
+      .invalidSlug(
+        "My Projects", derived: false, directory: "acme", roots: ["acme"],
+        choice: .init(slug: "My Projects", prefix: "WK")),
+      .invalidSlug(
+        "my projects", derived: true, directory: "My Projects", roots: ["My Projects"],
+        choice: .none),
+      .invalidPrefix("A_", origin: nil, roots: ["acme"], choice: .init(slug: "work")),
+      .invalidPrefix("A-", origin: .directory("a-team"), roots: ["a-team"], choice: .none),
+      .invalidPrefix("X-", origin: .slug("x-y"), roots: ["zed"], choice: .init(slug: "x-y")),
       .invalidRepoDirectory(
-        name: "My Projects", path: "/projects/My Projects", renamed: "/projects/my-projects"),
-      .slugExists("ACME", chosen: true, workspace: "acme", roots: ["api", "web"]),
-      .prefixTaken("AC", derived: true, workspace: "acme", roots: ["acorn"]),
-      .prefixTaken("AC", derived: false, workspace: "acme", roots: ["acorn"]),
+        name: "My Projects", path: "/projects/My Projects", renamed: "/projects/my-projects",
+        followUp: .create(.none)),
+      .invalidRepoDirectory(
+        name: "My Projects", path: "/projects/My Projects", renamed: "/projects/my-projects",
+        followUp: nil),
+      .slugExists(
+        "ACME", chosen: true, workspace: "acme", roots: ["api", "web"],
+        choice: .init(slug: "ACME", prefix: "WK")),
+      .prefixTaken(
+        "AC", derived: true, workspace: "acme", roots: ["acorn"], choice: .init(slug: "acorn")),
+      .prefixTaken(
+        "AC", derived: false, workspace: "acme", roots: ["acorn"],
+        choice: .init(prefix: "AC")),
       .repoPathTaken(repo: "api", path: "/projects/api", workspace: "acme"),
     ]
   }

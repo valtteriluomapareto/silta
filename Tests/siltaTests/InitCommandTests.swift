@@ -2,6 +2,17 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
+/// One naming refusal, its first `next`, and the workspace that command should create.
+private struct Refusal {
+  let arguments: [String]
+  let keeps: String
+  let placeholder: String
+  let replacement: String
+  let created: String
+  let prefix: String
+  let exit: Int32
+}
+
 @Suite(.timeLimit(.minutes(1)))
 struct InitCommandTests {
   @Test func bareInitCreatesOnlyDatabaseAndPointsToHumanEdit() throws {
@@ -109,6 +120,13 @@ struct InitCommandTests {
       ["-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm", "Acme"],
       in: scratch, cwd: repo)
     try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
+  }
+
+  /// The `data` object a `ws show --json` printed.
+  static func shownData(_ stdout: String) throws -> [String: Any] {
+    let object = try #require(
+      try JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any])
+    return try #require(object["data"] as? [String: Any])
   }
 
   /// The first `next` command a JSON refusal printed.
@@ -254,6 +272,9 @@ struct InitCommandTests {
     }
   }
 
+}
+
+extension InitCommandTests {
   /// A repo directory whose name is no slug: the refusal names the clone, and running
   /// its `ask human: mv` renames the directory so the rescan succeeds.
   @Test func aRepoDirectoryNameRefusalGivesAMvThatFixesIt() throws {
@@ -334,7 +355,8 @@ struct InitCommandTests {
       #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
       let shown = try SiltaBinary.run(["ws", "show", "my-projects", "--json"], in: scratch)
       #expect(shown.termination == .exit(0))
-      #expect(shown.stdout.contains("\"slug\":\"my-projects\""))
+      let data = try Self.shownData(shown.stdout)
+      #expect(data["workspace"] as? String == "my-projects")
     }
   }
 
@@ -343,21 +365,23 @@ struct InitCommandTests {
   @Test func everyNamingRefusalsNextKeepsTheChosenSlug() throws {
     try withScratchDirectory { scratch in
       let fixtures = try Self.fixtures(scratch)
-      #expect(try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
-        .termination == .exit(0))
-      let cases: [
-        (
-          arguments: [String], keeps: String, placeholder: String, replacement: String,
-          created: String, prefix: String, exit: Int32
-        )
-      ] = [
-        (["--slug", "acorn"], "--slug acorn", "<prefix>", "WK", "acorn", "WK", 6),
-        (["--slug", "bad-slug", "--prefix", "A_"], "--slug bad-slug", "<prefix>", "WM",
-          "bad-slug", "WM", 1),
-        (["--slug", "My Projects", "--prefix", "WX"], "--prefix WX", "<slug>", "fine", "fine",
-          "WX", 1),
-        (["--slug", "acme", "--prefix", "WZ"], "--prefix WZ", "<another-slug>", "other", "other",
-          "WZ", 6),
+      #expect(
+        try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
+          .termination == .exit(0))
+      let cases = [
+        Refusal(
+          arguments: ["--slug", "acorn"], keeps: "--slug acorn", placeholder: "<prefix>",
+          replacement: "WK", created: "acorn", prefix: "WK", exit: 6),
+        Refusal(
+          arguments: ["--slug", "bad-slug", "--prefix", "A_"], keeps: "--slug bad-slug",
+          placeholder: "<prefix>", replacement: "WM", created: "bad-slug", prefix: "WM", exit: 1),
+        Refusal(
+          arguments: ["--slug", "My Projects", "--prefix", "WX"], keeps: "--prefix WX",
+          placeholder: "<slug>", replacement: "fine", created: "fine", prefix: "WX", exit: 1),
+        Refusal(
+          arguments: ["--slug", "acme", "--prefix", "WZ"], keeps: "--prefix WZ",
+          placeholder: "<another-slug>", replacement: "other", created: "other", prefix: "WZ",
+          exit: 6),
       ]
       for (index, testCase) in cases.enumerated() {
         let root = scratch.appending(path: "refusal-\(index)")
@@ -374,7 +398,8 @@ struct InitCommandTests {
         let shown = try SiltaBinary.run(
           ["ws", "show", testCase.created, "--json"], in: scratch)
         #expect(shown.termination == .exit(0), "\(testCase.arguments)")
-        #expect(shown.stdout.contains("\"task_prefix\":\"\(testCase.prefix)\""))
+        let yaml = try #require(try Self.shownData(shown.stdout)["yaml"] as? String)
+        #expect(yaml.contains("\"task_prefix\":\"\(testCase.prefix)\""))
       }
     }
   }
@@ -383,8 +408,9 @@ struct InitCommandTests {
   @Test func theRepoPathRefusalNamesARescanThatWorks() throws {
     try withScratchDirectory { scratch in
       let fixtures = try Self.fixtures(scratch)
-      #expect(try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
-        .termination == .exit(0))
+      #expect(
+        try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
+          .termination == .exit(0))
       let refused = try SiltaBinary.run(
         ["init", "--scan", fixtures.path, "--slug", "other", "--json"], in: scratch)
       #expect(refused.termination == .exit(6))
@@ -399,7 +425,9 @@ struct InitCommandTests {
     try withScratchDirectory { scratch in
       let help = try SiltaBinary.run(["init", "--help"], in: scratch)
       #expect(help.termination == .exit(0))
-      #expect(help.stdout.contains("without regard to case"))
+      #expect(
+        help.stdout.replacingOccurrences(of: "\n", with: " ")
+          .contains("without regard to case"))
     }
   }
 }

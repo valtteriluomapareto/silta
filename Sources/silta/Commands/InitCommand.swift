@@ -13,8 +13,8 @@ struct InitCommand: OutputCommand {
       names another. Chosen values keep their case, and task refs read <prefix>-<n> (AC-1). Both \
       use letters, digits, _ or -, starting and ending with a letter or digit, and the same \
       validation as `ws edit`. --prefix works without --slug, and --slug also names the \
-      workspace. On a scan, --ws rescans that existing workspace instead of naming a new one, so \
-      it accepts neither option.
+      workspace. On a scan, --ws rescans an existing workspace, matching its slug without \
+      regard to case, instead of naming a new one, so it accepts neither option.
 
       Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC
       """)

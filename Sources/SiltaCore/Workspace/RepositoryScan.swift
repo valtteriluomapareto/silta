@@ -32,13 +32,15 @@ package enum RepositoryScan {
     guard let first = roots.first else { throw RepoError.scan }
     let paths = roots.map(\.path)
     let directory = first.standardizedFileURL.lastPathComponent
+    try validateRootRepos(roots, target: target)
     let naming = try naming(target, directory: directory, roots: paths)
     let discovered = try await discover(roots, git: git)
-    try validateRepoDirectories(discovered)
+    try validateRepoDirectories(discovered, roots: roots, target: target)
     var warnings: [OutputWarning] = []
     let request = ScanRequest(
-      target: target, slug: naming.slug, chosenPrefix: naming.prefix, directory: directory,
-      roots: paths, repos: discovered, identity: identity)
+      target: target, choice: ScanChoice(target), slug: naming.slug,
+      chosenPrefix: naming.prefix, directory: directory, roots: paths, repos: discovered,
+      identity: identity)
     let workspace = try store.write { tx in
       try apply(tx, request: request, warnings: &warnings)
     }
@@ -55,7 +57,7 @@ package enum RepositoryScan {
       if case .named(let chosenSlug, _) = request.target, let existing {
         throw ScanError.slugExists(
           request.slug, chosen: chosenSlug != nil, workspace: existing["slug"] as String,
-          roots: request.roots)
+          roots: request.roots, choice: request.choice)
       }
       if case .rescan = request.target, existing == nil { throw WorkspaceError.notFound }
       let workspace = existing.map { $0["slug"] as String } ?? request.slug
@@ -63,9 +65,7 @@ package enum RepositoryScan {
         request.repos, workspace: existing == nil ? nil : workspace, in: db, into: &warnings)
       guard Set(repos.map(\.slug)).count == repos.count else { throw RepoError.duplicateSlug }
       if existing == nil {
-        let prefix = try creationPrefix(
-          slug: request.slug, chosen: request.chosenPrefix, directory: request.directory,
-          roots: request.roots, in: db)
+        let prefix = try creationPrefix(request, in: db)
         let config = try configuration(
           slug: workspace, name: name(request.target, directory: request.directory), prefix: prefix,
           repos: repos)
@@ -120,21 +120,24 @@ extension RepositoryScan {
   private static func naming(
     _ target: ScanTarget, directory: String, roots: [String]
   ) throws -> (slug: String, prefix: String?) {
+    let choice = ScanChoice(target)
     switch target {
     case .rescan(let slug):
       return (slug, nil)
     case .derived:
       return (
-        try identifier(directory.lowercased(), derived: true, directory: directory, roots: roots),
+        try identifier(
+          directory.lowercased(), derived: true, directory: directory, roots: roots,
+          choice: choice),
         nil
       )
     case .named(let slug, let prefix):
       let value = try identifier(
-        slug ?? directory.lowercased(), derived: slug == nil, directory: directory, roots: roots)
+        slug ?? directory.lowercased(), derived: slug == nil, directory: directory, roots: roots,
+        choice: choice)
       guard let prefix else { return (value, nil) }
       guard WorkspaceConfig.isValidIdentifier(prefix) else {
-        throw ScanError.invalidPrefix(
-          prefix, derived: false, directory: directory, roots: roots)
+        throw ScanError.invalidPrefix(prefix, origin: nil, roots: roots, choice: choice)
       }
       return (value, prefix)
     }
@@ -142,10 +145,11 @@ extension RepositoryScan {
 
   /// Refuses a slug that is no identifier, naming the flag that fixes it.
   private static func identifier(
-    _ slug: String, derived: Bool, directory: String, roots: [String]
+    _ slug: String, derived: Bool, directory: String, roots: [String], choice: ScanChoice
   ) throws -> String {
     guard WorkspaceConfig.isValidIdentifier(slug) else {
-      throw ScanError.invalidSlug(slug, derived: derived, directory: directory, roots: roots)
+      throw ScanError.invalidSlug(
+        slug, derived: derived, directory: directory, roots: roots, choice: choice)
     }
     return slug
   }
@@ -158,31 +162,62 @@ extension RepositoryScan {
 
   /// The prefix of a new workspace. Refreshing an existing one never derives one, so
   /// directories whose first letters are no prefix keep working without options.
-  private static func creationPrefix(
-    slug: String, chosen: String?, directory: String, roots: [String], in db: Database
-  ) throws -> String {
-    let prefix = chosen ?? String(slug.prefix(2)).uppercased()
+  private static func creationPrefix(_ request: ScanRequest, in db: Database) throws -> String {
+    let derived = request.chosenPrefix == nil
+    let prefix = request.chosenPrefix ?? String(request.slug.prefix(2)).uppercased()
+    let origin: PrefixOrigin? =
+      derived
+      ? (request.choice.slug == nil ? .directory(request.directory) : .slug(request.slug)) : nil
     guard WorkspaceConfig.isValidIdentifier(prefix) else {
       throw ScanError.invalidPrefix(
-        prefix, derived: chosen == nil, directory: directory, roots: roots)
+        prefix, origin: origin, roots: request.roots, choice: request.choice)
     }
     if let holder = try String.fetchOne(
       db, sql: "SELECT slug FROM workspace WHERE lower(task_prefix)=lower(?)",
       arguments: [prefix])
     {
       throw ScanError.prefixTaken(
-        prefix, derived: chosen == nil, workspace: holder, roots: roots)
+        prefix, derived: derived, workspace: holder, roots: request.roots, choice: request.choice)
     }
     return prefix
   }
 
-  /// A clone whose directory name is no repo slug cannot be registered by any option.
-  private static func validateRepoDirectories(_ repos: [DiscoveredRepo]) throws {
-    for repo in repos where !WorkspaceConfig.isValidIdentifier(repo.slug) {
+  /// A scan root that is itself a clone with an unusable directory name: no option
+  /// can rename it, so the refusal offers the rename first.
+  private static func validateRootRepos(_ roots: [URL], target: ScanTarget) throws {
+    for root in roots {
+      guard FileManager.default.fileExists(atPath: root.appending(path: ".git").path)
+      else { continue }
+      let name = root.lastPathComponent
+      guard !WorkspaceConfig.isValidIdentifier(name.lowercased()) else { continue }
       throw ScanError.invalidRepoDirectory(
-        name: repo.directoryName, path: repo.path.path,
-        renamed: repo.path.deletingLastPathComponent()
-          .appending(path: suggestedSlug(repo.directoryName)).path)
+        name: name, path: root.path,
+        renamed: root.deletingLastPathComponent().appending(path: suggestedSlug(name)).path,
+        followUp: followUp(target))
+    }
+  }
+
+  /// A clone whose directory name is no repo slug cannot be registered by any option.
+  private static func validateRepoDirectories(
+    _ repos: [DiscoveredRepo], roots: [URL], target: ScanTarget
+  ) throws {
+    guard
+      let repo = repos.first(where: { !WorkspaceConfig.isValidIdentifier($0.slug) })
+    else { return }
+    let rootPaths = Set(try roots.map { try canonical($0).path })
+    let display = repo.displayPath
+    throw ScanError.invalidRepoDirectory(
+      name: repo.directoryName, path: display.path,
+      renamed: display.deletingLastPathComponent()
+        .appending(path: suggestedSlug(repo.directoryName)).path,
+      followUp: rootPaths.contains(repo.path.path) ? followUp(target) : nil)
+  }
+
+  /// How to scan the renamed path when the renamed clone was the scan root.
+  private static func followUp(_ target: ScanTarget) -> ScanFollowUp {
+    switch target {
+    case .rescan(let slug): .rescan(slug)
+    case .derived, .named: .create(ScanChoice(target))
     }
   }
 
@@ -305,9 +340,10 @@ extension RepositoryScan {
       }
       let refs = try await output(
         ["for-each-ref", "--format=%(refname:short)", "refs/remotes"], in: main, git: git)
-      let directoryName = URL(filePath: String(entry.dropFirst(9))).lastPathComponent
+      let listed = URL(filePath: String(entry.dropFirst(9)))
       found[main.path] = DiscoveredRepo(
-        path: main, directoryName: directoryName, slug: directoryName.lowercased(), remote: url,
+        path: main, displayPath: listed, directoryName: listed.lastPathComponent,
+        slug: listed.lastPathComponent.lowercased(), remote: url,
         refs: refs.split(separator: "\n").map(String.init))
     }
     return found.values.sorted { $0.path.path < $1.path.path }
@@ -372,6 +408,8 @@ extension RepositoryScan {
 private struct ScanRequest: Sendable {
   let target: ScanTarget
 
+  let choice: ScanChoice
+
   let slug: String
 
   let chosenPrefix: String?
@@ -388,6 +426,9 @@ private struct ScanRequest: Sendable {
 private struct DiscoveredRepo: Sendable {
   let path: URL
 
+  /// The clone's path as git spells it, for messages and renames.
+  let displayPath: URL
+
   /// The clone's directory as spelled on disk; the slug is its lowercased form.
   let directoryName: String
 
@@ -399,7 +440,9 @@ private struct DiscoveredRepo: Sendable {
 
   /// The same repo under another config slug.
   func renamed(_ slug: String) -> DiscoveredRepo {
-    DiscoveredRepo(path: path, directoryName: directoryName, slug: slug, remote: remote, refs: refs)
+    DiscoveredRepo(
+      path: path, displayPath: displayPath, directoryName: directoryName, slug: slug,
+      remote: remote, refs: refs)
   }
 
   var apps: [[String: String]] {

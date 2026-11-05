@@ -1426,7 +1426,8 @@ silta open [AC-12]                               [M5] open Silta.app
 ```
 
 `init --scan` options name only a new workspace, so they are refused together with
-`--ws`, which rescans an existing one. A chosen `--slug` and `--prefix` keep their
+`--ws`, which rescans an existing one and matches its slug without regard to case. A
+chosen `--slug` and `--prefix` keep their
 case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
 starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
 (`AC-1`). The DF3 onboarding scans only the chosen clones:
@@ -2008,21 +2009,28 @@ that workspace's complete configuration, including omitted children.
 A new workspace's slug is the first directory's lowercased name unless `--slug` names
 another, and `--slug` also names the workspace; without it the first directory's name
 does. Its task prefix is the slug's first two letters uppercased unless `--prefix`
-names another. Chosen values keep their case and use the identifier shape `ws edit`
-accepts; `--prefix` works without `--slug`. A scan without naming options refreshes an
-existing workspace, so a stored prefix that the directory cannot derive stays. When
-`--slug` or `--prefix` is given and that slug already names a workspace, the scan is
-refused, offering another slug first and the rescan second, and saying that a rescan
-only refreshes the repos already registered there. Slug and prefix clashes compare
-case-insensitively. Options without `--scan` are refused. `--slug` and `--prefix` are
-invalid with `--ws`, which rescans. A directory name that is not a valid slug, or does
-not yield a valid prefix, fails with an error that names `--slug` or `--prefix` as the
-fix and carries the scanned roots in a runnable `next`; a repo directory whose name is
-no slug fails naming the clone and telling the human to rename its directory. A task
-prefix another workspace holds, or a clone path another workspace already binds, is a
-conflict that names the holder and a command that repairs it. Remote `X`/`X-prod` pairs
-create app stubs with a prod ref; main or master provides a default app when its ref
-is not already represented.
+names another; a message about a derived prefix names where it came from, the slug when
+`--slug` was given and the directory otherwise. Chosen values keep their case and use the
+identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
+naming options refreshes an existing workspace, so a stored prefix that the directory
+cannot derive stays, and it finds that workspace by slug without regard to case, as does
+`--ws`. When `--slug` or `--prefix` is given and that slug already names a workspace, the
+scan is refused, saying that a rescan only refreshes the repos already registered there;
+with `--slug` it offers another slug first and the rescan second, with `--prefix` alone
+the rescan first and another slug second. Slug and prefix clashes compare
+case-insensitively. Every refusal's `next` repeats the naming options already given, so
+following it never lands on a different workspace. Options without `--scan` are refused.
+`--slug` and `--prefix` are invalid with `--ws`, which rescans. A directory name that is
+not a valid slug, or does not yield a valid prefix, fails with an error that names
+`--slug` or `--prefix` as the fix and carries the scanned roots in a runnable `next`. A
+scan root that is itself a clone with an unusable directory name gets the rename first,
+then the scan of the renamed path repeating any chosen names; a clone below the root gets
+the rename alone, because the original scan still works. Either refusal names the clone,
+its real spelling and the shortest directory name that is a valid slug. A task prefix
+another workspace holds, or a clone path another workspace already binds, is a conflict
+that names the holder and a command that repairs it. Remote `X`/`X-prod` pairs create app
+stubs with a prod ref; main or master provides a default app when its ref is not already
+represented.
 Worktrees and path aliases resolve to one canonical main clone. Initial scans create
 configuration; rescans only refresh local paths for registered repo slugs and preserve
 edited configuration. `--ws` targets an existing workspace for path rebinding.
