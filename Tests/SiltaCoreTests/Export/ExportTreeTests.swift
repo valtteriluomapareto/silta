@@ -311,6 +311,11 @@ struct TreeDamage: Sendable, CustomTestStringConvertible {
     edit("future format", "manifest.json", #""format": "1""#, #""format": "2""#, rehash: false),
     edit("escaped slash", "workspace.yaml", "src/Portal", #"src\/Portal"#),
     edit("wider fence", "tasks/AC-2.md", "~~~\nWaiting.\n~~~", "~~~~\nWaiting.\n~~~~"),
+    Self(testDescription: "record groups out of order") { files in
+      let lines = text(files["tasks/AC-2.jsonl"] ?? Data()).split(separator: "\n")
+      files["tasks/AC-2.jsonl"] = Data((lines.reversed().joined(separator: "\n") + "\n").utf8)
+      rehash(&files, "tasks/AC-2.jsonl")
+    },
   ]
 
   static func rehash(_ files: inout [String: Data], _ path: String) {

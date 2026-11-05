@@ -121,7 +121,7 @@ enum ExportFixture {
       closed_at,follow_up_at
       """
     try run(
-      "INSERT INTO task(\(columns)) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO task(\(columns)) VALUES(\(Array(repeating: "?", count: 29).joined(separator: ",")))",
       [
         1 + o, "01HZTASK000000000000000009", acme, 2, #"Add "sign-in""#, "feature", "blocked", 1,
         "Use the API.\n", "- [x] Inspect\n- [ ] Build\n", 2, "Signs in.", "Waiting.", nil,
@@ -131,7 +131,7 @@ enum ExportFixture {
         "2023-11-14T22:30:00.000Z", "2023-11-20",
       ])
     try run(
-      "INSERT INTO task(\(columns)) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO task(\(columns)) VALUES(\(Array(repeating: "?", count: 29).joined(separator: ",")))",
       [
         2 + o, "01HZTASK000000000000000001", acme, 10, "Check the callback", "chore", "done", 2,
         "~~~\n## Plan\n", "", 0, "", nil, 1 + o, 2 + o, "agent:claude:acme",

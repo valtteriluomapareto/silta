@@ -201,6 +201,19 @@ struct ExportCoverageTests {
     }
   }
 
+  /// Configured values and audit text are written as stored, paths included; only
+  /// machine-local state is left out (spec §15).
+  @Test func configuredPathsAreWrittenAsStored() throws {
+    try withScratchDirectory { scratch in
+      let store = try ExportFixture.make(scratch)
+      try DatabaseQueue(path: store.path).write {
+        try $0.execute(sql: "UPDATE source SET root='/Users/acme/notes' WHERE workspace_id=1")
+      }
+      let yaml = text(try #require(try ExportTreeTests.render(store)["workspace.yaml"]))
+      #expect(yaml.contains(#""root": "/Users/acme/notes""#))
+    }
+  }
+
   @Test func otherWorkspacesAndMachinePathsStayOut() throws {
     try withScratchDirectory { scratch in
       let store = try ExportFixture.make(scratch)
@@ -245,8 +258,10 @@ struct ExportCoverageTests {
         let task = try #require(
           try Row.fetchOne(
             db,
-            sql:
-              "SELECT task.uid, rev FROM task_plan_rev JOIN task ON task.id=task_id WHERE task_plan_rev.id=?",
+            sql: """
+              SELECT task.uid, rev FROM task_plan_rev JOIN task ON task.id=task_id
+              WHERE task_plan_rev.id=?
+              """,
             arguments: [value]))
         return [
           "\"\(key)\": \(quoted(task[0])), \"\(key)_rev\": \(quoted(String(task[1] as Int64)))"

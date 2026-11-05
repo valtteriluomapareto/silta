@@ -189,19 +189,37 @@ struct ExportServiceTests {
     }
   }
 
-  @Test func leftoverStagingFromACrashIsReplaced() throws {
+  /// Export removes only directories it created: siblings with staging-like names, even
+  /// one that is another workspace's registered repo, survive (first export and replace).
+  @Test func siblingsWithStagingNamesAreLeftAlone() throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "home")
       let store = try ExportFixture.make(home)
       let root = scratch.appending(path: "exports")
-      let staging = root.appending(path: ".acme.staging")
-      try FileManager.default.createDirectory(
-        at: staging.appending(path: "tasks"), withIntermediateDirectories: true)
-      try Data("partial".utf8).write(to: staging.appending(path: "tasks/AC-99.md"))
-      _ = try Self.export(store, home, to: root)
-      ExportTreeTests.expectSame(
-        try Self.tree(root.appending(path: "acme")), try ExportTreeTests.golden("acme"))
-      #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["acme"])
+      let names = [".acme.staging", ".acme.staging.previous", ".acme.previous"]
+      for name in names {
+        try FileManager.default.createDirectory(
+          at: root.appending(path: name), withIntermediateDirectories: true)
+        try Data("Acme \(name)".utf8).write(to: root.appending(path: "\(name)/README.md"))
+      }
+      try DatabaseQueue(path: store.path).write {
+        try $0.execute(
+          sql: "INSERT INTO repo_path(repo_id,path) VALUES(50,?)",
+          arguments: [try LocationPath.canonical(root.appending(path: ".acme.staging")).path])
+      }
+      for _ in 0..<2 {
+        _ = try Self.export(store, home, to: root)
+        ExportTreeTests.expectSame(
+          try Self.tree(root.appending(path: "acme")), try ExportTreeTests.golden("acme"))
+        for name in names {
+          #expect(
+            try Data(contentsOf: root.appending(path: "\(name)/README.md"))
+              == Data("Acme \(name)".utf8))
+        }
+        #expect(
+          Set(try FileManager.default.contentsOfDirectory(atPath: root.path))
+            == Set(names + ["acme"]))
+      }
     }
   }
 
