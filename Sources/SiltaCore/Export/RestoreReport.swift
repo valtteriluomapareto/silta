@@ -151,16 +151,19 @@ extension RestoreReport {
       approvalsAdded: 0, claimsReplaced: claims, reposWithoutPath: [], snapshot: nil)
   }
 
-  /// The task refs before and after: the counter takes the highest of what the database
-  /// holds, what the tree holds and one past the tree's last task.
+  /// The task refs before and after, each with its own workspace's prefix: the counter
+  /// takes the highest of what the database holds, what the tree holds and one past the
+  /// tree's last task.
   private static func taskRefs(_ current: ExportSnapshot?, _ tree: ExportSnapshot) -> TaskRef {
-    let prefix = tree.workspace.value("task_prefix") ?? ""
-    func ref(_ next: Int64?) -> String? {
+    func ref(_ next: Int64?, prefix: String) -> String? {
       next.map { "\(prefix)-\($0)" }
     }
     let stored = current?.workspace.value("next_task_seq").flatMap { Int64($0) }
     return TaskRef(
-      before: ref(stored), after: ref(RestoreWriter.nextTaskSeq(stored: stored, tree: tree)))
+      before: ref(stored, prefix: current?.workspace.value("task_prefix") ?? ""),
+      after: ref(
+        RestoreWriter.nextTaskSeq(stored: stored, tree: tree),
+        prefix: tree.workspace.value("task_prefix") ?? ""))
   }
 
   /// Row counts of the tables outside the tasks that differ.
