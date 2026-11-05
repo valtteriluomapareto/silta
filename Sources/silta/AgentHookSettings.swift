@@ -31,12 +31,7 @@ enum AgentHookSettings {
         groups.remove(at: found)
       } else {
         let replacement = group(event: event, origin: ownership.origin)
-        if let found = ownership.index {
-          if NSDictionary(dictionary: groups[found]).isEqual(to: replacement) { continue }
-          groups[found] = replacement
-        } else {
-          groups.append(replacement)
-        }
+        guard place(replacement, in: &groups, at: ownership.index) else { continue }
       }
       changed = true
       if groups.isEmpty, ownership.origin != .keep {
@@ -49,6 +44,18 @@ enum AgentHookSettings {
     put(hooks, into: &root, created: newHooks)
     if uninstall, newFile, root.isEmpty { return "" }
     return try json(root) + "\n"
+  }
+
+  private static func place(
+    _ replacement: [String: Any], in groups: inout [[String: Any]], at index: Int?
+  ) -> Bool {
+    if let index {
+      if NSDictionary(dictionary: groups[index]).isEqual(to: replacement) { return false }
+      groups[index] = replacement
+    } else {
+      groups.append(replacement)
+    }
+    return true
   }
 
   private static func put(_ hooks: [String: Any], into root: inout [String: Any], created: Bool) {
