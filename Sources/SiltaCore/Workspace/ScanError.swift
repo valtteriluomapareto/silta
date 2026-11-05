@@ -38,15 +38,6 @@ package enum PrefixOrigin: Equatable, Sendable {
   case slug(String)
 }
 
-/// What fixes a clone directory renamed by a scan refusal.
-package enum ScanFollowUp: Equatable, Sendable {
-  /// Rescan the renamed path into this existing workspace.
-  case rescan(String)
-
-  /// Create a workspace from the renamed path with these chosen names.
-  case create(ScanChoice)
-}
-
 /// A scan cannot name the workspace it would create, or cannot bind a clone's path.
 package enum ScanError: CodedError, Equatable {
   /// A chosen or directory-derived workspace slug is not an identifier.
@@ -55,10 +46,6 @@ package enum ScanError: CodedError, Equatable {
   /// A task prefix is not an identifier. `origin` is nil when `--prefix` named the
   /// value, and names the slug or directory a derived value came from.
   case invalidPrefix(String, origin: PrefixOrigin?, roots: [String], choice: ScanChoice)
-
-  /// A clone's directory name is not a valid repo slug, and no option renames it.
-  /// `followUp` is set only when the renamed clone was the scan root itself.
-  case invalidRepoDirectory(name: String, path: String, renamed: String, followUp: ScanFollowUp?)
 
   /// The slug the scan would create already names a workspace. `chosen` says
   /// whether `--slug` named it or the directory did and only `--prefix` was given.
@@ -72,15 +59,9 @@ package enum ScanError: CodedError, Equatable {
 
   package var code: ErrorCode {
     switch self {
-    case .invalidSlug, .invalidPrefix, .invalidRepoDirectory: .invalid
+    case .invalidSlug, .invalidPrefix: .invalid
     case .slugExists, .prefixTaken, .repoPathTaken: .conflict
     }
-  }
-
-  /// Renaming a clone's directory is the human's job, not the agent's.
-  package var nextBy: NextBy {
-    if case .invalidRepoDirectory = self { return .human }
-    return code.nextBy
   }
 
   package var message: String {
@@ -104,10 +85,6 @@ package enum ScanError: CodedError, Equatable {
       case nil:
         return "Invalid task prefix \(value.debugDescription); use \(shape)."
       }
-    case .invalidRepoDirectory(let name, _, let renamed, _):
-      return "Repo directory \(name.debugDescription) is not a valid repo slug; rename the clone's "
-        + "directory to use letters, digits, _ or -, starting and ending with a letter or digit "
-        + "(for example \(URL(filePath: renamed).lastPathComponent.debugDescription))."
     case .slugExists(_, let chosen, let workspace, _, _):
       return chosen
         ? "Workspace \(workspace.debugDescription) already exists; choose another --slug, or "
@@ -137,9 +114,6 @@ package enum ScanError: CodedError, Equatable {
       return [command(roots: roots, slug: "<slug>", prefix: choice.usablePrefix)]
     case .invalidPrefix(_, _, let roots, let choice):
       return [command(roots: roots, slug: choice.usableSlug, prefix: "<prefix>")]
-    case .invalidRepoDirectory(_, let path, let renamed, let followUp):
-      return ["mv \(shellWord(path)) \(shellWord(renamed))"]
-        + (followUp.map { [command($0, renamed: renamed)] } ?? [])
     case .slugExists(_, let chosen, let workspace, let roots, let choice):
       let another = command(roots: roots, slug: "<another-slug>", prefix: choice.usablePrefix)
       let rescan = "silta init --scan \(roots.scanArguments) --ws \(shellWord(workspace))"
@@ -148,15 +122,6 @@ package enum ScanError: CodedError, Equatable {
       return [command(roots: roots, slug: choice.usableSlug, prefix: "<prefix>")]
     case .repoPathTaken(_, let path, let workspace):
       return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(path))"]
-    }
-  }
-
-  private func command(_ followUp: ScanFollowUp, renamed: String) -> String {
-    switch followUp {
-    case .rescan(let workspace):
-      "silta init --scan \(shellWord(renamed)) --ws \(shellWord(workspace))"
-    case .create(let choice):
-      command(roots: [renamed], slug: choice.usableSlug, prefix: choice.usablePrefix)
     }
   }
 

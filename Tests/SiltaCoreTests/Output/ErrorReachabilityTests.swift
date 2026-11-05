@@ -111,12 +111,6 @@ extension ScanError: ErrorExamples {
       .invalidPrefix("A_", origin: nil, roots: ["acme"], choice: .init(slug: "work")),
       .invalidPrefix("A-", origin: .directory("a-team"), roots: ["a-team"], choice: .none),
       .invalidPrefix("X-", origin: .slug("x-y"), roots: ["zed"], choice: .init(slug: "x-y")),
-      .invalidRepoDirectory(
-        name: "My Projects", path: "/projects/My Projects", renamed: "/projects/my-projects",
-        followUp: .create(.none)),
-      .invalidRepoDirectory(
-        name: "My Projects", path: "/projects/My Projects", renamed: "/projects/my-projects",
-        followUp: nil),
       .slugExists(
         "ACME", chosen: true, workspace: "acme", roots: ["api", "web"],
         choice: .init(slug: "ACME", prefix: "WK")),

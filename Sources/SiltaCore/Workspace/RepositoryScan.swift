@@ -32,10 +32,8 @@ package enum RepositoryScan {
     guard let first = roots.first else { throw RepoError.scan }
     let paths = roots.map(\.path)
     let directory = first.standardizedFileURL.lastPathComponent
-    try validateRootRepos(roots, target: target)
     let naming = try naming(target, directory: directory, roots: paths)
     let discovered = try await discover(roots, git: git)
-    try validateRepoDirectories(discovered, roots: roots, target: target)
     var warnings: [OutputWarning] = []
     let request = ScanRequest(
       target: target, choice: ScanChoice(target), slug: naming.slug,
@@ -182,46 +180,8 @@ extension RepositoryScan {
     return prefix
   }
 
-  /// A scan root that is itself a clone with an unusable directory name: no option
-  /// can rename it, so the refusal offers the rename first.
-  private static func validateRootRepos(_ roots: [URL], target: ScanTarget) throws {
-    for root in roots {
-      guard FileManager.default.fileExists(atPath: root.appending(path: ".git").path)
-      else { continue }
-      let name = root.lastPathComponent
-      guard !WorkspaceConfig.isValidIdentifier(name.lowercased()) else { continue }
-      throw ScanError.invalidRepoDirectory(
-        name: name, path: root.path,
-        renamed: root.deletingLastPathComponent().appending(path: suggestedSlug(name)).path,
-        followUp: followUp(target))
-    }
-  }
-
-  /// A clone whose directory name is no repo slug cannot be registered by any option.
-  private static func validateRepoDirectories(
-    _ repos: [DiscoveredRepo], roots: [URL], target: ScanTarget
-  ) throws {
-    guard
-      let repo = repos.first(where: { !WorkspaceConfig.isValidIdentifier($0.slug) })
-    else { return }
-    let rootPaths = Set(try roots.map { try canonical($0).path })
-    let display = repo.displayPath
-    throw ScanError.invalidRepoDirectory(
-      name: repo.directoryName, path: display.path,
-      renamed: display.deletingLastPathComponent()
-        .appending(path: suggestedSlug(repo.directoryName)).path,
-      followUp: rootPaths.contains(repo.path.path) ? followUp(target) : nil)
-  }
-
-  /// How to scan the renamed path when the renamed clone was the scan root.
-  private static func followUp(_ target: ScanTarget) -> ScanFollowUp {
-    switch target {
-    case .rescan(let slug): .rescan(slug)
-    case .derived, .named: .create(ScanChoice(target))
-    }
-  }
-
-  /// `My Projects` suggests `my-projects`, the directory name the clone needs.
+  /// A repo slug is the clone directory's name normalized: `My Projects` is
+  /// `my-projects`, and a name with no usable character is `repo`.
   private static func suggestedSlug(_ name: String) -> String {
     let body = name.lowercased().replacing(/[^a-z0-9_-]+/, with: "-")
     let trimmed = body.replacing(/^[^a-z0-9]+/, with: "").replacing(/[^a-z0-9]+$/, with: "")
@@ -340,10 +300,8 @@ extension RepositoryScan {
       }
       let refs = try await output(
         ["for-each-ref", "--format=%(refname:short)", "refs/remotes"], in: main, git: git)
-      let listed = URL(filePath: String(entry.dropFirst(9)))
       found[main.path] = DiscoveredRepo(
-        path: main, displayPath: listed, directoryName: listed.lastPathComponent,
-        slug: listed.lastPathComponent.lowercased(), remote: url,
+        path: main, slug: suggestedSlug(main.lastPathComponent), remote: url,
         refs: refs.split(separator: "\n").map(String.init))
     }
     return found.values.sorted { $0.path.path < $1.path.path }
@@ -426,12 +384,6 @@ private struct ScanRequest: Sendable {
 private struct DiscoveredRepo: Sendable {
   let path: URL
 
-  /// The clone's path as git spells it, for messages and renames.
-  let displayPath: URL
-
-  /// The clone's directory as spelled on disk; the slug is its lowercased form.
-  let directoryName: String
-
   let slug: String
 
   let remote: String?
@@ -440,9 +392,7 @@ private struct DiscoveredRepo: Sendable {
 
   /// The same repo under another config slug.
   func renamed(_ slug: String) -> DiscoveredRepo {
-    DiscoveredRepo(
-      path: path, displayPath: displayPath, directoryName: directoryName, slug: slug,
-      remote: remote, refs: refs)
+    DiscoveredRepo(path: path, slug: slug, remote: remote, refs: refs)
   }
 
   var apps: [[String: String]] {

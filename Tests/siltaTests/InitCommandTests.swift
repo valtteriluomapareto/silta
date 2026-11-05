@@ -275,38 +275,38 @@ struct InitCommandTests {
 }
 
 extension InitCommandTests {
-  /// A repo directory whose name is no slug: the refusal names the clone, and running
-  /// its `ask human: mv` renames the directory so the rescan succeeds.
-  @Test func aRepoDirectoryNameRefusalGivesAMvThatFixesIt() throws {
+  /// A clone whose directory name is no identifier still scans: its repo slug is the
+  /// normalized name, and neither the directory nor its path changes.
+  @Test func aRepoDirectoryNameIsNormalizedIntoASlug() throws {
     try withScratchDirectory { scratch in
-      let root = scratch.appending(path: "root")
+      let root = scratch.appending(path: "work")
       let repo = root.appending(path: "My Projects")
-      try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
-      try Self.git(["init", "-q", "-b", "main"], in: scratch, cwd: repo)
-      try Data("Acme\n".utf8).write(to: repo.appending(path: "readme"))
-      try Self.git(["add", "."], in: scratch, cwd: repo)
-      try Self.git(
-        [
-          "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm",
-          "Acme",
-        ], in: scratch, cwd: repo)
-      try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
-      let refused = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
-      #expect(refused.termination == .exit(1))
-      #expect(refused.stderr.contains("Repo directory \"My Projects\" is not a valid repo slug"))
-      let line = try #require(
-        refused.stderr.split(separator: "\n").first { $0.hasPrefix("ask human: mv ") })
-      let command = line.dropFirst("ask human: ".count)
-      let paths = command.split(separator: "'").map(String.init).filter { $0.hasPrefix("/") }
-      #expect(paths.count == 2)
-      #expect(paths.allSatisfy { $0.hasPrefix(scratch.path) })
-      let moved = try SiltaBinary.runProcess(
-        URL(filePath: "/bin/bash"), ["-c", String(command)], in: scratch)
-      #expect(moved.termination == .exit(0))
-      let rescanned = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
-      #expect(rescanned.termination == .exit(0))
-      let shown = try SiltaBinary.run(["--ws", "root", "ws", "show"], in: scratch)
+      try Self.makeRepo(repo, in: scratch)
+      let scan = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "work"], in: scratch)
+      #expect(scan.termination == .exit(0), "\(scan.stderr)")
+      let shown = try SiltaBinary.run(["ws", "show", "work"], in: scratch)
+      #expect(shown.termination == .exit(0))
       #expect(shown.stdout.contains("\"slug\":\"my-projects\""))
+      #expect(FileManager.default.fileExists(atPath: repo.appending(path: ".git").path))
+      #expect(!FileManager.default.fileExists(atPath: root.appending(path: "my-projects").path))
+    }
+  }
+
+  /// A chosen prefix keeps the case it was typed with, down to task refs.
+  @Test func aChosenPrefixKeepsItsCase() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      let scan = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, "--slug", "Work", "--prefix", "wK"], in: scratch)
+      #expect(scan.termination == .exit(0), "\(scan.stderr)")
+      let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(list.stdout.contains("\"task_prefix\":\"wK\""))
+      let added = try SiltaBinary.run(
+        ["--ws", "Work", "task", "add", "Acme release", "--start", "--json"], in: scratch,
+        environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      #expect(added.termination == .exit(0), "\(added.stderr)")
+      #expect(added.stdout.contains("\"ref\":\"wK-1\""))
     }
   }
 
@@ -327,36 +327,6 @@ extension InitCommandTests {
       let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
       #expect(list.stdout.contains("\"slug\":\"a_b\""))
       #expect(list.stdout.contains("\"task_prefix\":\"AB\""))
-    }
-  }
-
-  /// A scan root that is itself a clone with an unusable name: the first `next`
-  /// renames it, the second scans the renamed path, and both stay under the scratch
-  /// directory.
-  @Test func aRepoRootRefusalRenamesItThenScansTheNewPath() throws {
-    try withScratchDirectory { scratch in
-      let root = scratch.appending(path: "My Projects")
-      try Self.makeRepo(root, in: scratch)
-      let refused = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
-      #expect(refused.termination == .exit(1))
-      #expect(refused.stderr.contains("Repo directory \"My Projects\""))
-      let commands = refused.stderr.split(separator: "\n")
-        .filter { $0.hasPrefix("ask human: ") }
-        .map { String($0.dropFirst("ask human: ".count)) }
-      #expect(commands.count == 2)
-      let rename = try #require(commands.first)
-      #expect(rename.hasPrefix("mv "))
-      let paths = rename.split(separator: "'").map(String.init).filter { $0.hasPrefix("/") }
-      #expect(paths.count == 2)
-      #expect(paths.allSatisfy { $0.hasPrefix(scratch.path) })
-      let moved = try Self.runNext(rename, in: scratch)
-      #expect(moved.termination == .exit(0), "\(moved.stderr)")
-      let rescanned = try Self.runNext(try #require(commands.last), in: scratch)
-      #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
-      let shown = try SiltaBinary.run(["ws", "show", "my-projects", "--json"], in: scratch)
-      #expect(shown.termination == .exit(0))
-      let data = try Self.shownData(shown.stdout)
-      #expect(data["workspace"] as? String == "my-projects")
     }
   }
 

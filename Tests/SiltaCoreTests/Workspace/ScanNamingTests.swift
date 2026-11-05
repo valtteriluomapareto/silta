@@ -295,49 +295,6 @@ struct ScanNamingTests {
 }
 
 extension ScanNamingTests {
-  @Test func anInvalidRepoDirectoryNamesTheCloneAndItsFix() async throws {
-    try await withScratchDirectory { home in
-      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      for (name, suggestion) in [
-        ("My Projects", "my-projects"), (".hidden", "hidden"), ("___", "repo"),
-      ] {
-        let root = home.appending(path: "scan-\(suggestion)")
-        let clone = root.appending(path: name)
-        let candidate = try Self.clone(clone)
-        let error = await Self.refusal {
-          _ = try await Self.create(
-            [root], store: store,
-            git: ScriptedGitRunner(script: RepositoryScanTests.script(candidate, listed: clone)))
-        }
-        #expect(error?.code == .invalid)
-        #expect(error?.message.contains("Repo directory \(name.debugDescription)") == true)
-        #expect(error?.message.contains(suggestion) == true)
-        #expect(error?.next.first?.hasPrefix("mv ") == true)
-        #expect(error?.next.first?.contains(clone.path) == true)
-        #expect(error?.next.first?.hasSuffix("/\(suggestion)'") == true)
-        #expect(error?.nextBy == .human)
-      }
-      #expect(try WorkspaceSelection.list(in: store).isEmpty)
-    }
-  }
-
-  @Test func aRepoDirectoryNameCannotBeFixedWithSlug() async throws {
-    try await withScratchDirectory { home in
-      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      let root = home.appending(path: "My Projects")
-      let path = try Self.clone(root)
-      let error = await Self.refusal {
-        _ = try await Self.create(
-          [root], slug: "my-projects", store: store,
-          git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
-      }
-      #expect(error?.code == .invalid)
-      #expect(error?.message.contains("Repo directory") == true)
-      #expect(error?.message.contains("--slug") == false)
-      #expect(try WorkspaceSelection.list(in: store).isEmpty)
-    }
-  }
-
   @Test func aRepoPathHeldByAnotherWorkspaceNamesTheFix() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
@@ -362,36 +319,6 @@ extension ScanNamingTests {
     }
   }
 
-  /// A scan root that is itself a clone with an unusable name: `--slug` cannot rename
-  /// it, so the rename comes first and the follow-up scans the renamed path.
-  @Test func aScanRootThatIsARepoRenamesItThenScansTheNewPath() async throws {
-    try await withScratchDirectory { home in
-      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      let root = home.appending(path: "My Projects")
-      try FileManager.default.createDirectory(
-        at: root.appending(path: ".git"), withIntermediateDirectories: true)
-      let renamed = home.appending(path: "my-projects")
-      let scan = "silta init --scan \(shellWord(renamed.path))"
-      let cases: [(ScanTarget, String)] = [
-        (.derived, scan),
-        (.named(slug: "work", prefix: nil), scan + " --slug work"),
-        (.named(slug: nil, prefix: "WK"), scan + " --prefix WK"),
-        (.rescan("acme"), scan + " --ws 'acme'"),
-      ]
-      for (target, followUp) in cases {
-        let error = await Self.refusal {
-          _ = try await RepositoryScan.scan(
-            [root], target: target, store: store, git: ScriptedGitRunner(script: []),
-            identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
-        }
-        #expect(error?.code == .invalid)
-        #expect(error?.message.contains("Repo directory \"My Projects\"") == true)
-        #expect(error?.next == ["mv \(shellWord(root.path)) \(shellWord(renamed.path))", followUp])
-        #expect(error?.nextBy == .human)
-      }
-      #expect(try WorkspaceSelection.list(in: store).isEmpty)
-    }
-  }
 }
 
 extension ScanNamingTests {
@@ -453,6 +380,74 @@ extension ScanNamingTests {
       #expect(error?.next.first?.hasSuffix("--ws 'acme'") == true)
       #expect(error?.next.count == 2)
       #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
+    }
+  }
+}
+
+extension ScanNamingTests {
+  /// A clone directory that is no identifier still scans: its repo slug is the
+  /// directory name normalized, and nothing on disk is renamed.
+  @Test func aRepoDirectoryNameIsNormalizedIntoASlug() async throws {
+    try await withScratchDirectory { home in
+      let root = home.appending(path: "My Projects")
+      let path = try Self.clone(root)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let outcome = try await Self.create(
+        [root], slug: "work", store: store,
+        git: ScriptedGitRunner(script: RepositoryScanTests.script(path, listed: root)))
+      #expect(outcome.workspace == "work")
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT slug FROM repo") } == "my-projects")
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == path.path)
+      #expect(FileManager.default.fileExists(atPath: root.appending(path: ".git").path))
+    }
+  }
+
+  /// Two directories that normalize to one slug keep the duplicate-slug refusal.
+  @Test func reposThatNormalizeToTheSameSlugAreRefused() async throws {
+    try await withScratchDirectory { home in
+      let root = home.appending(path: "scan")
+      let first = root.appending(path: "a/My Projects")
+      let second = root.appending(path: "b/my projects")
+      var script = RepositoryScanTests.script(try Self.clone(first), listed: first)
+      script += RepositoryScanTests.script(try Self.clone(second), listed: second)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      await #expect(throws: RepoError.duplicateSlug) {
+        _ = try await Self.create(
+          [root], slug: "work", store: store, git: ScriptedGitRunner(script: script))
+      }
+      #expect(try WorkspaceSelection.list(in: store).isEmpty)
+    }
+  }
+
+  /// A valid clone reached through a worktree or alias with an unusual name still
+  /// scans into the canonical main clone.
+  @Test(arguments: ["My Worktree", "My Alias"])
+  func anUnusualWorktreeOrAliasNameStillScans(_ name: String) async throws {
+    try await withScratchDirectory { home in
+      let main = home.appending(path: "acme")
+      let mainPath = try Self.clone(main)
+      let root = home.appending(path: name)
+      let script: [(GitRequest, Result<GitResult, any Error>)]
+      if name == "My Alias" {
+        try FileManager.default.createSymbolicLink(at: root, withDestinationURL: main)
+        script = RepositoryScanTests.script(mainPath)
+      } else {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data().write(to: root.appending(path: ".git"))
+        script = RepositoryScanTests.script(try RepositoryScanTests.path(root), main: mainPath)
+      }
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let outcome = try await Self.create(
+        [root], slug: "work", prefix: "WK", store: store,
+        git: ScriptedGitRunner(script: script))
+      #expect(outcome.workspace == "work")
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT slug FROM repo") } == "acme")
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") }
+          == mainPath.path)
     }
   }
 }
