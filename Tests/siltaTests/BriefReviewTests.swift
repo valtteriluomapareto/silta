@@ -42,6 +42,7 @@ extension BriefCommandTests {
         let result = try run(flags, repo, scratch)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
+        // WallClockHookTests checks the hook log without this allowance.
         if flags.contains("--hook"), try hookTimeoutCount(scratch) > before { continue }
         let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String]
         if flags.contains("--json") { #expect(result.stdout.contains("ref_missing")) }

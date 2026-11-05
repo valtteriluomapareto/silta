@@ -5,11 +5,12 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-/// Wall-clock proof of the hook's 1.5 s process deadline (spec §12), through the built
-/// binary. A wall-clock assertion can't tell a slow hook from a busy machine, so these
-/// run only in the isolated deadline tier (`deadlineTestsEnabled()`), which
-/// `scripts/verify.sh full` runs serially after the parallel suite.
-/// `BriefHookDeadlineTests` checks the same timing decisions on a fake clock in every run.
+/// Wall-clock proof of the hook's 1.5 s process deadline (spec §12) through the built
+/// binary, and the hook-output checks the parallel suite skips when that deadline trips.
+/// A wall-clock assertion can't tell a slow hook from a busy machine, so these run only
+/// in the isolated deadline tier (`deadlineTestsEnabled()`), which `scripts/verify.sh
+/// full` runs serially after the parallel suite. `BriefHookDeadlineTests` checks the
+/// same timing decisions on a fake clock in every run.
 @Suite(
   .tags(.deadline), .enabled(if: deadlineTestsEnabled()), .serialized, .blockingTestWork,
   .timeLimit(.minutes(3)))
@@ -24,6 +25,42 @@ struct WallClockHookTests {
   func store(_ scratch: URL) -> DatabaseStore { brief.store(scratch) }
 
   func contextFixture(_ scratch: URL) throws -> URL { try brief.contextFixture(scratch) }
+
+  /// The parallel suite skips this comparison when a busy machine trips the deadline;
+  /// here the hook must finish in time.
+  @Test func hookOutputMatchesTheShortBriefWithinTheDeadline() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try store(scratch).write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO task(uid,workspace_id,seq,title,status,plan_md,
+              created_by,created_at,updated_at)
+            VALUES('acme-long',1,1,'Acme long','todo',?,'human:acme','','')
+            """, arguments: [String(repeating: "- [ ] Acme 👩🏽‍💻é context\n", count: 300)])
+      }
+      let regular = try run(["--task", "AC-1"], repo, scratch)
+      let short = try run(["--task", "AC-1", "--short"], repo, scratch)
+      #expect(try run(["--task", "AC-1", "--hook"], repo, scratch) == short)
+      #expect(try run(["--task", "AC-1", "--hook", "--budget", "2500"], repo, scratch) == regular)
+      #expect(try brief.hookTimeoutCount(scratch) == 0)
+    }
+  }
+
+  /// The parallel suite skips these log checks when a busy machine trips the deadline.
+  @Test func hookLogKeepsLocationWarningsWithinTheDeadline() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try fixture.git(["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
+      for flags in [["--hook", "--json", "--verbose"], ["--hook"]] {
+        let result = try run(flags, repo, scratch)
+        #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+        if flags.contains("--json") { #expect(result.stdout.contains("ref_missing")) }
+        #expect(try DogfoodLogTests.last(scratch)["warnings"] as? [String] == ["ref_missing"])
+      }
+      #expect(try brief.hookTimeoutCount(scratch) == 0)
+    }
+  }
 
   @Test func hookLogRecordsItsActualExitAndKeepsDiagnosticCode() throws {
     try withScratchDirectory { scratch in

@@ -120,6 +120,7 @@ struct BriefCommandTests {
       let before = try hookTimeoutCount(scratch)
       let hook = try run(["--task", "AC-1", "--hook"], repo, scratch)
       #expect(hook.termination == .exit(0) && hook.stderr.isEmpty)
+      // WallClockHookTests checks the hook output without this allowance.
       if try hookTimeoutCount(scratch) == before { #expect(hook == short) }
       #expect(hook.stdout.count <= 3200)
       #expect(short.stdout.count <= 3200)
