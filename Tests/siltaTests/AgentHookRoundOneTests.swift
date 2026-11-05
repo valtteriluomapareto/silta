@@ -19,7 +19,7 @@ struct AgentHookRoundOneTests {
         switch kind {
         case "success": body = "printf 'Acme brief\\n\\n'"
         case "line": body = "printf 'Acme brief\\n'"
-        case "text": body = "printf 'Acme λ %%%% brief'"
+        case "text": body = "printf 'Acme λ %%%% brief.'"
         case "empty": body = ":"
         case "crash": body = "printf 'Acme partial'; printf 'Acme diagnostic' >&2; kill -SEGV $$"
         default: body = "printf 'Acme partial'; printf 'Acme diagnostic' >&2; exit 9"
@@ -32,8 +32,8 @@ struct AgentHookRoundOneTests {
       let expected =
         kind == "success"
         ? "Acme brief\n\n"
-        : kind == "line" ? "Acme brief\n" : kind == "text" ? "Acme λ %% brief" : ""
-      let run = { () throws -> Void in
+        : kind == "line" ? "Acme brief\n" : kind == "text" ? "Acme λ %% brief." : ""
+      let run: () throws -> Void = {
         let result = try SiltaBinary.runProcess(
           URL(filePath: "/bin/sh"), ["-c", command], in: scratch,
           environment: ["PATH": bin.path + ":/usr/bin:/bin"])
@@ -41,11 +41,7 @@ struct AgentHookRoundOneTests {
         #expect(result.stderr.isEmpty)
         #expect(result.stdout == expected)
       }
-      if ["success", "line", "text", "empty"].contains(kind) {
-        try run()
-      } else {
-        try withKnownIssue("SI-46/41: installed command leaks executable failures") { try run() }
-      }
+      try run()
     }
   }
 
@@ -73,16 +69,13 @@ struct AgentHookRoundOneTests {
       root["hooks"] = hooks
       let bytes = try JSONSerialization.data(withJSONObject: root)
       try AgentsInstallTests.write(
-        String(decoding: bytes, as: UTF8.self), ".claude/settings.json", in: scratch)
+        try #require(String(data: bytes, encoding: .utf8)), ".claude/settings.json", in: scratch)
       #expect(
         try AgentsInstallTests.apply(
           uninstall ? ["uninstall", "--claude"] : ["install", "--claude", "--hook"], in: scratch
         ).termination == .exit(0))
       if !uninstall {
-        try withKnownIssue("SI-46/41: upgrade exact legacy command to fail closed") {
-          () throws -> Void in
-          #expect(try AgentsHookTests.command("SessionStart", in: scratch) != legacy)
-        }
+        #expect(try AgentsHookTests.command("SessionStart", in: scratch) != legacy)
       }
     }
   }

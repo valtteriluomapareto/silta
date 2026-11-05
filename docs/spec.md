@@ -1120,7 +1120,9 @@ the installer lock. Hook runtime must be installed before settings that referenc
 it leaves settings unread. Uninstall selected Claude removes its unedited owned hook;
 omit hook flags on uninstall. Preview retries retain operation, selection and hook flags.
 The hook command is included in the binary; settings are written last. It needs `silta`
-on the harness PATH. Actual harness loading remains outside acceptance (D42).
+on the harness PATH. Its installed shell command suppresses failed executable output and
+returns zero, retaining successful brief text. Live harness loading and propagation remain
+unverified and pending installer acceptance (D42).
 
 Settings merge preserves unknown JSON values semantically; whitespace/key order may
 normalize. It accepts duplicate-free objects/arrays with strings, null, booleans and

@@ -30,8 +30,13 @@ enum AgentHookSettings {
       guard let found else { return original }
       groups.remove(at: found)
     } else {
-      if found != nil { return original }
-      groups.append(group(origin: origin))
+      let replacement = group(origin: origin)
+      if let found {
+        if NSDictionary(dictionary: groups[found]).isEqual(to: replacement) { return original }
+        groups[found] = replacement
+      } else {
+        groups.append(replacement)
+      }
     }
     if groups.isEmpty, origin != .keep {
       hooks.removeValue(forKey: "SessionStart")
@@ -59,6 +64,7 @@ enum AgentHookSettings {
         guard found == nil,
           let matched = Origin.allCases.first(where: {
             NSDictionary(dictionary: group).isEqual(to: self.group(origin: $0))
+              || NSDictionary(dictionary: group).isEqual(to: self.group(origin: $0, legacy: true))
           })
         else { try refusal() }
         origin = matched
@@ -89,14 +95,19 @@ enum AgentHookSettings {
       || (handler["command"] as? String)?.contains(marker) == true
   }
 
-  private static func group(origin: Origin) -> [String: Any] {
+  private static func group(origin: Origin, legacy: Bool = false) -> [String: Any] {
     let origin = origin.rawValue
     let digest = AgentInstallPlan.hash(Data(("SessionStart:" + origin).utf8))
+    // The sentinel retains trailing newlines; failed output stays inside the subshell.
+    let command =
+      legacy
+      ? "silta agents session-start"
+      : #"(o=$(silta agents session-start && printf .) && printf %s "${o%.}") 2>/dev/null || :"#
     return [
       "hooks": [
         [
           "type": "command",
-          "command": "silta agents session-start " + marker + origin + ":" + digest,
+          "command": command + " " + marker + origin + ":" + digest,
           "timeout": 2, "statusMessage": label,
         ]
       ]
