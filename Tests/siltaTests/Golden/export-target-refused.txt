@@ -1,0 +1,2 @@
+error: <scratch>/work/notes/acme is not a silta export: it holds README.md. Export replaces only a previous export, so it changed nothing. [conflict]
+ask human: silta export --to <empty or export directory>

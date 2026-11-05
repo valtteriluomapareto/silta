@@ -1,0 +1,2 @@
+{"uid": "01HZAPRV000000000000000009", "actor": "agent:codex:acme", "command": "silta task triage --accept AC-10", "words": "yes, accept it", "created_at": "2023-11-14T22:19:00.000Z"}
+{"uid": "01HZAPRV000000000000000001", "actor": "agent:codex:acme", "command": "silta task start AC-2 --steal", "words": "take it over", "created_at": "2023-11-14T22:26:00.000Z"}

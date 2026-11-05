@@ -1273,9 +1273,55 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     workspace.yaml       # settings, repos (slug, remote), apps, envs, services, edges, topics+aliases, sources
     tasks/AC-12.md       # frontmatter + Description / Plan / Acceptance / Result
     tasks/AC-12.jsonl    # events, plan revisions, comments, review requests
-    docs/<slug>.md, docs/<slug>.jsonl
+    docs/<slug>.md, docs/<slug>.jsonl   # (M2)
     links.jsonl, alias_decisions.jsonl, approvals.jsonl
   ```
+
+  **Format 1** (the contract restore reads):
+  - **Values.** Every value is a double-quoted string, integers in decimal; a NULL
+    column is left out. Only `"`, `\`, controls (U+0000–U+001F, U+007F–U+009F),
+    U+2028, U+2029, U+FEFF, U+FFFE and U+FFFF are escaped: `\"`, `\\`, `\n`, `\r`,
+    `\t`, else `\uXXXX`. So a row is at once a JSON object and a YAML flow mapping,
+    `{"key": "value", …}` with `", "` and `": "` separators. JSON-array columns and
+    `settings` are written as their stored text.
+  - **Keys and references.** Keys are the column names, in schema order, `uid`
+    first. A foreign key is written as its target's `uid` under the column name
+    without `_id` (`repo`, `app`, `parent`, `thread`, `topic`, `from_app`, `to_app`,
+    `to_service`). Integer ids and `workspace_id` are never written; the file implies
+    the workspace or the task.
+  - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), so
+    the bytes don't depend on integer ids. Files in byte order of their path. Every
+    file ends with a newline, and every listed file is always present: a file with no
+    rows is empty.
+  - **`workspace.yaml`:** a `workspace:` row (`uid`, `slug`, `name`, `task_prefix`,
+    `settings`, `next_task_seq`), then the sections `repos`, `apps`, `environments`,
+    `services`, `edges`, `topics`, `topic_aliases` and `sources`, each `<name>:`
+    followed by `  - <row>` lines, or `<name>: []`.
+  - **`tasks/<ref>.md`:** `---`, one `<key>: "<value>"` line per task column (`ref`
+    first, then `uid` and schema order, without the four bodies), `---`, then
+    `## Description`, `## Plan`, `## Acceptance`, and `## Result` when the result is
+    not NULL. Each body sits between two fence lines of `~`, longer than any run of
+    `~` in the task's bodies and at least three.
+  - **`tasks/<ref>.jsonl`:** one row per line, `table` first: `task_plan_rev`, then
+    `task_event`, `comment` and `review_request` rows.
+  - **`links.jsonl`:** `from` and `to` are the uids of the linked rows; a link to a
+    plan revision names the task's uid in `to` and the revision in `to_rev`.
+  - **`approvals.jsonl`:** the approval rows whose workspace is this one. Approvals
+    with no workspace aren't exported.
+  - **`manifest.json`:** `format`, `schema` (the last applied migration),
+    `workspace`, `counts` (rows per table) and `files` (`path` and `sha256` of every
+    other file), written by the same emitter, one entry per line.
+  - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
+    paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq`.
+  - **Refusals, with nothing written:** a database with migrations this binary
+    doesn't know; a workspace with docs, until docs export ships with docs (M2).
+  - **Target.** `--to` defaults to `$SILTA_HOME/exports`. Export replaces
+    `<root>/<workspace>/` only when it is absent or a previous export, holding
+    exactly the files its manifest lists (`.DS_Store` aside); anything else is
+    refused for the human to decide. A root inside a registered repo is refused, so
+    workspace data never lands in a code repo. The new tree is staged next to the
+    old one and swapped in, so a reader sees one tree or the other, never a mix. The
+    tree is owned by export: edits to it are overwritten by the next export.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace.
   - It checks the manifest checksums first and refuses partial or tampered trees.
@@ -1438,7 +1484,7 @@ silta inbox [--for <actor>|me] [--all] | inbox take <id>   [M1; take M2]
 silta doc new|ls|show|edit|propose|accept|reject|verify|archive …   [M2]
 
 # maintenance
-silta export [--commit] | restore <dir> [--dry-run] | backup     [M1]
+silta export [--to <root>] [--commit] | restore <dir> [--dry-run] | backup     [M1]
 silta index [--rebuild] | verify [--fix-tasks]   [M3]
 silta import --from dex|beads|backlog-md <path>  [M4]
 silta open [AC-12]                               [M5] open Silta.app

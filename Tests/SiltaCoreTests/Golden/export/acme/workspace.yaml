@@ -1,0 +1,21 @@
+workspace: {"uid": "01HZACME00000000000000WS01", "slug": "acme", "name": "Acme", "task_prefix": "AC", "settings": "{\"proposals\":\"ask\"}", "next_task_seq": "11"}
+repos:
+  - {"uid": "01HZREPO000000000000000009", "slug": "platform", "remote_url": "git@example.com:acme/platform.git", "default_ref": "master"}
+  - {"uid": "01HZREPO000000000000000001", "slug": "notes", "remote_url": "git@example.com:acme/notes.git", "default_ref": "main"}
+apps:
+  - {"uid": "01HZAPP0000000000000000009", "slug": "portal", "previous_slugs": "[\"web\"]", "name": "Acme Portal", "repo": "01HZREPO000000000000000009", "ref": "portal", "prod_ref": "portal-prod", "subpath": "src/Portal", "is_primary": "0", "stack": "dotnet", "summary": "Customer portal", "lifecycle": "active"}
+  - {"uid": "01HZAPP0000000000000000001", "slug": "api", "previous_slugs": "[]", "name": "Acme API", "repo": "01HZREPO000000000000000009", "ref": "api", "prod_ref": "api-prod", "subpath": "src/Api", "is_primary": "1", "stack": "dotnet", "summary": "Public API", "lifecycle": "legacy"}
+environments:
+  - {"uid": "01HZENV0000000000000000001", "app": "01HZAPP0000000000000000009", "name": "test", "url": "https://test.example.com", "deploy": "merge to test", "notes": "Reset nightly"}
+services:
+  - {"uid": "01HZSVC0000000000000000001", "slug": "mailer", "name": "Mailer", "summary": "Sends mail", "secrets_location": "1Password: Acme/Mailer"}
+edges:
+  - {"uid": "01HZEDGE000000000000000009", "from_app": "01HZAPP0000000000000000009", "to_service": "01HZSVC0000000000000000001", "kind": "calls", "summary": "Sends receipts", "code_refs": "[\"portal:src/Mail.cs\"]"}
+  - {"uid": "01HZEDGE000000000000000001", "from_app": "01HZAPP0000000000000000009", "to_app": "01HZAPP0000000000000000001", "kind": "reads", "summary": "Reads orders", "code_refs": "[]"}
+topics:
+  - {"uid": "01HZTOPC000000000000000001", "slug": "reports", "previous_slugs": "[\"raports\"]", "name": "Reports", "summary": "Monthly reports", "status": "active"}
+topic_aliases:
+  - {"topic": "01HZTOPC000000000000000001", "alias": "raportit"}
+  - {"topic": "01HZTOPC000000000000000001", "alias": "lomakkeet"}
+sources:
+  - {"uid": "01HZSRC0000000000000000001", "kind": "repo-docs", "root": "docs", "include": "[\"**/*.md\"]", "exclude": "[\"**/PEOPLE.md\"]", "repo": "01HZREPO000000000000000001"}
