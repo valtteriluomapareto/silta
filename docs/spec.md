@@ -1878,7 +1878,7 @@ steps, questions, handoffs and results.
 | **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the slice's task by the issue's `url:` link in `silta task ls --proposed --promoted --archived --json` (imported tasks are proposals until the human triages them, promoted tasks are hidden otherwise, and closed tasks archive after 14 days) and runs `silta task start <ref>`; a `proposed` task first needs the human's `task triage --accept`. Only if no task links the issue, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, ticking each step as it finishes, and runs `task submit <ref>` when its PR is open for review. The PR description ends with the draft result and its `Friction:` line. Whoever merges the PR pulls `main` and finishes the task from the main checkout with `task done <ref> --sha <squash commit> -F -` and a heredoc, never a result file in the repo, then posts the result on the issue and closes it (D41). |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
 | **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
-| **DF3: a real second workspace** | M1 done | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
+| **DF3: a real second workspace** | S13 and S11's inbox ([DF3 plan](plans/df3-real-workspace.md)) | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
 
 **Rules:**
 - **Tasks link their issue rather than being promoted.** A promoted task becomes
@@ -1935,10 +1935,10 @@ steps, questions, handoffs and results.
     `dogfood`), changes to the `silta guide` text, or nothing.
   - This is the earliest source of agent-experience findings, before the M4 evals.
 
-**First real use after M1 (DF3):** an agent runs `silta init --scan <projects dir>`,
-fills in the YAML with the human (Appendix A shows the shape) and applies it with
-`ws edit -F --approved`. Open items from meeting notes become `todo`
-tasks with `source` links.
+**First real use (DF3):** the [DF3 plan](plans/df3-real-workspace.md) covers
+onboarding with a setup prompt, private measurement and the decisions at the end.
+Open items from meeting notes becoming `todo` tasks with `source` links waits for
+notes indexing (M3).
 
 ## 23. Open questions
 
