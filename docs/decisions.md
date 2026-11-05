@@ -396,6 +396,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
       `restore`. `ws edit` is human-only under every setting, so every change is
       approved and recorded (D38), and settings can't loosen themselves. S14
       decides whether `restore` is human-only too.
+      - ↳ update (2026-11-05, S14): `restore` is human-only except `--dry-run`, and
+        refuses settings `ws edit` wouldn't accept. Its dry run shows each changed
+        setting, old and new, so the human approves the change knowingly.
     - Never from environment variables: an agent can set those.
     - Values are words, not booleans: YAML 1.1 reads `on`, `off`, `yes` and `no` as
       booleans, and validation rejects them with a hint.

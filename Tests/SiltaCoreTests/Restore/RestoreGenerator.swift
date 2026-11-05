@@ -73,16 +73,16 @@ struct RestoreGenerator {
         comments.append(db.lastInsertedRowID)
       }
     }
-    // The first generated task's parent is created after it, so its id is higher.
+    // The first generated task's parent is created after it, with a higher id and seq.
     try db.execute(
       sql: """
         INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
-        VALUES(?,1,19,'Later parent','todo','human:acme','2023-11-15T00:04:00.000Z',
+        VALUES(?,1,40,'Later parent','todo','human:acme','2023-11-15T00:04:00.000Z',
           '2023-11-15T00:04:00.000Z')
         """, arguments: [uid("P")])
     let parent = db.lastInsertedRowID
     try db.execute(sql: "UPDATE task SET parent_id=? WHERE id=?", arguments: [parent, tasks[0]])
-    try db.execute(sql: "UPDATE seq_counter SET next=30 WHERE scope='task:1'")
+    try db.execute(sql: "UPDATE seq_counter SET next=41 WHERE scope='task:1'")
     let ends: [(String, Int64?)] = [
       ("task", tasks[next(tasks.count)]), ("comment", comments[next(comments.count)]),
       ("task_plan_rev", revisions[next(revisions.count)]), ("app", 1), ("topic", 1),
