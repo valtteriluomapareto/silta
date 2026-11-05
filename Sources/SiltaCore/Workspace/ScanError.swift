@@ -1,4 +1,4 @@
-package import Foundation
+import Foundation
 
 /// A scan cannot name the workspace it would create, or cannot bind a clone's path.
 package enum ScanError: CodedError, Equatable {
