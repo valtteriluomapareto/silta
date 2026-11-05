@@ -1450,8 +1450,9 @@ chosen `--slug` and `--prefix` keep their
 case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
 starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
 (`AC-1`). A repo's slug is its directory name normalized — lowercased, other characters
-to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. The
-DF3 onboarding scans only the chosen clones:
+to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. A clone named `none`
+is stored as `none-repo`; taking that name from a clone the workspace still binds is a
+conflict that names both paths. The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 
 ## 17. Storage, concurrency, technology
@@ -2054,9 +2055,10 @@ repo `my-projects`. That slug is only an identifier: the real path is stored as 
 machine-local repo path, so nothing on disk is renamed and worktrees and path aliases
 resolve to their canonical main clone as they are. Two directories that normalize to one
 slug are a duplicate, checked on the normalized names before any rename. A clone named
-`none`, the word that means non-code work, is stored as `none-repo`, or the next free
-`none-repo-N` when another clone in the scan normalizes to that name; the same clone keeps
-its stored name on every full or partial rescan. A task prefix another workspace holds, or
+`none`, the word that means non-code work, is always stored as `none-repo`, so a clone
+that moved keeps that name when only its new path is rescanned. A scan that finds two
+clones that would take `none-repo`, or one that would take the name from a clone the
+workspace still binds, is refused with both paths and rewrites nothing. A task prefix another workspace holds, or
 a clone path another workspace already binds, is a conflict that names the holder and a
 command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
 or master provides a default app when its ref is not already represented.

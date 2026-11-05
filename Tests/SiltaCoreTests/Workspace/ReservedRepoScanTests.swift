@@ -58,6 +58,10 @@ struct ReservedRepoScanTests {
           identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
       }
       let error = try #require(refusal)
+      #expect(
+        error as? ScanError
+          == .reservedRepoBound(path: hiddenPath.path, bound: literalPath.path, workspace: "work")
+      )
       #expect(error.message.contains(hiddenPath.path))
       #expect(error.message.contains(literalPath.path))
       #expect(error.code == .conflict)

@@ -21,11 +21,27 @@ package struct ScanChoice: Equatable, Sendable {
 
   package static let none = ScanChoice()
 
-  /// A supplied value a `next` must keep. It stays bare when it is a valid
-  /// identifier and is shell-quoted otherwise, so an unusable value reaches its own
-  /// validation refusal instead of being dropped.
-  static func carried(_ value: String?) -> String? {
-    value.map { WorkspaceConfig.isValidIdentifier($0) ? $0 : shellWord($0) }
+  /// A supplied value a `next` must keep, rendered with its option. It stays bare when
+  /// it is a valid identifier and is shell-quoted otherwise, so an unusable value
+  /// reaches its own validation refusal instead of being dropped. A value starting
+  /// with `-` joins its option with `=`, so the parser reads it as a value rather than
+  /// another option.
+  static func carried(_ value: String?, option: String) -> String? {
+    value.map { value in
+      guard !WorkspaceConfig.isValidIdentifier(value) else { return "\(option) \(value)" }
+      return value.hasPrefix("-")
+        ? "\(option)=\(shellWord(value))" : "\(option) \(shellWord(value))"
+    }
+  }
+
+  /// The supplied `--slug`, if any, as a `next` keeps it.
+  static func slug(_ choice: ScanChoice) -> String? {
+    carried(choice.slug, option: "--slug")
+  }
+
+  /// The supplied `--prefix`, if any, as a `next` keeps it.
+  static func prefix(_ choice: ScanChoice) -> String? {
+    carried(choice.prefix, option: "--prefix")
   }
 }
 
@@ -54,10 +70,14 @@ package enum ScanError: CodedError, Equatable {
   /// Another workspace already binds the clone's path.
   case repoPathTaken(repo: String, path: String, workspace: String)
 
+  /// A `none` clone always takes `none-repo`, and the workspace binds that name to a
+  /// clone that still exists at `bound`.
+  case reservedRepoBound(path: String, bound: String, workspace: String)
+
   package var code: ErrorCode {
     switch self {
     case .invalidSlug, .invalidPrefix: .invalid
-    case .slugExists, .prefixTaken, .repoPathTaken: .conflict
+    case .slugExists, .prefixTaken, .repoPathTaken, .reservedRepoBound: .conflict
     }
   }
 
@@ -100,6 +120,11 @@ package enum ScanError: CodedError, Equatable {
       return "Repo \(repo.debugDescription) is already registered to workspace "
         + "\(workspace.debugDescription); scan a clone that belongs to this workspace, or rescan "
         + "the one that holds it."
+    case .reservedRepoBound(let path, let bound, let workspace):
+      return "Clone at \(path.debugDescription) would take repo \(TaskDraft.noneApp)-repo, but "
+        + "workspace \(workspace.debugDescription) binds that name to \(bound.debugDescription); "
+        + "scan the clone the workspace holds, or remove that repo in ws edit before scanning "
+        + "this one."
     }
   }
 
@@ -108,26 +133,26 @@ package enum ScanError: CodedError, Equatable {
   package var next: [String] {
     switch self {
     case .invalidSlug(_, _, _, let roots, let choice):
-      return [command(roots: roots, slug: "<slug>", prefix: ScanChoice.carried(choice.prefix))]
+      return [command(roots: roots, "--slug <slug>", ScanChoice.prefix(choice))]
     case .invalidPrefix(_, _, let roots, let choice):
-      return [command(roots: roots, slug: ScanChoice.carried(choice.slug), prefix: "<prefix>")]
+      return [command(roots: roots, ScanChoice.slug(choice), "--prefix <prefix>")]
     case .slugExists(_, let chosen, let workspace, let roots, let choice):
-      let another = command(
-        roots: roots, slug: "<another-slug>", prefix: ScanChoice.carried(choice.prefix))
+      let another = command(roots: roots, "--slug <another-slug>", ScanChoice.prefix(choice))
       let rescan = "silta init --scan \(roots.scanArguments) --ws \(shellWord(workspace))"
       return chosen ? [another, rescan] : [rescan, another]
     case .prefixTaken(_, _, _, let roots, let choice):
-      return [command(roots: roots, slug: ScanChoice.carried(choice.slug), prefix: "<prefix>")]
+      return [command(roots: roots, ScanChoice.slug(choice), "--prefix <prefix>")]
     case .repoPathTaken(_, let path, let workspace):
       return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(path))"]
+    case .reservedRepoBound(_, let bound, let workspace):
+      return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(bound))"]
     }
   }
 
-  private func command(roots: [String], slug: String?, prefix: String?) -> String {
-    var words = ["silta init --scan \(roots.scanArguments)"]
-    if let slug { words.append("--slug \(slug)") }
-    if let prefix { words.append("--prefix \(prefix)") }
-    return words.joined(separator: " ")
+  /// A scan command followed by the naming options the caller already gave.
+  private func command(roots: [String], _ options: String?...) -> String {
+    (["silta init --scan \(roots.scanArguments)"] + options.compactMap { $0 })
+      .joined(separator: " ")
   }
 }
 
