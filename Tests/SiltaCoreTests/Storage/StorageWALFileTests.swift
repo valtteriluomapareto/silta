@@ -34,7 +34,7 @@ struct StorageWALFileTests {
         atPath: scratch.appending(path: "backups").path)
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 1)
       try Self.removeWALFiles(store)
-      #expect(throws: StorageError.unavailable) {
+      #expect(throws: StorageError.accessDenied) {
         try store.read { db in try db.execute(sql: "DELETE FROM workspace") }
       }
       #expect(try Data(contentsOf: URL(filePath: store.path)) == before)
@@ -51,7 +51,7 @@ struct StorageWALFileTests {
       let store = StorageSchemaTests.store(scratch)
       try Self.removeWALFiles(store)
       try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: store.path)
-      #expect(throws: StorageError.unavailable) { try store.read { _ in () } }
+      #expect(throws: StorageError.accessDenied) { try store.read { _ in () } }
       #expect(!FileManager.default.fileExists(atPath: store.path + "-shm"))
       #expect(!FileManager.default.fileExists(atPath: store.path + "-wal"))
     }
@@ -67,7 +67,7 @@ struct StorageWALFileTests {
         try? FileManager.default.setAttributes(
           [.posixPermissions: 0o700], ofItemAtPath: scratch.path)  // restores scratch permissions
       }
-      #expect(throws: StorageError.unavailable) { try store.read { _ in () } }
+      #expect(throws: StorageError.accessDenied) { try store.read { _ in () } }
       #expect(!FileManager.default.fileExists(atPath: store.path + "-shm"))
     }
   }

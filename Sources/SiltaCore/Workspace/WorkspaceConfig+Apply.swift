@@ -20,7 +20,9 @@ extension WorkspaceConfig {
     let bytes = try JSONSerialization.data(
       withJSONObject: value,
       options: [.sortedKeys, .fragmentsAllowed, .withoutEscapingSlashes])
-    guard let result = String(data: bytes, encoding: .utf8) else { throw StorageError.unavailable }
+    guard let result = String(data: bytes, encoding: .utf8) else {
+      throw StorageError.internalMisuse
+    }
     return result
   }
 }
