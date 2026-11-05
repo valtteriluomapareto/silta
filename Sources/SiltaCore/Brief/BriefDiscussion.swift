@@ -45,11 +45,13 @@ struct BriefDiscussion {
     }
     guard !inbox.items.isEmpty else { return (task, []) }
     let count = inbox.items.count
+    let above = current.map { current in inbox.items.filter { $0.task == current.ref }.count } ?? 0
     var sections = [
       BriefSection(
         id: "inbox",
         text:
-          "inbox: \(count) \(count == 1 ? "item" : "items") for \(caller) (scope: \(inbox.scope))\n"
+          "inbox: \(count) \(count == 1 ? "item" : "items") for \(caller) (scope: \(inbox.scope)"
+          + (above == 0 ? "" : ", \(above) on this task") + ")\n"
       )
     ]
     sections += inbox.items.filter { $0.task != current?.ref }.prefix(Self.items).map {
@@ -71,10 +73,16 @@ struct BriefDiscussion {
 
   private func render(_ item: InboxItem, emitted: inout Set<String>) -> String {
     let kind = item.postKind == item.kind || item.kind != "discussion" ? "" : " (\(item.postKind))"
+    let question = item.kind == "answer" ? item.replyTo.map { " to " + $0 } ?? "" : ""
     let masked = SecretGuard.redacted(item.body).trimmingCharacters(in: .newlines)
-    let body = masked.count > Self.excerpt ? String(masked.prefix(Self.excerpt - 1)) + "…" : masked
-    return "\(item.kind) \(item.ref)\(kind) on \(item.task) by \(TaskError.shown(item.author)):\n"
-      + Self.quoted(body)
+    let cut = masked.count > Self.excerpt
+    let body = cut ? String(masked.prefix(Self.excerpt - 1)) + "…" : masked
+    let header = "\(item.kind) \(item.ref)\(kind)\(question) on \(item.task)"
+    let read = "\(command) task show \(shellWord(item.task)) --timeline"
+    let marker = item.next.contains(read) ? "(trimmed)\n" : "(trimmed; \(read))\n"
+    return header + " by \(TaskError.shown(item.author)):\n" + Self.quoted(body)
+      + (cut ? marker : "")
+      + (item.kind == "discussion" ? "clears on your next write to \(item.task)\n" : "")
       + item.next.filter { emitted.insert($0).inserted }.map { "next: " + $0 + "\n" }.joined()
   }
 

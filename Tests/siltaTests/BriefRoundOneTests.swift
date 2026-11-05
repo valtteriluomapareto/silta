@@ -106,11 +106,11 @@ extension BriefCommandTests {
             WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+4 FROM n WHERE x<20000)
             INSERT INTO comment(uid,task_id,seq,kind,body_md,mentions,actor,resolved_at,
               resolved_by,created_at)
-            SELECT 'bulk-q-'||x,task.id,1,'question',?,'["agent:codex:acme"]','human:acme',
-              '2023-11-14T21:00:00.000Z','human:acme','2023-11-14T20:00:00.000Z'
+            SELECT 'bulk-q-'||x,task.id,1,'question',?,'["human:acme"]','agent:codex:other',
+              NULL,NULL,'2023-11-14T20:00:00.000Z'
             FROM n JOIN task ON task.seq=n.x;
             INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,mentions,actor,created_at)
-            SELECT 'bulk-a-'||task_id,task_id,2,id,'answer',body_md,'[]','agent:codex:acme',
+            SELECT 'bulk-a-'||task_id,task_id,2,id,'answer',body_md,'[]','human:acme',
               '2023-11-14T20:30:00.000Z'
             FROM comment WHERE uid LIKE 'bulk-q-%';
             """,

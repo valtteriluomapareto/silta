@@ -90,6 +90,19 @@ extension BriefCommandTests {
       environment: ["SILTA_ACTOR": actor, "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
   }
 
+  /// A hook run that finished inside its deadline. A loaded machine can make one run time
+  /// out silently, so this retries twice; three silent timeouts fail the test.
+  func completedHook(_ flags: [String], _ repo: URL, _ scratch: URL) throws -> CLIResult {
+    var result = CLIResult(termination: .exit(0), stdout: "", stderr: "")
+    for _ in 0..<3 {
+      let before = try hookTimeoutCount(scratch)
+      result = try run(flags + ["--hook"], repo, scratch)
+      if try hookTimeoutCount(scratch) == before { return result }
+    }
+    Issue.record("Every hook run timed out")
+    return result
+  }
+
   @Test func discussionGoldenShowsHandoffCallerItemsAndInbox() throws {
     try withScratchDirectory { scratch in
       let repo = try discussionFixture(scratch)
@@ -110,9 +123,34 @@ extension BriefCommandTests {
     }
   }
 
+  /// Adds a resolved and a deleted question, and a second post on the claimed AC-3.
+  func extendDiscussion(_ scratch: URL) throws {
+    let old = "agent:codex:old"
+    try comment(
+      2, 8, Post("question", "Resolved?", by: old, at: "21:06:00", resolved: true), scratch)
+    try comment(2, 9, Post("question", "Deleted?", by: old, at: "21:07:00"), scratch)
+    try comment(3, 2, Post("comment", "Pushed again.", by: "human:acme", at: "21:08:00"), scratch)
+    try store(scratch).write {
+      try $0.database.execute(
+        sql: "UPDATE comment SET deleted_at='2023-11-14T21:10:00.000Z' WHERE uid='acme-c-2-9'")
+    }
+  }
+
   @Test func inboxAttentionIsPerCaller() throws {
     try withScratchDirectory { scratch in
       let repo = try discussionFixture(scratch)
+      try extendDiscussion(scratch)
+      for actor in ["agent:codex:acme", "agent:codex:old", "agent:codex:other"] {
+        let inbox = try SiltaBinary.run(
+          ["--ws", "acme", "inbox", "--all", "--json"], in: scratch, cwd: repo,
+          environment: ["SILTA_ACTOR": actor, "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
+        let items = try #require(fixture.data(inbox)["items"] as? [[String: Any]])
+        let brief = try run(as: actor, ["--app", "api"], repo, scratch).stdout
+        #expect(
+          items.isEmpty
+            ? !brief.contains("inbox: ")
+            : brief.contains("inbox: \(items.count) item"), "\(actor)")
+      }
       let other = try run(
         as: "agent:codex:other", ["--task", "AC-2", "--app", "api"], repo, scratch)
       #expect(other.termination == .exit(0))
@@ -124,19 +162,27 @@ extension BriefCommandTests {
       let asker = try run(as: "agent:codex:old", ["--task", "AC-2", "--app", "api"], repo, scratch)
       #expect(
         asker.stdout.contains(
-          "answer AC-2/4 on AC-2 by human:acme:\n> Yes.\n"
+          "answer AC-2/4 to AC-2/3 on AC-2 by human:acme:\n> Yes.\n"
             + "next: silta --ws 'acme' comment accept 'AC-2/4'\n"))
-      #expect(asker.stdout.contains("inbox: 1 item for agent:codex:old (scope: discussion)\n"))
+      #expect(
+        asker.stdout.contains(
+          "inbox: 1 item for agent:codex:old (scope: discussion, 1 on this task)\n"))
       #expect(!asker.stdout.contains("AC-1/1"))
       #expect(!asker.stdout.contains("question AC-2/2"))
       let noTask = try run(["--app", "api"], repo, scratch)
       #expect(noTask.stdout.contains("question AC-2/2 on AC-2 by agent:codex:old:"))
       #expect(!noTask.stdout.contains("handoff"))
-      let refs = ["AC-2/2", "AC-1/1", "AC-3/1"]
+      let refs = ["AC-2/2", "AC-1/1", "AC-3/1", "AC-3/2"]
       let text = try run(["--task", "AC-2", "--app", "api"], repo, scratch).stdout
       for ref in refs {
         #expect(text.components(separatedBy: " " + ref + " ").count == 2, "\(ref)")
       }
+      let read = "next: silta --ws 'acme' task show 'AC-3' --timeline\n"
+      #expect(text.components(separatedBy: read).count == 2)
+      #expect(
+        text.contains(
+          "discussion AC-3/2 (comment) on AC-3 by human:acme:\n> Pushed again.\n"
+            + "clears on your next write to AC-3\napp: api\n"))
     }
   }
 
@@ -166,24 +212,35 @@ extension BriefCommandTests {
   @Test func handoffIsMaskedBeforeTrimmingAndCappedByBudget() throws {
     try withScratchDirectory { scratch in
       let repo = try discussionFixture(scratch)
+      // A fixed-length token: a cut prefix of it matches no secret rule.
+      let token = "ghp_AcmeToken" + String(repeating: "x", count: 27)
       let body =
-        String(repeating: "Acme state. ", count: 29) + "Pwd=acme-secret-value\n"
+        String(repeating: "Acme state. ", count: 29) + token + "\n"
         + String(repeating: "Acme next. ", count: 700)
       try store(scratch).write {
         try $0.database.execute(
-          sql: "UPDATE comment SET body_md=? WHERE uid='acme-c-2-1'", arguments: [body])
+          sql: "UPDATE comment SET body_md=? WHERE uid IN ('acme-c-2-1','acme-c-1-1')",
+          arguments: [body])
       }
-      for flags in [[], ["--short"], ["--budget", "5000"]] {
-        let result = try run(["--task", "AC-2", "--app", "api"] + flags, repo, scratch)
+      for flags in [[], ["--short"], ["--hook"], ["--budget", "5000"]] {
+        let task = ["--task", "AC-2", "--app", "api"]
+        let result =
+          try flags == ["--hook"]
+          ? completedHook(task, repo, scratch) : run(task + flags, repo, scratch)
         #expect(result.stdout.contains("(handoff trimmed; silta --ws 'acme' task show AC-2)\n"))
-        #expect(!result.stdout.contains("acme-se"))
+        #expect(!result.stdout.contains("AcmeTok"))
         #expect(result.stdout.contains("plan (revision 0):"))
         let handoff = try #require(
           result.stdout.components(separatedBy: "handoff AC-2/1").last?
             .components(separatedBy: "(handoff trimmed").first)
-        let cap = flags.isEmpty ? 1500 : flags == ["--short"] ? 480 : 3000
+        let cap = flags.isEmpty ? 1500 : flags.count == 1 ? 480 : 3000
         #expect(handoff.count <= cap && handoff.count > cap - 120, "\(flags): \(handoff.count)")
       }
+      let item = try run(["--task", "AC-2", "--app", "api", "--budget", "5000"], repo, scratch)
+      #expect(
+        item.stdout.contains(
+          "question AC-1/1 on AC-1 by human:acme:\n> " + String(body.prefix(199))
+            + "…\n(trimmed; silta --ws 'acme' task show 'AC-1' --timeline)\n"))
     }
   }
 
@@ -210,11 +267,20 @@ extension BriefCommandTests {
       #expect(
         short.stdout.hasSuffix(
           " | silta --ws 'acme' task show AC-2 | silta --ws 'acme' inbox\n"))
-      #expect(short.stdout.components(separatedBy: "\nquestion AC-2/").count <= 4)
-      let before = try hookTimeoutCount(scratch)
-      let hook = try run(["--task", "AC-2", "--app", "api", "--hook"], repo, scratch)
-      #expect(hook.termination == .exit(0))
-      if try hookTimeoutCount(scratch) == before { #expect(hook == short) }
+      #expect(short.stdout.components(separatedBy: "\nquestion AC-2/").count == 4)
+      #expect(try completedHook(["--task", "AC-2", "--app", "api"], repo, scratch) == short)
+      for seq in 2..<7 {
+        try comment(
+          1, seq,
+          Post(
+            "question", "Acme other \(seq)?", by: "human:acme", to: ["agent:codex:acme"],
+            at: "21:3\(seq):00"),
+          scratch)
+      }
+      let wide = try run(["--task", "AC-2", "--app", "api", "--budget", "10000"], repo, scratch)
+      #expect(wide.stdout.components(separatedBy: "\nquestion AC-2/").count == 4)
+      #expect(wide.stdout.components(separatedBy: "\nquestion AC-1/").count == 4)
+      #expect(wide.stdout.contains("inbox: 18 items for agent:codex:acme"))
       for budget in [1, 50, 100, 200, 400, 800, 2500] {
         let result = try run(
           ["--task", "AC-2", "--app", "api", "--budget", String(budget)], repo, scratch)
@@ -258,24 +324,21 @@ extension BriefCommandTests {
       try store(scratch).write {
         try $0.database.execute(
           sql: """
-            WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+1 FROM n WHERE x<10)
+            WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+1 FROM n WHERE x<9)
             INSERT INTO task(uid,workspace_id,seq,title,status,app_id,result_md,closed_at,
               created_by,created_at,updated_at)
             SELECT 'done-'||x,1,x,'Acme done','done',app.id,'Acme result '||x,
               '2023-11-14T20:00:0'||(x-5)||'.000Z','human:acme','',''
             FROM n,app WHERE app.slug='api';
-            UPDATE task SET closed_at='not a date' WHERE seq=10;
+            UPDATE task SET closed_at='not a date' WHERE seq=9;
             """)
       }
-      for flags in [[], ["--hook"]] {
-        let before = try hookTimeoutCount(scratch)
-        let result = try run(["--task", "AC-2", "--app", "api"] + flags, repo, scratch)
-        #expect(result.termination == .exit(0))
-        // A loaded machine can hit the hook deadline, which prints nothing by design.
-        if try hookTimeoutCount(scratch) > before { continue }
-        #expect(result.stdout.components(separatedBy: "\ndone: ").count == 6, "\(flags)")
-        #expect(!result.stdout.contains("done: AC-10"))
-        #expect(result.stdout.contains("done: AC-9 Acme result 9"))
+      let task = ["--task", "AC-2", "--app", "api"]
+      for result in [try run(task, repo, scratch), try completedHook(task, repo, scratch)] {
+        // Four readable rows leave room under the limit, so a visible unreadable row shows.
+        #expect(result.stdout.components(separatedBy: "\ndone: ").count == 5)
+        #expect(!result.stdout.contains("done: AC-9"))
+        #expect(result.stdout.contains("done: AC-8 Acme result 8"))
       }
       let json = try run(["--task", "AC-2", "--app", "api", "--json"], repo, scratch)
       #expect(json.stdout.contains("\"closed_at_unreadable\""))

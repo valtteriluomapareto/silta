@@ -12,12 +12,13 @@ questions: 2 open (1 answered)
 plan (revision 0):
 1 done
 2. [ ] Acme next
-inbox: 3 items for agent:codex:acme (scope: discussion)
+inbox: 3 items for agent:codex:acme (scope: discussion, 1 on this task)
 question AC-1/1 on AC-1 by human:acme:
 > Can you check the portal build?
 next: silta --ws 'acme' comment 'AC-1' --kind answer --reply-to 'AC-1/1' -F <file>
 discussion AC-3/1 (comment) on AC-3 by human:acme:
 > Rebased on main.
+clears on your next write to AC-3
 next: silta --ws 'acme' task show 'AC-3' --timeline
 app: api
 AGENTS.md: <repo>/AGENTS.md

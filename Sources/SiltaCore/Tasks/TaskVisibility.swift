@@ -44,7 +44,8 @@ struct TaskVisibility {
   }
 
   /// The instant of an in-range `YYYY-MM-DDTHH:MM:SS.mmmZ` timestamp, computed without a
-  /// formatter so archive checks over large backlogs stay cheap. Other text returns nil
+  /// formatter so archive checks over large backlogs stay cheap. Other text, including
+  /// years before 1600 where calendars may differ, returns nil
   /// and takes the lenient parser.
   static func canonicalInstant(_ text: String) -> Double? {
     var text = text
@@ -66,7 +67,7 @@ struct TaskVisibility {
     }
     guard let year = number(0..<4), let month = number(5..<7), let day = number(8..<10),
       let hour = number(11..<13), let minute = number(14..<16), let second = number(17..<19),
-      let millisecond = number(20..<23), year >= 1, (1...12).contains(month), hour < 24,
+      let millisecond = number(20..<23), year >= 1600, (1...12).contains(month), hour < 24,
       minute < 60, second < 60
     else { return nil }
     let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
@@ -85,7 +86,7 @@ struct TaskVisibility {
     ).timeIntervalSince1970
   }
 
-  /// Counts closed tasks in `scope` whose archive instant cannot be read; the visibility
+  /// Counts done tasks in `scope` whose archive instant cannot be read; the visibility
   /// predicate already leaves them out.
   static func unreadableDates(scope: String, arguments: StatementArguments, in db: Database)
     throws -> Int
@@ -94,7 +95,7 @@ struct TaskVisibility {
       db,
       sql: """
         SELECT count(*) FROM task LEFT JOIN app ON app.id=task.app_id
-          WHERE \(scope) AND \(localSQL) AND (\(archiveSQL))=-1
+          WHERE task.status='done' AND \(scope) AND \(localSQL) AND (\(archiveSQL))=-1
         """, arguments: arguments) ?? 0
   }
 

@@ -1192,13 +1192,15 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 3. **Inbox**: the caller's own attention, read in the brief's snapshot as
    `silta inbox` reads it (same categories, order and `next` commands, uncapped).
    Omitted when the caller has none. A header
-   `inbox: N items for <actor> (scope: <scope>)` counts every item, including those
-   shown under the current task; then at most three items not on the current task.
-   Each item is `<kind> <ref> on <task> by <author>:` (a claimed-task `discussion`
-   item adds its post kind), its body masked, cut to 200 characters and quoted, and
-   its `next:` lines; a command already printed in the brief is not repeated. When
-   the caller has any item, `more:` adds `silta --ws acme inbox`, which no trim
-   removes.
+   `inbox: N items for <actor> (scope: <scope>, M on this task)` counts every item and
+   those shown under the current task; then at most three items not on the current
+   task. Each item is `<kind> <ref> on <task> by <author>:` (an answer adds
+   `to <question ref>`, a claimed-task `discussion` item its post kind), its body
+   masked, cut to 200 characters and quoted, then a `(trimmed; … task show <task>
+   --timeline)` marker when cut, `clears on your next write to <task>` for a
+   discussion item, and its `next:` lines; a command an earlier discussion item
+   printed is not repeated. When the caller has any item, `more:` adds
+   `silta --ws acme inbox`, which no trim removes.
 4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
    the resolved worktree's repo root with its on-disk casing, including for subpath apps. The pointer does not
    claim the file exists.
@@ -1266,7 +1268,8 @@ Brief masks stored task-body secrets. Blockers include their follow-up date.
 
 Hook mode has a 1.5 s process deadline, including environment
 assembly, fails immediately on database contention and never populates `where_cache`.
-A strict, zero-leeway watchdog timer alone owns that deadline. The watchdog appends a best-effort body-free timeout record, then exits without running
+A strict, zero-leeway watchdog timer alone owns that deadline; output can follow it only
+by that timer's latency. The watchdog appends a best-effort body-free timeout record, then exits without running
 exit handlers. Timeout and completion have exclusive log/output ownership; completion
 cancels the watchdog explicitly before output. A child Git deadline is recorded as
 `hook_timeout` even when it finishes before the process deadline. Hook log appends are

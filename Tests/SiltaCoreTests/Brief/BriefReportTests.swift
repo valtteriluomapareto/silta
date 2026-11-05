@@ -47,6 +47,10 @@ extension BriefReportTests {
       let minimum = report.floor.count + report.footer.count + marker
       report.trim(tokens: budget)
       #expect(report.text.count <= max(budget * 4, minimum), "budget \(budget)")
+      // Once any plan text fits, the reserve must keep the whole report inside the budget.
+      if report.text.contains("plan (revision 0):") {
+        #expect(report.text.count <= budget * 4, "budget \(budget) with steps")
+      }
     }
     var complete = BriefReport(
       location: BriefLocation(location),
