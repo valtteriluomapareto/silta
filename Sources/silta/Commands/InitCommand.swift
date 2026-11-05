@@ -20,16 +20,42 @@ struct InitCommand: OutputCommand {
     help: "Scan directories to two child levels; rescans only refresh registered paths.")
   var scan: [String] = []
 
+  @Option(help: "Workspace slug for a new scan; defaults to the first directory's name.")
+  var slug: String?
+
+  @Option(help: "Task prefix for a new scan; defaults to the slug's first two letters, uppercased.")
+  var prefix: String?
+
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let env = context.environment
+    if !scan.isEmpty, global.ws != nil, slug != nil || prefix != nil {
+      throw UsageError.invalid(
+        message: "--slug and --prefix apply only to a new workspace; --ws rescans an existing one.",
+        command: "silta init")
+    }
+    if scan.isEmpty, slug != nil || prefix != nil {
+      throw UsageError.invalid(
+        message: "--slug and --prefix need --scan.", command: "silta init")
+    }
     let outcome: ScanOutcome?
     if scan.isEmpty {
       try env.db.initialize()
       outcome = nil
     } else {
-      outcome = try await RepositoryScan.scan(
-        scan.map { URL(filePath: $0) }, store: env.db,
-        git: env.git, identity: (env.ids, env.clock.now()), workspace: global.ws)
+      do {
+        outcome = try await RepositoryScan.scan(
+          scan.map { URL(filePath: $0) }, store: env.db,
+          git: env.git, identity: (env.ids, env.clock.now()), workspace: global.ws,
+          slug: slug, prefix: prefix)
+      } catch let error as ScanNamingError {
+        if case .slugExists(let existing) = error {
+          let directories = scan.map(shellWord).joined(separator: " ")
+          throw CommandFailure(
+            error: error,
+            next: ["silta init --scan \(directories) --ws \(shellWord(existing))"])
+        }
+        throw error
+      }
     }
     let workspace = outcome?.workspace
     let edit =
