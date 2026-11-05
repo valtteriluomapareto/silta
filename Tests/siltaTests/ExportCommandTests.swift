@@ -121,11 +121,25 @@ struct ExportCommandTests {
     }
   }
 
-  @Test func concurrentExportsOfOneWorkspaceBothSucceed() async throws {
+  /// Enough tasks that writing a tree takes a while, so unserialised exports of one
+  /// workspace would remove each other's staging directory.
+  @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
+  func concurrentExportsOfOneWorkspaceAllSucceed() async throws {
     try await withScratchDirectory { scratch in
       try Self.seed(scratch)
+      let queue = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
+      try await queue.write { db in
+        for seq in 2...400 {
+          try db.execute(
+            sql: """
+              INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
+              VALUES(?,1,?,'Acme work','todo','human:acme','2023-11-14T22:00:00.000Z',
+                '2023-11-14T22:00:00.000Z')
+              """, arguments: ["01HZLOAD\(seq)", seq])
+        }
+      }
       let results = try await withThrowingTaskGroup(of: CLIResult.self) { group in
-        for _ in 0..<4 {
+        for _ in 0..<8 {
           group.addTask {
             try SiltaBinary.run(["--ws", "acme", "export", "--to", "shared"], in: scratch)
           }
