@@ -107,7 +107,8 @@ struct ProposalCommandTests {
       let run = { (args: [String]) in
         try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.actor)
       }
-      #expect(try run(["task", "add", "Acme", "--start", "--app", "none"]).stdout == "AC-1 doing\n")
+      let root = try run(["task", "add", "Acme", "--start", "--app", "none"])
+      #expect(root.stdout == "AC-1 doing\n")
       let plain = try run(["task", "add", "Acme child", "--parent", "AC-1"])
       #expect(plain.termination == .exit(0) && plain.stdout == "AC-2 todo\n")
       #expect(plain.stderr.isEmpty)
