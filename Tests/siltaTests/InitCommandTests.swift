@@ -148,16 +148,14 @@ struct InitCommandTests {
       #expect(first.termination == .exit(0))
       let before = try SiltaBinary.run(["ws", "show", "work"], in: scratch)
       #expect(before.termination == .exit(0))
-      for flags in [["--slug", "work"], ["--prefix", "WK"]] {
-        let again = try SiltaBinary.run(
-          ["init", "--scan", fixtures.path] + flags + ["--json"], in: scratch)
-        #expect(again.termination == .exit(6))
-        #expect(again.stdout.contains("\"code\":\"conflict\""))
-        #expect(again.stdout.contains(fixtures.path))
-        #expect(again.stdout.contains("--ws"))
-        #expect(again.stdout.contains("work"))
-        #expect(try SiltaBinary.run(["ws", "show", "work"], in: scratch).stdout == before.stdout)
-      }
+      let again = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, "--slug", "work", "--json"], in: scratch)
+      #expect(again.termination == .exit(6))
+      #expect(again.stdout.contains("\"code\":\"conflict\""))
+      #expect(again.stdout.contains(fixtures.path))
+      #expect(again.stdout.contains("--ws"))
+      #expect(again.stdout.contains("work"))
+      #expect(try SiltaBinary.run(["ws", "show", "work"], in: scratch).stdout == before.stdout)
       let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
       #expect(list.stdout.components(separatedBy: "\"slug\":\"work\"").count == 2)
     }
@@ -167,8 +165,10 @@ struct InitCommandTests {
     try withScratchDirectory { scratch in
       let fixtures = try Self.fixtures(scratch)
       let result = try SiltaBinary.run(
-        ["init", "--scan", fixtures.path, "--ws", "work", "--slug", "work", "--prefix", "WK",
-         "--json"], in: scratch)
+        [
+          "init", "--scan", fixtures.path, "--ws", "work", "--slug", "work", "--prefix", "WK",
+          "--json",
+        ], in: scratch)
       #expect(result.termination == .exit(1))
       #expect(result.stdout.contains("\"code\":\"invalid\""))
       #expect(result.stdout.contains("--slug"))
@@ -176,6 +176,23 @@ struct InitCommandTests {
       #expect(result.stdout.contains("silta init --help"))
       let list = try SiltaBinary.run(["ws", "ls"], in: scratch)
       #expect(list.stdout.contains("No workspaces"))
+    }
+  }
+
+  @Test func prefixOnAnExistingDefaultWorkspaceIsRefused() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      let first = try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch)
+      #expect(first.termination == .exit(0))
+      let before = try SiltaBinary.run(["ws", "show", "acme"], in: scratch)
+      #expect(before.termination == .exit(0))
+      let again = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, "--prefix", "WK", "--json"], in: scratch)
+      #expect(again.termination == .exit(6))
+      #expect(again.stdout.contains("\"code\":\"conflict\""))
+      #expect(again.stdout.contains("--ws"))
+      #expect(again.stdout.contains("acme"))
+      #expect(try SiltaBinary.run(["ws", "show", "acme"], in: scratch).stdout == before.stdout)
     }
   }
 
