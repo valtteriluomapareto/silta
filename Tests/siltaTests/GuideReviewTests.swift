@@ -117,7 +117,7 @@ struct GuideReviewTests {
   @Test func referenceTableMatchesSpec() throws {
     withKnownIssue("SI-34/10–24: reviewed guide contract") {
       try withScratchDirectory { scratch in
-        let guide = try SiltaBinary.run(["guide", "refs"], in: scratch)
+        let guide = try SiltaBinary.run(["help", "refs"], in: scratch)
         let spec = try String(
           contentsOf: ScenarioRunner.repository.appending(path: "docs/spec.md"), encoding: .utf8)
         let section = try #require(spec.components(separatedBy: "### 5.1 Reference grammar").last)
