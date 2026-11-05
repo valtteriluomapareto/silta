@@ -218,6 +218,48 @@ struct GuideCommandTests {
     }
   }
 
+  @Test func referenceHelpHasUsableUsageAndVersion() throws {
+    try withScratchDirectory { scratch in
+      let help = try SiltaBinary.run(["help", "refs", "--help"], in: scratch)
+      withKnownIssue("SI-34/4: reference help must name its usable route") {
+        #expect(help.stdout.contains("USAGE: silta help refs"))
+      }
+      let version = try SiltaBinary.run(["--version"], in: scratch)
+      for args in [["help", "refs", "--version"], ["--version", "help", "refs"]] {
+        let actual = try SiltaBinary.run(args, in: scratch)
+        withKnownIssue("SI-34/4: reference help inherits the version contract") {
+          #expect(actual == version)
+        }
+      }
+    }
+  }
+
+  @Test func handoffStopsWithoutReclaiming() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      _ = try SiltaBinary.run(
+        ["task", "add", "Acme", "--start"], in: scratch, environment: TaskCommandTests.actor)
+      let guide = try SiltaBinary.run(["guide", "handoff"], in: scratch)
+      let script = try #require(
+        guide.stdout.components(separatedBy: "```sh\n").dropFirst().first?.components(
+          separatedBy: "```"
+        ).first
+      )
+      .replacingOccurrences(of: "AC-12", with: "AC-1")
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-ec", script], in: scratch,
+        environment: TaskCommandTests.actor.merging([
+          "PATH": try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
+        ]) { $1 })
+      #expect(result.termination == .exit(0))
+      let shown = try SiltaBinary.run(["task", "show", "AC-1", "--json"], in: scratch)
+      let task = try #require(try object(shown.stdout)["data"] as? [String: Any])
+      withKnownIssue("SI-34/5: stopping after handoff must leave the claim released") {
+        #expect(task["claimed_by"] == nil)
+      }
+    }
+  }
+
   private func shellQuoted(_ text: String) -> String {
     "'" + text.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
   }
