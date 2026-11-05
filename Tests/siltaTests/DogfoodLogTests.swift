@@ -297,7 +297,6 @@ extension DogfoodLogTests {
       (acme + ["code", "grep", "api", "build"], "acme"),
       (acme + ["code", "log", "api"], "acme"),
       (acme + ["code", "ls", "api"], "acme"),
-      (acme + ["export", "--to", scratch.appending(path: "exports").path], "acme"),
       (["where", "--path", scratch.appending(path: "clone").path], "acme"),
       (["ws", "show", "acme"], "acme"),
       (["ws", "edit", "beta", "-F", yaml.path, "--approved", "Rename Acme Beta"], "beta"),
@@ -308,7 +307,7 @@ extension DogfoodLogTests {
       (acme + ["inbox"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
-    ] + [(["guide"], nil)]
+    ] + [(["guide"], nil), (acme + ["export", "--to", "exports"], "acme")]
   }
 
   static func discussionCatalog() -> [(args: [String], workspace: String?)] {
