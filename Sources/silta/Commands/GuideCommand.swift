@@ -129,6 +129,9 @@ struct GuideCommand: OutputCommand {
         ask`.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \
+        A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not \
+        as a proposal, so it needs no --approved; submit, block and handoff release the \
+        claim. \
         When the human asked in this chat to add the task for later, pass their words as \
         --approved so it becomes todo without triage (D39); do not ask again.
         If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta \
@@ -137,8 +140,9 @@ struct GuideCommand: OutputCommand {
         question, TODO comment or file.
         When no answer can come, leave a question for @me listing pending commands, write a \
         handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved \
-        ideas in the handoff/result instead of that question. `inbox --for me` is not \
-        available in this version; relay known pending choices in one short message.
+        ideas in the handoff/result instead of that question. For "what needs me?", run \
+        `silta inbox --for me` and relay the displayed choices in one short message. \
+        Apply "the rest" only to proposals you showed; ask before running triage.
         """ + "\n"),
     Section(
       topic: "questions",

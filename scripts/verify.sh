@@ -25,14 +25,6 @@ scripts/run-guards.sh
 step "lint"
 scripts/lint-check.sh
 
-if [[ ! -f Package.swift ]]; then
-  step "build and test"
-  echo "no Package.swift yet; skipped"
-  echo
-  echo "verify ${mode}: passed (guards and lint only)"
-  exit 0
-fi
-
 SILTA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/silta-verify.XXXXXX")"
 export SILTA_HOME
 

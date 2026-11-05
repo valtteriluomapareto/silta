@@ -44,11 +44,11 @@ also needs `gh` 2.48 or later, for `gh api --slurp`.
      `silta --ws silta task plan <ref> --step 1 --done` and
      `silta --ws silta task drop <ref> -m "Setup check only."`.
 
-   Only after this works should a PR change the stage line in AGENTS.md to DF0.
+   Don't start slice work on a new machine until this check passes.
 
-Do not add `proposals` or `ask_about` to the workspace YAML until S11 and S13 ship
-those keys. The maintainer can choose them with the agent then. The initial import
-runs before that choice; it does not implement those policies itself.
+The workspace YAML sets no `proposals` setting (spec §8, D39), so the default
+applies. `ask_about` waits for S13. Add either only after the maintainer chooses it;
+`ws edit` is human-only. The import does not apply those policies itself.
 
 ## Work a slice
 
