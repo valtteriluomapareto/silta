@@ -15,82 +15,66 @@ extension TaskService {
     } else {
       actor = environment.actor
     }
-    let slug = try selected(), name = actor.description
-    let command = "silta --ws " + shellWord(slug)
+    let slug = try selected(), command = "silta --ws " + shellWord(slug)
     return try environment.db.read { db in
-      let workspaceID = try Self.workspaceID(slug, in: db)
-      let tasks = try Row.fetchAll(
-        db,
-        sql: Self.query + """
-          \nWHERE task.workspace_id=? AND task.external_ref IS NULL
-          AND EXISTS(SELECT 1 FROM comment WHERE task_id=task.id AND deleted_at IS NULL)
-          """, arguments: [workspaceID]
-      ).map { TaskDetails(row: $0) }
-      var attention: [(id: Int64, item: InboxItem)] = []
-      for task in tasks {
-        let posts = try Self.discussion(task, timeline: true, in: db)
-        let roots = Dictionary(
-          uniqueKeysWithValues: posts.filter { $0.replyTo == nil }.map { ($0.ref, $0) })
-        for post in posts where !post.deleted {
-          if let item = inboxItem(
-            post, root: roots[post.replyTo ?? post.ref], task: task, actor: actor, command: command)
-          {
-            attention.append((post.id, item))
-          }
-        }
+      let attention = try Self.attention(
+        for: actor, workspaceID: Self.workspaceID(slug, in: db), in: db)
+      let items = (all ? attention : Array(attention.prefix(12))).map {
+        inboxItem($0, actor: actor, command: command)
       }
-      attention.sort {
-        if $0.item.rank != $1.item.rank { return $0.item.rank < $1.item.rank }
-        if $0.item.createdAt != $1.item.createdAt { return $0.item.createdAt < $1.item.createdAt }
-        return $0.id < $1.id
-      }
-      let items = (all ? attention : Array(attention.prefix(12))).map(\.item)
       let remaining = attention.count - items.count
       return InboxResult(
-        actor: name, items: items, remaining: remaining,
-        more: remaining == 0 ? nil : command + " inbox --for " + shellWord(name) + " --all")
+        actor: actor.description, items: items, remaining: remaining,
+        more: remaining == 0
+          ? nil : command + " inbox --for " + shellWord(actor.description) + " --all")
     }
   }
 
-  private func inboxItem(
-    _ post: CommentDetails, root: CommentDetails?, task: TaskDetails, actor: ActorID,
-    command: String
-  ) -> InboxItem? {
-    let name = actor.description
-    let kind: String
+  private func inboxItem(_ attention: DiscussionAttention, actor: ActorID, command: String)
+    -> InboxItem
+  {
+    let post = attention.post, task = attention.task
+    let read = command + " task show " + shellWord(task.ref) + " --timeline"
     let next: [String]
-    if post.kind == "question", post.resolvedAt == nil, post.answered == false,
-      post.mentions.contains(name)
+    if attention.kind == "question",
+      environment.actor.isHuman || post.mentions.contains(environment.actor.description)
     {
-      kind = "question"
       next = [
         command + " comment " + shellWord(task.ref) + " --kind answer --reply-to "
-          + shellWord(post.ref) + " -F <file>",
-        command + " comment resolve " + shellWord(post.ref) + " -m <reason>",
+          + shellWord(post.ref) + " -F <file>"
       ]
-    } else if post.kind == "answer", !post.accepted, let root,
-      root.kind == "question", !root.deleted, root.resolvedAt == nil,
-      root.actor == name || task.claimedBy == name
+    } else if attention.kind == "answer", let question = attention.question,
+      Self.canAcceptAnswer(
+        post.actor, asker: question.actor, claimer: task.claimedBy,
+        caller: environment.actor.description)
     {
-      kind = "answer"
-      let canAccept =
-        root.actor == environment.actor.description
-        || task.claimedBy == environment.actor.description
-      next = [
-        canAccept
-          ? command + " comment accept " + shellWord(post.ref)
-          : command + " comment resolve " + shellWord(root.ref) + " -m <reason>"
-      ]
-    } else if !actor.isHuman, task.claimedBy == name, post.actor != name,
-      let boundary = task.claimedAt, post.createdAt > boundary
-    {
-      kind = "comment"
-      next = [command + " task show " + shellWord(task.ref) + " --timeline"]
+      next = [command + " comment accept " + shellWord(post.ref)]
+    } else if let confirmation = relayConfirmation(attention, actor: actor, command: command) {
+      next = [confirmation, read]
     } else {
-      return nil
+      next = [read]
     }
+    let relayers =
+      attention.kind == "question"
+      ? attention.answers.filter {
+        ActorID.parse($0.actor)?.isHuman == false && !post.mentions.contains($0.actor)
+      }.map(\.actor) : []
     return InboxItem(
-      kind: kind, ref: post.ref, task: task.ref, author: post.actor, body: post.body,
-      createdAt: post.createdAt, next: next)
+      kind: attention.kind, ref: post.ref, task: task.ref, author: post.actor, body: post.body,
+      createdAt: post.createdAt, next: next, postKind: post.kind, replyTo: post.replyTo,
+      relayedBy: relayers.isEmpty ? nil : Set(relayers).sorted())
+  }
+
+  private func relayConfirmation(
+    _ attention: DiscussionAttention, actor: ActorID, command: String
+  ) -> String? {
+    guard actor.isHuman, !environment.actor.isHuman, let question = attention.question,
+      question.mentions.contains(actor.description),
+      !question.mentions.contains(environment.actor.description),
+      let own = attention.answers.first(where: { $0.actor == environment.actor.description })
+    else { return nil }
+    return "ask human: Does " + own.ref + " relay your confirmed answer to " + question.ref
+      + "? Only if yes: " + command + " comment resolve " + shellWord(question.ref)
+      + " -m \"<confirmed answer>\""
   }
 }

@@ -1,5 +1,5 @@
 human:acme discussion attention
+Scope: discussion only; proposals, blockers and promoted attention are not included.
 AC-1/1 question on AC-1 by agent:codex:acme
 > Which API?
-next: silta --ws 'acme' comment 'AC-1' --kind answer --reply-to 'AC-1/1' -F <file>
-next: silta --ws 'acme' comment resolve 'AC-1/1' -m <reason>
+next: silta --ws 'acme' task show 'AC-1' --timeline

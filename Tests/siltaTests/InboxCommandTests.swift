@@ -32,14 +32,18 @@ struct InboxCommandTests {
       #expect(items.first?["kind"] as? String == "answer")
       #expect(items.first?["next"] as? [String] == ["silta --ws 'acme' comment accept 'AC-1/2'"])
       #expect(try run(["--ws", "acme", "comment", "accept", "AC-1/2"]).termination == .exit(0))
-      #expect(try run(args).stdout == "No discussion attention for human:acme.\n")
+      #expect(
+        try run(args).stdout == "No discussion attention for human:acme.\n"
+          + InboxCorrectionCommandTests.scope + "\n")
       _ = try run(["comment", "reopen", "AC-1/1"])
       #expect(
         try run(["--ws", "acme", "comment", "resolve", "AC-1/1", "-m", "Relayed v2 in chat."])
           .termination == .exit(0))
-      #expect(try run(args + ["--all"]).stdout == "No discussion attention for human:acme.\n")
+      #expect(
+        try run(args + ["--all"]).stdout == "No discussion attention for human:acme.\n"
+          + InboxCorrectionCommandTests.scope + "\n")
       let help = try run(["comment", "--help"])
-      #expect(help.stdout.contains("never supplies approval words"))
+      #expect(help.stdout.contains("docs/spec.md §8.1"))
     }
   }
 
@@ -86,10 +90,10 @@ struct InboxCommandTests {
       #expect(items.map { $0["ref"] as? String } == ["AC-1/1", "AC-1/2"])
       #expect(
         items.last?["next"] as? [String] == [
-          "silta --ws 'acme' comment resolve 'AC-1/1' -m <reason>"
+          "silta --ws 'acme' task show 'AC-1' --timeline"
         ])
       _ = try run(
-        ["--ws", "acme", "comment", "resolve", "AC-1/1", "-m", "Human confirmed v2 in chat."], other
+        ["--ws", "acme", "comment", "resolve", "AC-1/1", "-m", "Asker selected v2."], holder
       )
       let discussion = try run(["--ws", "acme", "inbox", "--json"], holder)
       let posts = try #require(

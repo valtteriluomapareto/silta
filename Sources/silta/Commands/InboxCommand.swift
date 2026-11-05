@@ -6,16 +6,17 @@ struct InboxCommand: OutputCommand {
     commandName: "inbox", abstract: "Read current discussion attention without marking it read.",
     discussion: "Discussion attention only: grouped blockers, proposals and promoted attention "
       + "are not yet included. --for me means human:<USER>, independent of the caller. "
-      + "Items offer alternative actions. After confirming a human's answer in chat, "
-      + "the claimer accepts the relay or the relayer resolves with -m explaining it. "
-      + "A relay never supplies approval words. Reads never clear attention.")
+      + "ask human: is a confirmation instruction, not an executable command. "
+      + "See docs/spec.md §8.1 for relay and approval rules. Reads never clear attention.")
   static let workspaceSource = WorkspaceSource.option
   static let dataShape = Shape.object([
-    "actor": .string, "remaining": .int, "more": .optional(.string),
+    "scope": .string, "actor": .string, "remaining": .int, "more": .optional(.string),
     "items": .array(
       .object([
-        "kind": .string, "ref": .string, "task": .string, "author": .string, "body": .string,
-        "created_at": .string, "next": .array(.string),
+        "kind": .string, "next": .array(.string), "ref": .optional(.string),
+        "task": .optional(.string), "author": .optional(.string), "body": .optional(.string),
+        "created_at": .optional(.string), "post_kind": .optional(.string),
+        "reply_to": .optional(.string), "relayed_by": .optional(.array(.string)),
       ])),
   ])
 
@@ -28,16 +29,34 @@ struct InboxCommand: OutputCommand {
     let workspace = try context.workspace(global.ws)
     let result = try TaskService(environment: context.environment, workspace: workspace)
       .inbox(for: target, all: all)
-    var lines = [result.actor + " discussion attention"]
-    for item in result.items {
-      lines.append("\(item.ref) \(item.kind) on \(item.task) by \(item.author)")
-      lines += item.body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
-        .map { $0.isEmpty ? ">" : "> " + $0 }
-      lines += item.next.map { "next: " + $0 }
-    }
-    if result.items.isEmpty { lines = ["No discussion attention for \(result.actor)."] }
+    var lines = [
+      result.items.isEmpty
+        ? "No discussion attention for \(result.actor)."
+        : result.actor + " discussion attention"
+    ]
+    lines.append(
+      "Scope: discussion only; proposals, blockers and promoted attention are not included.")
+    lines += result.items.map(Self.detail)
     if let more = result.more { lines.append("\(result.remaining) more: " + more) }
     let text = lines.joined(separator: "\n")
     return CommandOutput(text: text, quiet: text, data: result).reporting(workspace)
+  }
+
+  private static func detail(_ item: InboxItem) -> String {
+    let label =
+      item.kind == "answer"
+      ? "answer to " + (item.replyTo ?? item.ref)
+      : item.kind == "discussion" ? "discussion (\(item.postKind))" : item.kind
+    var lines = ["\(item.ref) \(label) on \(item.task) by \(item.author)"]
+    var body = item.body
+    if body.last?.isNewline == true { body.removeLast() }
+    lines += body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+      .map { $0.isEmpty ? ">" : "> " + $0 }
+    if let relayers = item.relayedBy {
+      lines.append("Agent answers awaiting confirmation from: " + relayers.joined(separator: ", "))
+    }
+    if item.kind == "discussion" { lines.append("clears on your next write to " + item.task) }
+    lines += item.next.map { "next: " + $0 }
+    return lines.joined(separator: "\n")
   }
 }

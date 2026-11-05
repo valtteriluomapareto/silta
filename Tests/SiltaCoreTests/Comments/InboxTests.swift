@@ -140,7 +140,7 @@ struct InboxTests {
     }
   }
 
-  @Test func closedFencePreservesFollowingMentionAndResolvedHandoffCounts() async throws {
+  @Test func closedFencePreservesFollowingMentionAndHandoffIsNotDoubleCounted() async throws {
     try await withScratchDirectory { home in
       let owner = TaskService(environment: try await CommentTests.setup(home))
       let draft = CommentDraft(
@@ -149,7 +149,7 @@ struct InboxTests {
       _ = try owner.comment("AC-1", CommentDraft(body: "Resume", kind: "handoff"))
       _ = try owner.updateComments(["AC-1/2"], action: .resolve)
       let shown = try owner.show("AC-1")
-      #expect(shown.comments?.first?.ref == "AC-1/2" && shown.resolvedThreads == 1)
+      #expect(shown.comments?.first?.ref == "AC-1/2" && (shown.resolvedThreads ?? 0) == 0)
     }
   }
 }

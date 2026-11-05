@@ -744,7 +744,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   the captured `human:<USER>`, or `human:unknown` for an unset/invalid USER, independently
   of the caller. Recipients are deduplicated and sorted in `mentions`; questions
   default to `me` only when neither explicit recipients nor mentions are present.
-  Inline code spans and fenced code blocks are examples, not mentions. Tool-only
+  Closed inline code spans and closed fenced code blocks are examples, not mentions.
+  An unterminated fence hides nothing: its text is parsed as prose. Tool-only
   actors such as `@agent:codex` are refused; recipients require a complete session.
   Other Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
   aliases/actor mentions refuse rather than redirecting to the human. Lifecycle
@@ -755,9 +756,17 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   human. An agent outside its recipients may contribute an answer without clearing
   the addressees' attention. JSON includes `answered` for questions (false for a
   deleted question); text uses the same rule. Answer acceptance remains a separate
-  choice by the asker or current claimer. After confirming a human's answer in chat,
-  the claimer accepts an agent's relay, or the relaying agent explicitly resolves
-  the question with `comment resolve <ref> -m <explanation>`.
+  choice by the asker or current claimer. A claimer never accepts its own answer to
+  another actor's question; target-authored answers are omitted from that actor's
+  inbox unless the actor is also the asker. After confirming a human's answer in
+  chat, the asker or eligible claimer accepts a relay, or the relaying agent
+  explicitly resolves with `comment resolve <ref> -m <explanation>`. The inbox never
+  offers a bare resolve: only an agent with an existing outsider answer to the
+  queried human gets an `ask human:` confirmation instruction, alongside a safe read
+  command. Other callers without acceptance authority get only `task show`.
+  A non-addressee agent is not offered another answer action; the question names
+  existing outsider answer authors as awaiting confirmation, without treating their
+  prose as proof of a human relay.
 - Questions and handoffs are roots. Answers require a live unresolved question;
   comment/decision replies require a live unresolved root. A deleted immediate
   target or root cannot receive public replies. Cross-task/workspace replies refuse.
@@ -780,7 +789,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
   thread is omitted. The default read also shows `N resolved threads (see --timeline)`
   when retained resolved roots exist; optional JSON `resolved_threads` reports that
-  count, including a displayed resolved handoff. `--timeline` includes full discussion alongside task events.
+  count of hidden resolved roots; the displayed resolved handoff is excluded.
+  `--timeline` includes full discussion alongside task events.
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
@@ -852,28 +862,34 @@ inbox is short and grouped:
   2. blocked tasks past their follow-up day, one item per party or URL listing its
      tasks and asks, the longest overdue first (a task waiting on two parties shows
      under both);
-  3. questions to the human, oldest first;
-  4. review requests (M2);
-  5. proposals from the last 14 days, newest first;
-  6. promoted tasks needing attention.
-- At most 12 items, then `N more: silta inbox --for me --all`. `--all` shows every item,
-  including older proposals.
+  3. questions to the selected actor, oldest first;
+  4. answers awaiting acceptance, oldest first;
+  5. claimed-task discussion, oldest first (agent sessions only);
+  6. review requests (M2);
+  7. proposals from the last 14 days, newest first;
+  8. promoted tasks needing attention.
+- At most 12 items across every category; `remaining` counts every omitted item,
+  then `N more: silta --ws 'acme' inbox --for 'human:acme' --all`. `--all` shows every
+  item, including older proposals.
 - Every item shows its refs and the commands that answer it, e.g.
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
   agent asks first, and maps "the rest" only to items it showed.
 
-**Available M1 discussion query:** grouped blockers, proposals and promoted attention
-are not yet included. Discussion categories are questions, then answers awaiting
-acceptance, then claimed-task discussion, oldest first within each category with
-stored post id breaking time ties. Each live post appears once, with question/answer
-attention taking precedence over claimed-task discussion. The cap applies after
-ordering; JSON has `actor`, `items`, `remaining` and optional `more`. Each item has
-`kind`, `ref`, `task`, `author`, `body`, `created_at` and `next` commands qualified
-with the selected workspace. Actions are alternatives: after confirming a human's
-answer, the claimer accepts or the relayer resolves with an explanation. Acceptance
-is offered only when the caller is the asker or current claimer; other callers get
-explicit resolution. Promoted tasks are omitted because local discussion mutations
-refuse; `--all` does not include them.
+**Available M1 discussion query:** every text read explicitly says that grouped
+blockers, proposals and promoted attention are not yet included; JSON identifies
+`scope: "discussion"`. This marker will change when the other categories ship.
+Within each discussion category, stored post id breaks time ties. Each live post
+appears once, with question/answer attention taking precedence over claimed-task
+`discussion`. The latter retains the original `post_kind`, and an answer names its
+question via `reply_to`. The cap applies after ordering. `silta schema inbox`
+publishes the shape: only `kind` and `next` are required on every item; post fields
+are optional so grouped items can add multiple task/ref fields. Discussion items
+carry those post fields. Every command is qualified with the selected workspace;
+confirmation guidance follows the relay rule above. Closed and archived tasks
+remain included when they have matching live discussion. Promoted tasks are
+omitted because local discussion mutations refuse; `--all` does not include them.
+Reading a discussion item does not clear it: it clears on the claimer's next write
+to its task, as the item says.
 
 It lists:
 - live open questions mentioning the actor with no qualifying live answer (an answer

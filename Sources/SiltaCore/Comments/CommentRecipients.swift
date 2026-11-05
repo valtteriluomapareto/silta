@@ -30,28 +30,33 @@ enum CommentRecipients {
   }
 
   private static func prose(_ body: String) throws -> String {
-    var fence: (Character, Int)?
-    let parts = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
-    let lines = parts.map { line in
-      let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
-      if let (marker, length) = fence {
-        let run = trimmed.prefix(while: { $0 == marker })
-        if run.count >= length, trimmed.dropFirst(run.count).allSatisfy(\.isWhitespace) {
+    let parts = body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(
+      String.init)
+    var lines = parts
+    var fence: (start: Int, delimiter: String)?
+    for index in parts.indices {
+      let trimmed = parts[index].drop(while: { $0 == " " || $0 == "\t" })
+      if let open = fence {
+        let run = trimmed.prefix(while: { open.delimiter.contains($0) })
+        if run.count >= open.delimiter.count,
+          trimmed.dropFirst(run.count).allSatisfy(\.isWhitespace)
+        {
+          for hidden in open.start...index { lines[hidden] = "" }
           fence = nil
         }
-        return ""
-      }
-      if let marker = trimmed.first, marker == "`" || marker == "~" {
+      } else if let marker = trimmed.first, marker == "`" || marker == "~" {
         let length = trimmed.prefix(while: { $0 == marker }).count
-        if length >= 3 {
-          fence = (marker, length)
-          return ""
-        }
+        if length >= 3 { fence = (index, String(trimmed.prefix(length))) }
       }
-      return String(line)
-    }.joined(separator: "\n")
+    }
+    if let open = fence {
+      // An unterminated opener is prose, not an inline-code delimiter.
+      lines[open.start] = String(
+        parts[open.start].drop(while: { $0 == " " || $0 == "\t" }).dropFirst(open.delimiter.count))
+    }
+    let visible = lines.joined(separator: "\n")
     let code = try NSRegularExpression(pattern: #"(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)"#)
     return code.stringByReplacingMatches(
-      in: lines, range: NSRange(lines.startIndex..., in: lines), withTemplate: " ")
+      in: visible, range: NSRange(visible.startIndex..., in: visible), withTemplate: " ")
   }
 }

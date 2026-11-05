@@ -31,12 +31,10 @@ struct InboxCorrectionTests {
       let items = try owner.inbox().items
       let acceptance = Result { try owner.acceptComment("AC-1/2") }
       let after = try CommentLifecycleTests.snapshot(env)
-      withKnownIssue("SI-37/11: claimer self-accepts another actor's question") {
-        #expect(items.isEmpty)
-        if case .success = acceptance { Issue.record("Self-acceptance succeeded") }
-        if case .failure(let error) = acceptance { #expect(error is CommentError) }
-        #expect(after == before)
-      }
+      #expect(items.isEmpty)
+      if case .success = acceptance { Issue.record("Self-acceptance succeeded") }
+      if case .failure(let error) = acceptance { #expect(error is CommentError) }
+      #expect(after == before)
     }
   }
 
@@ -52,15 +50,17 @@ struct InboxCorrectionTests {
       let own = try relayer.inbox(for: "human:acme").items
       let foreign = try stranger.inbox(for: "human:acme").items
       let agent = try relayer.inbox(for: env.actor.description).items
-      withKnownIssue("SI-37/12–13: repeat-answer and unauthorized resolve hints") {
-        #expect(foreign.first?.next == ["silta --ws 'acme' task show 'AC-1' --timeline"])
-        #expect(agent.last?.next == ["silta --ws 'acme' task show 'AC-1' --timeline"])
-        #expect(own.first?.next.first?.hasPrefix("ask human:") == true)
-        #expect(
-          !own.flatMap(\.next).contains {
-            $0.contains("--kind answer") || $0.hasPrefix("silta --ws 'acme' comment resolve")
-          })
-      }
+      #expect(foreign.first?.next == ["silta --ws 'acme' task show 'AC-1' --timeline"])
+      #expect(agent.last?.next == ["silta --ws 'acme' task show 'AC-1' --timeline"])
+      #expect(own.first?.next.first?.hasPrefix("ask human:") == true)
+      #expect(
+        !own.flatMap(\.next).contains {
+          $0.contains("--kind answer") || $0.hasPrefix("silta --ws 'acme' comment resolve")
+        })
+      try Self.post(owner, kind: "question", to: ["agent:claude:addressee"])
+      try Self.post(relayer, kind: "answer", reply: "AC-1/3")
+      let otherAgent = try relayer.inbox(for: "agent:claude:addressee").items
+      #expect(otherAgent.first?.next == ["silta --ws 'acme' task show 'AC-1' --timeline"])
     }
   }
 
@@ -89,10 +89,8 @@ struct InboxCorrectionTests {
       let body = marker + "\n@human:hidden\nAsk @agent:claude:reader"
       let post = try owner.comment("AC-1", CommentDraft(body: body, kind: "question")).comment
       let refs = try owner.inbox(for: "agent:claude:reader").items.map(\.ref)
-      withKnownIssue("SI-37/16: unterminated fence drops recipients") {
-        #expect(post.mentions == ["agent:claude:reader", "human:hidden"])
-        #expect(refs == ["AC-1/1"])
-      }
+      #expect(post.mentions == ["agent:claude:reader", "human:hidden"])
+      #expect(refs == ["AC-1/1"])
     }
   }
 
@@ -103,15 +101,11 @@ struct InboxCorrectionTests {
       _ = try owner.updateComments(["AC-1/1"], action: .resolve)
       let shown = try owner.show("AC-1")
       #expect(shown.comments?.first?.ref == "AC-1/1")
-      withKnownIssue("SI-37/17: displayed handoff double-counted") {
-        #expect((shown.resolvedThreads ?? 0) == 0)
-      }
+      #expect((shown.resolvedThreads ?? 0) == 0)
       _ = try owner.comment("AC-1", CommentDraft(body: "Hidden"))
       _ = try owner.updateComments(["AC-1/2"], action: .resolve)
       let hidden = try owner.show("AC-1").resolvedThreads
-      withKnownIssue("SI-37/17: displayed handoff double-counted with hidden history") {
-        #expect(hidden == 1)
-      }
+      #expect(hidden == 1)
     }
   }
 
@@ -123,11 +117,9 @@ struct InboxCorrectionTests {
       let attention = try env.db.read { db in
         try TaskService.attention(for: .human(name: "acme"), workspaceID: 1, in: db)
       }
-      withKnownIssue("SI-37/21: uncapped snapshot projection stub") {
-        #expect(attention.count == 13)
-        #expect(attention.first?.post.ref == "AC-1/1")
-        #expect(attention.first?.task.ref == "AC-1")
-      }
+      #expect(attention.count == 13)
+      #expect(attention.first?.post.ref == "AC-1/1")
+      #expect(attention.first?.task.ref == "AC-1")
       #expect(try CommentLifecycleTests.snapshot(env) == before)
     }
   }
