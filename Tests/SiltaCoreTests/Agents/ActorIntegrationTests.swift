@@ -3,12 +3,13 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(3)), .tags(.slow), .enabled(if: slowTestsEnabled()))
+@Suite(
+  .blockingTestWork, .timeLimit(.minutes(3)), .tags(.slow), .enabled(if: slowTestsEnabled()))
 struct ActorIntegrationTests {
   @Test func nestedCwdSharesSessionButDistinctWorktreeDoesNot() async throws {
     try await withScratchDirectory { scratch in
       let fixtures = scratch.appending(path: "fixtures")
-      let setup = try AcmeFixtures.make(at: fixtures, in: scratch)
+      let setup = try AcmeFixtures.make(at: fixtures)
       try #require(setup.termination == .exit(0), "\(setup.stderr)")
       let terminal = TerminalState(stdin: false, stdout: false)
       let git = SystemGitRunner(environment: [

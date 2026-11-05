@@ -25,7 +25,7 @@ lint result differs from CI, trust CI's pinned versions.
 | `scripts/lint-check.sh` | swift-format and SwiftLint in `--strict` mode, no changes | Behaviour |
 | `scripts/lint-fix.sh` | Apply swift-format and SwiftLint fixes | — |
 | `scripts/verify.sh quick` | Guards, lint, `swift build` with warnings as errors, `swift test` (a run with zero tests fails) | Concurrency under load, wall-clock deadlines, real agent use |
-| `scripts/verify.sh full` | `quick` plus stress/scenarios (`SILTA_SLOW_TESTS=1`), then the wall-clock hook and Git deadline tier (`SILTA_DEADLINE_TESTS=1`, the `WallClock…` suites) alone and serially | Real agent use (spec §21 evals) |
+| `scripts/verify.sh full` | `quick` plus stress/scenarios (`SILTA_SLOW_TESTS=1`), then the wall-clock deadline tier (`SILTA_DEADLINE_TESTS=1`, the `WallClock…` suites: hook, Git and `where` lock deadlines) alone and serially | Real agent use (spec §21 evals) |
 
 Before a Swift package exists, the build and test steps report "skipped" and the
 guards still run.

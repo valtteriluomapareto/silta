@@ -168,7 +168,7 @@ struct CodeCommandTests {
   }
 
   func setup(_ scratch: URL) throws -> URL {
-    let result = try AcmeFixtures.make(at: scratch.appending(path: "fixtures"), in: scratch)
+    let result = try AcmeFixtures.make(at: scratch.appending(path: "fixtures"))
     try #require(result.termination == .exit(0), "\(result.stderr)")
     let repo = scratch.appending(path: "fixtures/acme-platform")
     let store = DatabaseStore(

@@ -115,7 +115,7 @@ extension TaskCommandTests {
   @Test func realAppCompletionUsesStoredWorktreeAndWarnsOnDirtyChanges() throws {
     try withScratchDirectory { scratch in
       let fixtures = scratch.appending(path: "acme")
-      let made = try AcmeFixtures.make(at: fixtures, in: scratch)
+      let made = try AcmeFixtures.make(at: fixtures)
       #expect(made.termination == .exit(0))
       #expect(
         try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch).termination == .exit(0))
@@ -153,7 +153,7 @@ extension TaskCommandTests {
       let fixtures = scratch.appending(path: "acme")
       let git = URL(filePath: "/usr/bin/git")
       #expect(
-        try AcmeFixtures.make(at: fixtures, in: scratch).termination == .exit(0))
+        try AcmeFixtures.make(at: fixtures).termination == .exit(0))
       #expect(
         try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch).termination == .exit(0))
       #expect(try SiltaBinary.run(["ws", "use", "acme"], in: scratch).termination == .exit(0))
@@ -260,7 +260,7 @@ extension TaskCommandTests {
   private static func appWorkspace(_ scratch: URL) throws -> URL {
     let fixtures = scratch.appending(path: "acme")
     #expect(
-      try AcmeFixtures.make(at: fixtures, in: scratch).termination == .exit(0))
+      try AcmeFixtures.make(at: fixtures).termination == .exit(0))
     #expect(
       try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch).termination
         == .exit(0))

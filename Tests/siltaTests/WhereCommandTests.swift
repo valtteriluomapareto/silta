@@ -149,7 +149,8 @@ struct WhereCommandTests {
       try queue.writeWithoutTransaction { db in
         try db.execute(sql: "BEGIN EXCLUSIVE")
         defer { try? db.execute(sql: "ROLLBACK") }  // best-effort lock release
-        let locked = try run([], repo, scratch, timeout: 3)
+        // WallClockWhereTests proves the locked read doesn't wait.
+        let locked = try run([], repo, scratch)
         #expect(locked.termination == .exit(0))
         #expect(locked.stdout == first.stdout)
       }
@@ -206,7 +207,7 @@ struct WhereCommandTests {
   }
 
   func setup(_ scratch: URL) throws -> URL {
-    let fixture = try AcmeFixtures.make(at: scratch.appending(path: "fixtures"), in: scratch)
+    let fixture = try AcmeFixtures.make(at: scratch.appending(path: "fixtures"))
     try #require(fixture.termination == .exit(0), "\(fixture.stderr)")
     let repo = scratch.appending(path: "fixtures/acme-platform")
     let config = try WorkspaceConfig.parse(

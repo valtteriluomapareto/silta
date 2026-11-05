@@ -175,7 +175,7 @@ extension ApprovalCommandTests {
 
   private func preparedApp(_ scratch: URL) throws -> URL {
     let fixtures = scratch.appending(path: "acme")
-    let made = try AcmeFixtures.make(at: fixtures, in: scratch)
+    let made = try AcmeFixtures.make(at: fixtures)
     #expect(made.termination == .exit(0))
     #expect(
       try SiltaBinary.run(["init", "--scan", fixtures.path], in: scratch).termination == .exit(0))
