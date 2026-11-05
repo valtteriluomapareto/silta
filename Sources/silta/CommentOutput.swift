@@ -5,6 +5,8 @@ enum CommentOutput {
     "ref": .string, "kind": .string, "body": .string, "actor": .string,
     "reply_to": .optional(.string), "deleted": .bool, "resolved_at": .optional(.string),
     "created_at": .string, "resolved_by": .optional(.string),
+    "mentions": .array(.string), "accepted": .bool, "from": .optional(.string),
+    "answered": .optional(.bool),
   ]
   static let shape = Shape.object(fields)
   static let receiptShape = Shape.object(fields.merging(["released": .bool]) { _, new in new })
@@ -38,14 +40,15 @@ enum CommentOutput {
     if let reply = post.replyTo { text += " (reply to \(reply))" }
     let resolution = post.resolvedBy.map { "resolved by " + $0 } ?? "resolved"
     if post.kind == "question" {
-      let answered = comments.contains {
-        $0.replyTo == post.ref && $0.kind == "answer" && !$0.deleted
-      }
       text +=
-        " [" + (answered ? "answered, " : "") + (post.resolvedAt == nil ? "unresolved" : resolution)
+        " [" + (post.answered == true ? "answered, " : "")
+        + (post.resolvedAt == nil ? "unresolved" : resolution)
         + "]"
     }
     if post.kind != "question", post.resolvedAt != nil { text += " [" + resolution + "]" }
+    if !post.mentions.isEmpty { text += " (to " + post.mentions.joined(separator: ", ") + ")" }
+    if post.accepted { text += " [accepted]" }
+    if let source = post.source { text += " (from " + source + ")" }
     var body = post.body
     if body.last?.isNewline == true { body.removeLast() }
     text +=

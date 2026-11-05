@@ -1,0 +1,93 @@
+import Foundation
+import GRDB
+@testable import SiltaCore
+import SiltaTestSupport
+import Testing
+
+struct CommentCorrectionTests {
+  @Test func currentClaimerCanAcceptAfterAskerHandoff() async throws {
+    try await withScratchDirectory { home in
+      let clock = FakeClock(now: TaskServiceTests.now)
+      let env = try await CommentTests.setup(home, clock: clock)
+      let asker = TaskService(environment: env)
+      _ = try CommentQuestionTests.post(asker, kind: "question")
+      _ = try CommentQuestionTests.post(asker, kind: "handoff")
+      let resumed = TaskService(
+        environment: try TaskServiceTests.environment(
+          home, actor: .agent(tool: "claude", session: "resumed"), clock: clock))
+      _ = try await resumed.start("AC-1", directory: home)
+      _ = try CommentQuestionTests.post(resumed, kind: "answer", reply: "AC-1/1")
+      clock.advance(milliseconds: 1000)
+      _ = try resumed.acceptComment("AC-1/3")
+      let shown = try resumed.show("AC-1", timeline: true)
+      #expect(shown.comments?.first?.resolvedBy == "agent:claude:resumed")
+      #expect(shown.timeline?.last?.actor == "agent:claude:resumed")
+      #expect(shown.claimedAt == TaskService.timestamp(clock.now()))
+    }
+
+  }
+
+  @Test(arguments: [
+    "`@agent:<tool>:<session>`", "``@human:acme``", "```text\n@agent:<tool>:<session>\n```",
+    "~~~\n@me-other\n~~~",
+  ])
+  func codeExamplesAreNotRecipients(body: String) async throws {
+
+    try await withScratchDirectory { home in
+      let service = TaskService(environment: try await CommentTests.setup(home))
+      #expect(try CommentQuestionTests.post(service, body: body).mentions.isEmpty)
+    }
+
+  }
+
+  @Test func malformedRecipientIdentifiesSafeToken() async throws {
+
+    try await withScratchDirectory { home in
+      let service = TaskService(environment: try await CommentTests.setup(home))
+      do {
+        _ = try CommentQuestionTests.post(service, body: "Ask @agent:codex")
+        Issue.record("Tool-only actor accepted")
+      } catch let error as CommentError {
+        #expect(error.message.contains("agent:codex"))
+      }
+    }
+
+  }
+}
+
+extension CommentCorrectionTests {
+  @Test func humanAnswersQualifyAndDeletedQuestionsDoNot() async throws {
+    try await withScratchDirectory { home in
+      let env = try await CommentTests.setup(home), owner = TaskService(environment: env)
+      _ = try CommentQuestionTests.post(owner, kind: "question", to: ["agent:claude:recipient"])
+      let human = TaskService(
+        environment: try TaskServiceTests.environment(home, actor: .human(name: "acme")))
+      _ = try CommentQuestionTests.post(human, kind: "answer", reply: "AC-1/1")
+      #expect(try owner.show("AC-1").comments?.first?.answered == true)
+      _ = try owner.updateComments(["AC-1/1"], action: .delete)
+      #expect(try owner.show("AC-1").comments?.first?.answered == false)
+    }
+  }
+}
+
+extension CommentCorrectionTests {
+  @Test func resolvedExecutionScopeDoesNotInventAuditFlags() async throws {
+    try await withScratchDirectory { home in
+      let env = try await CommentTests.setup(home)
+      let service = TaskService(
+        environment: env, workspace: "acme", approved: "Retain Acme content", bodyFlag: "-m <text>")
+      var draft = CommentDraft(body: "Acme")
+      draft.allowSecret = true
+      _ = try service.comment("AC-1", draft, includeWorkspaceInAudit: false)
+      _ = try service.comment("AC-1", draft, includeWorkspaceInAudit: true)
+      let commands = try env.db.read {
+        try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY rowid")
+      }
+      #expect(
+        commands == [
+          "silta comment 'AC-1' -m <text> --allow-secret -> AC-1/1",
+          "silta --ws 'acme' comment 'AC-1' -m <text> --allow-secret -> AC-1/2",
+        ])
+    }
+  }
+}

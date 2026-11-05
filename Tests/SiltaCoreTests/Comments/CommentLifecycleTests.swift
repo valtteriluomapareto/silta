@@ -6,7 +6,9 @@ import Testing
 struct CommentLifecycleTests {
   static func snapshot(_ env: SiltaEnvironment) throws -> [String] {
     try env.db.read { db in
-      try ["task", "comment", "task_event", "change_log", "approval"].flatMap { table in
+      try [
+        "task", "comment", "task_event", "change_log", "approval", "link", "meta", "seq_counter",
+      ].flatMap { table in
         try Row.fetchAll(db, sql: "SELECT * FROM \(table) ORDER BY rowid").map { "\(table): \($0)" }
       }
     }

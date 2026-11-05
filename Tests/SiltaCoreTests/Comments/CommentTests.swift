@@ -133,26 +133,6 @@ struct CommentTests {
     }
   }
 
-  // Stored kinds without a posting command retain forward-reader coverage.
-  static func seedStoredQuestion(_ env: SiltaEnvironment) throws {
-    try env.db.write {
-      try $0.database.execute(
-        sql: """
-          INSERT INTO comment(uid,task_id,seq,kind,body_md,actor,created_at)
-          VALUES('q',1,9,'question','Stored question',?,?);
-          """, arguments: [env.actor.description, TaskService.timestamp(env.clock.now())])
-      try $0.database.execute(
-        sql: """
-          INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,actor,created_at)
-          VALUES('a',1,10,?,'answer','Stored answer',?,?)
-          """,
-        arguments: [
-          $0.database.lastInsertedRowID, env.actor.description,
-          TaskService.timestamp(env.clock.now()),
-        ])
-    }
-  }
-
   @Test func storedDiscussionRemainsReadableAndScoped() async throws {
     try await withScratchDirectory { home in
       let env = try await Self.setup(home)
@@ -178,17 +158,17 @@ struct CommentTests {
       }
       _ = try service.comment("AC-1", CommentDraft(body: "Hidden if deleted"))
       _ = try service.updateComments(["AC-1/8"], action: .delete)
-      try Self.seedStoredQuestion(env)
+      _ = try service.comment("AC-1", CommentDraft(body: "Stored question", kind: "question"))
+      var answer = CommentDraft(body: "Stored answer", kind: "answer")
+      answer.replyTo = "AC-1/9"
+      _ = try service.comment("AC-1", answer)
       let shown = try #require(service.show("AC-1").comments)
       #expect(
         shown.map(\.ref) == ["AC-1/7", "AC-1/1", "AC-1/2", "AC-1/4", "AC-1/5", "AC-1/9", "AC-1/10"])
       #expect(shown.first { $0.deleted }?.body == "[deleted]")
       #expect(try service.show("AC-1", timeline: true).comments?.count == 10)
       #expect(try service.comment("AC-1", CommentDraft(body: "Next")).comment.ref == "AC-1/11")
-      _ = try service.updateComments(["AC-1/9"], action: .resolve)
-      try env.db.write {
-        try $0.database.execute(sql: "UPDATE comment SET accepted=1 WHERE seq=10")
-      }
+      _ = try service.acceptComment("AC-1/10")
       _ = try service.updateComments(["AC-1/10"], action: .reopen)
       #expect(
         try env.db.read { try Int.fetchOne($0, sql: "SELECT accepted FROM comment WHERE seq=10") }
@@ -233,7 +213,7 @@ extension CommentTests {
       let after = try service.show("AC-1")
       #expect(after.claimedBy == claim.claimedBy && after.claimedAt == claim.claimedAt)
       #expect(after.updatedAt == claim.updatedAt && after.status == claim.status)
-      for kind in ["question", "answer", "review", "future"] {
+      for kind in ["answer", "review", "future"] {
         #expect(throws: CommentError.self) {
           _ = try service.comment("AC-1", CommentDraft(body: "Acme", kind: kind))
         }

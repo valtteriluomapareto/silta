@@ -169,6 +169,8 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
 - **Task**: a backlog item with plan, result, comments and links.
 - **Comment**: a post on a task or a doc revision. Its kind is one of `comment`,
   `question`, `answer`, `decision` or `handoff`. Threads can be resolved.
+  The asker or current task claimer may accept an answer; acceptance resolves the
+  thread and records the accepting actor.
 - **Review** (M2): a comment with a verdict on a subject (the task's diff, a plan
   revision, or a doc revision), with line comments.
 - **Doc** (M2): a versioned markdown document owned by `silta`.
@@ -309,7 +311,7 @@ CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERE
   actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
-  -- discussion: 'resolved <root-ref>' or 'reopened <root-ref>', once per changed root.
+  -- discussion: 'resolved <root-ref>', 'reopened <root-ref>' or 'accepted <answer-ref>', once per change.
   -- A comment's secret_redacted event body is that comment's ref, never its content.
 CREATE INDEX task_event_task ON task_event(task_id, kind);
 
@@ -325,7 +327,7 @@ CREATE TABLE comment (
   anchor TEXT, anchor_sha TEXT, anchor_snippet TEXT,  -- (M2) quoted lines kept for orphaned anchors
   body_md TEXT NOT NULL,
   mentions TEXT NOT NULL DEFAULT '[]',        -- JSON array of actors, parsed from @…
-  accepted INTEGER NOT NULL DEFAULT 0,        -- answer accepted by the asker
+  accepted INTEGER NOT NULL DEFAULT 0,        -- answer accepted by the asker or current task claimer
   actor TEXT NOT NULL,
   resolved_at TEXT, resolved_by TEXT, deleted_at TEXT,
   created_at TEXT NOT NULL,
@@ -732,17 +734,51 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 | Kind | Use | Behaviour |
 |---|---|---|
 | `comment` | General notes | — |
-| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until answered. **Ask in chat first** when the human is there. |
-| `answer` | Reply to a question | The asker can `comment accept AC-12/5`, which resolves the thread |
+| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until a qualifying live answer exists or the root is explicitly resolved. **Ask in chat first** when the human is there. |
+| `answer` | Reply to a question | The asker or current task claimer can `comment accept AC-12/5`, which resolves the thread |
 | `decision` | A choice and its reason | Shown in `brief`; `--from note:…` cites a meeting |
 | `handoff` | Where I stopped, what's next | Releases the author's own claim, preserving status. The newest one is shown first in `brief --task`. Template in `silta guide` |
 
+- Recipients: repeatable `--to <actor>|me` and body mentions `@human:<name>`,
+  `@agent:<tool>:<session>` and `@me`. Only complete actors are accepted; `me` is
+  the captured `human:<USER>`, or `human:unknown` for an unset/invalid USER, independently
+  of the caller. Recipients are deduplicated and sorted in `mentions`; questions
+  default to `me` only when neither explicit recipients nor mentions are present.
+  Inline code spans and fenced code blocks are examples, not mentions. Tool-only
+  actors such as `@agent:codex` are refused; recipients require a complete session.
+  Other Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
+  aliases/actor mentions refuse rather than redirecting to the human. Lifecycle
+  explanations parse mentions too. `--from note:…` stores a nonempty, control-free
+  note citation as a comment `cites` link without accessing the file; JSON exposes
+  optional `from`. Citation/recipient metadata must contain no secrets.
+- A question is `answered` only by a live answer from one of its addressees or a
+  human. An agent outside its recipients may contribute an answer without clearing
+  the addressees' attention. JSON includes `answered` for questions (false for a
+  deleted question); text uses the same rule. Answer acceptance remains a separate
+  choice by the asker or current claimer.
+- Questions and handoffs are roots. Answers require a live unresolved question;
+  comment/decision replies require a live unresolved root. A deleted immediate
+  target or root cannot receive public replies. Cross-task/workspace replies refuse.
+- Accept requires the question's exact asker actor/session or current task claimer,
+  and a live answer/root.
+  It sets the answer's `accepted` flag and the root's `resolved_at`/`resolved_by`
+  to the accepter, recording `accepted <answer-ref>` in the attributed discussion event.
+  Repeating that same live acceptance writes nothing. A manually resolved question
+  or a different answer selection requires reopen first; deleted posts refuse.
+  JSON always includes `accepted`; text identifies accepted answers distinctly.
+  Giving accept a question or non-answer ref points to the task's full discussion.
+- An answer posted by an agent, including a relay of the human's answer, never
+  supplies approval words; human-only commands still follow [§11](#actors-and-sessions).
+- Post findings as roots, not replies to a handoff: the newest handoff thread stays
+  shown even when resolved. Task show offers no per-thread `next:` lines.
 - Threads: `--reply-to AC-12/3`. `comment resolve|reopen <ref>… [-m …]` takes several
   refs in one call.
 - `task show` shows the newest handoff thread first and unresolved threads with
   their replies, identifying answered versus resolved questions. Roots and replies
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
-  thread is omitted. `--timeline` includes full discussion alongside task events.
+  thread is omitted. The default read also shows `N resolved threads (see --timeline)`
+  when retained resolved roots exist; optional JSON `resolved_threads` reports that
+  count. `--timeline` includes full discussion alongside task events.
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
@@ -761,6 +797,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - Resolve/reopen normalize reply refs to thread roots, deduplicating in first-appearance
   order, atomically across the selected workspace. Deleted roots remain resolvable.
   Any actor may resolve/reopen; only a post's exact author may delete that named post.
+  Wrong-author deletion offers resolve recovery only while the root is open.
   Reopen clears answer acceptance; delete preserves resolution and retained refs.
   An optional explanation appends one ordinary reply per changed root in the same
   transaction, with one consent for the batch. No-ops write nothing, including
@@ -824,7 +861,13 @@ inbox is short and grouped:
   agent asks first, and maps "the rest" only to items it showed.
 
 It lists:
-- unanswered questions mentioning the actor
+- live open questions mentioning the actor with no qualifying live answer (an answer
+  by an addressee or human); deleting the last qualifying answer restores attention
+- answers to your live open questions awaiting acceptance, including answers from
+  other agents; the asker must be able to review these without being an answer recipient
+- reopening clears acceptance and restores attention: the asker receives live answers
+  awaiting acceptance, and addressees receive questions without a qualifying answer;
+  deleted question roots never appear in either question category
 - open review requests for the actor's tool (M2)
 - for humans, also: `proposed` tasks, pending doc proposals (M2), and promoted tasks
   needing attention
@@ -951,6 +994,9 @@ silta code ls   <app>[@<ref>] [<dir>]
     in this chat in reply to a message where the agent named this command. A task
     prompt, an earlier instruction or the agent's own text never counts. One answer
     covers every command named in the message it answers, and nothing else.
+  - An answer or comment posted by an agent never counts as approval words, even
+    when it relays the human's answer. A human-only command still requires the
+    human's own reply in chat to a message naming that command (D38).
   - The words are 1–300 Unicode scalars after trimming and secret-guarded like any agent text. Words in
     angle brackets, or containing a printed placeholder such as `<the human's words>`
     anywhere, are `invalid`.
