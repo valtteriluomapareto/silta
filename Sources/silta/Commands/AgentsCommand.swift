@@ -24,7 +24,8 @@ struct AgentInstallOptions: ParsableArguments {
     }
     let selected = (claude ? " --claude" : "") + (codex ? " --codex" : "")
     let preview = command + selected
-    let files = try AgentInstallFiles(preview: preview)
+    let files = try AgentInstallFiles(
+      preview: preview, claude: claude || !codex, codex: codex || !claude)
     defer { files.close() }
     let plan = try AgentInstallPlan(
       files: files, claude: claude || !codex, codex: codex || !claude,
@@ -64,7 +65,8 @@ struct AgentsInstallCommand: OutputCommand {
 
 struct AgentsUninstallCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "uninstall", abstract: "Preview removal of selected, unedited Silta ownership.")
+    commandName: "uninstall", abstract: "Preview removal of selected, unedited Silta ownership.",
+    discussion: AgentsInstallCommand.configuration.discussion)
   static let workspaceSource = WorkspaceSource.none
   static let dataShape = AgentInstallResult.shape
   @OptionGroup var global: GlobalOptions

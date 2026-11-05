@@ -1039,17 +1039,21 @@ and empty user files. Ownership remains recognizable if `SILTA_HOME` changes.
 Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
 nonregular/multiply linked files and files over 1 MiB are refused before writes.
 
-Targets come from explicit absolute `HOME`; nonmatching `CODEX_HOME` or
-`CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. The Codex grant uses the
+Targets come from explicit absolute `HOME`; a selected harness's nonmatching
+`CODEX_HOME` or `CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. Unselected
+overrides are ignored. The Codex grant uses the
 effective `SILTA_HOME`. The conservative TOML editor supports bare single-line
 keys/tables and refuses existing user-owned writable-root definitions or ambiguous
-syntax; it never changes sandbox mode, trust or authentication. A human must inspect
+syntax. Supported values are JSON-compatible strings, finite numbers, booleans and
+arrays, and single-quoted literal strings; inline comments, dates, multiline values
+and inline tables are refused. It never changes sandbox mode, trust or authentication. A human must inspect
 such refusals; there is no overwrite flag. Configuring a root does not prove it is
 effective in a managed harness (D42).
 
 Installers serialize with an advisory lock on HOME and preflight all selected
 targets. Each file replacement is atomic; multiple replacements are not one
-transaction. An I/O failure lists completed paths and asks for a fresh preview/retry;
+transaction. An I/O failure names the failing target/cause and completed paths, asks
+the human to inspect permissions/structure, then offers a fresh preview/retry;
 there is no rollback or process-crash guarantee. An unrelated editor does not honor
 the installer lock. Hook runtime must be installed before settings that reference it.
 

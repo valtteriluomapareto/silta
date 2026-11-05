@@ -46,6 +46,7 @@ struct AgentsInstallTests {
       try Self.write("Acme changed", ".codex/AGENTS.md", in: scratch)
       let stale = try Self.run(args + ["--apply", token, "--json"], in: scratch)
       #expect(stale.termination == .exit(6))
+      Golden.forTests().check(stale.stdout, "agents-install-stale.json")
       #expect(
         !FileManager.default.fileExists(
           atPath: scratch.appending(path: "home/.codex/config.toml").path))
@@ -183,10 +184,9 @@ struct AgentsInstallTests {
         in: scratch)
       #expect(result.termination == .exit(9))
       #expect(result.stdout.contains("Completed: .claude/skills/silta/SKILL.md"))
-      withKnownIssue("#17: partial failure must name the failing target and cause") {
-        #expect(result.stdout.contains(".claude/CLAUDE.md"))
-        #expect(result.stdout.contains("cannot stage replacement"))
-      }
+      #expect(result.stdout.contains(".claude/CLAUDE.md"))
+      #expect(result.stdout.contains("cannot stage replacement"))
+      Golden.forTests().check(result.stdout, "agents-install-partial.json")
       #expect(!FileManager.default.fileExists(atPath: directory.appending(path: "CLAUDE.md").path))
       #expect(try Self.read(".claude/skills/silta/SKILL.md", in: scratch).contains("name: silta"))
       try FileManager.default.setAttributes(

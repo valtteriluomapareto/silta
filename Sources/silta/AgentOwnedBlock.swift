@@ -3,6 +3,7 @@ import Foundation
 /// A content seal detects edits without depending on the installed binary version.
 struct AgentOwnedBlock {
   let outside: String
+  let owned: Bool
   private let origin: String
   private let start: String
   private let end: String
@@ -18,6 +19,7 @@ struct AgentOwnedBlock {
     var text = original
     var origin = existed ? "keep" : "new"
     var offset = text.count
+    var hadOwnership = false
     if let begin = text.range(of: start), let finish = text.range(of: end),
       begin.upperBound < finish.lowerBound,
       let header = text.range(of: seal, range: begin.upperBound..<finish.lowerBound)
@@ -34,11 +36,13 @@ struct AgentOwnedBlock {
       }
       offset = text.distance(from: text.startIndex, to: begin.lowerBound)
       text.removeSubrange(begin.lowerBound..<finish.upperBound)
+      hadOwnership = true
     }
     if text.contains("silta:begin") || text.contains("silta:end") { try refusal() }
     self.outside = text
     self.origin = origin
     self.offset = offset
+    self.owned = hadOwnership
   }
 
   func render(_ body: String, refusal: () throws -> Never) throws -> String {
@@ -94,12 +98,7 @@ struct AgentOwnedBlock {
   }
 
   private static func validateTOMLLine(_ text: String, refusal: () throws -> Never) throws {
-    // Only bare single-line keys/tables can be edited without interpreting value syntax.
-    guard
-      text.range(
-        of: #"^(\[\[?[A-Za-z0-9_.-]+\]\]?|[A-Za-z0-9_.-]+\s*=)"#,
-        options: .regularExpression) != nil,
-      !text.contains("\"\"\""), !text.contains("'''"),
+    guard AgentTOML.accepts(text),
       !text.contains("sandbox_workspace_write") || text == "[sandbox_workspace_write]"
     else { try refusal() }
   }

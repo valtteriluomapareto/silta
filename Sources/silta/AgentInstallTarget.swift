@@ -45,6 +45,7 @@ struct AgentInstallTarget {
     }
     let block = try AgentOwnedBlock(
       text, toml: path.hasSuffix(".toml"), existed: existed, refusal: refusal)
+    if whole, !original.isEmpty, !block.owned { try refusal() }
     if whole, !block.outside.isEmpty { try refusal() }
     if uninstall { return block.outside }
     return (whole ? Self.frontmatter : "") + (try block.render(body, refusal: refusal))

@@ -8,7 +8,7 @@ final class AgentInstallFiles {
   let preview: String
   private let root: Int32
 
-  init(preview: String) throws {
+  init(preview: String, claude: Bool, codex: Bool) throws {
     self.preview = preview
     let env = ProcessInfo.processInfo.environment
     guard let path = env["HOME"], path.hasPrefix("/"),
@@ -19,7 +19,8 @@ final class AgentInstallFiles {
         human: true)
     }
     home = URL(filePath: path).resolvingSymlinksInPath().path
-    for (key, suffix) in [("CODEX_HOME", ".codex"), ("CLAUDE_CONFIG_DIR", ".claude")] {
+    for (key, suffix) in [("CODEX_HOME", ".codex"), ("CLAUDE_CONFIG_DIR", ".claude")]
+    where suffix == ".codex" ? codex : claude {
       if let override = env[key], !override.isEmpty,
         URL(filePath: override).standardized.path
           != URL(filePath: home).appending(path: suffix).path,
@@ -105,11 +106,13 @@ final class AgentInstallFiles {
         completed.append(edit.path)
       }
     } catch {
+      let detail = (error as? any CodedError)?.message ?? "I/O failed for a selected target"
       throw AgentInstallError(
         .env,
-        "Install write failed. Completed: "
+        "Harness write failed: \(detail) Completed: "
           + (completed.isEmpty ? "none" : completed.joined(separator: ", "))
-          + ". No rollback; review a fresh preview before retrying.", next: [preview], human: true)
+          + ". Check the named path's permissions/structure; no rollback. Review a fresh preview.",
+        next: [preview + " --help", preview], human: true)
     }
   }
 

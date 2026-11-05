@@ -25,12 +25,7 @@ struct GuideCommand: OutputCommand {
           + topics.joined(separator: ", ") + ".",
         command: "silta guide")
     }
-    let text = selected.map { section in
-      section.text
-        + (section.topic == "output"
-          ? "Topics: " + topics.joined(separator: ", ") + ". Read one with `silta guide <topic>`.\n"
-          : "")
-    }.joined(separator: "\n")
+    let text = Self.render(selected)
     return CommandOutput(
       text: text, quiet: text, data: GuideManual(text: text, topics: topics, topic: topic))
   }
@@ -261,7 +256,11 @@ private struct GuideManual: Encodable, Sendable {
 
 extension GuideCommand {
   static func manual() -> String {
-    sections.map { section in
+    render(sections)
+  }
+
+  private static func render(_ selected: [Section]) -> String {
+    selected.map { section in
       section.text
         + (section.topic == "output"
           ? "Topics: " + sections.map(\.topic).joined(separator: ", ")
