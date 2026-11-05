@@ -49,11 +49,16 @@ package struct TaskEditDocument: Equatable, Sendable {
 
   /// Wraps each value in a tilde fence longer than any value's own tilde run.
   package func render() -> String {
-    let longest = values.flatMap { $0.split(whereSeparator: { $0 != "~" }) }.map(\.count).max() ?? 0
-    let fence = String(repeating: "~", count: max(3, longest + 1))
+    let fence = Self.fence(for: values)
     return zip(Self.headings, values).map { heading, value in
       "## \(heading)\n\(fence)\n\(value)\n\(fence)\n"
     }.joined()
+  }
+
+  /// A tilde fence longer than any run of `~` in `values`, and at least three long.
+  static func fence(for values: [String]) -> String {
+    let longest = values.flatMap { $0.split(whereSeparator: { $0 != "~" }) }.map(\.count).max() ?? 0
+    return String(repeating: "~", count: max(3, longest + 1))
   }
 
   /// Parses ordered fenced sections; headings and fences inside values remain literal text.

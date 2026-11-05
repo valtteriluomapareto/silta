@@ -297,6 +297,7 @@ extension DogfoodLogTests {
       (acme + ["code", "grep", "api", "build"], "acme"),
       (acme + ["code", "log", "api"], "acme"),
       (acme + ["code", "ls", "api"], "acme"),
+      (acme + ["export", "--to", scratch.appending(path: "exports").path], "acme"),
       (["where", "--path", scratch.appending(path: "clone").path], "acme"),
       (["ws", "show", "acme"], "acme"),
       (["ws", "edit", "beta", "-F", yaml.path, "--approved", "Rename Acme Beta"], "beta"),

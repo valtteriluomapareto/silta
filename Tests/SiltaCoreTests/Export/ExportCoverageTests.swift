@@ -101,7 +101,7 @@ struct ExportCoverageTests {
       "requested_by": .plain, "created_at": .plain, "taken_by": .plain, "taken_at": .plain,
       "done_at": .plain,
     ],
-    // Docs are refused until their export ships (M2).
+    // Export refuses docs, so none of their columns are written.
     "doc": [
       "id": .excluded, "uid": .excluded, "workspace_id": .excluded, "slug": .excluded,
       "previous_slugs": .excluded, "title": .excluded, "kind": .excluded, "owner": .excluded,
@@ -178,7 +178,8 @@ struct ExportCoverageTests {
     try withScratchDirectory { scratch in
       let store = try ExportFixture.make(scratch)
       let files = try ExportTreeTests.render(store)
-      let text = files.values.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "\n")
+      let text = files.values.map { (String(bytes: $0, encoding: .utf8) ?? "") }.joined(
+        separator: "\n")
       try store.read { db in
         for (table, filter) in Self.scope {
           let columns = try #require(Self.tables[table])
@@ -187,7 +188,8 @@ struct ExportCoverageTests {
           for (column, kind) in columns where kind != .excluded {
             let values = rows.compactMap { $0[column] as DatabaseValue? }.filter { !$0.isNull }
             #expect(!values.isEmpty, "the fixture leaves \(table).\(column) NULL in every row")
-            for (row, value) in zip(rows, rows.map { $0[column] as DatabaseValue }) where !value.isNull {
+            for (row, value) in zip(rows, rows.map { $0[column] as DatabaseValue })
+            where !value.isNull {
               let expected = try Self.expected(kind, column: column, value: value, row: row, db: db)
               #expect(
                 expected.contains { text.contains($0) },
@@ -203,7 +205,7 @@ struct ExportCoverageTests {
     try withScratchDirectory { scratch in
       let store = try ExportFixture.make(scratch)
       let files = try ExportTreeTests.render(store)
-      let text = files.values.map { String(decoding: $0, as: UTF8.self) }.joined()
+      let text = files.values.map { (String(bytes: $0, encoding: .utf8) ?? "") }.joined()
       for absent in ExportFixture.machinePaths + [
         "/private/", "Other work", "01HZTASK0000000000000OTHR", "01HZAPRV0000000000000NULL",
         "01HZAPRV0000000000000OTHR", "01HZOTHR00000000000000WS02",
@@ -217,7 +219,8 @@ struct ExportCoverageTests {
     _ kind: Column, column: String, value: DatabaseValue, row: Row, db: Database
   ) throws -> [String] {
     func quoted(_ text: String) -> String {
-      "\"" + text.replacingOccurrences(of: "\\", with: "\\\\")
+      "\""
+        + text.replacingOccurrences(of: "\\", with: "\\\\")
         .replacingOccurrences(of: "\"", with: "\\\"")
         .replacingOccurrences(of: "\n", with: "\\n") + "\""
     }
@@ -234,21 +237,25 @@ struct ExportCoverageTests {
     case .plain: return keyed(column, text)
     case .body: return ["\n" + text + "\n"]
     case .reference(let key, let table):
-      let uid = try String.fetchOne(db, sql: "SELECT uid FROM \(table) WHERE id=?", arguments: [value])
+      let uid = try String.fetchOne(
+        db, sql: "SELECT uid FROM \(table) WHERE id=?", arguments: [value])
       return keyed(key, try #require(uid))
     case .linkEnd(let key, let kindColumn):
       let kind: String = row[kindColumn]
       if kind == "task_plan_rev" {
         let task = try #require(
           try Row.fetchOne(
-            db, sql: "SELECT task.uid, rev FROM task_plan_rev JOIN task ON task.id=task_id WHERE task_plan_rev.id=?",
+            db,
+            sql:
+              "SELECT task.uid, rev FROM task_plan_rev JOIN task ON task.id=task_id WHERE task_plan_rev.id=?",
             arguments: [value]))
         return [
           "\"\(key)\": \(quoted(task[0])), \"\(key)_rev\": \(quoted(String(task[1] as Int64)))"
         ]
       }
       let table = try #require(Self.kindTables[kind])
-      let uid = try String.fetchOne(db, sql: "SELECT uid FROM \(table) WHERE id=?", arguments: [value])
+      let uid = try String.fetchOne(
+        db, sql: "SELECT uid FROM \(table) WHERE id=?", arguments: [value])
       return keyed(key, try #require(uid))
     case .excluded: return []
     }

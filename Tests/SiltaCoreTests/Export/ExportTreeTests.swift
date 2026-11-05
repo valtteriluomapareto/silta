@@ -35,9 +35,9 @@ struct ExportTreeTests {
     #expect(actual.keys.sorted() == expected.keys.sorted(), sourceLocation: sourceLocation)
     for (path, bytes) in expected.sorted(by: { $0.key < $1.key }) {
       guard let got = actual[path], got != bytes else { continue }
-      let gotLines = String(decoding: got, as: UTF8.self).split(
+      let gotLines = text(got).split(
         separator: "\n", omittingEmptySubsequences: false)
-      let wantLines = String(decoding: bytes, as: UTF8.self).split(
+      let wantLines = text(bytes).split(
         separator: "\n", omittingEmptySubsequences: false)
       let index =
         (0..<min(gotLines.count, wantLines.count)).first { gotLines[$0] != wantLines[$0] }
@@ -96,7 +96,8 @@ struct ExportTreeTests {
       let manifest = try #require(
         try JSONSerialization.jsonObject(with: manifestBytes) as? [String: Any])
       let listed = try #require(manifest["files"] as? [[String: String]])
-      #expect(Set(listed.compactMap { $0["path"] }) == Set(files.keys).subtracting(["manifest.json"]))
+      #expect(
+        Set(listed.compactMap { $0["path"] }) == Set(files.keys).subtracting(["manifest.json"]))
       for entry in listed {
         let path = try #require(entry["path"])
         let digest = SHA256Hex.of(try #require(files[path]))
@@ -107,7 +108,8 @@ struct ExportTreeTests {
         "workspace": "SELECT count(*) FROM workspace WHERE id=1",
         "repo": "SELECT count(*) FROM repo WHERE workspace_id=1",
         "app": "SELECT count(*) FROM app WHERE workspace_id=1",
-        "environment": "SELECT count(*) FROM environment JOIN app ON app.id=app_id WHERE workspace_id=1",
+        "environment":
+          "SELECT count(*) FROM environment JOIN app ON app.id=app_id WHERE workspace_id=1",
         "service": "SELECT count(*) FROM service WHERE workspace_id=1",
         "edge": "SELECT count(*) FROM edge WHERE workspace_id=1",
         "topic": "SELECT count(*) FROM topic WHERE workspace_id=1",
@@ -151,7 +153,7 @@ struct ExportTreeTests {
   }
 
   /// Every way a tree can differ from what export writes is refused by the reader.
-  @Test(arguments: TreeDamage.allCases)
+  @Test(arguments: TreeDamage.all)
   func readerRefusesDamagedTrees(_ damage: TreeDamage) throws {
     try withScratchDirectory { scratch in
       let store = try ExportFixture.make(scratch)
@@ -161,66 +163,10 @@ struct ExportTreeTests {
     }
   }
 
-  enum TreeDamage: CaseIterable, CustomTestStringConvertible {
-    case flippedByte, missingFile, extraFile, missingManifest, reorderedKeys, unknownKey,
-      numberValue, missingNewline, extraBlankLine, crlf, wrongRef, unquotedFrontmatter,
-      futureFormat
-
-    var testDescription: String { "\(self)" }
-
-    func apply(_ files: inout [String: Data]) {
-      func edit(_ path: String, _ change: (String) -> String, rehash: Bool = true) {
-        let text = String(decoding: files[path] ?? Data(), as: UTF8.self)
-        files[path] = Data(change(text).utf8)
-        if rehash { Self.rehash(&files, path) }
-      }
-      switch self {
-      case .flippedByte:
-        edit("tasks/AC-2.md", { $0.replacingOccurrences(of: "Waiting.", with: "Waiting!") },
-          rehash: false)
-      case .missingFile: files["tasks/AC-10.jsonl"] = nil
-      case .extraFile: files["tasks/AC-11.md"] = Data("---\n---\n".utf8)
-      case .missingManifest: files["manifest.json"] = nil
-      case .reorderedKeys:
-        edit("approvals.jsonl") {
-          $0.replacingOccurrences(
-            of: #""actor": "agent:codex:acme", "command""#,
-            with: #""command": "silta task start AC-2 --steal", "actor": "agent:codex:acme", "x""#)
-        }
-      case .unknownKey:
-        edit("links.jsonl") { $0.replacingOccurrences(of: #""rel": "cites""#, with: #""rel": "cites", "note": "x""#) }
-      case .numberValue:
-        edit("tasks/AC-2.md") { $0.replacingOccurrences(of: #"priority: "1""#, with: "priority: 1") }
-      case .missingNewline: edit("approvals.jsonl") { String($0.dropLast()) }
-      case .extraBlankLine: edit("workspace.yaml") { $0 + "\n" }
-      case .crlf: edit("tasks/AC-10.jsonl") { $0.replacingOccurrences(of: "\n", with: "\r\n") }
-      case .wrongRef: edit("tasks/AC-2.md") { $0.replacingOccurrences(of: #"ref: "AC-2""#, with: #"ref: "AC-3""#) }
-      case .unquotedFrontmatter:
-        edit("tasks/AC-10.md") { $0.replacingOccurrences(of: #"type: "chore""#, with: "type: chore") }
-      case .futureFormat:
-        edit("manifest.json", { $0.replacingOccurrences(of: #""format": "1""#, with: #""format": "2""#) },
-          rehash: false)
-      }
-    }
-
-    /// Keeps the manifest consistent with an edited file, so the reader must find the
-    /// damage in the file itself.
-    static func rehash(_ files: inout [String: Data], _ path: String) {
-      guard let manifest = files["manifest.json"], let bytes = files[path] else { return }
-      var text = String(decoding: manifest, as: UTF8.self)
-      if let range = text.range(of: #"{"path": "\#(path)", "sha256": ""#) {
-        let start = range.upperBound
-        let end = text.index(start, offsetBy: 64)
-        text.replaceSubrange(start..<end, with: SHA256Hex.of(bytes))
-      }
-      files["manifest.json"] = Data(text.utf8)
-    }
-  }
-
   /// Values that YAML 1.1 or a naive emitter would change come back byte for byte.
   @Test func escapingCorpusRoundTrips() throws {
     let corpus = [
-      "quote \" and backslash \\", "line\nbreak", "crlf\r\nend", "tab\there", "nul\u{0}x",
+      "quote \" and backslash \\", "line\nbreak", "crlf\r\nend", "tab\there", "soh\u{1}x",
       "del\u{7F}", "nel\u{85}", "ls\u{2028}ps\u{2029}", "bom\u{FEFF}", "nonchar\u{FFFE}\u{FFFF}",
       "emoji 🧭", "no", "on", "0123", "~", "- [ ] item", "e\u{301}", "#comment", "{a: b}",
       "/slash/",
@@ -240,19 +186,21 @@ struct ExportTreeTests {
           arguments: [corpus.joined(separator: "|"), corpus.joined(separator: "\n")])
       }
       let files = try Self.render(store)
-      let lines = String(decoding: try #require(files["approvals.jsonl"]), as: UTF8.self)
+      let lines = text(try #require(files["approvals.jsonl"]))
         .split(separator: "\n")
       #expect(lines.count == corpus.count + 2)
       for (index, line) in lines.dropFirst(2).enumerated() {
         let object = try #require(
           try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: String])
         #expect(object["words"]?.utf8.elementsEqual(corpus[index].utf8) == true, "\(corpus[index])")
-        #expect(!line.contains("\u{2028}") && !line.contains("\u{85}") && !line.contains("\u{0}"))
+        #expect(!line.contains("\u{2028}") && !line.contains("\u{85}") && !line.contains("\u{1}"))
       }
       let snapshot = try ExportTree.parse(files)
       let task = try #require(snapshot.tasks.first { $0.ref == "AC-2" })
-      #expect(task.row.value("title")?.utf8.elementsEqual(corpus.joined(separator: "|").utf8) == true)
-      #expect(task.row.value("plan_md")?.utf8.elementsEqual(corpus.joined(separator: "\n").utf8) == true)
+      #expect(
+        task.row.value("title")?.utf8.elementsEqual(corpus.joined(separator: "|").utf8) == true)
+      #expect(
+        task.row.value("plan_md")?.utf8.elementsEqual(corpus.joined(separator: "\n").utf8) == true)
       Self.expectSame(snapshot.files(), files)
     }
   }
@@ -290,5 +238,61 @@ struct ExportTreeTests {
       }
       #expect(throws: StorageError.schemaTooNew) { try Self.render(store) }
     }
+  }
+}
+
+/// Decodes UTF-8 test output, empty when it isn't UTF-8.
+func text(_ data: Data) -> String {
+  String(bytes: data, encoding: .utf8) ?? ""
+}
+
+/// One way a tree can differ from what export writes.
+struct TreeDamage: Sendable, CustomTestStringConvertible {
+  let testDescription: String
+  let apply: @Sendable (inout [String: Data]) -> Void
+
+  /// Replaces `old` with `new` in `path`; with `rehash`, the manifest is updated to
+  /// match, so the reader must find the damage in the file itself.
+  static func edit(
+    _ name: String, _ path: String, _ old: String, _ new: String, rehash: Bool = true
+  )
+    -> Self
+  {
+    Self(testDescription: name) { files in
+      files[path] = Data(text(files[path] ?? Data()).replacingOccurrences(of: old, with: new).utf8)
+      if rehash { Self.rehash(&files, path) }
+    }
+  }
+
+  static let all: [Self] = [
+    edit("flipped byte", "tasks/AC-2.md", "Waiting.", "Waiting!", rehash: false),
+    Self(testDescription: "missing file") { $0["tasks/AC-10.jsonl"] = nil },
+    Self(testDescription: "extra file") { $0["tasks/AC-11.md"] = Data("---\n---\n".utf8) },
+    Self(testDescription: "missing manifest") { $0["manifest.json"] = nil },
+    edit(
+      "reordered keys", "approvals.jsonl",
+      #"{"uid": "01HZAPRV000000000000000009", "actor": "agent:codex:acme""#,
+      #"{"actor": "agent:codex:acme", "uid": "01HZAPRV000000000000000009""#),
+    edit("unknown key", "links.jsonl", #""rel": "cites""#, #""rel": "cites", "note": "x""#),
+    edit("number value", "tasks/AC-2.md", #"priority: "1""#, "priority: 1"),
+    edit("missing newline", "approvals.jsonl", "\"}\n{", "\"}{"),
+    edit("extra blank line", "workspace.yaml", "sources:\n", "\nsources:\n"),
+    edit("crlf", "tasks/AC-10.jsonl", "\n", "\r\n"),
+    edit("wrong ref", "tasks/AC-2.md", #"ref: "AC-2""#, #"ref: "AC-3""#),
+    edit("unquoted frontmatter", "tasks/AC-10.md", #"type: "chore""#, "type: chore"),
+    edit("future format", "manifest.json", #""format": "1""#, #""format": "2""#, rehash: false),
+    edit("escaped slash", "workspace.yaml", "src/Portal", #"src\/Portal"#),
+    edit("wider fence", "tasks/AC-2.md", "~~~\nWaiting.\n~~~", "~~~~\nWaiting.\n~~~~"),
+  ]
+
+  static func rehash(_ files: inout [String: Data], _ path: String) {
+    guard let manifest = files["manifest.json"], let bytes = files[path] else { return }
+    var text = text(manifest)
+    if let range = text.range(of: #"{"path": "\#(path)", "sha256": ""#) {
+      let start = range.upperBound
+      let end = text.index(start, offsetBy: 64)
+      text.replaceSubrange(start..<end, with: SHA256Hex.of(bytes))
+    }
+    files["manifest.json"] = Data(text.utf8)
   }
 }

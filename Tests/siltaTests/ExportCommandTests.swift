@@ -25,7 +25,10 @@ struct ExportCommandTests {
           """)
     }
     for arguments in [
-      ["--ws", "acme", "task", "add", "--start", "0123: on #x", "-m", "Use the API.\n~~~\n", "--app", "none"],
+      [
+        "--ws", "acme", "task", "add", "--start", "0123: on #x", "-m", "Use the API.\n~~~\n",
+        "--app", "none",
+      ],
       ["--ws", "acme", "comment", "AC-1", "-m", "Which callback URL?", "--kind", "question"],
       ["--ws", "acme", "task", "plan", "AC-1", "-m", "- [ ] Inspect"],
     ] {
@@ -35,7 +38,10 @@ struct ExportCommandTests {
   }
 
   static func masked(_ text: String, _ scratch: URL) -> String {
-    text.replacingOccurrences(of: scratch.path, with: "<scratch>")
+    let path = scratch.path
+    let short = path.hasPrefix("/private/") ? String(path.dropFirst("/private".count)) : path
+    return text.replacingOccurrences(of: path, with: "<scratch>")
+      .replacingOccurrences(of: short, with: "<scratch>")
   }
 
   @Test func exportsToTheDefaultRootWithTextAndJSONReceipts() throws {
@@ -73,13 +79,14 @@ struct ExportCommandTests {
       #expect(result.termination == .exit(0), "\(result.stderr)")
       let tree = scratch.appending(path: "work/out/acme")
       let workspace = try #require(
-        try Yams.load(yaml: try String(contentsOf: tree.appending(path: "workspace.yaml"), encoding: .utf8))
+        try Yams.load(
+          yaml: try String(contentsOf: tree.appending(path: "workspace.yaml"), encoding: .utf8))
           as? [String: Any])
       let row = try #require(workspace["workspace"] as? [String: Any])
       #expect(row["name"] as? String == "no")
       #expect(row["settings"] as? String == #"{"review_gate":"none"}"#)
       #expect(row["next_task_seq"] as? String == "2")
-      #expect(workspace["repos"] as? [Any] != nil)
+      #expect(workspace["repos"] is [Any])
       let markdown = try String(contentsOf: tree.appending(path: "tasks/AC-1.md"), encoding: .utf8)
       let parts = markdown.components(separatedBy: "---\n")
       let frontmatter = try #require(try Yams.load(yaml: parts[1]) as? [String: Any])
@@ -93,8 +100,10 @@ struct ExportCommandTests {
         let object = try JSONSerialization.jsonObject(with: Data(line.utf8))
         #expect(object is [String: String])
       }
-      let text = try ExportServiceFiles.all(tree).values.map { String(decoding: $0, as: UTF8.self) }
-      #expect(!text.contains { $0.contains(scratch.path) })
+      let text = try ExportServiceFiles.all(tree).values.map {
+        (String(bytes: $0, encoding: .utf8) ?? "")
+      }
+      #expect(!text.contains { Self.masked($0, scratch) != $0 || $0.contains("/private/") })
     }
   }
 
@@ -130,7 +139,8 @@ struct ExportCommandTests {
         try ExportServiceFiles.all(scratch.appending(path: "work/shared/acme"))
           == (try ExportServiceFiles.all(scratch.appending(path: "work/ref/acme"))))
       #expect(
-        try FileManager.default.contentsOfDirectory(atPath: scratch.appending(path: "work/shared").path)
+        try FileManager.default.contentsOfDirectory(
+          atPath: scratch.appending(path: "work/shared").path)
           == ["acme"])
     }
   }

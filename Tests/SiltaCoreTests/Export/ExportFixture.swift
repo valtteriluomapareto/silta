@@ -81,19 +81,21 @@ enum ExportFixture {
       """, [1 + o, acme])
     try run(
       """
-      INSERT INTO edge(id,uid,workspace_id,from_app_id,to_app_id,to_service_id,kind,summary,code_refs)
-      VALUES
-      (?,'01HZEDGE000000000000000009',?,?,NULL,?,'calls','Sends receipts','["portal:src/Mail.cs"]'),
+      INSERT INTO edge(id,uid,workspace_id,from_app_id,to_app_id,to_service_id,kind,summary,
+        code_refs) VALUES
+      (?,'01HZEDGE000000000000000009',?,?,NULL,?,'calls','Sends receipts',
+        '["portal:src/Mail.cs"]'),
       (?,'01HZEDGE000000000000000001',?,?,?,NULL,'reads','Reads orders','[]')
       """, [1 + o, acme, 1 + o, 1 + o, 2 + o, acme, 1 + o, 2 + o])
     try run(
       """
       INSERT INTO topic(id,uid,workspace_id,slug,previous_slugs,name,summary,status) VALUES
-      (?,'01HZTOPC000000000000000001',?,'reports','["raports"]','Reports','Monthly reports','active')
+      (?,'01HZTOPC000000000000000001',?,'reports','["raports"]','Reports','Monthly reports',
+        'active')
       """, [1 + o, acme])
     try run(
-      "INSERT INTO topic_alias(workspace_id,topic_id,alias) VALUES(?,?,'raportit'),(?,?,'lomakkeet')",
-      [acme, 1 + o, acme, 1 + o])
+      "INSERT INTO topic_alias(workspace_id,topic_id,alias) VALUES(?,?,'raportit'),(?,?,?)",
+      [acme, 1 + o, acme, 1 + o, "lomakkeet"])
     try run(
       """
       INSERT INTO source(id,uid,workspace_id,kind,root,include,exclude,repo_id) VALUES

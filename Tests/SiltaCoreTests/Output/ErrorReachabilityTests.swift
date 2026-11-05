@@ -189,6 +189,17 @@ extension ActorError: ErrorExamples {
   }
 }
 
+extension ExportError: ErrorExamples {
+  static var examples: [ExportError] {
+    [
+      .notAnExport(path: "/tmp/acme-notes/acme", entry: "README.md"),
+      .insideRepo(path: "/tmp/acme/platform/exports", repo: "platform"),
+      .unsupported("docs"), .unwritable(path: "/tmp/acme-notes"),
+      .invalidTree("links.jsonl does not match its sha256"),
+    ]
+  }
+}
+
 /// Proves every `ErrorCode` is produced by some error type (spec §16, D22).
 ///
 /// This shows each code is *mapped* by a registered type's examples, not that a
@@ -201,6 +212,7 @@ struct ErrorReachabilityTests {
     ScanError.self, CommentError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
+    ExportError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
