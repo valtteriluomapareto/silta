@@ -88,4 +88,146 @@ struct InitCommandTests {
     }
   }
 
+  static func fixtures(_ scratch: URL) throws -> URL {
+    let fixtures = scratch.appending(path: "acme")
+    let generated = try SiltaBinary.runProcess(
+      URL(filePath: "/bin/bash"),
+      [ScenarioRunner.repository.appending(path: "scripts/make-fixtures.sh").path, fixtures.path],
+      in: scratch)
+    #expect(generated.termination == .exit(0))
+    return fixtures
+  }
+
+  static func gitRepo(named name: String, in scratch: URL, parent: URL) throws -> URL {
+    let repo = parent.appending(path: name)
+    try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+    try Self.git(["init", "-q", "-b", "main"], in: scratch, cwd: repo)
+    try Data("Acme\n".utf8).write(to: repo.appending(path: "readme"))
+    try Self.git(["add", "."], in: scratch, cwd: repo)
+    try Self.git(
+      ["-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm", "Acme"],
+      in: scratch, cwd: repo)
+    try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
+    return repo
+  }
+
+  @Test func chosenSlugAndPrefixNameANewWorkspace() throws {
+    for json in [false, true] {
+      try withScratchDirectory { scratch in
+        let fixtures = try Self.fixtures(scratch)
+        let scan = try SiltaBinary.run(
+          ["init", "--scan", fixtures.path, "--slug", "work", "--prefix", "WK"]
+            + (json ? ["--json"] : []), in: scratch)
+        #expect(scan.termination == .exit(0))
+        Golden.forTests().check(scan.stdout, json ? "init-scan-slug.json" : "init-scan-slug.txt")
+        let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+        #expect(list.stdout.contains("\"slug\":\"work\""))
+        #expect(list.stdout.contains("\"task_prefix\":\"WK\""))
+      }
+    }
+  }
+
+  @Test func prefixWithoutSlugKeepsTheDirectorySlug() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      let scan = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, "--prefix", "WK", "--json"], in: scratch)
+      #expect(scan.termination == .exit(0))
+      Golden.forTests().check(scan.stdout, "init-scan.json")
+      let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(list.stdout.contains("\"slug\":\"acme\""))
+      #expect(list.stdout.contains("\"task_prefix\":\"WK\""))
+    }
+  }
+
+  @Test func chosenSlugThatAlreadyExistsIsRefusedWithTheRescanCommand() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      let first = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, "--slug", "work"], in: scratch)
+      #expect(first.termination == .exit(0))
+      let before = try SiltaBinary.run(["ws", "show", "work"], in: scratch)
+      #expect(before.termination == .exit(0))
+      for flags in [["--slug", "work"], ["--prefix", "WK"]] {
+        let again = try SiltaBinary.run(
+          ["init", "--scan", fixtures.path] + flags + ["--json"], in: scratch)
+        #expect(again.termination == .exit(6))
+        #expect(again.stdout.contains("\"code\":\"conflict\""))
+        #expect(again.stdout.contains(fixtures.path))
+        #expect(again.stdout.contains("--ws"))
+        #expect(again.stdout.contains("work"))
+        #expect(try SiltaBinary.run(["ws", "show", "work"], in: scratch).stdout == before.stdout)
+      }
+      let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(list.stdout.components(separatedBy: "\"slug\":\"work\"").count == 2)
+    }
+  }
+
+  @Test func namingOptionsAreRefusedOnARescan() throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      let result = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, "--ws", "work", "--slug", "work", "--prefix", "WK",
+         "--json"], in: scratch)
+      #expect(result.termination == .exit(1))
+      #expect(result.stdout.contains("\"code\":\"invalid\""))
+      #expect(result.stdout.contains("--slug"))
+      #expect(result.stdout.contains("--prefix"))
+      #expect(result.stdout.contains("silta init --help"))
+      let list = try SiltaBinary.run(["ws", "ls"], in: scratch)
+      #expect(list.stdout.contains("No workspaces"))
+    }
+  }
+
+  @Test(arguments: [("--slug", "My Projects"), ("--prefix", "A_")])
+  func invalidChosenNamesAreRefused(flag: String, value: String) throws {
+    try withScratchDirectory { scratch in
+      let fixtures = try Self.fixtures(scratch)
+      let result = try SiltaBinary.run(
+        ["init", "--scan", fixtures.path, flag, value, "--json"], in: scratch)
+      #expect(result.termination == .exit(1))
+      #expect(result.stdout.contains("\"code\":\"invalid\""))
+      #expect(result.stdout.contains(flag))
+      let list = try SiltaBinary.run(["ws", "ls"], in: scratch)
+      #expect(list.stdout.contains("No workspaces"))
+    }
+  }
+
+  @Test func invalidDirectoryNamesNameTheFlagToUse() throws {
+    try withScratchDirectory { scratch in
+      for name in ["My Projects", ".hidden"] {
+        let root = scratch.appending(path: name)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let result = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
+        #expect(result.termination == .exit(1))
+        #expect(result.stdout.contains("\"code\":\"invalid\""))
+        #expect(result.stdout.contains("--slug"))
+      }
+    }
+  }
+
+  @Test func aDirectoryPrefixThatIsNotValidNamesThePrefixFlag() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "a_b")
+      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+      let result = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
+      #expect(result.termination == .exit(1))
+      #expect(result.stdout.contains("\"code\":\"invalid\""))
+      #expect(result.stdout.contains("--prefix"))
+    }
+  }
+
+  @Test func aSingleLetterDirectoryGetsASingleLetterPrefix() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "projects")
+      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+      let repo = try Self.gitRepo(named: "x", in: scratch, parent: root)
+      let result = try SiltaBinary.run(["init", "--scan", repo.path, "--json"], in: scratch)
+      #expect(result.termination == .exit(0))
+      let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(list.stdout.contains("\"slug\":\"x\""))
+      #expect(list.stdout.contains("\"task_prefix\":\"X\""))
+    }
+  }
+
 }

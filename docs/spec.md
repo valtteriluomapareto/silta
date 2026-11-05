@@ -1379,7 +1379,7 @@ run.
 
 ```
 # setup & health
-silta init [--scan <dir>…]                       [M1] create DB; discover repos, worktrees, branch-apps; open YAML
+silta init [--scan <dir>…] [--slug <slug>] [--prefix <XX>]   [M1] create DB; discover repos, worktrees, branch-apps; open YAML
 silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] config as YAML (validated on save, "did you mean"); -F for agents
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
@@ -1998,9 +1998,15 @@ repo paths are excluded from this view. A `workspace` change-log event invalidat
 that workspace's complete configuration, including omitted children.
 
 `init --scan` discovers repos at the root and at most two child levels, without fetching.
-The first directory's lowercased name is the workspace slug and its first two letters
-uppercase are the task prefix. Remote `X`/`X-prod` pairs create app stubs with a prod ref;
-main or master provides a default app when its ref is not already represented.
+A new workspace's slug is the first directory's lowercased name unless `--slug` names
+another; its task prefix is the slug's first two letters uppercased unless `--prefix`
+names another. Both values use the identifier shape `ws edit` accepts, and `--prefix`
+works without `--slug`. A slug that names an existing workspace is refused with the
+rescan command as `next`; `--slug` and `--prefix` are invalid with `--ws`, which rescans.
+A directory name that is not a valid slug, or does not yield a valid prefix, fails with
+an error that names `--slug` or `--prefix` as the fix. Remote `X`/`X-prod` pairs
+create app stubs with a prod ref; main or master provides a default app when its ref
+is not already represented.
 Worktrees and path aliases resolve to one canonical main clone. Initial scans create
 configuration; rescans only refresh local paths for registered repo slugs and preserve
 edited configuration. `--ws` targets an existing workspace for path rebinding.
