@@ -27,6 +27,8 @@ scripts/lint-check.sh
 
 SILTA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/silta-verify.XXXXXX")"
 export SILTA_HOME
+last_test_log=""
+trap 'rm -rf "$SILTA_HOME"; rm -f "$last_test_log"' EXIT
 
 # SwiftPM sandboxes manifest builds, which macOS refuses inside another sandbox such as
 # Codex's seatbelt (it sets CODEX_SANDBOX). That outer sandbox already confines the build.
@@ -60,8 +62,6 @@ run_tests() {
   fi
   last_test_log="$test_log"
 }
-last_test_log=""
-trap 'rm -rf "$SILTA_HOME"; rm -f "$last_test_log"' EXIT
 
 step "test"
 if [[ "$mode" == full ]]; then
