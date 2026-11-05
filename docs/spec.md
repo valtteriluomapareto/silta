@@ -150,7 +150,8 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
   (`Silta.app/Contents/Helpers/silta`). Every write transaction checks
   `min_writer_version` (§17).
 - **Data directory.** `SILTA_HOME` (default `~/.silta`) relocates everything. Tests and
-  evals use it, and the real data is never touched.
+  evals use it, and the real data is never touched. Private reports live in
+  `$SILTA_HOME/reports/<slug>/` (§22.1).
 
 ## 5. Concepts
 
@@ -523,7 +524,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|---|
 | Human | `task add` | `todo` |
 | Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
-| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
+| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --parent AC-3` (with or without `--split`) | `todo` |
 | Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it. With the setting `proposals: ask` (D39), human-only instead: the agent asks in chat first |
 | Agent, with the human's go-ahead (D39) | a write that would be `proposed`, with `--approved` | `todo`, under either setting |
 
@@ -880,21 +881,39 @@ inbox is short and grouped:
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
   agent asks first, and maps "the rest" only to items it showed.
 
-**Available M1 discussion query:** every text read explicitly says that grouped
-blockers, proposals and promoted attention are not yet included; JSON identifies
-`scope: "discussion"`. This marker will change when the other categories ship.
+**Available M1 query:** text identifies current local attention and says tracker
+status is not refreshed; JSON uses `scope: "local"`. Review requests and doc
+proposals wait for M2. Promoted attention consists of open, unarchived local task
+pointers, ordered by task id, with their `external_ref` and a read-only `task show`
+action. It does not infer status from the tracker (M4).
+
+Only `kind` and `next` are required on every item. Discussion items retain their
+post fields; task/group items add `tasks` (each with `ref`, `title`, and applicable
+`why`, `on`, `follow_up_at`, `external_ref`). Due party/URL groups add `target` and
+the earliest `follow_up_at` among their due members. Group by stored target before
+redacting displayed URLs; two targets may have identical redacted text. Due tasks
+without a party/URL form one item each, including no-`--on` and unfinished task-only
+blocks. Ready/re-plan tasks appear only in the first category, ordered by task id;
+due groups sort by earliest follow-up, first task id, then stored target. Follow-up
+is due at the start of its UTC day. Ready `next` is `task unblock`; every other block
+uses `task ls --status todo`, just like `task start` (D35), with inspection actions
+for every task. Blocked and proposed attention remains visible despite explicit
+archiving. Proposals appear only while `created_at` is strictly newer than 14 days
+before the read instant, newest first with descending task id breaking ties;
+`--all` includes older proposals without changing their status. Proposal actions
+are direct for human callers; agent callers get an ask-human instruction naming
+only that displayed proposal's accept/drop commands and approval placeholder.
+
 Within each discussion category, stored post id breaks time ties. Each live post
 appears once, with question/answer attention taking precedence over claimed-task
 `discussion`. The latter retains the original `post_kind`, and an answer names its
-question via `reply_to`. The cap applies after ordering. `silta schema inbox`
-publishes the shape: only `kind` and `next` are required on every item; post fields
-are optional so grouped items can add multiple task/ref fields. Discussion items
-carry those post fields. Every command is qualified with the selected workspace;
-confirmation guidance follows the relay rule above. Closed and archived tasks
-remain included when they have matching live discussion. Promoted tasks are
-omitted because local discussion mutations refuse; `--all` does not include them.
-Reading a discussion item does not clear it: it clears on the claimer's next write
-to its task, as the item says.
+question via `reply_to`. The cap applies after grouping and ordering across all
+categories. `silta schema inbox` publishes the shape. Every command is qualified
+with the selected workspace; confirmation guidance follows the relay rule above.
+Closed and archived tasks remain included when they have matching live discussion.
+Promoted task discussion is omitted because local mutations refuse; `--all` does
+not include it. Reading discussion does not clear it: it clears on the claimer's
+next write to its task, as the item says.
 
 It lists:
 - live open questions mentioning the actor with no qualifying live answer (an answer
@@ -1214,15 +1233,19 @@ settings (D39). It covers:
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
   - Proposals: usually none; never more than two per session, and only what you'd bet
-    the human wants. `task add --start` is only for work the human asked for. If
-    the human asked you to add a task for later, pass their words as `--approved`,
-    so it becomes `todo` without triage (D39).
+    the human wants. `task add --start` is only for work the human asked for. A
+    subtask of a task you still claim (`task add --parent AC-12`) starts as `todo`
+    and is not a proposal (§8), so it needs no `--approved`; passing it only warns
+    `approval_unused`. `submit`, `block` and a handoff release the claim, and a
+    subtask added after that is a proposal again. If the human asked you to add a task for later, pass their
+    words as `--approved`, so it becomes `todo` without triage (D39).
   - If `brief` shows `proposals: ask` (D39): don't propose. Name each idea and its
     `silta task add` command in your message, and add the ones the human wants with
     `--approved`. With no human present, list ideas under "what's left" in the
     handoff or the `done` result, never in a question, a TODO comment or a file.
   - "What needs me?" means `silta inbox --for me`, relayed as one short message with
-    the choices to make.
+    the choices to make. Map "the rest" only to proposals actually shown, and ask
+    before running triage.
   - "Work the backlog": see §8, Working the backlog.
 - **Questions:** ask in chat; record only when blocked beyond this session. Use
   `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
@@ -1584,8 +1607,9 @@ chosen `--slug` and `--prefix` keep their
 case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
 starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
 (`AC-1`). A repo's slug is its directory name normalized — lowercased, other characters
-to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. The
-DF3 onboarding scans only the chosen clones:
+to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. A clone whose slug is
+`none` is refused, because that word means non-code work, and the conflict names its path.
+The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 
 ## 17. Storage, concurrency, technology
@@ -1634,20 +1658,11 @@ Rust would win only if:
 - Windows teammates must run `silta` themselves, or
 - Turso becomes required.
 
-```
-silta/
-  Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
-  Sources/SiltaCore/           # domain, policy, storage (GRDB), git, actors, brief, output
-  Sources/silta/               # ArgumentParser commands, the entry point
-  Sources/SiltaTestSupport/    # fakes, golden helper, scratch dirs; used by tests and the scenario runner only
-  Tests/SiltaCoreTests/        # unit + fixture git repos
-  Tests/siltaTests/            # golden CLI output + exit codes
-  Tests/Stress/                # multi-process tests driving the built binary
-  Tests/Scenarios/             # scenario files run in a temporary SILTA_HOME (§20.1)
-  Evals/                       # agent evaluation suite (§21)
-  scripts/                     # run-guards.sh, verify.sh, lint-*.sh, make-fixtures.sh, guards/, ci/
-  App/SiltaApp.xcodeproj       # M5
-```
+**Layout.** One Swift package (swift-tools 6.2, Swift 6 mode, macOS 15+) with the
+`SiltaCore`, `silta` and `SiltaTestSupport` targets and the `SiltaCoreTests` and
+`siltaTests` test targets. What each target and folder holds is in
+[coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). Still to come:
+`Evals/`, the agent evaluation suite (§21, S16), and `App/SiltaApp.xcodeproj` (M5).
 
 **Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
@@ -1674,11 +1689,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
-  - Slack and Google keys
+  - Slack, Google and Anthropic keys
   - JWTs (except obvious placeholders)
   - Finnish personal identity codes (henkilötunnus, as PII)
 
-  There's no entropy check in v1.
+  There's no entropy check in v1, and a token hard-wrapped across lines is not detected.
 - **Allowlist:** 40- and 64-character hex SHAs, UUIDs, refs (§5.1), and
   `<placeholder>`-style values. Exemptions cover whole candidate values; a containing
   reference does not exempt an embedded credential. Explicit credential fields
@@ -2058,7 +2073,7 @@ steps, questions, handoffs and results.
     own, so the result asks every time.
   - Friction that needs its own fix, or that comes up outside a task, also becomes a
     task with the topic `dogfood`.
-  - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
+  - `scripts/dogfood-report.sh [--ws <slug>] [--since <YYYY-MM-DD>]` (built in DF) prints a
     Markdown report from the command logs (§19) and the tasks. `--since` defaults
     to the date of the newest report in `docs/dogfood/reports/`, so reports leave
     no gaps, and a `--since` after the report day is refused. The report states its
@@ -2091,6 +2106,15 @@ steps, questions, handoffs and results.
     actor's calls and approvals out. Unreadable log lines (malformed, or missing
     the expected fields) are only counted too. Failures before the environment is
     set up (a bad `SILTA_*` value) aren't logged, so the report can't see them.
+    With `--ws <slug>` it reports on any workspace privately (DF3): it refuses a slug
+    that is no workspace identifier before using it, writes the report to
+    `$SILTA_HOME/reports/<slug>/<YYYY-MM-DD>.md` instead of printing it, takes the
+    default `--since` from that folder, and never replaces an existing report. It
+    refuses a destination inside a git work tree or behind a symlink in its own
+    `reports/` folders, never follows whatever already sits at the report's path, and
+    gives a slug too long for a folder name a shortened folder ending in a hash.
+    Friction lines and `dogfood` tasks belong to the `silta` workspace (D36), so other
+    workspaces' reports say they aren't collected.
   - Once per wave, at the latest every 60 days so no log has expired, an agent
     runs the report with the maintainer, who reviews it before it is added through
     a pull request as `docs/dogfood/reports/<YYYY-MM-DD>.md`, named by the report's
@@ -2187,10 +2211,11 @@ characters to `-`, trimmed, and `repo` when nothing remains — so `My Projects`
 repo `my-projects`. That slug is only an identifier: the real path is stored as the
 machine-local repo path, so nothing on disk is renamed and worktrees and path aliases
 resolve to their canonical main clone as they are. Two directories that normalize to one
-slug are a duplicate, checked on the normalized names before any rename. A clone named
-`none`, the word that means non-code work, is stored as `none-repo`, or the next free
-`none-repo-N` when another clone in the scan normalizes to that name; the same clone keeps
-its stored name on every full or partial rescan. A task prefix another workspace holds, or
+slug are a duplicate, checked on the normalized names before anything is written. A clone named
+`none`, the word that means non-code work in `--app none`, is a reserved repo slug, so a
+clone whose directory name normalizes to it is refused: the conflict names the clone's
+path and asks for a different directory name rather than renaming it. Nothing is written
+and no stored path moves. A task prefix another workspace holds, or
 a clone path another workspace already binds, is a conflict that names the holder and a
 command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
 or master provides a default app when its ref is not already represented.

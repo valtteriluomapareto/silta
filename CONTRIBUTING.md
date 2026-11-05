@@ -20,15 +20,15 @@ lint result differs from CI, trust CI's pinned versions.
 
 | Command | What it does | What it doesn't prove |
 |---|---|---|
-| `scripts/run-guards.sh` | Repository guards: core boundary, determinism, test waits, plan references, docs links, plans board | That the code builds or behaves |
+| `scripts/run-guards.sh` | Guard self-tests, then the repository guards: core boundary, determinism, test waits, plan references, core hygiene, `try?` reasons, coded errors, package features, package graph, docs links, plans board | That the code builds or behaves |
 | `python3 -B -m unittest discover -s scripts/tests` | Guard self-tests: each guard passes a clean tree and fails a planted violation | — |
 | `scripts/lint-check.sh` | swift-format and SwiftLint in `--strict` mode, no changes | Behaviour |
 | `scripts/lint-fix.sh` | Apply swift-format and SwiftLint fixes | — |
 | `scripts/verify.sh quick` | Guards, lint, `swift build` with warnings as errors, `swift test` (a run with zero tests fails) | Concurrency under load, real agent use |
 | `scripts/verify.sh full` | `quick` plus stress/scenarios (`SILTA_SLOW_TESTS=1`) and strict hook-scale/Git-deadline checks, each run separately after concurrent work | Real agent use (spec §21 evals) |
 
-Before a Swift package exists, the build and test steps report "skipped" and the
-guards still run.
+Each script's header comment says how to run it. What each target and folder holds is
+in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
 
 ## Workflow
 

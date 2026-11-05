@@ -133,4 +133,37 @@ struct InboxCorrectionTests {
       }
     }
   }
+  @Test(arguments: ["human:acme", "agent:claude:asker", "agent:codex:other"])
+  func foreignQuestionProtectionUsesWholeActor(asker: String) async throws {
+    try await withScratchDirectory { home in
+      let clock = FakeClock(now: TaskServiceTests.now)
+      let env = try await CommentTests.setup(home, clock: clock)
+      let owner = TaskService(environment: env)
+      let foreign = try Self.service(home, #require(ActorID.parse(asker)), clock)
+      try Self.post(foreign, kind: "question", to: [env.actor.description])
+      try Self.post(owner, kind: "answer", reply: "AC-1/1")
+      #expect(try owner.inbox().items.isEmpty)
+      let failure = Result { try owner.acceptComment("AC-1/2") }
+      if case .success = failure { Issue.record("Accepted own answer to a foreign question") }
+      let pending = try foreign.inbox().items
+      #expect(pending.map(\.ref) == ["AC-1/2"])
+      #expect(pending.first?.next == ["silta --ws 'acme' comment accept 'AC-1/2'"])
+    }
+  }
+
+  @Test func callerAddresseeCannotResolveViaOutsiderRelayGuidance() async throws {
+    try await withScratchDirectory { home in
+      let clock = FakeClock(now: TaskServiceTests.now)
+      let env = try await CommentTests.setup(home, clock: clock)
+      let owner = TaskService(environment: env)
+      let asker = try Self.service(home, .human(name: "acme"), clock)
+      try Self.post(asker, kind: "question", to: ["human:acme", env.actor.description])
+      try Self.post(owner, kind: "answer", reply: "AC-1/1")
+      let items = try owner.inbox(for: "human:acme").items
+      #expect(items.map(\.ref) == ["AC-1/2"])
+      #expect(items.first?.next == ["silta --ws 'acme' task show 'AC-1' --timeline"])
+      #expect(!items.flatMap(\.next).contains { $0.hasPrefix("ask human:") })
+    }
+  }
+
 }

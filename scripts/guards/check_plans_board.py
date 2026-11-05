@@ -1,4 +1,4 @@
-"""The plans board in docs/README.md mirrors docs/plans/ (AGENTS.md invariant 6, D15)."""
+"""The plans board in docs/README.md mirrors docs/plans/ (AGENTS.md invariant 7, D15)."""
 
 from __future__ import annotations
 

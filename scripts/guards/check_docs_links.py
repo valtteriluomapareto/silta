@@ -1,4 +1,4 @@
-"""Relative links in markdown resolve (AGENTS.md invariant 5).
+"""Relative links in markdown resolve (AGENTS.md invariant 6).
 
 External links (any URL scheme) and pure anchors are not checked. Links inside fenced
 code blocks and inline code spans are ignored.

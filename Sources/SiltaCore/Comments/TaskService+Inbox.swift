@@ -1,8 +1,9 @@
+import Foundation
 import GRDB
 
 extension TaskService {
-  /// Reads discussion attention in one snapshot. `me` means the captured human;
-  /// nil means the caller. Promoted tasks are excluded because local actions refuse.
+  /// Reads local attention in one snapshot. `me` means the captured human;
+  /// nil means the caller. Human categories still build actions for the caller.
   /// Reads never update claims, discussion, read markers or task state.
   package func inbox(for target: String? = nil, all: Bool = false) throws -> InboxResult {
     let actor: ActorID
@@ -17,11 +18,16 @@ extension TaskService {
     }
     let slug = try selected(), command = "silta --ws " + shellWord(slug)
     return try environment.db.read { db in
-      let attention = try Self.attention(
-        for: actor, workspaceID: Self.workspaceID(slug, in: db), in: db)
-      let items = (all ? attention : Array(attention.prefix(12))).map {
+      let workspaceID = try Self.workspaceID(slug, in: db), at = environment.clock.now()
+      let discussion = try Self.attention(for: actor, workspaceID: workspaceID, in: db).map {
         inboxItem($0, actor: actor, command: command)
       }
+      let attention =
+        actor.isHuman
+        ? try inboxBlocks(workspaceID, at: at, command: command, in: db) + discussion
+          + inboxBacklog(workspaceID, at: at, all: all, command: command, in: db)
+        : discussion
+      let items = all ? attention : Array(attention.prefix(12))
       let remaining = attention.count - items.count
       return InboxResult(
         actor: actor.description, items: items, remaining: remaining,
