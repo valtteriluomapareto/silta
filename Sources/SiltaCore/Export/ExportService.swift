@@ -93,9 +93,10 @@ package enum ExportService {
   private static func ownDirectory(in parent: URL, prefix: String) throws -> URL {
     var template = Array(parent.appending(path: prefix + "XXXXXX").path.utf8CString)
     let created = template.withUnsafeMutableBufferPointer { mkdtemp($0.baseAddress) }
-    guard created != nil else { throw SwapFailure() }
-    let path = String(
-      decoding: template.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    let bytes = template.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+    guard created != nil, let path = String(bytes: bytes, encoding: .utf8) else {
+      throw SwapFailure()
+    }
     return URL(filePath: path, directoryHint: .isDirectory)
   }
 
