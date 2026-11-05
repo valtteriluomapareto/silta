@@ -19,16 +19,18 @@ struct AgentInstallResourceTests {
         sys.stderr.buffer.write(result.stderr)
         sys.exit(result.returncode)
         """
-      let result = try SiltaBinary.runProcess(URL(filePath: "/usr/bin/python3"),
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/python3"),
         ["-c", script, try SiltaBinary.url().path, try #require(preview["token"] as? String)],
         in: scratch)
       #expect(result.termination == .exit(9))
-      withKnownIssue("#17: uncoded write failures must retain the active target and safe cause") {
-        #expect(result.stdout.contains(".codex/AGENTS.md"))
-        #expect(result.stdout.contains("file size limit"))
-      }
-      #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "home/.codex/AGENTS.md").path))
-      #expect(try AgentsInstallTests.apply(["install", "--codex"], in: scratch).termination == .exit(0))
+      #expect(result.stdout.contains(".codex/AGENTS.md"))
+      #expect(result.stdout.contains("file size limit"))
+      #expect(
+        !FileManager.default.fileExists(
+          atPath: scratch.appending(path: "home/.codex/AGENTS.md").path))
+      #expect(
+        try AgentsInstallTests.apply(["install", "--codex"], in: scratch).termination == .exit(0))
     }
   }
 }

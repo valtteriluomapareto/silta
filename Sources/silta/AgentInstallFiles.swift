@@ -94,19 +94,22 @@ final class AgentInstallFiles {
 
   func apply(_ edits: [AgentInstallPlan.Edit]) throws {
     var completed: [String] = []
+    var active = "selected target"
     do {
       for edit in edits {
+        active = edit.path
         let (data, mode) = try read(edit.path)
         guard data == edit.before, mode == edit.mode else {
           throw refusal(edit.path, "changed since preview")
         }
       }
       for edit in edits {
+        active = edit.path
         try replace(edit)
         completed.append(edit.path)
       }
     } catch {
-      let detail = (error as? any CodedError)?.message ?? "I/O failed for a selected target"
+      let detail = (error as? any CodedError)?.message ?? "\(active): \(Self.writeCause(error))."
       throw AgentInstallError(
         .env,
         "Harness write failed: \(detail) Completed: "
@@ -114,6 +117,15 @@ final class AgentInstallFiles {
           + ". Check the named path's permissions/structure; no rollback. Review a fresh preview.",
         next: [preview + " --help", preview], human: true)
     }
+  }
+
+  private static func writeCause(_ error: any Error) -> String {
+    let outer = error as NSError
+    let cause = outer.userInfo[NSUnderlyingErrorKey] as? NSError ?? outer
+    if cause.domain == NSPOSIXErrorDomain, cause.code == Int(EFBIG) {
+      return "file size limit exceeded"
+    }
+    return "I/O failure (code \(cause.code)); inspect disk/resource limits and permissions"
   }
 
   private func replace(_ edit: AgentInstallPlan.Edit) throws {
