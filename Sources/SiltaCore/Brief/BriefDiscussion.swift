@@ -28,7 +28,7 @@ struct BriefDiscussion {
     if let current {
       let posts = try TaskService.discussion(current, timeline: true, in: db)
       if let handoff = TaskService.newestHandoff(posts) { task.append(section(handoff)) }
-      task += inbox.items.filter { $0.task == current.ref }.prefix(Self.items).map {
+      task += inbox.items.filter { onTask($0) }.prefix(Self.items).map {
         BriefSection(id: "task_inbox", text: render($0, emitted: &emitted))
       }
       let open = posts.filter {
@@ -45,16 +45,15 @@ struct BriefDiscussion {
     }
     guard !inbox.items.isEmpty else { return (task, []) }
     let count = inbox.items.count
-    let above = current.map { current in inbox.items.filter { $0.task == current.ref }.count } ?? 0
+    let above = inbox.items.filter { onTask($0) }.count
     var sections = [
       BriefSection(
         id: "inbox",
-        text:
-          "inbox: \(count) \(count == 1 ? "item" : "items") for \(caller) (scope: \(inbox.scope)"
-          + (above == 0 ? "" : ", \(above) on this task") + ")\n"
+        text: "inbox: \(count) \(count == 1 ? "item" : "items") for \(caller)"
+          + (above == 0 ? "" : " (\(above) on this task)") + "\n"
       )
     ]
-    sections += inbox.items.filter { $0.task != current?.ref }.prefix(Self.items).map {
+    sections += inbox.items.filter { !onTask($0) }.prefix(Self.items).map {
       BriefSection(id: "inbox", text: render($0, emitted: &emitted))
     }
     return (task, sections)
@@ -71,19 +70,44 @@ struct BriefDiscussion {
       characters: BriefBudget.share(15, of: characters))
   }
 
+  /// Post items name the current task; grouped items have no single task.
+  private func onTask(_ item: InboxItem) -> Bool {
+    item.task != nil && item.task == current?.ref
+  }
+
   private func render(_ item: InboxItem, emitted: inout Set<String>) -> String {
-    let kind = item.postKind == item.kind || item.kind != "discussion" ? "" : " (\(item.postKind))"
+    let next = item.next.filter { emitted.insert($0).inserted }.map { "next: " + $0 + "\n" }
+    guard let ref = item.ref, let task = item.task, let author = item.author,
+      let text = item.body
+    else { return grouped(item) + next.joined() }
+    let postKind = item.postKind ?? item.kind
+    let kind = item.kind == "discussion" && postKind != item.kind ? " (\(postKind))" : ""
     let question = item.kind == "answer" ? item.replyTo.map { " to " + $0 } ?? "" : ""
-    let masked = SecretGuard.redacted(item.body).trimmingCharacters(in: .newlines)
+    let masked = SecretGuard.redacted(text).trimmingCharacters(in: .newlines)
     let cut = masked.count > Self.excerpt
     let body = cut ? String(masked.prefix(Self.excerpt - 1)) + "…" : masked
-    let header = "\(item.kind) \(item.ref)\(kind)\(question) on \(item.task)"
-    let read = "\(command) task show \(shellWord(item.task)) --timeline"
+    let header = "\(item.kind) \(ref)\(kind)\(question) on \(task)"
+    let read = "\(command) task show \(shellWord(task)) --timeline"
     let marker = item.next.contains(read) ? "(trimmed)\n" : "(trimmed; \(read))\n"
-    return header + " by \(TaskError.shown(item.author)):\n" + Self.quoted(body)
+    return header + " by \(TaskError.shown(author)):\n" + Self.quoted(body)
       + (cut ? marker : "")
-      + (item.kind == "discussion" ? "clears on your next write to \(item.task)\n" : "")
-      + item.next.filter { emitted.insert($0).inserted }.map { "next: " + $0 + "\n" }.joined()
+      + (item.kind == "discussion" ? "clears on your next write to \(task)\n" : "")
+      + next.joined()
+  }
+
+  /// A grouped or task-pointer item: its kind, task refs and context, then at most three
+  /// task titles, quoted.
+  private func grouped(_ item: InboxItem) -> String {
+    let tasks = item.tasks ?? []
+    let refs = tasks.isEmpty ? item.ref ?? "" : tasks.map(\.ref).joined(separator: ", ")
+    let header =
+      "\(item.kind) \(refs)"
+      + (item.target.map { " on " + TaskError.shown($0) } ?? "")
+      + (item.followUpAt.map { " due " + $0 } ?? "")
+      + (item.author.map { " by " + TaskError.shown($0) } ?? "") + ":\n"
+    let shown = tasks.prefix(Self.items).map { "\($0.ref): \($0.title)" }
+    return header + (shown.isEmpty ? "" : Self.quoted(shown.joined(separator: "\n")))
+      + (tasks.count > Self.items ? "(\(tasks.count - Self.items) more tasks)\n" : "")
   }
 
   /// Masks, then quotes every line so comment text cannot pose as brief structure.

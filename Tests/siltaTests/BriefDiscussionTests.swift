@@ -167,7 +167,7 @@ extension BriefCommandTests {
             + "next: silta --ws 'acme' comment accept 'AC-2/4'\n"))
       #expect(
         asker.stdout.contains(
-          "inbox: 1 item for agent:codex:old (scope: discussion, 1 on this task)\n"))
+          "inbox: 1 item for agent:codex:old (1 on this task)\n"))
       #expect(!asker.stdout.contains("AC-1/1"))
       #expect(!asker.stdout.contains("question AC-2/2"))
       let noTask = try run(["--app", "api"], repo, scratch)
@@ -269,7 +269,7 @@ extension BriefCommandTests {
       #expect(short.stdout.contains("plan (revision 0):\n1. [ ] Acme step 1\n"))
       #expect(
         short.stdout.hasSuffix(
-          " | silta --ws 'acme' task show AC-2 | silta --ws 'acme' inbox\n"))
+          "\nmore: silta --ws 'acme' task show AC-2\nmore: silta --ws 'acme' inbox\n"))
       #expect(short.stdout.components(separatedBy: "\nquestion AC-2/").count == 4)
       if let hook = try completedHook(["--task", "AC-2", "--app", "api"], repo, scratch) {
         #expect(hook == short)
