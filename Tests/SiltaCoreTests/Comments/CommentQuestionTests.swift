@@ -286,3 +286,44 @@ extension CommentQuestionTests {
     }
   }
 }
+
+extension CommentQuestionTests {
+  // An Anthropic key never reaches storage or a refusal through any comment field: the
+  // body is redacted in place, and recipient, mention and citation metadata are refused
+  // without echoing the key.
+  @Test func anthropicKeysNeverReachCommentStorageOrRefusals() async throws {
+    try await withScratchDirectory { home in
+      let env = try await CommentTests.setup(home), service = TaskService(environment: env)
+      let key = SecretGuardTests.anthropicKey()
+      // Any surviving piece counts as a leak, not only the whole key.
+      let pieces = ["sk-" + "ant-", String(key.suffix(24)), String(key.dropFirst(40).prefix(24))]
+      let leaks = { (text: String) in pieces.contains { text.contains($0) } }
+      let posted = try service.comment("AC-1", CommentDraft(body: "Rotate " + key + " today."))
+      #expect(posted.comment.body == "Rotate [REDACTED:anthropic] today.")
+      #expect(posted.warnings == [SecretGuard.warning])
+      let stable = try CommentLifecycleTests.snapshot(env)
+      var drafts = [CommentDraft(body: "Ask @agent:claude:" + key, kind: "question")]
+      for recipient in ["human:" + key, "agent:claude:" + key] {
+        drafts.append(CommentDraft(body: "Acme", kind: "question"))
+        drafts[drafts.count - 1].recipients = [recipient]
+      }
+      for source in ["note:" + key, "note:notes/" + key + ".md"] {
+        drafts.append(CommentDraft(body: "Acme", kind: "question"))
+        drafts[drafts.count - 1].source = source
+      }
+      for draft in drafts {
+        do {
+          _ = try service.comment("AC-1", draft)
+          Issue.record("Accepted a key in comment metadata")
+        } catch let error as CommentError {
+          #expect(error.code == .invalid)
+          let echoed = leaks(error.message + error.next.joined(separator: " "))
+          #expect(!echoed)
+        }
+      }
+      #expect(try CommentLifecycleTests.snapshot(env) == stable)
+      let leaked = stable.contains(where: leaks)
+      #expect(!leaked)
+    }
+  }
+}

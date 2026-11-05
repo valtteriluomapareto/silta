@@ -47,12 +47,17 @@ struct OutputContractTests {
     #expect(result.stderr.isEmpty)
   }
 
-  @Test(arguments: [[String](), ["--json"]])
-  func bareSiltaPrintsHelp(arguments: [String]) throws {
+  // Spec §16: bare `silta` prints the status line; without storage, its fallback.
+  @Test(arguments: [
+    ([String](), "No workspace here; next: silta ws ls\n"),
+    (
+      ["--json"],
+      "{\"data\":{\"location\":\"unregistered\"},\"ok\":true,\"schema\":1,\"warnings\":[]}\n"
+    ),
+  ])
+  func bareSiltaPrintsTheStatusLine(arguments: [String], stdout: String) throws {
     let result = try silta(arguments)
-    #expect(result.termination == .exit(0))
-    #expect(result.stdout.hasPrefix("OVERVIEW: "))
-    #expect(result.stderr.isEmpty)
+    #expect(result == CLIResult(termination: .exit(0), stdout: stdout, stderr: ""))
   }
 
   // Arguments can carry bodies, so a parse error never repeats one at length.
