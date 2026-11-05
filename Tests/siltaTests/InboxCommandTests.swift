@@ -34,14 +34,14 @@ struct InboxCommandTests {
       #expect(items.first?["next"] as? [String] == ["silta --ws 'acme' comment accept 'AC-1/2'"])
       #expect(try run(["--ws", "acme", "comment", "accept", "AC-1/2"]).termination == .exit(0))
       #expect(
-        try run(args).stdout == "No discussion attention for human:acme.\n"
+        try run(args).stdout == "No attention for human:acme.\n"
           + InboxCorrectionCommandTests.scope + "\n")
       _ = try run(["comment", "reopen", "AC-1/1"])
       #expect(
         try run(["--ws", "acme", "comment", "resolve", "AC-1/1", "-m", "Relayed v2 in chat."])
           .termination == .exit(0))
       #expect(
-        try run(args + ["--all"]).stdout == "No discussion attention for human:acme.\n"
+        try run(args + ["--all"]).stdout == "No attention for human:acme.\n"
           + InboxCorrectionCommandTests.scope + "\n")
       let help = try run(["comment", "--help"])
       #expect(help.stdout.contains("docs/spec.md §8.1"))
@@ -60,7 +60,9 @@ struct InboxCommandTests {
         Golden.forTests().check(result.stdout, "inbox-invalid.json")
       }
       let help = try SiltaBinary.run(["inbox", "--help"], in: scratch)
-      #expect(help.termination == .exit(0) && help.stdout.contains("Discussion attention only"))
+      #expect(
+        help.termination == .exit(0)
+          && help.stdout.contains("Human inboxes include grouped blockers"))
       let schema = try SiltaBinary.run(["schema", "inbox", "--json"], in: scratch)
       #expect(schema.termination == .exit(0) && schema.stdout.contains("remaining"))
     }
