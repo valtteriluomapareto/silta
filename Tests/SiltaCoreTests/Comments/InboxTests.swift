@@ -27,6 +27,10 @@ struct InboxTests {
       #expect(try owner.show("AC-1").comments?.first?.answered == qualifies)
       #expect(try owner.inbox(for: "human:acme").items.map(\.ref) == (qualifies ? [] : ["AC-1/1"]))
       #expect(try owner.inbox().items.map(\.kind) == ["answer"])
+      _ = try owner.updateComments(["AC-1/1"], action: .resolve)
+      #expect(try owner.inbox().items.isEmpty)
+      #expect(try owner.inbox(for: "human:acme").items.isEmpty)
+      _ = try owner.updateComments(["AC-1/1"], action: .reopen)
       _ = try owner.comment("AC-1", CommentDraft(body: "Resume", kind: "handoff"))
       let successor = TaskService(
         environment: try TaskServiceTests.environment(
@@ -41,8 +45,10 @@ struct InboxTests {
       _ = try responder.updateComments(["AC-1/2"], action: .delete)
       #expect(try owner.show("AC-1").comments?.first { $0.ref == "AC-1/1" }?.answered == false)
       #expect(try owner.inbox(for: "human:acme").items.map(\.ref) == ["AC-1/1"])
+      _ = try responder.comment("AC-1", answer)
       _ = try owner.updateComments(["AC-1/1"], action: .delete)
       #expect(try owner.inbox(for: "human:acme").items.isEmpty)
+      #expect(try owner.inbox().items.isEmpty)
     }
   }
 
