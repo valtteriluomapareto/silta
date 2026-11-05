@@ -1961,7 +1961,9 @@ steps, questions, handoffs and results.
     With `--ws <slug>` it reports on any workspace privately (DF3): it refuses a slug
     that is no workspace identifier before using it, writes the report to
     `$SILTA_HOME/reports/<slug>/<YYYY-MM-DD>.md` instead of printing it, takes the
-    default `--since` from that folder, and never replaces an existing report.
+    default `--since` from that folder, and never replaces an existing report. It
+    refuses a destination inside a git work tree, and a slug too long for a folder
+    name gets a shortened folder ending in a hash.
     Friction lines and `dogfood` tasks belong to the `silta` workspace (D36), so other
     workspaces' reports say they aren't collected.
   - Once per wave, at the latest every 60 days so no log has expired, an agent

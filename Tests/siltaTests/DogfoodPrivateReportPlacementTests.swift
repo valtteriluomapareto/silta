@@ -46,7 +46,7 @@ struct DogfoodPrivateReportPlacementTests {
       let repo = scratch.appending(path: "acme-repo")
       try fm.createDirectory(at: repo, withIntermediateDirectories: true)
       _ = try DogfoodInstallTests.git(["init", "-q", "-b", "main"], in: scratch, cwd: repo)
-      try Data("*.db*\nlog/\nbackups/\n".utf8).write(to: repo.appending(path: ".gitignore"))
+      try Data("*.db*\n*.lock\nlog/\nbackups/\n".utf8).write(to: repo.appending(path: ".gitignore"))
       try fm.moveItem(at: fixture, to: repo.appending(path: ".silta"))
       return (repo, ["SILTA_HOME": repo.appending(path: ".silta").path])
     case "home-is-a-repo":
@@ -98,7 +98,7 @@ struct DogfoodPrivateReportPlacementTests {
       if layout == "ignored-state" {
         let status = try DogfoodInstallTests.git(
           ["status", "--short", "--untracked-files=all"], in: scratch, cwd: placed.repo)
-        #expect(status == "?? .gitignore\n")
+        #expect(status == "?? .gitignore", "\(status)")
       }
     }
   }

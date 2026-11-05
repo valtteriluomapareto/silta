@@ -22,9 +22,35 @@ done
 command -v silta >/dev/null || fail 'silta is missing from PATH.'
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 home="${SILTA_HOME:-$HOME/.silta}"
+# A slug past the 255-byte file name limit names its folder by a prefix and a hash;
+# `.` never occurs in a slug, so the shortened name cannot be another workspace's.
+folder() {
+  if (( ${#1} <= 255 )); then echo "$1"; return; fi
+  local hash
+  hash="$(printf '%s' "$1" | /usr/bin/shasum -a 256)" || return 1
+  echo "${1:0:200}.${hash:0:16}"
+}
+# Prints the work tree holding the physical location of path, judged from its nearest
+# existing ancestor; status 1 when no ancestor holds a .git entry.
+work_tree() {
+  local dir="$1"
+  while [[ ! -d "$dir" ]]; do dir="$(dirname "$dir")"; done
+  dir="$(cd -P "$dir" && pwd -P)" || return 2
+  while true; do
+    [[ -e "$dir/.git" ]] && { echo "$dir"; return 0; }
+    [[ "$dir" == / ]] && return 1
+    dir="$(dirname "$dir")"
+  done
+}
 if [[ $private == yes ]]; then
   umask 077
-  reports="$home/reports/$ws"
+  name="$(folder "$ws")" || fail 'could not name the report folder.'
+  reports="$home/reports/$name"
+  if repo="$(work_tree "$reports")"; then
+    fail "$reports is inside the git work tree $repo; set SILTA_HOME outside every repository."
+  elif (( $? != 1 )); then
+    fail "could not resolve $reports."
+  fi
 else
   reports="$root/docs/dogfood/reports"
 fi

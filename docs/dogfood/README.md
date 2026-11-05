@@ -150,7 +150,12 @@ workspace, `silta` included, and keeps it on this machine:
 - It refuses a slug that is no workspace identifier (letters, digits, `_` or `-`,
   starting and ending with a letter or digit) before reading anything.
 - It writes `$SILTA_HOME/reports/<slug>/<Until date>.md` (file `0600`, any folder it
-  creates `0700`) and prints only that path. Without `--since`, the newest report in that
+  creates `0700`) and prints only that path. A slug longer than 255 bytes, too long
+  for a folder name, gets a folder named by its first 200 characters, a `.` and a
+  hash.
+- It refuses to write when that folder, followed through symlinks, is inside a git
+  work tree (any parent holds a `.git` entry), even where the repository ignores the
+  database: set `SILTA_HOME` outside every repository. Without `--since`, the newest report in that
   folder supplies the date. It never replaces a report: a second run on the same day
   is refused, so move the earlier one away first if you mean to regenerate it.
 - Outside `silta`, the friction section says it isn't collected: the `Friction:` line
