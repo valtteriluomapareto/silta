@@ -123,12 +123,28 @@ struct SecretGuardTests {
     }
   }
 
+  // Every rule, not just the Azure PAT one, must leave identifiers alone at the
+  // lengths where a fixed-width rule could reach into them.
+  @Test(arguments: [
+    "proposingATaskForAnotherWorkspacesRepoKeepsItsSlugAndPrefixStableWhileWaitingForTriage",
+    "hiddenBranchNamesStayOutOfAnotherWorkspacesProposedTaskList",
+    "a_repo_path_held_by_another_workspace_names_the_repo_and_holder",
+    "ACME_WORKSPACE_REPO_PATH_HELD_BY_ANOTHER_WORKSPACE_NAMES_ITS_HOLDER",
+    "parseV2WorkspaceSlugAndPrefixFromTheScanRootBeforeRegisteringRepos",
+    "repoPathHeldByAnotherWorkspaceNamesTheRepoAndItsHolderTodayV2",
+  ])
+  func otherRulesLeaveLongIdentifiersAlone(identifier: String) {
+    #expect(SecretGuard.matches(in: identifier).isEmpty)
+    #expect(SecretGuard.redacted(identifier) == identifier)
+  }
+
   // Microsoft documents the AZDO marker at positions 76 through 80 of an
   // 84-character token, which leaves a 75- or 76-character prefix depending on
   // whether positions count from one.
   @Test(arguments: [75, 76])
   func currentPATsStayDetected(prefixLength: Int) {
-    let token = String(repeating: "q", count: prefixLength) + "AZ" + "DO"
+    let token =
+      String(repeating: "q", count: prefixLength) + "AZ" + "DO"
       + String(repeating: "7", count: 80 - prefixLength)
     #expect(token.count == 84)
     #expect(SecretGuard.redacted("token " + token) == "token [REDACTED:azure_pat]")
@@ -193,7 +209,7 @@ struct SecretGuardTests {
     let token = "AK" + "IA" + String(repeating: "Q", count: 16)
     let input = "🦊 " + token + " 🦊 " + token + "!"
     #expect(SecretGuard.redacted(input) == "🦊 [REDACTED:aws_key] 🦊 [REDACTED:aws_key]!")
-    #expect(SecretGuard.version == 1)
+    #expect(SecretGuard.version == 2)
   }
 
   @Test func rejectionAndWarningNeverStoreOrRenderMatches() throws {
