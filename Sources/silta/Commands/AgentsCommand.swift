@@ -73,6 +73,8 @@ struct AgentsInstallCommand: OutputCommand {
     commandName: "install", abstract: "Preview owned harness edits; confirm with --apply <token>.",
     discussion: "Defaults to Claude and Codex. Unrelated content and file modes are retained. "
       + "Edited ownership, symlinks and ambiguous Codex root definitions are refused. "
+      + "ACLs, non-provenance extended attributes, file flags, special mode bits and ownership "
+      + "that replacement cannot retain are refused before writes. "
       + "Replacements are atomic per file, not across files; a failure lists completed paths. "
       + "--hook opts into SessionStart; --stop-hook adds Stop and requires SessionStart. "
       + "No hook flag leaves settings unread during install. "

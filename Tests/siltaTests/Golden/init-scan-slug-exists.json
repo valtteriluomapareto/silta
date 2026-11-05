@@ -1,0 +1,1 @@
+{"error":{"code":"conflict","message":"Workspace \"work\" already exists; choose another --slug, or rescan it to refresh only the repos already registered there.","next":["silta init --scan '<scratch>/acme' --slug <another-slug>","silta init --scan '<scratch>/acme' --ws 'work'"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

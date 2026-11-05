@@ -3,6 +3,7 @@ import SiltaTestSupport
 import Testing
 
 /// `silta schema` from the outside (spec §20.1). Goldens were written from the spec.
+@Suite(.blockingTestWork)
 struct SchemaCommandTests {
   private func silta(_ arguments: [String]) throws -> CLIResult {
     try withScratchDirectory { try SiltaBinary.run(arguments, in: $0) }

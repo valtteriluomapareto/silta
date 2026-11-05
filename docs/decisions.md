@@ -295,6 +295,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     at rots, and the agents' work with it.
   - ↳ update (D39): the ask-list is fixed; a workspace's `ask_about: short` shortens
     it.
+  - ↳ update (2026-11-05): discussion recovery preserves human confirmation rather
+    than turning an agent's answer into acceptance authority. The display rules in
+    [spec §8.1](spec.md#81-discussion-and-reviews) also treat unfinished fences as
+    prose so incomplete examples cannot silently redirect questions, and count only
+    hidden resolved history so a visible handoff does not imply missing work.
 - **D38: The human works through agents.**
   - The human talks to an agent, which runs `silta` for them. They don't use the CLI
     themselves. The Mac app (M5) is their own surface and counts as `human:*`.
@@ -578,3 +583,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     Fresh file-backed Codex authentication and a separate claude.ai profile avoid
     copying credentials; actual grants, propagation, continuation and discovery remain
     unverified until that procedure runs.
+  - ↳ 2026-11-05: Installer permission retention uses conservative refusal rather
+    than security-metadata copying: file ACLs, unsupported xattrs/flags/mode bits,
+    nonpreservable ownership and inheritable parent ACLs refuse before writes.
+    OS-managed provenance is not treated as access permissions. Supported uid/gid
+    and POSIX modes bind confirmation. Public configuration diffs come only from
+    validated ownership spans, independently of placement, and an owned TOML table
+    retains its offset. Namespace validation stays a documented conservative subset
+    rather than adding a general TOML parser dependency.

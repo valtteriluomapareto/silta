@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct CommentQuestionCommandTests {
   @Test(arguments: [false, true])
   func threeActorsAskAnswerAcceptAndReopen(json: Bool) throws {

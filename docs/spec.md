@@ -745,7 +745,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   the captured `human:<USER>`, or `human:unknown` for an unset/invalid USER, independently
   of the caller. Recipients are deduplicated and sorted in `mentions`; questions
   default to `me` only when neither explicit recipients nor mentions are present.
-  Inline code spans and fenced code blocks are examples, not mentions. Tool-only
+  Closed inline code spans and closed fenced code blocks are examples, not mentions.
+  An unterminated fence hides nothing: its text is parsed as prose. Tool-only
   actors such as `@agent:codex` are refused; recipients require a complete session.
   Other Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
   aliases/actor mentions refuse rather than redirecting to the human. Lifecycle
@@ -756,7 +757,17 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   human. An agent outside its recipients may contribute an answer without clearing
   the addressees' attention. JSON includes `answered` for questions (false for a
   deleted question); text uses the same rule. Answer acceptance remains a separate
-  choice by the asker or current claimer.
+  choice by the asker or current claimer. A claimer never accepts its own answer to
+  another actor's question; target-authored answers are omitted from that actor's
+  inbox unless the actor is also the asker. After confirming a human's answer in
+  chat, the asker or eligible claimer accepts a relay, or the relaying agent
+  explicitly resolves with `comment resolve <ref> -m <explanation>`. The inbox never
+  offers a bare resolve: only an agent with an existing outsider answer to the
+  queried human gets an `ask human:` confirmation instruction, alongside a safe read
+  command. Other callers without acceptance authority get only `task show`.
+  A non-addressee agent is not offered another answer action; the question names
+  existing outsider answer authors as awaiting confirmation, without treating their
+  prose as proof of a human relay.
 - Questions and handoffs are roots. Answers require a live unresolved question;
   comment/decision replies require a live unresolved root. A deleted immediate
   target or root cannot receive public replies. Cross-task/workspace replies refuse.
@@ -779,7 +790,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
   thread is omitted. The default read also shows `N resolved threads (see --timeline)`
   when retained resolved roots exist; optional JSON `resolved_threads` reports that
-  count. `--timeline` includes full discussion alongside task events.
+  count of hidden resolved roots; the displayed resolved handoff is excluded.
+  `--timeline` includes full discussion alongside task events.
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
@@ -798,7 +810,11 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - Resolve/reopen normalize reply refs to thread roots, deduplicating in first-appearance
   order, atomically across the selected workspace. Deleted roots remain resolvable.
   Any actor may resolve/reopen; only a post's exact author may delete that named post.
-  Wrong-author deletion offers resolve recovery only while the root is open.
+  Unauthorized acceptance and wrong-author deletion offer read-only task history.
+  An empty explanation on a resolve batch containing another actor's question also
+  offers task history for every selected task, without suggesting dropping the
+  explanation and closing the question. Explicit resolve remains available under
+  the confirmation rule above; the refusal itself supplies no confirmation.
   Reopen clears answer acceptance; delete preserves resolution and retained refs.
   An optional explanation appends one ordinary reply per changed root in the same
   transaction, with one consent for the batch. No-ops write nothing, including
@@ -851,21 +867,40 @@ inbox is short and grouped:
   2. blocked tasks past their follow-up day, one item per party or URL listing its
      tasks and asks, the longest overdue first (a task waiting on two parties shows
      under both);
-  3. questions to the human, oldest first;
-  4. review requests (M2);
-  5. proposals from the last 14 days, newest first;
-  6. promoted tasks needing attention.
-- At most 12 items, then `N more: silta inbox --for me --all`. `--all` shows every item,
-  including older proposals.
+  3. questions to the selected actor, oldest first;
+  4. answers awaiting acceptance, oldest first;
+  5. claimed-task discussion, oldest first (agent sessions only);
+  6. review requests (M2);
+  7. proposals from the last 14 days, newest first;
+  8. promoted tasks needing attention.
+- At most 12 items across every category; `remaining` counts every omitted item,
+  then `N more: silta --ws 'acme' inbox --for 'human:acme' --all`. `--all` shows every
+  item, including older proposals.
 - Every item shows its refs and the commands that answer it, e.g.
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
   agent asks first, and maps "the rest" only to items it showed.
 
+**Available M1 discussion query:** every text read explicitly says that grouped
+blockers, proposals and promoted attention are not yet included; JSON identifies
+`scope: "discussion"`. This marker will change when the other categories ship.
+Within each discussion category, stored post id breaks time ties. Each live post
+appears once, with question/answer attention taking precedence over claimed-task
+`discussion`. The latter retains the original `post_kind`, and an answer names its
+question via `reply_to`. The cap applies after ordering. `silta schema inbox`
+publishes the shape: only `kind` and `next` are required on every item; post fields
+are optional so grouped items can add multiple task/ref fields. Discussion items
+carry those post fields. Every command is qualified with the selected workspace;
+confirmation guidance follows the relay rule above. Closed and archived tasks
+remain included when they have matching live discussion. Promoted tasks are
+omitted because local discussion mutations refuse; `--all` does not include them.
+Reading a discussion item does not clear it: it clears on the claimer's next write
+to its task, as the item says.
+
 It lists:
 - live open questions mentioning the actor with no qualifying live answer (an answer
   by an addressee or human); deleting the last qualifying answer restores attention
-- answers to your live open questions awaiting acceptance, including answers from
-  other agents; the asker must be able to review these without being an answer recipient
+- live answers to open questions awaiting acceptance reach the asker **or the current
+  claimer**, including answers from other agents, independently of answer recipients
 - reopening clears acceptance and restores attention: the asker receives live answers
   awaiting acceptance, and addressees receive questions without a qualifying answer;
   deleted question roots never appear in either question category
@@ -874,8 +909,9 @@ It lists:
   needing attention
 - for humans, also: blocked tasks that are ready to unblock, have a dropped blocker
   ("re-plan"), or have reached their follow-up day, each with its `next` (D35)
-- for agent sessions: new comments by others on tasks they claim, since their last
-  write there
+- for agent sessions: all live post kinds by others on tasks they claim, including
+  resolved threads, strictly newer than the holder's own last write (`claimed_at`);
+  foreign writes and reads do not advance this attention boundary
 
 ## 9. Docs (M2)
 
@@ -1041,6 +1077,13 @@ Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
 nonregular/multiply linked files and files over 1 MiB are refused before writes.
 Rendered files must also fit that limit, so installation never creates a file that
 its next preview or uninstall cannot read.
+Permission preservation uses refusal rather than copying security metadata: nonempty
+file ACLs, extended attributes other than OS-managed com.apple.provenance, file flags
+and special mode bits refuse. Inheritable ACLs on selected parent directories also
+refuse before any selected write. Existing files must belong to the current effective
+user and match their parent directory's group, which a replacement inherits. Accepted
+uid/gid and POSIX modes are bound to confirmation; adding unsupported metadata after
+preview refuses. OS-managed provenance is not copied or treated as access permissions.
 
 Targets come from explicit absolute `HOME`; a selected harness's nonmatching
 `CODEX_HOME` or `CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. Unselected
@@ -1049,12 +1092,15 @@ effective `SILTA_HOME`. The conservative TOML editor supports bare single-line
 keys/tables and refuses existing user-owned writable-root definitions or ambiguous
 syntax. Supported values are JSON-compatible strings, finite numbers, booleans and
 arrays, and single-quoted literal strings; inline comments, dates, multiline values
-and inline tables are refused. It never changes sandbox mode, trust or authentication. A human must inspect
+and inline tables are refused. Duplicate/conflicting names refuse across the
+complete document, including the owned table. Dotted assignments, arrays of tables
+and reopening an implicitly introduced parent table require manual integration. It never changes sandbox mode, trust or authentication. A human must inspect
 such refusals; there is no overwrite flag. Configuring a root does not prove it is
 effective in a managed harness (D42).
 
 Installers serialize with an advisory lock on HOME and preflight all selected
-targets. Each file replacement is atomic; multiple replacements are not one
+targets. Public diffs are extracted from validated owned spans; unrelated text never becomes diff context. An owned TOML table retains its insertion offset.
+Each file replacement is atomic; multiple replacements are not one
 transaction. An I/O failure names the failing target/cause and completed paths, asks
 the human to inspect permissions/structure, then offers a fresh preview/retry;
 there is no rollback or process-crash guarantee. An unrelated editor does not honor
@@ -1484,7 +1530,7 @@ run.
 
 ```
 # setup & health
-silta init [--scan <dir>…]                       [M1] create DB; discover repos, worktrees, branch-apps; open YAML
+silta init [--scan <dir>…] [--slug <slug>] [--prefix <prefix>]   [M1] create DB; discover repos, worktrees, branch-apps; open YAML
 silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] config as YAML (validated on save, "did you mean"); -F for agents
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
@@ -1529,6 +1575,16 @@ silta index [--rebuild] | verify [--fix-tasks]   [M3]
 silta import --from dex|beads|backlog-md <path>  [M4]
 silta open [AC-12]                               [M5] open Silta.app
 ```
+
+`init --scan` options name only a new workspace, so they are refused together with
+`--ws`, which rescans an existing one and matches its slug without regard to case. A
+chosen `--slug` and `--prefix` keep their
+case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
+starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
+(`AC-1`). A repo's slug is its directory name normalized — lowercased, other characters
+to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. The
+DF3 onboarding scans only the chosen clones:
+`silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 
 ## 17. Storage, concurrency, technology
 
@@ -2107,9 +2163,35 @@ repo paths are excluded from this view. A `workspace` change-log event invalidat
 that workspace's complete configuration, including omitted children.
 
 `init --scan` discovers repos at the root and at most two child levels, without fetching.
-The first directory's lowercased name is the workspace slug and its first two letters
-uppercase are the task prefix. Remote `X`/`X-prod` pairs create app stubs with a prod ref;
-main or master provides a default app when its ref is not already represented.
+A new workspace's slug is the first directory's lowercased name unless `--slug` names
+another, and `--slug` also names the workspace; without it the first directory's name
+does. Its task prefix is the slug's first two letters uppercased unless `--prefix`
+names another; a message about a derived prefix names where it came from, the slug when
+`--slug` was given and the directory otherwise. Chosen values keep their case and use the
+identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
+naming options refreshes an existing workspace, so a stored prefix that the directory
+cannot derive stays, and it finds that workspace by slug without regard to case, as does
+`--ws`. When `--slug` or `--prefix` is given and that slug already names a workspace, the
+scan is refused, saying that a rescan only refreshes the repos already registered there;
+with `--slug` it offers another slug first and the rescan second, with `--prefix` alone
+the rescan first and another slug second. Slug and prefix clashes compare
+case-insensitively. Every refusal's `next` repeats the naming options already given, so
+following it never lands on a different workspace. Options without `--scan` are refused.
+`--slug` and `--prefix` are invalid with `--ws`, which rescans. A directory name that is
+not a valid workspace slug, or does not yield a valid prefix, fails with an error that
+names `--slug` or `--prefix` as the fix and carries the scanned roots in a runnable
+`next`. A repo's slug is its clone directory's name normalized — lowercased, other
+characters to `-`, trimmed, and `repo` when nothing remains — so `My Projects` is the
+repo `my-projects`. That slug is only an identifier: the real path is stored as the
+machine-local repo path, so nothing on disk is renamed and worktrees and path aliases
+resolve to their canonical main clone as they are. Two directories that normalize to one
+slug are a duplicate, checked on the normalized names before any rename. A clone named
+`none`, the word that means non-code work, is stored as `none-repo`, or the next free
+`none-repo-N` when another clone in the scan normalizes to that name; the same clone keeps
+its stored name on every full or partial rescan. A task prefix another workspace holds, or
+a clone path another workspace already binds, is a conflict that names the holder and a
+command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
+or master provides a default app when its ref is not already represented.
 Worktrees and path aliases resolve to one canonical main clone. Initial scans create
 configuration; rescans only refresh local paths for registered repo slugs and preserve
 edited configuration. `--ws` targets an existing workspace for path rebinding.

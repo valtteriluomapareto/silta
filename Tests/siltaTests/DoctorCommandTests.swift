@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DoctorCommandTests {
   private let environment = ["SILTA_NOW": "2023-11-14T22:13:20.000Z"]
 

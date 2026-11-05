@@ -2,6 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct GuideCommandTests {
   @Test func fullGuideMatchesSpec() throws {
     try withScratchDirectory { scratch in

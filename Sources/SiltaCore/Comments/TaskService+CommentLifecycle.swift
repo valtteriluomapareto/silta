@@ -28,7 +28,9 @@ extension TaskService {
         required: allowSecret,
         command: scopedCommand(command, workspace: slug) + " --allow-secret -F <file>")
       let safe = try checkedExplanation(
-        explanation, allowSecret: allowSecret, command: scopedCommand(command, workspace: slug))
+        explanation, allowSecret: allowSecret, command: scopedCommand(command, workspace: slug),
+        emptyRecovery: explanationRecovery(
+          targets, action: action, workspace: slug, command: command))
       var touched: Set<Int64> = []
       for (task, row) in changed {
         let id: Int64 = row["id"]
@@ -57,15 +59,32 @@ extension TaskService {
   }
 
   private func checkedExplanation(
-    _ text: String?, allowSecret: Bool, command: String
+    _ text: String?, allowSecret: Bool, command: String, emptyRecovery: [String]
   ) throws -> (CommentDraft, Bool)? {
     guard let text else { return nil }
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw CommentError.explanationEmpty(command)
+      throw CommentError.explanationEmpty(emptyRecovery)
     }
     var draft = CommentDraft(body: text)
     draft.allowSecret = allowSecret
     return try checkedComment(draft, command: command)
+  }
+
+  private func explanationRecovery(
+    _ targets: [(TaskDetails, Row)], action: CommentAction, workspace: String, command: String
+  ) -> [String] {
+    guard action == .resolve,
+      targets.contains(where: {
+        $0.1["kind"] as String == "question"
+          && $0.1["actor"] as String != environment.actor.description
+      })
+    else { return [scopedCommand(command, workspace: workspace)] }
+    return Set(
+      targets.map {
+        scopedCommand(
+          "silta task show " + shellWord($0.0.ref) + " --timeline", workspace: workspace)
+      }
+    ).sorted()
   }
 
   private func commentTargets(

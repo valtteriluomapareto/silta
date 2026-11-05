@@ -45,6 +45,17 @@ struct AgentInstallTarget {
     return targets
   }
 
+  func previewDiff(
+    _ before: String, _ after: String, refusal: () throws -> Never
+  ) throws -> String {
+    if whole { return AgentInstallPlan.difference(before, after) }
+    let old = try AgentOwnedBlock(
+      before, toml: path.hasSuffix(".toml"), existed: !before.isEmpty, refusal: refusal)
+    let new = try AgentOwnedBlock(
+      after, toml: path.hasSuffix(".toml"), existed: !after.isEmpty, refusal: refusal)
+    return AgentInstallPlan.difference(old.span, new.span)
+  }
+
   func replace(
     _ original: String, existed: Bool, uninstall: Bool, refusal: () throws -> Never
   ) throws -> String {
