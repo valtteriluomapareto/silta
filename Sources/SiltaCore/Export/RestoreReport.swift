@@ -1,3 +1,5 @@
+import Foundation
+
 /// What a restore did, or would do, to the workspace: enough for the human to approve it
 /// knowingly from a dry run (spec §15).
 package struct RestoreReport: Encodable, Equatable, Sendable {
@@ -81,5 +83,57 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
     case approvalsAdded = "approvals_added"
     case claimsReplaced = "claims_replaced"
     case reposWithoutPath = "repos_without_path"
+  }
+}
+
+extension RestoreReport {
+  /// What replacing `current` (nil: no such workspace) with `tree` changes.
+  static func between(
+    _ current: ExportSnapshot?, _ tree: ExportSnapshot, workspace: String, digest: String,
+    dryRun: Bool
+  ) -> RestoreReport {
+    let incoming = Dictionary(tree.tasks.map { ($0.row.value("uid") ?? "", $0) }) { first, _ in
+      first
+    }
+    let existing = current?.tasks ?? []
+    var removed: [String] = []
+    var changed: [String] = []
+    var claims: [Claim] = []
+    for task in existing {
+      let replacement = incoming[task.row.value("uid") ?? ""]
+      if replacement == nil {
+        removed.append(task.ref)
+      } else if replacement != task {
+        changed.append(replacement?.ref ?? task.ref)
+      }
+      if let actor = task.row.value("claimed_by"), replacement?.row.value("claimed_by") != actor {
+        claims.append(Claim(task: task.ref, actor: actor))
+      }
+    }
+    return RestoreReport(
+      workspace: workspace, dryRun: dryRun, created: current == nil,
+      sameUID: current.map { $0.workspace.value("uid") == tree.workspace.value("uid") } ?? true,
+      manifestSHA256: digest, tasks: Counts(before: existing.count, after: tree.tasks.count),
+      removed: removed, changed: changed,
+      settings: settingChanges(
+        current?.workspace.value("settings"), tree.workspace.value("settings")),
+      approvalsAdded: 0, claimsReplaced: claims, reposWithoutPath: [], snapshot: nil)
+  }
+
+  private static func settingChanges(_ before: String?, _ after: String?) -> [SettingChange] {
+    func values(_ json: String?) -> [String: String] {
+      let bytes = Data((json ?? "{}").utf8)
+      let parsed = try? JSONSerialization.jsonObject(with: bytes)  // not JSON: no settings
+      return ((parsed as? [String: Any]) ?? [:]).compactMapValues { value in
+        let data = try? JSONSerialization.data(  // unencodable: left out
+          withJSONObject: value, options: [.fragmentsAllowed, .sortedKeys, .withoutEscapingSlashes])
+        return data.flatMap { String(bytes: $0, encoding: .utf8) }
+      }
+    }
+    let old = values(before)
+    let new = values(after)
+    return Set(old.keys).union(new.keys).sorted().compactMap { key in
+      old[key] == new[key] ? nil : SettingChange(key: key, before: old[key], after: new[key])
+    }
   }
 }

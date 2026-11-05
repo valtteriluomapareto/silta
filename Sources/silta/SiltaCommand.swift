@@ -10,6 +10,7 @@ struct SiltaCommand: ParsableCommand {
       SchemaCommand.self, WsCommand.self, InitCommand.self, RepoCommand.self, TaskCommand.self,
       CodeCommand.self, WhereCommand.self, DoctorCommand.self, CommentCommand.self,
       BriefCommand.self, InboxCommand.self, GuideCommand.self, ExportCommand.self,
+      RestoreCommand.self,
     ]
   )
 

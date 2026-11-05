@@ -125,8 +125,10 @@ struct GuideCommand: OutputCommand {
         Human-only gates: `task promote`; task edit except your claimed task; doc \
         edit/accept/reject (M2); effective `where --set/--unset` changes; task triage; --steal \
         over another session's fresh claim; --force past an unmet review gate; --allow-secret; \
-        ws edit; task unblock with open blockers; and proposed-task writes under `proposals: \
-        ask`.
+        ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task \
+        writes under `proposals: ask`.
+        Before `restore`, run it with --dry-run and show the human its lines: it replaces the \
+        workspace and drops work done after the export. Never edit an export tree.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \
         When the human asked in this chat to add the task for later, pass their words as \

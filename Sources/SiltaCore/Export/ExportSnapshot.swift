@@ -29,6 +29,13 @@ package struct ExportRow: Equatable, Sendable {
     fields = keys.compactMap { key in values[key].map { Field(key: key, value: $0) } }
   }
 
+  /// This row with `key` set to `value`, or left out when nil, in `keys` order.
+  func replacing(_ key: String, with value: String?, keys: [String]) -> ExportRow {
+    var values = Dictionary(fields.map { ($0.key, $0.value) }) { first, _ in first }
+    values[key] = value
+    return ExportRow(keys: keys, values: values)
+  }
+
   /// Reads `keys` from a result row; a NULL column is left out.
   init(keys: [String], row: Row) throws {
     var values: [String: String] = [:]

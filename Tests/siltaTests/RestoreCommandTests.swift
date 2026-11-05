@@ -6,7 +6,6 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreCommandTests {
   static let agent = ["SILTA_ACTOR": "agent:codex:acme", "SILTA_NOW": "2023-11-14T22:40:00.000Z"]
-  static let human = ["SILTA_ACTOR": "human:acme", "SILTA_NOW": "2023-11-14T22:30:00.000Z"]
 
   /// Seeds Acme with AC-1, exports it to `work/out/acme`, then adds AC-2, which a
   /// restore of that export removes.
@@ -16,7 +15,7 @@ struct RestoreCommandTests {
     #expect(export.termination == .exit(0), "\(export.stderr)")
     let add = try SiltaBinary.run(
       ["--ws", "acme", "task", "add", "Later work", "--app", "none"], in: scratch,
-      environment: human)
+      environment: agent)
     #expect(add.termination == .exit(0), "\(add.stderr)")
   }
 
@@ -65,20 +64,21 @@ struct RestoreCommandTests {
   @Test func restoresIntoAnotherHome() throws {
     try withScratchDirectory { scratch in
       try Self.exported(scratch)
-      let other = ["SILTA_HOME": scratch.appending(path: "other-home").path]
+      let other = Self.agent.merging(
+        ["SILTA_HOME": scratch.appending(path: "other-home").path]) { $1 }
       let restore = try SiltaBinary.run(
-        ["restore", "out/acme", "--json"], in: scratch,
-        environment: other.merging(Self.human) { $1 })
-      #expect(restore.termination == .exit(0), "\(restore.stderr)")
+        ["restore", "out/acme", "--json", "--approved", "yes, move acme here"], in: scratch,
+        environment: other)
+      #expect(restore.termination == .exit(0), "\(restore.stdout)")
       #expect(restore.stdout.contains(#""created":true"#))
       let show = try SiltaBinary.run(
         ["--ws", "acme", "task", "show", "AC-1"], in: scratch, environment: other)
       #expect(show.termination == .exit(0), "\(show.stderr)")
       let added = try SiltaBinary.run(
-        ["--ws", "acme", "task", "add", "Next", "--app", "none", "--quiet"], in: scratch,
-        environment: other.merging(Self.human) { $1 })
+        ["--ws", "acme", "task", "add", "Next", "--app", "none"], in: scratch,
+        environment: other)
       #expect(added.termination == .exit(0), "\(added.stderr)")
-      #expect(added.stdout.hasPrefix("AC-2"))
+      #expect(added.stdout.contains("AC-2"), "\(added.stdout)")
     }
   }
 

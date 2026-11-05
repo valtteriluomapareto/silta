@@ -1,0 +1,156 @@
+import Foundation
+import GRDB
+
+/// The replace inside the restore's transaction: checks against the database, the
+/// report, the delete and inserts with ids mapped by uid, and the self-check.
+struct RestoreWriter {
+  let tx: StorageTransaction
+  let tree: ExportSnapshot
+  let slug: String
+
+  var approvalsAdded = 0
+  var reposWithoutPath: [String] = []
+  var workspace: Int64?
+  var current: ExportSnapshot?
+  var ids: [String: [String: Int64]] = [:]
+  var revisions: [String: Int64] = [:]
+
+  init(tx: StorageTransaction, tree: ExportSnapshot, slug: String) {
+    self.tx = tx
+    self.tree = tree
+    self.slug = slug
+  }
+
+  var db: Database { tx.database }
+
+  /// Refuses what the database can't take, before anything changes, and reports the
+  /// difference between the workspace now and the tree.
+  mutating func prepare(digest: String, dryRun: Bool) throws -> RestoreReport {
+    if try StorageSchema.migrator.hasBeenSuperseded(db) { throw StorageError.schemaTooNew }
+    workspace = try Int64.fetchOne(
+      db, sql: "SELECT id FROM workspace WHERE slug=?", arguments: [slug])
+    current = try workspace.map { _ in try ExportSnapshot.read(db, workspace: slug) }
+    let uid = tree.workspace.value("uid") ?? ""
+    let prefix = tree.workspace.value("task_prefix") ?? ""
+    if let other = try String.fetchOne(
+      db, sql: "SELECT slug FROM workspace WHERE (uid=? OR task_prefix=?) AND slug<>?",
+      arguments: [uid, prefix, slug])
+    {
+      throw ExportError.restoreConflict(
+        "workspace \(other) already has the tree's uid or task prefix")
+    }
+    try checkForeignUIDs()
+    return RestoreReport.between(current, tree, workspace: slug, digest: digest, dryRun: dryRun)
+  }
+
+  /// A uid of the tree that a row of another workspace holds; uids are unique across
+  /// the database.
+  private func checkForeignUIDs() throws {
+    var uids: [String: [String]] = [:]
+    for (section, format) in zip(tree.sections, ExportFormat.sections) {
+      uids[format.table, default: []] += section.rows.compactMap { $0.value("uid") }
+    }
+    uids["task"] = tree.tasks.compactMap { $0.row.value("uid") }
+    uids["comment"] = tree.tasks.flatMap {
+      $0.records.compactMap { $0.value("table") == "comment" ? $0.value("uid") : nil }
+    }
+    uids["link"] = tree.links.compactMap { $0.value("uid") }
+    let ownership = [
+      "environment": "app_id IN (SELECT id FROM app WHERE workspace_id IS ?)",
+      "comment": "task_id IN (SELECT id FROM task WHERE workspace_id IS ?)",
+    ]
+    for (table, list) in uids.sorted(by: { $0.key < $1.key }) where !list.isEmpty {
+      let mine = ownership[table] ?? "workspace_id IS ?"
+      let json = "[" + list.map(ExportFormat.quote).joined(separator: ",") + "]"
+      if let uid = try String.fetchOne(
+        db,
+        sql:
+          "SELECT uid FROM \(table) WHERE uid IN (SELECT value FROM json_each(?)) AND NOT (\(mine))",
+        arguments: [json, workspace])
+      {
+        throw ExportError.restoreConflict("\(table) uid \(uid) belongs to another workspace")
+      }
+    }
+  }
+
+  /// Deletes the workspace's rows, approvals aside, and inserts the tree's.
+  mutating func replace() throws {
+    let kept = try machineRows()
+    let old = try removedIDs()
+    if let workspace { try delete(workspace) }
+    let row = tree.workspace
+    if let workspace {
+      try db.execute(
+        sql: "UPDATE workspace SET uid=?, name=?, task_prefix=?, settings=? WHERE id=?",
+        arguments: [
+          row.value("uid"), row.value("name"), row.value("task_prefix"),
+          row.value("settings") ?? "{}", workspace,
+        ])
+    } else {
+      try db.execute(
+        sql: "INSERT INTO workspace(uid,slug,name,task_prefix,settings) VALUES(?,?,?,?,?)",
+        arguments: [
+          row.value("uid"), slug, row.value("name"), row.value("task_prefix"),
+          row.value("settings") ?? "{}",
+        ])
+      workspace = db.lastInsertedRowID
+    }
+    let id = workspace ?? 0
+    for (section, format) in zip(tree.sections, ExportFormat.sections) {
+      for row in section.rows {
+        try insert(
+          format.table, row, extra: format.table == "environment" ? [:] : ["workspace_id": id])
+      }
+    }
+    try insertTasks(workspace: id)
+    try insertLinks(workspace: id)
+    for row in tree.aliasDecisions {
+      try insert("alias_decision", row, extra: ["workspace_id": id])
+    }
+    try mergeApprovals()
+    try counter(workspace: id)
+    try restore(kept)
+    try tx.recordChange(kind: "workspace", rowID: id)
+    let new = (ids["task"]?.values.sorted() ?? [], ids["comment"]?.values.sorted() ?? [])
+    for task in old.tasks + new.0 { try tx.recordChange(kind: "task", rowID: task) }
+    for comment in old.comments + new.1 { try tx.recordChange(kind: "comment", rowID: comment) }
+  }
+
+  /// The task and comment ids the replace removes, for the change log.
+  private func removedIDs() throws -> (tasks: [Int64], comments: [Int64]) {
+    (
+      try Int64.fetchAll(
+        db, sql: "SELECT id FROM task WHERE workspace_id IS ?", arguments: [workspace]),
+      try Int64.fetchAll(
+        db,
+        sql:
+          "SELECT id FROM comment WHERE task_id IN (SELECT id FROM task WHERE workspace_id IS ?)",
+        arguments: [workspace])
+    )
+  }
+
+  private func delete(_ workspace: Int64) throws {
+    let tasks = "task_id IN (SELECT id FROM task WHERE workspace_id=:ws)"
+    let apps = "app_id IN (SELECT id FROM app WHERE workspace_id=:ws)"
+    try db.execute(
+      sql: """
+        DELETE FROM link WHERE workspace_id=:ws;
+        DELETE FROM alias_decision WHERE workspace_id=:ws;
+        DELETE FROM review_request WHERE \(tasks);
+        DELETE FROM comment WHERE \(tasks);
+        DELETE FROM task_event WHERE \(tasks);
+        DELETE FROM task_plan_rev WHERE \(tasks);
+        DELETE FROM task WHERE workspace_id=:ws;
+        DELETE FROM worktree_override WHERE \(apps);
+        DELETE FROM environment WHERE \(apps);
+        DELETE FROM edge WHERE workspace_id=:ws;
+        DELETE FROM topic_alias WHERE workspace_id=:ws;
+        DELETE FROM source WHERE workspace_id=:ws;
+        DELETE FROM app WHERE workspace_id=:ws;
+        DELETE FROM repo_path WHERE repo_id IN (SELECT id FROM repo WHERE workspace_id=:ws);
+        DELETE FROM repo WHERE workspace_id=:ws;
+        DELETE FROM service WHERE workspace_id=:ws;
+        DELETE FROM topic WHERE workspace_id=:ws;
+        """, arguments: ["ws": workspace])
+  }
+}

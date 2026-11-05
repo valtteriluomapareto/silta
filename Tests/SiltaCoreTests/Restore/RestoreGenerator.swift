@@ -89,6 +89,7 @@ struct RestoreGenerator {
       ("url", nil),
     ]
     for (kind, target) in ends {
+      let fromTask = next(2) == 0
       try db.execute(
         sql: """
           INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,to_ext,created_by,
@@ -96,8 +97,8 @@ struct RestoreGenerator {
             '2023-11-15T00:05:00.000Z',?)
           """,
         arguments: [
-          uid("L"), next(2) == 0 ? "task" : "comment",
-          next(2) == 0 ? tasks[next(tasks.count)] : comments[next(comments.count)], kind, target,
+          uid("L"), fromTask ? "task" : "comment",
+          fromTask ? tasks[next(tasks.count)] : comments[next(comments.count)], kind, target,
           target == nil ? "https://example.com/\(next(1000))" : nil,
           next(2) == 0 ? nil : "L\(1 + next(9))",
         ])

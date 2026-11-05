@@ -128,7 +128,8 @@ struct RestoreServiceTests {
         try db.execute(
           sql: """
             INSERT INTO approval(uid,workspace,actor,command,words,created_at) VALUES
-            ('01HZAPRVLATER','acme','agent:codex:acme','silta ws edit','later','2023-11-15T00:00:00.000Z')
+            ('01HZAPRVLATER','acme','agent:codex:acme','silta ws edit','later',
+              '2023-11-15T00:00:00.000Z')
             """)
         try db.execute(sql: "DELETE FROM approval WHERE uid='01HZAPRV000000000000000009'")
       }

@@ -1024,7 +1024,8 @@ silta code ls   <app>[@<ref>] [<dir>]
 - **Human-only commands** need the human's go-ahead (D38): `task promote`, `task edit`,
   `doc edit|accept|reject`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
   session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
-  `ws edit`, and an agent's `task unblock` of a block that isn't ready (D40); and, with
+  `ws edit`, `restore` except `--dry-run` (§15), and an agent's `task unblock` of a block
+  that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
   - A `human:*` actor (a TTY, or the app) runs them directly; `--approved` from a
     human is ignored.
@@ -1374,11 +1375,32 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     first. The tree is owned by export: edits to it are overwritten by the next
     export.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
-  **replace** semantics for one workspace.
-  - It checks the manifest checksums first and refuses partial or tampered trees.
-  - It validates foreign keys, seq uniqueness and prefix clashes.
-  - The replace happens in one transaction, and nothing is written on failure.
-  - Repo paths are re-resolved with `silta init --scan`.
+  **replace** semantics for one workspace. `<dir>` is the `<root>/<workspace>` that
+  holds `manifest.json`; the workspace comes from the tree, and a `--ws` naming
+  another one is refused.
+  - It is human-only, except `--dry-run`: it replaces the workspace's settings, which
+    only the human changes (D39). An agent's approved run records its approval, naming
+    the manifest's sha256.
+  - It checks the manifest checksums first and refuses partial or tampered trees,
+    then everything the form doesn't show: integer values, settings as `ws edit`
+    accepts them, unique uids, references that resolve inside the tree, no parent
+    cycles. A database of a newer schema or with docs in the workspace is refused, and
+    so is a tree whose uid, task prefix or row uids another workspace holds.
+  - The replace happens in one transaction, and nothing is written on failure. The
+    workspace keeps its row; its other rows are deleted and the tree's inserted.
+    Approvals are never deleted: the tree's are added when missing. The task counter
+    never rewinds, so refs already cited are never reused. Before committing, the
+    workspace is read back and must render as the tree does.
+  - Repo paths and worktree overrides stay for repos and apps the tree keeps, and a
+    task's worktree while its claim and branch are unchanged. Other repo paths are
+    re-resolved with `silta init --scan`.
+  - Replacing a workspace first takes `backups/silta-<day>-before-restore-<ms>.db`; a
+    refusal found inside the transaction may leave it.
+  - `--dry-run` runs the same transaction and rolls it back, so it finds every
+    refusal the real run would. It reports what would change: tasks removed or
+    changed since the export, settings, approvals added and claims replaced.
+  - A tree of an older schema restores the columns later migrations added at their
+    defaults.
   - It is **not** a merge, and not a sharing mechanism (Q3).
 - **Importers** (M4): `silta import --from dex|beads|backlog-md <path>`. Imported tasks
   become `proposed`, with a `source` link to the original id.

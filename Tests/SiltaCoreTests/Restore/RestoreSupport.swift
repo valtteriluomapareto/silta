@@ -52,9 +52,8 @@ enum RestoreSupport {
     approval: HumanApproval? = nil, dryRun: Bool = false, seed: UInt64 = 1
   ) throws -> RestoreReport {
     try RestoreService.restore(
-      from: tree, workspace: workspace, store: store, home: home,
-      identity: (SeededIDGenerator(seed: seed), ExportFixture.instant), approval: approval,
-      dryRun: dryRun)
+      RestoreRequest(directory: tree, workspace: workspace, approval: approval, dryRun: dryRun),
+      store: store, home: home, identity: (SeededIDGenerator(seed: seed), ExportFixture.instant))
   }
 
   /// The acme export of `store`, written under `directory/acme`.

@@ -11,10 +11,12 @@ struct StorageBackup {
   /// name, and a crashed attempt's leftover is replaced by the next attempt.
   /// The staged file is flushed to disk before it is linked, so a published backup is
   /// complete; with `reuseExisting`, one already published under `name` counts as done.
-  func snapshot(name: String, reuseExisting: Bool = false) throws -> URL {
+  /// `staging` names the staging file when the caller is neither of those two kinds.
+  func snapshot(name: String, reuseExisting: Bool = false, staging: String? = nil) throws -> URL {
     let directory = home.appending(path: "backups")
     let destination = directory.appending(path: name)
-    let temporary = directory.appending(path: reuseExisting ? "daily.pending" : "migration.pending")
+    let temporary = directory.appending(
+      path: staging ?? (reuseExisting ? "daily.pending" : "migration.pending"))
     let fm = FileManager.default
     do {
       try fm.createDirectory(at: directory, withIntermediateDirectories: true)

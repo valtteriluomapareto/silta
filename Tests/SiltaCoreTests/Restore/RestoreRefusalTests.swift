@@ -37,7 +37,8 @@ struct RestoreRefusalTests {
       "future format", .invalid, "manifest.json", #""format": "1""#, #""format": "2""#,
       rehash: false),
     .init(
-      "newer schema", .env, "manifest.json", #""schema": "v4""#, #""schema": "v99""#, rehash: false),
+      "newer schema", .env, "manifest.json", #""schema": "v4""#, #""schema": "v99""#,
+      rehash: false),
     .init(
       "dangling parent", .invalid, "tasks/AC-10.md", #"parent: "\#(task2)""#,
       #"parent: "01HZTASKGONE""#),
@@ -51,7 +52,8 @@ struct RestoreRefusalTests {
       "dangling app", .invalid, "workspace.yaml", #""app": "01HZAPP0000000000000000009""#,
       #""app": "01HZAPPGONE""#),
     .init(
-      "priority not an integer", .invalid, "tasks/AC-2.md", #"priority: "1""#, #"priority: "high""#),
+      "priority not an integer", .invalid, "tasks/AC-2.md", #"priority: "1""#,
+      #"priority: "high""#),
     .init("duplicate uid", .invalid, "tasks/AC-10.md", #"uid: "\#(task10)""#, #"uid: "\#(task2)""#),
     .init(
       "parent cycle", .invalid, "tasks/AC-2.md", #"app: "01HZAPP"#,
