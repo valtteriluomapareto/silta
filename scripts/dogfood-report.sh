@@ -196,5 +196,8 @@ target="$reports/${asof:0:10}.md"
 mkdir -p "$reports" || fail "could not create $reports."
 staged="$(mktemp "$reports/.report.XXXXXX")" || fail "could not write in $reports."
 cat "$temporary/report" > "$staged" || fail "could not write in $reports."
-ln "$staged" "$target" 2>/dev/null || fail "$target already exists; keep it, or move it away to regenerate."
+if ! ln "$staged" "$target" 2>/dev/null; then
+  [[ -e "$target" ]] && fail "$target already exists; keep it, or move it away to regenerate."
+  fail "could not write $target."
+fi
 echo "$target"
