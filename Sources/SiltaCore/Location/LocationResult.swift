@@ -2,9 +2,11 @@
 package struct LocationResult: Encodable, Sendable {
   /// Internal evidence shared with the brief reader, never encoded as location metadata.
   var currentTask: TaskDetails?
+  /// Git's worktree path with on-disk casing, used for display rather than identity.
+  var displayWorktree: String?
   /// Canonical inspected directory, preserved in path-sensitive retries.
   package let path: String
-  /// Canonical worktree toplevel, used only for override identity and receipts.
+  /// Canonical worktree toplevel, used for override identity, receipts and the repo-root AGENTS pointer.
   package let worktree: String
   /// Whether an override request changed stored state; absent for ordinary reads.
   package var overrideChanged: Bool?

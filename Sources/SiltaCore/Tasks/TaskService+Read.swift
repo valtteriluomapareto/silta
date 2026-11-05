@@ -24,18 +24,20 @@ extension TaskService {
     return try environment.db.read { db in
       let id = try Self.workspaceID(slug, in: db)
       if let on = filter.on { _ = try Self.blocker(on, workspace: slug, in: db) }
+      let visibility = TaskVisibility(
+        actor: environment.actor, at: environment.clock.now(),
+        days: WorkspaceSettings.defaultArchiveAfterDays,
+        proposed: filter.proposed || filter.status == "proposed", promoted: filter.promoted)
+      var arguments = visibility.arguments
+      arguments += ["workspace": id]
       return try Row.fetchAll(
         db,
         sql: Self.query + """
-          \nWHERE task.workspace_id=?
+          \nWHERE task.workspace_id=:workspace AND \(TaskVisibility.localSQL)
           ORDER BY task.priority,task.seq
-          """, arguments: [id]
+          """, arguments: arguments
       ).map { TaskDetails(row: $0) }.filter {
-        let visible =
-          $0.status != "proposed" || filter.proposed || filter.status == "proposed"
-          || environment.actor.isHuman || $0.createdBy == environment.actor.description
-        return visible && ($0.externalRef == nil || filter.promoted)
-          && (filter.status == nil || filter.status == $0.status)
+        (filter.status == nil || filter.status == $0.status)
           && (filter.app == nil || filter.app == $0.app)
           && (!filter.mine || $0.createdBy == environment.actor.description
             || $0.claimedBy == environment.actor.description)

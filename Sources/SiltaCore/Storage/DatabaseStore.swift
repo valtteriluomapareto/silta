@@ -42,6 +42,7 @@ package final class DatabaseStore: Sendable {
         guard flock(descriptor, LOCK_EX) == 0 else { throw StorageError.unavailable }
         defer { flock(descriptor, LOCK_UN) }
         var config = Configuration()
+        config.prepareDatabase { TaskVisibility.register(in: $0) }
         config.busyMode = .timeout(5)
         let queue = try DatabaseQueue(path: path, configuration: config)
         let migrator = StorageSchema.migrator
@@ -130,6 +131,7 @@ package final class DatabaseStore: Sendable {
   package func read<T>(_ body: (Database) throws -> T) throws -> T {
     do {
       var config = Configuration()
+      config.prepareDatabase { TaskVisibility.register(in: $0) }
       config.readonly = true
       config.busyMode = .timeout(readBusyTimeout)
       let queue: DatabaseQueue

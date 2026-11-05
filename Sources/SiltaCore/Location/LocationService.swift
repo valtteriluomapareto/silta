@@ -40,6 +40,7 @@ package struct LocationService {
       head: head, confidence: "low", reason: "unresolved", candidates: candidates,
       warnings: context.warnings)
     result.currentTask = current
+    result.displayWorktree = context.displayRoot?.path
     func picked(_ app: String, _ reason: String) -> LocationResult {
       var selected = result
       selected.app = app
@@ -134,10 +135,8 @@ package struct LocationService {
       throw LocationError.outsideRepository
     }
     if let workspace { _ = try WorkspaceSelection.resolve(workspace, in: environment.db) }
-    let root = try LocationPath.canonical(
-      URL(
-        filePath:
-          try await git.required(["rev-parse", "--show-toplevel"])))
+    let displayRoot = URL(filePath: try await git.required(["rev-parse", "--show-toplevel"]))
+    let root = try LocationPath.canonical(displayRoot)
     for repo in try LocationRepository.all(workspace: workspace, in: environment.db) {
       guard FileManager.default.fileExists(atPath: repo.path) else { continue }
       let registered = LocationGit(runner: environment.git, directory: URL(filePath: repo.path))
@@ -160,7 +159,7 @@ package struct LocationService {
       }
       return LocationContext(
         path: path, root: root, repo: repo, git: git, candidates: candidates,
-        refs: refs, warnings: warnings)
+        refs: refs, warnings: warnings, displayRoot: displayRoot)
     }
     throw unregistered(path: root, workspace: workspace)
   }
