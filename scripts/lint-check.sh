@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Check formatting and lint without changing files (what CI runs).
+#
+#   scripts/lint-check.sh
 # With no Swift sources yet, reports "skipped" and succeeds.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."

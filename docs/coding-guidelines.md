@@ -118,9 +118,19 @@ quietly diverge.
 
 ## 5. Layout and naming (D25)
 
-- **Folders by feature** inside `SiltaCore`: `Tasks/`, `Comments/`, `Location/`,
-  `Code/`, `Output/`, `Policy/`, `Agents/`, `Storage/`, `Support/`. A slice should
-  touch mostly one folder.
+| Target or folder | Holds |
+|---|---|
+| `Sources/SiltaCore` | The domain library: storage, policy, git access, actors, brief and output. No UI or CLI frameworks (AGENTS.md invariant 1) |
+| `Sources/silta` | The CLI: ArgumentParser commands under `Commands/`, plus the entry point, global options and text renderers next to them |
+| `Sources/SiltaTestSupport` | Fakes (clock, log, git runner), the golden helper, scratch directories, `SiltaBinary` and the `.slow` tag. Only test targets depend on it (D23) |
+| `Tests/SiltaCoreTests` | Unit and fixture tests of `SiltaCore`, in folders that mirror its feature folders; error-code goldens in `Golden/` |
+| `Tests/siltaTests` | Black-box CLI tests that run the built binary: golden text and `--json` in `Golden/`, the scenario runner in `Scenarios/`, and tests of the dogfood scripts |
+| `Tests/Scenarios` | Scenario files (`<name>.yaml`) the runner executes in a temporary `SILTA_HOME` (spec §20.1) |
+| `scripts/` | The verify ladder, lint, fixtures and dogfood scripts; `guards/` holds the repository guards, `tests/` their self-tests, and `ci/` the CI-only steps. Each script's header says how to run it |
+
+- **Folders by feature** inside `SiltaCore`: `Agents/`, `Brief/`, `Code/`,
+  `Comments/`, `Doctor/`, `Location/`, `Output/`, `Policy/`, `Storage/`, `Support/`,
+  `Tasks/`, `Workspace/`. A slice should touch mostly one folder.
 - **GRDB record conformances** live in `Storage/Records/` as extensions. Domain
   types never import GRDB (D11).
 - **One primary type per file**, with the file named after it. Small private helpers
@@ -138,9 +148,8 @@ quietly diverge.
 - **Parameterized tests for matrices:** the actor matrix, the `where` matrix, the
   error-code table, the secret corpus.
 - **Tiers:**
-  - slow tests carry a `.slow` tag and run only when `SILTA_SLOW_TESTS=1`; the
-    first slice with a slow test (CP or S3) adds the tag and the gate to
-    `SiltaTestSupport`
+  - slow tests carry the `.slow` tag from `SiltaTestSupport` and run only when
+    `SILTA_SLOW_TESTS=1` (`scripts/verify.sh full`)
   - the scenario runner is a slow test
 - **Isolation:** each test gets its own scratch directory and `SILTA_HOME`, so tests
   share no state and run in parallel.

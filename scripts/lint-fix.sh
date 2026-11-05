@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Apply swift-format and SwiftLint auto-fixes. Run scripts/lint-check.sh afterwards.
+#
+#   scripts/lint-fix.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
