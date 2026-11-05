@@ -524,7 +524,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|---|
 | Human | `task add` | `todo` |
 | Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
-| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
+| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --parent AC-3` (with or without `--split`) | `todo` |
 | Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it. With the setting `proposals: ask` (D39), human-only instead: the agent asks in chat first |
 | Agent, with the human's go-ahead (D39) | a write that would be `proposed`, with `--approved` | `todo`, under either setting |
 
@@ -881,21 +881,39 @@ inbox is short and grouped:
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
   agent asks first, and maps "the rest" only to items it showed.
 
-**Available M1 discussion query:** every text read explicitly says that grouped
-blockers, proposals and promoted attention are not yet included; JSON identifies
-`scope: "discussion"`. This marker will change when the other categories ship.
+**Available M1 query:** text identifies current local attention and says tracker
+status is not refreshed; JSON uses `scope: "local"`. Review requests and doc
+proposals wait for M2. Promoted attention consists of open, unarchived local task
+pointers, ordered by task id, with their `external_ref` and a read-only `task show`
+action. It does not infer status from the tracker (M4).
+
+Only `kind` and `next` are required on every item. Discussion items retain their
+post fields; task/group items add `tasks` (each with `ref`, `title`, and applicable
+`why`, `on`, `follow_up_at`, `external_ref`). Due party/URL groups add `target` and
+the earliest `follow_up_at` among their due members. Group by stored target before
+redacting displayed URLs; two targets may have identical redacted text. Due tasks
+without a party/URL form one item each, including no-`--on` and unfinished task-only
+blocks. Ready/re-plan tasks appear only in the first category, ordered by task id;
+due groups sort by earliest follow-up, first task id, then stored target. Follow-up
+is due at the start of its UTC day. Ready `next` is `task unblock`; every other block
+uses `task ls --status todo`, just like `task start` (D35), with inspection actions
+for every task. Blocked and proposed attention remains visible despite explicit
+archiving. Proposals appear only while `created_at` is strictly newer than 14 days
+before the read instant, newest first with descending task id breaking ties;
+`--all` includes older proposals without changing their status. Proposal actions
+are direct for human callers; agent callers get an ask-human instruction naming
+only that displayed proposal's accept/drop commands and approval placeholder.
+
 Within each discussion category, stored post id breaks time ties. Each live post
 appears once, with question/answer attention taking precedence over claimed-task
 `discussion`. The latter retains the original `post_kind`, and an answer names its
-question via `reply_to`. The cap applies after ordering. `silta schema inbox`
-publishes the shape: only `kind` and `next` are required on every item; post fields
-are optional so grouped items can add multiple task/ref fields. Discussion items
-carry those post fields. Every command is qualified with the selected workspace;
-confirmation guidance follows the relay rule above. Closed and archived tasks
-remain included when they have matching live discussion. Promoted tasks are
-omitted because local discussion mutations refuse; `--all` does not include them.
-Reading a discussion item does not clear it: it clears on the claimer's next write
-to its task, as the item says.
+question via `reply_to`. The cap applies after grouping and ordering across all
+categories. `silta schema inbox` publishes the shape. Every command is qualified
+with the selected workspace; confirmation guidance follows the relay rule above.
+Closed and archived tasks remain included when they have matching live discussion.
+Promoted task discussion is omitted because local mutations refuse; `--all` does
+not include it. Reading discussion does not clear it: it clears on the claimer's
+next write to its task, as the item says.
 
 It lists:
 - live open questions mentioning the actor with no qualifying live answer (an answer
@@ -1117,15 +1135,19 @@ settings (D39). It covers:
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
   - Proposals: usually none; never more than two per session, and only what you'd bet
-    the human wants. `task add --start` is only for work the human asked for. If
-    the human asked you to add a task for later, pass their words as `--approved`,
-    so it becomes `todo` without triage (D39).
+    the human wants. `task add --start` is only for work the human asked for. A
+    subtask of a task you still claim (`task add --parent AC-12`) starts as `todo`
+    and is not a proposal (§8), so it needs no `--approved`; passing it only warns
+    `approval_unused`. `submit`, `block` and a handoff release the claim, and a
+    subtask added after that is a proposal again. If the human asked you to add a task for later, pass their
+    words as `--approved`, so it becomes `todo` without triage (D39).
   - If `brief` shows `proposals: ask` (D39): don't propose. Name each idea and its
     `silta task add` command in your message, and add the ones the human wants with
     `--approved`. With no human present, list ideas under "what's left" in the
     handoff or the `done` result, never in a question, a TODO comment or a file.
   - "What needs me?" means `silta inbox --for me`, relayed as one short message with
-    the choices to make.
+    the choices to make. Map "the rest" only to proposals actually shown, and ask
+    before running triage.
   - "Work the backlog": see §8, Working the backlog.
 - **Questions:** ask in chat; record only when blocked beyond this session. Use
   `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
