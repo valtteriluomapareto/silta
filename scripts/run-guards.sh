@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Run the guard self-tests, then every repository guard. Keeps going after a failure
 # and lists all failures at the end. Needs only python3; no build.
+#
+#   scripts/run-guards.sh
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 

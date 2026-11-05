@@ -41,7 +41,7 @@ body:
       value: |
         - [ ] <specific tests / scenarios>
         - [ ] `scripts/verify.sh quick` (or `full` for storage, concurrency, location, agent-facing output)
-        - [ ] Plan posted on this issue and reviewed with `skills/persona-review`
+        - [ ] Plan recorded where the current dogfooding stage requires (AGENTS.md) and reviewed with `skills/persona-review`
         - [ ] Implementation reviewed by the same reviewers
         - [ ] Scenarios added where §20.1 requires them
         - [ ] Spec, decisions and plan board updated if behaviour or scope changed

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Build the fixed synthetic Acme git suite in an empty destination.
+#
+#   scripts/make-fixtures.sh <empty-directory>
 set -euo pipefail
 [[ $# == 1 ]] || { echo 'usage: make-fixtures.sh <empty-directory>' >&2; exit 64; }
 destination="$1"
