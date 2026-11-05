@@ -8,7 +8,7 @@ enum BriefHook {
     let path = SiltaMain.commandPath(arguments)
     return
       (path == "silta brief" && flags.contains("--hook")
-      || path == "silta agents session-start")
+      || path == "silta agents session-start" || path == "silta agents stop")
       && !flags.contains("--help") && !flags.contains("--version")
   }
 

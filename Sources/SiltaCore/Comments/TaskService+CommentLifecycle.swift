@@ -133,6 +133,10 @@ extension TaskService {
       try changed(
         task.id, kind: "discussion", body: "\(action.receipt) \(task.ref)/\(row["seq"] as Int)",
         at: at, in: tx)
+    } else {
+      try event(
+        "discussion", task: task.id, body: "\(action.receipt) \(task.ref)/\(row["seq"] as Int)",
+        at: at, in: tx)
     }
   }
 

@@ -37,6 +37,7 @@ silta brief  Read budgeted local context for the current task.
 silta guide  Read the agent manual, or one topic.
 silta agents install  Preview owned harness edits; confirm with --apply <token>.
 silta agents uninstall  Preview removal of selected, unedited Silta ownership.
+silta session check  Read fresh own claims needing handoff across all workspaces.
 details: silta schema <command>
 
 global flags:

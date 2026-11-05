@@ -1,71 +1,76 @@
 import Foundation
 import SiltaCore
 
-/// Only an exact sealed hook group is owned; unknown settings stay as JSON values.
+/// Only exact sealed hook groups are owned; unknown settings stay as JSON values.
 enum AgentHookSettings {
   private enum Origin: String, CaseIterable { case file = "new", hooks, event, keep }
-
-  private static let marker = "# silta:session-start:v1:"
-  private static let label = "Silta SessionStart"
+  private static let events = ["SessionStart", "Stop"]
 
   static func edit(
-    _ original: String, existed: Bool, uninstall: Bool,
+    _ original: String, existed: Bool, uninstall: Bool, stop: Bool,
     refusal: () throws -> Never
   ) throws -> String {
     var root: [String: Any]
     do { root = existed ? try AgentJSON.object(original) : [:] } catch { try refusal() }
     guard root["hooks"] == nil || root["hooks"] is [String: Any] else { try refusal() }
     var hooks = root["hooks"] as? [String: Any] ?? [:]
-    guard hooks["SessionStart"] == nil || hooks["SessionStart"] is [[String: Any]] else {
-      try refusal()
+    let origins = events.flatMap { event in
+      (hooks[event] as? [[String: Any]] ?? []).compactMap { matched($0, event: event) }
     }
-    var groups = hooks["SessionStart"] as? [[String: Any]] ?? []
-    let initial: Origin =
-      !existed
-      ? .file
-      : root["hooks"] == nil ? .hooks : hooks["SessionStart"] == nil ? .event : .keep
-    let ownership = try ownership(groups, origin: initial, refusal: refusal)
-    let found = ownership.index, origin = ownership.origin
-    if uninstall {
-      guard let found else { return original }
-      groups.remove(at: found)
-    } else {
-      if found != nil { return original }
-      groups.append(group(origin: origin))
+    let newFile = !existed || origins.contains(.file)
+    let newHooks = newFile || root["hooks"] == nil || origins.contains(.hooks)
+    var changed = false
+    for event in (uninstall || stop ? events : ["SessionStart"]) {
+      guard hooks[event] == nil || hooks[event] is [[String: Any]] else { try refusal() }
+      var groups = hooks[event] as? [[String: Any]] ?? []
+      let initial: Origin =
+        newFile ? .file : newHooks ? .hooks : hooks[event] == nil ? .event : .keep
+      let ownership = try ownership(groups, event: event, origin: initial, refusal: refusal)
+      if uninstall {
+        guard let found = ownership.index else { continue }
+        groups.remove(at: found)
+      } else {
+        if ownership.index != nil { continue }
+        groups.append(group(event: event, origin: ownership.origin))
+      }
+      changed = true
+      if groups.isEmpty, ownership.origin != .keep {
+        hooks.removeValue(forKey: event)
+      } else {
+        hooks[event] = groups
+      }
     }
-    if groups.isEmpty, origin != .keep {
-      hooks.removeValue(forKey: "SessionStart")
-    } else {
-      hooks["SessionStart"] = groups
-    }
-    if hooks.isEmpty, origin == .file || origin == .hooks {
-      root.removeValue(forKey: "hooks")
-    } else {
-      root["hooks"] = hooks
-    }
-    if uninstall, origin == .file, root.isEmpty { return "" }
+    guard changed else { return original }
+    put(hooks, into: &root, created: newHooks)
+    if uninstall, newFile, root.isEmpty { return "" }
     return try json(root) + "\n"
   }
 
+  private static func put(_ hooks: [String: Any], into root: inout [String: Any], created: Bool) {
+    if hooks.isEmpty, created { root.removeValue(forKey: "hooks") } else { root["hooks"] = hooks }
+  }
+
   private static func ownership(
-    _ groups: [[String: Any]], origin: Origin,
+    _ groups: [[String: Any]], event: String, origin: Origin,
     refusal: () throws -> Never
   ) throws -> (index: Int?, origin: Origin) {
     var found: Int?
     var origin = origin
     for (index, group) in groups.enumerated() {
       guard let handlers = group["hooks"] as? [[String: Any]] else { try refusal() }
-      if handlers.contains(where: candidate) {
-        guard found == nil,
-          let matched = Origin.allCases.first(where: {
-            NSDictionary(dictionary: group).isEqual(to: self.group(origin: $0))
-          })
-        else { try refusal() }
+      if handlers.contains(where: { candidate($0, event: event) }) {
+        guard found == nil, let matched = matched(group, event: event) else { try refusal() }
         origin = matched
         found = index
       }
     }
     return (found, origin)
+  }
+
+  private static func matched(_ value: [String: Any], event: String) -> Origin? {
+    Origin.allCases.first {
+      NSDictionary(dictionary: value).isEqual(to: group(event: event, origin: $0))
+    }
   }
 
   static func diff(_ old: String, _ new: String) throws -> String {
@@ -79,25 +84,33 @@ enum AgentHookSettings {
     if text.isEmpty { return [] }
     let root = try AgentJSON.object(text)
     let hooks = root["hooks"] as? [String: Any] ?? [:]
-    let groups = hooks["SessionStart"] as? [[String: Any]] ?? []
-    return try groups.filter { ($0["hooks"] as? [[String: Any]] ?? []).contains(where: candidate) }
-      .map { try json(["SessionStart": $0]) }
+    return try events.flatMap { event in
+      let groups = hooks[event] as? [[String: Any]] ?? []
+      return try groups.filter {
+        ($0["hooks"] as? [[String: Any]] ?? []).contains { candidate($0, event: event) }
+      }.map { try json([event: $0]) }
+    }
   }
 
-  private static func candidate(_ handler: [String: Any]) -> Bool {
-    handler["statusMessage"] as? String == label
-      || (handler["command"] as? String)?.contains(marker) == true
+  private static func candidate(_ handler: [String: Any], event: String) -> Bool {
+    handler["statusMessage"] as? String == "Silta " + event
+      || (handler["command"] as? String)?.contains(marker(event)) == true
   }
 
-  private static func group(origin: Origin) -> [String: Any] {
+  private static func marker(_ event: String) -> String {
+    "# silta:" + (event == "SessionStart" ? "session-start" : "stop") + ":v1:"
+  }
+
+  private static func group(event: String, origin: Origin) -> [String: Any] {
     let origin = origin.rawValue
-    let digest = AgentInstallPlan.hash(Data(("SessionStart:" + origin).utf8))
+    let digest = AgentInstallPlan.hash(Data((event + ":" + origin).utf8))
+    let command = event == "SessionStart" ? "session-start" : "stop"
     return [
       "hooks": [
         [
           "type": "command",
-          "command": "silta agents session-start " + marker + origin + ":" + digest,
-          "timeout": 2, "statusMessage": label,
+          "command": "silta agents " + command + " " + marker(event) + origin + ":" + digest,
+          "timeout": 2, "statusMessage": "Silta " + event,
         ]
       ]
     ]

@@ -5,12 +5,14 @@ struct AgentInstallTarget {
   let body: String
   let whole: Bool
   let settings: Bool
+  let stopHook: Bool
 
-  init(path: String, body: String, whole: Bool, settings: Bool = false) {
+  init(path: String, body: String, whole: Bool, settings: Bool = false, stopHook: Bool = false) {
     self.path = path
     self.body = body
     self.whole = whole
     self.settings = settings
+    self.stopHook = stopHook
   }
   private static let frontmatter =
     "---\nname: silta\ndescription: Use Silta for context, "
@@ -48,7 +50,7 @@ struct AgentInstallTarget {
   ) throws -> String {
     if settings {
       return try AgentHookSettings.edit(
-        original, existed: existed, uninstall: uninstall,
+        original, existed: existed, uninstall: uninstall, stop: stopHook,
         refusal: refusal)
     }
     var text = original

@@ -37,6 +37,7 @@ a plan ships:
 
 ## Dogfooding
 
-[Setup and daily workflow](dogfood/README.md), [workspace YAML](dogfood/workspace.yaml)
-and [reviewed reports](dogfood/reports/README.md). Setup does not activate until the
+[Setup and daily workflow](dogfood/README.md), [workspace YAML](dogfood/workspace.yaml),
+[isolated harness acceptance](dogfood/agents-acceptance.md) and
+[reviewed reports](dogfood/reports/README.md). Setup does not activate until the
 maintainer completes it with an agent after the tooling PR merges.

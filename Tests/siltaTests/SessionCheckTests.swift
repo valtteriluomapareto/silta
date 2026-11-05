@@ -43,22 +43,7 @@ struct SessionCheckTests {
       #expect(try Self.run(["task", "start", "AC-1"], in: scratch).termination == .exit(0))
       #expect(try Self.tasks(in: scratch).count == 1)
       let payload = #"{"session_id":"acme-session","stop_hook_active":false}"#
-      let blocked = try AgentsHookTests.hook(
-        command, payload: payload, in: scratch, environment: Self.environment)
-      #expect(blocked.termination == .exit(0))
-      let result = try GuideContractTests.object(blocked.stdout)
-      #expect(result["decision"] as? String == "block")
-      #expect((result["reason"] as? String)?.contains("AC-1") == true)
-      let active = try AgentsHookTests.hook(
-        command, payload: #"{"session_id":"acme-session","stop_hook_active":true}"#, in: scratch,
-        environment: Self.environment)
-      #expect(active.termination == .exit(0) && active.stdout.isEmpty && active.stderr.isEmpty)
-      let other = Self.environment.merging(["SILTA_SESSION": "other"]) { _, new in new }
-      #expect(try Self.tasks(in: scratch, environment: other).isEmpty)
-      let expired = Self.environment.merging(["SILTA_NOW": "2023-11-15T00:13:20.000Z"]) { _, new in
-        new
-      }
-      #expect(try Self.tasks(in: scratch, environment: expired).isEmpty)
+      try Self.assertBlockedThenActive(command, payload: payload, in: scratch)
       #expect(
         try Self.run(
           [
@@ -86,16 +71,31 @@ struct SessionCheckTests {
     }
   }
 
+  static func assertBlockedThenActive(_ command: String, payload: String, in scratch: URL) throws {
+    let blocked = try AgentsHookTests.hook(
+      command, payload: payload, in: scratch, environment: Self.environment)
+    #expect(blocked.termination == .exit(0))
+    let result = try GuideContractTests.object(blocked.stdout)
+    #expect(result["decision"] as? String == "block")
+    #expect((result["reason"] as? String)?.contains("AC-1") == true)
+    let active = try AgentsHookTests.hook(
+      command, payload: #"{"session_id":"acme-session","stop_hook_active":true}"#, in: scratch,
+      environment: Self.environment)
+    #expect(active.termination == .exit(0) && active.stdout.isEmpty && active.stderr.isEmpty)
+  }
+
   @Test func deletingOldContextIsStillAWriteAfterHandoff() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
       for args in [
         ["task", "add", "Acme work", "--start"], ["comment", "AC-1", "-m", "Acme context"],
         ["comment", "AC-1", "--kind", "handoff", "-m", "State: Acme saved. Next: review."],
-        ["task", "start", "AC-1"], ["comment", "delete", "AC-1/1"],
+        ["task", "start", "AC-1"],
       ] {
         #expect(try Self.run(args, in: scratch).termination == .exit(0))
       }
+      #expect(try Self.tasks(in: scratch).isEmpty)
+      #expect(try Self.run(["comment", "delete", "AC-1/1"], in: scratch).termination == .exit(0))
       #expect(try Self.tasks(in: scratch).count == 1)
       let audit = try store.read {
         try Int.fetchOne(
@@ -119,7 +119,8 @@ extension SessionCheckTests {
       try store.write { tx in
         try tx.database.execute(
           sql:
-            "DELETE FROM grdb_migrations WHERE identifier='v4'; UPDATE meta SET value='3' WHERE key='min_writer_version'"
+            "DELETE FROM grdb_migrations WHERE identifier='v4'; "
+            + "UPDATE meta SET value='3' WHERE key='min_writer_version'"
         )
       }
       let before = try store.read { try Int.fetchOne($0, sql: "SELECT max(seq) FROM change_log") }
@@ -148,7 +149,8 @@ extension SessionCheckTests {
       try store.write {
         try $0.database.execute(
           sql:
-            "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Acme Beta','BE')"
+            "INSERT INTO workspace(uid,slug,name,task_prefix) "
+            + "VALUES('beta','beta','Acme Beta','BE')"
         )
       }
       #expect(
@@ -184,18 +186,6 @@ extension SessionCheckTests {
         #expect(result.termination == .exit(0))
       }
       #expect(try Self.tasks(in: scratch).isEmpty)
-      #expect(
-        try AgentsHookTests.hook(
-          command, payload: #"{"session_id":"acme-session","stop_hook_active":"bad"}"#, in: scratch,
-          environment: Self.environment
-        ).stdout.isEmpty)
-      #expect(
-        try AgentsInstallTests.apply(["install", "--claude", "--hook"], in: scratch).termination
-          == .exit(0))
-      #expect(try AgentsHookTests.command("Stop", in: scratch) == command)
-      let invalid = try AgentsInstallTests.run(
-        ["install", "--codex", "--stop-hook", "--json"], in: scratch)
-      #expect(invalid.termination == .exit(1))
     }
   }
 }

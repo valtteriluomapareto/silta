@@ -174,7 +174,8 @@ struct GuideCommand: OutputCommand {
         # Handoff
         Always leave a handoff before stopping. It releases your claim while preserving \
         status. Use the actual branch and sha; the next session reads the task and starts it \
-        again.
+        again. Run `silta session check` to find fresh own claims needing handoff across all \
+        workspaces; follow each printed scoped command with the handoff body on stdin.
         ```sh
         silta comment AC-12 --kind handoff -F - <<'HANDOFF'
         State: API inspected; implementation remains.

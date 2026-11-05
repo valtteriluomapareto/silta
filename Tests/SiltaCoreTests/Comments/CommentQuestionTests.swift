@@ -129,7 +129,10 @@ struct CommentQuestionTests {
       #expect(try CommentLifecycleTests.snapshot(env) == accepted)
       #expect(throws: CommentError.self) { _ = try outsider.acceptComment("AC-1/2") }
       _ = try holder.updateComments(["AC-1/2"], action: .delete)
-      #expect(try holder.show("AC-1", timeline: true).timeline?.last?.body == "accepted AC-1/2")
+      let deleted = try #require(holder.show("AC-1", timeline: true).timeline)
+      #expect(deleted.last?.body == "deleted AC-1/2")
+      #expect(
+        deleted.contains { $0.body == "accepted AC-1/2" && $0.actor == askerActor.description })
       #expect(throws: CommentError.self) { _ = try asker.acceptComment("AC-1/2") }
       _ = try holder.updateComments(["AC-1/1"], action: .reopen)
       let reopened = try #require(holder.show("AC-1").comments)
