@@ -175,6 +175,33 @@ struct RestoreCommandTests {
     }
   }
 
+  /// A prefix change is a ref change even while the counter stays put.
+  @Test func dryRunShowsAPrefixChange() throws {
+    try withScratchDirectory { scratch in
+      try ExportCommandTests.seed(scratch)
+      try Self.setCounter(scratch, to: 50)
+      let export = try SiltaBinary.run(["--ws", "acme", "export", "--to", "out"], in: scratch)
+      #expect(export.termination == .exit(0), "\(export.stderr)")
+      try Self.setPrefix(scratch, to: "AX")
+      try Self.setCounter(scratch, to: 100)
+      let dry = try SiltaBinary.run(
+        ["restore", "out/acme", "--dry-run"], in: scratch, environment: Self.agent)
+      #expect(dry.termination == .exit(0), "\(dry.stderr)")
+      Golden.forTests().check(Self.masked(dry.stdout, scratch), "restore-dry-run-prefix.txt")
+      let json = try SiltaBinary.run(
+        ["restore", "out/acme", "--dry-run", "--json"], in: scratch, environment: Self.agent)
+      #expect(json.termination == .exit(0), "\(json.stderr)")
+      Golden.forTests().check(Self.masked(json.stdout, scratch), "restore-dry-run-prefix.json")
+    }
+  }
+
+  static func setPrefix(_ scratch: URL, to prefix: String) throws {
+    try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path).write { db in
+      try db.execute(
+        sql: "UPDATE workspace SET task_prefix=? WHERE slug='acme'", arguments: [prefix])
+    }
+  }
+
   static func setCounter(_ scratch: URL, to next: Int) throws {
     try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path).write { db in
       try db.execute(
