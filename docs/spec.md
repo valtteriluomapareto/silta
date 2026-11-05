@@ -1024,7 +1024,34 @@ silta code ls   <app>[@<ref>] [<dir>]
 
 ### `silta agents install`
 
-Writes idempotent marker blocks, after showing a diff and asking first.
+Writes idempotent, content-hashed ownership blocks. Preview is the default (also
+`--dry-run`), with only the changed spans, target paths and a confirmation token;
+unrelated configuration is omitted. `--apply <token>` confirms that exact preview
+without a TTY prompt. Changes to source bytes, file modes, target selection or paths
+invalidate the token (`conflict`, exit 6); run the same preview again. Never combine
+`--dry-run` and `--apply`. JSON data is `{applied, token, changes: [{path, diff}]}`.
+
+Default selection is Claude and Codex. `--claude` or `--codex` restricts both install
+and uninstall; unselected paths are never inspected. The shared Claude skill starts
+with YAML name/description frontmatter and contains the versioned `silta guide`.
+Uninstall removes only unedited ownership, retaining unrelated bytes, permissions
+and empty user files. Ownership remains recognizable if `SILTA_HOME` changes.
+Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
+nonregular/multiply linked files and files over 1 MiB are refused before writes.
+
+Targets come from explicit absolute `HOME`; nonmatching `CODEX_HOME` or
+`CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. The Codex grant uses the
+effective `SILTA_HOME`. The conservative TOML editor supports bare single-line
+keys/tables and refuses existing user-owned writable-root definitions or ambiguous
+syntax; it never changes sandbox mode, trust or authentication. A human must inspect
+such refusals; there is no overwrite flag. Configuring a root does not prove it is
+effective in a managed harness (D42).
+
+Installers serialize with an advisory lock on HOME and preflight all selected
+targets. Each file replacement is atomic; multiple replacements are not one
+transaction. An I/O failure lists completed paths and asks for a fresh preview/retry;
+there is no rollback or process-crash guarantee. An unrelated editor does not honor
+the installer lock. Hook runtime must be installed before settings that reference it.
 
 | Target | Content |
 |---|---|
@@ -1033,7 +1060,7 @@ Writes idempotent marker blocks, after showing a diff and asking first.
 | Claude Code **SessionStart hook** | `silta brief --hook`: short, no indexing, 1.5 s timeout, silent if unregistered. It also exports `SILTA_SESSION`. |
 | Claude Code **Stop hook** (optional; D42, live run unverified) | `silta session check`: if this session holds a claim with writes since its last handoff, ask the agent to leave a handoff before stopping |
 | `~/.codex/AGENTS.md` block | The same 5 lines |
-| `~/.codex/config.toml` | Adds `~/.silta` to the sandbox's writable roots (`sandbox_workspace_write.writable_roots`; D42, live run unverified), so Codex can write |
+| `~/.codex/config.toml` | Adds the effective `SILTA_HOME` (default `~/.silta`) to `sandbox_workspace_write.writable_roots` (D42, live run unverified) |
 | Permissions (optional) | Deny tracker writes, e.g. `Bash(az boards work-item create*)`, `Bash(gh issue create*)` |
 
 ### `silta guide`

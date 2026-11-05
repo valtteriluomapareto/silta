@@ -258,3 +258,14 @@ private struct GuideManual: Encodable, Sendable {
   let topics: [String]
   let topic: String?
 }
+
+extension GuideCommand {
+  static func manual() -> String {
+    sections.map { section in
+      section.text
+        + (section.topic == "output"
+          ? "Topics: " + sections.map(\.topic).joined(separator: ", ")
+            + ". Read one with `silta guide <topic>`.\n" : "")
+    }.joined(separator: "\n")
+  }
+}

@@ -1,0 +1,9 @@
++
++<!-- silta:begin <digest>:new -->
++If `silta where` resolves this repo, use Silta for cross-repo work and backlog.
++Read `silta brief` at session start unless the hook already printed it.
++Keep plans and results in Silta; never create repo plan files or tracker items.
++Leave a handoff before stopping; read errors and their next commands.
++Details: `silta guide`.
++<!-- silta:end -->
++
