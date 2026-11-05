@@ -58,6 +58,19 @@ struct ExportCommandTests {
     }
   }
 
+  @Test func aLeftoverWorkDirectoryIsAWarning() throws {
+    try withScratchDirectory { scratch in
+      try Self.seed(scratch)
+      let leftover = scratch.appending(path: "work/out/.acme.export-a1b2c3")
+      try FileManager.default.createDirectory(at: leftover, withIntermediateDirectories: true)
+      let result = try SiltaBinary.run(
+        ["--ws", "acme", "export", "--to", "out", "--json"], in: scratch)
+      #expect(result.termination == .exit(0), "\(result.stderr)")
+      #expect(result.stdout.contains(#""code":"export_leftover""#))
+      #expect(FileManager.default.fileExists(atPath: leftover.path))
+    }
+  }
+
   @Test func relativeRootResolvesAgainstTheWorkingDirectory() throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)

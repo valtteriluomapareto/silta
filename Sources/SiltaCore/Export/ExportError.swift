@@ -1,4 +1,5 @@
-/// Export failures. Each leaves the target as it was (spec §15).
+/// Export failures. Each leaves the target as it was (spec §15), except `previousKept`,
+/// which says where the previous tree is.
 package enum ExportError: CodedError, Equatable {
   /// The target exists but is not exactly a previous export; `entry` is the first file
   /// that shows it.
@@ -9,6 +10,9 @@ package enum ExportError: CodedError, Equatable {
   case unsupported(String)
   /// The tree could not be written under the root.
   case unwritable(path: String, workspace: String)
+  /// The new tree could not be put in place and the previous one could not be moved
+  /// back; it is kept at `path`.
+  case previousKept(path: String, target: String, workspace: String)
   /// A tree is not byte for byte what export writes, or doesn't hold together.
   case invalidTree(String)
   /// The restore input is not an export tree; `child` is one inside it that is.
@@ -25,7 +29,7 @@ package enum ExportError: CodedError, Equatable {
     switch self {
     case .notAnExport, .restoreConflict, .manifestChanged: .conflict
     case .insideRepo, .invalidTree, .notATree, .otherWorkspace: .invalid
-    case .unsupported, .unwritable: .env
+    case .unsupported, .unwritable, .previousKept: .env
     }
   }
 
@@ -51,6 +55,9 @@ package enum ExportError: CodedError, Equatable {
       "This workspace has \(what), which this version of silta can't export; nothing was written."
     case .unwritable(let path, _):
       "The export could not be written under \(path); the previous export, if any, is unchanged."
+    case .previousKept(let path, let target, _):
+      "The new export could not replace \(target), and the previous export could not be "
+        + "moved back; it is kept at \(path)."
     case .invalidTree(let reason):
       "Not an unchanged silta export tree: \(reason). Nothing was restored."
     case .notATree(let path, let reason, _):
@@ -77,6 +84,7 @@ package enum ExportError: CodedError, Equatable {
       ]
     case .unwritable(_, let workspace):
       [workspaceCommand("silta export --to <writable directory>", workspace: workspace)]
+    case .previousKept(let path, let target, _): ["mv " + shellWord(path) + " " + shellWord(target)]
     case .unsupported: ["update silta"]
     case .invalidTree: ["silta export  # again, on the machine the tree came from"]
     case .notATree(let path, _, let child):

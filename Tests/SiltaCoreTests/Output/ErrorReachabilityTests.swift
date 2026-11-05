@@ -201,6 +201,9 @@ extension ExportError: ErrorExamples {
       .otherWorkspace(tree: "acme", given: "beta", directory: "/tmp/acme-notes/acme"),
       .restoreConflict("workspace beta already has the tree's task prefix"),
       .manifestChanged(approved: "a1b2c3d4e5f6", directory: "/tmp/acme-notes/acme"),
+      .previousKept(
+        path: "/tmp/acme-notes/.acme.export-abc123/previous", target: "/tmp/acme-notes/acme",
+        workspace: "acme"),
     ]
   }
 }

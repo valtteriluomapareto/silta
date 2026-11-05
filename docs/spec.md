@@ -150,7 +150,8 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
   (`Silta.app/Contents/Helpers/silta`). Every write transaction checks
   `min_writer_version` (§17).
 - **Data directory.** `SILTA_HOME` (default `~/.silta`) relocates everything. Tests and
-  evals use it, and the real data is never touched.
+  evals use it, and the real data is never touched. Private reports live in
+  `$SILTA_HOME/reports/<slug>/` (§22.1).
 
 ## 5. Concepts
 
@@ -523,7 +524,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|---|
 | Human | `task add` | `todo` |
 | Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
-| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
+| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --parent AC-3` (with or without `--split`) | `todo` |
 | Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it. With the setting `proposals: ask` (D39), human-only instead: the agent asks in chat first |
 | Agent, with the human's go-ahead (D39) | a write that would be `proposed`, with `--approved` | `todo`, under either setting |
 
@@ -1135,9 +1136,12 @@ settings (D39). It covers:
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
   - Proposals: usually none; never more than two per session, and only what you'd bet
-    the human wants. `task add --start` is only for work the human asked for. If
-    the human asked you to add a task for later, pass their words as `--approved`,
-    so it becomes `todo` without triage (D39).
+    the human wants. `task add --start` is only for work the human asked for. A
+    subtask of a task you still claim (`task add --parent AC-12`) starts as `todo`
+    and is not a proposal (§8), so it needs no `--approved`; passing it only warns
+    `approval_unused`. `submit`, `block` and a handoff release the claim, and a
+    subtask added after that is a proposal again. If the human asked you to add a task for later, pass their
+    words as `--approved`, so it becomes `todo` without triage (D39).
   - If `brief` shows `proposals: ask` (D39): don't propose. Name each idea and its
     `silta task add` command in your message, and add the ones the human wants with
     `--approved`. With no human present, list ideas under "what's left" in the
@@ -1318,7 +1322,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **Daily backup (M1):** on the first write of each day, `VACUUM INTO
   $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
   first.
-- **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
+- **`silta export [--ws] [--to]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
   keyed by `uid`; display refs are included for readability. Machine-local state is
   never written: repo paths, worktree overrides and task worktrees. Values the user
@@ -1393,9 +1397,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     snapshot under the lock, so the last one written is the latest state. The new
     tree is staged in a directory of export's own next to the target, created under a
     unique name, and swapped in, so a reader sees one tree or the other, never a mix;
-    a volume without an atomic swap moves the old tree aside first. Export removes
-    nothing it did not create; a crash can leave its hidden work directory behind. The tree is owned by export: edits to it are overwritten by the next
-    export.
+    a volume without an atomic swap moves the old tree aside first, and puts it back,
+    or keeps it and names it, when the new one can't take its place. Export removes
+    only the target it replaces and its own work directory, and keeps that directory
+    when the replaced tree turns out to hold a file export didn't write. A work
+    directory it doesn't remove, including one a crash left, is reported in the
+    command's warnings for the human. An entry export can't read refuses the target.
+    The tree is owned by export: edits to it are overwritten by the next export.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace. `<dir>` is the `<root>/<workspace>` that
   holds `manifest.json`; the workspace comes from the tree, and a `--ws` naming
@@ -1680,11 +1688,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
-  - Slack and Google keys
+  - Slack, Google and Anthropic keys
   - JWTs (except obvious placeholders)
   - Finnish personal identity codes (henkilötunnus, as PII)
 
-  There's no entropy check in v1.
+  There's no entropy check in v1, and a token hard-wrapped across lines is not detected.
 - **Allowlist:** 40- and 64-character hex SHAs, UUIDs, refs (§5.1), and
   `<placeholder>`-style values. Exemptions cover whole candidate values; a containing
   reference does not exempt an embedded credential. Explicit credential fields
@@ -2064,7 +2072,7 @@ steps, questions, handoffs and results.
     own, so the result asks every time.
   - Friction that needs its own fix, or that comes up outside a task, also becomes a
     task with the topic `dogfood`.
-  - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
+  - `scripts/dogfood-report.sh [--ws <slug>] [--since <YYYY-MM-DD>]` (built in DF) prints a
     Markdown report from the command logs (§19) and the tasks. `--since` defaults
     to the date of the newest report in `docs/dogfood/reports/`, so reports leave
     no gaps, and a `--since` after the report day is refused. The report states its
@@ -2097,6 +2105,15 @@ steps, questions, handoffs and results.
     actor's calls and approvals out. Unreadable log lines (malformed, or missing
     the expected fields) are only counted too. Failures before the environment is
     set up (a bad `SILTA_*` value) aren't logged, so the report can't see them.
+    With `--ws <slug>` it reports on any workspace privately (DF3): it refuses a slug
+    that is no workspace identifier before using it, writes the report to
+    `$SILTA_HOME/reports/<slug>/<YYYY-MM-DD>.md` instead of printing it, takes the
+    default `--since` from that folder, and never replaces an existing report. It
+    refuses a destination inside a git work tree or behind a symlink in its own
+    `reports/` folders, never follows whatever already sits at the report's path, and
+    gives a slug too long for a folder name a shortened folder ending in a hash.
+    Friction lines and `dogfood` tasks belong to the `silta` workspace (D36), so other
+    workspaces' reports say they aren't collected.
   - Once per wave, at the latest every 60 days so no log has expired, an agent
     runs the report with the maintainer, who reviews it before it is added through
     a pull request as `docs/dogfood/reports/<YYYY-MM-DD>.md`, named by the report's
