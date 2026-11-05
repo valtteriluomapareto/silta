@@ -21,14 +21,11 @@ package struct ScanChoice: Equatable, Sendable {
 
   package static let none = ScanChoice()
 
-  /// The chosen slug, when it is a usable identifier.
-  var usableSlug: String? {
-    slug.flatMap { WorkspaceConfig.isValidIdentifier($0) ? $0 : nil }
-  }
-
-  /// The chosen prefix, when it is a usable identifier.
-  var usablePrefix: String? {
-    prefix.flatMap { WorkspaceConfig.isValidIdentifier($0) ? $0 : nil }
+  /// A supplied value a `next` must keep. It stays bare when it is a valid
+  /// identifier and is shell-quoted otherwise, so an unusable value reaches its own
+  /// validation refusal instead of being dropped.
+  static func carried(_ value: String?) -> String? {
+    value.map { WorkspaceConfig.isValidIdentifier($0) ? $0 : shellWord($0) }
   }
 }
 
@@ -111,15 +108,16 @@ package enum ScanError: CodedError, Equatable {
   package var next: [String] {
     switch self {
     case .invalidSlug(_, _, _, let roots, let choice):
-      return [command(roots: roots, slug: "<slug>", prefix: choice.usablePrefix)]
+      return [command(roots: roots, slug: "<slug>", prefix: ScanChoice.carried(choice.prefix))]
     case .invalidPrefix(_, _, let roots, let choice):
-      return [command(roots: roots, slug: choice.usableSlug, prefix: "<prefix>")]
+      return [command(roots: roots, slug: ScanChoice.carried(choice.slug), prefix: "<prefix>")]
     case .slugExists(_, let chosen, let workspace, let roots, let choice):
-      let another = command(roots: roots, slug: "<another-slug>", prefix: choice.usablePrefix)
+      let another = command(
+        roots: roots, slug: "<another-slug>", prefix: ScanChoice.carried(choice.prefix))
       let rescan = "silta init --scan \(roots.scanArguments) --ws \(shellWord(workspace))"
       return chosen ? [another, rescan] : [rescan, another]
     case .prefixTaken(_, _, _, let roots, let choice):
-      return [command(roots: roots, slug: choice.usableSlug, prefix: "<prefix>")]
+      return [command(roots: roots, slug: ScanChoice.carried(choice.slug), prefix: "<prefix>")]
     case .repoPathTaken(_, let path, let workspace):
       return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(path))"]
     }

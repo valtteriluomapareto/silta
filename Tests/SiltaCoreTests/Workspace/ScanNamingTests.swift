@@ -451,3 +451,124 @@ extension ScanNamingTests {
     }
   }
 }
+
+extension ScanNamingTests {
+  /// Every repo and the path bound to it, ordered by slug.
+  static func repoPaths(_ store: DatabaseStore) throws -> [(slug: String, path: String)] {
+    try store.read { db in
+      try Row.fetchAll(
+        db,
+        sql: """
+          SELECT repo.slug AS slug,repo_path.path AS path
+          FROM repo
+          LEFT JOIN repo_path ON repo_path.repo_id=repo.id
+          ORDER BY repo.slug
+          """
+      ).map { (slug: $0["slug"] as String, path: $0["path"] as String? ?? "") }
+    }
+  }
+
+  /// Two directories that both normalize to the reserved `none` are a duplicate
+  /// before any remapping can give them different names.
+  @Test func reservedSlugsThatNormalizeAlikeAreRefused() async throws {
+    try await withScratchDirectory { home in
+      let root = home.appending(path: "scan")
+      let none = root.appending(path: "none")
+      let hidden = root.appending(path: ".none")
+      var script: [(GitRequest, Result<GitResult, any Error>)] = []
+      for directory in [none, hidden].sorted(by: { $0.path < $1.path }) {
+        script += RepositoryScanTests.script(try Self.clone(directory), listed: directory)
+      }
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      await #expect(throws: RepoError.duplicateSlug) {
+        _ = try await Self.create(
+          [root], slug: "work", prefix: "WK", store: store,
+          git: ScriptedGitRunner(script: script))
+      }
+      #expect(try WorkspaceSelection.list(in: store).isEmpty)
+    }
+  }
+
+  /// The reserved alias a scan gives a `none` repo is the same on a full and on a
+  /// subset rescan, and a subset rescan never rebinds another repo's path.
+  @Test func aReservedSlugAliasSurvivesRescans() async throws {
+    try await withScratchDirectory { home in
+      let root = home.appending(path: "scan")
+      let hidden = root.appending(path: ".none")
+      let literal = root.appending(path: "none-repo")
+      let hiddenPath = try Self.clone(hidden)
+      let literalPath = try Self.clone(literal)
+      let hiddenScript = RepositoryScanTests.script(hiddenPath, listed: hidden)
+      let literalScript = RepositoryScanTests.script(literalPath, listed: literal)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let created = try await Self.create(
+        [root], slug: "work", prefix: "WK", store: store,
+        git: ScriptedGitRunner(script: hiddenScript + literalScript))
+      #expect(created.workspace == "work")
+      let expected = [
+        (slug: "none-repo", path: literalPath.path),
+        (slug: "none-repo-2", path: hiddenPath.path),
+      ]
+      let stored = try Self.repoPaths(store)
+      #expect(stored.map(\.slug) == expected.map(\.slug))
+      #expect(stored.map(\.path) == expected.map(\.path))
+
+      for (roots, script) in [
+        ([root], hiddenScript + literalScript),
+        ([hidden], hiddenScript),
+        ([literal], literalScript),
+      ] {
+        let outcome = try await RepositoryScan.scan(
+          roots, target: .rescan("work"), store: store, git: ScriptedGitRunner(script: script),
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+        #expect(outcome.workspace == "work")
+        let kept = try Self.repoPaths(store)
+        #expect(kept.map(\.slug) == expected.map(\.slug))
+        #expect(kept.map(\.path) == expected.map(\.path))
+      }
+    }
+  }
+
+  /// A directory that is only punctuation, or only a dot, still becomes a repo slug.
+  @Test(arguments: [(".hidden", "hidden"), ("___", "repo")])
+  func boundaryDirectoryNamesNormalizeIntoASlug(_ name: String, _ slug: String) async throws {
+    try await withScratchDirectory { home in
+      let root = home.appending(path: "work")
+      let clone = root.appending(path: name)
+      let path = try Self.clone(clone)
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let outcome = try await Self.create(
+        [root], slug: "work", prefix: "WK", store: store,
+        git: ScriptedGitRunner(script: RepositoryScanTests.script(path, listed: clone)))
+      #expect(outcome.workspace == "work")
+      let stored = try Self.repoPaths(store)
+      #expect(stored.map(\.slug) == [slug])
+      #expect(stored.map(\.path) == [path.path])
+      #expect(FileManager.default.fileExists(atPath: clone.appending(path: ".git").path))
+    }
+  }
+
+  /// A refusal for the invalid slug keeps the supplied prefix, quoted, so the caller's
+  /// other option is neither dropped nor run as shell words.
+  @Test func anInvalidSlugKeepsTheSuppliedPrefix() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let chosen = home.appending(path: "acme")
+      let derived = home.appending(path: "My Projects")
+      let cases: [(URL, String?)] = [(chosen, "Work Space"), (derived, nil)]
+      for (root, slug) in cases {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let error = await Self.refusal {
+          _ = try await Self.create(
+            [root], slug: slug, prefix: "!", store: store, git: ScriptedGitRunner(script: []))
+        }
+        #expect(error?.code == .invalid)
+        #expect(
+          error?.next == [
+            "silta init --scan \(shellWord(root.path)) --slug <slug> --prefix '!'"
+          ])
+      }
+      #expect(try WorkspaceSelection.list(in: store).isEmpty)
+    }
+  }
+}

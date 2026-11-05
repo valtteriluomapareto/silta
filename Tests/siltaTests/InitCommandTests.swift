@@ -275,6 +275,75 @@ struct InitCommandTests {
 }
 
 extension InitCommandTests {
+  /// Two clones that both normalize to the reserved `none` are refused before the
+  /// reserved alias can tell them apart, and nothing is created.
+  @Test func reservedRepoSlugsThatNormalizeAlikeAreRefused() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "scan")
+      try Self.makeRepo(root.appending(path: "none"), in: scratch)
+      try Self.makeRepo(root.appending(path: ".none"), in: scratch)
+      let refused = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK", "--json"], in: scratch)
+      #expect(refused.termination == .exit(6))
+      #expect(refused.stdout.contains("\"code\":\"conflict\""))
+      let list = try SiltaBinary.run(["ws", "ls"], in: scratch)
+      #expect(list.stdout.contains("No workspaces"))
+    }
+  }
+
+  /// The reserved alias for a `none` repo is stable: a full rescan and a rescan of
+  /// only that clone keep the repo slugs the creation stored.
+  @Test func aReservedSlugAliasSurvivesARescan() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "scan")
+      let hidden = root.appending(path: ".none")
+      try Self.makeRepo(hidden, in: scratch)
+      try Self.makeRepo(root.appending(path: "none-repo"), in: scratch)
+      let created = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK"], in: scratch)
+      #expect(created.termination == .exit(0), "\(created.stderr)")
+      let before = try SiltaBinary.run(["ws", "show", "Work"], in: scratch)
+      #expect(before.termination == .exit(0))
+      #expect(before.stdout.contains("\"slug\":\"none-repo\""))
+      #expect(before.stdout.contains("\"slug\":\"none-repo-2\""))
+      for path in [root.path, hidden.path] {
+        let rescanned = try SiltaBinary.run(
+          ["--ws", "Work", "init", "--scan", path], in: scratch)
+        #expect(rescanned.termination == .exit(0), "\(path): \(rescanned.stderr)")
+        #expect(try SiltaBinary.run(["ws", "show", "Work"], in: scratch).stdout == before.stdout)
+      }
+    }
+  }
+
+  /// An invalid slug's refusal keeps the supplied prefix; running the printed command
+  /// then refuses that prefix and its own `next` completes the scan.
+  @Test func anInvalidSlugRefusalKeepsTheSuppliedPrefix() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "acme")
+      try Self.makeRepo(root, in: scratch)
+      let refused = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "Work Space", "--prefix", "!", "--json"],
+        in: scratch)
+      #expect(refused.termination == .exit(1))
+      let next = try Self.nextCommand(refused.stdout)
+      #expect(next.hasSuffix("--prefix '!'"))
+      let slugFixed = try Self.runNext(
+        next.replacingOccurrences(of: "<slug>", with: "Other"), in: scratch)
+      #expect(slugFixed.termination == .exit(1))
+      #expect(slugFixed.stderr.contains("--prefix"))
+      let prefixNext = try #require(
+        slugFixed.stderr.split(separator: "\n").first { $0.hasPrefix("next: ") })
+      let fixed = try Self.runNext(
+        String(prefixNext.dropFirst("next: ".count))
+          .replacingOccurrences(of: "<prefix>", with: "WK"),
+        in: scratch)
+      #expect(fixed.termination == .exit(0), "\(fixed.stderr)")
+      let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(list.stdout.contains("\"slug\":\"Other\""))
+      #expect(list.stdout.contains("\"task_prefix\":\"WK\""))
+    }
+  }
+
   /// A clone whose directory name is no identifier still scans: its repo slug is the
   /// normalized name, and neither the directory nor its path changes.
   @Test func aRepoDirectoryNameIsNormalizedIntoASlug() throws {

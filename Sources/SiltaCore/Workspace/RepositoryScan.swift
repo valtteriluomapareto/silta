@@ -59,8 +59,13 @@ package enum RepositoryScan {
       }
       if case .rescan = request.target, existing == nil { throw WorkspaceError.notFound }
       let workspace = existing.map { $0["slug"] as String } ?? request.slug
+      guard Set(request.repos.map(\.slug)).count == request.repos.count else {
+        throw RepoError.duplicateSlug
+      }
       let repos = try naming(
         request.repos, workspace: existing == nil ? nil : workspace, in: db, into: &warnings)
+      // Remapping can still collide with a repo the workspace already stores; never
+      // let a rewrite pick a name that another row in this scan also uses.
       guard Set(repos.map(\.slug)).count == repos.count else { throw RepoError.duplicateSlug }
       if existing == nil {
         let prefix = try creationPrefix(request, in: db)
@@ -206,59 +211,64 @@ extension RepositoryScan {
   }
 
   /// Repo slugs come from directory names, so a repo named `none` would collide with the
-  /// word that means non-code work. A new workspace names it `none-repo` with a warning;
-  /// an existing one keeps the slug it already stores, so a rescan finds its rows.
+  /// word that means non-code work. It takes the first `none-repo` name that no other
+  /// clone in the scan normalizes to, which gives creation and every rescan the same
+  /// answer; a clone this workspace already binds keeps its stored slug.
   private static func naming(
     _ repos: [DiscoveredRepo], workspace: String?, in db: Database,
     into warnings: inout [OutputWarning]
   ) throws -> [DiscoveredRepo] {
-    var stored: Set<String> = []
-    if let workspace {
-      stored = Set(
-        try String.fetchAll(
-          db,
-          sql: """
-            SELECT repo.slug
-            FROM repo
-            JOIN workspace ON workspace.id=repo.workspace_id
-            WHERE workspace.slug=?
-            """, arguments: [workspace]))
+    guard let index = repos.firstIndex(where: { $0.slug == TaskDraft.noneApp }) else {
+      return repos
     }
-    var taken = Set(repos.map(\.slug))
-    taken.remove(TaskDraft.noneApp)
-    return repos.map { repo in
-      guard repo.slug == TaskDraft.noneApp else { return repo }
-      let slug: String
-      if stored.contains(TaskDraft.noneApp) {
-        slug = TaskDraft.noneApp
-      } else if let kept = Self.storedReservedSlug(in: stored) {
-        slug = kept
-      } else {
-        slug = Self.freeReservedSlug(excluding: taken)
-        warnings.append(
-          OutputWarning(
-            code: "slug_renamed",
-            message: "Repo \(repo.slug) was renamed \(slug) because "
-              + "\(TaskDraft.noneApp) is reserved for non-code work."))
-      }
-      taken.insert(slug)
-      return repo.renamed(slug)
+    let slug: String
+    if let workspace,
+      let bound = try registeredSlug(for: repos[index].path.path, workspace: workspace, in: db)
+    {
+      slug = bound
+    } else if let workspace, try storesReservedNone(workspace, in: db) {
+      slug = TaskDraft.noneApp
+    } else {
+      slug = Self.freeReservedSlug(excluding: Set(repos.map(\.slug)))
+      warnings.append(
+        OutputWarning(
+          code: "slug_renamed",
+          message: "Repo \(TaskDraft.noneApp) was renamed \(slug) because "
+            + "\(TaskDraft.noneApp) is reserved for non-code work."))
     }
+    var named = repos
+    named[index] = repos[index].renamed(slug)
+    return named
   }
 
-  /// The `none-repo` name an existing workspace already stores, if any.
-  private static func storedReservedSlug(in stored: Set<String>) -> String? {
-    var slug = TaskDraft.noneApp + "-repo"
-    var suffix = 2
-    while suffix <= stored.count + 1 {
-      if stored.contains(slug) { return slug }
-      slug = TaskDraft.noneApp + "-repo-\(suffix)"
-      suffix += 1
-    }
-    return nil
+  /// The repo slug this workspace already binds `path` to, if any.
+  private static func registeredSlug(
+    for path: String, workspace: String, in db: Database
+  ) throws -> String? {
+    try String.fetchOne(
+      db,
+      sql: """
+        SELECT repo.slug
+        FROM repo_path
+        JOIN repo ON repo.id=repo_path.repo_id
+        JOIN workspace ON workspace.id=repo.workspace_id
+        WHERE workspace.slug=? AND repo_path.path=?
+        """, arguments: [workspace, path])
   }
 
-  /// The first `none-repo` name this scan has not given to another repo.
+  /// Whether the workspace already stores a repo spelled `none`.
+  private static func storesReservedNone(_ workspace: String, in db: Database) throws -> Bool {
+    try Bool.fetchOne(
+      db,
+      sql: """
+        SELECT 1
+        FROM repo
+        JOIN workspace ON workspace.id=repo.workspace_id
+        WHERE workspace.slug=? AND repo.slug=?
+        """, arguments: [workspace, TaskDraft.noneApp]) ?? false
+  }
+
+  /// The first `none-repo` name no other repo in this scan normalizes to.
   private static func freeReservedSlug(excluding taken: Set<String>) -> String {
     var slug = TaskDraft.noneApp + "-repo"
     var suffix = 2
