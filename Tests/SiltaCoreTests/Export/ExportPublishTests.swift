@@ -139,7 +139,7 @@ struct ExportPublishTests {
         return renamex_np(from, to, UInt32(RENAME_SWAP))
       })
       let result = try Self.export(store, home, root, appearing)
-      let kept = try #require(result.leftovers.first)
+      let kept = try #require(result.leftovers.first?.path)
       #expect(FileManager.default.fileExists(atPath: kept + "/tree/conflict copy.md"))
       ExportTreeTests.expectSame(
         try ExportServiceTests.tree(root.appending(path: "acme")), try ExportTreeTests.render(store)
@@ -156,7 +156,8 @@ struct ExportPublishTests {
       try FileManager.default.createDirectory(at: leftover, withIntermediateDirectories: true)
       let result = try ExportServiceTests.export(store, home, to: root)
       #expect(
-        result.leftovers.map { URL(filePath: $0).lastPathComponent } == [".acme.export-a1b2c3"])
+        result.leftovers.map { URL(filePath: $0.path).lastPathComponent } == [".acme.export-a1b2c3"]
+      )
       #expect(FileManager.default.fileExists(atPath: leftover.path))
     }
   }

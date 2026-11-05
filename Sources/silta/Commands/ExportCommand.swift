@@ -36,12 +36,7 @@ struct ExportCommand: OutputCommand {
       ?? environment.home.url.appending(path: "exports", directoryHint: .isDirectory)
     let result = try ExportService.export(
       workspace: workspace, to: root, store: environment.db, home: environment.home.url)
-    let warnings = result.leftovers.map {
-      OutputWarning(
-        code: "export_leftover",
-        message:
-          "\($0) is a work directory export did not remove; ask the human before deleting it.")
-    }
+    let warnings = result.leftovers.map(\.warning)
     return CommandOutput(
       text: "Exported \(result.workspace) to \(result.path) (\(result.files) files).", data: result,
       warnings: warnings

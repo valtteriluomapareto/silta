@@ -61,16 +61,18 @@ package enum OutputRouter {
 
   private static func failure(_ error: any CodedError, mode: OutputMode) -> Rendered {
     let code = error.code
+    let warnings = (error as? any WarnedFailure)?.warnings ?? []
     if mode.json {
       let envelope = Envelope(
         ok: false, data: nil,
         error: EnvelopeFailure(
           code: code.rawValue, message: error.message, next: error.next,
           nextBy: error.nextBy.rawValue, retryAfter: error.retryAfter),
-        warnings: [])
+        warnings: warnings)
       do {
         return Rendered(
-          stdout: try line(envelope), stderr: "", exitCode: code.exitCode, errorCode: code)
+          stdout: try line(envelope), stderr: "", exitCode: code.exitCode, errorCode: code,
+          warningCodes: warnings.map(\.code))
       } catch {
         // Strings, ints and string arrays always encode, so this is unreachable; it
         // still answers in JSON on stdout as promised.
@@ -79,7 +81,13 @@ package enum OutputRouter {
           errorCode: .env)
       }
     }
-    return text(error: error, code: code)
+    let rendered = text(error: error, code: code)
+    guard !warnings.isEmpty else { return rendered }
+    return Rendered(
+      stdout: rendered.stdout,
+      stderr: warnings.map { "warning: \($0.message) [\($0.code)]\n" }.joined() + rendered.stderr,
+      exitCode: rendered.exitCode, errorCode: rendered.errorCode,
+      warningCodes: warnings.map(\.code))
   }
 
   private static let unencodableError =
