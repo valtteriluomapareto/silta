@@ -158,29 +158,36 @@ struct DogfoodPrivateReportTests {
     }
   }
 
+  /// The fixture's acme rows with valid times, plus acme log lines that would change the
+  /// silta report's "Unused commands" and unreadable count if they leaked into it.
+  static func seedAcme(_ scratch: URL) throws -> URL {
+    let store = try Report.setup(scratch)
+    try store.write {
+      try $0.database.execute(
+        sql: """
+          UPDATE approval SET created_at='2023-11-14T12:00:00.000Z'
+          WHERE uid='acme-foreign-approval';
+          UPDATE task SET created_at='2023-11-01T00:00:00.000Z',
+            updated_at='2023-11-14T00:00:00.000Z' WHERE uid='acme-foreign-task';
+          """)
+    }
+    let tools = try Report.tools(scratch)
+    let log = try FileHandle(
+      forWritingTo: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+    try log.seekToEnd()
+    for overrides: [String: Any] in [
+      ["workspace": "acme", "command": "silta brief"],
+      ["workspace": "acme", "command": "silta guide", "actor": 5],
+    ] {
+      try log.write(contentsOf: Data((try Report.line(overrides) + "\n").utf8))
+    }
+    try log.close()
+    return tools
+  }
+
   @Test func canariesNeverCrossWorkspaces() throws {
     try withScratchDirectory { scratch in
-      let store = try Report.setup(scratch)
-      try store.write {
-        try $0.database.execute(
-          sql: """
-            UPDATE approval SET created_at='2023-11-14T12:00:00.000Z'
-            WHERE uid='acme-foreign-approval';
-            UPDATE task SET created_at='2023-11-01T00:00:00.000Z',
-              updated_at='2023-11-14T00:00:00.000Z' WHERE uid='acme-foreign-task';
-            """)
-      }
-      let tools = try Report.tools(scratch)
-      let log = try FileHandle(
-        forWritingTo: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
-      try log.seekToEnd()
-      for overrides: [String: Any] in [
-        ["workspace": "acme", "command": "silta brief"],
-        ["workspace": "acme", "command": "silta guide", "actor": 5],
-      ] {
-        try log.write(contentsOf: Data((try Report.line(overrides) + "\n").utf8))
-      }
-      try log.close()
+      let tools = try Self.seedAcme(scratch)
       let committed = try Report.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
       let silta = try Report.run(
         ["--ws", "silta", "--since", "2023-11-14"], scratch: scratch, tools: tools)
