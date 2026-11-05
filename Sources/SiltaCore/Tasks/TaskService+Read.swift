@@ -62,13 +62,7 @@ extension TaskService {
       let comments = try Self.discussion(task, timeline: timeline, in: db)
       task.comments = comments.isEmpty ? nil : comments
       if !timeline {
-        let resolved =
-          try Int.fetchOne(
-            db,
-            sql: """
-              SELECT count(*) FROM comment
-              WHERE task_id=? AND thread_id IS NULL AND resolved_at IS NOT NULL
-              """, arguments: [task.id]) ?? 0
+        let resolved = try Self.hiddenResolvedThreads(task, displayed: comments, in: db)
         if resolved > 0 { task.resolvedThreads = resolved }
       }
       if task.status == "doing", task.claimedBy == nil, task.externalRef == nil,
@@ -103,6 +97,22 @@ extension TaskService {
       }
       return task
     }
+  }
+
+  private static func hiddenResolvedThreads(
+    _ task: TaskDetails, displayed comments: [CommentDetails], in db: Database
+  ) throws -> Int {
+    let resolved =
+      try Int.fetchOne(
+        db,
+        sql: """
+          SELECT count(*) FROM comment
+          WHERE task_id=? AND thread_id IS NULL AND resolved_at IS NOT NULL
+          """, arguments: [task.id]) ?? 0
+    let displayed = comments.filter {
+      $0.kind == "handoff" && $0.replyTo == nil && $0.resolvedAt != nil
+    }.count
+    return resolved - displayed
   }
 
   static func lookup(_ ref: String, workspace: String, in db: Database) throws -> TaskDetails {

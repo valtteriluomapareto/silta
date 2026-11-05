@@ -1,7 +1,7 @@
 /// Pure, pinned secret scanning and redaction. Callers decide whether a write is allowed.
 package enum SecretGuard {
   /// Rule-set version; changes deliberately with detection behavior.
-  package static let version = 1
+  package static let version = 2
 
   /// Body-free warning for a successful redacted write.
   package static let warning = OutputWarning(
@@ -78,7 +78,13 @@ package enum SecretGuard {
       ("password", /(?i)\b(?:Password|Pwd)\s*=\s*(?:"[^"\r\n]+"|'[^'\r\n]+'|[^;\s]+)/),
       ("aws_key", /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/),
       ("github_pat", /\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82})\b/),
-      ("azure_pat", /\b(?:[A-Za-z0-9]{52}|[A-Za-z0-9]{75}AZDO[A-Za-z0-9]{5})\b/),
+      // A legacy PAT is 52 lowercase letters and digits. A current PAT is 84
+      // characters with the uppercase AZDO marker at position 76; a 75- or
+      // 76-character prefix covers both readings of the documented position.
+      (
+        "azure_pat",
+        /\b(?:[a-z0-9]{52}|[A-Za-z0-9]{75}AZDO[A-Za-z0-9]{5}|[A-Za-z0-9]{76}AZDO[A-Za-z0-9]{4})\b/
+      ),
       ("slack", /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/),
       ("google", /\bAIza[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/),
       ("jwt", /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}(?![A-Za-z0-9_-])/),

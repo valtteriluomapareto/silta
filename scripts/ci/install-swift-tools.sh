@@ -21,15 +21,18 @@ installed=false
 trap 'if [[ "$installed" != true ]]; then rm -rf "$install_root"; fi' EXIT
 lint_archive="$install_root/swiftlint.zip"
 format_archive="$install_root/swift-format.tar.gz"
+# Retry transient failures, including a 504 mid-transfer (curl exit 56), which plain --retry
+# gave up on after three quick attempts. The checksums below reject any partial download.
+fetch=(curl --fail --location --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors)
 
-curl --fail --location --retry 3 --silent --show-error \
+"${fetch[@]}" \
   'https://github.com/realm/SwiftLint/releases/download/0.65.1/portable_swiftlint.zip' \
   --output "$lint_archive"
 printf '%s  %s\n' 'c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0' "$lint_archive" | shasum -a 256 -c
 unzip -q "$lint_archive" -d "$install_root/swiftlint"
 
 # GHCR's public anonymous token, not a signing credential or repository secret.
-curl --fail --location --retry 3 --silent --show-error --header 'Authorization: Bearer QQ==' \
+"${fetch[@]}" --header 'Authorization: Bearer QQ==' \
   'https://ghcr.io/v2/homebrew/core/swift-format/blobs/sha256:a32eef7ab3a18682cc5865060d25801dd948936704ff82f50cc0afeec1416ca9' \
   --output "$format_archive"
 printf '%s  %s\n' 'a32eef7ab3a18682cc5865060d25801dd948936704ff82f50cc0afeec1416ca9' "$format_archive" | shasum -a 256 -c

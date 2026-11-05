@@ -29,7 +29,7 @@ struct SecretGuardTests {
       Sample(rule: "github_pat", text: "gh" + "s_" + String(repeating: "Q", count: 36)),
       Sample(rule: "github_pat", text: "gh" + "r_" + String(repeating: "Q", count: 36)),
       Sample(rule: "github_pat", text: "github_" + "pat_" + String(repeating: "Q", count: 82)),
-      Sample(rule: "azure_pat", text: String(repeating: "Q", count: 52)),
+      Sample(rule: "azure_pat", text: legacyPAT),
       Sample(rule: "azure_pat", text: String(repeating: "Q", count: 75) + "AZ" + "DO" + "Q1234"),
       Sample(
         rule: "slack",
@@ -46,6 +46,10 @@ struct SecretGuardTests {
       // Every century sign, including the common `-` (1900s) and `+` (1800s).
       + "+-ABCDEFYXWVU".map { sign in Sample(rule: "hetu", text: identity(number: 2, sign: sign)) }
   }
+
+  // Lowercase letters and digits: the alphabet both maintained Azure DevOps PAT
+  // detectors match, so the fixture looks like a real legacy token.
+  static var legacyPAT: String { String(repeating: "acme7zq3", count: 6) + "acme" }
 
   static var keyBlock: String {
     "-----BE" + "GIN RSA PRIVATE KEY-----\n" + String(repeating: "Q", count: 64)
@@ -81,7 +85,7 @@ struct SecretGuardTests {
     let sha40 = String(repeating: "a1", count: 20)
     let sha64 = String(repeating: "b2", count: 32)
     let uuid = "12345678-1234-1234-1234-123456789abc"
-    let ref = "doc:" + String(repeating: "Q", count: 52)
+    let ref = "doc:" + Self.legacyPAT
     let clean = [
       "Acme backlog", sha40, sha64, uuid, ref, "AC-12/3", "app:platform-api",
       "Password=<placeholder>", "Password= <placeholder>", "Pwd=\"<acme-password>\"",
@@ -98,6 +102,85 @@ struct SecretGuardTests {
     for value in clean.suffix(6) {
       #expect(SecretGuard.matches(in: value).isEmpty)
     }
+  }
+
+  // Long identifiers are ordinary text: a name, its `Tests` suffix, and a sentence
+  // around it must survive untouched, whatever the rule set grows.
+  @Test(arguments: [
+    "aRepoPathHeldByAnotherWorkspaceNamesTheRepoAndHolder",
+    "aRepoPathHeldByAnotherWorkspaceNamesTheRepoAndHolderBeforeTheTaskIsTriagedAndStarted",
+    "repo_path_held_by_another_workspace_names_the_holder",
+    "a_repo_path_held_by_another_workspace_names_the_repo_and_holder_before_it_is_triaged",
+  ])
+  func longIdentifiersAreNotSecrets(identifier: String) {
+    #expect([52, 84].contains(identifier.count))
+    for text in [
+      identifier, identifier + "Tests", "see `" + identifier + "`",
+      "The reply names " + identifier + " and its plan step.",
+    ] {
+      #expect(SecretGuard.matches(in: text).isEmpty)
+      #expect(SecretGuard.redacted(text) == text)
+    }
+  }
+
+  // Every rule, not just the Azure PAT one, must leave identifiers alone at the
+  // lengths where a fixed-width rule could reach into them.
+  @Test(arguments: [
+    "proposingATaskForAnotherWorkspacesRepoKeepsItsSlugAndPrefixStableWhileWaitingForTriage",
+    "hiddenBranchNamesStayOutOfAnotherWorkspacesProposedTaskList",
+    "a_repo_path_held_by_another_workspace_names_the_repo_and_holder",
+    "ACME_WORKSPACE_REPO_PATH_HELD_BY_ANOTHER_WORKSPACE_NAMES_ITS_HOLDER",
+    "parseV2WorkspaceSlugAndPrefixFromTheScanRootBeforeRegisteringRepos",
+    "repoPathHeldByAnotherWorkspaceNamesTheRepoAndItsHolderTodayV2",
+  ])
+  func otherRulesLeaveLongIdentifiersAlone(identifier: String) {
+    #expect(SecretGuard.matches(in: identifier).isEmpty)
+    #expect(SecretGuard.redacted(identifier) == identifier)
+  }
+
+  // Microsoft documents the AZDO marker at positions 76 through 80 of an
+  // 84-character token, which leaves a 75- or 76-character prefix depending on
+  // whether positions count from one.
+  @Test(arguments: [75, 76])
+  func currentPATsStayDetected(prefixLength: Int) {
+    let token =
+      String(repeating: "q", count: prefixLength) + "AZ" + "DO"
+      + String(repeating: "7", count: 80 - prefixLength)
+    #expect(token.count == 84)
+    #expect(SecretGuard.redacted("token " + token) == "token [REDACTED:azure_pat]")
+  }
+
+  @Test func legacyPATsStayDetected() {
+    #expect(Self.legacyPAT.count == 52)
+    #expect(SecretGuard.redacted("token " + Self.legacyPAT) == "token [REDACTED:azure_pat]")
+  }
+
+  // Every permitted character, so narrowing the alphabet cannot silently drop one.
+  @Test(arguments: Array("abcdefghijklmnopqrstuvwxyz0123456789"))
+  func legacyPATsCoverTheWholeAlphabet(character: Character) {
+    let token = String(repeating: "a", count: 51) + String(character)
+    #expect(token.count == 52)
+    #expect(SecretGuard.redacted("token " + token) == "token [REDACTED:azure_pat]")
+  }
+
+  // One uppercase letter is enough to make 52 characters an identifier, not a PAT.
+  @Test(arguments: Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  func oneUppercaseLetterMakesALongIdentifierClean(letter: Character) {
+    let identifier =
+      String(repeating: "a", count: 25) + String(letter) + String(repeating: "a", count: 26)
+    #expect(identifier.count == 52)
+    #expect(SecretGuard.matches(in: identifier).isEmpty)
+    #expect(SecretGuard.redacted(identifier) == identifier)
+  }
+
+  // Mixed case on both sides of AZDO must survive the current-format branch at both offsets.
+  @Test(arguments: [75, 76])
+  func currentPATsAcceptMixedCase(prefixLength: Int) {
+    let prefix = String((0..<prefixLength).map { $0.isMultiple(of: 2) ? "Q" : "q" })
+    let suffix = String((0..<(80 - prefixLength)).map { $0.isMultiple(of: 2) ? "R" : "7" })
+    let token = prefix + "AZDO" + suffix
+    #expect(token.count == 84)
+    #expect(SecretGuard.redacted("token " + token) == "token [REDACTED:azure_pat]")
   }
 
   @Test func vendorTokenInsideARefStillRedacts() {
@@ -127,7 +210,7 @@ struct SecretGuardTests {
   }
 
   @Test func embeddedLegacyPATIsNotAWholeRefIdentifier() {
-    let token = String(repeating: "Q", count: 52)
+    let token = Self.legacyPAT
     let input = "doc:notes." + token + ".draft"
     #expect(SecretGuard.redacted(input) == "doc:notes.[REDACTED:azure_pat].draft")
   }
@@ -154,7 +237,7 @@ struct SecretGuardTests {
     let token = "AK" + "IA" + String(repeating: "Q", count: 16)
     let input = "🦊 " + token + " 🦊 " + token + "!"
     #expect(SecretGuard.redacted(input) == "🦊 [REDACTED:aws_key] 🦊 [REDACTED:aws_key]!")
-    #expect(SecretGuard.version == 1)
+    #expect(SecretGuard.version == 2)
   }
 
   @Test func rejectionAndWarningNeverStoreOrRenderMatches() throws {
@@ -181,7 +264,7 @@ struct SecretGuardTests {
   @Test func previewsRevealNothingPrivate() throws {
     for (text, preview) in [
       (Self.identity(number: 2), "…[hetu]"),
-      (String(repeating: "Q", count: 52), "…[azure_pat]"),
+      (Self.legacyPAT, "…[azure_pat]"),
       ("Pwd\t=acme", "Pwd…[password]"),
     ] {
       let match = try #require(SecretGuard.matches(in: text).first)

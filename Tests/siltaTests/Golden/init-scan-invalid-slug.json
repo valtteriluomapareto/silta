@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"Directory name \"My Projects\" is not a valid workspace slug; use letters, digits, _ or -, starting and ending with a letter or digit, or choose one with --slug.","next":["silta init --scan '<scratch>/My Projects' --slug <slug>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

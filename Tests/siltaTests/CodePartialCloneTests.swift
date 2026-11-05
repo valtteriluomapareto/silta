@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(3)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(3)))
 struct CodePartialCloneTests {
   @Test(arguments: ["show", "grep"])
   func codeReadsFetchPromisedBlobsWithoutCheckout(verb: String) throws {

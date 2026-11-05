@@ -1,3 +1,2 @@
 error: Only author agent:codex:acme can delete this comment; current actor is agent:codex:other. [conflict]
-next: silta --ws 'acme' comment resolve 'AC-1/1'
 next: silta --ws 'acme' task show 'AC-1' --timeline

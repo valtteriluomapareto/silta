@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 /// Validation and secret-guard rules of the task commands, from the outside.
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskInputRegressionTests {
   static let other = TaskStateRegressionTests.other
 
