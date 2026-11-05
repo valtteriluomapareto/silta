@@ -1567,7 +1567,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
-  - Slack and Google keys
+  - Slack, Google and Anthropic keys
   - JWTs (except obvious placeholders)
   - Finnish personal identity codes (henkilötunnus, as PII)
 

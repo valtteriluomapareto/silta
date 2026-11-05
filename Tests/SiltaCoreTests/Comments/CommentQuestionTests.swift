@@ -292,38 +292,36 @@ extension CommentQuestionTests {
   // body is redacted in place, and recipient, mention and citation metadata are refused
   // without echoing the key.
   @Test func anthropicKeysNeverReachCommentStorageOrRefusals() async throws {
-    await withKnownIssue("SI-33: Anthropic keys are stored and echoed") {
-      try await withScratchDirectory { home in
-        let env = try await CommentTests.setup(home), service = TaskService(environment: env)
-        let key = SecretGuardTests.anthropicKey()
-        var draft = CommentDraft(body: "Rotate " + key + " today.")
-        let posted = try service.comment("AC-1", draft)
-        #expect(posted.comment.body == "Rotate [REDACTED:anthropic] today.")
-        #expect(posted.warnings == [SecretGuard.warning])
-        let stable = try CommentLifecycleTests.snapshot(env)
-        for (recipients, body, source) in [
-          (["human:" + key], "Acme", nil),
-          (["agent:claude:" + key], "Acme", nil),
-          ([], "Ask @agent:claude:" + key, nil),
-          ([], "Acme", "note:" + key),
-          ([], "Acme", "note:notes/" + key + ".md"),
-        ] as [([String], String, String?)] {
-          draft = CommentDraft(body: body, kind: "question")
-          draft.recipients = recipients
-          draft.source = source
-          do {
-            _ = try service.comment("AC-1", draft)
-            Issue.record("Accepted a key in comment metadata")
-          } catch let error as CommentError {
-            #expect(error.code == .invalid)
-            let echoed = (error.message + error.next.joined()).contains(key)
-            #expect(!echoed)
-          }
+    try await withScratchDirectory { home in
+      let env = try await CommentTests.setup(home), service = TaskService(environment: env)
+      let key = SecretGuardTests.anthropicKey()
+      var draft = CommentDraft(body: "Rotate " + key + " today.")
+      let posted = try service.comment("AC-1", draft)
+      #expect(posted.comment.body == "Rotate [REDACTED:anthropic] today.")
+      #expect(posted.warnings == [SecretGuard.warning])
+      let stable = try CommentLifecycleTests.snapshot(env)
+      for (recipients, body, source) in [
+        (["human:" + key], "Acme", nil),
+        (["agent:claude:" + key], "Acme", nil),
+        ([], "Ask @agent:claude:" + key, nil),
+        ([], "Acme", "note:" + key),
+        ([], "Acme", "note:notes/" + key + ".md"),
+      ] as [([String], String, String?)] {
+        draft = CommentDraft(body: body, kind: "question")
+        draft.recipients = recipients
+        draft.source = source
+        do {
+          _ = try service.comment("AC-1", draft)
+          Issue.record("Accepted a key in comment metadata")
+        } catch let error as CommentError {
+          #expect(error.code == .invalid)
+          let echoed = (error.message + error.next.joined()).contains(key)
+          #expect(!echoed)
         }
-        #expect(try CommentLifecycleTests.snapshot(env) == stable)
-        let leaked = stable.contains { $0.contains(key) }
-        #expect(!leaked)
       }
+      #expect(try CommentLifecycleTests.snapshot(env) == stable)
+      let leaked = stable.contains { $0.contains(key) }
+      #expect(!leaked)
     }
   }
 }
