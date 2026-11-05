@@ -12,17 +12,18 @@ enum BriefHook {
       && !flags.contains("--help") && !flags.contains("--version")
   }
 
+  /// The process deadline on the monotonic clock, measured from `started`.
+  static func deadline(startedAt started: ContinuousClock.Instant) -> BriefHookDeadline {
+    BriefHookDeadline(elapsed: { started.duration(to: ContinuousClock.now) })
+  }
+
   static func environment(
-    _ snapshot: [String: String], deterministic: Bool, deadline: ContinuousClock.Instant,
+    _ snapshot: [String: String], deterministic: Bool, deadline: BriefHookDeadline,
     watchdog: HookWatchdog?
   ) async throws -> SiltaEnvironment {
     let git = BriefHookGitRunner(
       runner: SystemGitRunner(killAfter: 0.01, environment: snapshot),
-      remaining: {
-        let duration = ContinuousClock().now.duration(to: deadline).components
-        // Utility workers can coalesce timeout wakeups; reserve time to terminate and reap.
-        return Double(duration.seconds) + Double(duration.attoseconds) / 1e18 - 0.5
-      }, onTimeout: { watchdog?.timedOut() })
+      deadline: deadline, onTimeout: { watchdog?.timedOut() })
     return try await SiltaEnvironment.system(
       environment: snapshot, deterministic: deterministic, git: git, readBusyTimeout: 0)
   }

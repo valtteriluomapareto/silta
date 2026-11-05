@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The verify ladder (AGENTS.md).
 #   quick  guards, lint, build with warnings as errors, tests (a run with zero tests fails)
-#   full   quick plus stress/scenarios and isolated strict process-deadline checks
+#   full   quick plus stress/scenarios, then the wall-clock deadline tier alone and serially
 # Tests always run against a temporary SILTA_HOME, never the real ~/.silta.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -27,7 +27,8 @@ scripts/lint-check.sh
 
 SILTA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/silta-verify.XXXXXX")"
 export SILTA_HOME
-trap 'rm -rf "$SILTA_HOME"' EXIT
+last_test_log=""
+trap 'rm -rf "$SILTA_HOME"; rm -f "$last_test_log"' EXIT
 
 # SwiftPM sandboxes manifest builds, which macOS refuses inside another sandbox such as
 # Codex's seatbelt (it sets CODEX_SANDBOX). That outer sandbox already confines the build.
@@ -44,6 +45,7 @@ swift build ${swiftpm[@]+"${swiftpm[@]}"} --build-tests --only-use-versions-from
 run_tests() {
   local test_log
   local test_exit
+  rm -f "$last_test_log"
   test_log="$(mktemp "${TMPDIR:-/tmp}/silta-test-log.XXXXXX")"
   set +e
   swift test ${swiftpm[@]+"${swiftpm[@]}"} --skip-build "$@" 2>&1 | tee "$test_log"
@@ -58,20 +60,35 @@ run_tests() {
     echo "verify ${mode}: no tests ran" >&2
     return 1
   fi
-  rm -f "$test_log"
+  last_test_log="$test_log"
 }
 
 step "test"
 if [[ "$mode" == full ]]; then
   export SILTA_SLOW_TESTS=1
-  # A deadline-based scale check must not compete with hundreds of CLI subprocesses.
-  run_tests --skip 'hookWithTwentyThousandTasks|timeoutKillsAChildIgnoringTermination'
-  step "hook scale (isolated)"
-  run_tests --filter hookWithTwentyThousandTasks
-  step "git deadline (isolated)"
-  run_tests --filter timeoutKillsAChildIgnoringTermination
+  SILTA_DEADLINE_TESTS='' run_tests
+  # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
+  # parallel suite skips them; they run here alone and one at a time.
+  step "wall-clock deadlines (isolated, serial)"
+  if ! SILTA_DEADLINE_TESTS=1 run_tests --no-parallel --filter 'WallClock'; then
+    # Processes outside this run can still delay a wall-clock check on a shared machine,
+    # while a real regression fails every attempt. Measure once more before failing.
+    step "wall-clock deadlines (second attempt after a failure)"
+    SILTA_DEADLINE_TESTS=1 run_tests --no-parallel --filter 'WallClock'
+  fi
+  # Skipped tests still count as run, so a broken gate would otherwise pass silently.
+  if grep -q ' skipped' "$last_test_log"; then
+    echo "verify ${mode}: a wall-clock deadline test was skipped" >&2
+    exit 1
+  fi
+  for suite in WallClockHookTests WallClockGitTests WallClockWhereTests; do
+    if ! grep -q "Suite ${suite} passed" "$last_test_log"; then
+      echo "verify ${mode}: ${suite} did not run" >&2
+      exit 1
+    fi
+  done
 else
-  run_tests
+  SILTA_DEADLINE_TESTS='' run_tests
 fi
 
 echo

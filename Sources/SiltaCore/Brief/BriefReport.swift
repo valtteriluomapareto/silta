@@ -24,7 +24,8 @@ package struct BriefReport: Encodable, Sendable {
     location.text + settings.text + "task: \(currentTask ?? "none")\n"
   }
 
-  var footer: String { "more: " + more.joined(separator: " | ") + "\n" }
+  /// One `more:` line per command, so no line reads as a shell pipe.
+  var footer: String { more.map { "more: " + $0 + "\n" }.joined() }
 
   /// Text preserves a compact location, task ref, settings and complete recovery commands.
   package var text: String {

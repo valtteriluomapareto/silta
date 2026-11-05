@@ -21,8 +21,12 @@ final class HookWatchdog: @unchecked Sendable {
   init(command: String, flags: [String]) {
     self.command = command
     self.flags = flags
-    timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
-    timer.schedule(deadline: .now() + 1.5)
+    // The only process-deadline owner: a strict timer without leeway.
+    timer = DispatchSource.makeTimerSource(flags: .strict, queue: .global(qos: .userInteractive))
+    let budget = BriefHookDeadline.budget.components
+    timer.schedule(
+      deadline: .now() + Double(budget.seconds) + Double(budget.attoseconds) / 1e18,
+      leeway: .nanoseconds(0))
     timer.setEventHandler { [self] in fire() }
     timer.resume()
   }
@@ -44,7 +48,8 @@ final class HookWatchdog: @unchecked Sendable {
     do {
       var entry = LogEntry(
         timestamp: timestamp, command: command,
-        actor: actor.description, exitCode: 0, milliseconds: 1500)
+        actor: actor.description, exitCode: 0,
+        milliseconds: Int(BriefHookDeadline.budget / .milliseconds(1)))
       entry.flags = flags
       entry.errorCode = .env
       entry.warnings = ["hook_timeout"]
