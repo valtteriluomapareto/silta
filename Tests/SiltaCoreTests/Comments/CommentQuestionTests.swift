@@ -25,7 +25,8 @@ struct CommentQuestionTests {
       let posted = try Self.post(
         service,
         body:
-          #"**@human:acme**, `@agent:codex:other`. @human:acme: @me! mail@acme.test @meeting "@human:acme""#,
+          #"**@human:acme**, `@agent:codex:other`. @human:acme: @me! "#
+          + #"mail@acme.test @meeting "@human:acme""#,
         to: ["me", "human:acme"], source: "note:notes/acme.md")
       #expect(posted.mentions == ["human:acme", "human:unknown"])
       #expect(posted.source == "note:notes/acme.md")
