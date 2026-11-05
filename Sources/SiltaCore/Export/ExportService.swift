@@ -10,6 +10,18 @@ package struct ExportResult: Encodable, Sendable {
   package let path: String
   /// The number of files in the tree, the manifest included.
   package let files: Int
+  /// Work directories left for the human: a crashed export's, or one kept because the
+  /// replaced tree held files export did not write. Reported as warnings, not data.
+  package var leftovers: [String] = []
+
+  enum CodingKeys: String, CodingKey { case workspace, path, files }
+}
+
+/// The two moves export makes, so a test can stand in for a volume without an atomic
+/// swap. Both return 0 or -1 with `errno` set, like the system calls.
+struct ExportMoves: Sendable {
+  var swap: @Sendable (String, String) -> Int32 = { renamex_np($0, $1, UInt32(RENAME_SWAP)) }
+  var rename: @Sendable (String, String) -> Int32 = { Darwin.rename($0, $1) }
 }
 
 /// Writes export trees to disk (spec §15).
@@ -20,6 +32,12 @@ package enum ExportService {
   /// `ExportError`, `StorageError` or `WorkspaceError`; on failure the target is as it was.
   package static func export(
     workspace slug: String, to root: URL, store: DatabaseStore, home: URL
+  ) throws -> ExportResult {
+    try export(workspace: slug, to: root, store: store, home: home, moves: ExportMoves())
+  }
+
+  static func export(
+    workspace slug: String, to root: URL, store: DatabaseStore, home: URL, moves: ExportMoves
   ) throws -> ExportResult {
     try store.initialize()
     let root = root.standardizedFileURL
@@ -52,45 +70,90 @@ package enum ExportService {
       throw failed
     }
     try checkTarget(target, workspace: slug)
+    let prefix = ".\(slug).export-"
+    let crashed = ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [])  // none
+      .filter { $0.hasPrefix(prefix) }.sorted().map { root.appending(path: $0).path }
+    let kept: [String]
     do {
-      try publish(files, to: target, prefix: ".\(slug).export-")
+      kept = try publish(files, to: target, prefix: prefix, workspace: slug, moves: moves)
+    } catch let error as ExportError {
+      throw error
     } catch {
       throw failed
     }
-    return ExportResult(workspace: slug, path: target.path, files: files.count)
+    var result = ExportResult(workspace: slug, path: target.path, files: files.count)
+    result.leftovers = crashed + kept
+    return result
   }
 
   /// Writes `files` into a work directory of its own next to `target`, created with a
-  /// unique name, then swaps the tree in; the previous tree goes with the work directory.
-  /// Nothing else is removed. A volume without an atomic swap (exFAT, SMB) moves the
-  /// previous tree aside first and puts it back on failure.
-  private static func publish(_ files: [String: Data], to target: URL, prefix: String) throws {
+  /// unique name, then swaps the tree in; the replaced tree goes with the work directory
+  /// when it is export's own, and the work directory is returned for a warning when it
+  /// isn't. Nothing else is removed. A volume without an atomic swap (exFAT, SMB) moves
+  /// the previous tree aside first and puts it back on failure; when even that fails,
+  /// the work directory is kept and `previousKept` names it.
+  static func publish(
+    _ files: [String: Data], to target: URL, prefix: String, workspace: String,
+    moves: ExportMoves
+  ) throws -> [String] {
     let fm = FileManager.default
     let work = try ownDirectory(in: target.deletingLastPathComponent(), prefix: prefix)
-    defer { try? fm.removeItem(at: work) }  // best-effort cleanup of this run's own directory
     let staging = work.appending(path: "tree")
     let previous = work.appending(path: "previous")
-    for (path, data) in files {
-      let file = staging.appending(path: path)
-      try fm.createDirectory(
-        at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-      try data.write(to: file)
+    func discard() { try? fm.removeItem(at: work) }  // best-effort: only this run's directory
+    do {
+      for (path, data) in files {
+        let file = staging.appending(path: path)
+        try fm.createDirectory(
+          at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: file)
+      }
+    } catch {
+      discard()
+      throw error
     }
-    if !fm.fileExists(atPath: target.path) {
-      guard rename(staging.path, target.path) == 0 else { throw SwapFailure() }
-    } else if renamex_np(staging.path, target.path, UInt32(RENAME_SWAP)) != 0 {
-      guard errno == ENOTSUP || errno == EINVAL, rename(target.path, previous.path) == 0 else {
+    guard fm.fileExists(atPath: target.path) else {
+      guard moves.rename(staging.path, target.path) == 0 else {
+        discard()
         throw SwapFailure()
       }
-      guard rename(staging.path, target.path) == 0 else {
-        _ = rename(previous.path, target.path)
-        throw SwapFailure()
+      return retire(work, replaced: nil, workspace: workspace)
+    }
+    if moves.swap(staging.path, target.path) == 0 {
+      return retire(work, replaced: staging, workspace: workspace)
+    }
+    guard errno == ENOTSUP || errno == EINVAL, moves.rename(target.path, previous.path) == 0 else {
+      discard()
+      throw SwapFailure()
+    }
+    guard moves.rename(staging.path, target.path) == 0 else {
+      guard moves.rename(previous.path, target.path) == 0 else {
+        throw ExportError.previousKept(
+          path: previous.path, target: target.path, workspace: workspace)
       }
+      discard()
+      throw SwapFailure()
+    }
+    return retire(work, replaced: previous, workspace: workspace)
+  }
+
+  /// Removes the work directory once the tree it holds is export's own, checked again
+  /// now, since files can appear in the target while the new tree is written. Otherwise
+  /// the directory stays and is returned, as is one that could not be removed.
+  private static func retire(_ work: URL, replaced: URL?, workspace: String) -> [String] {
+    if let replaced {
+      do { try checkTarget(replaced, workspace: workspace) } catch { return [work.path] }
+    }
+    do {
+      try FileManager.default.removeItem(at: work)
+      return []
+    } catch {
+      return [work.path]
     }
   }
 
   /// A new directory under `parent` that no one else has: `mkdtemp` creates it exclusively.
-  private static func ownDirectory(in parent: URL, prefix: String) throws -> URL {
+  static func ownDirectory(in parent: URL, prefix: String) throws -> URL {
     var template = Array(parent.appending(path: prefix + "XXXXXX").path.utf8CString)
     let created = template.withUnsafeMutableBufferPointer { mkdtemp($0.baseAddress) }
     let bytes = template.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
@@ -103,8 +166,8 @@ package enum ExportService {
   private struct SwapFailure: Error {}  // guard:allow-error mapped to unwritable by export
 
   /// Refuses a target that isn't absent, empty or this workspace's previous export:
-  /// a format 1 manifest for `workspace` and no file it doesn't list (`.DS_Store`
-  /// aside). Listed files may be missing; they are rewritten.
+  /// a format 1 manifest for `workspace`, no file it doesn't list (`.DS_Store` aside)
+  /// and nothing unreadable. Listed files may be missing; they are rewritten.
   private static func checkTarget(_ target: URL, workspace: String) throws {
     let refused = { (entry: String) in
       ExportError.notAnExport(path: target.path, entry: entry, workspace: workspace)
@@ -115,15 +178,26 @@ package enum ExportService {
     guard values.isDirectory == true, values.isSymbolicLink != true else {
       throw refused("a file, not a directory")
     }
+    // An entry that can't be read could hold anything, so it refuses rather than counts
+    // as empty.
+    var unreadable: String?
+    let base = target.standardizedFileURL.path
+    let found = FileManager.default.enumerator(
+      at: target, includingPropertiesForKeys: [.isDirectoryKey], options: [],
+      errorHandler: { url, _ in
+        unreadable = unreadable ?? url.standardizedFileURL.path
+        return false
+      })
+    guard let found else { throw refused("an entry it can't read (\(base))") }
     var present: Set<String> = []
-    if let enumerator = FileManager.default.enumerator(atPath: target.path) {
-      for case let path as String in enumerator
-      where enumerator.fileAttributes?[.type] as? FileAttributeType != .typeDirectory
-        && URL(filePath: path).lastPathComponent != ".DS_Store"
-      {
-        present.insert(path)
-      }
+    for case let url as URL in found {
+      let values = try? url.resourceValues(forKeys: [.isDirectoryKey])  // nil: a file
+      let directory = values?.isDirectory
+      let path = url.standardizedFileURL.path
+      let relative = path.hasPrefix(base + "/") ? String(path.dropFirst(base.count + 1)) : path
+      if directory != true && url.lastPathComponent != ".DS_Store" { present.insert(relative) }
     }
+    if let unreadable { throw refused("an entry it can't read (\(unreadable))") }
     guard let first = present.min(by: ExportSnapshot.byteOrder) else { return }
     let data = FileManager.default.contents(
       atPath: target.appending(path: ExportFormat.manifestFile).path)

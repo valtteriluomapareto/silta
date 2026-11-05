@@ -1317,7 +1317,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **Daily backup (M1):** on the first write of each day, `VACUUM INTO
   $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
   first.
-- **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
+- **`silta export [--ws] [--to]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
   keyed by `uid`; display refs are included for readability. Machine-local state is
   never written: repo paths, worktree overrides and task worktrees. Values the user
@@ -1392,9 +1392,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     snapshot under the lock, so the last one written is the latest state. The new
     tree is staged in a directory of export's own next to the target, created under a
     unique name, and swapped in, so a reader sees one tree or the other, never a mix;
-    a volume without an atomic swap moves the old tree aside first. Export removes
-    nothing it did not create; a crash can leave its hidden work directory behind. The tree is owned by export: edits to it are overwritten by the next
-    export.
+    a volume without an atomic swap moves the old tree aside first, and puts it back,
+    or keeps it and names it, when the new one can't take its place. Export removes
+    only the target it replaces and its own work directory, and keeps that directory
+    when the replaced tree turns out to hold a file export didn't write. A work
+    directory it doesn't remove, including one a crash left, is reported in the
+    command's warnings for the human. An entry export can't read refuses the target.
+    The tree is owned by export: edits to it are overwritten by the next export.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace.
   - It checks the manifest checksums first and refuses partial or tampered trees.

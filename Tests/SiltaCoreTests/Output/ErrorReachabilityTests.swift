@@ -196,6 +196,9 @@ extension ExportError: ErrorExamples {
       .insideRepo(path: "/tmp/acme/platform/exports/acme", repo: "platform", workspace: "acme"),
       .unsupported("docs"), .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
       .invalidTree("links.jsonl does not match its sha256"),
+      .previousKept(
+        path: "/tmp/acme-notes/.acme.export-abc123/previous", target: "/tmp/acme-notes/acme",
+        workspace: "acme"),
     ]
   }
 }
