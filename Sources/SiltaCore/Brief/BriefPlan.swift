@@ -8,11 +8,22 @@ enum BriefPlan {
     let lines = MarkdownPlan.numbered(safe).components(separatedBy: "\n")
     var body = boxes.first.map { lines[..<$0.line].joined(separator: "\n") } ?? safe
     if !body.isEmpty, !body.hasSuffix("\n") { body += "\n" }
+    func collapsible(_ index: Int) -> Bool {
+      guard boxes[index].done else { return false }
+      let end = index + 1 < boxes.count ? boxes[index + 1].line : lines.count
+      let nested = Array(lines[(boxes[index].line + 1)..<end])
+      return !MarkdownPlan.visibleLines(nested).contains {
+        let line = nested[$0]
+        let indentation = line.prefix { $0 == " " || $0 == "\t" }
+        return !indentation.isEmpty
+          && MarkdownPlan.checkbox(String(line.dropFirst(indentation.count)))?.done == false
+      }
+    }
     var index = 0
     while index < boxes.count {
-      if boxes[index].done {
+      if collapsible(index) {
         let first = index + 1
-        while index < boxes.count, boxes[index].done { index += 1 }
+        while index < boxes.count, collapsible(index) { index += 1 }
         body += first == index ? "\(first) done\n" : "\(first)–\(index) done\n"
       } else {
         let end = index + 1 < boxes.count ? boxes[index + 1].line : lines.count
@@ -21,7 +32,8 @@ enum BriefPlan {
       }
     }
     return BriefSection(
-      id: "plan", text: "plan (revision \(revision)):\n" + body,
+      id: "plan",
+      text: "plan (revision \(revision)):\n" + body.trimmingCharacters(in: .newlines) + "\n",
       policy: .plan(ref: ref, total: boxes.count))
   }
 
@@ -38,7 +50,8 @@ enum BriefPlan {
   }
 
   static func marker(ref: String, total: Int, through: Int, workspace: String) -> String {
-    let count = total == 0 ? "" : ": \(through)/\(total)"
+    let count =
+      total == 0 ? "" : through == 0 ? ": no steps shown (\(total) total)" : ": \(through)/\(total)"
     return
       "(plan trimmed\(count); \(workspaceCommand("silta task show " + ref, workspace: workspace)))\n"
   }

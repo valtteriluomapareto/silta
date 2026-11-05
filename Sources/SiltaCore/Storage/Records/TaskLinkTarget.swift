@@ -116,7 +116,7 @@ struct TaskLinkTarget {
     return Self(kind: "task", id: source.id, anchor: "plan#" + anchor)
   }
 
-  private static func code(_ raw: String, workspace: Int64, in db: Database) throws -> Self {
+  static func code(_ raw: String, workspace: Int64, in db: Database) throws -> Self {
     let value = raw.hasPrefix("code:") ? String(raw.dropFirst(5)) : raw
     guard let colon = value.firstIndex(of: ":") else {
       throw TaskError.invalid("Invalid code reference.")

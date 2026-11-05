@@ -1,56 +1,98 @@
 import Foundation
 
-/// Open JSON object of non-default settings; unsupported keys retain masked raw values.
+/// Typed non-default settings, with independently bounded diagnostics for unsupported keys.
 package struct BriefSettings: Encodable, Sendable {
-  let values: [String: BriefSettingValue]
-  let text: String
-  let warnings: [OutputWarning]
+  var proposals: String?
+  var reviewGate: String?
+  var archiveAfterDays: Int?
+  var staleDays: Int?
+  var text = ""
+  var warnings: [OutputWarning] = []
+
+  enum CodingKeys: String, CodingKey {
+    case proposals, reviewGate = "review_gate"
+    case archiveAfterDays = "archive_after_days", staleDays = "stale_days"
+  }
 
   init(_ settings: WorkspaceSettings, workspace: String) {
     do {
-      let document = try JSONSerialization.jsonObject(with: Data(settings.json.utf8))
-      guard let object = document as? [String: Any] else { throw StorageError.unavailable }
-      let raw = try JSONDecoder().decode(
-        [String: BriefSettingValue].self,
-        from: JSONSerialization.data(withJSONObject: WorkspaceSettings.masked(object)))
+      guard
+        let raw = try JSONSerialization.jsonObject(with: Data(settings.json.utf8)) as? [String: Any]
+      else { throw StorageError.unavailable }
       let defaults = WorkspaceSettings(workspace: workspace, json: "{}")
-      var values: [String: BriefSettingValue] = [:]
-      var items: [String] = []
-      var warnings: [OutputWarning] = []
       let known = WorkspaceSettings.CodingKeys.allCases.map(\.rawValue)
+      var items: [String] = []
+      var unsupported: [String] = []
       for name in known + raw.keys.filter({ !known.contains($0) }).sorted() {
         guard let value = raw[name] else { continue }
-        do {
-          guard let key = WorkspaceSettings.CodingKeys(rawValue: name) else {
-            throw StorageError.unavailable
+        if let key = WorkspaceSettings.CodingKeys(rawValue: name) {
+          do {
+            if let item = try read(key, from: settings, defaults: defaults) {
+              items.append("\(name): \(item.value) (\(item.gloss))")
+            }
+          } catch {
+            warn(name: name, value: value, workspace: workspace)
+            unsupported.append(name)
           }
-          let typed = try key.value(in: settings)
-          guard typed != (try key.value(in: defaults)) else { continue }
-          values[name] = typed
-          items.append("\(name): \(typed.text) (\(try key.gloss(in: settings)))")
-        } catch {
-          values[name] = value
-          items.append("\(TaskError.shown(name)): \(value.text)")
-          warnings.append(
-            OutputWarning(
-              code: "setting_unsupported",
-              message: "Unsupported setting \(TaskError.shown(name)); inspect silta ws show "
-                + shellWord(workspace) + "."))
+        } else {
+          warn(name: name, value: value, workspace: workspace)
+          unsupported.append(name)
         }
       }
-      self.values = values
-      self.text = items.isEmpty ? "" : "settings: " + items.joined(separator: "; ") + "\n"
-      self.warnings = warnings
+      text = items.isEmpty ? "" : "settings: " + items.joined(separator: "; ") + "\n"
+      text += Self.hint(unsupported)
     } catch {
-      values = ["_invalid": .string("[invalid settings document]")]
-      text = "settings: [invalid settings document]\n"
-      warnings = [
-        .init(
-          code: "setting_unsupported",
-          message: "Invalid settings document; inspect silta ws show " + shellWord(workspace) + ".")
-      ]
+      warn(name: "settings", value: "[invalid settings document]", workspace: workspace)
+      text = Self.hint(["settings"])
     }
   }
 
-  package func encode(to encoder: any Encoder) throws { try values.encode(to: encoder) }
+  private static func hint(_ names: [String]) -> String {
+    guard !names.isEmpty else { return "" }
+    let shown = names.prefix(8).map { TaskError.shown(String($0.prefix(40))) }
+    let more = names.count > 8 ? ", +\(names.count - 8) keys" : ""
+    return "settings unsupported: " + shown.joined(separator: ", ") + more + " (ask the human)\n"
+  }
+
+  private mutating func warn(name: String, value: Any, workspace: String) {
+    let preview: String
+    do { preview = try WorkspaceConfig.json(WorkspaceSettings.masked([name: value])) } catch {
+      preview = "[unsupported value]"
+    }
+    let bounded = String(preview.prefix(160)) + (preview.count > 160 ? "…" : "")
+    warnings.append(
+      .init(
+        code: "setting_unsupported",
+        message:
+          "Unsupported setting \(TaskError.shown(String(name.prefix(40)))): \(bounded); inspect silta --ws "
+          + shellWord(workspace) + " ws show."))
+  }
+
+  private mutating func read(
+    _ key: WorkspaceSettings.CodingKeys,
+    from settings: WorkspaceSettings, defaults: WorkspaceSettings
+  ) throws -> (value: String, gloss: String)? {
+    switch key {
+    case .proposals:
+      let typed = try settings.proposals
+      guard typed != (try defaults.proposals) else { return nil }
+      proposals = typed.rawValue
+      return (typed.rawValue, typed.gloss)
+    case .reviewGate:
+      let typed = try settings.reviewGate
+      guard typed != (try defaults.reviewGate) else { return nil }
+      reviewGate = typed.rawValue
+      return (typed.rawValue, typed.gloss)
+    case .archiveAfterDays:
+      let typed = try settings.archiveAfterDays
+      guard typed != (try defaults.archiveAfterDays) else { return nil }
+      archiveAfterDays = typed
+      return (String(typed), "days before closed tasks archive")
+    case .staleDays:
+      let typed = try settings.staleDays
+      guard typed != (try defaults.staleDays) else { return nil }
+      staleDays = typed
+      return (String(typed), "days before docs are stale")
+    }
+  }
 }
