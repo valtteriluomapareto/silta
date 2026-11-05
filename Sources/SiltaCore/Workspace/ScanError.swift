@@ -11,8 +11,9 @@ package enum ScanError: CodedError, Equatable {
   /// A clone's directory name is not a valid repo slug, and no option renames it.
   case invalidRepoDirectory(name: String, path: String, renamed: String)
 
-  /// The slug the scan would create already names a workspace.
-  case slugExists(String, workspace: String, roots: [String])
+  /// The slug the scan would create already names a workspace. `chosen` says
+  /// whether `--slug` named it or the directory did and only `--prefix` was given.
+  case slugExists(String, chosen: Bool, workspace: String, roots: [String])
 
   /// Another workspace already uses the task prefix.
   case prefixTaken(String, derived: Bool, workspace: String, roots: [String])
@@ -53,9 +54,13 @@ package enum ScanError: CodedError, Equatable {
       "Repo directory \(name.debugDescription) is not a valid repo slug; rename the clone's "
         + "directory to use letters, digits, _ or -, starting and ending with a letter or digit "
         + "(for example \(URL(filePath: renamed).lastPathComponent.debugDescription))."
-    case .slugExists(_, let workspace, _):
-      "Workspace \(workspace.debugDescription) already exists; choose another --slug, or rescan "
-        + "it to refresh only the repos already registered there."
+    case .slugExists(_, let chosen, let workspace, _):
+      chosen
+        ? "Workspace \(workspace.debugDescription) already exists; choose another --slug, or "
+          + "rescan it to refresh only the repos already registered there."
+        : "Workspace \(workspace.debugDescription) already exists; --prefix applies only to a "
+          + "new workspace, so rescan it to refresh the repos already registered there, or pass "
+          + "--slug to choose another name."
     case .prefixTaken(let prefix, let derived, let workspace, _):
       derived
         ? "Task prefix \(prefix.debugDescription) is already used by workspace "
@@ -79,11 +84,16 @@ package enum ScanError: CodedError, Equatable {
       ["silta init --scan \(roots.scanArguments) --prefix <prefix>"]
     case .invalidRepoDirectory(_, let path, let renamed):
       ["mv \(shellWord(path)) \(shellWord(renamed))"]
-    case .slugExists(_, let workspace, let roots):
-      [
-        "silta init --scan \(roots.scanArguments) --slug <another-slug>",
-        "silta init --scan \(roots.scanArguments) --ws \(shellWord(workspace))",
-      ]
+    case .slugExists(_, let chosen, let workspace, let roots):
+      chosen
+        ? [
+          "silta init --scan \(roots.scanArguments) --slug <another-slug>",
+          "silta init --scan \(roots.scanArguments) --ws \(shellWord(workspace))",
+        ]
+        : [
+          "silta init --scan \(roots.scanArguments) --ws \(shellWord(workspace))",
+          "silta init --scan \(roots.scanArguments) --slug <another-slug>",
+        ]
     case .prefixTaken(_, _, _, let roots):
       ["silta init --scan \(roots.scanArguments) --prefix <prefix>"]
     case .repoPathTaken(_, let path, let workspace):

@@ -108,7 +108,7 @@ extension ScanError: ErrorExamples {
       .invalidPrefix("A-", derived: true, directory: "a-team", roots: ["a-team"]),
       .invalidRepoDirectory(
         name: "My Projects", path: "/projects/My Projects", renamed: "/projects/my-projects"),
-      .slugExists("ACME", workspace: "acme", roots: ["api", "web"]),
+      .slugExists("ACME", chosen: true, workspace: "acme", roots: ["api", "web"]),
       .prefixTaken("AC", derived: true, workspace: "acme", roots: ["acorn"]),
       .prefixTaken("AC", derived: false, workspace: "acme", roots: ["acorn"]),
       .repoPathTaken(repo: "api", path: "/projects/api", workspace: "acme"),

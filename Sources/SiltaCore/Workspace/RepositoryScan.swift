@@ -52,9 +52,10 @@ package enum RepositoryScan {
     do {
       let db = tx.database
       let existing = try existingWorkspace(request.slug, in: db)
-      if case .named = request.target, let existing {
+      if case .named(let chosenSlug, _) = request.target, let existing {
         throw ScanError.slugExists(
-          request.slug, workspace: existing["slug"] as String, roots: request.roots)
+          request.slug, chosen: chosenSlug != nil, workspace: existing["slug"] as String,
+          roots: request.roots)
       }
       if case .rescan = request.target, existing == nil { throw WorkspaceError.notFound }
       let workspace = existing.map { $0["slug"] as String } ?? request.slug
