@@ -322,7 +322,7 @@ extension ScanNamingTests {
     }
   }
 
-  @Test func aRepoPathHeldByAnotherWorkspaceNamesTheRepoAndHolder() async throws {
+  @Test func aRepoPathHeldByAnotherWorkspaceNamesTheFix() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
       try WorkspaceConfigTests.apply(
