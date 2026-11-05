@@ -5,7 +5,19 @@ import SiltaCore
 struct InitCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "init",
-    abstract: "Initialize or scan repos; select with ws use; configuration editing is human-only.")
+    abstract: "Initialize or scan repos; select with ws use; configuration editing is human-only.",
+    discussion: """
+      `init --scan` discovers repos at the scan roots and at most two child levels, without \
+      fetching. A new workspace's slug is the first directory's lowercased name unless --slug \
+      names another; its task prefix is the slug's first two letters uppercased unless --prefix \
+      names another. Chosen values keep their case, and task refs read <prefix>-<n> (AC-1). Both \
+      use letters, digits, _ or -, starting and ending with a letter or digit, and the same \
+      validation as `ws edit`. --prefix works without --slug, and --slug also names the \
+      workspace. On a scan, --ws rescans that existing workspace instead of naming a new one, so \
+      it accepts neither option.
+
+      Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC
+      """)
 
   static let dataShape = Shape.object([
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,
@@ -17,13 +29,20 @@ struct InitCommand: OutputCommand {
 
   @Option(
     parsing: .upToNextOption,
-    help: "Scan directories to two child levels; rescans only refresh registered paths.")
+    help: ArgumentHelp(
+      "Scan directories to two child levels; an existing workspace only refreshes the "
+        + "repo paths already registered."))
   var scan: [String] = []
 
-  @Option(help: "Workspace slug for a new scan; defaults to the first directory's name.")
+  @Option(
+    help: ArgumentHelp(
+      "Slug for a new workspace, kept as typed; defaults to the first directory's "
+        + "lowercased name."))
   var slug: String?
 
-  @Option(help: "Task prefix for a new scan; defaults to the slug's first two letters, uppercased.")
+  @Option(
+    help: ArgumentHelp(
+      "Task prefix for a new workspace, kept as typed; task refs read <prefix>-<n>, e.g. AC-1."))
   var prefix: String?
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
@@ -42,20 +61,17 @@ struct InitCommand: OutputCommand {
       try env.db.initialize()
       outcome = nil
     } else {
-      do {
-        outcome = try await RepositoryScan.scan(
-          scan.map { URL(filePath: $0) }, store: env.db,
-          git: env.git, identity: (env.ids, env.clock.now()), workspace: global.ws,
-          slug: slug, prefix: prefix)
-      } catch let error as ScanNamingError {
-        if case .slugExists(let existing) = error {
-          let directories = scan.map(shellWord).joined(separator: " ")
-          throw CommandFailure(
-            error: error,
-            next: ["silta init --scan \(directories) --ws \(shellWord(existing))"])
+      let target: ScanTarget =
+        if let workspace = global.ws {
+          .rescan(workspace)
+        } else if slug == nil, prefix == nil {
+          .derived
+        } else {
+          .named(slug: slug, prefix: prefix)
         }
-        throw error
-      }
+      outcome = try await RepositoryScan.scan(
+        scan.map { URL(filePath: $0) }, target: target, store: env.db,
+        git: env.git, identity: (env.ids, env.clock.now()))
     }
     let workspace = outcome?.workspace
     let edit =

@@ -99,12 +99,19 @@ extension RepoError: ErrorExamples {
   }
 }
 
-extension ScanNamingError: ErrorExamples {
-  static var examples: [ScanNamingError] {
+extension ScanError: ErrorExamples {
+  static var examples: [ScanError] {
     [
-      .invalidSlug("My Projects", derived: false), .invalidSlug("my projects", derived: true),
-      .invalidPrefix("A_", derived: false), .invalidPrefix("A_", derived: true),
-      .slugExists("acme"),
+      .invalidSlug("My Projects", derived: false, directory: "acme", roots: ["acme"]),
+      .invalidSlug("my projects", derived: true, directory: "My Projects", roots: ["My Projects"]),
+      .invalidPrefix("A_", derived: false, directory: "acme", roots: ["acme"]),
+      .invalidPrefix("A-", derived: true, directory: "a-team", roots: ["a-team"]),
+      .invalidRepoDirectory(
+        name: "My Projects", path: "/projects/My Projects", renamed: "/projects/my-projects"),
+      .slugExists("ACME", workspace: "acme", roots: ["api", "web"]),
+      .prefixTaken("AC", derived: true, workspace: "acme", roots: ["acorn"]),
+      .prefixTaken("AC", derived: false, workspace: "acme", roots: ["acorn"]),
+      .repoPathTaken(repo: "api", path: "/projects/api", workspace: "acme"),
     ]
   }
 }
@@ -183,7 +190,7 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
-    ScanNamingError.self, CommentError.self,
+    ScanError.self, CommentError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
   ]

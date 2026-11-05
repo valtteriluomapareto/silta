@@ -4,6 +4,19 @@ import GRDB
 import SiltaTestSupport
 import Testing
 
+/// One name a scan refuses, and what the refusal must show and suggest.
+struct InvalidName {
+  let slug: String?
+
+  let prefix: String?
+
+  let directory: String
+
+  let flag: String
+
+  let shown: String
+}
+
 @Suite(.timeLimit(.minutes(1)))
 struct ScanNamingTests {
   /// A scan that may name a new workspace, through the API the command uses.
@@ -11,10 +24,11 @@ struct ScanNamingTests {
     _ roots: [URL], slug: String? = nil, prefix: String? = nil, store: DatabaseStore,
     git: any GitRunner, seed: UInt64 = 1
   ) async throws -> ScanOutcome {
-    try await RepositoryScan.scan(
-      roots, store: store, git: git,
-      identity: (SeededIDGenerator(seed: seed), WorkspaceConfigTests.instant), slug: slug,
-      prefix: prefix)
+    let target: ScanTarget =
+      if slug == nil, prefix == nil { .derived } else { .named(slug: slug, prefix: prefix) }
+    return try await RepositoryScan.scan(
+      roots, target: target, store: store, git: git,
+      identity: (SeededIDGenerator(seed: seed), WorkspaceConfigTests.instant))
   }
 
   /// Makes `url` a clone and returns its canonical path.
@@ -225,7 +239,8 @@ struct ScanNamingTests {
         git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
       #expect(outcome.workspace == "a-team")
       #expect(try Self.workspaces(store) == ["a-team:A Team:AT"])
-      #expect(try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == path.path)
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == path.path)
     }
   }
 
@@ -233,14 +248,19 @@ struct ScanNamingTests {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
       let none = ScriptedGitRunner(script: [])
-      let cases: [(slug: String?, prefix: String?, directory: String, flag: String, shown: String)] =
-        [
-          ("My Projects", nil, "acme", "--slug", "My Projects"),
-          (nil, "A_", "acme", "--prefix", "A_"),
-          (nil, nil, "My Projects", "--slug", "My Projects"),
-          (nil, nil, ".hidden", "--slug", ".hidden"),
-          (nil, nil, "a_b", "--prefix", "a_b"),
-        ]
+      let cases = [
+        InvalidName(
+          slug: "My Projects", prefix: nil, directory: "acme", flag: "--slug",
+          shown: "My Projects"),
+        InvalidName(slug: nil, prefix: "A_", directory: "acme", flag: "--prefix", shown: "A_"),
+        InvalidName(
+          slug: nil, prefix: nil, directory: "My Projects", flag: "--slug",
+          shown: "My Projects"),
+        InvalidName(
+          slug: nil, prefix: nil, directory: ".hidden", flag: "--slug",
+          shown: ".hidden"),
+        InvalidName(slug: nil, prefix: nil, directory: "a_b", flag: "--prefix", shown: "a_b"),
+      ]
       for testCase in cases {
         let root = home.appending(path: testCase.directory)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -253,13 +273,18 @@ struct ScanNamingTests {
         #expect(error?.message.contains(testCase.shown) == true)
         let placeholder = "<" + testCase.flag.dropFirst(2) + ">"
         #expect(
-          error?.next == ["silta init --scan \(shellWord(root.path)) \(testCase.flag) \(placeholder)"])
+          error?.next == [
+            "silta init --scan \(shellWord(root.path)) \(testCase.flag) \(placeholder)"
+          ])
       }
       #expect(none.isExhausted)
       #expect(try WorkspaceSelection.list(in: store).isEmpty)
     }
   }
 
+}
+
+extension ScanNamingTests {
   @Test func anInvalidRepoDirectoryNamesTheCloneAndItsFix() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))

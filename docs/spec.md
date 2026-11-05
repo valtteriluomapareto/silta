@@ -1379,7 +1379,7 @@ run.
 
 ```
 # setup & health
-silta init [--scan <dir>…] [--slug <slug>] [--prefix <XX>]   [M1] create DB; discover repos, worktrees, branch-apps; open YAML
+silta init [--scan <dir>…] [--slug <slug>] [--prefix <prefix>]   [M1] create DB; discover repos, worktrees, branch-apps; open YAML
 silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] config as YAML (validated on save, "did you mean"); -F for agents
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
@@ -1424,6 +1424,13 @@ silta index [--rebuild] | verify [--fix-tasks]   [M3]
 silta import --from dex|beads|backlog-md <path>  [M4]
 silta open [AC-12]                               [M5] open Silta.app
 ```
+
+`init --scan` options name only a new workspace, so they are refused together with
+`--ws`, which rescans an existing one. A chosen `--slug` and `--prefix` keep their
+case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
+starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
+(`AC-1`). The DF3 onboarding scans only the chosen clones:
+`silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 
 ## 17. Storage, concurrency, technology
 
@@ -1999,12 +2006,21 @@ that workspace's complete configuration, including omitted children.
 
 `init --scan` discovers repos at the root and at most two child levels, without fetching.
 A new workspace's slug is the first directory's lowercased name unless `--slug` names
-another; its task prefix is the slug's first two letters uppercased unless `--prefix`
-names another. Both values use the identifier shape `ws edit` accepts, and `--prefix`
-works without `--slug`. A slug that names an existing workspace is refused with the
-rescan command as `next`; `--slug` and `--prefix` are invalid with `--ws`, which rescans.
-A directory name that is not a valid slug, or does not yield a valid prefix, fails with
-an error that names `--slug` or `--prefix` as the fix. Remote `X`/`X-prod` pairs
+another, and `--slug` also names the workspace; without it the first directory's name
+does. Its task prefix is the slug's first two letters uppercased unless `--prefix`
+names another. Chosen values keep their case and use the identifier shape `ws edit`
+accepts; `--prefix` works without `--slug`. A scan without naming options refreshes an
+existing workspace, so a stored prefix that the directory cannot derive stays. When
+`--slug` or `--prefix` is given and that slug already names a workspace, the scan is
+refused, offering another slug first and the rescan second, and saying that a rescan
+only refreshes the repos already registered there. Slug and prefix clashes compare
+case-insensitively. Options without `--scan` are refused. `--slug` and `--prefix` are
+invalid with `--ws`, which rescans. A directory name that is not a valid slug, or does
+not yield a valid prefix, fails with an error that names `--slug` or `--prefix` as the
+fix and carries the scanned roots in a runnable `next`; a repo directory whose name is
+no slug fails naming the clone and telling the human to rename its directory. A task
+prefix another workspace holds, or a clone path another workspace already binds, is a
+conflict that names the holder and a command that repairs it. Remote `X`/`X-prod` pairs
 create app stubs with a prod ref; main or master provides a default app when its ref
 is not already represented.
 Worktrees and path aliases resolve to one canonical main clone. Initial scans create
