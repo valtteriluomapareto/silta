@@ -99,6 +99,31 @@ extension RepoError: ErrorExamples {
   }
 }
 
+extension ScanError: ErrorExamples {
+  static var examples: [ScanError] {
+    [
+      .invalidSlug(
+        "My Projects", derived: false, directory: "acme", roots: ["acme"],
+        choice: .init(slug: "My Projects", prefix: "WK")),
+      .invalidSlug(
+        "my projects", derived: true, directory: "My Projects", roots: ["My Projects"],
+        choice: .none),
+      .invalidPrefix("A_", origin: nil, roots: ["acme"], choice: .init(slug: "work")),
+      .invalidPrefix("A-", origin: .directory("a-team"), roots: ["a-team"], choice: .none),
+      .invalidPrefix("X-", origin: .slug("x-y"), roots: ["zed"], choice: .init(slug: "x-y")),
+      .slugExists(
+        "ACME", chosen: true, workspace: "acme", roots: ["api", "web"],
+        choice: .init(slug: "ACME", prefix: "WK")),
+      .prefixTaken(
+        "AC", derived: true, workspace: "acme", roots: ["acorn"], choice: .init(slug: "acorn")),
+      .prefixTaken(
+        "AC", derived: false, workspace: "acme", roots: ["acorn"],
+        choice: .init(prefix: "AC")),
+      .repoPathTaken(repo: "api", path: "/projects/api", workspace: "acme"),
+    ]
+  }
+}
+
 extension TaskError: ErrorExamples {
   static var examples: [TaskError] {
     [
@@ -173,7 +198,7 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
-    CommentError.self,
+    ScanError.self, CommentError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
   ]
