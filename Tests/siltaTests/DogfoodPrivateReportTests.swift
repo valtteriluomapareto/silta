@@ -116,7 +116,7 @@ struct DogfoodPrivateReportTests {
 
   @Test(arguments: [
     "", "-acme", "acme-", "_acme", "ac'me", "acme;touch pwned", "../acme", "acme/x", "a b",
-    "acme\n", "äcme", "--since",
+    "acme\n", "äcme", "acme_", "--since",
   ])
   func invalidSlugIsRefusedBeforeAnyRead(slug: String) throws {
     try withScratchDirectory { scratch in
