@@ -30,8 +30,13 @@ enum AgentHookSettings {
         guard let found = ownership.index else { continue }
         groups.remove(at: found)
       } else {
-        if ownership.index != nil { continue }
-        groups.append(group(event: event, origin: ownership.origin))
+        let replacement = group(event: event, origin: ownership.origin)
+        if let found = ownership.index {
+          if NSDictionary(dictionary: groups[found]).isEqual(to: replacement) { continue }
+          groups[found] = replacement
+        } else {
+          groups.append(replacement)
+        }
       }
       changed = true
       if groups.isEmpty, ownership.origin != .keep {
@@ -70,6 +75,9 @@ enum AgentHookSettings {
   private static func matched(_ value: [String: Any], event: String) -> Origin? {
     Origin.allCases.first {
       NSDictionary(dictionary: value).isEqual(to: group(event: event, origin: $0))
+        || (event == "SessionStart"
+          && NSDictionary(dictionary: value).isEqual(
+            to: group(event: event, origin: $0, legacy: true)))
     }
   }
 
@@ -101,15 +109,20 @@ enum AgentHookSettings {
     "# silta:" + (event == "SessionStart" ? "session-start" : "stop") + ":v1:"
   }
 
-  private static func group(event: String, origin: Origin) -> [String: Any] {
+  private static func group(event: String, origin: Origin, legacy: Bool = false) -> [String: Any] {
     let origin = origin.rawValue
     let digest = AgentInstallPlan.hash(Data((event + ":" + origin).utf8))
-    let command = event == "SessionStart" ? "session-start" : "stop"
+    let executable = "silta agents " + (event == "SessionStart" ? "session-start" : "stop")
+    // The sentinel retains trailing newlines; failed output stays inside the subshell.
+    let command =
+      event == "SessionStart" && !legacy
+      ? #"(o=$(silta agents session-start && printf .) && printf %s "${o%.}") 2>/dev/null || :"#
+      : executable
     return [
       "hooks": [
         [
           "type": "command",
-          "command": "silta agents " + command + " " + marker(event) + origin + ":" + digest,
+          "command": command + " " + marker(event) + origin + ":" + digest,
           "timeout": 2, "statusMessage": "Silta " + event,
         ]
       ]

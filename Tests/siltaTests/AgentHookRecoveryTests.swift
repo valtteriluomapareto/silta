@@ -36,7 +36,7 @@ struct AgentHookRecoveryTests {
         def limit():
           signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
           resource.setrlimit(resource.RLIMIT_FSIZE, (24, 24))
-        result = subprocess.run(['/bin/sh', '-c', 'exec ' + sys.argv[1]], env=os.environ,
+        result = subprocess.run(['/bin/sh', '-c', sys.argv[1]], env=os.environ,
           input=b'{"session_id":"acme-session"}', capture_output=True,
           preexec_fn=limit, restore_signals=False)
         sys.stdout.buffer.write(result.stdout)

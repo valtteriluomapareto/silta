@@ -25,7 +25,8 @@ struct AgentsHookTests {
     let path = try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
     return try SiltaBinary.runProcess(
       URL(filePath: "/bin/sh"),
-      ["-c", "exec < " + shellWord(input.path) + "; exec " + command], in: scratch, cwd: cwd,
+      ["-c", "exec < " + shellWord(input.path) + "; exec /bin/sh -c " + shellWord(command)],
+      in: scratch, cwd: cwd,
       environment: ["PATH": path].merging(environment) { _, new in new })
   }
 
@@ -297,19 +298,29 @@ extension AgentsHookTests {
         try AgentsInstallTests.apply(["install", "--claude", "--hook"], in: scratch).termination
           == .exit(0))
       let command = try Self.command("SessionStart", in: scratch)
-      let fifo = scratch.appending(path: "held-input")
-      #expect(
-        try SiltaBinary.runProcess(URL(filePath: "/usr/bin/mkfifo"), [fifo.path], in: scratch)
-          .termination == .exit(0))
+      let script = """
+        import os, signal, subprocess, sys
+        child = subprocess.Popen(['/bin/sh', '-c', sys.argv[1]], stdin=subprocess.PIPE,
+          stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        status = 124
+        try:
+          status = child.wait(timeout=2.5)
+        except subprocess.TimeoutExpired:
+          pass
+        finally:
+          try:
+            os.killpg(child.pid, signal.SIGKILL)
+          except ProcessLookupError:
+            pass
+          out, err = child.communicate(timeout=2)
+        sys.stdout.buffer.write(out)
+        sys.stderr.buffer.write(err)
+        sys.exit(status)
+        """
       let path = try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
       let held = try SiltaBinary.runProcess(
-        URL(filePath: "/bin/sh"),
-        [
-          "-c",
-          "exec 3<> " + shellWord(fifo.path) + "; exec < " + shellWord(fifo.path) + "; exec "
-            + command,
-        ],
-        in: scratch, environment: ["PATH": path], timeout: 4)
+        URL(filePath: "/usr/bin/python3"), ["-c", script, command],
+        in: scratch, environment: ["PATH": path], timeout: 6)
       #expect(held.termination == .exit(0) && held.stdout.isEmpty && held.stderr.isEmpty)
       let logs = scratch.appending(path: "silta-home/log")
       let files = try FileManager.default.contentsOfDirectory(
