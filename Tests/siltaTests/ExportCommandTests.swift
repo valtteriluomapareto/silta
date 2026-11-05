@@ -71,6 +71,27 @@ struct ExportCommandTests {
     }
   }
 
+  /// A refused export still names leftover work directories, in both output modes.
+  @Test func aRefusalStillReportsLeftovers() throws {
+    try withScratchDirectory { scratch in
+      try Self.seed(scratch)
+      let root = scratch.appending(path: "work/out")
+      try FileManager.default.createDirectory(
+        at: root.appending(path: ".acme.export-a1b2c3"), withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(
+        at: root.appending(path: "acme"), withIntermediateDirectories: true)
+      try Data("Acme".utf8).write(to: root.appending(path: "acme/README.md"))
+      let json = try SiltaBinary.run(
+        ["--ws", "acme", "export", "--to", "out", "--json"], in: scratch)
+      #expect(json.termination == .exit(6))
+      #expect(json.stdout.contains(#""warnings":[{"code":"export_leftover""#), "\(json.stdout)")
+      let text = try SiltaBinary.run(["--ws", "acme", "export", "--to", "out"], in: scratch)
+      #expect(text.termination == .exit(6))
+      #expect(text.stderr.hasPrefix("warning: "), "\(text.stderr)")
+      #expect(text.stderr.contains("[export_leftover]"))
+    }
+  }
+
   @Test func relativeRootResolvesAgainstTheWorkingDirectory() throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)

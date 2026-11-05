@@ -10,11 +10,43 @@ package struct ExportResult: Encodable, Sendable {
   package let path: String
   /// The number of files in the tree, the manifest included.
   package let files: Int
-  /// Work directories left for the human: a crashed export's, or one kept because the
-  /// replaced tree held files export did not write. Reported as warnings, not data.
-  package var leftovers: [String] = []
+  /// Work directories left for the human, with why. Reported as warnings, not data.
+  package var leftovers: [ExportLeftover] = []
 
   enum CodingKeys: String, CodingKey { case workspace, path, files }
+}
+
+/// A directory export left for the human to look at, and why.
+package struct ExportLeftover: Equatable, Sendable {
+  /// The directory.
+  package let path: String
+  /// Why it is there, as a clause after the path.
+  package let reason: String
+
+  /// The `export_leftover` warning that names it.
+  package var warning: OutputWarning {
+    OutputWarning(
+      code: "export_leftover", message: "\(path) \(reason); ask the human before deleting it.")
+  }
+}
+
+/// An export error that also reports leftover directories.
+package struct ExportFailure: WarnedFailure, Equatable {
+  /// The error itself.
+  package let error: ExportError
+  /// The leftovers to report with it.
+  package let leftovers: [ExportLeftover]
+
+  /// The error's code.
+  package var code: ErrorCode { error.code }
+  /// The error's message.
+  package var message: String { error.message }
+  /// The error's next commands.
+  package var next: [String] { error.next }
+  /// Who acts on them.
+  package var nextBy: NextBy { error.nextBy }
+  /// One `export_leftover` warning per leftover.
+  package var warnings: [OutputWarning] { leftovers.map(\.warning) }
 }
 
 /// The two moves export makes, so a test can stand in for a volume without an atomic
@@ -69,17 +101,20 @@ package enum ExportService {
     } catch {
       throw failed
     }
-    try checkTarget(target, workspace: slug)
     let prefix = ".\(slug).export-"
-    let crashed = ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? [])  // none
-      .filter { $0.hasPrefix(prefix) }.sorted().map { root.appending(path: $0).path }
-    let kept: [String]
+    let crashed = leftovers(in: root, prefix: prefix)
+    // A failure still reports the leftovers the human may need to look at.
+    func failing(_ error: ExportError) -> any Error {
+      crashed.isEmpty ? error : ExportFailure(error: error, leftovers: crashed)
+    }
+    let kept: [ExportLeftover]
     do {
+      try checkTarget(target, workspace: slug)
       kept = try publish(files, to: target, prefix: prefix, workspace: slug, moves: moves)
     } catch let error as ExportError {
-      throw error
+      throw failing(error)
     } catch {
-      throw failed
+      throw failing(failed)
     }
     var result = ExportResult(workspace: slug, path: target.path, files: files.count)
     result.leftovers = crashed + kept
@@ -95,7 +130,7 @@ package enum ExportService {
   static func publish(
     _ files: [String: Data], to target: URL, prefix: String, workspace: String,
     moves: ExportMoves
-  ) throws -> [String] {
+  ) throws -> [ExportLeftover] {
     let fm = FileManager.default
     let work = try ownDirectory(in: target.deletingLastPathComponent(), prefix: prefix)
     let staging = work.appending(path: "tree")
@@ -140,15 +175,38 @@ package enum ExportService {
   /// Removes the work directory once the tree it holds is export's own, checked again
   /// now, since files can appear in the target while the new tree is written. Otherwise
   /// the directory stays and is returned, as is one that could not be removed.
-  private static func retire(_ work: URL, replaced: URL?, workspace: String) -> [String] {
+  private static func retire(_ work: URL, replaced: URL?, workspace: String) -> [ExportLeftover] {
     if let replaced {
-      do { try checkTarget(replaced, workspace: workspace) } catch { return [work.path] }
+      do { try checkTarget(replaced, workspace: workspace) } catch {
+        var problem = "something export did not write"
+        if case ExportError.notAnExport(_, let entry, _)? = error as? ExportError {
+          problem =
+            entry.hasPrefix("it holds ") ? String(entry.dropFirst("it holds ".count)) : entry
+        }
+        let reason =
+          "holds the replaced tree in \(replaced.lastPathComponent)/, with \(problem), "
+          + "which export did not write"
+        return [ExportLeftover(path: work.path, reason: reason)]
+      }
     }
     do {
       try FileManager.default.removeItem(at: work)
       return []
     } catch {
-      return [work.path]
+      return [ExportLeftover(path: work.path, reason: "could not be removed")]
+    }
+  }
+
+  /// Work directories an earlier export left under `root`; a root that can't be listed
+  /// is reported itself, since it may hold some.
+  private static func leftovers(in root: URL, prefix: String) -> [ExportLeftover] {
+    guard let names = try? FileManager.default.contentsOfDirectory(atPath: root.path)  // reported
+    else {
+      return [ExportLeftover(path: root.path, reason: "could not be listed for work directories")]
+    }
+    return names.filter { $0.hasPrefix(prefix) }.sorted().map {
+      ExportLeftover(
+        path: root.appending(path: $0).path, reason: "was left by an export that did not finish")
     }
   }
 
@@ -176,7 +234,7 @@ package enum ExportService {
     let values = try? target.resourceValues(forKeys: keys)  // nil: absent
     guard let values else { return }
     guard values.isDirectory == true, values.isSymbolicLink != true else {
-      throw refused("a file, not a directory")
+      throw refused("it is a file, not a directory")
     }
     // An entry that can't be read could hold anything, so it refuses rather than counts
     // as empty.
@@ -188,7 +246,7 @@ package enum ExportService {
         unreadable = unreadable ?? url.standardizedFileURL.path
         return false
       })
-    guard let found else { throw refused("an entry it can't read (\(base))") }
+    guard let found else { throw refused("it can't be read") }
     var present: Set<String> = []
     for case let url as URL in found {
       let values = try? url.resourceValues(forKeys: [.isDirectoryKey])  // nil: a file
@@ -197,15 +255,21 @@ package enum ExportService {
       let relative = path.hasPrefix(base + "/") ? String(path.dropFirst(base.count + 1)) : path
       if directory != true && url.lastPathComponent != ".DS_Store" { present.insert(relative) }
     }
-    if let unreadable { throw refused("an entry it can't read (\(unreadable))") }
+    if let unreadable {
+      throw refused(
+        unreadable == base ? "it can't be read" : "it holds an entry it can't read (\(unreadable))")
+    }
     guard let first = present.min(by: ExportSnapshot.byteOrder) else { return }
-    let data = FileManager.default.contents(
-      atPath: target.appending(path: ExportFormat.manifestFile).path)
+    let manifestPath = target.appending(path: ExportFormat.manifestFile).path
+    let data = FileManager.default.contents(atPath: manifestPath)
+    if data == nil, present.contains(ExportFormat.manifestFile) {
+      throw refused("its manifest.json can't be read")
+    }
     let manifest = try? ExportManifest(data)  // nil: not an export, refused below
-    guard let manifest, manifest.workspace == workspace else { throw refused(first) }
+    guard let manifest, manifest.workspace == workspace else { throw refused("it holds \(first)") }
     let listed = Set(manifest.files.keys).union([ExportFormat.manifestFile])
     if let extra = present.subtracting(listed).min(by: ExportSnapshot.byteOrder) {
-      throw refused(extra)
+      throw refused("it holds \(extra)")
     }
   }
 

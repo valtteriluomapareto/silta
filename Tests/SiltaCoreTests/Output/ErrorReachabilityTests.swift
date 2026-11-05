@@ -192,7 +192,7 @@ extension ActorError: ErrorExamples {
 extension ExportError: ErrorExamples {
   static var examples: [ExportError] {
     [
-      .notAnExport(path: "/tmp/acme-notes/acme", entry: "README.md", workspace: "acme"),
+      .notAnExport(path: "/tmp/acme-notes/acme", entry: "it holds README.md", workspace: "acme"),
       .insideRepo(path: "/tmp/acme/platform/exports/acme", repo: "platform", workspace: "acme"),
       .unsupported("docs"), .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
       .invalidTree("links.jsonl does not match its sha256"),
@@ -204,6 +204,20 @@ extension ExportError: ErrorExamples {
       .previousKept(
         path: "/tmp/acme-notes/.acme.export-abc123/previous", target: "/tmp/acme-notes/acme",
         workspace: "acme"),
+    ]
+  }
+}
+
+extension ExportFailure: ErrorExamples {
+  static var examples: [ExportFailure] {
+    [
+      ExportFailure(
+        error: .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
+        leftovers: [
+          ExportLeftover(
+            path: "/tmp/acme-notes/.acme.export-a1b2c3",
+            reason: "was left by an export that did not finish")
+        ])
     ]
   }
 }
@@ -220,7 +234,7 @@ struct ErrorReachabilityTests {
     ScanError.self, CommentError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
-    ExportError.self,
+    ExportError.self, ExportFailure.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.

@@ -9,7 +9,9 @@ struct ExportCommand: OutputCommand {
     discussion:
       "The tree goes to <root>/<workspace>. It replaces only an absent, empty or previously "
       + "exported directory, never one inside a registered repo. Repo paths and worktrees are "
-      + "not written; configured values are written as stored.")
+      + "not written; configured values are written as stored. It stages in a hidden "
+      + ".<workspace>.export-XXXXXX next to the tree; one it can't remove, or a crash left, is "
+      + "an export_leftover warning for the human. Unreadable entries refuse the target.")
 
   static let dataShape = Shape.object(["workspace": .string, "path": .string, "files": .int])
 
@@ -36,12 +38,7 @@ struct ExportCommand: OutputCommand {
       ?? environment.home.url.appending(path: "exports", directoryHint: .isDirectory)
     let result = try ExportService.export(
       workspace: workspace, to: root, store: environment.db, home: environment.home.url)
-    let warnings = result.leftovers.map {
-      OutputWarning(
-        code: "export_leftover",
-        message:
-          "\($0) is a work directory export did not remove; ask the human before deleting it.")
-    }
+    let warnings = result.leftovers.map(\.warning)
     return CommandOutput(
       text: "Exported \(result.workspace) to \(result.path) (\(result.files) files).", data: result,
       warnings: warnings
