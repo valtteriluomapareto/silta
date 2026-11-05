@@ -18,7 +18,9 @@ final class HookWatchdog: @unchecked Sendable {
 
   init() {
     timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
-    timer.schedule(deadline: .now() + 1.5)
+    let budget = BriefHookDeadline.budget.components
+    timer.schedule(
+      deadline: .now() + Double(budget.seconds) + Double(budget.attoseconds) / 1e18)
     timer.setEventHandler { [self] in fire() }
     timer.resume()
   }
@@ -40,7 +42,8 @@ final class HookWatchdog: @unchecked Sendable {
     do {
       var entry = LogEntry(
         timestamp: timestamp, command: "silta brief",
-        actor: actor.description, exitCode: 0, milliseconds: 1500)
+        actor: actor.description, exitCode: 0,
+        milliseconds: Int(BriefHookDeadline.budget / .milliseconds(1)))
       entry.flags = ["--hook"]
       entry.errorCode = .env
       entry.warnings = ["hook_timeout"]

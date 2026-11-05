@@ -1779,7 +1779,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 | Tier | What | Notes |
 |---|---|---|
 | Unit | Ref parser, actor matrix, secret corpus, brief budgeting, plan parser, `where` scoring | Fake `Clock` and fake `GitRunner` |
-| Fixture git | `scripts/make-fixtures.sh` builds repos | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
+| Fixture git | `scripts/make-fixtures.sh` builds repos once per test process; tests get relocated copies (`AcmeFixtures`) | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
 | Multi-process stress | Spawns the built binary | 20 writers × 200 adds: no duplicate seq. N concurrent `start`: exactly one claimer. Concurrent first-open migration. Concurrent lazy index: one indexer. p95 latency recorded. |
 | Golden CLI | Text, `--json` and exit codes for every command | Includes every error code's message and `next` hint |
 | Round-trip | Property test | `export(restore(export(db))) == export(db)`, byte-identical. Tampered and partial trees are rejected with nothing written. |
