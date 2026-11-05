@@ -41,9 +41,9 @@ ask human: silta doctor
 {"error":{"code":"env","message":"Database is corrupt: SQLite reported corruption or a stored value or reference cannot be read.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## resourceExhausted
-error: Database engine ran out of memory or a value exceeded SQLite's size limit. [env]
+error: Database engine ran out of memory, a value exceeded SQLite's size limit, or the process or system ran out of open files. [env]
 ask human: silta doctor
-{"error":{"code":"env","message":"Database engine ran out of memory or a value exceeded SQLite's size limit.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Database engine ran out of memory, a value exceeded SQLite's size limit, or the process or system ran out of open files.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
 ## internalMisuse
 error: internal error (bug): Silta made an invalid database call; nothing was saved. Report which silta command failed (not its arguments) and the time, with silta doctor output. [env]

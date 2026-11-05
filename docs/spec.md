@@ -1681,7 +1681,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   | Id (display order) | Check / availability |
   |---|---|
-  | `database.integrity` | SQLite integrity or operational read failure |
+  | `database.integrity` | SQLite or stored-value integrity, or operational read failure |
   | `database.foreign_keys` | Foreign-key integrity |
   | `database.schema` | Truth schema and writer compatibility |
   | `database.wal` | File-only WAL size |

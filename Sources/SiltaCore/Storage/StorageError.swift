@@ -19,7 +19,7 @@ package enum StorageError: CodedError, CaseIterable {
   case walRefused
   /// SQLite reports corruption, or a stored value or reference cannot be read.
   case corrupt
-  /// The database engine ran out of memory or exceeded a value size limit.
+  /// The database engine ran out of memory, exceeded a value size limit or open files.
   case resourceExhausted
   /// Silta made a database call its own schema does not allow.
   case internalMisuse
@@ -59,7 +59,8 @@ package enum StorageError: CodedError, CaseIterable {
       "Database is corrupt: SQLite reported corruption or a stored value or reference cannot be "
         + "read."
     case .resourceExhausted:
-      "Database engine ran out of memory or a value exceeded SQLite's size limit."
+      "Database engine ran out of memory, a value exceeded SQLite's size limit, or the "
+        + "process or system ran out of open files."
     case .internalMisuse:
       "internal error (bug): Silta made an invalid database call; nothing was saved. "
         + "Report which silta command failed (not its arguments) and the time, "
@@ -105,7 +106,7 @@ package enum StorageError: CodedError, CaseIterable {
   /// The SQLite primary code decides the class; a few extended codes override it.
   private static func mapped(_ error: DatabaseError, at path: String?) -> StorageError {
     switch error.extendedResultCode {
-    case .SQLITE_IOERR_ACCESS, .SQLITE_IOERR_AUTH: return .accessDenied
+    case .SQLITE_IOERR_AUTH: return .accessDenied
     case .SQLITE_IOERR_NOMEM: return .resourceExhausted
     default: return mapped(error.resultCode, at: path)
     }

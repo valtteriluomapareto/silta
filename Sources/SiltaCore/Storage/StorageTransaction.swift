@@ -26,7 +26,7 @@ package struct StorageTransaction {
         sql: """
           UPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='change_seq' RETURNING value
           """)
-    else { throw StorageError.internalMisuse }
+    else { throw StorageError.corrupt }
     try database.execute(
       sql: "INSERT INTO change_log(seq,kind,row_id) VALUES(?,?,?)", arguments: [seq, kind, rowID])
   }

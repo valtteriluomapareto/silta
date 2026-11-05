@@ -101,6 +101,32 @@ extension DoctorService {
     }
   }
 
+  /// Persisted rows the read and write paths refuse to interpret as valid Silta state.
+  private static func storedDataProblems(_ db: Database) throws -> [String] {
+    guard try db.tableExists("meta"), try db.tableExists("task") else { return [] }
+    var problems: [String] = []
+    let unreadable =
+      try Int.fetchOne(
+        db,
+        sql: """
+          SELECT count(*) FROM task
+          WHERE archive_override IS NULL AND status IN ('done','dropped')
+            AND closed_at IS NOT NULL AND silta_archive_instant(closed_at) IS NULL
+          """) ?? 0
+    if unreadable > 0 {
+      problems.append("\(unreadable) stored task close timestamp(s) cannot be read")
+    }
+    let required = ["change_seq", "last_backup_day"]
+    let present = Set(
+      try String.fetchAll(
+        db, sql: "SELECT key FROM meta WHERE key IN ('change_seq','last_backup_day')"))
+    let missing = required.filter { !present.contains($0) }
+    if !missing.isEmpty {
+      problems.append("required metadata \(missing.joined(separator: ", ")) is missing")
+    }
+    return problems
+  }
+
   private static func databaseChecks(
     _ db: Database, path: String, backups: DoctorBackups, recovery: [String], at now: Date
   ) -> [DoctorCheck] {
@@ -142,15 +168,18 @@ extension DoctorService {
   private static func integrity(_ db: Database, recovery: [String]) -> [DoctorCheck] {
     var checks: [DoctorCheck] = []
     do {
-      let valid = try String.fetchAll(db, sql: "PRAGMA integrity_check") == ["ok"]
+      let structural = try String.fetchAll(db, sql: "PRAGMA integrity_check") == ["ok"]
+      let problems =
+        (structural ? [] : ["SQLite integrity check failed"])
+        + (try storedDataProblems(db))
       checks.append(
         DoctorCheck(
-          id: "database.integrity", status: valid ? .pass : .fail,
-          message: valid
+          id: "database.integrity", status: problems.isEmpty ? .pass : .fail,
+          message: problems.isEmpty
             ? "SQLite integrity check passed."
-            : "SQLite integrity check failed; inspect backups and read-only evidence. "
+            : problems.joined(separator: "; ") + "; inspect backups and read-only evidence. "
               + "Restore is the human's decision.",
-          next: valid ? [] : recovery))
+          next: problems.isEmpty ? [] : recovery))
     } catch {
       checks.append(
         DoctorCheck(

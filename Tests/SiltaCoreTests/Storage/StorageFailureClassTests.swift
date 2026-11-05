@@ -233,6 +233,13 @@ struct StorageFailureClassTests {
     #expect(throws: StorageError.walRefused) { try DatabaseStore.requireWAL(nil) }
   }
 
+  private func chmod(_ permissions: Int, _ url: URL) throws {
+    try FileManager.default.setAttributes(
+      [.posixPermissions: permissions], ofItemAtPath: url.path)
+  }
+}
+
+extension StorageFailureClassTests {
   @Test func resourceExhaustionMessageCoversFileDescriptors() {
     let message = StorageError.resourceExhausted.message
     #expect(message.contains("memory"))
@@ -263,7 +270,56 @@ struct StorageFailureClassTests {
     }
   }
 
-  @Test func everyDanglingLinkTargetGuardIsCorrupt() throws {
+  @Test func danglingLinkTargetGuardsAreCorrupt() throws {
+    try withLinkDatabase { db, _ in
+      let missingID = Row(["to_kind": "task", "to_id": nil, "to_ext": nil, "anchor": nil])
+      #expect(throws: StorageError.corrupt) { _ = try TaskLinkTarget.render(missingID, in: db) }
+
+      let missingEntity = Row(["to_kind": "doc", "to_id": 9999, "to_ext": nil, "anchor": nil])
+      #expect(throws: StorageError.corrupt) { _ = try TaskLinkTarget.render(missingEntity, in: db) }
+
+      let missingPlanRevision = Row([
+        "to_kind": "task_plan_rev", "to_id": 9999, "to_ext": nil, "anchor": nil,
+      ])
+      #expect(throws: StorageError.corrupt) {
+        _ = try TaskLinkTarget.render(missingPlanRevision, in: db)
+      }
+
+      let missingComment = Row([
+        "to_kind": "comment", "to_id": 9999, "to_ext": nil, "anchor": nil,
+      ])
+      #expect(throws: StorageError.corrupt) {
+        _ = try TaskLinkTarget.render(missingComment, in: db)
+      }
+    }
+  }
+
+  @Test func danglingLinkReferenceGuardsAreCorrupt() throws {
+    try withLinkDatabase { db, orphanedComment in
+      let orphanedRow = Row([
+        "to_kind": "comment", "to_id": orphanedComment, "to_ext": nil, "anchor": nil,
+      ])
+      #expect(throws: StorageError.corrupt) { _ = try TaskLinkTarget.render(orphanedRow, in: db) }
+
+      let missingTask = Row(["to_kind": "task", "to_id": 9999, "to_ext": nil, "anchor": nil])
+      #expect(throws: StorageError.corrupt) { _ = try TaskLinkTarget.render(missingTask, in: db) }
+
+      let missingRevision = Row([
+        "to_kind": "doc_rev", "to_id": 9999, "to_ext": nil, "anchor": nil,
+      ])
+      #expect(throws: StorageError.corrupt) {
+        _ = try TaskLinkTarget.render(missingRevision, in: db)
+      }
+
+      let unknownKind = Row([
+        "to_kind": "acme-unknown", "to_id": 1, "to_ext": nil, "anchor": nil,
+      ])
+      #expect(throws: StorageError.corrupt) { _ = try TaskLinkTarget.render(unknownKind, in: db) }
+    }
+  }
+
+  /// A database with one comment row whose two reference columns are both unset.
+  private func withLinkDatabase(_ body: (Database, Int64) throws -> Void) throws {
     try withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)
       try store.initialize()
@@ -277,60 +333,7 @@ struct StorageFailureClassTests {
             """)
         orphanedComment = transaction.database.lastInsertedRowID
       }
-      try store.read { db in
-        let missingID = Row(["to_kind": "task", "to_id": nil, "to_ext": nil, "anchor": nil])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(missingID, in: db)
-        }
-
-        let missingEntity = Row(["to_kind": "doc", "to_id": 9999, "to_ext": nil, "anchor": nil])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(missingEntity, in: db)
-        }
-
-        let missingPlanRevision = Row([
-          "to_kind": "task_plan_rev", "to_id": 9999, "to_ext": nil, "anchor": nil,
-        ])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(missingPlanRevision, in: db)
-        }
-
-        let missingComment = Row(["to_kind": "comment", "to_id": 9999, "to_ext": nil, "anchor": nil])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(missingComment, in: db)
-        }
-
-        let orphanedCommentRow = Row([
-          "to_kind": "comment", "to_id": orphanedComment, "to_ext": nil, "anchor": nil,
-        ])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(orphanedCommentRow, in: db)
-        }
-
-        let missingTask = Row(["to_kind": "task", "to_id": 9999, "to_ext": nil, "anchor": nil])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(missingTask, in: db)
-        }
-
-        let missingDocumentRevision = Row([
-          "to_kind": "doc_rev", "to_id": 9999, "to_ext": nil, "anchor": nil,
-        ])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(missingDocumentRevision, in: db)
-        }
-
-        let unknownKind = Row([
-          "to_kind": "acme-unknown", "to_id": 1, "to_ext": nil, "anchor": nil,
-        ])
-        #expect(throws: StorageError.corrupt) {
-          _ = try TaskLinkTarget.render(unknownKind, in: db)
-        }
-      }
+      try store.read { db in try body(db, orphanedComment) }
     }
-  }
-
-  private func chmod(_ permissions: Int, _ url: URL) throws {
-    try FileManager.default.setAttributes(
-      [.posixPermissions: permissions], ofItemAtPath: url.path)
   }
 }

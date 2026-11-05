@@ -259,6 +259,30 @@ struct DoctorReviewTests {
     }
   }
 
+  private func corruptiblePage(_ path: String) throws -> (Int, Int) {
+    let queue = try DatabaseQueue(path: path)
+    try queue.write {
+      try $0.execute(
+        sql: "CREATE TABLE doctor_probe(value TEXT); INSERT INTO doctor_probe VALUES('Acme')")
+    }
+    let result = try queue.read { db in
+      (
+        try #require(
+          try Int.fetchOne(
+            db,
+            sql: """
+              SELECT rootpage FROM sqlite_master WHERE name='doctor_probe'
+              """)),
+        try #require(try Int.fetchOne(db, sql: "PRAGMA page_size"))
+      )
+    }
+    try queue.writeWithoutTransaction { try $0.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)") }
+    try queue.close()
+    return result
+  }
+}
+
+extension DoctorReviewTests {
   @Test func malformedStoredCloseDateFailsDoctor() async throws {
     try await withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)
@@ -267,7 +291,8 @@ struct DoctorReviewTests {
       try store.write { transaction in
         try transaction.database.execute(
           sql: """
-            INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at,closed_at)
+            INSERT INTO task(uid,workspace_id,seq,title,status,created_by,
+              created_at,updated_at,closed_at)
             VALUES('acme-done',1,1,'Acme','done','human:acme',
               '2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z','malformed')
             """)
@@ -295,27 +320,5 @@ struct DoctorReviewTests {
       #expect(check.next.contains { $0.contains("sqlite3") && $0.contains("-readonly") })
       #expect(DoctorFailure(report: report).code == .env)
     }
-  }
-
-  private func corruptiblePage(_ path: String) throws -> (Int, Int) {
-    let queue = try DatabaseQueue(path: path)
-    try queue.write {
-      try $0.execute(
-        sql: "CREATE TABLE doctor_probe(value TEXT); INSERT INTO doctor_probe VALUES('Acme')")
-    }
-    let result = try queue.read { db in
-      (
-        try #require(
-          try Int.fetchOne(
-            db,
-            sql: """
-              SELECT rootpage FROM sqlite_master WHERE name='doctor_probe'
-              """)),
-        try #require(try Int.fetchOne(db, sql: "PRAGMA page_size"))
-      )
-    }
-    try queue.writeWithoutTransaction { try $0.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)") }
-    try queue.close()
-    return result
   }
 }
