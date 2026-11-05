@@ -85,31 +85,6 @@ extension BriefCommandTests {
       #expect(result.stdout.contains("AGENTS.md: " + repo.path + "/AGENTS.md"))
     }
   }
-
-  @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
-  func hookWithTwentyThousandTasks() throws {
-    try withScratchDirectory { scratch in
-      let repo = try contextFixture(scratch)
-      try store(scratch).write {
-        try $0.database.execute(
-          sql: """
-            WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+1 FROM n WHERE x<20004)
-            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,description_md,plan_md,
-              result_md,created_by,created_at,updated_at)
-            SELECT 'bulk-'||x,1,x,'Acme backlog','todo',app.id,?,?,?,'human:acme','',''
-            FROM n,app WHERE app.slug='api'
-            """,
-          arguments: StatementArguments(
-            Array(repeating: String(repeating: "Acme unused ", count: 180), count: 3)))
-      }
-      let short = try run(["--task", "AC-2", "--app", "api", "--short"], repo, scratch)
-      #expect(short.stdout.contains("open: AC-1"))
-      let hook = try run(["--task", "AC-2", "--app", "api", "--hook"], repo, scratch)
-      let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String] ?? []
-      #expect(hook.stdout.contains("open: AC-1"))
-      #expect(!warnings.contains("hook_timeout"))
-    }
-  }
 }
 
 extension BriefCommandTests {

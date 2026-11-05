@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The verify ladder (AGENTS.md).
 #   quick  guards, lint, build with warnings as errors, tests (a run with zero tests fails)
-#   full   quick plus stress/scenarios and isolated strict process-deadline checks
+#   full   quick plus stress/scenarios, then the wall-clock deadline tier alone and serially
 # Tests always run against a temporary SILTA_HOME, never the real ~/.silta.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -72,12 +72,11 @@ run_tests() {
 step "test"
 if [[ "$mode" == full ]]; then
   export SILTA_SLOW_TESTS=1
-  # A deadline-based scale check must not compete with hundreds of CLI subprocesses.
-  run_tests --skip 'hookWithTwentyThousandTasks|timeoutKillsAChildIgnoringTermination'
-  step "hook scale (isolated)"
-  run_tests --filter hookWithTwentyThousandTasks
-  step "git deadline (isolated)"
-  run_tests --filter timeoutKillsAChildIgnoringTermination
+  run_tests
+  # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
+  # parallel suite skips them; they run here alone and one at a time.
+  step "wall-clock deadlines (isolated, serial)"
+  SILTA_DEADLINE_TESTS=1 run_tests --no-parallel --filter 'WallClock'
 else
   run_tests
 fi

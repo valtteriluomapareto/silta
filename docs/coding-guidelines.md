@@ -142,6 +142,10 @@ quietly diverge.
     first slice with a slow test (CP or S3) adds the tag and the gate to
     `SiltaTestSupport`
   - the scenario runner is a slow test
+  - wall-clock deadline checks carry a `.deadline` tag, live in `WallClock…` suites
+    and run only when `SILTA_DEADLINE_TESTS=1`, which `scripts/verify.sh full` sets
+    for a serial run of those suites alone; the decisions they prove also get a
+    fake-clock test that runs everywhere
 - **Isolation:** each test gets its own scratch directory and `SILTA_HOME`, so tests
   share no state and run in parallel.
 - **CLI tests are black-box.** `siltaTests` runs the built binary through

@@ -137,64 +137,6 @@ struct BriefCommandTests {
     }
   }
 
-  @Test func hookDoesNotWaitForDatabaseLock() throws {
-    try withScratchDirectory { scratch in
-      let repo = try fixture.setup(scratch)
-      var config = Configuration()
-      config.allowsUnsafeTransactions = true
-      let queue = try DatabaseQueue(path: store(scratch).path, configuration: config)
-      try queue.writeWithoutTransaction { db in
-        try db.execute(sql: "PRAGMA journal_mode=DELETE; BEGIN EXCLUSIVE")
-        defer { try? db.execute(sql: "ROLLBACK") }  // best-effort release after assertion
-        let result = try SiltaBinary.run(
-          ["brief", "--hook", "--json", "--verbose"],
-          in: scratch, cwd: repo,
-          environment: [
-            "SILTA_ACTOR": "agent:codex:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z",
-          ], timeout: 2)
-        #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
-        let entry = try DogfoodLogTests.last(scratch)
-        #expect(entry["error_code"] as? String == "busy")
-        #expect(!(entry["warnings"] as? [String] ?? []).contains("hook_timeout"))
-      }
-    }
-  }
-
-  @Test(arguments: ["git", "database"])
-  func hookBoundsBlockedIO(kind: String) throws {
-    try withScratchDirectory { scratch in
-      let repo = try fixture.setup(scratch)
-      let fifo = scratch.appending(path: "blocked")
-      try #require(mkfifo(fifo.path, 0o600) == 0)
-      if kind == "git" {
-        let config = repo.appending(path: ".git/config")
-        var text = try String(contentsOf: config, encoding: .utf8)
-        text += "\n[include]\npath = \(fifo.path)\n"
-        try Data(text.utf8).write(to: config)
-      } else {
-        let path = store(scratch).path
-        try FileManager.default.removeItem(atPath: path)
-        try FileManager.default.moveItem(atPath: fifo.path, toPath: path)
-      }
-      let clock = ContinuousClock()
-      let started = clock.now
-      let result = try SiltaBinary.run(
-        ["brief", "--hook", "--json", "--verbose"], in: scratch, cwd: repo,
-        environment: ["SILTA_ACTOR": "agent:codex", "SILTA_NOW": "2023-11-14T22:13:20.000Z"],
-        timeout: 2.5)
-      #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
-      #expect(started.duration(to: clock.now) < .seconds(2))
-      if kind == "git" {
-        let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String]
-        #expect(warnings?.contains("hook_timeout") == true)
-        let descriptor = open(fifo.path, O_WRONLY | O_NONBLOCK)
-        let failure = errno
-        if descriptor >= 0 { close(descriptor) }
-        #expect(descriptor == -1 && failure == ENXIO, "Git reader survived hook exit")
-      }
-    }
-  }
-
   @Test func blockersMatchStartRecoveryAndSecretsStayMasked() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)

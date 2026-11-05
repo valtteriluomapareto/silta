@@ -16,7 +16,7 @@ struct BriefHookGitRunnerTests {
     let scripted = ScriptedGitRunner(script: [(bounded, .success(.init(termination: termination)))])
     let notifications = Mutex(0)
     let runner = BriefHookGitRunner(
-      runner: scripted, remaining: { 1 },
+      runner: scripted, deadline: BriefHookDeadlineTests.Elapsed(milliseconds: 0).deadline,
       onTimeout: { notifications.withLock { $0 += 1 } })
     let result = try await runner.run(request)
     #expect(result.termination == termination)
@@ -28,7 +28,7 @@ struct BriefHookGitRunnerTests {
     let scripted = ScriptedGitRunner(script: [])
     let notifications = Mutex(0)
     let runner = BriefHookGitRunner(
-      runner: scripted, remaining: { 0 },
+      runner: scripted, deadline: BriefHookDeadlineTests.Elapsed(milliseconds: 1000).deadline,
       onTimeout: { notifications.withLock { $0 += 1 } })
     let result = try await runner.run(
       .init(arguments: ["status"], directory: URL(filePath: "/acme")))
@@ -44,6 +44,8 @@ extension BriefHookGitRunnerTests {
     let original = LogEntry(
       timestamp: Date(timeIntervalSince1970: 1_700_000_000),
       command: "silta brief", actor: "agent:codex:acme", exitCode: 0, milliseconds: 1499)
+    var diagnosed = original
+    diagnosed.errorCode = .notFound
     let output = Rendered(
       stdout: "Acme context", stderr: "warning", exitCode: exitCode, errorCode: nil)
     let completed = BriefHookCompletion(rendered: output, entry: original, expired: expired)
@@ -52,5 +54,8 @@ extension BriefHookGitRunnerTests {
     #expect(completed.rendered.exitCode == 0)
     #expect(completed.rendered.stderr.isEmpty)
     #expect(completed.rendered.stdout == (expired || exitCode != 0 ? "" : "Acme context"))
+    let failed = BriefHookCompletion(rendered: output, entry: diagnosed, expired: expired)
+    #expect(failed.entry.errorCode == .notFound)
+    #expect(failed.entry.exitCode == 0)
   }
 }

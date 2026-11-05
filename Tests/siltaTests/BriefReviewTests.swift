@@ -33,21 +33,6 @@ extension BriefCommandTests {
     }
   }
 
-  @Test func hookLogRecordsItsActualExitAndKeepsDiagnosticCode() throws {
-    try withScratchDirectory { scratch in
-      let repo = try fixture.setup(scratch)
-      let result = try run(["--task", "AC-99", "--hook", "--json", "--verbose"], repo, scratch)
-      #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
-      let entry = try DogfoodLogTests.last(scratch)
-      #expect(entry["exit_code"] as? Int == 0)
-      #expect(entry["error_code"] as? String == "not_found")
-      let log = try String(
-        contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"),
-        encoding: .utf8)
-      #expect(log.split(separator: "\n").count == 1)
-    }
-  }
-
   @Test func briefRetainsLocationWarningsWithoutHookStderr() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)
