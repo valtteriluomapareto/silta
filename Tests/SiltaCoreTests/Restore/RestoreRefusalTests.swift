@@ -62,6 +62,16 @@ struct RestoreRefusalTests {
       "uid of another workspace", .conflict, "workspace.yaml", "01HZSVC0000000000000000001",
       "01HZSVC00000000000000OTHR"),
     .init(
+      "workspace uid of another workspace", .conflict, "workspace.yaml",
+      "01HZACME00000000000000WS01", "01HZOTHR00000000000000WS02"),
+    .init(
+      "approval of another workspace", .conflict, "approvals.jsonl",
+      "01HZAPRV000000000000000009", "01HZAPRV0000000000000OTHR"),
+    .init(
+      "duplicate app slug", .invalid, "workspace.yaml", #""slug": "api""#, #""slug": "portal""#),
+    .init(
+      "duplicate plan revision", .invalid, "tasks/AC-2.jsonl", #""rev": "1""#, #""rev": "2""#),
+    .init(
       "unknown setting", .invalid, "workspace.yaml", #"{\"proposals\":\"ask\"}"#,
       #"{\"proposals\":\"ask\",\"colour\":\"red\"}"#),
     .init(
@@ -150,6 +160,8 @@ struct RestoreRefusalTests {
           #expect(error.code == .invalid)
           #expect(
             error.message.contains(hint) || error.next.joined().contains(hint), "\(error.message)")
+          // Only the hint to a tree inside the root is a dry run the agent may run itself.
+          #expect(error.nextBy == (hint == "acme" ? .agent : .human), "\(error.message)")
         }
       }
       #expect(try RestoreSupport.dump(store) == dump)
@@ -186,7 +198,7 @@ struct RestoreRefusalTests {
         _ = try RestoreSupport.restore(tree, into: store, home: home, workspace: "other")
         Issue.record("restored under another workspace")
       } catch let error as ExportError {
-        #expect(error.code == .invalid)
+        #expect(error.code == .invalid && error.nextBy == .agent)
         #expect(error.next.first?.hasPrefix("silta --ws 'acme' restore ") == true)
       }
     }

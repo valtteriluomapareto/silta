@@ -6,15 +6,21 @@ package struct RestoreRequest: Sendable {
   package var directory: URL
   /// The `--ws` the caller named, if any; it must be the tree's workspace.
   package var workspace: String?
+  /// The manifest sha256 prefix the human approved, if any; it must match the tree.
+  package var manifest: String?
   /// The human's go-ahead for an agent, recorded with the restore.
   package var approval: HumanApproval?
   /// Roll the transaction back and only report.
   package var dryRun: Bool
 
   /// A restore of `directory`.
-  package init(directory: URL, workspace: String?, approval: HumanApproval?, dryRun: Bool) {
+  package init(
+    directory: URL, workspace: String?, manifest: String?, approval: HumanApproval?,
+    dryRun: Bool
+  ) {
     self.directory = directory
     self.workspace = workspace
+    self.manifest = manifest
     self.approval = approval
     self.dryRun = dryRun
   }

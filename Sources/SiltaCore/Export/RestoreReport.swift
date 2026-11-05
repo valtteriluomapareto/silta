@@ -34,6 +34,16 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
     }
   }
 
+  /// A table outside the tasks whose row count changes.
+  package struct RowCount: Encodable, Equatable, Sendable {
+    /// The table.
+    package var table: String
+    /// Rows before the restore.
+    package var before: Int
+    /// Rows after the restore.
+    package var after: Int
+  }
+
   /// A live claim the restore replaces.
   package struct Claim: Encodable, Equatable, Sendable {
     /// The task ref as it is now.
@@ -64,6 +74,8 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
   package var removed: [String]
   /// Refs of tasks whose row or records differ from the tree.
   package var changed: [String]
+  /// Tables outside the tasks whose row counts change.
+  package var rows: [RowCount]
   /// Settings whose values differ.
   package var settings: [SettingChange]
   /// Approval rows the tree adds.
@@ -76,7 +88,7 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
   package var snapshot: String?
 
   enum CodingKeys: String, CodingKey {
-    case workspace, created, tasks, removed, changed, settings, snapshot
+    case workspace, created, tasks, removed, changed, rows, settings, snapshot
     case dryRun = "dry_run"
     case sameUID = "same_uid"
     case manifestSHA256 = "manifest_sha256"
@@ -114,7 +126,7 @@ extension RestoreReport {
       workspace: workspace, dryRun: dryRun, created: current == nil,
       sameUID: current.map { $0.workspace.value("uid") == tree.workspace.value("uid") } ?? true,
       manifestSHA256: digest, tasks: Counts(before: existing.count, after: tree.tasks.count),
-      removed: removed, changed: changed,
+      removed: removed, changed: changed, rows: [],
       settings: settingChanges(
         current?.workspace.value("settings"), tree.workspace.value("settings")),
       approvalsAdded: 0, claimsReplaced: claims, reposWithoutPath: [], snapshot: nil)

@@ -94,10 +94,21 @@ struct RestoreServiceTests {
         }
         try db.execute(sql: "UPDATE task SET title='Renamed' WHERE seq=2")
         try db.execute(sql: "UPDATE seq_counter SET next=13 WHERE scope='task:1'")
+        try db.execute(
+          sql: """
+            INSERT INTO service(uid,workspace_id,slug,name) VALUES('01HZSVCLATER',1,'later','Later')
+            """)
         try db.execute(sql: #"UPDATE workspace SET settings='{"proposals":"triage"}' WHERE id=1"#)
       }
       let report = try RestoreSupport.restore(tree, into: store, home: home)
       #expect(report.tasks == .init(before: 4, after: 2))
+      #expect(report.rows == [.init(table: "service", before: 2, after: 1)])
+      let snapshot = try DatabaseQueue(path: try #require(report.snapshot))
+      #expect(
+        try snapshot.read {
+          try Int.fetchOne($0, sql: "SELECT count(*) FROM task WHERE uid='01HZLATE11'")
+        }
+          == 1)
       #expect(report.removed == ["AC-11", "AC-12"])
       #expect(report.changed == ["AC-2"])
       #expect(
@@ -170,6 +181,54 @@ struct RestoreServiceTests {
 
   /// A tree of an older schema lacks the keys later migrations added; they restore as
   /// their column defaults (spec §15).
+  /// The tree's counter is kept when it is above every task's seq: refs of tasks
+  /// deleted before the export are never reused on the new machine.
+  @Test func treeCounterAboveTheHighestSeqIsKept() throws {
+    try withScratchDirectory { scratch in
+      let source = try ExportFixture.make(scratch.appending(path: "a"))
+      try DatabaseQueue(path: source.path).write {
+        try $0.execute(sql: "UPDATE seq_counter SET next=50 WHERE scope='task:1'")
+      }
+      let tree = try RestoreSupport.exportTree(source, to: scratch.appending(path: "tree"))
+      let home = scratch.appending(path: "b")
+      let target = ExportFixture.store(home)
+      try target.initialize()
+      _ = try RestoreSupport.restore(tree, into: target, home: home)
+      #expect(
+        try target.read { try Int.fetchOne($0, sql: "SELECT next FROM seq_counter") } == 50)
+    }
+  }
+
+  /// A dry run never changes a workspace, also into a home that has none.
+  @Test func dryRunIntoAFreshHomeCreatesNoWorkspace() throws {
+    try withScratchDirectory { scratch in
+      let source = try ExportFixture.make(scratch.appending(path: "a"))
+      let tree = try RestoreSupport.exportTree(source, to: scratch.appending(path: "tree"))
+      let home = scratch.appending(path: "b")
+      let target = ExportFixture.store(home)
+      let report = try RestoreSupport.restore(tree, into: target, home: home, dryRun: true)
+      #expect(report.created && report.dryRun)
+      #expect(try target.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 0)
+    }
+  }
+
+  /// The approval names the tree the human saw: another manifest is refused.
+  @Test func aChangedTreeIsRefusedAgainstTheApprovedManifest() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "a")
+      let store = try ExportFixture.make(home)
+      let tree = try RestoreSupport.exportTree(store, to: scratch.appending(path: "tree"))
+      let dump = try RestoreSupport.dump(store)
+      #expect(throws: ExportError.self) {
+        try RestoreSupport.restore(tree, into: store, home: home, manifest: "000000000000")
+      }
+      #expect(try RestoreSupport.dump(store) == dump)
+      let report = try RestoreSupport.restore(tree, into: store, home: home, dryRun: true)
+      _ = try RestoreSupport.restore(
+        tree, into: store, home: home, manifest: String(report.manifestSHA256.prefix(12)))
+    }
+  }
+
   @Test func olderSchemaTreeRestoresLaterColumnsAtTheirDefaults() throws {
     try withScratchDirectory { scratch in
       let source = try ExportFixture.make(scratch.appending(path: "a"))
@@ -183,7 +242,7 @@ struct RestoreServiceTests {
       }
       let manifest = text(try #require(files["manifest.json"]))
       files["manifest.json"] = Data(
-        manifest.replacingOccurrences(of: #""schema": "v4""#, with: #""schema": "v3""#).utf8)
+        manifest.replacingOccurrences(of: #""schema": "v4""#, with: #""schema": "v2""#).utf8)
       let tree = try RestoreSupport.write(files, to: scratch.appending(path: "tree/acme"))
       let home = scratch.appending(path: "b")
       let target = ExportFixture.store(home)
@@ -197,13 +256,14 @@ struct RestoreServiceTests {
     }
   }
 
-  @Test func taskWorktreeIsKeptOnlyForTheSameClaim() throws {
+  @Test(arguments: ["claimed_by='agent:claude:other'", "branch='feature/other'"])
+  func taskWorktreeIsKeptOnlyForTheSameClaim(_ change: String) throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "a")
       let store = try ExportFixture.make(home)
       let tree = try RestoreSupport.exportTree(store, to: scratch.appending(path: "tree"))
       try DatabaseQueue(path: store.path).write {
-        try $0.execute(sql: "UPDATE task SET claimed_by='agent:claude:other' WHERE seq=2")
+        try $0.execute(sql: "UPDATE task SET \(change) WHERE seq=2")
       }
       _ = try RestoreSupport.restore(tree, into: store, home: home)
       #expect(

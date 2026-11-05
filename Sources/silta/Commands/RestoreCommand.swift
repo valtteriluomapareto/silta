@@ -48,7 +48,8 @@ struct RestoreCommand: OutputCommand {
         command: "silta restore " + shellWord(directory.path), approved: global.approved)
     let report = try RestoreService.restore(
       RestoreRequest(
-        directory: directory, workspace: global.ws, approval: approval, dryRun: dryRun),
+        directory: directory, workspace: global.ws, manifest: nil, approval: approval,
+        dryRun: dryRun),
       store: environment.db, home: environment.home.url,
       identity: (environment.ids, environment.clock.now()))
     return CommandOutput(

@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import SiltaCore
 import SiltaTestSupport
 import Testing
@@ -47,6 +48,28 @@ struct RestoreCommandTests {
     }
   }
 
+  /// Every line a human is shown before approving: changed tasks, other rows,
+  /// settings and claims.
+  @Test func dryRunShowsWhatTheHumanApproves() throws {
+    try withScratchDirectory { scratch in
+      try Self.exported(scratch)
+      let queue = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
+      try queue.write { db in
+        try db.execute(sql: #"UPDATE workspace SET settings='{"review_gate":"any"}'"#)
+        try db.execute(
+          sql: "UPDATE task SET title='Renamed', claimed_by='agent:claude:other' WHERE seq=1")
+        try db.execute(
+          sql:
+            "INSERT INTO service(uid,workspace_id,slug,name) VALUES('01HZSVCLATER',1,'later','Later')"
+        )
+      }
+      let dry = try SiltaBinary.run(
+        ["restore", "out/acme", "--dry-run"], in: scratch, environment: Self.agent)
+      #expect(dry.termination == .exit(0), "\(dry.stderr)")
+      Golden.forTests().check(Self.masked(dry.stdout, scratch), "restore-dry-run-changes.txt")
+    }
+  }
+
   @Test func approvedRestoreReplacesTheWorkspace() throws {
     try withScratchDirectory { scratch in
       try Self.exported(scratch)
@@ -78,7 +101,7 @@ struct RestoreCommandTests {
         ["--ws", "acme", "task", "add", "Next", "--app", "none"], in: scratch,
         environment: other)
       #expect(added.termination == .exit(0), "\(added.stderr)")
-      #expect(added.stdout.contains("AC-2"), "\(added.stdout)")
+      #expect(added.stdout.hasPrefix("AC-2"), "\(added.stdout)")
     }
   }
 

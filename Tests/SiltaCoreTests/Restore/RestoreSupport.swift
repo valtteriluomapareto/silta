@@ -49,11 +49,13 @@ enum RestoreSupport {
 
   static func restore(
     _ tree: URL, into store: DatabaseStore, home: URL, workspace: String? = nil,
-    approval: HumanApproval? = nil, dryRun: Bool = false, seed: UInt64 = 1
+    approval: HumanApproval? = nil, dryRun: Bool = false, manifest: String? = nil
   ) throws -> RestoreReport {
     try RestoreService.restore(
-      RestoreRequest(directory: tree, workspace: workspace, approval: approval, dryRun: dryRun),
-      store: store, home: home, identity: (SeededIDGenerator(seed: seed), ExportFixture.instant))
+      RestoreRequest(
+        directory: tree, workspace: workspace, manifest: manifest, approval: approval,
+        dryRun: dryRun),
+      store: store, home: home, identity: (SeededIDGenerator(seed: 1), ExportFixture.instant))
   }
 
   /// The acme export of `store`, written under `directory/acme`.

@@ -1,1 +1,1 @@
-{"data":{"approvals_added":0,"changed":[],"claims_replaced":[],"created":false,"dry_run":true,"manifest_sha256":"<sha>","removed":["AC-2"],"repos_without_path":[],"same_uid":true,"settings":[],"tasks":{"after":1,"before":2},"workspace":"acme"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"approvals_added":0,"changed":[],"claims_replaced":[],"created":false,"dry_run":true,"manifest_sha256":"<sha>","removed":["AC-2"],"repos_without_path":[],"rows":[],"same_uid":true,"settings":[],"tasks":{"after":1,"before":2},"workspace":"acme"},"ok":true,"schema":1,"warnings":[]}
