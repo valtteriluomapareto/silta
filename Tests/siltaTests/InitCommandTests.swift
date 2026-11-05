@@ -122,6 +122,16 @@ struct InitCommandTests {
     try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
   }
 
+  /// Adds `README.md` with `text`, commits it, and moves `origin/main` onto it.
+  static func commit(_ repo: URL, _ text: String, in scratch: URL) throws {
+    try Data((text + "\n").utf8).write(to: repo.appending(path: "README.md"))
+    try Self.git(["add", "README.md"], in: scratch, cwd: repo)
+    try Self.git(
+      ["-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm", text],
+      in: scratch, cwd: repo)
+    try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
+  }
+
   /// The `data` object a `ws show --json` printed.
   static func shownData(_ stdout: String) throws -> [String: Any] {
     let object = try #require(
@@ -291,27 +301,94 @@ extension InitCommandTests {
     }
   }
 
-  /// The reserved alias for a `none` repo is stable: a full rescan and a rescan of
-  /// only that clone keep the repo slugs the creation stored.
-  @Test func aReservedSlugAliasSurvivesARescan() throws {
+  /// A `none` clone is stored as `none-repo`; moving it and rescanning only its new
+  /// path repoints that repo, and no other repo's path changes.
+  @Test func aMovedReservedCloneRepointsOnlyItsPath() throws {
     try withScratchDirectory { scratch in
-      let root = scratch.appending(path: "scan")
+      let root = scratch.appending(path: "old")
       let hidden = root.appending(path: ".none")
       try Self.makeRepo(hidden, in: scratch)
-      try Self.makeRepo(root.appending(path: "none-repo"), in: scratch)
+      try Self.commit(hidden, "Acme reserved clone A", in: scratch)
+      let other = root.appending(path: "other")
+      try Self.makeRepo(other, in: scratch)
+      try Self.commit(other, "Acme other clone B", in: scratch)
       let created = try SiltaBinary.run(
         ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK"], in: scratch)
       #expect(created.termination == .exit(0), "\(created.stderr)")
-      let before = try SiltaBinary.run(["ws", "show", "Work"], in: scratch)
-      #expect(before.termination == .exit(0))
-      #expect(before.stdout.contains("\"slug\":\"none-repo\""))
-      #expect(before.stdout.contains("\"slug\":\"none-repo-2\""))
-      for path in [root.path, hidden.path] {
-        let rescanned = try SiltaBinary.run(
-          ["--ws", "Work", "init", "--scan", path], in: scratch)
-        #expect(rescanned.termination == .exit(0), "\(path): \(rescanned.stderr)")
-        #expect(try SiltaBinary.run(["ws", "show", "Work"], in: scratch).stdout == before.stdout)
-      }
+      #expect(created.stderr.contains("none-repo"))
+      #expect(
+        try SiltaBinary.run(
+          ["--ws", "Work", "code", "show", "none-repo", "--", "README.md"],
+          in: scratch
+        ).stdout.contains("reserved clone A"))
+
+      let moved = scratch.appending(path: "new/.none")
+      try FileManager.default.createDirectory(
+        at: moved.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try FileManager.default.moveItem(at: hidden, to: moved)
+      let rescanned = try SiltaBinary.run(
+        ["--ws", "Work", "init", "--scan", moved.path], in: scratch)
+      #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
+      let reserved = try SiltaBinary.run(
+        ["--ws", "Work", "code", "show", "none-repo", "--", "README.md"], in: scratch)
+      #expect(reserved.termination == .exit(0), "\(reserved.stderr)")
+      #expect(reserved.stdout.contains("reserved clone A"))
+      let untouched = try SiltaBinary.run(
+        ["--ws", "Work", "code", "show", "other", "--", "README.md"], in: scratch)
+      #expect(untouched.termination == .exit(0), "\(untouched.stderr)")
+      #expect(untouched.stdout.contains("other clone B"))
+    }
+  }
+
+  /// A `none` clone takes `none-repo`; when the workspace binds that name to a clone
+  /// that still exists, the scan refuses, names both paths, and its `next` runs.
+  @Test func aReservedNameBoundToALiveCloneIsRefused() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "scan")
+      let literal = root.appending(path: "none-repo")
+      try Self.makeRepo(literal, in: scratch)
+      try Self.commit(literal, "Acme literal clone B", in: scratch)
+      let created = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK"], in: scratch)
+      #expect(created.termination == .exit(0), "\(created.stderr)")
+      let before = try SiltaBinary.run(["--ws", "Work", "ws", "show"], in: scratch).stdout
+
+      let hidden = scratch.appending(path: "other/.none")
+      try Self.makeRepo(hidden, in: scratch)
+      try Self.commit(hidden, "Acme reserved clone A", in: scratch)
+      let refused = try SiltaBinary.run(
+        ["--ws", "Work", "init", "--scan", hidden.path, "--json"], in: scratch)
+      #expect(refused.termination == .exit(6))
+      #expect(refused.stdout.contains("\"code\":\"conflict\""))
+      let shown = refused.stdout.lowercased()
+      #expect(shown.contains(hidden.path.lowercased()))
+      #expect(shown.contains(literal.path.lowercased()))
+      #expect(try SiltaBinary.run(["--ws", "Work", "ws", "show"], in: scratch).stdout == before)
+      #expect(
+        try SiltaBinary.run(
+          ["--ws", "Work", "code", "show", "none-repo", "--", "README.md"],
+          in: scratch
+        ).stdout.contains("literal clone B"))
+
+      let next = try Self.nextCommand(refused.stdout)
+      #expect(next.lowercased().contains(literal.path.lowercased()))
+      let followed = try Self.runNext(next, in: scratch)
+      #expect(followed.termination == .exit(0), "\(followed.stderr)")
+    }
+  }
+
+  /// A `none` clone and a literal `none-repo` clone would share one slug, so a scan
+  /// that sees both is refused and writes nothing.
+  @Test func aNoneAndALiteralNoneRepoCannotShareOneScan() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "scan")
+      try Self.makeRepo(root.appending(path: ".none"), in: scratch)
+      try Self.makeRepo(root.appending(path: "none-repo"), in: scratch)
+      let refused = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "Work", "--prefix", "WK", "--json"], in: scratch)
+      #expect(refused.termination == .exit(6))
+      #expect(refused.stdout.contains("\"code\":\"conflict\""))
+      #expect(try SiltaBinary.run(["ws", "ls"], in: scratch).stdout.contains("No workspaces"))
     }
   }
 
@@ -341,6 +418,35 @@ extension InitCommandTests {
       let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
       #expect(list.stdout.contains("\"slug\":\"Other\""))
       #expect(list.stdout.contains("\"task_prefix\":\"WK\""))
+    }
+  }
+
+  /// A supplied prefix starting with `-` keeps a retry the parser accepts: it joins its
+  /// option with `=`, so the printed command reaches the prefix refusal and its own
+  /// `next` completes the scan.
+  @Test func aLeadingDashPrefixKeepsARunnableRetry() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "acme")
+      try Self.makeRepo(root, in: scratch)
+      let refused = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--slug", "Work Space", "--prefix=-x", "--json"],
+        in: scratch)
+      #expect(refused.termination == .exit(1))
+      let next = try Self.nextCommand(refused.stdout)
+      #expect(next.hasSuffix("--prefix='-x'"))
+      let slugFixed = try Self.runNext(
+        next.replacingOccurrences(of: "<slug>", with: "Other"), in: scratch)
+      #expect(slugFixed.termination == .exit(1), "\(slugFixed.stderr)")
+      #expect(slugFixed.stderr.contains("--prefix"))
+      let prefixNext = try #require(
+        slugFixed.stderr.split(separator: "\n").first { $0.hasPrefix("next: ") })
+      let fixed = try Self.runNext(
+        String(prefixNext.dropFirst("next: ".count))
+          .replacingOccurrences(of: "<prefix>", with: "WK"),
+        in: scratch)
+      #expect(fixed.termination == .exit(0), "\(fixed.stderr)")
+      let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(list.stdout.contains("\"slug\":\"Other\""))
     }
   }
 
