@@ -155,7 +155,11 @@ workspace, `silta` included, and keeps it on this machine:
   hash.
 - It refuses to write when that folder, followed through symlinks, is inside a git
   work tree (any parent holds a `.git` entry), even where the repository ignores the
-  database: set `SILTA_HOME` outside every repository. Without `--since`, the newest report in that
+  database: set `SILTA_HOME` outside every repository. It checks before reading and
+  again on the resolved folder just before writing. `reports/` and
+  `reports/<slug>/` must be real directories, not symlinks, and the report is
+  published with `link(2)`, which refuses anything already at its path (a file, a
+  directory or a symlink) instead of following it. Without `--since`, the newest report in that
   folder supplies the date. It never replaces a report: a second run on the same day
   is refused, so move the earlier one away first if you mean to regenerate it.
 - Outside `silta`, the friction section says it isn't collected: the `Friction:` line

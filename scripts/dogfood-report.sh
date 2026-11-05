@@ -48,15 +48,29 @@ work_tree() {
     dir="$(dirname "$dir")"
   done
 }
+outside_work_trees() {
+  local repo
+  if repo="$(work_tree "$1")"; then
+    fail "$1 is inside the git work tree $repo; set SILTA_HOME outside every repository."
+  elif (( $? != 1 )); then
+    fail "could not resolve $1."
+  fi
+}
+# The script owns reports/ and reports/<folder>, so neither may be a symlink; the folders
+# above them are judged on their physical path.
+owned_folders() {
+  local path
+  for path in "$home/reports" "$reports"; do
+    [[ -L "$path" ]] && fail "$path is a symlink; the report folders must be real directories."
+  done
+  return 0
+}
 if [[ $private == yes ]]; then
   umask 077
   name="$(folder "$ws")" || fail 'could not name the report folder.'
   reports="$home/reports/$name"
-  if repo="$(work_tree "$reports")"; then
-    fail "$reports is inside the git work tree $repo; set SILTA_HOME outside every repository."
-  elif (( $? != 1 )); then
-    fail "could not resolve $reports."
-  fi
+  outside_work_trees "$reports"
+  owned_folders
 else
   reports="$root/docs/dogfood/reports"
 fi
@@ -223,13 +237,18 @@ if [[ $private == no ]]; then
   cat "$temporary/report"
   exit 0
 fi
-# Publish without ever replacing a report: a second run's default range starts at its day.
-target="$reports/${asof:0:10}.md"
+# Publish into the folder as resolved now, checked again, without ever replacing a report:
+# a second run's default range starts at its day. link(2) refuses any existing entry,
+# a directory or a symlink included, and never follows it.
 mkdir -p "$reports" || fail "could not create $reports."
-staged="$(mktemp "$reports/.report.XXXXXX")" || fail "could not write in $reports."
-cat "$temporary/report" > "$staged" || fail "could not write in $reports."
-if ! ln "$staged" "$target" 2>/dev/null; then
-  [[ -e "$target" ]] && fail "$target already exists; keep it, or move it away to regenerate."
+owned_folders
+physical="$(cd -P "$reports" && pwd -P)" || fail "could not resolve $reports."
+outside_work_trees "$physical"
+target="$physical/${asof:0:10}.md"
+staged="$(mktemp "$physical/.report.XXXXXX")" || fail "could not write in $physical."
+cat "$temporary/report" > "$staged" || fail "could not write in $physical."
+if ! /bin/link "$staged" "$target" 2>/dev/null; then
+  [[ -e "$target" || -L "$target" ]] && fail "$target already exists; keep it, or move it away to regenerate."
   fail "could not write $target."
 fi
 echo "$target"

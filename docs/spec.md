@@ -1989,8 +1989,9 @@ steps, questions, handoffs and results.
     that is no workspace identifier before using it, writes the report to
     `$SILTA_HOME/reports/<slug>/<YYYY-MM-DD>.md` instead of printing it, takes the
     default `--since` from that folder, and never replaces an existing report. It
-    refuses a destination inside a git work tree, and a slug too long for a folder
-    name gets a shortened folder ending in a hash.
+    refuses a destination inside a git work tree or behind a symlink in its own
+    `reports/` folders, never follows whatever already sits at the report's path, and
+    gives a slug too long for a folder name a shortened folder ending in a hash.
     Friction lines and `dogfood` tasks belong to the `silta` workspace (D36), so other
     workspaces' reports say they aren't collected.
   - Once per wave, at the latest every 60 days so no log has expired, an agent
