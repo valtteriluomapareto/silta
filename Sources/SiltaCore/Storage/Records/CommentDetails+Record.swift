@@ -30,6 +30,11 @@ extension TaskService {
     FROM comment c LEFT JOIN comment r ON r.id=c.thread_id AND r.task_id=c.task_id
     """
 
+  /// The newest live handoff of posts in creation then id order, resolved or not.
+  static func newestHandoff(_ posts: [CommentDetails]) -> CommentDetails? {
+    posts.last { $0.kind == "handoff" && !$0.deleted }
+  }
+
   static func discussion(_ task: TaskDetails, timeline: Bool, in db: Database) throws
     -> [CommentDetails]
   {
@@ -42,7 +47,7 @@ extension TaskService {
     }
     if timeline { return posts }
     let groups = Dictionary(grouping: posts) { $0.replyTo ?? $0.ref }
-    let handoff = posts.last { $0.kind == "handoff" && !$0.deleted }?.ref
+    let handoff = newestHandoff(posts)?.ref
     let roots = posts.filter { post in
       guard post.replyTo == nil else { return false }
       if post.ref == handoff { return true }

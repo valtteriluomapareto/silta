@@ -9,7 +9,7 @@ extension ExportSnapshot {
     let migrator = StorageSchema.migrator
     if try migrator.hasBeenSuperseded(db) { throw StorageError.schemaTooNew }
     guard try migrator.hasCompletedMigrations(db), let schema = migrator.migrations.last else {
-      throw StorageError.unavailable
+      throw StorageError.internalMisuse
     }
     guard let found = try Row.fetchOne(db, sql: Query.workspace, arguments: [slug]) else {
       throw WorkspaceError.unknown(slug)

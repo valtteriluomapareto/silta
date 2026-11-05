@@ -75,10 +75,10 @@ struct StorageWriteTests {
     try withScratchDirectory { home in
       let clock = FakeClock(now: StorageSchemaTests.instant)
       let store = Self.make(home, clock: clock)
-      #expect(throws: StorageError.unavailable) {
+      #expect(throws: StorageError.internalMisuse) {
         try store.write { transaction in
           _ = try Self.insert(transaction, uid: "acme-rollback")
-          throw StorageError.unavailable
+          throw StorageError.internalMisuse
         }
       }
       #expect(try Self.meta(store, "last_backup_day") == "")
@@ -129,7 +129,7 @@ struct StorageWriteTests {
       let clock = FakeClock(now: StorageSchemaTests.instant)
       let store = Self.make(home, clock: clock)
       var attempts = 0
-      let expected: StorageError = coded ? .busy : .unavailable
+      let expected: StorageError = coded ? .busy : .accessDenied
       #expect(throws: expected) {
         try store.write { _ in
           attempts += 1
@@ -246,7 +246,7 @@ struct StorageWriteTests {
           [.posixPermissions: 0o600], ofItemAtPath: database.path)  // restores scratch permissions
       }
       let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
-      #expect(throws: StorageError.unavailable) {
+      #expect(throws: StorageError.accessDenied) {
         try store.write { try Self.insert($0, uid: "acme-refused") }
       }
       #expect(try Self.meta(store, "change_seq") == "0")

@@ -120,6 +120,7 @@ extension ScanError: ErrorExamples {
         "AC", derived: false, workspace: "acme", roots: ["acorn"],
         choice: .init(prefix: "AC")),
       .repoPathTaken(repo: "api", path: "/projects/api", workspace: "acme"),
+      .reservedSlug(path: "/projects/.none"),
     ]
   }
 }

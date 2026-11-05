@@ -3,4 +3,5 @@ branch: api
 settings: proposals: ask (ask in chat before adding a task)
 task: none
 (brief trimmed; see more)
-more: silta --ws 'acme' task ls | silta --ws 'acme' ws show
+more: silta --ws 'acme' task ls
+more: silta --ws 'acme' ws show

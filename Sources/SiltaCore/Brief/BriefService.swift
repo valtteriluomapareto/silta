@@ -16,7 +16,10 @@ package struct BriefService {
   ) async throws -> BriefReport {
     let location = try await LocationService(environment: environment).resolve(
       path: path, workspace: workspace, app: app, task: task, cacheWrites: !hook)
-    let (current, settings, context) = try environment.db.read { db in
+    let command = "silta --ws " + shellWord(location.workspace)
+    let characters = BriefBudget.characters(tokens: budget)
+    let now = environment.clock.now()
+    let (current, settings, discussion, context) = try environment.db.read { db in
       let id = try TaskService.workspaceID(location.workspace, in: db)
       let settings = BriefSettings(
         try WorkspaceSettings.read(workspaceID: id, in: db), workspace: location.workspace)
@@ -24,41 +27,50 @@ package struct BriefService {
         try TaskService.lookup($0.ref, workspace: location.workspace, in: db)
       }
       if let current = selected {
-        selected?.waiting = try TaskService.waiting(current, at: environment.clock.now(), in: db)
+        selected?.waiting = try TaskService.waiting(current, at: now, in: db)
       }
+      let discussion = try BriefDiscussion(
+        db: db, service: TaskService(environment: environment, workspace: location.workspace),
+        caller: environment.actor, workspace: location.workspace, command: command,
+        current: selected, now: now, characters: characters
+      ).sections()
       return (
-        selected, settings,
+        selected, settings, discussion,
         try BriefContext(
-          db: db, location: location, actor: environment.actor,
-          date: environment.clock.now(),
+          db: db, location: location, actor: environment.actor, date: now,
           archiveDays: settings.archiveAfterDays ?? WorkspaceSettings.defaultArchiveAfterDays
         ).sections(topics: topics)
       )
     }
-    let command = "silta --ws " + shellWord(location.workspace)
     let selection =
       (app.map { " --app " + shellWord($0) } ?? "")
       + topics.map { " --topic " + shellWord($0) }.joined()
     let more =
-      current.map {
+      (current.map {
         (budget < 2500 ? [command + " brief --task " + $0.ref + selection] : [])
           + [command + " task show " + $0.ref]
       }
-      ?? [command + " task ls", command + " ws show"]
+        ?? [command + " task ls", command + " ws show"])
+      + (discussion.inbox.isEmpty ? [] : [command + " inbox"])
     var report = BriefReport(
       location: BriefLocation(location), settings: settings,
       currentTask: current?.ref,
-      sections: sections(location, current: current, command: command, topics: topics) + context,
-      more: more, warnings: location.warnings + settings.warnings)
+      sections: sections(
+        location, current: current, topics: topics,
+        discussion: discussion.task, characters: characters)
+        + discussion.inbox + context.sections,
+      more: more, warnings: location.warnings + settings.warnings + context.warnings)
     report.trim(tokens: budget)
     return report
   }
 
   private func sections(
-    _ location: LocationResult, current: TaskDetails?, command: String, topics: [String]
+    _ location: LocationResult, current: TaskDetails?, topics: [String],
+    discussion: [BriefSection], characters: Int
   )
     -> [BriefSection]
   {
+    let command = "silta --ws " + shellWord(location.workspace)
     var sections: [BriefSection] = []
     if location.confidence == "low" {
       let candidates = location.retryCandidates
@@ -82,6 +94,7 @@ package struct BriefService {
             "\(current.status): \(TaskError.shown(current.title)) (app: \(current.app ?? "unbound"))\n",
           policy: .characters
         ))
+      sections += discussion
       if let waiting = current.waiting {
         let error = TaskError.blocked(current.ref, waiting)
         let next = error.next.map { workspaceCommand($0, workspace: location.workspace) }
@@ -98,22 +111,25 @@ package struct BriefService {
         sections.append(
           BriefPlan.section(current.plan, ref: current.ref, revision: current.planRev))
       }
-    }
-    if let current, !current.description.isEmpty {
-      sections.append(description(current, command: command))
+      if !current.description.isEmpty {
+        sections.append(description(current, command: command, characters: characters))
+      }
     }
     return sections
   }
 
-  private func description(_ current: TaskDetails, command: String) -> BriefSection {
+  /// The description takes 6% of a larger budget and at most 600 characters otherwise;
+  /// below the default the global budget trims it.
+  private func description(_ current: TaskDetails, command: String, characters: Int)
+    -> BriefSection
+  {
     let marker = "(description trimmed; \(command) task show \(current.ref))\n"
     let text =
       "description:\n"
       + SecretGuard.redacted(current.description)
       .trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
-    let section = BriefSection(id: "description", text: text, policy: .excerpt(marker: marker))
-    return BriefBudget.trim([section], characters: 600).sections.first
-      ?? BriefSection(id: "description", text: marker, truncated: true)
+    return BriefBudget.capped(
+      BriefSection(id: "description", text: text, policy: .excerpt(marker: marker)),
+      characters: max(600, BriefBudget.share(6, of: characters)))
   }
-
 }

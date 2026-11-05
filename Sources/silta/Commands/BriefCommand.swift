@@ -8,7 +8,9 @@ struct BriefCommand: OutputCommand {
     discussion: "An explicit budget overrides the 2500-token default (800 for short/hook). "
       + "Tiny budgets retain location, task reference, settings and complete more commands. "
       + "Hook mode has a 1.5 s process deadline and silently succeeds on errors; it never "
-      + "fetches, indexes or migrates. Discussion sections are not yet included.")
+      + "fetches, indexes or migrates. The current task shows its newest handoff, your inbox "
+      + "items on it and an open-question count; your other inbox items follow it. "
+      + "Decisions are not yet included.")
   static let workspaceSource = WorkspaceSource.option
   static let dataShape = Shape.object([
     "location": .object([
