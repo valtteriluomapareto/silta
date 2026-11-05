@@ -4,7 +4,7 @@ import Testing
 
 /// Every `silta …` an error tells the caller to run must exist (spec §16), or be
 /// planned in a slice. The error goldens hold every coded error's text form.
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct NextCommandTests {
   /// Commands that errors may name before their slice ships. Remove each when it lands.
   static let planned: [String: String] = [:]

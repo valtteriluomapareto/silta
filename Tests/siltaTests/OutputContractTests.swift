@@ -3,6 +3,7 @@ import Testing
 
 /// The CLI's output contract from the outside (spec §16, §20.1). Goldens were written
 /// from the spec text.
+@Suite(.blockingTestWork)
 struct OutputContractTests {
   private func silta(_ arguments: [String]) throws -> CLIResult {
     try withScratchDirectory { try SiltaBinary.run(arguments, in: $0) }
