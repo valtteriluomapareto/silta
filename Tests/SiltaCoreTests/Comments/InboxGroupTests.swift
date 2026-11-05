@@ -31,7 +31,8 @@ struct InboxGroupTests {
     (item["tasks"] as? [[String: Any]] ?? []).compactMap { $0["ref"] as? String }
   }
 
-  @Test func readinessDroppedPrecedenceAndPerTaskDueFallback() async throws {
+  @Test(arguments: ["0d", "7d"])
+  func readinessDroppedPrecedenceAndPerTaskDueFallback(followUp: String) async throws {
     try await withScratchDirectory { home in
       let clock = FakeClock(now: TaskServiceTests.now)
       let env = try TaskServiceTests.environment(home, actor: .human(name: "acme"), clock: clock)
@@ -39,7 +40,7 @@ struct InboxGroupTests {
       let service = TaskService(environment: env)
       for _ in 0..<8 { _ = try await Self.add(service, home) }
       try Self.block(service, "AC-2", ["AC-1"], "7d")
-      try Self.block(service, "AC-3", ["AC-4", "ext:acme"], "0d")
+      try Self.block(service, "AC-3", ["AC-4", "ext:acme"], followUp)
       try Self.block(service, "AC-5", [], "0d")
       try Self.block(service, "AC-6", ["AC-7"], "0d")
       try Self.block(service, "AC-8", ["ext:future"], "1d")
