@@ -8,7 +8,9 @@ private final class BlockingTestExecutor: TaskExecutor {
   private init() {
     queue = OperationQueue()
     queue.name = "silta.blocking-tests"
-    queue.maxConcurrentOperationCount = 4
+    // Cases wait on child processes. Admit I/O work alongside long stress cases
+    // while bounding simultaneous bodies independently of cooperative workers.
+    queue.maxConcurrentOperationCount = 32
   }
 
   func enqueue(_ job: consuming ExecutorJob) {

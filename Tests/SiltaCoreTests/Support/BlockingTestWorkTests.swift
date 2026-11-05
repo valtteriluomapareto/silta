@@ -66,7 +66,7 @@ struct InheritedBlockingScopeTests {
   @Test(arguments: [1, 2])
   func synchronousCasesUseBlockingExecutor(value: Int) {
     #expect(OperationQueue.current?.name == "silta.blocking-tests")
-    #expect(OperationQueue.current?.maxConcurrentOperationCount == 4)
+    #expect(OperationQueue.current?.maxConcurrentOperationCount == 32)
     #expect(Test.current != nil)
     #expect(Test.Case.current != nil)
     #expect(value > 0)
