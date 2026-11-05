@@ -27,7 +27,7 @@ package struct BlockingTestScope: TestTrait, SuiteTrait, TestScoping {
   package var isRecursive: Bool { true }
 
   package func scopeProvider(for test: Test, testCase: Test.Case?) -> Self? {
-    guard !test.isSuite, !test.isParameterized || testCase != nil else { return nil }
+    guard !test.isSuite, testCase != nil else { return nil }
     return self
   }
 

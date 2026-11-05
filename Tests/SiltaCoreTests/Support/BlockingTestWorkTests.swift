@@ -17,9 +17,7 @@ struct BlockingTestScopeTests {
   @Test func runnerScopesStayCooperative() throws {
     let test = try #require(Test.current)
     #expect(!test.isParameterized)
-    withKnownIssue("Outer test scope inherits the blocking executor") {
-      #expect(BlockingTestScope().scopeProvider(for: test, testCase: nil) == nil)
-    }
+    #expect(BlockingTestScope().scopeProvider(for: test, testCase: nil) == nil)
     let testCase = try #require(Test.Case.current)
     #expect(BlockingTestScope().scopeProvider(for: test, testCase: testCase) != nil)
   }
@@ -73,6 +71,12 @@ struct BlockingTestScopeTests {
 
 @Suite(.blockingTestWork)
 struct InheritedBlockingScopeTests {
+  @Test func synchronousCaseUsesBlockingExecutor() {
+    #expect(OperationQueue.current?.name == "silta.blocking-tests")
+    #expect(Test.current != nil)
+    #expect(Test.Case.current != nil)
+  }
+
   @Test(arguments: [1, 2])
   func synchronousCasesUseBlockingExecutor(value: Int) {
     #expect(OperationQueue.current?.name == "silta.blocking-tests")
