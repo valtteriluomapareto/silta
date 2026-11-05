@@ -150,7 +150,8 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
   (`Silta.app/Contents/Helpers/silta`). Every write transaction checks
   `min_writer_version` (§17).
 - **Data directory.** `SILTA_HOME` (default `~/.silta`) relocates everything. Tests and
-  evals use it, and the real data is never touched.
+  evals use it, and the real data is never touched. Private reports live in
+  `$SILTA_HOME/reports/<slug>/` (§22.1).
 
 ## 5. Concepts
 
@@ -1973,7 +1974,7 @@ steps, questions, handoffs and results.
     own, so the result asks every time.
   - Friction that needs its own fix, or that comes up outside a task, also becomes a
     task with the topic `dogfood`.
-  - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
+  - `scripts/dogfood-report.sh [--ws <slug>] [--since <YYYY-MM-DD>]` (built in DF) prints a
     Markdown report from the command logs (§19) and the tasks. `--since` defaults
     to the date of the newest report in `docs/dogfood/reports/`, so reports leave
     no gaps, and a `--since` after the report day is refused. The report states its
@@ -2006,6 +2007,15 @@ steps, questions, handoffs and results.
     actor's calls and approvals out. Unreadable log lines (malformed, or missing
     the expected fields) are only counted too. Failures before the environment is
     set up (a bad `SILTA_*` value) aren't logged, so the report can't see them.
+    With `--ws <slug>` it reports on any workspace privately (DF3): it refuses a slug
+    that is no workspace identifier before using it, writes the report to
+    `$SILTA_HOME/reports/<slug>/<YYYY-MM-DD>.md` instead of printing it, takes the
+    default `--since` from that folder, and never replaces an existing report. It
+    refuses a destination inside a git work tree or behind a symlink in its own
+    `reports/` folders, never follows whatever already sits at the report's path, and
+    gives a slug too long for a folder name a shortened folder ending in a hash.
+    Friction lines and `dogfood` tasks belong to the `silta` workspace (D36), so other
+    workspaces' reports say they aren't collected.
   - Once per wave, at the latest every 60 days so no log has expired, an agent
     runs the report with the maintainer, who reviews it before it is added through
     a pull request as `docs/dogfood/reports/<YYYY-MM-DD>.md`, named by the report's
