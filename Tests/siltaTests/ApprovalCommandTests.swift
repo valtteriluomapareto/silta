@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct ApprovalCommandTests {
   @Test func approvedStealAndForceKeepAgentAttributionAndOneRowPerCall() throws {
     try withScratchDirectory { scratch in

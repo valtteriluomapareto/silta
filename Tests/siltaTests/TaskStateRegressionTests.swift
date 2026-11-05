@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 /// State-machine, permanence and approval rules of the task commands, from the outside.
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskStateRegressionTests {
   static let other = ["SILTA_ACTOR": "agent:codex:other"]
 

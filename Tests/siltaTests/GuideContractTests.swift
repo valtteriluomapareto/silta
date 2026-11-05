@@ -7,6 +7,7 @@ import SiltaTestSupport
 import Synchronization
 import Testing
 
+@Suite(.blockingTestWork)
 struct GuideContractTests {
   @Test func refsUsesOrdinaryGuideRouting() throws {
     try withScratchDirectory { scratch in

@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskPlanCommandTests {
   @Test func revisionsTicksAndImportHaveWrittenContracts() throws {
     try withScratchDirectory { scratch in

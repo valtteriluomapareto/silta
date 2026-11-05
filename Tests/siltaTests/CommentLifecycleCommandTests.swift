@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct CommentLifecycleCommandTests {
   @Test(arguments: [false, true])
   func rootPostingAndLifecycleShareTheCommand(json: Bool) throws {

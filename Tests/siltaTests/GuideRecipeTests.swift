@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct GuideRecipeTests {
   @Test func everyPrintedRecipeExecutes() throws {
     try withScratchDirectory { scratch in

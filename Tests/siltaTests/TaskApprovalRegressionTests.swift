@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 /// When task commands need the human's go-ahead, and what their approval rows record.
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskApprovalRegressionTests {
   static let other = TaskStateRegressionTests.other
 

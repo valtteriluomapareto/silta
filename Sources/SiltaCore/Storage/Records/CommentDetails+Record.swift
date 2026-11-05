@@ -3,6 +3,7 @@ import GRDB
 
 extension CommentDetails {
   init(row: Row, task: String) {
+    id = row["id"]
     ref = task + "/\(row["seq"] as Int)"
     kind = row["kind"]
     deleted = row["deleted_at"] as String? != nil
@@ -34,45 +35,24 @@ extension TaskService {
   {
     let rows = try Row.fetchAll(
       db, sql: commentQuery + " WHERE c.task_id=? ORDER BY c.created_at,c.id", arguments: [task.id])
-    func details(_ row: Row) -> CommentDetails {
-      var post = CommentDetails(row: row, task: task.ref)
-      if post.kind == "question" {
-        let questionID: Int64 = row["id"], recipients = post.mentions
-        post.answered =
-          !post.deleted
-          && rows.contains { answer in
-            let actor: String = answer["actor"]
-            return answer["thread_id"] as Int64? == questionID
-              && answer["kind"] as String == "answer" && answer["deleted_at"] as String? == nil
-              && (ActorID.parse(actor)?.isHuman == true || recipients.contains(actor))
-          }
-      }
-      return post
+    var posts = rows.map { CommentDetails(row: $0, task: task.ref) }
+    let answers = posts.filter { $0.kind == "answer" && !$0.deleted }
+    for index in posts.indices where posts[index].kind == "question" {
+      posts[index].answered = posts[index].isAnswered(by: answers)
     }
-    if timeline { return rows.map(details) }
-    let groups = Dictionary(grouping: rows) { ($0["thread_id"] as Int64?) ?? ($0["id"] as Int64) }
-    let latest = rows.last {
-      $0["kind"] as String == "handoff" && $0["deleted_at"] as String? == nil
+    if timeline { return posts }
+    let groups = Dictionary(grouping: posts) { $0.replyTo ?? $0.ref }
+    let handoff = posts.last { $0.kind == "handoff" && !$0.deleted }?.ref
+    let roots = posts.filter { post in
+      guard post.replyTo == nil else { return false }
+      if post.ref == handoff { return true }
+      guard post.resolvedAt == nil else { return false }
+      let liveReplies = groups[post.ref, default: []].contains { $0.replyTo != nil && !$0.deleted }
+      return liveReplies || (post.kind != "handoff" && !post.deleted)
     }
-    let handoff = latest.map { ($0["thread_id"] as Int64?) ?? ($0["id"] as Int64) }
-    let roots = rows.filter { row in
-      guard row["thread_id"] as Int64? == nil else { return false }
-      let id: Int64 = row["id"]
-      if id == handoff { return true }
-      guard row["resolved_at"] as String? == nil else { return false }
-      let liveReplies = groups[id, default: []].contains {
-        $0["thread_id"] as Int64? != nil && $0["deleted_at"] as String? == nil
-      }
-      return liveReplies
-        || (row["kind"] as String != "handoff" && row["deleted_at"] as String? == nil)
-    }
-    let ordered =
-      roots.filter { $0["id"] as Int64 == handoff } + roots.filter { $0["id"] as Int64 != handoff }
+    let ordered = roots.filter { $0.ref == handoff } + roots.filter { $0.ref != handoff }
     return ordered.flatMap { root in
-      let replies = groups[root["id"] as Int64, default: []].filter {
-        $0["thread_id"] as Int64? != nil
-      }
-      return ([root] + replies).map(details)
+      [root] + groups[root.ref, default: []].filter { $0.replyTo != nil }
     }
   }
 }

@@ -1,0 +1,5 @@
+human:acme discussion attention
+Scope: discussion only; proposals, blockers and promoted attention are not included.
+AC-1/1 question on AC-1 by agent:codex:acme
+> Which API?
+next: silta --ws 'acme' task show 'AC-1' --timeline
