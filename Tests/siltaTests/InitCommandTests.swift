@@ -161,6 +161,8 @@ struct InitCommandTests {
       #expect(again.termination == .exit(6))
       #expect(again.stdout.contains("\"code\":\"conflict\""))
       #expect(again.stdout.contains("acme"))
+      #expect(again.stdout.contains("--prefix applies only to a new workspace"))
+      #expect(again.stdout.contains("--ws 'acme'"))
       #expect(!again.stdout.contains("choosing its name"))
       #expect(try SiltaBinary.run(["ws", "show", "acme"], in: scratch).stdout == before.stdout)
     }
@@ -218,6 +220,38 @@ struct InitCommandTests {
       let fixed = try SiltaBinary.run(
         ["init", "--scan", "My Projects", "--slug", "my-projects"], in: scratch, cwd: scratch)
       #expect(fixed.termination == .exit(0))
+    }
+  }
+
+  /// A repo directory whose name is no slug: the refusal names the clone, and running
+  /// its `ask human: mv` renames the directory so the rescan succeeds.
+  @Test func aRepoDirectoryNameRefusalGivesAMvThatFixesIt() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "root")
+      let repo = root.appending(path: "My Projects")
+      try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+      try Self.git(["init", "-q", "-b", "main"], in: scratch, cwd: repo)
+      try Data("Acme\n".utf8).write(to: repo.appending(path: "readme"))
+      try Self.git(["add", "."], in: scratch, cwd: repo)
+      try Self.git(
+        [
+          "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit", "-qm",
+          "Acme",
+        ], in: scratch, cwd: repo)
+      try Self.git(["update-ref", "refs/remotes/origin/main", "HEAD"], in: scratch, cwd: repo)
+      let refused = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
+      #expect(refused.termination == .exit(1))
+      #expect(refused.stderr.contains("Repo directory \"My Projects\" is not a valid repo slug"))
+      let line = try #require(
+        refused.stderr.split(separator: "\n").first { $0.hasPrefix("ask human: mv ") })
+      let command = line.dropFirst("ask human: ".count)
+      let moved = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/bash"), ["-c", String(command)], in: scratch)
+      #expect(moved.termination == .exit(0))
+      let rescanned = try SiltaBinary.run(["init", "--scan", root.path], in: scratch)
+      #expect(rescanned.termination == .exit(0))
+      let shown = try SiltaBinary.run(["--ws", "root", "ws", "show"], in: scratch)
+      #expect(shown.stdout.contains("\"slug\":\"my-projects\""))
     }
   }
 

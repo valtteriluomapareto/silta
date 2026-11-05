@@ -346,3 +346,26 @@ extension ScanNamingTests {
     }
   }
 }
+
+extension ScanNamingTests {
+  /// `--prefix` alone cannot name an existing workspace: the refusal says the
+  /// option is for a new workspace and puts the rescan first.
+  @Test func prefixOnlyOnAnExistingWorkspaceSaysItAppliesToANewOne() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
+      let root = home.appending(path: "acme")
+      let path = try Self.clone(root)
+      let error = await Self.refusal {
+        _ = try await Self.create(
+          [root], prefix: "WK", store: store,
+          git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
+      }
+      #expect(error?.code == .conflict)
+      #expect(error?.message.contains("--prefix applies only to a new workspace") == true)
+      #expect(error?.next.first?.hasSuffix("--ws 'acme'") == true)
+      #expect(error?.next.count == 2)
+      #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
+    }
+  }
+}
