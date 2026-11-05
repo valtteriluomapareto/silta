@@ -95,6 +95,9 @@ struct CommandExecution {
   let rendered: Rendered
 
   var scope = CommandScope()
+
+  /// The command name the log line uses, when it differs from the parsed path.
+  var command: String?
 }
 
 /// Reads known options while ArgumentParser retains the malformed command remainder.

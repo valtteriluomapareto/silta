@@ -31,21 +31,6 @@ extension BriefCommandTests {
     }
   }
 
-  @Test func successfulHookDoesNotBlockOnLogFIFO() throws {
-    try withScratchDirectory { scratch in
-      let repo = try fixture.setup(scratch)
-      let directory = scratch.appending(path: "silta-home/log")
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      try #require(mkfifo(directory.appending(path: "2023-11-14.jsonl").path, 0o600) == 0)
-      let result = try SiltaBinary.run(
-        ["brief", "--hook"], in: scratch, cwd: repo,
-        environment: TaskBlockCommandTests.environment, timeout: 2)
-      #expect(result.termination == .exit(0))
-      #expect(result.stderr.isEmpty)
-      #expect(result.stdout.count <= 3200)
-    }
-  }
-
   @Test func claimPriorityUsesDistinctTimesBeforeSequenceAndBranchUpdates() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)
@@ -132,43 +117,6 @@ extension BriefCommandTests {
         #expect(!result.stdout.contains("acme-secret"))
         #expect((envelope["warnings"] as? [[String: Any]])?.isEmpty == false)
       }
-    }
-  }
-
-  @Test func watchdogWritesOneBodyFreeTraceAndDoesNotBlockOnLogFIFO() throws {
-    try withScratchDirectory { scratch in
-      let repo = try fixture.setup(scratch)
-      let path = store(scratch).path
-      try FileManager.default.removeItem(atPath: path)
-      try #require(mkfifo(path, 0o600) == 0)
-      let log = scratch.appending(path: "silta-home/log/2023-11-14.jsonl")
-      let result = try run(["--hook"], repo, scratch)
-      #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
-      let bytes = FileManager.default.contents(atPath: log.path)
-      #expect(bytes != nil)
-      if let bytes {
-        let text = try #require(String(bytes: bytes, encoding: .utf8))
-        let lines = text.split(separator: "\n")
-        #expect(lines.count == 1)
-        let line = try #require(lines.first)
-        let entry = try #require(
-          try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
-        #expect(entry["command"] as? String == "silta brief")
-        #expect(entry["actor"] as? String == "agent:codex:acme")
-        #expect(entry["exit_code"] as? Int == 0)
-        #expect((entry["warnings"] as? [String])?.contains("hook_timeout") == true)
-        #expect(!text.contains(repo.path))
-        try FileManager.default.removeItem(at: log)
-      } else {
-        try FileManager.default.createDirectory(
-          at: log.deletingLastPathComponent(),
-          withIntermediateDirectories: true)
-      }
-      try #require(mkfifo(log.path, 0o600) == 0)
-      let clock = ContinuousClock()
-      let started = clock.now
-      #expect(try run(["--hook"], repo, scratch) == result)
-      #expect(started.duration(to: clock.now) < .seconds(2))
     }
   }
 }

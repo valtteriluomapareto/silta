@@ -9,12 +9,14 @@ struct BriefContext {
   let date: Date
   let archiveDays: Int
 
-  func sections(topics requested: [String]) throws -> [BriefSection] {
-    try appSections()
-      + BriefBacklog(
-        db: db, location: location, actor: actor,
-        date: date, archiveDays: archiveDays
-      ).sections(topics: requested)
+  func sections(topics requested: [String]) throws
+    -> (sections: [BriefSection], warnings: [OutputWarning])
+  {
+    let backlog = try BriefBacklog(
+      db: db, location: location, actor: actor,
+      date: date, archiveDays: archiveDays
+    ).sections(topics: requested)
+    return (try appSections() + backlog.sections, backlog.warnings)
   }
 
   private func appSections() throws -> [BriefSection] {
