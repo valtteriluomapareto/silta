@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(2)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(2)))
 struct DogfoodLogTests {
   static func setup(_ scratch: URL) throws -> DatabaseStore {
     let store = try TaskCommandTests.setup(scratch)
@@ -304,6 +304,7 @@ extension DogfoodLogTests {
       (["schema"], nil),
       (["doctor", "--ws", "absent"], nil),
       (acme + ["brief"], "acme"),
+      (acme + ["inbox"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
     ] + [(["guide"], nil)]

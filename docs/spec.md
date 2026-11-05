@@ -523,7 +523,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|---|
 | Human | `task add` | `todo` |
 | Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
-| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
+| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --parent AC-3` (with or without `--split`) | `todo` |
 | Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it. With the setting `proposals: ask` (D39), human-only instead: the agent asks in chat first |
 | Agent, with the human's go-ahead (D39) | a write that would be `proposed`, with `--approved` | `todo`, under either setting |
 
@@ -745,7 +745,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   the captured `human:<USER>`, or `human:unknown` for an unset/invalid USER, independently
   of the caller. Recipients are deduplicated and sorted in `mentions`; questions
   default to `me` only when neither explicit recipients nor mentions are present.
-  Inline code spans and fenced code blocks are examples, not mentions. Tool-only
+  Closed inline code spans and closed fenced code blocks are examples, not mentions.
+  An unterminated fence hides nothing: its text is parsed as prose. Tool-only
   actors such as `@agent:codex` are refused; recipients require a complete session.
   Other Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
   aliases/actor mentions refuse rather than redirecting to the human. Lifecycle
@@ -756,7 +757,17 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   human. An agent outside its recipients may contribute an answer without clearing
   the addressees' attention. JSON includes `answered` for questions (false for a
   deleted question); text uses the same rule. Answer acceptance remains a separate
-  choice by the asker or current claimer.
+  choice by the asker or current claimer. A claimer never accepts its own answer to
+  another actor's question; target-authored answers are omitted from that actor's
+  inbox unless the actor is also the asker. After confirming a human's answer in
+  chat, the asker or eligible claimer accepts a relay, or the relaying agent
+  explicitly resolves with `comment resolve <ref> -m <explanation>`. The inbox never
+  offers a bare resolve: only an agent with an existing outsider answer to the
+  queried human gets an `ask human:` confirmation instruction, alongside a safe read
+  command. Other callers without acceptance authority get only `task show`.
+  A non-addressee agent is not offered another answer action; the question names
+  existing outsider answer authors as awaiting confirmation, without treating their
+  prose as proof of a human relay.
 - Questions and handoffs are roots. Answers require a live unresolved question;
   comment/decision replies require a live unresolved root. A deleted immediate
   target or root cannot receive public replies. Cross-task/workspace replies refuse.
@@ -779,7 +790,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
   thread is omitted. The default read also shows `N resolved threads (see --timeline)`
   when retained resolved roots exist; optional JSON `resolved_threads` reports that
-  count. `--timeline` includes full discussion alongside task events.
+  count of hidden resolved roots; the displayed resolved handoff is excluded.
+  `--timeline` includes full discussion alongside task events.
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
@@ -798,7 +810,11 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - Resolve/reopen normalize reply refs to thread roots, deduplicating in first-appearance
   order, atomically across the selected workspace. Deleted roots remain resolvable.
   Any actor may resolve/reopen; only a post's exact author may delete that named post.
-  Wrong-author deletion offers resolve recovery only while the root is open.
+  Unauthorized acceptance and wrong-author deletion offer read-only task history.
+  An empty explanation on a resolve batch containing another actor's question also
+  offers task history for every selected task, without suggesting dropping the
+  explanation and closing the question. Explicit resolve remains available under
+  the confirmation rule above; the refusal itself supplies no confirmation.
   Reopen clears answer acceptance; delete preserves resolution and retained refs.
   An optional explanation appends one ordinary reply per changed root in the same
   transaction, with one consent for the batch. No-ops write nothing, including
@@ -851,21 +867,58 @@ inbox is short and grouped:
   2. blocked tasks past their follow-up day, one item per party or URL listing its
      tasks and asks, the longest overdue first (a task waiting on two parties shows
      under both);
-  3. questions to the human, oldest first;
-  4. review requests (M2);
-  5. proposals from the last 14 days, newest first;
-  6. promoted tasks needing attention.
-- At most 12 items, then `N more: silta inbox --for me --all`. `--all` shows every item,
-  including older proposals.
+  3. questions to the selected actor, oldest first;
+  4. answers awaiting acceptance, oldest first;
+  5. claimed-task discussion, oldest first (agent sessions only);
+  6. review requests (M2);
+  7. proposals from the last 14 days, newest first;
+  8. promoted tasks needing attention.
+- At most 12 items across every category; `remaining` counts every omitted item,
+  then `N more: silta --ws 'acme' inbox --for 'human:acme' --all`. `--all` shows every
+  item, including older proposals.
 - Every item shows its refs and the commands that answer it, e.g.
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
   agent asks first, and maps "the rest" only to items it showed.
 
+**Available M1 query:** text identifies current local attention and says tracker
+status is not refreshed; JSON uses `scope: "local"`. Review requests and doc
+proposals wait for M2. Promoted attention consists of open, unarchived local task
+pointers, ordered by task id, with their `external_ref` and a read-only `task show`
+action. It does not infer status from the tracker (M4).
+
+Only `kind` and `next` are required on every item. Discussion items retain their
+post fields; task/group items add `tasks` (each with `ref`, `title`, and applicable
+`why`, `on`, `follow_up_at`, `external_ref`). Due party/URL groups add `target` and
+the earliest `follow_up_at` among their due members. Group by stored target before
+redacting displayed URLs; two targets may have identical redacted text. Due tasks
+without a party/URL form one item each, including no-`--on` and unfinished task-only
+blocks. Ready/re-plan tasks appear only in the first category, ordered by task id;
+due groups sort by earliest follow-up, first task id, then stored target. Follow-up
+is due at the start of its UTC day. Ready `next` is `task unblock`; every other block
+uses `task ls --status todo`, just like `task start` (D35), with inspection actions
+for every task. Blocked and proposed attention remains visible despite explicit
+archiving. Proposals appear only while `created_at` is strictly newer than 14 days
+before the read instant, newest first with descending task id breaking ties;
+`--all` includes older proposals without changing their status. Proposal actions
+are direct for human callers; agent callers get an ask-human instruction naming
+only that displayed proposal's accept/drop commands and approval placeholder.
+
+Within each discussion category, stored post id breaks time ties. Each live post
+appears once, with question/answer attention taking precedence over claimed-task
+`discussion`. The latter retains the original `post_kind`, and an answer names its
+question via `reply_to`. The cap applies after grouping and ordering across all
+categories. `silta schema inbox` publishes the shape. Every command is qualified
+with the selected workspace; confirmation guidance follows the relay rule above.
+Closed and archived tasks remain included when they have matching live discussion.
+Promoted task discussion is omitted because local mutations refuse; `--all` does
+not include it. Reading discussion does not clear it: it clears on the claimer's
+next write to its task, as the item says.
+
 It lists:
 - live open questions mentioning the actor with no qualifying live answer (an answer
   by an addressee or human); deleting the last qualifying answer restores attention
-- answers to your live open questions awaiting acceptance, including answers from
-  other agents; the asker must be able to review these without being an answer recipient
+- live answers to open questions awaiting acceptance reach the asker **or the current
+  claimer**, including answers from other agents, independently of answer recipients
 - reopening clears acceptance and restores attention: the asker receives live answers
   awaiting acceptance, and addressees receive questions without a qualifying answer;
   deleted question roots never appear in either question category
@@ -874,8 +927,9 @@ It lists:
   needing attention
 - for humans, also: blocked tasks that are ready to unblock, have a dropped blocker
   ("re-plan"), or have reached their follow-up day, each with its `next` (D35)
-- for agent sessions: new comments by others on tasks they claim, since their last
-  write there
+- for agent sessions: all live post kinds by others on tasks they claim, including
+  resolved threads, strictly newer than the holder's own last write (`claimed_at`);
+  foreign writes and reads do not advance this attention boundary
 
 ## 9. Docs (M2)
 
@@ -1080,15 +1134,19 @@ settings (D39). It covers:
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
   - Proposals: usually none; never more than two per session, and only what you'd bet
-    the human wants. `task add --start` is only for work the human asked for. If
-    the human asked you to add a task for later, pass their words as `--approved`,
-    so it becomes `todo` without triage (D39).
+    the human wants. `task add --start` is only for work the human asked for. A
+    subtask of a task you still claim (`task add --parent AC-12`) starts as `todo`
+    and is not a proposal (§8), so it needs no `--approved`; passing it only warns
+    `approval_unused`. `submit`, `block` and a handoff release the claim, and a
+    subtask added after that is a proposal again. If the human asked you to add a task for later, pass their
+    words as `--approved`, so it becomes `todo` without triage (D39).
   - If `brief` shows `proposals: ask` (D39): don't propose. Name each idea and its
     `silta task add` command in your message, and add the ones the human wants with
     `--approved`. With no human present, list ideas under "what's left" in the
     handoff or the `done` result, never in a question, a TODO comment or a file.
   - "What needs me?" means `silta inbox --for me`, relayed as one short message with
-    the choices to make.
+    the choices to make. Map "the rest" only to proposals actually shown, and ask
+    before running triage.
   - "Work the backlog": see §8, Working the backlog.
 - **Questions:** ask in chat; record only when blocked beyond this session. Use
   `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
@@ -1501,20 +1559,11 @@ Rust would win only if:
 - Windows teammates must run `silta` themselves, or
 - Turso becomes required.
 
-```
-silta/
-  Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
-  Sources/SiltaCore/           # domain, policy, storage (GRDB), git, actors, brief, output
-  Sources/silta/               # ArgumentParser commands, the entry point
-  Sources/SiltaTestSupport/    # fakes, golden helper, scratch dirs; used by tests and the scenario runner only
-  Tests/SiltaCoreTests/        # unit + fixture git repos
-  Tests/siltaTests/            # golden CLI output + exit codes
-  Tests/Stress/                # multi-process tests driving the built binary
-  Tests/Scenarios/             # scenario files run in a temporary SILTA_HOME (§20.1)
-  Evals/                       # agent evaluation suite (§21)
-  scripts/                     # run-guards.sh, verify.sh, lint-*.sh, make-fixtures.sh, guards/, ci/
-  App/SiltaApp.xcodeproj       # M5
-```
+**Layout.** One Swift package (swift-tools 6.2, Swift 6 mode, macOS 15+) with the
+`SiltaCore`, `silta` and `SiltaTestSupport` targets and the `SiltaCoreTests` and
+`siltaTests` test targets. What each target and folder holds is in
+[coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). Still to come:
+`Evals/`, the agent evaluation suite (§21, S16), and `App/SiltaApp.xcodeproj` (M5).
 
 **Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
@@ -1541,11 +1590,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
-  - Slack and Google keys
+  - Slack, Google and Anthropic keys
   - JWTs (except obvious placeholders)
   - Finnish personal identity codes (henkilötunnus, as PII)
 
-  There's no entropy check in v1.
+  There's no entropy check in v1, and a token hard-wrapped across lines is not detected.
 - **Allowlist:** 40- and 64-character hex SHAs, UUIDs, refs (§5.1), and
   `<placeholder>`-style values. Exemptions cover whole candidate values; a containing
   reference does not exempt an embedded credential. Explicit credential fields

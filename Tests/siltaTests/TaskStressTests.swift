@@ -6,7 +6,7 @@ import SiltaTestSupport
 import Synchronization
 import Testing
 
-@Suite(.timeLimit(.minutes(10)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(10)))
 struct TaskStressTests {
   @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
   func twentyProcessesAddFourThousandTasksWithoutSequenceGaps() throws {

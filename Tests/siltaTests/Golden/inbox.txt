@@ -1,0 +1,5 @@
+human:acme attention
+Scope: current local attention; tracker status is not refreshed.
+AC-1/1 question on AC-1 by agent:codex:acme
+> Which API?
+next: silta --ws 'acme' task show 'AC-1' --timeline

@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct CommentCorrectionCommandTests {
   @Test func bodyReadKeepsTheResolvedWorkspace() throws {
 

@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskBlockCommandTests {
   static let environment = [
     "SILTA_ACTOR": "agent:codex:acme",
@@ -55,7 +55,7 @@ struct TaskBlockCommandTests {
   }
 }
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskBlockPrivacyCommandTests {
   @Test func explicitWorkspaceFileInputAndSafeOutput() throws {
     try withScratchDirectory { scratch in

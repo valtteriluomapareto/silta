@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct ProposalCommandTests {
   @Test(arguments: [false, true], [false, true])
   func previewDescribesAuthorizedOutcome(approved: Bool, json: Bool) throws {
@@ -95,6 +95,47 @@ struct ProposalCommandTests {
         try store.read { try String.fetchAll($0, sql: "SELECT status FROM task") }
           == Array(repeating: "todo", count: split ? 3 : 1))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
+    }
+  }
+
+  // The guide's promise: a subtask of a task the agent still claims is todo, not a
+  // proposal, under either setting, so --approved on it is unused and stores nothing.
+  // Once a handoff releases the claim, a new subtask is a proposal again.
+  @Test(arguments: [false, true])
+  func ownClaimedSubtaskIsTodoWithoutApproval(ask: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try ask ? Self.setup(scratch) : TaskCommandTests.setup(scratch)
+      let run = { (args: [String]) in
+        try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.actor)
+      }
+      let count = { (table: String) in
+        try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM \(table)") }
+      }
+      let root = try run(["task", "add", "Acme", "--start", "--app", "none"])
+      #expect(root.stdout == "AC-1 doing\n")
+      let plain = try run(["task", "add", "Acme child", "--parent", "AC-1"])
+      #expect(plain.termination == .exit(0) && plain.stdout == "AC-2 todo\n")
+      #expect(plain.stderr.isEmpty)
+      let approved = try run([
+        "task", "add", "Acme second child", "--parent", "AC-1", "--approved", "Add it",
+        "--json",
+      ])
+      #expect(approved.termination == .exit(0))
+      #expect(try TaskStateRegressionTests.data(approved)["status"] as? String == "todo")
+      #expect(try TaskStateRegressionTests.warnings(approved) == ["approval_unused"])
+      #expect(try count("approval") == 0)
+      let handoff = try run(["comment", "AC-1", "--kind", "handoff", "-m", "Paused."])
+      #expect(handoff.termination == .exit(0))
+      let tasks = try count("task")
+      let released = try run(["task", "add", "Acme later", "--parent", "AC-1"])
+      if ask {
+        #expect(released.termination == .exit(3))
+        #expect((released.stdout + released.stderr).contains("human_only"))
+        #expect(try count("task") == tasks)
+      } else {
+        #expect(released.termination == .exit(0))
+        #expect(released.stdout.hasPrefix("AC-4 proposed"))
+      }
     }
   }
 }
