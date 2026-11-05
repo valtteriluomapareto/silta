@@ -183,6 +183,10 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
 
 ### 5.1 Reference grammar
 
+Bare task ids are accepted wherever a task is expected. The grammar is used in arguments
+and JSON. [[links]] in bodies are not yet resolved. Parsing a reference does not imply
+its target exists or is supported by a command.
+
 | Ref | Example | Notes |
 |---|---|---|
 | Task | `AC-12` | `task:AC-12` is also accepted |
@@ -981,7 +985,7 @@ silta code ls   <app>[@<ref>] [<dir>]
 - **Codex marker evidence:** `CODEX_THREAD_ID` was present in a Codex desktop
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
-- **Human-only commands** need the human's go-ahead (D38): `promote`, `task edit`,
+- **Human-only commands** need the human's go-ahead (D38): `task promote`, `task edit`,
   `doc edit|accept|reject`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
   session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
   `ws edit`, and an agent's `task unblock` of a block that isn't ready (D40); and, with
@@ -1040,8 +1044,8 @@ section. Topics are `when`, `start`, `recipes`, `human`, `questions`, `blocked`,
 `handoff`, `reviews`, `refusals`, `refs` and `output`, also listed in `guide --help`.
 Topic names match exactly (case-sensitive). An unknown topic returns `invalid`,
 naming the rejected topic and valid topics, with `next: silta guide --help`.
-Guide JSON data is `{text, topics, topic}`: `topic` is the selected string or null
-for the full manual, and `topics` always lists every available topic. Text
+Guide JSON data has `text` and `topics`, plus optional `topic` naming the selected
+section. `topic` is absent for the full manual; `topics` lists every available topic. Text
 includes its terminating newline in both modes. `--quiet` preserves these reads.
 The guide never opens the truth database or changes harness configuration; ordinary
 command logging still applies. Native `silta help [command…]` remains available.
@@ -1065,7 +1069,8 @@ settings (D39). It covers:
   - Decide and record: make the choice, add a `decision` comment and carry on, unless
     it is one of these. Ask about: changing the scope; a new dependency; a public
     API, schema or migration; anything another app or the customer sees; deleting
-    what you didn't create; anything irreversible; money. The guide includes conditional rules only for supported settings.
+    what you didn't create; anything irreversible; money. If `brief` shows
+    `ask_about: short`, ask only about the last four (SI-36; not yet in the guide).
   - When you need the human, put everything in one message: approvals, proposals to
     triage, questions. Never drip them one at a time.
   - Human-only commands: name the exact commands in your message, and after the human
@@ -1092,18 +1097,20 @@ settings (D39). It covers:
 - **Blocked:** a question to the human doesn't block the task. If the human can
   answer, ask in chat, even about the customer. If only
   someone outside can (`ext:`) or another task must land first, keep doing what you
-  can; block only when nothing useful is left. Silta sends nothing, so tell the human
-  exactly what to ask whom. Then write a handoff and pick other work. Never unblock
+  can; block only when nothing useful is left. Leave a handoff before blocking,
+  because block releases the claim. Silta sends nothing, so tell the human exactly
+  what to ask whom, then pick other work. Never unblock
   while a blocker is open unless the human says so, and never write "waiting for…"
   into repo files or plans.
 - **Handoff:** always before stopping. Template: state, next step, open questions,
   branch and sha.
 - **Reviews:** submit, read task discussion and reply to each finding with
   `--reply-to`, naming the change and proving test. Authors do not resolve findings
-  unless assigned that responsibility. The M2 inbox/take/diff/review workflow is
-  labelled unavailable in the current manual.
+  unless assigned that responsibility. M2 (not yet available): `inbox` → `inbox take`
+  → `task diff` → one `task review` with a lines file → replies → batch `comment resolve`.
+  The current guide labels that future workflow unavailable.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
-  `--steal`, `where --set`, `promote` or `--allow-secret` on your own initiative, only
+  `--steal`, `where --set/--unset`, `task promote` or `--allow-secret` on your own initiative, only
   with the human's words through `--approved`. Never create tracker items or plan
   files in repos.
 - **Output:** text by default; `--json` only when parsing the result.
@@ -1723,8 +1730,7 @@ scriptable and deterministic (D13).
     `{"help"?,"kind":"flag"|"option"|"positional","names":[…],"repeating","required","value_name"?}`;
     a positional's name is `<value_name>`.
   - A shape `S` is `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`,
-    `{"object":{"<field>":S,…}}`, `{"nullable":S}` (a value or JSON null), or,
-    as an object field only, `{"optional":S}`. An
+    `{"object":{"<field>":S,…}}`, or, as an object field only, `{"optional":S}`. An
     object has exactly its fields. An optional field is absent or has its shape; it's
     never `null`. The required `where.branch` field is a specific exception: a
     string for an attached branch, `null` for detached HEAD (§7), published as `"any"`.

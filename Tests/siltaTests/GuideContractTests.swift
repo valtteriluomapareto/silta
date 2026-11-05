@@ -19,17 +19,15 @@ struct GuideContractTests {
   }
 
   @Test func jsonIdentifiesSelectedTopic() throws {
-    withKnownIssue("SI-34 round 2: reviewed guide contract") {
-      try withScratchDirectory { scratch in
-        for topic in [nil, "human", "refs"] as [String?] {
-          let result = try SiltaBinary.run(
-            ["guide"] + (topic.map { [$0] } ?? []) + ["--json"], in: scratch)
-          let data = try Self.data(result)
-          if let topic {
-            #expect(data["topic"] as? String == topic)
-          } else {
-            #expect(data["topic"] == nil)
-          }
+    try withScratchDirectory { scratch in
+      for topic in [nil, "human", "refs"] as [String?] {
+        let result = try SiltaBinary.run(
+          ["guide"] + (topic.map { [$0] } ?? []) + ["--json"], in: scratch)
+        let data = try Self.data(result)
+        if let topic {
+          #expect(data["topic"] as? String == topic)
+        } else {
+          #expect(data["topic"] == nil)
         }
       }
     }
@@ -79,25 +77,23 @@ struct GuideContractTests {
   }
 
   @Test func referenceTableMatchesSpec() throws {
-    withKnownIssue("SI-34 round 2: reviewed guide contract") {
-      try withScratchDirectory { scratch in
-        let guide = try SiltaBinary.run(["guide", "refs"], in: scratch)
-        let spec = try String(
-          contentsOf: ScenarioRunner.repository.appending(path: "docs/spec.md"), encoding: .utf8)
-        let section = try #require(spec.components(separatedBy: "### 5.1 Reference grammar").last)
-          .components(separatedBy: "## 6.")[0]
-        let expected = section.split(separator: "\n").filter { $0.hasPrefix("|") }.map(String.init)
-        let actual = guide.stdout.split(separator: "\n").filter { $0.hasPrefix("|") }.map(
-          String.init)
-        try #require(!actual.isEmpty)
-        #expect(actual == expected)
-        let prose = section.components(separatedBy: "| Ref |")[0]
-        let printed = guide.stdout.components(separatedBy: "| Ref |")[0]
-          .replacingOccurrences(of: "# Reference grammar", with: "")
-        #expect(
-          printed.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-            == prose.split(whereSeparator: \.isWhitespace).joined(separator: " "))
-      }
+    try withScratchDirectory { scratch in
+      let guide = try SiltaBinary.run(["guide", "refs"], in: scratch)
+      let spec = try String(
+        contentsOf: ScenarioRunner.repository.appending(path: "docs/spec.md"), encoding: .utf8)
+      let section = try #require(spec.components(separatedBy: "### 5.1 Reference grammar").last)
+        .components(separatedBy: "## 6.")[0]
+      let expected = section.split(separator: "\n").filter { $0.hasPrefix("|") }.map(String.init)
+      let actual = guide.stdout.split(separator: "\n").filter { $0.hasPrefix("|") }.map(
+        String.init)
+      try #require(!actual.isEmpty)
+      #expect(actual == expected)
+      let prose = section.components(separatedBy: "| Ref |")[0]
+      let printed = guide.stdout.components(separatedBy: "| Ref |")[0]
+        .replacingOccurrences(of: "# Reference grammar", with: "")
+      #expect(
+        printed.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+          == prose.split(whereSeparator: \.isWhitespace).joined(separator: " "))
     }
   }
 

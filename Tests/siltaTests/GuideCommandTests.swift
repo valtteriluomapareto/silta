@@ -4,13 +4,11 @@ import Testing
 
 struct GuideCommandTests {
   @Test func fullGuideMatchesSpec() throws {
-    withKnownIssue("SI-34 round 2: reviewed guide contract") {
-      try withScratchDirectory { scratch in
-        let result = try SiltaBinary.run(["guide"], in: scratch)
-        #expect(result.termination == .exit(0))
-        #expect(result.stderr.isEmpty)
-        Golden.forTests().check(result.stdout, "guide.txt")
-      }
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(["guide"], in: scratch)
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.isEmpty)
+      Golden.forTests().check(result.stdout, "guide.txt")
     }
   }
 
@@ -31,40 +29,38 @@ struct GuideCommandTests {
   }
 
   @Test func outputModesAndSchema() throws {
-    withKnownIssue("SI-34 round 2: reviewed guide contract") {
-      try withScratchDirectory { scratch in
-        for args in [["guide"], ["guide", "human"], ["guide", "refs"]] {
-          let text = try SiltaBinary.run(args, in: scratch)
-          #expect(try SiltaBinary.run(["--quiet"] + args, in: scratch) == text)
-          for flags in [["--json"], ["--quiet", "--json"]] {
-            let result = try SiltaBinary.run(args + flags, in: scratch)
-            #expect(result.termination == .exit(0))
-            #expect(result.stderr.isEmpty)
-            if let topic = args.dropFirst().first, topic == "human" {
-              Golden.forTests().check(result.stdout, "guide-\(topic).json")
-            }
-            let root = try GuideContractTests.object(result.stdout)
-            #expect(root["ok"] as? Bool == true)
-            #expect(root["schema"] as? Int == 1)
-            #expect((root["warnings"] as? [Any])?.isEmpty == true)
-            let data = try GuideContractTests.data(result)
-            #expect(data["text"] as? String == text.stdout)
-            #expect(
-              Set(data.keys)
-                == (args.count == 1 ? ["text", "topics"] : ["text", "topics", "topic"]))
+    try withScratchDirectory { scratch in
+      for args in [["guide"], ["guide", "human"], ["guide", "refs"]] {
+        let text = try SiltaBinary.run(args, in: scratch)
+        #expect(try SiltaBinary.run(["--quiet"] + args, in: scratch) == text)
+        for flags in [["--json"], ["--quiet", "--json"]] {
+          let result = try SiltaBinary.run(args + flags, in: scratch)
+          #expect(result.termination == .exit(0))
+          #expect(result.stderr.isEmpty)
+          if let topic = args.dropFirst().first, topic == "human" {
+            Golden.forTests().check(result.stdout, "guide-\(topic).json")
           }
+          let root = try GuideContractTests.object(result.stdout)
+          #expect(root["ok"] as? Bool == true)
+          #expect(root["schema"] as? Int == 1)
+          #expect((root["warnings"] as? [Any])?.isEmpty == true)
+          let data = try GuideContractTests.data(result)
+          #expect(data["text"] as? String == text.stdout)
+          #expect(
+            Set(data.keys)
+              == (args.count == 1 ? ["text", "topics"] : ["text", "topics", "topic"]))
         }
-        let result = try SiltaBinary.run(["schema", "guide", "--json"], in: scratch)
-        let commands = try #require(
-          try GuideContractTests.data(result)["commands"] as? [[String: Any]])
-        #expect(commands.count == 1)
-        let shape = try #require(commands.first?["data"] as? [String: Any])
-        let fields = try #require(shape["object"] as? [String: Any])
-        #expect(Set(fields.keys) == ["text", "topics", "topic"])
-        #expect(fields["text"] as? String == "string")
-        #expect((fields["topics"] as? [String: String])?["array"] == "string")
-        #expect((fields["topic"] as? [String: String])?["optional"] == "string")
       }
+      let result = try SiltaBinary.run(["schema", "guide", "--json"], in: scratch)
+      let commands = try #require(
+        try GuideContractTests.data(result)["commands"] as? [[String: Any]])
+      #expect(commands.count == 1)
+      let shape = try #require(commands.first?["data"] as? [String: Any])
+      let fields = try #require(shape["object"] as? [String: Any])
+      #expect(Set(fields.keys) == ["text", "topics", "topic"])
+      #expect(fields["text"] as? String == "string")
+      #expect((fields["topics"] as? [String: String])?["array"] == "string")
+      #expect((fields["topic"] as? [String: String])?["optional"] == "string")
     }
   }
 

@@ -1,5 +1,5 @@
 /// The shape of a command's `--json` data, as `silta schema` publishes it (spec §20.1):
-/// `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`, `{"optional":S}`, `{"nullable":S}` or
+/// `"string"`, `"int"`, `"bool"`, `"any"`, `{"array":S}`, `{"optional":S}` or
 /// `{"object":{…}}`.
 package indirect enum Shape: Encodable, Equatable, Sendable {
   /// A JSON string.
@@ -12,15 +12,13 @@ package indirect enum Shape: Encodable, Equatable, Sendable {
   case any
   /// A JSON array whose elements have this shape.
   case array(Shape)
-  /// A value that may also be JSON null.
-  case nullable(Shape)
   /// An object field that may be absent.
   case optional(Shape)
   /// A JSON object with exactly these fields.
   case object([String: Shape])
 
   private enum Key: String, CodingKey {
-    case array, optional, nullable, object
+    case array, optional, object
   }
 
   package func encode(to encoder: any Encoder) throws {
@@ -31,9 +29,6 @@ package indirect enum Shape: Encodable, Equatable, Sendable {
     case .array(let element):
       var container = encoder.container(keyedBy: Key.self)
       try container.encode(element, forKey: .array)
-    case .nullable(let wrapped):
-      var container = encoder.container(keyedBy: Key.self)
-      try container.encode(wrapped, forKey: .nullable)
     case .optional(let wrapped):
       var container = encoder.container(keyedBy: Key.self)
       try container.encode(wrapped, forKey: .optional)
