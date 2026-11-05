@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import SiltaCore
 import SiltaTestSupport
@@ -30,8 +31,12 @@ struct AgentsHookTests {
 
   @Test func hookSettingsRoundTripAndSelection() throws {
     try withScratchDirectory { scratch in
-      let original =
-        #"{"permissions":{"allow":["Bash(acme)"]},"private":{"nested":[null,true,42,"Acme sentinel"]},"hooks":{"Future":{"opaque":true},"SessionStart":[{"hooks":[{"type":"command","command":"echo Acme"}]}]}}"#
+      let original = """
+        {"permissions":{"allow":["Bash(acme)"]},
+        "private":{"nested":[null,true,42,"Acme sentinel"]},
+        "hooks":{"Future":{"opaque":true},
+        "SessionStart":[{"hooks":[{"type":"command","command":"echo Acme"}]}]}}
+        """
       try AgentsInstallTests.write(original, ".claude/settings.json", in: scratch)
       let preview = try AgentsInstallTests.run(
         ["install", "--claude", "--hook", "--json"], in: scratch)
@@ -75,6 +80,64 @@ struct AgentsHookTests {
 }
 
 extension AgentsHookTests {
+  @Test(arguments: [false, true])
+  func hookSettingsRetainFileProvenance(existed: Bool) throws {
+    try withScratchDirectory { scratch in
+      if existed { try AgentsInstallTests.write("{}", ".claude/settings.json", in: scratch) }
+      #expect(
+        try AgentsInstallTests.apply(["install", "--claude", "--hook"], in: scratch).termination
+          == .exit(0))
+      let invalid = try AgentsInstallTests.run(
+        ["uninstall", "--claude", "--hook", "--json"], in: scratch)
+      #expect(invalid.termination == .exit(1))
+      #expect(invalid.stdout.contains("silta agents uninstall --help"))
+      #expect(
+        try AgentsInstallTests.apply(["uninstall", "--claude"], in: scratch).termination == .exit(0)
+      )
+      if existed {
+        #expect(
+          try GuideContractTests.object(
+            AgentsInstallTests.read(".claude/settings.json", in: scratch)
+          ).isEmpty)
+      } else {
+        #expect(
+          !FileManager.default.fileExists(
+            atPath: scratch.appending(path: "home/.claude/settings.json").path))
+      }
+    }
+  }
+
+  @Test(arguments: [".claude/settings.json", ".claude/CLAUDE.md"])
+  func renderedFilesStayWithinReadableLimit(path: String) throws {
+    try withScratchDirectory { scratch in
+      let body = String(repeating: "A", count: 1_048_550)
+      let original = path.hasSuffix(".json") ? "{\"private\":\"" + body + "\"}" : body
+      #expect(original.utf8.count <= 1_048_576)
+      try AgentsInstallTests.write(original, path, in: scratch)
+      let result = try AgentsInstallTests.run(
+        ["install", "--claude", "--hook", "--json"], in: scratch)
+      #expect(result.termination == .exit(6))
+      #expect(try AgentsInstallTests.read(path, in: scratch) == original)
+      #expect(
+        !FileManager.default.fileExists(atPath: scratch.appending(path: "home/.claude/skills").path)
+      )
+    }
+  }
+
+  @Test func ownedHookDiffMatchesSpec() throws {
+    try withScratchDirectory { scratch in
+      #expect(
+        try AgentsInstallTests.apply(["install", "--claude"], in: scratch).termination == .exit(0))
+      let result = try AgentsInstallTests.run(
+        ["install", "--claude", "--hook", "--json"], in: scratch)
+      let data = try AgentsInstallTests.data(result)
+      let token = try #require(data["token"] as? String)
+      Golden.forTests().check(
+        result.stdout.replacingOccurrences(of: token, with: "<token>"),
+        "agents-install-hook.json")
+    }
+  }
+
   @Test func hookExportsValidatedSessionAndPreservesExports() throws {
     try withScratchDirectory { scratch in
       #expect(
@@ -134,6 +197,15 @@ extension AgentsHookTests {
       #expect(result.termination == .exit(0))
       #expect(result.stdout.contains("acme"))
       #expect(result.stderr.isEmpty)
+      let logs = scratch.appending(path: "silta-home/log")
+      let files = try FileManager.default.contentsOfDirectory(
+        at: logs, includingPropertiesForKeys: nil)
+      let entries = try files.filter { $0.pathExtension == "jsonl" }.flatMap {
+        try String(contentsOf: $0, encoding: .utf8).split(separator: "\n").map(String.init)
+      }.map(GuideContractTests.object)
+      let entry = try #require(
+        entries.first { $0["command"] as? String == "silta agents session-start" })
+      #expect(entry["actor"] as? String == "agent:claude:acme-session")
       let script =
         ". " + shellWord(file.path) + "; " + shellWord(try SiltaBinary.url().path)
         + " --ws acme task add 'Acme work' --start --app none --json"
@@ -261,6 +333,8 @@ extension AgentsHookTests {
       let file = scratch.appending(path: "claude-env")
       try Data("export ACME=kept\n".utf8).write(to: file)
       var target = file.path
+      var fifo: Int32 = -1
+      defer { if fifo >= 0 { Darwin.close(fifo) } }
       switch kind {
       case "relative": target = "claude-env"
       case "symlink", "ancestor":
@@ -275,6 +349,8 @@ extension AgentsHookTests {
         #expect(
           try SiltaBinary.runProcess(URL(filePath: "/usr/bin/mkfifo"), [target], in: scratch)
             .termination == .exit(0))
+        fifo = open(target, O_RDWR | O_NONBLOCK)
+        #expect(fifo >= 0)
       case "directory": target = scratch.path
       case "readonly":
         try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: file.path)
@@ -286,6 +362,10 @@ extension AgentsHookTests {
         environment: ["CLAUDE_ENV_FILE": target])
       #expect(result.termination == .exit(0) && result.stdout.isEmpty && result.stderr.isEmpty)
       #expect(try Data(contentsOf: file) == before)
+      if fifo >= 0 {
+        var bytes = [UInt8](repeating: 0, count: 256)
+        #expect(Darwin.read(fifo, &bytes, bytes.count) <= 0)
+      }
     }
   }
 }

@@ -4,6 +4,14 @@ struct AgentInstallTarget {
   let path: String
   let body: String
   let whole: Bool
+  let settings: Bool
+
+  init(path: String, body: String, whole: Bool, settings: Bool = false) {
+    self.path = path
+    self.body = body
+    self.whole = whole
+    self.settings = settings
+  }
   private static let frontmatter =
     "---\nname: silta\ndescription: Use Silta for context, "
     + "backlog, plans and handoffs across repositories.\n---\n"
@@ -38,6 +46,11 @@ struct AgentInstallTarget {
   func replace(
     _ original: String, existed: Bool, uninstall: Bool, refusal: () throws -> Never
   ) throws -> String {
+    if settings {
+      return try AgentHookSettings.edit(
+        original, existed: existed, uninstall: uninstall,
+        refusal: refusal)
+    }
     var text = original
     if whole {
       guard text.isEmpty || text.hasPrefix(Self.frontmatter) else { try refusal() }

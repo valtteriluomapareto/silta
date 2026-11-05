@@ -9,7 +9,9 @@ struct AgentInstallPlan {
     let before: Data?
     let after: Data?
     let mode: UInt16
+    let diff: String?
     var change: AgentInstallResult.Change {
+      if let diff { return .init(path: path, diff: diff) }
       let old = String(data: before ?? Data(), encoding: .utf8) ?? ""
       let new = String(data: after ?? Data(), encoding: .utf8) ?? ""
       var prefix = 0
@@ -32,8 +34,7 @@ struct AgentInstallPlan {
   let edits: [Edit]
   let token: String
 
-  init(files: AgentInstallFiles, claude: Bool, codex: Bool, uninstall: Bool, root: String) throws {
-    let targets = try AgentInstallTarget.selected(claude: claude, codex: codex, root: root)
+  init(files: AgentInstallFiles, targets: [AgentInstallTarget], uninstall: Bool) throws {
     var edits: [Edit] = []
     var fingerprint = Data((files.home + files.preview).utf8)
     for target in targets {
@@ -43,17 +44,21 @@ struct AgentInstallPlan {
       let after = try target.replace(
         old, existed: before != nil, uninstall: uninstall,
         refusal: { throw files.refusal(path, "edited or ambiguous ownership/configuration") })
+      guard after.utf8.count <= AgentInstallFiles.maximumBytes else {
+        throw files.refusal(path, "rendered file exceeds the 1 MiB readable limit")
+      }
       fingerprint.append(Data(path.utf8))
       fingerprint.append(Data("\(mode):\(before?.count ?? -1):".utf8))
       fingerprint.append(before ?? Data())
       fingerprint.append(Data("\(after.count):".utf8))
       fingerprint.append(Data(after.utf8))
       if old != after {
+        let diff = target.settings ? try AgentHookSettings.diff(old, after) : nil
         let keepEmpty = old.contains(":keep" + (path.hasSuffix(".toml") ? "\n" : " -->\n"))
         edits.append(
           Edit(
             path: path, before: before,
-            after: after.isEmpty && !keepEmpty ? nil : Data(after.utf8), mode: mode))
+            after: after.isEmpty && !keepEmpty ? nil : Data(after.utf8), mode: mode, diff: diff))
       }
     }
     self.edits = edits

@@ -4,6 +4,7 @@ import SiltaCore
 
 /// Relative descriptor traversal never follows a harness-directory symlink.
 final class AgentInstallFiles {
+  static let maximumBytes = 1_048_576
   let home: String
   let preview: String
   private let root: Int32
@@ -85,7 +86,7 @@ final class AgentInstallFiles {
     let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     var info = stat()
     guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
-      info.st_nlink == 1, info.st_size <= 1_048_576
+      info.st_nlink == 1, info.st_size <= Self.maximumBytes
     else { throw refusal(path, "expected one regular file of at most 1 MiB") }
     let data = try handle.readToEnd() ?? Data()
     guard String(data: data, encoding: .utf8) != nil else { throw refusal(path, "invalid UTF-8") }
