@@ -305,6 +305,7 @@ extension DogfoodLogTests {
       (["doctor", "--ws", "absent"], nil),
       (acme + ["brief"], "acme"),
       (acme + ["inbox"], "acme"),
+      (acme + ["status"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
     ] + [(["guide"], nil)]
