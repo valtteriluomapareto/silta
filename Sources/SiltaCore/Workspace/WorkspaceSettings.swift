@@ -18,6 +18,8 @@ struct WorkspaceSettings: Sendable {
     case staleDays = "stale_days"
   }
 
+  static let defaultArchiveAfterDays = 14
+
   private let workspace: String
   let json: String
 
@@ -49,7 +51,7 @@ struct WorkspaceSettings: Sendable {
   }
 
   var archiveAfterDays: Int {
-    get throws { try days(.archiveAfterDays, default: 14) }
+    get throws { try days(.archiveAfterDays, default: Self.defaultArchiveAfterDays) }
   }
 
   var staleDays: Int {
@@ -90,6 +92,9 @@ struct WorkspaceSettings: Sendable {
       return Dictionary(
         object.map { key, value in
           let safeKey = SecretGuard.redacted(key)
+          if ["secret", "api_token"].contains(key.lowercased()) {
+            return (safeKey, "[REDACTED:credential]" as Any)
+          }
           let context = key + "=" + (value as? String ?? "stored-value")
           let valueStart = context.index(context.startIndex, offsetBy: key.count + 1)
           if let match = SecretGuard.matches(in: context).first(where: {

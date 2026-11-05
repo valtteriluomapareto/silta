@@ -4,6 +4,23 @@ import SiltaCore
 import SiltaTestSupport
 
 extension BriefCommandTests {
+  func normalizeBrief(_ text: String, _ repo: URL) -> String {
+    text.replacingOccurrences(of: repo.path, with: "<repo>")
+      .replacingOccurrences(of: repo.path.lowercased(), with: "<repo>")
+  }
+
+  func hookTimeoutCount(_ scratch: URL) throws -> Int {
+    let directory = scratch.appending(path: "silta-home/log")
+    guard FileManager.default.fileExists(atPath: directory.path) else { return 0 }
+    let files = try FileManager.default.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: nil)
+    return try files.filter { $0.pathExtension == "jsonl" }.reduce(0) { count, file in
+      count
+        + (try String(contentsOf: file, encoding: .utf8)).split(separator: "\n")
+        .filter { $0.contains("\"hook_timeout\"") }.count
+    }
+  }
+
   func seedTasks(_ store: DatabaseStore) throws {
     try store.write { tx in
       for (seq, app, actor, branch, status) in [

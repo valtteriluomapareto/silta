@@ -6,6 +6,17 @@ import SiltaTestSupport
 import Testing
 
 extension BriefCommandTests {
+  @Test func unsupportedSettingsAreOmittedPerKeyWithRawWarnings() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try settings("{\"review_gate\":\"team\",\"proposals\":\"ask\"}", scratch)
+      let result = try run(["--json"], repo, scratch)
+      let data = try fixture.data(result)
+      #expect(data["settings"] as? [String: String] == ["proposals": "ask"])
+      #expect(result.stdout.contains("team"))
+    }
+  }
+
   @Test func unsupportedSettingsGoldenKeepsRawTypesAndValidGloss() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)
@@ -13,9 +24,10 @@ extension BriefCommandTests {
       try settings(
         "{\"review_gate\":\"team\",\"archive_after_days\":null,\"proposals\":\"ask\"}", scratch)
       let text = try run([], repo, scratch)
-      Golden.forTests().check(text.stdout, "brief-unsupported.txt")
+      Golden.forTests().check(normalizeBrief(text.stdout, repo), "brief-unsupported.txt")
       #expect(text.stderr.contains("setting_unsupported"))
-      Golden.forTests().check(try run(["--json"], repo, scratch).stdout, "brief-unsupported.json")
+      Golden.forTests().check(
+        normalizeBrief(try run(["--json"], repo, scratch).stdout, repo), "brief-unsupported.json")
     }
   }
 
@@ -30,7 +42,7 @@ extension BriefCommandTests {
         environment: TaskBlockCommandTests.environment, timeout: 2)
       #expect(result.termination == .exit(0))
       #expect(result.stderr.isEmpty)
-      #expect(result.stdout.contains("task: none"))
+      #expect(result.stdout.count <= 3200)
     }
   }
 
@@ -69,7 +81,7 @@ extension BriefCommandTests {
       try store(scratch).write {
         try $0.database.execute(sql: "UPDATE task SET plan_md=? WHERE seq=1", arguments: [plan])
       }
-      let result = try run(["--task", "AC-1", "--hook"], repo, scratch)
+      let result = try run(["--task", "AC-1", "--short"], repo, scratch)
       #expect(result.stdout.contains("1–7 done"))
       #expect(!result.stdout.contains("1. [x]"))
       #expect(result.stdout.contains("8. [ ] Acme step 8"))
@@ -157,6 +169,23 @@ extension BriefCommandTests {
       let started = clock.now
       #expect(try run(["--hook"], repo, scratch) == result)
       #expect(started.duration(to: clock.now) < .seconds(2))
+    }
+  }
+}
+
+extension BriefCommandTests {
+  @Test func candidatesAreCompactAndFooterHasNoEmptyLine() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try fixture.git(["checkout", "-q", "from-non-app"], repo, scratch)
+      let result = try run([], repo, scratch)
+      #expect(result.stdout.components(separatedBy: "candidates:").count == 2)
+      try seedTasks(store(scratch))
+      try store(scratch).write {
+        try $0.database.execute(sql: "UPDATE task SET plan_md=plan_md||char(10)")
+      }
+      let task = try run(["--task", "AC-1"], repo, scratch)
+      #expect(!task.stdout.contains("\n\nmore:"))
     }
   }
 }

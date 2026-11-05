@@ -10,32 +10,17 @@ enum BriefHook {
   }
 
   static func environment(
-    _ snapshot: [String: String], deterministic: Bool, deadline: ContinuousClock.Instant
+    _ snapshot: [String: String], deterministic: Bool, deadline: ContinuousClock.Instant,
+    watchdog: HookWatchdog?
   ) async throws -> SiltaEnvironment {
-    let git = HookGitRunner(snapshot: snapshot, deadline: deadline)
+    let git = BriefHookGitRunner(
+      runner: SystemGitRunner(killAfter: 0.01, environment: snapshot),
+      remaining: {
+        let duration = ContinuousClock().now.duration(to: deadline).components
+        // Utility workers can coalesce timeout wakeups; reserve time to terminate and reap.
+        return Double(duration.seconds) + Double(duration.attoseconds) / 1e18 - 0.5
+      }, onTimeout: { watchdog?.timedOut() })
     return try await SiltaEnvironment.system(
       environment: snapshot, deterministic: deterministic, git: git, readBusyTimeout: 0)
-  }
-}
-
-/// Every child gets the remaining process budget, with time reserved to terminate and reap it.
-private struct HookGitRunner: GitRunner {
-  let system: SystemGitRunner
-  let deadline: ContinuousClock.Instant
-
-  init(snapshot: [String: String], deadline: ContinuousClock.Instant) {
-    system = SystemGitRunner(killAfter: 0.01, environment: snapshot)
-    self.deadline = deadline
-  }
-
-  func run(_ request: GitRequest) async throws -> GitResult {
-    let duration = ContinuousClock().now.duration(to: deadline).components
-    // Utility workers can coalesce timeout wakeups; reserve time to terminate and reap.
-    let remaining = Double(duration.seconds) + Double(duration.attoseconds) / 1e18 - 0.5
-    guard remaining > 0 else { return GitResult(termination: .timedOut) }
-    return try await system.run(
-      GitRequest(
-        arguments: request.arguments,
-        directory: request.directory, timeout: min(request.timeout, remaining), lazyFetch: false))
   }
 }

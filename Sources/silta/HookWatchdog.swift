@@ -8,6 +8,7 @@ import Synchronization
 final class HookWatchdog: @unchecked Sendable {
   private enum Phase { case armed, completed, fired }
   private struct State {
+    var timedOut = false
     var phase = Phase.armed
     var record: (path: String, data: Data)?
   }
@@ -67,7 +68,13 @@ final class HookWatchdog: @unchecked Sendable {
     timer.cancel()
   }
 
+  func timedOut() { state.withLock { $0.timedOut = true } }
+
   func finish(_ entry: LogEntry) {
+    var entry = entry
+    if state.withLock({ $0.timedOut }), !entry.warnings.contains("hook_timeout") {
+      entry.warnings.append("hook_timeout")
+    }
     let directory = state.withLock {
       $0.record.map { URL(filePath: $0.path).deletingLastPathComponent() }
     }

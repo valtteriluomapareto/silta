@@ -5,4 +5,9 @@ doing: Acme task (app: portal)
 plan (revision 0):
 1 done
 2. [ ] Acme next
+app: api
+AGENTS.md: <repo>/AGENTS.md
+open: AC-1 [doing, p2] Acme task
+open: AC-3 [doing, p2] Acme task
+done: AC-4
 more: silta --ws 'acme' task show AC-2
