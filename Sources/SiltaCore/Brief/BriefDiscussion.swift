@@ -16,19 +16,22 @@ struct BriefDiscussion {
   let workspace: String
   let command: String
   let current: TaskDetails?
+  /// The brief's one clock reading, so every time-dependent section agrees.
+  let now: Date
   /// Character budget of the whole brief; the handoff takes a share of it.
   let characters: Int
 
   /// Sections for the current task and sections after it; the inbox is empty exactly
   /// when the caller has no attention.
   func sections() throws -> (task: [BriefSection], inbox: [BriefSection]) {
-    let inbox = try service.inbox(for: caller, workspace: workspace, all: true, in: db)
+    let items = try service.inboxItems(
+      for: caller, workspace: workspace, all: false, at: now, in: db)
     var emitted: Set<String> = []
     var task: [BriefSection] = []
     if let current {
       let posts = try TaskService.discussion(current, timeline: true, in: db)
       if let handoff = TaskService.newestHandoff(posts) { task.append(section(handoff)) }
-      task += inbox.items.filter { onTask($0) }.prefix(Self.items).map {
+      task += items.filter { onTask($0) }.prefix(Self.items).map {
         BriefSection(id: "task_inbox", text: render($0, emitted: &emitted))
       }
       let open = posts.filter {
@@ -43,9 +46,9 @@ struct BriefDiscussion {
               + (answered == 0 ? "" : " (\(answered) answered)") + "\n"))
       }
     }
-    guard !inbox.items.isEmpty else { return (task, []) }
-    let count = inbox.items.count
-    let above = inbox.items.filter { onTask($0) }.count
+    guard !items.isEmpty else { return (task, []) }
+    let count = items.count
+    let above = items.filter { onTask($0) }.count
     var sections = [
       BriefSection(
         id: "inbox",
@@ -53,7 +56,7 @@ struct BriefDiscussion {
           + (above == 0 ? "" : " (\(above) on this task)") + "\n"
       )
     ]
-    sections += inbox.items.filter { !onTask($0) }.prefix(Self.items).map {
+    sections += items.filter { !onTask($0) }.prefix(Self.items).map {
       BriefSection(id: "inbox", text: render($0, emitted: &emitted))
     }
     return (task, sections)

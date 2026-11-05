@@ -86,8 +86,15 @@ struct TaskVisibility {
     ).timeIntervalSince1970
   }
 
-  /// Counts done tasks in `scope` whose archive instant cannot be read; the visibility
-  /// predicate already leaves them out.
+  /// Brief rows need a readable `closed_at` even when an archive override skips the date;
+  /// rows without an override already fail the archive predicate.
+  static let readableOverrideSQL = """
+    (task.archive_override IS NULL OR task.closed_at IS NULL
+      OR silta_archive_instant(task.closed_at) IS NOT NULL)
+    """
+
+  /// Counts done tasks in `scope` left out for an unreadable `closed_at`: every such task
+  /// except one explicitly archived, which would be hidden anyway.
   static func unreadableDates(scope: String, arguments: StatementArguments, in db: Database)
     throws -> Int
   {
@@ -95,7 +102,9 @@ struct TaskVisibility {
       db,
       sql: """
         SELECT count(*) FROM task LEFT JOIN app ON app.id=task.app_id
-          WHERE task.status='done' AND \(scope) AND \(localSQL) AND (\(archiveSQL))=-1
+          WHERE task.status='done' AND \(scope) AND \(localSQL)
+          AND task.closed_at IS NOT NULL AND silta_archive_instant(task.closed_at) IS NULL
+          AND coalesce(task.archive_override,'')<>'archived'
         """, arguments: arguments) ?? 0
   }
 

@@ -17,31 +17,32 @@ extension TaskService {
       actor = environment.actor
     }
     let slug = try selected()
+    let command = "silta --ws " + shellWord(slug), at = environment.clock.now()
     return try environment.db.read { db in
-      try inbox(for: actor, workspace: slug, all: all, in: db)
+      let attention = try inboxItems(for: actor, workspace: slug, all: all, at: at, in: db)
+      let items = all ? attention : Array(attention.prefix(12))
+      let remaining = attention.count - items.count
+      return InboxResult(
+        actor: actor.description, items: items, remaining: remaining,
+        more: remaining == 0
+          ? nil : command + " inbox --for " + shellWord(actor.description) + " --all")
     }
   }
 
-  /// The same attention inside the caller's read snapshot; `all` lifts the cap.
-  func inbox(for actor: ActorID, workspace slug: String, all: Bool, in db: Database) throws
-    -> InboxResult
-  {
+  /// Every ordered item inside the caller's read snapshot at one instant, without the
+  /// item cap. `all` only widens eligibility, to proposals older than 14 days.
+  func inboxItems(
+    for actor: ActorID, workspace slug: String, all: Bool, at: Date, in db: Database
+  ) throws -> [InboxItem] {
     let command = "silta --ws " + shellWord(slug)
-    let workspaceID = try Self.workspaceID(slug, in: db), at = environment.clock.now()
+    let workspaceID = try Self.workspaceID(slug, in: db)
     let discussion = try Self.attention(for: actor, workspaceID: workspaceID, in: db).map {
       inboxItem($0, actor: actor, command: command)
     }
-    let attention =
-      actor.isHuman
+    return actor.isHuman
       ? try inboxBlocks(workspaceID, at: at, command: command, in: db) + discussion
         + inboxBacklog(workspaceID, at: at, all: all, command: command, in: db)
       : discussion
-    let items = all ? attention : Array(attention.prefix(12))
-    let remaining = attention.count - items.count
-    return InboxResult(
-      actor: actor.description, items: items, remaining: remaining,
-      more: remaining == 0
-        ? nil : command + " inbox --for " + shellWord(actor.description) + " --all")
   }
 
   private func inboxItem(_ attention: DiscussionAttention, actor: ActorID, command: String)

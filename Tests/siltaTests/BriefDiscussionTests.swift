@@ -342,19 +342,15 @@ extension BriefCommandTests {
       let task = ["--task", "AC-2", "--app", "api"]
       let results = [try run(task, repo, scratch), try completedHook(task, repo, scratch)]
       for result in results.compactMap({ $0 }) {
-        withKnownIssue("An explicitly kept task bypasses the unreadable-date omission") {
-          // Four readable rows leave room under the limit, so a visible unreadable row shows.
-          #expect(result.stdout.components(separatedBy: "\ndone: ").count == 5)
-          #expect(!result.stdout.contains("done: AC-10"))
-        }
+        // Four readable rows leave room under the limit, so a visible unreadable row shows.
+        #expect(result.stdout.components(separatedBy: "\ndone: ").count == 5)
+        #expect(!result.stdout.contains("done: AC-10"))
         #expect(!result.stdout.contains("done: AC-9"))
         #expect(result.stdout.contains("done: AC-8 Acme result 8"))
       }
       let json = try run(["--task", "AC-2", "--app", "api", "--json"], repo, scratch)
       #expect(json.stdout.contains("\"closed_at_unreadable\""))
-      withKnownIssue("An explicitly kept task bypasses the unreadable-date warning") {
-        #expect(json.stdout.contains("Left out 2 tasks with an unreadable closed_at."))
-      }
+      #expect(json.stdout.contains("Left out 2 tasks with an unreadable closed_at."))
       #expect(!json.stdout.contains("not a date"))
     }
   }

@@ -23,7 +23,8 @@ struct BriefInboxTests {
       let sections = try env.db.read { db in
         try BriefDiscussion(
           db: db, service: service, caller: env.actor, workspace: "acme",
-          command: "silta --ws 'acme'", current: nil, characters: 10_000
+          command: "silta --ws 'acme'", current: nil, now: env.clock.now(),
+          characters: 10_000
         ).sections()
       }
       #expect(sections.task.isEmpty)
@@ -64,12 +65,60 @@ struct BriefInboxTests {
       let sections = try env.db.read { db in
         try BriefDiscussion(
           db: db, service: service, caller: env.actor, workspace: "acme",
-          command: "silta --ws 'acme'", current: nil, characters: 10_000
+          command: "silta --ws 'acme'", current: nil, now: env.clock.now(),
+          characters: 10_000
         ).sections()
       }
-      withKnownIssue("The brief's uncapped inbox read also includes expired proposals") {
-        #expect(sections.inbox.isEmpty)
-      }
+      #expect(sections.inbox.isEmpty)
     }
   }
+
+  /// The brief reads the clock once: a stepping clock that crosses UTC midnight on its
+  /// next read must not make a follow-up due in the brief while the brief's instant
+  /// still precedes it.
+  @Test func briefInboxUsesTheBriefsInstantAcrossMidnight() async throws {
+    try await withScratchDirectory { home in
+      let before = try #require(utcInstant("2023-11-14T23:59:59.998Z"))
+      let clock = SteppingClock(start: before)
+      let env = try TaskServiceTests.environment(home, actor: .human(name: "acme"))
+      try TaskServiceTests.setup(env)
+      let service = TaskService(environment: env)
+      _ = try await InboxGroupTests.add(service, home)
+      // Blocked on nothing at 2023-11-14T22:13:20Z, following up on 2023-11-15.
+      try InboxGroupTests.block(service, "AC-1", [], "1d")
+      let stepping = SiltaEnvironment(
+        clock: clock, ids: env.ids, git: env.git, home: env.home, db: env.db, log: env.log,
+        actor: env.actor)
+      let steppingService = TaskService(environment: stepping)
+      let sections = try env.db.read { db in
+        try BriefDiscussion(
+          db: db, service: steppingService, caller: env.actor, workspace: "acme",
+          command: "silta --ws 'acme'", current: nil, now: before, characters: 10_000
+        ).sections()
+      }
+      #expect(clock.reads == 0)
+      #expect(sections.inbox.isEmpty)
+      // The standalone inbox reads once per call: before midnight, then after it.
+      #expect(try steppingService.inbox(for: nil).items.isEmpty)
+      #expect(try steppingService.inbox(for: nil).items.map(\.kind) == ["due"])
+    }
+  }
+}
+
+/// Starts at an instant and moves 5 ms forward after every read.
+private final class SteppingClock: SiltaCore.Clock, @unchecked Sendable {
+  private var instant: Date
+  private(set) var reads = 0
+
+  init(start: Date) { instant = start }
+
+  func now() -> Date {
+    defer {
+      instant.addTimeInterval(0.005)
+      reads += 1
+    }
+    return instant
+  }
+
+  func wait(milliseconds: UInt64) {}
 }

@@ -32,7 +32,7 @@ package struct BriefService {
       let discussion = try BriefDiscussion(
         db: db, service: TaskService(environment: environment, workspace: location.workspace),
         caller: environment.actor, workspace: location.workspace, command: command,
-        current: selected, characters: characters
+        current: selected, now: now, characters: characters
       ).sections()
       return (
         selected, settings, discussion,
