@@ -113,8 +113,9 @@ struct StatusCommandTests {
       let inGit = try Self.silta([], scratch, cwd: detached)
       #expect(inGit.termination == .exit(0))
       #expect(inGit.stdout == "No workspace here; next: silta where\n")
-      #expect(try Self.silta(["--json"], scratch, cwd: detached).stdout.contains(
-        "{\"location\":\"unregistered\"}"))
+      #expect(
+        try Self.silta(["--json"], scratch, cwd: detached).stdout.contains(
+          "{\"location\":\"unregistered\"}"))
       let outside = try Self.silta([], scratch)
       Golden.forTests().check(outside.stdout, "status-none.txt")
     }
@@ -176,7 +177,9 @@ struct StatusCommandTests {
     try withScratchDirectory { scratch in
       let broken = Self.caller.merging(["SILTA_NOW": "bad"]) { $1 }
       let version = try Self.silta(["--version"], scratch, environment: broken)
-      #expect(version == CLIResult(termination: .exit(0), stdout: SiltaVersion.current + "\n", stderr: ""))
+      #expect(
+        version == CLIResult(termination: .exit(0), stdout: SiltaVersion.current + "\n", stderr: "")
+      )
       let bare = try Self.silta(["--json"], scratch, environment: broken)
       #expect(bare.termination == .exit(9))
       #expect(bare.stdout.contains("\"env\""))
