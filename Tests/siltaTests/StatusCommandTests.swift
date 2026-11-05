@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import GRDB
 import SiltaCore
@@ -13,16 +14,24 @@ struct StatusCommandTests {
     "SILTA_ACTOR": "agent:claude:other", "SILTA_NOW": "2023-11-14T22:13:21.000Z",
   ]) { $1 }
 
+  static let later = caller.merging(["SILTA_NOW": "2023-11-14T22:13:22.000Z"]) { $1 }
+
   /// The fixture workspace with AC-1 and AC-3 claimed by the caller and AC-2 by another
-  /// session; returns the registered repository on the `api` branch.
+  /// session; returns the registered repository on the `api` branch. AC-1 is claimed
+  /// again after AC-3, so task order differs from claim order.
   static func setup(_ scratch: URL) throws -> URL {
     let fixture = WhereCommandTests()
     let repo = try fixture.setup(scratch)
     try fixture.git(["checkout", "-q", "api"], repo, scratch)
-    for (title, actor) in [("Acme status", caller), ("Acme other", other), ("Acme next", caller)] {
-      let added = try SiltaBinary.run(
-        ["task", "add", title, "--start"], in: scratch, environment: actor)
-      try #require(added.termination == .exit(0), "\(added.stderr)")
+    for (args, actor) in [
+      (["task", "add", "Acme status", "--start"], caller),
+      (["task", "add", "Acme other", "--start"], other),
+      (["task", "add", "Acme next", "--start"], caller),
+      (["comment", "AC-1", "--kind", "handoff", "-m", "State: Acme paused."], caller),
+      (["task", "start", "AC-1"], later),
+    ] {
+      let result = try SiltaBinary.run(args, in: scratch, environment: actor)
+      try #require(result.termination == .exit(0), "\(args) \(result.stderr)")
     }
     return repo
   }
@@ -47,6 +56,57 @@ struct StatusCommandTests {
       #expect(json.termination == .exit(0) && json.stderr.isEmpty)
       Golden.forTests().check(json.stdout, "status.json")
       #expect(try Self.silta(["status", "--json"], scratch, cwd: repo).stdout == json.stdout)
+      try WhereCommandTests().git(
+        ["update-ref", "-d", "refs/remotes/origin/portal"], repo, scratch)
+      #expect(
+        try Self.silta(["where", "--json"], scratch, cwd: repo).stdout.contains("ref_missing"))
+      let warned = try Self.silta(["--json"], scratch, cwd: repo)
+      #expect(warned.stdout.hasSuffix("\"warnings\":[]}\n"))
+      #expect(warned.stdout.contains("\"location\":\"resolved\""))
+    }
+  }
+
+  // The repository's workspace wins over the current one; `--ws` wins over both.
+  @Test func workspacePrecedenceAndAnEmptyClaimList() throws {
+    try withScratchDirectory { scratch in
+      let repo = try Self.setup(scratch)
+      let store = DatabaseStore(
+        home: scratch.appending(path: "silta-home"),
+        clock: FakeClock(now: Date(timeIntervalSince1970: 1_700_000_000)), jitter: { 0 })
+      try store.write {
+        try $0.database.execute(
+          sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE')")
+      }
+      try WorkspaceSelection.use("beta", in: store)
+      let empty = "workspace beta, app (unregistered), inbox 0, claimed none\n"
+      #expect(try Self.silta([], scratch).stdout == empty)
+      #expect(try Self.silta(["--ws", "beta"], scratch, cwd: repo).stdout == empty)
+      #expect(
+        try Self.silta([], scratch, cwd: repo).stdout
+          == "workspace acme, app api, inbox 0, claimed AC-1 AC-3\n")
+      let json = try WhereCommandTests().data(Self.silta(["--json"], scratch))
+      #expect((json["claimed"] as? [Any])?.isEmpty == true)
+    }
+  }
+
+  // Only `unregistered` falls back: other location failures and an unknown `--ws` are
+  // reported as `where` reports them.
+  @Test func locationFailuresAndUnknownWorkspacesAreReported() throws {
+    try withScratchDirectory { scratch in
+      let repo = try Self.setup(scratch)
+      for cwd in [repo, scratch.appending(path: "work")] {
+        let unknown = try Self.silta(["--ws", "nope", "--json"], scratch, cwd: cwd)
+        #expect(unknown.termination == .exit(2))
+        #expect(unknown.stdout.contains("\"code\":\"not_found\""))
+      }
+      #expect(try DogfoodLogTests.last(scratch)["command"] as? String == "silta status")
+      try Data("broken\n".utf8).write(to: repo.appending(path: ".git/HEAD"))
+      let location = try Self.silta(["where", "--json"], scratch, cwd: repo)
+      let status = try Self.silta(["--json"], scratch, cwd: repo)
+      #expect(location.termination == .exit(9))
+      #expect(status.termination == location.termination)
+      #expect(status.stdout.contains("\"code\":\"env\""))
+      #expect(!status.stdout.contains("No workspace"))
     }
   }
 
@@ -127,7 +187,7 @@ struct StatusCommandTests {
       let repo = try Self.setup(scratch)
       for index in 1...13 {
         let posted = try Self.silta(
-          ["comment", "AC-1", "-m", "Acme note \(index)"], scratch, environment: Self.other)
+          ["comment", "AC-3", "-m", "Acme note \(index)"], scratch, environment: Self.other)
         try #require(posted.termination == .exit(0), "\(posted.stderr)")
       }
       let inbox = try WhereCommandTests().data(Self.silta(["inbox", "--json"], scratch))
@@ -147,6 +207,9 @@ struct StatusCommandTests {
     try withScratchDirectory { scratch in
       let repo = try Self.setup(scratch)
       let home = scratch.appending(path: "silta-home")
+      try WhereCommandTests().git(["checkout", "-q", "from-non-app"], repo, scratch)
+      _ = try Self.silta(["where"], scratch, cwd: repo)
+      try #require(FileManager.default.fileExists(atPath: home.appending(path: "index.db").path))
       let before = try Self.snapshot(home)
       for (args, cwd) in [
         ([], repo), (["--json"], repo), ([], scratch), (["--ws", "acme"], scratch),
@@ -183,6 +246,12 @@ struct StatusCommandTests {
       let bare = try Self.silta(["--json"], scratch, environment: broken)
       #expect(bare.termination == .exit(9))
       #expect(bare.stdout.contains("\"env\""))
+      let text = try Self.silta([], scratch, environment: broken)
+      #expect(text.termination == .exit(9) && text.stdout.isEmpty)
+      #expect(text.stderr.contains("[env]"))
+      let flag = try Self.silta(["--bogus", "--json"], scratch)
+      #expect(flag.termination == .exit(1))
+      #expect(flag.stdout.contains("\"next\":[\"silta --help\"]"))
       let typo = try Self.silta(["stauts", "--json"], scratch)
       #expect(typo.termination == .exit(1))
       #expect(typo.stdout.contains("\"next\":[\"silta --help\"]"))
@@ -199,14 +268,21 @@ struct StatusCommandTests {
       #expect(entry["app"] == nil)
     }
   }
+}
 
-  /// Every storage file but the command log, with truth rows read logically: a read
-  /// connection may checkpoint the WAL, which changes bytes but not rows.
+extension StatusCommandTests {
+  /// Every storage file but the command log, by content, with truth rows read
+  /// logically: a read connection may checkpoint the WAL, which changes bytes but not
+  /// rows.
   static func snapshot(_ home: URL) throws -> [String] {
     let files = try FileManager.default.subpathsOfDirectory(atPath: home.path).filter {
       !$0.hasPrefix("log") && !$0.hasSuffix("-wal") && !$0.hasSuffix("-shm")
         && !$0.hasPrefix("silta.db")
-    }.sorted()
+    }.sorted().map { path in
+      guard let data = FileManager.default.contents(atPath: home.appending(path: path).path)
+      else { return path }
+      return path + " " + SHA256.hash(data: data).description
+    }
     let queue = try DatabaseQueue(path: home.appending(path: "silta.db").path)
     let rows = try queue.read { db in
       try String.fetchAll(
