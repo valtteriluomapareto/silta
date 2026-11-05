@@ -108,7 +108,7 @@ struct CommentRecoverySafetyTests {
     }
   }
 
-  @Test func foreignInboxNamesTheClaimerWhoseWriteClearsAttention() throws {
+  @Test func foreignInboxClearsOnClaimerWrite() throws {
     try withScratchDirectory { home in
       let store = try TaskCommandTests.setup(home)
       try #require(
