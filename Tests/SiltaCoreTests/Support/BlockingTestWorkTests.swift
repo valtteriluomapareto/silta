@@ -62,7 +62,7 @@ struct BlockingTestScopeTests {
       }
       var iterator = entered.makeAsyncIterator()
       for _ in 0..<8 {
-        let event = await iterator.next()
+        let event: Void? = await iterator.next()
         #expect(event != nil)
       }
       let ran = Mutex(false)
