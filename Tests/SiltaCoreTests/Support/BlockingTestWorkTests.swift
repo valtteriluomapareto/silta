@@ -21,9 +21,7 @@ struct BlockingTestWorkTests {
         return release.wait(timeout: .now() + 2) == .success
       }
       await sibling.value
-      withKnownIssue("SI-37/79: synchronous work occupies the only executor worker") {
-        #expect(progressed)
-      }
+      #expect(progressed)
     }.value
   }
 
