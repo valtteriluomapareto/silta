@@ -51,6 +51,16 @@ struct SecretGuardTests {
   // detectors match, so the fixture looks like a real legacy token.
   static var legacyPAT: String { String(repeating: "acme7zq3", count: 6) + "acme" }
 
+  // A synthetic key in the shape Anthropic's keys share: `sk-ant-`, a kind and version
+  // tag, a dash, then a base64url body. A current API key's body is 95 characters ending
+  // in `AA`; `length` counts the whole body. The prefix is split so this file holds no
+  // contiguous key.
+  static func anthropicKey(tag: String = "api03", length: Int = 95) -> String {
+    let alphabet = Array("Qz7-x_Rk")
+    let body = String((0..<(length - 2)).map { alphabet[$0 % alphabet.count] }) + "AA"
+    return "sk-" + "ant-" + tag + "-" + body
+  }
+
   static var keyBlock: String {
     "-----BE" + "GIN RSA PRIVATE KEY-----\n" + String(repeating: "Q", count: 64)
       + "\n-----EN" + "D RSA PRIVATE KEY-----"
