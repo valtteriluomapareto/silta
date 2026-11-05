@@ -6,7 +6,7 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct ControlPlaneRecoveryTests {
   @Test(
-    arguments: [["--help", "--json"], ["--version", "--json"], ["schema", "--help"], []],
+    arguments: [["--help", "--json"], ["--version", "--json"], ["schema", "--help"], ["-h"]],
     [false, true])
   func helpAndVersionWorkWithInvalidConfiguration(arguments: [String], invalidHome: Bool) throws {
     try withScratchDirectory { scratch in
