@@ -17,8 +17,9 @@ final class HookWatchdog: @unchecked Sendable {
   private let finished = DispatchSemaphore(value: 0)
 
   init() {
-    timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
-    timer.schedule(deadline: .now() + 1.5)
+    // The only process-deadline owner: a strict timer without leeway.
+    timer = DispatchSource.makeTimerSource(flags: .strict, queue: .global(qos: .userInteractive))
+    timer.schedule(deadline: .now() + 1.5, leeway: .nanoseconds(0))
     timer.setEventHandler { [self] in fire() }
     timer.resume()
   }

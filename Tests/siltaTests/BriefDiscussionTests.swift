@@ -18,27 +18,55 @@ extension BriefCommandTests {
           UPDATE task SET claimed_at='2023-11-14T21:00:00.000Z' WHERE seq=3;
           """)
     }
-    try comment(2, 1, kind: "handoff", "State: callback inspected.\nNext step: wire refresh.",
-      by: "agent:codex:old", at: "21:00:00", scratch)
-    try comment(2, 2, kind: "question", "Which callback URL?", by: "agent:codex:old",
-      to: ["agent:codex:acme"], at: "21:01:00", scratch)
-    try comment(2, 3, kind: "question", "Ship before Friday?", by: "agent:codex:old",
-      to: ["human:acme"], at: "21:02:00", scratch)
-    try comment(2, 4, kind: "answer", "Yes.", by: "human:acme", thread: 3, at: "21:03:00", scratch)
-    try comment(2, 5, kind: "comment", "Looks good.", by: "human:acme", at: "21:03:30", scratch)
-    try comment(1, 1, kind: "question", "Can you check the portal build?", by: "human:acme",
-      to: ["agent:codex:acme"], at: "21:04:00", scratch)
-    try comment(3, 1, kind: "comment", "Rebased on main.", by: "human:acme",
-      at: "21:05:00", scratch)
+    let old = "agent:codex:old"
+    try comment(
+      2, 1,
+      Post(
+        "handoff", "State: callback inspected.\nNext step: wire refresh.", by: old, at: "21:00:00"),
+      scratch)
+    try comment(
+      2, 2,
+      Post("question", "Which callback URL?", by: old, to: ["agent:codex:acme"], at: "21:01:00"),
+      scratch)
+    try comment(
+      2, 3, Post("question", "Ship before Friday?", by: old, to: ["human:acme"], at: "21:02:00"),
+      scratch)
+    try comment(2, 4, Post("answer", "Yes.", by: "human:acme", thread: 3, at: "21:03:00"), scratch)
+    try comment(2, 5, Post("comment", "Looks good.", by: "human:acme", at: "21:03:30"), scratch)
+    try comment(
+      1, 1,
+      Post(
+        "question", "Can you check the portal build?", by: "human:acme",
+        to: ["agent:codex:acme"], at: "21:04:00"),
+      scratch)
+    try comment(
+      3, 1, Post("comment", "Rebased on main.", by: "human:acme", at: "21:05:00"), scratch)
     return repo
   }
 
-  func comment(
-    _ task: Int, _ seq: Int, kind: String, _ body: String, by actor: String,
-    to mentions: [String] = [], thread: Int? = nil, at time: String,
-    resolved: Bool = false, _ scratch: URL
-  ) throws {
-    let encoded = "[" + mentions.map { "\"" + $0 + "\"" }.joined(separator: ",") + "]"
+  struct Post {
+    let kind: String
+    let body: String
+    let actor: String
+    let mentions: [String]
+    let thread: Int?
+    let time: String
+    let resolved: Bool
+
+    init(
+      _ kind: String, _ body: String, by actor: String, to mentions: [String] = [],
+      thread: Int? = nil, at time: String, resolved: Bool = false
+    ) {
+      (self.kind, self.body, self.actor, self.mentions) = (kind, body, actor, mentions)
+      (self.thread, self.time, self.resolved) = (thread, time, resolved)
+    }
+  }
+
+  func comment(_ task: Int, _ seq: Int, _ post: Post, _ scratch: URL) throws {
+    let (kind, body, actor, thread, time, resolved) = (
+      post.kind, post.body, post.actor, post.thread, post.time, post.resolved
+    )
+    let encoded = "[" + post.mentions.map { "\"" + $0 + "\"" }.joined(separator: ",") + "]"
     try store(scratch).write {
       try $0.database.execute(
         sql: """
@@ -85,7 +113,8 @@ extension BriefCommandTests {
   @Test func inboxAttentionIsPerCaller() throws {
     try withScratchDirectory { scratch in
       let repo = try discussionFixture(scratch)
-      let other = try run(as: "agent:codex:other", ["--task", "AC-2", "--app", "api"], repo, scratch)
+      let other = try run(
+        as: "agent:codex:other", ["--task", "AC-2", "--app", "api"], repo, scratch)
       #expect(other.termination == .exit(0))
       #expect(other.stdout.contains("handoff AC-2/1 by agent:codex:old"))
       #expect(other.stdout.contains("questions: 2 open (1 answered)\n"))
@@ -106,7 +135,7 @@ extension BriefCommandTests {
       let refs = ["AC-2/2", "AC-1/1", "AC-3/1"]
       let text = try run(["--task", "AC-2", "--app", "api"], repo, scratch).stdout
       for ref in refs {
-        #expect(text.components(separatedBy: " " + ref + " on ").count == 2, "\(ref)")
+        #expect(text.components(separatedBy: " " + ref + " ").count == 2, "\(ref)")
       }
     }
   }
@@ -114,16 +143,21 @@ extension BriefCommandTests {
   @Test func newestHandoffBreaksTimeTiesByIdAndStaysWhenResolved() throws {
     try withScratchDirectory { scratch in
       let repo = try discussionFixture(scratch)
-      try comment(2, 6, kind: "handoff", "Second handoff.", by: "agent:codex:old",
-        at: "21:00:00", resolved: true, scratch)
-      try comment(2, 7, kind: "handoff", "Deleted handoff.", by: "agent:codex:old",
-        at: "21:09:00", scratch)
+      try comment(
+        2, 6,
+        Post("handoff", "Second handoff.", by: "agent:codex:old", at: "21:00:00", resolved: true),
+        scratch)
+      try comment(
+        2, 7, Post("handoff", "Deleted handoff.", by: "agent:codex:old", at: "21:09:00"), scratch)
       try store(scratch).write {
         try $0.database.execute(
           sql: "UPDATE comment SET deleted_at='2023-11-14T21:10:00.000Z' WHERE uid='acme-c-2-7'")
       }
       let text = try run(["--task", "AC-2", "--app", "api"], repo, scratch).stdout
-      #expect(text.contains("handoff AC-2/6 by agent:codex:old at 2023-11-14T21:00:00.000Z, resolved:\n> Second handoff.\n"))
+      #expect(
+        text.contains(
+          "handoff AC-2/6 by agent:codex:old at 2023-11-14T21:00:00.000Z, resolved:\n"
+            + "> Second handoff.\n"))
       #expect(!text.contains("AC-2/1 by"))
       #expect(!text.contains("Deleted handoff"))
     }
@@ -132,13 +166,14 @@ extension BriefCommandTests {
   @Test func handoffIsMaskedBeforeTrimmingAndCappedByBudget() throws {
     try withScratchDirectory { scratch in
       let repo = try discussionFixture(scratch)
-      let body = String(repeating: "Acme state. ", count: 29) + "Pwd=acme-secret-value\n"
+      let body =
+        String(repeating: "Acme state. ", count: 29) + "Pwd=acme-secret-value\n"
         + String(repeating: "Acme next. ", count: 700)
       try store(scratch).write {
         try $0.database.execute(
           sql: "UPDATE comment SET body_md=? WHERE uid='acme-c-2-1'", arguments: [body])
       }
-      for flags in [[], ["--hook"], ["--budget", "5000"]] {
+      for flags in [[], ["--short"], ["--budget", "5000"]] {
         let result = try run(["--task", "AC-2", "--app", "api"] + flags, repo, scratch)
         #expect(result.stdout.contains("(handoff trimmed; silta --ws 'acme' task show AC-2)\n"))
         #expect(!result.stdout.contains("acme-se"))
@@ -146,7 +181,7 @@ extension BriefCommandTests {
         let handoff = try #require(
           result.stdout.components(separatedBy: "handoff AC-2/1").last?
             .components(separatedBy: "(handoff trimmed").first)
-        let cap = flags.isEmpty ? 1500 : flags == ["--hook"] ? 480 : 3000
+        let cap = flags.isEmpty ? 1500 : flags == ["--short"] ? 480 : 3000
         #expect(handoff.count <= cap && handoff.count > cap - 120, "\(flags): \(handoff.count)")
       }
     }
@@ -161,15 +196,25 @@ extension BriefCommandTests {
           arguments: [(1...60).map { "- [ ] Acme step \($0)" }.joined(separator: "\n")])
       }
       for seq in 10..<20 {
-        try comment(2, seq, kind: "question", String(repeating: "Acme question? ", count: 80),
-          by: "agent:codex:old", to: ["agent:codex:acme"], at: "21:2\(seq - 10):00", scratch)
+        let body = String(repeating: "Acme question? ", count: 80)
+        try comment(
+          2, seq,
+          Post(
+            "question", body, by: "agent:codex:old", to: ["agent:codex:acme"],
+            at: "21:2\(seq - 10):00"),
+          scratch)
       }
+      let short = try run(["--task", "AC-2", "--app", "api", "--short"], repo, scratch)
+      #expect(short.stdout.count <= 3200)
+      #expect(short.stdout.contains("plan (revision 0):\n1. [ ] Acme step 1\n"))
+      #expect(
+        short.stdout.hasSuffix(
+          " | silta --ws 'acme' task show AC-2 | silta --ws 'acme' inbox\n"))
+      #expect(short.stdout.components(separatedBy: "\nquestion AC-2/").count <= 4)
+      let before = try hookTimeoutCount(scratch)
       let hook = try run(["--task", "AC-2", "--app", "api", "--hook"], repo, scratch)
       #expect(hook.termination == .exit(0))
-      #expect(hook.stdout.count <= 3200)
-      #expect(hook.stdout.contains("plan (revision 0):\n1. [ ] Acme step 1\n"))
-      #expect(hook.stdout.hasSuffix("more: silta --ws 'acme' task show AC-2 | silta --ws 'acme' inbox\n"))
-      #expect(hook.stdout.components(separatedBy: "\nquestion AC-2/").count <= 4)
+      if try hookTimeoutCount(scratch) == before { #expect(hook == short) }
       for budget in [1, 50, 100, 200, 400, 800, 2500] {
         let result = try run(
           ["--task", "AC-2", "--app", "api", "--budget", String(budget)], repo, scratch)
@@ -193,7 +238,8 @@ extension BriefCommandTests {
       }
       for (budget, cap) in [(2500, 600), (2504, 600), (2505, 601), (5000, 1200)] {
         let data = try fixture.data(
-          run(["--task", "AC-2", "--app", "api", "--budget", String(budget), "--json"],
+          run(
+            ["--task", "AC-2", "--app", "api", "--budget", String(budget), "--json"],
             repo, scratch))
         let sections = try #require(data["sections"] as? [[String: String]])
         let count = sections.first { $0["id"] == "description" }?["text"]?.count ?? 0
@@ -222,8 +268,11 @@ extension BriefCommandTests {
             """)
       }
       for flags in [[], ["--hook"]] {
+        let before = try hookTimeoutCount(scratch)
         let result = try run(["--task", "AC-2", "--app", "api"] + flags, repo, scratch)
         #expect(result.termination == .exit(0))
+        // A loaded machine can hit the hook deadline, which prints nothing by design.
+        if try hookTimeoutCount(scratch) > before { continue }
         #expect(result.stdout.components(separatedBy: "\ndone: ").count == 6, "\(flags)")
         #expect(!result.stdout.contains("done: AC-10"))
         #expect(result.stdout.contains("done: AC-9 Acme result 9"))

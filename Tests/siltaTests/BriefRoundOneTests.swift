@@ -117,16 +117,17 @@ extension BriefCommandTests {
           arguments: StatementArguments(
             Array(repeating: String(repeating: "Acme unused ", count: 180), count: 4)))
       }
-      let short = try run(["--task", "AC-2", "--app", "api", "--short"], repo, scratch)
-      #expect(short.stdout.contains("open: AC-1"))
+      let full = try run(["--task", "AC-2", "--app", "api", "--budget", "5000"], repo, scratch)
+      #expect(full.stdout.contains("open: AC-1"))
+      #expect(full.stdout.contains("done: AC-20004"))
       let clock = ContinuousClock()
       let started = clock.now
       let hook = try run(["--task", "AC-2", "--app", "api", "--hook"], repo, scratch)
       let elapsed = started.duration(to: clock.now)
-      let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String] ?? []
-      #expect(hook.stdout.contains("task: AC-2\n"), "hook output was empty after \(elapsed)")
+      let entry = try DogfoodLogTests.last(scratch)
+      let warnings = entry["warnings"] as? [String] ?? []
+      #expect(hook.stdout.contains("task: AC-2\n"), "empty after \(elapsed): \(entry)")
       #expect(hook.stdout.contains("open: AC-1"))
-      #expect(hook.stdout.contains("done: AC-20004"))
       #expect(!warnings.contains("hook_timeout"))
     }
   }

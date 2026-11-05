@@ -15,25 +15,34 @@ extension TaskService {
     } else {
       actor = environment.actor
     }
-    let slug = try selected(), command = "silta --ws " + shellWord(slug)
+    let slug = try selected()
     return try environment.db.read { db in
-      let attention = try Self.attention(
-        for: actor, workspaceID: Self.workspaceID(slug, in: db), in: db)
-      let items = (all ? attention : Array(attention.prefix(12))).map {
-        inboxItem($0, actor: actor, command: command)
-      }
-      let remaining = attention.count - items.count
-      return InboxResult(
-        actor: actor.description, items: items, remaining: remaining,
-        more: remaining == 0
-          ? nil : command + " inbox --for " + shellWord(actor.description) + " --all")
+      try inbox(for: actor, workspace: slug, all: all, in: db)
     }
+  }
+
+  /// The same attention inside the caller's read snapshot; `all` lifts the cap.
+  func inbox(for actor: ActorID, workspace slug: String, all: Bool, in db: Database) throws
+    -> InboxResult
+  {
+    let command = "silta --ws " + shellWord(slug)
+    let attention = try Self.attention(
+      for: actor, workspaceID: Self.workspaceID(slug, in: db), in: db)
+    let items = (all ? attention : Array(attention.prefix(12))).map {
+      inboxItem($0, actor: actor, command: command)
+    }
+    let remaining = attention.count - items.count
+    return InboxResult(
+      actor: actor.description, items: items, remaining: remaining,
+      more: remaining == 0
+        ? nil : command + " inbox --for " + shellWord(actor.description) + " --all")
   }
 
   private func inboxItem(_ attention: DiscussionAttention, actor: ActorID, command: String)
     -> InboxItem
   {
-    let post = attention.post, task = attention.task
+    let post = attention.post
+    let task = attention.task
     let read = command + " task show " + shellWord(task.ref) + " --timeline"
     let next: [String]
     if attention.kind == "question",

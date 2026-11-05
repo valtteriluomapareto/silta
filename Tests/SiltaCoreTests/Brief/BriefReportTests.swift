@@ -40,9 +40,10 @@ extension BriefReportTests {
         settings: BriefSettings(
           WorkspaceSettings(workspace: "acme", json: "{}"), workspace: "acme"),
         currentTask: "AC-1", sections: [plan], more: ["silta task show AC-1"], warnings: [])
-      let marker = [0, 60].map {
-        BriefPlan.marker(ref: "AC-1", total: 60, through: $0, workspace: "acme").count
-      }.max() ?? 0
+      let marker =
+        [0, 60].map {
+          BriefPlan.marker(ref: "AC-1", total: 60, through: $0, workspace: "acme").count
+        }.max() ?? 0
       let minimum = report.floor.count + report.footer.count + marker
       report.trim(tokens: budget)
       #expect(report.text.count <= max(budget * 4, minimum), "budget \(budget)")

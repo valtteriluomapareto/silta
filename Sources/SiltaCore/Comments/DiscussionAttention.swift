@@ -13,6 +13,8 @@ struct DiscussionAttention {
 extension TaskService {
   /// Returns uncapped discussion attention inside the caller's read snapshot.
   /// Classification has no caller-specific actions and does not mutate storage.
+  /// Only tasks the actor claims or with a live open question can hold attention, so
+  /// closed discussion history adds no per-task reads.
   static func attention(for actor: ActorID, workspaceID: Int64, in db: Database) throws
     -> [DiscussionAttention]
   {
@@ -21,7 +23,9 @@ extension TaskService {
       sql: query + """
         \nWHERE task.workspace_id=? AND task.external_ref IS NULL
         AND EXISTS(SELECT 1 FROM comment WHERE task_id=task.id AND deleted_at IS NULL)
-        """, arguments: [workspaceID]
+        AND (task.claimed_by=? OR EXISTS(SELECT 1 FROM comment WHERE task_id=task.id
+          AND kind='question' AND resolved_at IS NULL AND deleted_at IS NULL))
+        """, arguments: [workspaceID, actor.description]
     ).map { TaskDetails(row: $0) }
     let result = try tasks.flatMap { task -> [DiscussionAttention] in
       let posts = try discussion(task, timeline: true, in: db)
