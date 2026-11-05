@@ -49,6 +49,7 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 - `silta doctor`
 - `silta export`
 - `silta guide`
+- `silta inbox`
 - `silta init`
 - `silta repo fetch`
 - `silta task archive`

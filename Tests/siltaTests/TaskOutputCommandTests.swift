@@ -6,7 +6,7 @@ import Testing
 
 /// What task commands print: one-line receipts that say what changed, data that
 /// `--quiet` keeps, and approval rows that name the body flag passed.
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskOutputCommandTests {
   private static func run(_ arguments: [String], in scratch: URL) throws -> CLIResult {
     try SiltaBinary.run(arguments, in: scratch, environment: TaskCommandTests.actor)

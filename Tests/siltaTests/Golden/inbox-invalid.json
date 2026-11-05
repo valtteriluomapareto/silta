@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"Use a complete human:<name> or agent:<tool>:<session> actor, or me.","next":["silta inbox --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

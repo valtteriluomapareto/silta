@@ -1,5 +1,6 @@
 /// A discussion post; deleted bodies are replaced by a placeholder on reads.
 package struct CommentDetails: Encodable, Sendable {
+  let id: Int64
   /// The canonical task/comment reference.
   package let ref: String
   /// Stored kinds remain readable even when a newer writer introduced them.
@@ -34,5 +35,13 @@ package struct CommentDetails: Encodable, Sendable {
     case resolvedAt = "resolved_at"
     case resolvedBy = "resolved_by"
     case createdAt = "created_at"
+  }
+
+  func isAnswered(by posts: [CommentDetails]) -> Bool {
+    !deleted
+      && posts.contains {
+        $0.replyTo == ref && $0.kind == "answer" && !$0.deleted
+          && (ActorID.parse($0.actor)?.isHuman == true || mentions.contains($0.actor))
+      }
   }
 }

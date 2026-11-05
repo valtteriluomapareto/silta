@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(3)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(3)))
 struct WhereOverrideTests {
   private let fixture = WhereCommandTests()
 

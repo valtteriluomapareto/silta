@@ -1,0 +1,1 @@
+{"error":{"code":"conflict","message":"A claimer cannot accept its own answer to another actor's question.","next":["silta --ws 'acme' task show 'AC-1' --timeline"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

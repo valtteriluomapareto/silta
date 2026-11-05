@@ -3,7 +3,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(3)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(3)))
 struct DogfoodInstallTests {
   static func git(_ args: [String], in scratch: URL, cwd: URL) throws -> String {
     let result = try SiltaBinary.runProcess(

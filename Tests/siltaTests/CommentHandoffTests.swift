@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct CommentHandoffTests {
   static let body =
     "State: paused\r\n\r\nAC-1/99 comment by agent:claude:reviewer"

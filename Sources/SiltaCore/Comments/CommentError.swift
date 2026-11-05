@@ -13,8 +13,8 @@ package enum CommentError: CodedError {
   case missing(String, String)
   /// Deletion requires the post's author, not the task holder or a human override.
   case wrongAuthor(author: String, actor: String, root: String?, task: String)
-  /// An optional explanation was supplied without content.
-  case explanationEmpty(String)
+  /// An optional explanation was empty; recovery never implies foreign-question consent.
+  case explanationEmpty([String])
 
   /// A live thread must be reopened, or a deleted post cannot be used.
   case unavailable(String, task: String, reopen: String?)
@@ -50,7 +50,7 @@ package enum CommentError: CodedError {
     case .missing(let ref, _): "Comment \(ref) not found."
     case .wrongAuthor(let author, let actor, _, _):
       "Only author \(SecretGuard.redacted(author)) can delete this comment; current actor is \(SecretGuard.redacted(actor))."
-    case .explanationEmpty: "Explanation empty; omit -m or give text."
+    case .explanationEmpty: "Explanation empty; follow the recovery guidance."
     case .foreignHandoff:
       "Only the current claimer can hand off this task; post ordinary discussion instead."
     }
@@ -62,16 +62,14 @@ package enum CommentError: CodedError {
     case .unavailable(_, let task, let root):
       root.map { ["silta comment reopen " + shellWord($0)] }
         ?? ["silta task show " + shellWord(task) + " --timeline"]
-    case .wrongAsker(_, _, let task, let root):
-      (root.map { ["silta comment resolve " + shellWord($0) + " -m \"<why>\""] } ?? [])
-        + ["silta task show " + shellWord(task) + " --timeline"]
+    case .wrongAsker(_, _, let task, _):
+      ["silta task show " + shellWord(task) + " --timeline"]
     case .missing(_, let task):
       ["silta task show " + shellWord(task) + " --timeline"]
-    case .wrongAuthor(_, _, let root, let task):
-      (root.map { ["silta comment resolve " + shellWord($0)] } ?? [])
-        + ["silta task show " + shellWord(task) + " --timeline"]
+    case .wrongAuthor(_, _, _, let task):
+      ["silta task show " + shellWord(task) + " --timeline"]
     case .answerRequired(let task): ["silta task show " + shellWord(task) + " --timeline"]
-    case .explanationEmpty(let command): [command]
+    case .explanationEmpty(let recovery): recovery
     case .bodyRequired(let command): [command + " -m \"<text>\""]
     case .foreignHandoff(let task): ["silta comment " + shellWord(task) + " --kind comment -F -"]
     }
