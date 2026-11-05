@@ -44,9 +44,12 @@ extension BriefCommandTests {
       }
       let result = try run(["--app", "api", "--topic", "PAYMENTS"], repo, scratch)
       #expect(result.stdout.contains("open: AC-100"))
-      #expect(result.stdout.contains("7 more open;"))
-      #expect(result.stdout.contains("task ls --app 'api'"))
-      #expect(result.stdout.contains("task ls --topic 'billing'"))
+      #expect(
+        result.stdout.contains(
+          "7 more open:\nnext: silta --ws 'acme' task ls --app 'api'\n"
+            + "next: silta --ws 'acme' task ls --topic 'billing'\n"
+            + "next: silta --ws 'acme' task ls --topic 'messages'\n"))
+      #expect(!result.stdout.contains(" | silta --ws 'acme' task ls"))
     }
   }
 

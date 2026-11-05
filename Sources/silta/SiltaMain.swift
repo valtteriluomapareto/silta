@@ -60,9 +60,8 @@ enum SiltaMain {
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = logFlags(flags)
-      if let hookDeadline {
-        let completion = BriefHookCompletion(
-          rendered: rendered, entry: entry, expired: hookDeadline.expired)
+      if hookDeadline != nil {
+        let completion = BriefHookCompletion(rendered: rendered, entry: entry)
         if let watchdog {
           watchdog.finish(completion.entry)
         } else {

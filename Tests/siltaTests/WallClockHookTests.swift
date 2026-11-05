@@ -26,6 +26,22 @@ struct WallClockHookTests {
 
   func contextFixture(_ scratch: URL) throws -> URL { try brief.contextFixture(scratch) }
 
+  /// The discussion tests' hook runs skip when the deadline trips; here a hook brief with
+  /// a handoff, caller items and an inbox must finish and equal the short brief.
+  @Test func hookDiscussionMatchesTheShortBriefWithinTheDeadline() throws {
+    try withScratchDirectory { scratch in
+      let repo = try brief.discussionFixture(scratch)
+      let task = ["--task", "AC-2", "--app", "api"]
+      let short = try run(task + ["--short"], repo, scratch)
+      #expect(short.stdout.contains("handoff AC-2/1 by agent:codex:old"))
+      #expect(short.stdout.contains("inbox: 3 items for agent:codex:acme (1 on this task)\n"))
+      let hook = try run(task + ["--hook"], repo, scratch)
+      let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String] ?? []
+      #expect(!warnings.contains("hook_timeout"))
+      #expect(hook == short)
+    }
+  }
+
   /// The parallel suite skips this comparison when a busy machine trips the deadline;
   /// here the hook must finish in time.
   @Test func hookOutputMatchesTheShortBriefWithinTheDeadline() throws {
@@ -187,7 +203,8 @@ struct WallClockHookTests {
     }
   }
 
-  /// Scale under the same deadline; it also needs the slow tier.
+  /// Scale under the same deadline: mostly done rows and 5k open answered questions for
+  /// another actor. It also needs the slow tier.
   @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
   func hookWithTwentyThousandTasks() throws {
     try withScratchDirectory { scratch in
@@ -197,17 +214,35 @@ struct WallClockHookTests {
           sql: """
             WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+1 FROM n WHERE x<20004)
             INSERT INTO task(uid,workspace_id,seq,title,status,app_id,description_md,plan_md,
-              result_md,created_by,created_at,updated_at)
-            SELECT 'bulk-'||x,1,x,'Acme backlog','todo',app.id,?,?,?,'human:acme','',''
-            FROM n,app WHERE app.slug='api'
+              result_md,closed_at,created_by,created_at,updated_at)
+            SELECT 'bulk-'||x,1,x,'Acme backlog',CASE WHEN x%10=0 THEN 'todo' ELSE 'done' END,
+              app.id,?,?,?,CASE WHEN x%10=0 THEN NULL ELSE '2023-11-14T20:00:00.000Z' END,
+              'human:acme','',''
+            FROM n,app WHERE app.slug='api';
+            WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+4 FROM n WHERE x<20000)
+            INSERT INTO comment(uid,task_id,seq,kind,body_md,mentions,actor,resolved_at,
+              resolved_by,created_at)
+            SELECT 'bulk-q-'||x,task.id,1,'question',?,'["human:acme"]','agent:codex:other',
+              NULL,NULL,'2023-11-14T20:00:00.000Z'
+            FROM n JOIN task ON task.seq=n.x;
+            INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,mentions,actor,created_at)
+            SELECT 'bulk-a-'||task_id,task_id,2,id,'answer',body_md,'[]','human:acme',
+              '2023-11-14T20:30:00.000Z'
+            FROM comment WHERE uid LIKE 'bulk-q-%';
             """,
           arguments: StatementArguments(
-            Array(repeating: String(repeating: "Acme unused ", count: 180), count: 3)))
+            Array(repeating: String(repeating: "Acme unused ", count: 180), count: 4)))
       }
-      let short = try run(["--task", "AC-2", "--app", "api", "--short"], repo, scratch)
-      #expect(short.stdout.contains("open: AC-1"))
+      let full = try run(["--task", "AC-2", "--app", "api", "--budget", "5000"], repo, scratch)
+      #expect(full.stdout.contains("open: AC-1"))
+      #expect(full.stdout.contains("done: AC-20004"))
+      let clock = ContinuousClock()
+      let started = clock.now
       let hook = try run(["--task", "AC-2", "--app", "api", "--hook"], repo, scratch)
-      let warnings = try DogfoodLogTests.last(scratch)["warnings"] as? [String] ?? []
+      let elapsed = started.duration(to: clock.now)
+      let entry = try DogfoodLogTests.last(scratch)
+      let warnings = entry["warnings"] as? [String] ?? []
+      #expect(hook.stdout.contains("task: AC-2\n"), "empty after \(elapsed): \(entry)")
       #expect(hook.stdout.contains("open: AC-1"))
       #expect(!warnings.contains("hook_timeout"))
     }

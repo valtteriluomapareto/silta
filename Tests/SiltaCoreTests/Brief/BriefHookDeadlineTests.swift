@@ -17,9 +17,12 @@ struct BriefHookDeadlineTests {
 
   func deadline(_ milliseconds: Int) -> BriefHookDeadline { Self.deadline(milliseconds) }
 
-  @Test(arguments: [(0, false), (1499, false), (1500, true), (4000, true)])
-  func processExpiresExactlyAtOnePointFiveSeconds(_ milliseconds: Int, _ expired: Bool) {
-    #expect(deadline(milliseconds).expired == expired)
+  /// The watchdog schedules exactly this budget; child reads stop half a second sooner.
+  @Test func processBudgetIsOnePointFiveSecondsWithAHalfSecondChildReserve() {
+    #expect(BriefHookDeadline.budget == .milliseconds(1500))
+    #expect(BriefHookDeadline.childReserve == .milliseconds(500))
+    #expect(deadline(0).childSeconds == 1.0)
+    #expect(deadline(1000).childSeconds == 0)
   }
 
   @Test(arguments: [
