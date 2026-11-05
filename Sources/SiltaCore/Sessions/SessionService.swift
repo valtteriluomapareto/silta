@@ -20,10 +20,10 @@ package struct SessionService: Sendable {
           WHERE t.claimed_by=:actor AND t.claimed_at>:fresh AND t.status='doing'
             AND t.external_ref IS NULL AND (
               EXISTS(SELECT 1 FROM task_event e WHERE e.task_id=t.id AND e.actor=:actor
-                AND e.kind NOT IN ('claim','created','secret_redacted')
+                AND e.kind NOT IN ('claim','created','secret_redacted','handoff')
                 AND e.id>COALESCE((SELECT MAX(h.id) FROM task_event h
-                  WHERE h.task_id=t.id AND h.actor=:actor AND h.kind='claim'
-                    AND h.body LIKE 'released %'),0))
+                  WHERE h.task_id=t.id AND h.actor=:actor AND (h.kind='handoff' OR
+                    (h.kind='claim' AND h.body LIKE 'released %'))),0))
               OR EXISTS(SELECT 1 FROM comment c WHERE c.task_id=t.id AND c.actor=:actor
                 AND c.kind<>'handoff' AND c.seq>COALESCE((SELECT MAX(h.seq) FROM comment h
                   WHERE h.task_id=t.id AND h.actor=:actor AND h.kind='handoff'),0))

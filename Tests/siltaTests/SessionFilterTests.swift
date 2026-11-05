@@ -6,7 +6,7 @@ import Testing
 
 struct SessionFilterTests {
   @Test(arguments: [
-    "own", "foreign-claim", "foreign-write", "expired", "boundary", "promoted",
+    "own", "foreign-claim", "foreign-write", "expired", "expired-at-start", "promoted",
     "review", "no-writes", "claim-only", "created-only", "secret-only", "link", "foreign-comment",
   ])
   func onlyFreshOwnMeaningfulWritesNeedHandoff(kind: String) throws {
@@ -32,7 +32,7 @@ struct SessionFilterTests {
         var change = "claimed_at='2023-11-14T22:13:20.000Z'"
         if kind == "foreign-claim" { change += ",claimed_by='agent:claude:other'" }
         if kind == "expired" { change = "claimed_at='2023-11-14T20:13:19.999Z'" }
-        if kind == "boundary" { change = "claimed_at='2023-11-14T20:13:20.000Z'" }
+        if kind == "expired-at-start" { change = "claimed_at='2023-11-14T20:13:20.000Z'" }
         if kind == "promoted" { change += ",external_ref='ado:42'" }
         if kind == "review" { change += ",status='review'" }
         try tx.database.execute(sql: "UPDATE task SET " + change)

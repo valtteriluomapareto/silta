@@ -1106,8 +1106,11 @@ without promotion, and has meaningful own writes since its last own handoff.
 Creation and claiming alone do not count. Plan/step/task changes, discussion posts
 and discussion state changes do. Repeating start does not erase earlier writes;
 old-comment deletion is audited in the same transaction. Own event IDs after the
-last handoff release and own comment sequences after the last handoff are compared
-separately, so equal timestamps do not hide work. Foreign and expired claims are omitted.
+last handoff event (including a context-only unclaimed handoff) and own comment
+sequences after the last handoff are compared
+separately, so equal timestamps do not hide work. Older claim-release markers remain
+recognized. A historical unclaimed handoff without an audit event may conservatively
+request one extra handoff. Foreign and expired claims are omitted.
 
 Stop uses the same query under the bounded hook gateway. If needed it emits raw
 Claude `{"decision":"block","reason":"..."}` JSON with at most five scoped handoff

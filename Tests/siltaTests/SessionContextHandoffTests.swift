@@ -20,9 +20,7 @@ struct SessionContextHandoffTests {
         #expect(try SessionCheckTests.run(args, in: scratch).termination == .exit(0))
       }
       let pending = try SessionCheckTests.tasks(in: scratch)
-      withKnownIssue("Context-only handoff must clear earlier own event writes") {
-        #expect(pending.isEmpty)
-      }
+      #expect(pending.isEmpty)
       _ = try SessionCheckTests.run(
         ["task", "plan", "AC-1", "-m", "- [ ] Acme follow-up"], in: scratch)
       #expect(try SessionCheckTests.tasks(in: scratch).count == 1)
