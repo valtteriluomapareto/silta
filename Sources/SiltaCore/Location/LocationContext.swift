@@ -8,4 +8,5 @@ struct LocationContext {
   let candidates: [LocationCandidate]
   let refs: [(String, String)]
   let warnings: [OutputWarning]
+  var displayRoot: URL?
 }

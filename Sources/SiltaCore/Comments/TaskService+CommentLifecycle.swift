@@ -78,9 +78,12 @@ extension TaskService {
       try Self.mutable(task)
       if action == .delete {
         guard row["actor"] as String == environment.actor.description else {
+          let resolved = (row["root_resolved_at"] as String?) ?? (row["resolved_at"] as String?)
           throw CommentError.wrongAuthor(
             author: row["actor"], actor: environment.actor.description,
-            root: "\(task.ref)/\((row["root_seq"] as Int?) ?? (row["seq"] as Int))", task: task.ref)
+            root: resolved == nil
+              ? "\(task.ref)/\((row["root_seq"] as Int?) ?? (row["seq"] as Int))" : nil,
+            task: task.ref)
         }
       } else if let root = row["thread_id"] as Int64? {
         guard
@@ -133,7 +136,7 @@ extension TaskService {
     }
   }
 
-  private static func commentTarget(_ raw: String, workspace: String, in db: Database) throws
+  static func commentTarget(_ raw: String, workspace: String, in db: Database) throws
     -> (TaskDetails, Row)
   {
     let parts = raw.split(separator: "/", omittingEmptySubsequences: false)

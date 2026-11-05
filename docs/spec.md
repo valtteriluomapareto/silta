@@ -169,6 +169,8 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
 - **Task**: a backlog item with plan, result, comments and links.
 - **Comment**: a post on a task or a doc revision. Its kind is one of `comment`,
   `question`, `answer`, `decision` or `handoff`. Threads can be resolved.
+  The asker or current task claimer may accept an answer; acceptance resolves the
+  thread and records the accepting actor.
 - **Review** (M2): a comment with a verdict on a subject (the task's diff, a plan
   revision, or a doc revision), with line comments.
 - **Doc** (M2): a versioned markdown document owned by `silta`.
@@ -309,7 +311,7 @@ CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERE
   actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
-  -- discussion: 'resolved <root-ref>' or 'reopened <root-ref>', once per changed root.
+  -- discussion: 'resolved <root-ref>', 'reopened <root-ref>' or 'accepted <answer-ref>', once per change.
   -- A comment's secret_redacted event body is that comment's ref, never its content.
 CREATE INDEX task_event_task ON task_event(task_id, kind);
 
@@ -325,7 +327,7 @@ CREATE TABLE comment (
   anchor TEXT, anchor_sha TEXT, anchor_snippet TEXT,  -- (M2) quoted lines kept for orphaned anchors
   body_md TEXT NOT NULL,
   mentions TEXT NOT NULL DEFAULT '[]',        -- JSON array of actors, parsed from @…
-  accepted INTEGER NOT NULL DEFAULT 0,        -- answer accepted by the asker
+  accepted INTEGER NOT NULL DEFAULT 0,        -- answer accepted by the asker or current task claimer
   actor TEXT NOT NULL,
   resolved_at TEXT, resolved_by TEXT, deleted_at TEXT,
   created_at TEXT NOT NULL,
@@ -732,17 +734,51 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 | Kind | Use | Behaviour |
 |---|---|---|
 | `comment` | General notes | — |
-| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until answered. **Ask in chat first** when the human is there. |
-| `answer` | Reply to a question | The asker can `comment accept AC-12/5`, which resolves the thread |
+| `question` | Blocks work *beyond this session* | Listed in the inbox of the mentioned actors (default `@me`) until a qualifying live answer exists or the root is explicitly resolved. **Ask in chat first** when the human is there. |
+| `answer` | Reply to a question | The asker or current task claimer can `comment accept AC-12/5`, which resolves the thread |
 | `decision` | A choice and its reason | Shown in `brief`; `--from note:…` cites a meeting |
 | `handoff` | Where I stopped, what's next | Releases the author's own claim, preserving status. The newest one is shown first in `brief --task`. Template in `silta guide` |
 
+- Recipients: repeatable `--to <actor>|me` and body mentions `@human:<name>`,
+  `@agent:<tool>:<session>` and `@me`. Only complete actors are accepted; `me` is
+  the captured `human:<USER>`, or `human:unknown` for an unset/invalid USER, independently
+  of the caller. Recipients are deduplicated and sorted in `mentions`; questions
+  default to `me` only when neither explicit recipients nor mentions are present.
+  Inline code spans and fenced code blocks are examples, not mentions. Tool-only
+  actors such as `@agent:codex` are refused; recipients require a complete session.
+  Other Markdown wrappers and trailing punctuation delimit mentions; malformed reserved
+  aliases/actor mentions refuse rather than redirecting to the human. Lifecycle
+  explanations parse mentions too. `--from note:…` stores a nonempty, control-free
+  note citation as a comment `cites` link without accessing the file; JSON exposes
+  optional `from`. Citation/recipient metadata must contain no secrets.
+- A question is `answered` only by a live answer from one of its addressees or a
+  human. An agent outside its recipients may contribute an answer without clearing
+  the addressees' attention. JSON includes `answered` for questions (false for a
+  deleted question); text uses the same rule. Answer acceptance remains a separate
+  choice by the asker or current claimer.
+- Questions and handoffs are roots. Answers require a live unresolved question;
+  comment/decision replies require a live unresolved root. A deleted immediate
+  target or root cannot receive public replies. Cross-task/workspace replies refuse.
+- Accept requires the question's exact asker actor/session or current task claimer,
+  and a live answer/root.
+  It sets the answer's `accepted` flag and the root's `resolved_at`/`resolved_by`
+  to the accepter, recording `accepted <answer-ref>` in the attributed discussion event.
+  Repeating that same live acceptance writes nothing. A manually resolved question
+  or a different answer selection requires reopen first; deleted posts refuse.
+  JSON always includes `accepted`; text identifies accepted answers distinctly.
+  Giving accept a question or non-answer ref points to the task's full discussion.
+- An answer posted by an agent, including a relay of the human's answer, never
+  supplies approval words; human-only commands still follow [§11](#actors-and-sessions).
+- Post findings as roots, not replies to a handoff: the newest handoff thread stays
+  shown even when resolved. Task show offers no per-thread `next:` lines.
 - Threads: `--reply-to AC-12/3`. `comment resolve|reopen <ref>… [-m …]` takes several
   refs in one call.
 - `task show` shows the newest handoff thread first and unresolved threads with
   their replies, identifying answered versus resolved questions. Roots and replies
   sort by creation time then id. Deleted content is a placeholder; an empty deleted
-  thread is omitted. `--timeline` includes full discussion alongside task events.
+  thread is omitted. The default read also shows `N resolved threads (see --timeline)`
+  when retained resolved roots exist; optional JSON `resolved_threads` reports that
+  count. `--timeline` includes full discussion alongside task events.
   Text bodies are quoted line by line, including blank lines, so content cannot
   impersonate a comment header. One final newline is omitted from text framing; raw
   JSON bodies and intentional extra blank lines are preserved. Full-history comment
@@ -761,6 +797,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
 - Resolve/reopen normalize reply refs to thread roots, deduplicating in first-appearance
   order, atomically across the selected workspace. Deleted roots remain resolvable.
   Any actor may resolve/reopen; only a post's exact author may delete that named post.
+  Wrong-author deletion offers resolve recovery only while the root is open.
   Reopen clears answer acceptance; delete preserves resolution and retained refs.
   An optional explanation appends one ordinary reply per changed root in the same
   transaction, with one consent for the batch. No-ops write nothing, including
@@ -824,7 +861,13 @@ inbox is short and grouped:
   agent asks first, and maps "the rest" only to items it showed.
 
 It lists:
-- unanswered questions mentioning the actor
+- live open questions mentioning the actor with no qualifying live answer (an answer
+  by an addressee or human); deleting the last qualifying answer restores attention
+- answers to your live open questions awaiting acceptance, including answers from
+  other agents; the asker must be able to review these without being an answer recipient
+- reopening clears acceptance and restores attention: the asker receives live answers
+  awaiting acceptance, and addressees receive questions without a qualifying answer;
+  deleted question roots never appear in either question category
 - open review requests for the actor's tool (M2)
 - for humans, also: `proposed` tasks, pending doc proposals (M2), and promoted tasks
   needing attention
@@ -951,6 +994,9 @@ silta code ls   <app>[@<ref>] [<dir>]
     in this chat in reply to a message where the agent named this command. A task
     prompt, an earlier instruction or the agent's own text never counts. One answer
     covers every command named in the message it answers, and nothing else.
+  - An answer or comment posted by an agent never counts as approval words, even
+    when it relays the human's answer. A human-only command still requires the
+    human's own reply in chat to a message naming that command (D38).
   - The words are 1–300 Unicode scalars after trimming and secret-guarded like any agent text. Words in
     angle brackets, or containing a printed placeholder such as `<the human's words>`
     anywhere, are `invalid`.
@@ -1069,16 +1115,41 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    1. the latest handoff
    2. unanswered questions, and what the task is blocked on and for how long, with
       the same `next` as a refused `task start`
-   3. the plan with step state: completed runs collapse (e.g. `1–7 done`), open
-      steps keep original numbering, and the tail is trimmed. A complete marker
+   3. the plan with step state: completed runs collapse (e.g. `1–7 done`) unless they contain open nested
+      work. Open steps keep original numbering, and the tail is trimmed. A complete marker
       such as `(plan trimmed: 32/60; silta --ws acme task show AC-12)` names the last
-      represented original step and total, including completed summaries. Zero
-      means no step fits; freeform plans retain their text and use a marker without counts.
-   4. (M2) review state and unresolved `changes` threads with their snippets
-3. **App card**: summary, environments, a pointer to the repo's AGENTS.md.
-4. **Neighbours**: edges in and out, each with a ready `silta code show …` command.
-5. **Open tasks** for this app and its topics (top 8).
-6. **Recently done**: the first line of each result, with `done_sha`, for the last 5.
+      represented original step and total, including completed summaries. The count
+      is replaced by “no steps shown (60 total)” when no step fits; freeform plans
+      retain their text and use a marker without counts.
+   4. the task description, trimmed after the plan to at most 600 characters,
+      including a complete `task show` marker. Global trimming keeps that marker
+      whole whenever a partial description is displayed. Local capping marks the
+      report truncated and leaves later app context eligible.
+   5. (M2) review state and unresolved `changes` threads with their snippets
+3. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
+   the resolved worktree's repo root with its on-disk casing, including for subpath apps. The pointer does not
+   claim the file exists.
+4. **Neighbours**: edges in and out, ordered by source app, target app, target
+   service, kind and edge id. Configured code references produce complete, quoted
+   `silta code show …` commands, including ref and line selection. With no usable
+   code references, offer `silta code ls` on the other app. Service edges omit a
+   redundant directory command for the current app. Repeated code commands appear
+   only once; valid references survive unsupported elements in the same list.
+5. **Open tasks** for this app and its topics (top 8), ordered by priority then
+   task sequence ascending, after explicit-topic matches, which rank first. When
+   the selection exceeds eight, an omitted count includes complete `task ls` commands
+   for the app and canonical selected topics. Open statuses are todo, doing, review, blocked and visible
+   proposals (the caller's proposals, or all for a human). Promoted and archived tasks
+   are omitted. Topics come from `about` links on visible, unarchived, unpromoted
+   tasks assigned to this app. Repeatable `--topic` adds topic slugs or normalized
+   aliases. Their matching tasks may belong to other apps; duplicates appear once,
+   and topics do not expand recursively. An unknown topic returns `not_found` with
+   a workspace-qualified `ws show` command. The current task may also appear here.
+6. **Recently done**: the first line of each result, with the first 12 characters of `done_sha` when set, for the last 5
+   matching tasks, ordered by completion instant then task sequence descending.
+   Empty result text is omitted. Cross-app open rows name their app.
+   Promoted and archived tasks are omitted. Brief alone uses the default 14-day
+   archive threshold if the stored archive setting is unsupported, with a warning.
 7. **Decisions**: `decision` comments, plus decisions from meeting notes from M3.
 8. **Docs** (M2): titles, plus stale flags.
 9. **Glossary**: aliases of the topics shown.
@@ -1096,13 +1167,18 @@ retain the compact location, current task reference, non-default settings and co
 and their complete `brief --app` retries are budgeted before the task line in both
 formats. Empty candidate lists are omitted. Recovery commands and trim markers are
 kept whole; a marker remains even when zero plan lines fit. The normal budget omits
-the redundant `brief --task` retry; short briefs retain it.
+the redundant `brief --task` retry; short briefs retain it, preserving explicit
+app and topic selections. Candidate retries retain task and topic selections too.
 JSON contains compact `location` metadata, `settings`, optional `current_task`, ordered
 `sections` (`id` and trimmed `text`), `more` commands and a `truncated` boolean.
-Absent location app and branch values encode as `null`. Settings is an open object:
-unsupported keys/values retain masked raw JSON without a gloss and produce a
-`setting_unsupported` warning per key. A malformed top-level settings document uses
-an `_invalid` indicator. This tolerant projection does not relax write-policy validation.
+Absent location app and branch values encode as `null`. Settings contains only
+supported non-default typed keys (`proposals`, `review_gate`, `archive_after_days`,
+`stale_days`). Unsupported keys or values are omitted and produce a per-key
+`setting_unsupported` warning with a secret-masked preview of at most 160 characters
+plus an ellipsis. Text includes a protected “settings unsupported” hint naming at
+most eight keys (40 characters each) and asking the human; further keys are counted. A malformed settings
+document produces an empty settings object and a warning. This tolerant read does
+not relax write-policy validation.
 
 Automatic current-task ties use newest claim time (session matches), otherwise newest
 update time (branch matches), then highest task sequence. Only local open, unarchived
@@ -1113,13 +1189,14 @@ rules. App cards, neighbours and app backlogs follow resolved `location.app`; th
 section names its own app, including when an explicit `--app` selects a different app.
 Brief masks stored task-body secrets. Blockers include their follow-up date.
 
-The available core brief omits app/backlog and discussion/inbox sections until their
-ordered additions ship; the task description joins the richer context addition.
+Discussion/inbox sections remain omitted until their ordered addition ships.
 Hook mode has a 1.5 s process deadline, including environment
 assembly, fails immediately on database contention and never populates `where_cache`.
 The watchdog appends a best-effort body-free timeout record, then exits without running
 exit handlers. Timeout and completion have exclusive log/output ownership; completion
-cancels the watchdog explicitly before output. Hook log appends are nonblocking and
+cancels the watchdog explicitly before output. A child Git deadline is recorded as
+`hook_timeout` even when it finishes before the process deadline. Hook log appends are
+nonblocking and
 skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NONBLOCK`.
 
 ## 13. Indexing and search (M3)
@@ -1887,6 +1964,27 @@ tasks with `source` links.
    - whether the system SQLite allows loadable extensions (for vectors later)
 6. **Tracker mirror depth** in M4: is reading status and title enough?
 7. **Turso:** revisit at 1.0, or when a Swift binding appears.
+8. **Is code access (§10) worth keeping?** Its value has not been shown, and it may
+   be overkill. Agents can already read a neighbouring clone directly, or run
+   `git -C <clone> show <ref>:<path>`. `code` adds four commands, a Git runner,
+   fetch-staleness rules and their errors, all of which must be maintained.
+   Evaluate it in detail before building on it:
+   - **Compare outcomes, not adoption.** Run the same cross-repo tasks with and
+     without `code`: the agent may also use plain file and git reads. Use
+     Claude Code, Codex and at least one open model. The tasks read a neighbour's
+     default branch, a feature branch and the prod ref. Measure task success,
+     reads of the wrong version (another clone's working tree on the wrong
+     branch), tool calls, tokens and time.
+   - **Check the eval itself.** `start-cross-repo` (§21) passes only when the agent
+     used `code show/grep`, which assumes the answer. Its criterion should be the
+     outcome: the agent read the right version of the backend.
+   - **Watch real use.** In DF3's multi-repo workspace, compare `code` calls in the
+     logs with direct reads of other clones, and record the friction.
+   - **Decide.** Keep `code` as it is, cut it down (for example to `show` and
+     `grep`, or to the read commands `brief` suggests), or remove it in favour of
+     plain git hints in `brief`.
+
+   Until that decision, `code` gets fixes only, and no new features.
 
 ## Appendix A — Example workspace (`silta ws edit` YAML)
 

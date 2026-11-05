@@ -1,1 +1,1 @@
-{"error":{"code":"invalid","message":"Use comment, decision or handoff.","next":["silta --ws 'acme' comment --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"Use comment, question, answer, decision or handoff.","next":["silta --ws 'acme' comment --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

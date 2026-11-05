@@ -316,6 +316,13 @@ extension DogfoodLogTests {
       (acme + ["comment", "resolve", "AC-1/1"], "acme"),
       (acme + ["comment", "reopen", "AC-1/1"], "acme"),
       (acme + ["comment", "delete", "AC-1/1"], "acme"),
+      (acme + ["comment", "AC-1", "--kind", "question", "-m", "Acme question"], "acme"),
+      (
+        acme + [
+          "comment", "AC-1", "--kind", "answer", "--reply-to", "AC-1/2", "-m", "Acme answer",
+        ], "acme"
+      ),
+      (acme + ["comment", "accept", "AC-1/3"], "acme"),
     ]
   }
 

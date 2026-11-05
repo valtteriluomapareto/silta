@@ -30,3 +30,18 @@ steps:
   - args: [--ws, fixtures, task, start, FI-1, --json]
     env: {SILTA_ACTOR: 'agent:claude:reviewer'}
     expect: {exit: 0, json: {data.status: doing}}
+  - args: [--ws, fixtures, comment, FI-1, --kind, question, -m, Which API?, --to, 'agent:codex:acme', --json]
+    env: {SILTA_ACTOR: 'agent:claude:reviewer'}
+    expect: {exit: 0, json: {data.ref: FI-1/5, data.kind: question}}
+  - args: [--ws, fixtures, comment, FI-1, --kind, answer, --reply-to, FI-1/5, -m, Use v2., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: FI-1/6, data.reply_to: FI-1/5}}
+  - args: [--ws, fixtures, comment, accept, FI-1/6, --json]
+    env: {SILTA_ACTOR: 'agent:claude:reviewer'}
+    expect: {exit: 0, json: {data.action: accepted, data.refs.0: FI-1/6}}
+  - args: [--ws, fixtures, comment, reopen, FI-1/6, --json]
+    env: {SILTA_ACTOR: 'agent:codex:third'}
+    expect: {exit: 0, json: {data.action: reopened, data.refs.0: FI-1/5}}
+  - args: [--ws, fixtures, comment, resolve, FI-1/5, --json]
+    env: {SILTA_ACTOR: 'agent:codex:third'}
+    expect: {exit: 0, json: {data.action: resolved, data.refs.0: FI-1/5}}

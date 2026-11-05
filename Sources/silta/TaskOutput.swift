@@ -33,7 +33,7 @@ enum TaskOutput {
     "done_branch": .optional(.string), "done_dirty": .optional(.bool),
     "links": linksShape,
     "comments": .optional(.array(CommentOutput.shape)),
-    "handed_off": .optional(.string),
+    "handed_off": .optional(.string), "resolved_threads": .optional(.int),
     "timeline": .optional(
       .array(
         .object([
@@ -104,6 +104,9 @@ enum TaskOutput {
         CommentOutput.detail(
           $0, comments: comments, timeline: task.timeline != nil)
       }
+    }
+    if let count = task.resolvedThreads {
+      lines.append("\n\(count) resolved thread\(count == 1 ? "" : "s") (see --timeline)")
     }
     for event in task.timeline ?? [] {
       lines.append(

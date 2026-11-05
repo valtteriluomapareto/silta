@@ -8,27 +8,22 @@ import Testing
 struct CommentCommandTests {
   @Test func schemaAndStoredThreadsAdvertiseAvailableActionsOnly() throws {
     try withScratchDirectory { scratch in
-      let store = try TaskCommandTests.setup(scratch)
+      _ = try TaskCommandTests.setup(scratch)
       _ = try SiltaBinary.run(
         ["task", "add", "Acme", "--start"], in: scratch,
         environment: TaskCommandTests.fixed)
       let schema = try SiltaBinary.run(["schema", "comment", "--json"], in: scratch)
       #expect(schema.termination == .exit(0))
       for flag in ["--reply-to", "--to", "--from"] {
-        #expect(!schema.stdout.contains("\"" + flag + "\""))
-        let invalid = try SiltaBinary.run(
-          ["comment", "AC-1", flag, "Acme", "--json"],
-          in: scratch, environment: TaskCommandTests.actor)
-        #expect(invalid.termination == .exit(1) && invalid.stdout.contains("\"usage\""))
+        #expect(schema.stdout.contains("\"" + flag + "\""))
       }
-      try store.write {
-        try $0.database.execute(
-          sql: """
-            INSERT INTO comment(id,uid,task_id,seq,kind,body_md,actor,created_at) VALUES
-            (1,'q',1,1,'question','Stored question','agent:codex:acme','t');
-            INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,actor,created_at)
-            VALUES('a',1,2,1,'answer','Stored answer','agent:claude:reviewer','t');
-            """)
+      for args in [
+        ["comment", "AC-1", "--kind", "question", "-m", "Stored question"],
+        ["comment", "AC-1", "--kind", "answer", "--reply-to", "AC-1/1", "-m", "Stored answer"],
+      ] {
+        #expect(
+          try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.actor).termination
+            == .exit(0))
       }
       let shown = try SiltaBinary.run(
         ["task", "show", "AC-1"], in: scratch,
@@ -54,7 +49,7 @@ struct CommentCommandTests {
             UPDATE meta SET value='other' WHERE key='current_workspace';
             """)
       }
-      for (flags, name) in [(["--kind", "question"], "kind"), (["--kind", "handoff"], "handoff")] {
+      for (flags, name) in [(["--kind", "review"], "kind"), (["--kind", "handoff"], "handoff")] {
         let result = try SiltaBinary.run(
           ["--ws", "acme", "comment", "AC-1", "-m", "Acme private context"] + flags
             + (json ? ["--json"] : []), in: scratch,
