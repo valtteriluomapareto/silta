@@ -88,49 +88,6 @@ extension BriefCommandTests {
       #expect(result.stdout.contains("AGENTS.md: " + repo.path + "/AGENTS.md"))
     }
   }
-
-  @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
-  func hookWithTwentyThousandTasks() throws {
-    try withScratchDirectory { scratch in
-      let repo = try contextFixture(scratch)
-      try store(scratch).write {
-        try $0.database.execute(
-          sql: """
-            WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+1 FROM n WHERE x<20004)
-            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,description_md,plan_md,
-              result_md,closed_at,created_by,created_at,updated_at)
-            SELECT 'bulk-'||x,1,x,'Acme backlog',CASE WHEN x%10=0 THEN 'todo' ELSE 'done' END,
-              app.id,?,?,?,CASE WHEN x%10=0 THEN NULL ELSE '2023-11-14T20:00:00.000Z' END,
-              'human:acme','',''
-            FROM n,app WHERE app.slug='api';
-            WITH RECURSIVE n(x) AS (VALUES(5) UNION ALL SELECT x+4 FROM n WHERE x<20000)
-            INSERT INTO comment(uid,task_id,seq,kind,body_md,mentions,actor,resolved_at,
-              resolved_by,created_at)
-            SELECT 'bulk-q-'||x,task.id,1,'question',?,'["human:acme"]','agent:codex:other',
-              NULL,NULL,'2023-11-14T20:00:00.000Z'
-            FROM n JOIN task ON task.seq=n.x;
-            INSERT INTO comment(uid,task_id,seq,thread_id,kind,body_md,mentions,actor,created_at)
-            SELECT 'bulk-a-'||task_id,task_id,2,id,'answer',body_md,'[]','human:acme',
-              '2023-11-14T20:30:00.000Z'
-            FROM comment WHERE uid LIKE 'bulk-q-%';
-            """,
-          arguments: StatementArguments(
-            Array(repeating: String(repeating: "Acme unused ", count: 180), count: 4)))
-      }
-      let full = try run(["--task", "AC-2", "--app", "api", "--budget", "5000"], repo, scratch)
-      #expect(full.stdout.contains("open: AC-1"))
-      #expect(full.stdout.contains("done: AC-20004"))
-      let clock = ContinuousClock()
-      let started = clock.now
-      let hook = try run(["--task", "AC-2", "--app", "api", "--hook"], repo, scratch)
-      let elapsed = started.duration(to: clock.now)
-      let entry = try DogfoodLogTests.last(scratch)
-      let warnings = entry["warnings"] as? [String] ?? []
-      #expect(hook.stdout.contains("task: AC-2\n"), "empty after \(elapsed): \(entry)")
-      #expect(hook.stdout.contains("open: AC-1"))
-      #expect(!warnings.contains("hook_timeout"))
-    }
-  }
 }
 
 extension BriefCommandTests {

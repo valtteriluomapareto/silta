@@ -150,7 +150,8 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
   (`Silta.app/Contents/Helpers/silta`). Every write transaction checks
   `min_writer_version` (§17).
 - **Data directory.** `SILTA_HOME` (default `~/.silta`) relocates everything. Tests and
-  evals use it, and the real data is never touched.
+  evals use it, and the real data is never touched. Private reports live in
+  `$SILTA_HOME/reports/<slug>/` (§22.1).
 
 ## 5. Concepts
 
@@ -523,7 +524,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 |---|---|---|
 | Human | `task add` | `todo` |
 | Agent, work the human asked for in chat | `task add --start` | `doing`, claimed by this session |
-| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --split` | `todo` |
+| Agent, subtask of a task it has claimed | `task add --parent AC-3` or `from-plan --parent AC-3` (with or without `--split`) | `todo` |
 | Agent, an unsolicited idea for later | `task add` | `proposed`; listed in the human's inbox for 14 days; `task triage` accepts or drops it. With the setting `proposals: ask` (D39), human-only instead: the agent asks in chat first |
 | Agent, with the human's go-ahead (D39) | a write that would be `proposed`, with `--approved` | `todo`, under either setting |
 
@@ -1134,9 +1135,12 @@ settings (D39). It covers:
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
   - Proposals: usually none; never more than two per session, and only what you'd bet
-    the human wants. `task add --start` is only for work the human asked for. If
-    the human asked you to add a task for later, pass their words as `--approved`,
-    so it becomes `todo` without triage (D39).
+    the human wants. `task add --start` is only for work the human asked for. A
+    subtask of a task you still claim (`task add --parent AC-12`) starts as `todo`
+    and is not a proposal (§8), so it needs no `--approved`; passing it only warns
+    `approval_unused`. `submit`, `block` and a handoff release the claim, and a
+    subtask added after that is a proposal again. If the human asked you to add a task for later, pass their
+    words as `--approved`, so it becomes `todo` without triage (D39).
   - If `brief` shows `proposals: ask` (D39): don't propose. Name each idea and its
     `silta task add` command in your message, and add the ones the human wants with
     `--approved`. With no human present, list ideas under "what's left" in the
@@ -1533,8 +1537,9 @@ chosen `--slug` and `--prefix` keep their
 case, use the same identifier shape as `ws edit` (letters, digits, `_` or `-`,
 starting and ending with a letter or digit), and task refs read `<prefix>-<n>`
 (`AC-1`). A repo's slug is its directory name normalized — lowercased, other characters
-to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. The
-DF3 onboarding scans only the chosen clones:
+to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is renamed. A clone whose slug is
+`none` is refused, because that word means non-code work, and the conflict names its path.
+The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 
 ## 17. Storage, concurrency, technology
@@ -1614,11 +1619,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
-  - Slack and Google keys
+  - Slack, Google and Anthropic keys
   - JWTs (except obvious placeholders)
   - Finnish personal identity codes (henkilötunnus, as PII)
 
-  There's no entropy check in v1.
+  There's no entropy check in v1, and a token hard-wrapped across lines is not detected.
 - **Allowlist:** 40- and 64-character hex SHAs, UUIDs, refs (§5.1), and
   `<placeholder>`-style values. Exemptions cover whole candidate values; a containing
   reference does not exempt an embedded credential. Explicit credential fields
@@ -1780,7 +1785,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 | Tier | What | Notes |
 |---|---|---|
 | Unit | Ref parser, actor matrix, secret corpus, brief budgeting, plan parser, `where` scoring | Fake `Clock` and fake `GitRunner` |
-| Fixture git | `scripts/make-fixtures.sh` builds repos | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
+| Fixture git | `scripts/make-fixtures.sh` builds repos once per test process; tests get relocated copies (`AcmeFixtures`) | Covers: a branch-as-app promotion chain (master → portal → api, plus prod refs and a subpath app), worktrees, detached HEAD, shallow clone, missing remote, rebased and force-pushed branches, a renamed branch, and a branch from a non-app ref |
 | Multi-process stress | Spawns the built binary | 20 writers × 200 adds: no duplicate seq. N concurrent `start`: exactly one claimer. Concurrent first-open migration. Concurrent lazy index: one indexer. p95 latency recorded. |
 | Golden CLI | Text, `--json` and exit codes for every command | Includes every error code's message and `next` hint |
 | Round-trip | Property test | `export(restore(export(db))) == export(db)`, byte-identical. Tampered and partial trees are rejected with nothing written. |
@@ -1998,7 +2003,7 @@ steps, questions, handoffs and results.
     own, so the result asks every time.
   - Friction that needs its own fix, or that comes up outside a task, also becomes a
     task with the topic `dogfood`.
-  - `scripts/dogfood-report.sh [--since <YYYY-MM-DD>]` (built in DF) prints a
+  - `scripts/dogfood-report.sh [--ws <slug>] [--since <YYYY-MM-DD>]` (built in DF) prints a
     Markdown report from the command logs (§19) and the tasks. `--since` defaults
     to the date of the newest report in `docs/dogfood/reports/`, so reports leave
     no gaps, and a `--since` after the report day is refused. The report states its
@@ -2031,6 +2036,15 @@ steps, questions, handoffs and results.
     actor's calls and approvals out. Unreadable log lines (malformed, or missing
     the expected fields) are only counted too. Failures before the environment is
     set up (a bad `SILTA_*` value) aren't logged, so the report can't see them.
+    With `--ws <slug>` it reports on any workspace privately (DF3): it refuses a slug
+    that is no workspace identifier before using it, writes the report to
+    `$SILTA_HOME/reports/<slug>/<YYYY-MM-DD>.md` instead of printing it, takes the
+    default `--since` from that folder, and never replaces an existing report. It
+    refuses a destination inside a git work tree or behind a symlink in its own
+    `reports/` folders, never follows whatever already sits at the report's path, and
+    gives a slug too long for a folder name a shortened folder ending in a hash.
+    Friction lines and `dogfood` tasks belong to the `silta` workspace (D36), so other
+    workspaces' reports say they aren't collected.
   - Once per wave, at the latest every 60 days so no log has expired, an agent
     runs the report with the maintainer, who reviews it before it is added through
     a pull request as `docs/dogfood/reports/<YYYY-MM-DD>.md`, named by the report's
@@ -2127,10 +2141,11 @@ characters to `-`, trimmed, and `repo` when nothing remains — so `My Projects`
 repo `my-projects`. That slug is only an identifier: the real path is stored as the
 machine-local repo path, so nothing on disk is renamed and worktrees and path aliases
 resolve to their canonical main clone as they are. Two directories that normalize to one
-slug are a duplicate, checked on the normalized names before any rename. A clone named
-`none`, the word that means non-code work, is stored as `none-repo`, or the next free
-`none-repo-N` when another clone in the scan normalizes to that name; the same clone keeps
-its stored name on every full or partial rescan. A task prefix another workspace holds, or
+slug are a duplicate, checked on the normalized names before anything is written. A clone named
+`none`, the word that means non-code work in `--app none`, is a reserved repo slug, so a
+clone whose directory name normalizes to it is refused: the conflict names the clone's
+path and asks for a different directory name rather than renaming it. Nothing is written
+and no stored path moves. A task prefix another workspace holds, or
 a clone path another workspace already binds, is a conflict that names the holder and a
 command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
 or master provides a default app when its ref is not already represented.

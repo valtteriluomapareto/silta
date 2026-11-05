@@ -8,8 +8,9 @@ import SiltaCore
 enum SiltaMain {
   static func main() async {
     let arguments = Array(CommandLine.arguments.dropFirst())
+    let started = ContinuousClock.now
     let hook = BriefHook.requested(arguments)
-    let deadline = hook ? ContinuousClock().now.advanced(by: .milliseconds(1500)) : nil
+    let deadline = hook ? BriefHook.deadline(startedAt: started) : nil
     let watchdog = hook ? HookWatchdog() : nil
     let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     watchdog?.prepare(
@@ -23,7 +24,7 @@ enum SiltaMain {
   }
 
   static func run(
-    _ arguments: [String], hookDeadline: ContinuousClock.Instant? = nil,
+    _ arguments: [String], hookDeadline: BriefHookDeadline? = nil,
     watchdog: HookWatchdog? = nil
   ) async
     -> Rendered
