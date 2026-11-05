@@ -1080,15 +1080,18 @@ Settings merge preserves unknown JSON values semantically; whitespace/key order 
 normalize. It accepts duplicate-free objects/arrays with strings, null, booleans and
 integers within ±(2^53−1); other numbers are refused before writes instead of rounding.
 Only the selected event's structure is inspected; unknown event shapes remain intact.
-Edited, duplicate or mixed owned groups refuse. Preview shows only owned group deltas,
+Edited, duplicate or mixed owned groups refuse. File, hooks-object and event-array
+provenance preserve even preexisting empty containers. Preview shows only owned group deltas,
 while its token still binds every original byte and file mode. There is no overwrite flag.
 
 The SessionStart protocol reads at most 64 KiB of stdin. Its 1.5 s process deadline
 covers input, decoding, export and brief execution. A valid session is appended as an
 export to `CLAUDE_ENV_FILE`, preserving existing exports even without a final newline.
 The file must be absolute under HOME or an OS temporary root, with no symlink below
-that anchor; it must be regular, singly linked and at most 1 MiB. A missing leaf may
-be created privately. Missing/unsafe ENV_FILE or malformed input silently succeeds
+that anchor; it must be regular and singly linked, and the resulting file must fit
+1 MiB. A missing leaf may be created privately. Exports use an advisory file lock;
+an incomplete append is neutralized to blank lines without truncating another
+hook's later data. Missing/unsafe ENV_FILE or malformed input silently succeeds
 without context; the installed instructions tell the agent to run `silta brief` when
 the hook printed none. Live propagation to Claude's later shell commands is unverified.
 

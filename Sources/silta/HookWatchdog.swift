@@ -12,11 +12,15 @@ final class HookWatchdog: @unchecked Sendable {
     var phase = Phase.armed
     var record: (path: String, data: Data)?
   }
+  private let command: String
+  private let flags: [String]
   private let state = Mutex(State())
   private let timer: any DispatchSourceTimer
   private let finished = DispatchSemaphore(value: 0)
 
-  init() {
+  init(command: String, flags: [String]) {
+    self.command = command
+    self.flags = flags
     timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
     timer.schedule(deadline: .now() + 1.5)
     timer.setEventHandler { [self] in fire() }
@@ -39,9 +43,9 @@ final class HookWatchdog: @unchecked Sendable {
   private func prepare(home: URL, actor: ActorID, at timestamp: Date) {
     do {
       var entry = LogEntry(
-        timestamp: timestamp, command: "silta brief",
+        timestamp: timestamp, command: command,
         actor: actor.description, exitCode: 0, milliseconds: 1500)
-      entry.flags = ["--hook"]
+      entry.flags = flags
       entry.errorCode = .env
       entry.warnings = ["hook_timeout"]
       let record = try SystemLog.prepared(entry)

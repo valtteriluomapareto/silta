@@ -10,7 +10,11 @@ enum SiltaMain {
     let arguments = Array(CommandLine.arguments.dropFirst())
     let hook = BriefHook.requested(arguments)
     let deadline = hook ? ContinuousClock().now.advanced(by: .milliseconds(1500)) : nil
-    let watchdog = hook ? HookWatchdog() : nil
+    let watchdog =
+      hook
+      ? HookWatchdog(
+        command: commandPath(arguments),
+        flags: commandPath(arguments) == "silta brief" ? ["--hook"] : []) : nil
     let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     watchdog?.prepare(
       snapshot: ProcessInfo.processInfo.environment,

@@ -312,17 +312,17 @@ extension AgentsHookTests {
         in: scratch, environment: ["PATH": path], timeout: 4)
       #expect(held.termination == .exit(0) && held.stdout.isEmpty && held.stderr.isEmpty)
       let logs = scratch.appending(path: "silta-home/log")
-      let files = try FileManager.default.contentsOfDirectory(at: logs, includingPropertiesForKeys: nil)
+      let files = try FileManager.default.contentsOfDirectory(
+        at: logs, includingPropertiesForKeys: nil)
       let entries = try files.filter { $0.pathExtension == "jsonl" }.flatMap {
         try String(contentsOf: $0, encoding: .utf8).split(separator: "\n").map(String.init)
       }.map(GuideContractTests.object)
-      let timeout = try #require(entries.first {
-        ($0["warnings"] as? [String])?.contains("hook_timeout") == true
-      })
-      withKnownIssue("#17: hook timeout diagnostics must retain their actual command") {
-        #expect(timeout["command"] as? String == "silta agents session-start")
-        #expect((timeout["flags"] as? [String] ?? []).isEmpty)
-      }
+      let timeout = try #require(
+        entries.first {
+          ($0["warnings"] as? [String])?.contains("hook_timeout") == true
+        })
+      #expect(timeout["command"] as? String == "silta agents session-start")
+      #expect((timeout["flags"] as? [String] ?? []).isEmpty)
       let file = scratch.appending(path: "claude-env")
       try Data().write(to: file)
       let large = try Self.hook(
