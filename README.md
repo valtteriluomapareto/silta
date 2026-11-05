@@ -16,8 +16,28 @@ repos.
 
 ## Status
 
-Design phase. The draft spec is in [`docs/spec.md`](docs/spec.md), and the first
-milestone is planned in [`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md).
+The first milestone (M1, daily use) is in progress; its slices are in
+[`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md). The design is in
+[`docs/spec.md`](docs/spec.md). Silta is built with Silta: the current dogfooding
+stage is in [`AGENTS.md`](AGENTS.md#dogfooding).
+
+The CLI has these commands today: `init`, `ws`, `repo fetch`, `where`, `code`,
+`task`, `comment`, `inbox` (discussion only so far), `brief`, `doctor`, `schema` and
+`guide`. Run `silta --help` for the list and `silta guide` for the agent manual. Not
+built yet: agent install, export and restore (spec §16 marks each command's
+milestone).
+
+## Install
+
+Silta needs macOS 15 and Xcode 27.1 (Swift 6.4). From a clean `main` that matches
+`origin/main`:
+
+```sh
+scripts/install-dev.sh
+```
+
+It builds a release binary and installs it as `~/.local/bin/silta`. Data lives in
+`~/.silta`, or in `SILTA_HOME` when set.
 
 ## Contributing
 
