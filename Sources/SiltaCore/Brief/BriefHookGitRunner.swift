@@ -1,22 +1,21 @@
-/// Bounds hook Git reads to the caller's remaining process budget and reports deadlines.
+/// Bounds hook Git reads to the hook's remaining process budget and reports deadlines.
 package struct BriefHookGitRunner: GitRunner {
   let runner: any GitRunner
-  let remaining: @Sendable () -> Double
+  let deadline: BriefHookDeadline
   let onTimeout: @Sendable () -> Void
 
-  /// The caller reserves child cleanup time before returning its remaining seconds.
   package init(
-    runner: any GitRunner, remaining: @escaping @Sendable () -> Double,
+    runner: any GitRunner, deadline: BriefHookDeadline,
     onTimeout: @escaping @Sendable () -> Void
   ) {
     self.runner = runner
-    self.remaining = remaining
+    self.deadline = deadline
     self.onTimeout = onTimeout
   }
 
   /// Runs without lazy fetching. Expired budgets avoid spawning and still notify the caller.
   package func run(_ request: GitRequest) async throws -> GitResult {
-    let seconds = remaining()
+    let seconds = deadline.childSeconds
     guard seconds > 0 else {
       onTimeout()
       return GitResult(termination: .timedOut)

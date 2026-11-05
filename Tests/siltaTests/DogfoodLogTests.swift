@@ -306,7 +306,7 @@ extension DogfoodLogTests {
       (acme + ["brief"], "acme"),
       (acme + ["inbox"], "acme"),
       (["init"], nil),
-      (["ws", "use", "acme"], "acme"),
+      (["ws", "use", "acme"], "acme"), (acme + ["status"], "acme"),
     ] + integrationCatalog()
   }
 

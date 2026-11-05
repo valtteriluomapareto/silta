@@ -8,8 +8,9 @@ import SiltaCore
 enum SiltaMain {
   static func main() async {
     let arguments = Array(CommandLine.arguments.dropFirst())
+    let started = ContinuousClock.now
     let hook = BriefHook.requested(arguments)
-    let deadline = hook ? ContinuousClock().now.advanced(by: .milliseconds(1500)) : nil
+    let deadline = hook ? BriefHook.deadline(startedAt: started) : nil
     let watchdog =
       hook
       ? HookWatchdog(
@@ -27,7 +28,7 @@ enum SiltaMain {
   }
 
   static func run(
-    _ arguments: [String], hookDeadline: ContinuousClock.Instant? = nil,
+    _ arguments: [String], hookDeadline: BriefHookDeadline? = nil,
     watchdog: HookWatchdog? = nil
   ) async
     -> Rendered
@@ -55,7 +56,7 @@ enum SiltaMain {
       let rendered = execution.rendered
       let milliseconds = elapsedMilliseconds(started.duration(to: timer.now))
       var entry = LogEntry(
-        timestamp: timestamp, command: commandPath(arguments),
+        timestamp: timestamp, command: execution.command ?? commandPath(arguments),
         actor: environment.actor.description, exitCode: hookDeadline == nil ? rendered.exitCode : 0,
         milliseconds: milliseconds)
       entry.workspace = execution.scope.workspace
@@ -63,9 +64,8 @@ enum SiltaMain {
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = logFlags(flags)
-      let expired = hookDeadline.map { ContinuousClock().now >= $0 } ?? false
       if hookDeadline != nil {
-        let completion = BriefHookCompletion(rendered: rendered, entry: entry, expired: expired)
+        let completion = BriefHookCompletion(rendered: rendered, entry: entry)
         if let watchdog {
           watchdog.finish(completion.entry)
         } else {
@@ -156,18 +156,28 @@ enum SiltaMain {
       output.warnings = context.environment.warnings + output.warnings
       return CommandExecution(
         rendered: OutputRouter.render(.success(output), mode: mode),
-        scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store))
+        scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store),
+        command: loggedPath(arguments, outputCommand))
     } catch let error as any CodedError {
       let recovered = recovery(
         error, command: outputCommand, arguments: arguments, context: context)
       return CommandExecution(
         rendered: OutputRouter.render(.failure(recovered), mode: mode),
-        scope: CommandScope.failure(outputCommand, store: store))
+        scope: CommandScope.failure(outputCommand, store: store),
+        command: loggedPath(arguments, outputCommand))
     } catch {
       return CommandExecution(
         rendered: OutputRouter.render(.failure(error), mode: mode),
-        scope: CommandScope.failure(outputCommand, store: store))
+        scope: CommandScope.failure(outputCommand, store: store),
+        command: loggedPath(arguments, outputCommand))
     }
+  }
+
+  /// The name the log gives a command: the root's default command, which bare `silta`
+  /// runs, keeps the name `silta schema` lists for it (spec §19).
+  static func loggedPath(_ arguments: [String], _ command: any OutputCommand) -> String {
+    let path = commandPath(arguments)
+    return path == "silta" ? path + " " + type(of: command)._commandName : path
   }
 
   /// Keeps recovery tied to the failed command and intended workspace.

@@ -54,6 +54,7 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 - `silta init`
 - `silta repo fetch`
 - `silta session check`
+- `silta status`
 - `silta task archive`
 - `silta task block`
 - `silta task done`

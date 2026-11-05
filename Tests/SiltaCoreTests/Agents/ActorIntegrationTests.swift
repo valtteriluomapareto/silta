@@ -3,16 +3,13 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(3)), .tags(.slow), .enabled(if: slowTestsEnabled()))
+@Suite(
+  .blockingTestWork, .timeLimit(.minutes(3)), .tags(.slow), .enabled(if: slowTestsEnabled()))
 struct ActorIntegrationTests {
   @Test func nestedCwdSharesSessionButDistinctWorktreeDoesNot() async throws {
     try await withScratchDirectory { scratch in
-      let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().deletingLastPathComponent()
       let fixtures = scratch.appending(path: "fixtures")
-      let setup = try SiltaBinary.runProcess(
-        URL(filePath: "/bin/bash"),
-        [root.appending(path: "scripts/make-fixtures.sh").path, fixtures.path], in: scratch)
+      let setup = try AcmeFixtures.make(at: fixtures)
       try #require(setup.termination == .exit(0), "\(setup.stderr)")
       let terminal = TerminalState(stdin: false, stdout: false)
       let git = SystemGitRunner(environment: [

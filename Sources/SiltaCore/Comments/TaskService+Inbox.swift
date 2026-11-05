@@ -16,17 +16,10 @@ extension TaskService {
     } else {
       actor = environment.actor
     }
-    let slug = try selected(), command = "silta --ws " + shellWord(slug)
+    let slug = try selected()
+    let command = "silta --ws " + shellWord(slug), at = environment.clock.now()
     return try environment.db.read { db in
-      let workspaceID = try Self.workspaceID(slug, in: db), at = environment.clock.now()
-      let discussion = try Self.attention(for: actor, workspaceID: workspaceID, in: db).map {
-        inboxItem($0, actor: actor, command: command)
-      }
-      let attention =
-        actor.isHuman
-        ? try inboxBlocks(workspaceID, at: at, command: command, in: db) + discussion
-          + inboxBacklog(workspaceID, at: at, all: all, command: command, in: db)
-        : discussion
+      let attention = try inboxItems(for: actor, workspace: slug, all: all, at: at, in: db)
       let items = all ? attention : Array(attention.prefix(12))
       let remaining = attention.count - items.count
       return InboxResult(
@@ -36,10 +29,27 @@ extension TaskService {
     }
   }
 
+  /// Every ordered item inside the caller's read snapshot at one instant, without the
+  /// item cap. `all` only widens eligibility, to proposals older than 14 days.
+  func inboxItems(
+    for actor: ActorID, workspace slug: String, all: Bool, at: Date, in db: Database
+  ) throws -> [InboxItem] {
+    let command = "silta --ws " + shellWord(slug)
+    let workspaceID = try Self.workspaceID(slug, in: db)
+    let discussion = try Self.attention(for: actor, workspaceID: workspaceID, in: db).map {
+      inboxItem($0, actor: actor, command: command)
+    }
+    return actor.isHuman
+      ? try inboxBlocks(workspaceID, at: at, command: command, in: db) + discussion
+        + inboxBacklog(workspaceID, at: at, all: all, command: command, in: db)
+      : discussion
+  }
+
   private func inboxItem(_ attention: DiscussionAttention, actor: ActorID, command: String)
     -> InboxItem
   {
-    let post = attention.post, task = attention.task
+    let post = attention.post
+    let task = attention.task
     let read = command + " task show " + shellWord(task.ref) + " --timeline"
     let next: [String]
     if attention.kind == "question",
