@@ -577,3 +577,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     directories; no real harness configuration was changed. Installation,
     uninstall/dry-run fidelity and one real run per harness belong to the installer
     acceptance. SQLite extension support remains an independent open question.
+  - ↳ 2026-11-05: Installer permission retention uses conservative refusal rather
+    than security-metadata copying: file ACLs, unsupported xattrs/flags/mode bits,
+    nonpreservable ownership and inheritable parent ACLs refuse before writes.
+    OS-managed provenance is not treated as access permissions. Supported uid/gid
+    and POSIX modes bind confirmation. Public configuration diffs come only from
+    validated ownership spans, independently of placement, and an owned TOML table
+    retains its offset. Namespace validation stays a documented conservative subset
+    rather than adding a general TOML parser dependency.
