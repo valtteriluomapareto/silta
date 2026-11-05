@@ -1589,11 +1589,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
-  - Slack and Google keys
+  - Slack, Google and Anthropic keys
   - JWTs (except obvious placeholders)
   - Finnish personal identity codes (henkilötunnus, as PII)
 
-  There's no entropy check in v1.
+  There's no entropy check in v1, and a token hard-wrapped across lines is not detected.
 - **Allowlist:** 40- and 64-character hex SHAs, UUIDs, refs (§5.1), and
   `<placeholder>`-style values. Exemptions cover whole candidate values; a containing
   reference does not exempt an embedded credential. Explicit credential fields
