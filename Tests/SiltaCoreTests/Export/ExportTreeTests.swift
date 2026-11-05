@@ -217,6 +217,33 @@ struct ExportTreeTests {
     }
   }
 
+  /// The manifest is checked before anything is parsed (spec §15): a changed, missing or
+  /// unlisted file is named as such, not caught later as a file in the wrong form.
+  @Test func readerChecksTheManifestFirst() throws {
+    try withScratchDirectory { scratch in
+      let store = try ExportFixture.make(scratch)
+      let files = try Self.render(store)
+      var changed = files
+      changed["tasks/AC-2.md"] = Data(
+        text(try #require(files["tasks/AC-2.md"])).replacingOccurrences(
+          of: "Waiting.", with: "Waiting!"
+        ).utf8)
+      #expect(throws: ExportError.invalidTree("tasks/AC-2.md does not match its sha256")) {
+        try ExportTree.parse(changed)
+      }
+      var missing = files
+      missing["links.jsonl"] = nil
+      #expect(throws: ExportError.invalidTree("links.jsonl is missing")) {
+        try ExportTree.parse(missing)
+      }
+      var extra = files
+      extra["notes.md"] = Data()
+      #expect(throws: ExportError.invalidTree("notes.md is not in the manifest")) {
+        try ExportTree.parse(extra)
+      }
+    }
+  }
+
   /// A tree names its schema; one this binary doesn't know is refused, and an older
   /// one it knows is read (spec §15).
   @Test func readerChecksTheTreeSchema() throws {
