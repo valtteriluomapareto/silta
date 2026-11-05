@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(3)), .tags(.slow), .enabled(if: slowTestsEnabled()))
+@Suite(.blockingTestWork, .timeLimit(.minutes(3)), .tags(.slow), .enabled(if: slowTestsEnabled()))
 struct FixtureTests {
   @Test func deterministicFixturesCoverHistoryAndCloneStates() throws {
     try withScratchDirectory { scratch in

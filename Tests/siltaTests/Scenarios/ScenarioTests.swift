@@ -5,36 +5,33 @@ import Testing
 
 @Suite(.timeLimit(.minutes(5)), .tags(.slow), .enabled(if: slowTestsEnabled()))
 struct ScenarioTests {
-  @Test func allScenariosReplayByteIdentically() async throws {
-    try await withBlockingTestWork {
-      let root = ScenarioRunner.repository.appending(path: "Tests/Scenarios")
-      let files = try FileManager.default.contentsOfDirectory(
-        at: root, includingPropertiesForKeys: nil
-      )
-      .filter { $0.pathExtension == "yaml" }.sorted { $0.path < $1.path }
-      try #require(!files.isEmpty)
-      for file in files {
-        var transcripts: [Data] = []
-        for _ in 0..<2 {
-          try withScratchDirectory { scratch in
-            let transcript = try ScenarioRunner.run(file, in: scratch)
-            transcripts.append(transcript)
-            let log = try String(
-              contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"),
-              encoding: .utf8)
-            let lines = log.split(separator: "\n")
-            #expect(lines.count == transcript.split(separator: 10).count)
-            for (index, line) in lines.enumerated() {
-              let entry = try #require(
-                JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
-              let expected = ScenarioRunner.environment(
-                step: index, overrides: [:], scratch: scratch)
-              #expect(entry["timestamp"] as? String == expected["SILTA_NOW"])
-            }
+  @Test(.blockingTestWork)
+  func allScenariosReplayByteIdentically() throws {
+    let root = ScenarioRunner.repository.appending(path: "Tests/Scenarios")
+    let files = try FileManager.default.contentsOfDirectory(
+      at: root, includingPropertiesForKeys: nil
+    )
+    .filter { $0.pathExtension == "yaml" }.sorted { $0.path < $1.path }
+    try #require(!files.isEmpty)
+    for file in files {
+      var transcripts: [Data] = []
+      for _ in 0..<2 {
+        try withScratchDirectory { scratch in
+          let transcript = try ScenarioRunner.run(file, in: scratch)
+          transcripts.append(transcript)
+          let log = try String(
+            contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)
+          let lines = log.split(separator: "\n")
+          #expect(lines.count == transcript.split(separator: 10).count)
+          for (index, line) in lines.enumerated() {
+            let entry = try #require(
+              JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
+            let expected = ScenarioRunner.environment(step: index, overrides: [:], scratch: scratch)
+            #expect(entry["timestamp"] as? String == expected["SILTA_NOW"])
           }
         }
-        #expect(transcripts[0] == transcripts[1])
       }
+      #expect(transcripts[0] == transcripts[1])
     }
   }
 
@@ -57,7 +54,8 @@ struct ScenarioTests {
     }
   }
 
-  @Test func wrongExpectationAndMalformedYAMLLeaveFailureEvidence() throws {
+  @Test(.blockingTestWork)
+  func wrongExpectationAndMalformedYAMLLeaveFailureEvidence() throws {
     try withScratchDirectory { scratch in
       for (name, contents) in [
         ("wrong", "steps:\n  - args: [--version]\n    expect: {exit: 99}\n"),
@@ -91,7 +89,8 @@ struct ScenarioTests {
     }
   }
 
-  @Test func environmentOverridesCannotEscapeIsolationOrChangeStepIdentity() throws {
+  @Test(.blockingTestWork)
+  func environmentOverridesCannotEscapeIsolationOrChangeStepIdentity() throws {
     try withScratchDirectory { scratch in
       let expected = ScenarioRunner.environment(step: 1, overrides: [:], scratch: scratch)
       let actual = ScenarioRunner.environment(
@@ -109,7 +108,8 @@ struct ScenarioTests {
     }
   }
 
-  @Test func nonExitTerminationsCannotSatisfyAnExitExpectation() {
+  @Test(.blockingTestWork)
+  func nonExitTerminationsCannotSatisfyAnExitExpectation() {
     for termination in [Termination.timedOut, .signal(9)] {
       #expect(ScenarioRunner.terminationMismatch(termination, expected: 0) != nil)
     }

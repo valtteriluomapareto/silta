@@ -2,6 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct CommentReviewCommandTests {
   static func run(_ home: URL, _ args: [String], actor: String = "agent:codex:acme") throws
     -> CLIResult

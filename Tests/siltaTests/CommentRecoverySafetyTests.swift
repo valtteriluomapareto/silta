@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct CommentRecoverySafetyTests {
   static let alpha = TaskCommandTests.fixed.merging([
     "SILTA_ACTOR": "agent:codex:alpha", "USER": "acme",

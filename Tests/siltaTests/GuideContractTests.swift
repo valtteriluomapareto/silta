@@ -7,6 +7,7 @@ import SiltaTestSupport
 import Synchronization
 import Testing
 
+@Suite(.blockingTestWork)
 struct GuideContractTests {
   @Test func refsUsesOrdinaryGuideRouting() throws {
     try withScratchDirectory { scratch in
@@ -120,26 +121,24 @@ struct GuideContractTests {
     }
   }
 
-  @Test func staticReadsNeverOpenStore() async throws {
-    try await withBlockingTestWork {
-      try withScratchDirectory { scratch in
-        let directory = scratch.appending(path: "silta-home")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let fifo = directory.appending(path: "silta.db")
-        #expect(mkfifo(fifo.path, 0o600) == 0)
-        let probe = try Self.observeReader(fifo) {
-          try SiltaBinary.runProcess(URL(filePath: "/bin/cat"), [fifo.path], in: scratch)
-        }
-        #expect(probe.opened)
-        for (args, exit) in [
-          (["guide"], Int32(0)), (["guide", "refs"], 0),
-          (["--ws", "acme", "guide", "human", "--json"], 0),
-          (["guide", "refs", "--json"], 0), (["guide", "nope"], 1),
-        ] {
-          let result = try Self.observeReader(fifo) { try SiltaBinary.run(args, in: scratch) }
-          #expect(!result.opened)
-          #expect(result.result.termination == .exit(exit))
-        }
+  @Test func staticReadsNeverOpenStore() throws {
+    try withScratchDirectory { scratch in
+      let directory = scratch.appending(path: "silta-home")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let fifo = directory.appending(path: "silta.db")
+      #expect(mkfifo(fifo.path, 0o600) == 0)
+      let probe = try Self.observeReader(fifo) {
+        try SiltaBinary.runProcess(URL(filePath: "/bin/cat"), [fifo.path], in: scratch)
+      }
+      #expect(probe.opened)
+      for (args, exit) in [
+        (["guide"], Int32(0)), (["guide", "refs"], 0),
+        (["--ws", "acme", "guide", "human", "--json"], 0),
+        (["guide", "refs", "--json"], 0), (["guide", "nope"], 1),
+      ] {
+        let result = try Self.observeReader(fifo) { try SiltaBinary.run(args, in: scratch) }
+        #expect(!result.opened)
+        #expect(result.result.termination == .exit(exit))
       }
     }
   }

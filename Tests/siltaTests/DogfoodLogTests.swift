@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(2)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(2)))
 struct DogfoodLogTests {
   static func setup(_ scratch: URL) throws -> DatabaseStore {
     let store = try TaskCommandTests.setup(scratch)

@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct InboxCorrectionCommandTests {
   static let scope =
     "Scope: discussion only; proposals, blockers and promoted attention are not included."

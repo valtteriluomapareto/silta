@@ -4,38 +4,6 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-struct BlockingTestWorkTests {
-  @Test func blockingWorkAllowsSingleWorkerProgress() async throws {
-    let worker = SingleTestWorker()
-    try await Task(executorPreference: worker) {
-      let (entered, continuation) = AsyncStream<Void>.makeStream()
-      let release = DispatchSemaphore(value: 0)
-      let sibling = Task(executorPreference: worker) {
-        for await _ in entered {
-          release.signal()
-          return
-        }
-      }
-      let progressed = try await withBlockingTestWork {
-        continuation.yield()
-        defer { continuation.finish() }
-        return release.wait(timeout: .now() + 2) == .success
-      }
-      await sibling.value
-      #expect(progressed)
-    }.value
-  }
-
-  @Test func blockingWorkPreservesTestingContextAndErrors() async throws {
-    let test = Test.current?.id
-    let inherited = try await withBlockingTestWork { Test.current?.id }
-    #expect(test != nil && inherited == test)
-    await #expect(throws: CocoaError(.fileReadUnknown)) {
-      try await withBlockingTestWork { throw CocoaError(.fileReadUnknown) }
-    }
-  }
-}
-
 private final class SingleTestWorker: TaskExecutor {
   private let queue = DispatchQueue(label: "silta.test.single-worker")
 
@@ -47,8 +15,16 @@ private final class SingleTestWorker: TaskExecutor {
 
 struct BlockingTestScopeTests {
   @Test func scopedProcessAllowsSingleWorkerProgress() async throws {
-    await withKnownIssue("Blocking process scope occupies the only worker") {
-      try await checkScopedProcessProgress()
+    try await checkScopedProcessProgress()
+  }
+
+  @Test func scopedErrorsPreserveTestingContext() async throws {
+    let test = try #require(Test.current)
+    await #expect(throws: CocoaError(.fileReadUnknown)) {
+      try await BlockingTestScope().provideScope(for: test, testCase: nil) {
+        #expect(Test.current?.id == test.id)
+        throw CocoaError(.fileReadUnknown)
+      }
     }
   }
 
@@ -89,9 +65,8 @@ struct BlockingTestScopeTests {
 struct InheritedBlockingScopeTests {
   @Test(arguments: [1, 2])
   func synchronousCasesUseBlockingExecutor(value: Int) {
-    withKnownIssue("Inherited scope still occupies cooperative workers") {
-      #expect(OperationQueue.current?.name == "silta.blocking-tests")
-    }
+    #expect(OperationQueue.current?.name == "silta.blocking-tests")
+    #expect(OperationQueue.current?.maxConcurrentOperationCount == 4)
     #expect(Test.current != nil)
     #expect(Test.Case.current != nil)
     #expect(value > 0)

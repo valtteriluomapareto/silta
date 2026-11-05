@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct InboxCommandTests {
   @Test(arguments: [false, true])
   func questionRelayAndEveryNextCommand(json: Bool) throws {

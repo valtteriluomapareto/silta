@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskBusyTests {
   @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
   func busyRetryNamesOnlyFailedCommandPath() throws {
