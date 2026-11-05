@@ -11,7 +11,11 @@ enum SiltaMain {
     let started = ContinuousClock.now
     let hook = BriefHook.requested(arguments)
     let deadline = hook ? BriefHook.deadline(startedAt: started) : nil
-    let watchdog = hook ? HookWatchdog() : nil
+    let watchdog =
+      hook
+      ? HookWatchdog(
+        command: commandPath(arguments),
+        flags: commandPath(arguments) == "silta brief" ? ["--hook"] : []) : nil
     let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     watchdog?.prepare(
       snapshot: ProcessInfo.processInfo.environment,
@@ -34,7 +38,7 @@ enum SiltaMain {
     let timer = ContinuousClock()
     let started = timer.now
     do {
-      let snapshot = ProcessInfo.processInfo.environment
+      let snapshot = try environmentSnapshot(arguments, hook: hookDeadline != nil)
       let environment: SiltaEnvironment
       if let hookDeadline {
         environment = try await BriefHook.environment(
@@ -78,6 +82,14 @@ enum SiltaMain {
       if let informational = informationalResult(arguments, mode: mode) { return informational }
       return OutputRouter.render(.failure(error), mode: mode)
     }
+  }
+
+  private static func environmentSnapshot(_ arguments: [String], hook: Bool) throws -> [String:
+    String]
+  {
+    let snapshot = ProcessInfo.processInfo.environment
+    return commandPath(arguments) == "silta agents session-start" && hook
+      ? try AgentHook.environment(snapshot) : snapshot
   }
 
   private static func elapsedMilliseconds(_ duration: Duration) -> Int {

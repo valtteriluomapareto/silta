@@ -1089,8 +1089,9 @@ invalidate the token (`conflict`, exit 6); run the same preview again. Never com
 Default selection is Claude and Codex. `--claude` or `--codex` restricts both install
 and uninstall; unselected paths are never inspected. The shared Claude skill starts
 with YAML name/description frontmatter and contains the versioned `silta guide`.
-Uninstall removes only unedited ownership, retaining unrelated bytes, permissions
-and empty user files. Ownership remains recognizable if `SILTA_HOME` changes.
+Uninstall removes only unedited ownership, retaining unrelated Markdown/TOML bytes,
+JSON values, permissions and empty user files. Ownership remains recognizable if
+`SILTA_HOME` changes.
 Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
 nonregular/multiply linked files and files over 1 MiB are refused before writes.
 Permission preservation uses refusal rather than copying security metadata: nonempty
@@ -1126,11 +1127,38 @@ the installer lock. Hook runtime must be installed before settings that referenc
 |---|---|
 | `~/.claude/skills/silta/SKILL.md` | The skill (outline below). OpenCode reads it too unless it's disabled. |
 | `~/.claude/CLAUDE.md` block | 5 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
-| Claude Code **SessionStart hook** | `silta brief --hook`: short, no indexing, 1.5 s timeout, silent if unregistered. It also exports `SILTA_SESSION`. |
+| Claude Code **SessionStart hook** (`--hook`) | `silta agents session-start` consumes hook JSON, exports `SILTA_SESSION`, then runs the short bounded brief; silent if unregistered or on error. |
 | Claude Code **Stop hook** (optional; D42, live run unverified) | `silta session check`: if this session holds a claim with writes since its last handoff, ask the agent to leave a handoff before stopping |
 | `~/.codex/AGENTS.md` block | The same 5 lines |
 | `~/.codex/config.toml` | Adds the effective `SILTA_HOME` (default `~/.silta`) to `sandbox_workspace_write.writable_roots` (D42, live run unverified) |
 | Permissions (optional) | Deny tracker writes, e.g. `Bash(az boards work-item create*)`, `Bash(gh issue create*)` |
+
+`--hook` opts into Claude SessionStart and requires selected Claude. Install without
+it leaves settings unread. Uninstall selected Claude removes its unedited owned hook;
+omit hook flags on uninstall. Preview retries retain operation, selection and hook flags.
+The hook command is included in the binary; settings are written last. It needs `silta`
+on the harness PATH. Its installed shell command suppresses failed executable output and
+returns zero, retaining successful brief text. Live harness loading and propagation remain
+unverified and pending installer acceptance (D42).
+
+Settings merge preserves unknown JSON values semantically; whitespace/key order may
+normalize. It accepts duplicate-free objects/arrays with strings, null, booleans and
+integers within ±(2^53−1); other numbers are refused before writes instead of rounding.
+Only the selected event's structure is inspected; unknown event shapes remain intact.
+Edited, duplicate or mixed owned groups refuse. File, hooks-object and event-array
+provenance preserve even preexisting empty containers. Preview shows only owned group deltas,
+while its token still binds every original byte and file mode. There is no overwrite flag.
+
+The SessionStart protocol reads at most 64 KiB of stdin. Its 1.5 s process deadline
+covers input, decoding, export and brief execution. A valid session is appended as an
+export to `CLAUDE_ENV_FILE`, preserving existing exports even without a final newline.
+The file must be absolute under HOME or an OS temporary root, with no symlink below
+that anchor; it must be regular and singly linked, and the resulting file must fit
+1 MiB. A missing leaf may be created privately. Exports use an advisory file lock;
+an incomplete append is neutralized to blank lines without truncating another
+hook's later data. Missing/unsafe ENV_FILE or malformed input silently succeeds
+without context; the installed instructions tell the agent to run `silta brief` when
+the hook printed none. Live propagation to Claude's later shell commands is unverified.
 
 ### `silta guide`
 
