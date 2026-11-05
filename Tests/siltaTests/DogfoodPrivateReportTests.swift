@@ -116,7 +116,7 @@ struct DogfoodPrivateReportTests {
 
   @Test(arguments: [
     "", "-acme", "acme-", "_acme", "ac'me", "acme;touch pwned", "../acme", "acme/x", "a b",
-    "acme\n", "--since",
+    "acme\n", "äcme", "--since",
   ])
   func invalidSlugIsRefusedBeforeAnyRead(slug: String) throws {
     try withScratchDirectory { scratch in
@@ -127,6 +127,7 @@ struct DogfoodPrivateReportTests {
         "silta", text: "#!/bin/bash\ntouch " + shellWord(marker.path) + "\nexit 9\n", in: tools)
       let result = try Report.run(["--ws", slug], scratch: scratch, tools: tools)
       #expect(result.termination == .exit(1) && result.stdout.isEmpty)
+      #expect(result.stderr.contains("invalid workspace slug"))
       #expect(!FileManager.default.fileExists(atPath: marker.path))
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/reports").path))
@@ -170,6 +171,16 @@ struct DogfoodPrivateReportTests {
             """)
       }
       let tools = try Report.tools(scratch)
+      let log = try FileHandle(
+        forWritingTo: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
+      try log.seekToEnd()
+      for overrides: [String: Any] in [
+        ["workspace": "acme", "command": "silta brief"],
+        ["workspace": "acme", "command": "silta guide", "actor": 5],
+      ] {
+        try log.write(contentsOf: Data((try Report.line(overrides) + "\n").utf8))
+      }
+      try log.close()
       let committed = try Report.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
       let silta = try Report.run(
         ["--ws", "silta", "--since", "2023-11-14"], scratch: scratch, tools: tools)
@@ -184,6 +195,8 @@ struct DogfoodPrivateReportTests {
         #expect(!report.contains("Acme foreign") && !report.contains("AC-1"))
       }
       #expect(acmeReport.contains("| Acme foreign command | 1 | 100% | env: 1 |"))
+      #expect(acmeReport.contains("| silta brief | 1 | 0% |"))
+      #expect(acmeReport.contains("Unreadable log lines: 1."))
       #expect(acmeReport.contains("| 2023-W46 | other | 1 |"))
       #expect(
         acmeReport.contains(

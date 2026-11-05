@@ -1,30 +1,49 @@
 #!/usr/bin/env bash
-# Summarize only Silta's own workspace; emit Markdown after every read succeeds.
+# Summarize one workspace; emit Markdown after every read succeeds.
+# Without --ws: the silta workspace, printed for a reviewed commit under docs/dogfood/reports.
+# With --ws: any workspace, written privately under $SILTA_HOME/reports/<slug>/.
 set -euo pipefail
 fail() { echo "dogfood-report: $*" >&2; exit 1; }
+usage='usage: scripts/dogfood-report.sh [--ws <slug>] [--since YYYY-MM-DD]'
+# The workspace identifier shape of the core, matched byte-wise.
+identifier() { local LC_ALL=C; [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$ ]]; }
+private=no ws=silta since=
+while (( $# )); do
+  case "$1" in
+    --ws) [[ $private == no ]] && (( $# >= 2 )) || fail "$usage"
+      identifier "$2" || fail 'invalid workspace slug; use letters, digits, _ or -, starting and ending with a letter or digit; silta ws ls lists them.'
+      private=yes ws="$2"; shift 2;;
+    --since) [[ -z "$since" ]] && (( $# >= 2 )) && [[ -n "$2" ]] || fail "$usage"
+      since="$2"; shift 2;;
+    *) fail "$usage";;
+  esac
+done
 [[ -x /usr/bin/jq ]] || fail '/usr/bin/jq is missing; it ships with macOS 15 or later.'
 command -v silta >/dev/null || fail 'silta is missing from PATH.'
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-since=1970-01-01
-if (( $# == 0 )); then
-  for report in "$root"/docs/dogfood/reports/????-??-??.md; do
+home="${SILTA_HOME:-$HOME/.silta}"
+if [[ $private == yes ]]; then
+  umask 077
+  reports="$home/reports/$ws"
+else
+  reports="$root/docs/dogfood/reports"
+fi
+if [[ -z "$since" ]]; then
+  since=1970-01-01
+  for report in "$reports"/????-??-??.md; do
     [[ -f "$report" ]] || continue
     day="$(basename "$report" .md)"
     [[ "$day" > "$since" ]] && since="$day"
   done
-elif (( $# == 2 )) && [[ "$1" == --since ]]; then
-  since="$2"
-else
-  fail 'usage: scripts/dogfood-report.sh [--since YYYY-MM-DD]'
 fi
 canonical="$(/bin/date -j -u -f '%Y-%m-%d' "$since" '+%Y-%m-%d' 2>/dev/null)" || fail 'invalid --since day.'
 [[ "$canonical" == "$since" ]] || fail 'use a canonical YYYY-MM-DD day.'
 asof="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 [[ "$since" > "${asof:0:10}" ]] && fail "--since $since is after the report day ${asof:0:10} (UTC)."
 export SILTA_ACTOR=agent:silta:dogfood-report
-home="${SILTA_HOME:-$HOME/.silta}"
 temporary="$(mktemp -d)"
-trap 'rm -rf "$temporary"' EXIT
+staged=
+trap 'rm -rf "$temporary"; [[ -z "$staged" ]] || rm -f "$staged"' EXIT
 shopt -s nullglob
 files=("$home"/log/????-??-??.jsonl)
 oldest=none
@@ -37,25 +56,25 @@ if (( ${#files[@]} )); then
 else
   echo '[]' > "$temporary/logs"
 fi
-silta --ws silta task ls --proposed --promoted --archived --json > "$temporary/tasks" || fail 'task list failed; run silta --ws silta task ls --proposed --promoted --archived.'
+silta --ws "$ws" task ls --proposed --promoted --archived --json > "$temporary/tasks" || fail "task list failed; run silta --ws $ws task ls --proposed --promoted --archived."
 /usr/bin/jq -e '.ok == true and (.data.tasks | type == "array")' "$temporary/tasks" >/dev/null || fail 'invalid task list.'
 : > "$temporary/details"
 while IFS= read -r ref; do
   [[ -n "$ref" ]] || continue
-  silta --ws silta task show "$ref" --timeline --json >> "$temporary/details" || fail 'task timeline read failed.'
+  silta --ws "$ws" task show "$ref" --timeline --json >> "$temporary/details" || fail 'task timeline read failed.'
 done <<<"$(/usr/bin/jq -r '.data.tasks[].ref' "$temporary/tasks")"
 /usr/bin/jq -s '[.[] | if .ok == true then .data else error("task read failed") end]' "$temporary/details" > "$temporary/detail-array" || fail 'invalid task timelines.'
-silta --ws silta schema --json > "$temporary/schema" || fail 'schema read failed.'
+silta --ws "$ws" schema --json > "$temporary/schema" || fail 'schema read failed.'
 /usr/bin/jq -e '.ok == true and (.data.commands | type == "array")' "$temporary/schema" >/dev/null || fail 'invalid schema.'
 /usr/bin/sqlite3 -readonly -json "$home/silta.db" "
 SELECT created_at,command
 FROM approval
-WHERE workspace='silta' AND actor<>'$SILTA_ACTOR' AND substr(created_at,1,10)>='$since';
+WHERE workspace='$ws' AND actor<>'$SILTA_ACTOR' AND substr(created_at,1,10)>='$since';
 " > "$temporary/approvals" 2>/dev/null || fail 'approval metadata read failed.'
 [[ -s "$temporary/approvals" ]] || echo '[]' > "$temporary/approvals"
 if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$temporary/detail-array" \
   --slurpfile schema "$temporary/schema" --slurpfile approvals "$temporary/approvals" \
-  --arg since "$since" --arg asof "$asof" --arg oldest "$oldest" --arg actor "$SILTA_ACTOR" '
+  --arg since "$since" --arg asof "$asof" --arg oldest "$oldest" --arg actor "$SILTA_ACTOR" --arg ws "$ws" '
   def seconds: (capture("^(?<whole>[^.]+)(?<fraction>\\.[0-9]+)?Z$") // error("invalid timestamp")) |
     ((.whole+"Z"|fromdateiso8601) + ((.fraction // "0")|tonumber));
   def stamp: if type == "object" and (.timestamp|type) == "string"
@@ -90,10 +109,10 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
       withdrawn:($decision != null and $decision.body == "dropped"
         and $decision.actor == $created.actor and ($created.actor|startswith("agent:"))
         and ($decision.at|seconds) as $at | $triaged | index($at) == null)};
-  ($raw[0] | map(select(type != "object" or .workspace == null or .workspace == "silta"))) as $own |
+  ($raw[0] | map(select(type != "object" or .workspace == null or .workspace == $ws))) as $own |
   ($own | map(select(readable|not)) | length) as $unreadable |
   ($own | map(select(readable and .actor != $actor and (stamp|after(.))))) as $selected |
-  ($selected | map(select(.workspace == "silta"))) as $logs |
+  ($selected | map(select(.workspace == $ws))) as $logs |
   ($schema[0].data.commands | map(.name)) as $commands |
   ($logs | group_by(.command)) as $groups |
   ($logs | map(select(.actor | startswith("agent:"))) | group_by(.actor)) as $sessions |
@@ -125,7 +144,7 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
         (if $codes == "" then "-" else $codes end),
         (map(select(.error_code == "usage"))|length), (map(.milliseconds)|max)]]),
   "", "## Repeated failures", "",
-  "Consecutive failures within the selected silta stream; flag values are unavailable.", "",
+  "Consecutive failures within the selected \($ws) stream; flag values are unavailable.", "",
   table(["Actor session","Command","Code","Calls"];
     [$sessions[] | sort_by(.timestamp) |
       reduce .[] as $entry ([];
@@ -139,15 +158,19 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   table(["Code","Calls"]; [$logs[] | .warnings | unique[]] | group_by(.) | map([.[0],length])),
   "", "## Unused commands", "",
   list([$commands | sort[] | . as $command | select([$selected[].command] | index($command) == null) | "- `\($command)`"]),
-  "", "## Friction in the silta workspace", "",
-  list([$done[] | select(.friction != "" and .friction != "none") | "- \(.day) \(.ref): \(.friction|cell)"]),
-  "",
-  "Done tasks without a Friction line: \($missing|length)"
-    + (if ($missing|length) > 0 then " (\($missing|join(", ")))" else "" end) + ".",
-  "", "Open dogfood tasks:", "",
-  list([$tasks[0][] | select(.status != "done" and .status != "dropped") |
-    select(any(.links[]; .rel == "about" and .target == "topic:dogfood")) |
-    "- \(.ref) \(.status): \(.title|cell)"]),
+  "", "## Friction in the \($ws) workspace", "",
+  if $ws != "silta" then
+    "Not collected: `Friction:` lines and dogfood tasks belong to the silta workspace only (D36)."
+  else
+    list([$done[] | select(.friction != "" and .friction != "none") | "- \(.day) \(.ref): \(.friction|cell)"]),
+    "",
+    "Done tasks without a Friction line: \($missing|length)"
+      + (if ($missing|length) > 0 then " (\($missing|join(", ")))" else "" end) + ".",
+    "", "Open dogfood tasks:", "",
+    list([$tasks[0][] | select(.status != "done" and .status != "dropped") |
+      select(any(.links[]; .rel == "about" and .target == "topic:dogfood")) |
+      "- \(.ref) \(.status): \(.title|cell)"])
+  end,
   "", "## Human load", "", "Approvals per ISO week by command:", "",
   table(["Week","Command","Approvals"];
     [$approvals[0][] | select(.created_at|seconds|after(.)) | . as $approval |
@@ -164,4 +187,14 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
 ' > "$temporary/report" 2> "$temporary/error"; then
   fail 'could not summarize collected data; no report was published.'
 fi
-cat "$temporary/report"
+if [[ $private == no ]]; then
+  cat "$temporary/report"
+  exit 0
+fi
+# Publish without ever replacing a report: a second run's default range starts at its day.
+target="$reports/${asof:0:10}.md"
+mkdir -p "$reports" || fail "could not create $reports."
+staged="$(mktemp "$reports/.report.XXXXXX")" || fail "could not write in $reports."
+cat "$temporary/report" > "$staged" || fail "could not write in $reports."
+ln "$staged" "$target" 2>/dev/null || fail "$target already exists; keep it, or move it away to regenerate."
+echo "$target"
