@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Install a release built from clean main that matches origin/main; never prompt.
+#
+#   scripts/install-dev.sh
+#
+# Takes no arguments. Installs into SILTA_INSTALL_DIR (default ~/.local/bin).
 set -euo pipefail
 root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 cd "$root"

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Link every open slice issue to one task in the silta workspace.
+#
+#   scripts/dogfood-import-issues.sh
+#
+# Takes no arguments. Needs gh 2.48 or later, /usr/bin/jq and silta on PATH. Setup
+# step 3 in docs/dogfood/README.md explains when to run it.
 set -euo pipefail
 [[ -x /usr/bin/jq ]] || { echo 'import: /usr/bin/jq is missing; it ships with macOS 15 or later.' >&2; exit 1; }
 for tool in gh silta; do

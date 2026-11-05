@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Summarize only Silta's own workspace; emit Markdown after every read succeeds.
+#
+#   scripts/dogfood-report.sh [--since YYYY-MM-DD]
+#
+# Without --since, the newest report in docs/dogfood/reports/ sets the start day.
+# Reads SILTA_HOME (default ~/.silta). See "Review friction" in docs/dogfood/README.md.
 set -euo pipefail
 fail() { echo "dogfood-report: $*" >&2; exit 1; }
 [[ -x /usr/bin/jq ]] || fail '/usr/bin/jq is missing; it ships with macOS 15 or later.'

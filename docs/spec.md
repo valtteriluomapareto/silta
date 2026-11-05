@@ -1597,20 +1597,11 @@ Rust would win only if:
 - Windows teammates must run `silta` themselves, or
 - Turso becomes required.
 
-```
-silta/
-  Package.swift              # swift-tools 6.2, Swift 6 mode, macOS 15+
-  Sources/SiltaCore/           # domain, policy, storage (GRDB), git, actors, brief, output
-  Sources/silta/               # ArgumentParser commands, the entry point
-  Sources/SiltaTestSupport/    # fakes, golden helper, scratch dirs; used by tests and the scenario runner only
-  Tests/SiltaCoreTests/        # unit + fixture git repos
-  Tests/siltaTests/            # golden CLI output + exit codes
-  Tests/Stress/                # multi-process tests driving the built binary
-  Tests/Scenarios/             # scenario files run in a temporary SILTA_HOME (§20.1)
-  Evals/                       # agent evaluation suite (§21)
-  scripts/                     # run-guards.sh, verify.sh, lint-*.sh, make-fixtures.sh, guards/, ci/
-  App/SiltaApp.xcodeproj       # M5
-```
+**Layout.** One Swift package (swift-tools 6.2, Swift 6 mode, macOS 15+) with the
+`SiltaCore`, `silta` and `SiltaTestSupport` targets and the `SiltaCoreTests` and
+`siltaTests` test targets. What each target and folder holds is in
+[coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). Still to come:
+`Evals/`, the agent evaluation suite (§21, S16), and `App/SiltaApp.xcodeproj` (M5).
 
 **Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
