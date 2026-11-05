@@ -1,0 +1,1 @@
+{"data":{"actor":"human:acme","items":[{"author":"agent:codex:acme","body":"Which API?","created_at":"2023-11-14T22:13:20.001Z","kind":"question","next":["silta --ws 'acme' comment 'AC-1' --kind answer --reply-to 'AC-1/1' -F <file>","silta --ws 'acme' comment resolve 'AC-1/1' -m <reason>"],"ref":"AC-1/1","task":"AC-1"}],"remaining":0},"ok":true,"schema":1,"warnings":[]}
