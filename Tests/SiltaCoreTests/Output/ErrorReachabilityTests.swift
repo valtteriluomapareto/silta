@@ -99,6 +99,16 @@ extension RepoError: ErrorExamples {
   }
 }
 
+extension ScanNamingError: ErrorExamples {
+  static var examples: [ScanNamingError] {
+    [
+      .invalidSlug("My Projects", derived: false), .invalidSlug("my projects", derived: true),
+      .invalidPrefix("A_", derived: false), .invalidPrefix("A_", derived: true),
+      .slugExists("acme"),
+    ]
+  }
+}
+
 extension TaskError: ErrorExamples {
   static var examples: [TaskError] {
     [
@@ -173,7 +183,7 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
-    CommentError.self,
+    ScanNamingError.self, CommentError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self,
   ]
