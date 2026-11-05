@@ -109,6 +109,9 @@ GitHub issue (label `dogfood`), a `silta guide` text fix, or nothing.
   chains, and low confidence never guesses.
 - **Hook latency.** `--hook` has a 1.5 s budget and never indexes or fetches.
 - **Harness details not yet verified** (spec §23 Q5). S13 verifies them first.
+- **Code access may be overkill** (spec §23 Q8). S8 shipped it, but nothing shows
+  agents need it over plain file and git reads. S16 and DF3 evaluate it against that
+  baseline, and it gets fixes only until then.
 
 ## Done when
 

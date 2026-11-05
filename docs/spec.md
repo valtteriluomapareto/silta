@@ -1887,6 +1887,27 @@ tasks with `source` links.
    - whether the system SQLite allows loadable extensions (for vectors later)
 6. **Tracker mirror depth** in M4: is reading status and title enough?
 7. **Turso:** revisit at 1.0, or when a Swift binding appears.
+8. **Is code access (§10) worth keeping?** Its value has not been shown, and it may
+   be overkill. Agents can already read a neighbouring clone directly, or run
+   `git -C <clone> show <ref>:<path>`. `code` adds four commands, a Git runner,
+   fetch-staleness rules and their errors, all of which must be maintained.
+   Evaluate it in detail before building on it:
+   - **Compare outcomes, not adoption.** Run the same cross-repo tasks with and
+     without `code`: the agent may also use plain file and git reads. Use
+     Claude Code, Codex and at least one open model. The tasks read a neighbour's
+     default branch, a feature branch and the prod ref. Measure task success,
+     reads of the wrong version (another clone's working tree on the wrong
+     branch), tool calls, tokens and time.
+   - **Check the eval itself.** `start-cross-repo` (§21) passes only when the agent
+     used `code show/grep`, which assumes the answer. Its criterion should be the
+     outcome: the agent read the right version of the backend.
+   - **Watch real use.** In DF3's multi-repo workspace, compare `code` calls in the
+     logs with direct reads of other clones, and record the friction.
+   - **Decide.** Keep `code` as it is, cut it down (for example to `show` and
+     `grep`, or to the read commands `brief` suggests), or remove it in favour of
+     plain git hints in `brief`.
+
+   Until that decision, `code` gets fixes only, and no new features.
 
 ## Appendix A — Example workspace (`silta ws edit` YAML)
 
