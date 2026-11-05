@@ -7,12 +7,17 @@ enum CommandCatalog {
   /// Every visible `OutputCommand` under `silta`, in definition order.
   static func commands() throws -> [CommandSchema] {
     let global = try Set(arguments(of: GlobalOptions.self).flatMap(\.names))
-    return try walk(SiltaCommand.self, path: "silta").map { type, name in
+    var commands = try walk(SiltaCommand.self, path: "silta").map { type, name in
       CommandSchema(
         name: name, abstract: type.configuration.abstract,
         arguments: try arguments(of: type).filter { global.isDisjoint(with: $0.names) },
         data: type.dataShape)
     }
+    commands.append(
+      CommandSchema(
+        name: "silta help refs", abstract: ReferenceHelpCommand.configuration.abstract,
+        arguments: [], data: ReferenceHelpCommand.dataShape))
+    return commands
   }
 
   /// The arguments `type` declares, without `--help` and `--version`.

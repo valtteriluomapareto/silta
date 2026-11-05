@@ -539,3 +539,31 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     prompts; S7 needed eight relays and no decisions. Such a run never uses
     `--approved`: relayed words don't count (D38), so it names human-only commands
     and the coordinating agent asks for them in chat and runs them itself.
+
+## Agent harness evidence (2026-11-05)
+
+- **D42: Distinguish documented harness support from live acceptance.**
+  - [OpenAI configuration reference](https://developers.openai.com/codex/config-reference/)
+    documents `sandbox_workspace_write.writable_roots` as an array of additional
+    paths for workspace-write mode. It also lists newer permission profiles; this
+    does not establish the effective policy in the desktop app or a managed run.
+    Installed `codex-cli 0.166.0` help confirms `exec --json` emits JSONL and
+    `--add-dir` adds writable directories. `CODEX_THREAD_ID` has the observation
+    recorded in spec §11; its presence across harnesses/versions remains unverified.
+    No official marker guarantee was found in the documentation checked.
+  - [Claude hook reference](https://code.claude.com/docs/en/hooks) documents appending
+    exports to `CLAUDE_ENV_FILE` in SessionStart for later shell commands. Stop can
+    return `decision: block` with a reason; `stop_hook_active` avoids endless
+    continuation. Installed Claude Code reports `2.1.314`. Live propagation,
+    session identity and Stop behavior were not run in this sandbox.
+  - [OpenCode skills](https://docs.opencode.ai/docs/skills/) documents discovery from
+    `~/.claude/skills`; permissions can deny skills.
+    [CLI environment reference](https://opencode.ai/docs/cli/) lists
+    `OPENCODE_CLIENT` as a configurable client identifier, not a promised child
+    process marker. Installed OpenCode reports `1.19.5`; inherited marker and live
+    skill discovery remain unverified. The existing arbitrary `OPENCODE_*`
+    detection is a provisional heuristic, not verified harness identity.
+  - All installed CLI help/version checks used temporary HOME, CODEX_HOME and XDG
+    directories; no real harness configuration was changed. Installation,
+    uninstall/dry-run fidelity and one real run per harness belong to the installer
+    acceptance. SQLite extension support remains an independent open question.

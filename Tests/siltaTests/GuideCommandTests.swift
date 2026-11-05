@@ -3,7 +3,10 @@ import SiltaTestSupport
 import Testing
 
 struct GuideCommandTests {
-  static let topics = ["when", "start", "recipes", "human", "questions", "blocked", "handoff", "reviews", "refusals", "output"]
+  static let topics = [
+    "when", "start", "recipes", "human", "questions", "blocked", "handoff", "reviews", "refusals",
+    "output",
+  ]
 
   @Test func fullGuideMatchesSpec() throws {
     try withScratchDirectory { scratch in
@@ -45,6 +48,10 @@ struct GuideCommandTests {
         #expect(text == quiet)
         for flags in [["--json"], ["--quiet", "--json"]] {
           let result = try SiltaBinary.run(args + flags, in: scratch)
+          if args == ["guide", "human"] || args == ["help", "refs"] {
+            Golden.forTests().check(
+              result.stdout, args.first == "guide" ? "guide-human.json" : "help-refs.json")
+          }
           let envelope = try object(result.stdout)
           #expect(result.termination == .exit(0))
           #expect(result.stderr.isEmpty)
@@ -67,6 +74,9 @@ struct GuideCommandTests {
         let fields = try #require(shape["object"] as? [String: Any])
         #expect(fields["text"] as? String == "string")
         #expect(Set(fields.keys) == (name == "guide" ? ["text", "topics"] : ["text"]))
+        if name == "guide" {
+          #expect((fields["topics"] as? [String: String])?["array"] == "string")
+        }
       }
     }
   }
@@ -80,13 +90,17 @@ struct GuideCommandTests {
       ] {
         let result = try SiltaBinary.run(args + ["--json"], in: scratch)
         #expect(result.termination == .exit(1))
+        if args == ["guide", "nope"] {
+          Golden.forTests().check(result.stdout, "guide-invalid.json")
+        }
         #expect(result.stderr.isEmpty)
         let error = try #require(try object(result.stdout)["error"] as? [String: Any])
         #expect(error["code"] as? String == code)
         let next = try #require(error["next"] as? [String])
         #expect(next == [args.first == "guide" ? "silta guide --help" : "silta help refs --help"])
         for command in next {
-          let retry = try SiltaBinary.run(command.split(separator: " ").dropFirst().map(String.init), in: scratch)
+          let retry = try SiltaBinary.run(
+            command.split(separator: " ").dropFirst().map(String.init), in: scratch)
           #expect(retry.termination == .exit(0))
           #expect(retry.stderr.isEmpty)
         }
@@ -94,6 +108,7 @@ struct GuideCommandTests {
         #expect(text.termination == .exit(1))
         #expect(text.stdout.isEmpty)
         #expect(text.stderr.contains("[\(code)]"))
+        if args == ["guide", "nope"] { Golden.forTests().check(text.stderr, "guide-invalid.txt") }
       }
     }
   }
@@ -110,14 +125,20 @@ struct GuideCommandTests {
         let result = try SiltaBinary.run(args, in: scratch)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
-        #expect(result.stdout.contains(marker))
+        #expect(
+          result.stdout.split(whereSeparator: \.isWhitespace).joined(separator: " ").contains(
+            marker))
       }
       let baseline = try SiltaBinary.run(["help", "refs"], in: scratch)
-      for args in [["--ws", "acme", "help", "refs"], ["help", "--ws=acme", "refs"], ["help", "refs", "--ws", "acme"]] {
+      for args in [
+        ["--ws", "acme", "help", "refs"], ["help", "--ws=acme", "refs"],
+        ["help", "refs", "--ws", "acme"],
+      ] {
         #expect(try SiltaBinary.run(args, in: scratch) == baseline)
       }
       let unknown = try SiltaBinary.run(["help", "nope", "--json"], in: scratch)
-      #expect(unknown.termination == .exit(1))
+      #expect(unknown.termination == .exit(0))
+      #expect(unknown.stdout.contains("USAGE: silta"))
     }
   }
 
@@ -129,9 +150,13 @@ struct GuideCommandTests {
       let fm = FileManager.default
       let database = scratch.appending(path: "silta-home/silta.db")
       #expect(!fm.fileExists(atPath: database.path))
+      for path in ["home/.claude", "home/.codex"] {
+        #expect(!fm.fileExists(atPath: scratch.appending(path: path).path))
+      }
       for path in ["home/.claude/CLAUDE.md", "home/.codex/config.toml", "home/.codex/AGENTS.md"] {
         let file = scratch.appending(path: path)
-        try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createDirectory(
+          at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("sentinel".utf8).write(to: file)
       }
       let corrupt = Data("not a database".utf8)
@@ -154,11 +179,14 @@ struct GuideCommandTests {
     try withScratchDirectory { scratch in
       let fixture = CodeCommandTests()
       let repo = try fixture.setup(scratch)
-      let sha = try fixture.git(["rev-parse", "HEAD"], repo, scratch).trimmingCharacters(in: .newlines)
+      let sha = try fixture.git(["rev-parse", "HEAD"], repo, scratch).trimmingCharacters(
+        in: .newlines)
       let guide = try SiltaBinary.run(["guide", "recipes"], in: scratch)
       let handoff = try SiltaBinary.run(["guide", "handoff"], in: scratch)
       func blocks(_ text: String) -> [String] {
-        text.components(separatedBy: "```sh\n").dropFirst().compactMap { $0.components(separatedBy: "```").first }
+        text.components(separatedBy: "```sh\n").dropFirst().compactMap {
+          $0.components(separatedBy: "```").first
+        }
       }
       let recipeBlocks = blocks(guide.stdout)
       let handoffBlocks = blocks(handoff.stdout)
@@ -166,7 +194,10 @@ struct GuideCommandTests {
       try #require(handoffBlocks.count == 1)
       let plan = scratch.appending(path: "acme-plan.md")
       try "# Acme follow-up\n- [ ] Inspect API\n".write(to: plan, atomically: true, encoding: .utf8)
-      for script in [recipeBlocks[0], recipeBlocks[1], handoffBlocks[0], "silta task submit AC-12\n" + recipeBlocks[2]] {
+      for script in [
+        recipeBlocks[0], recipeBlocks[1], handoffBlocks[0],
+        "silta task submit AC-12\n" + recipeBlocks[2],
+      ] {
         let concrete = script.replacingOccurrences(of: "AC-12", with: "AC-1")
           .replacingOccurrences(of: "platform-api", with: "console")
           .replacingOccurrences(of: "src/Auth.swift", with: "README.md")
@@ -176,7 +207,7 @@ struct GuideCommandTests {
         let result = try SiltaBinary.runProcess(
           URL(filePath: "/bin/sh"), ["-ec", concrete], in: scratch, cwd: repo,
           environment: TaskCommandTests.actor.merging([
-            "PATH": try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin",
+            "PATH": try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
           ]) { $1 })
         #expect(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
       }

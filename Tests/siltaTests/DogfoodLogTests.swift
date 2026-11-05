@@ -306,7 +306,7 @@ extension DogfoodLogTests {
       (acme + ["brief"], "acme"),
       (["init"], nil),
       (["ws", "use", "acme"], "acme"),
-    ]
+    ] + [(["guide"], nil), (["help", "refs"], nil)]
   }
 
   static func discussionCatalog() -> [(args: [String], workspace: String?)] {

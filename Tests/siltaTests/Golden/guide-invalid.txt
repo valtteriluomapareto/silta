@@ -1,0 +1,2 @@
+error: Unknown guide topic; see the topic list in help. [invalid]
+next: silta guide --help

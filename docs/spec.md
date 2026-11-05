@@ -973,7 +973,8 @@ silta code ls   <app>[@<ref>] [<dir>]
   `SILTA_ACTOR` or `SILTA_SESSION` is `env` (exit 9); an empty one counts as unset. A
   `USER` that doesn't fit becomes `human:unknown`.
 - **Session:** `SILTA_SESSION` if set and non-empty. The Claude SessionStart hook exports it through
-  the hook's environment file (`CLAUDE_ENV_FILE`, to verify). Otherwise it's the
+  the hook's environment file (`CLAUDE_ENV_FILE`; documented in D42, live propagation
+  unverified). Otherwise it's the
   first six lowercase hexadecimal characters of SHA-256 over the UTF-8 worktree
   root (`git rev-parse --show-toplevel`), or the current directory outside git or
   when git fails: attribution never fails a command over git. A git failure (anything
@@ -1038,8 +1039,16 @@ Writes idempotent marker blocks, after showing a diff and asking first.
 
 The full agent manual, printed by the binary and versioned with it, so Codex,
 OpenCode and others get the same text as the skill. `silta guide <topic>` prints one
-section. The text is the same in every workspace: a setting that changes the rules
-gets one conditional sentence, and `brief` names the workspace's non-default
+section. Topics are `when`, `start`, `recipes`, `human`, `questions`, `blocked`,
+`handoff`, `reviews`, `refusals` and `output`, also listed in `guide --help`.
+An unknown topic returns `invalid` with `next: silta guide --help`.
+Guide JSON data is `{text, topics}`; reference help JSON data is `{text}`. Text
+includes its terminating newline in both modes. `--quiet` preserves these reads.
+Neither command opens the truth database or changes harness configuration; ordinary
+command logging still applies. Native `silta help [command…]` remains available.
+The manual labels workflows unavailable in the binary instead of teaching them as
+runnable commands. The text is the same in every workspace: a setting that changes
+the rules gets one conditional sentence, and `brief` names the workspace's non-default
 settings (D39). It covers:
 - **When to use silta.** Cross-repo work, another app or backend, branch-as-app repos,
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
@@ -1957,10 +1966,12 @@ tasks with `source` links.
 4. **Notes frontmatter.** Should notes carry `apps:`/`topics:` frontmatter using
    `silta topic` slugs, and should a notes pipeline propose tasks for the user's own
    action items?
-5. **To verify:**
-   - Codex env marker, `exec` JSON flag and writable-roots config key
-   - `CLAUDE_ENV_FILE` in SessionStart hooks, and Stop-hook blocking
-   - OpenCode's env marker
+5. **Harness verification:** documentation and installed CLI evidence is in D42.
+   - Still unverified in real harnesses: Codex env-marker stability and effective
+     writable roots; Claude environment propagation and Stop-hook behavior;
+     OpenCode child-process env marker and skill discovery.
+   - Documented: `exec --json`, the legacy writable-roots key, `CLAUDE_ENV_FILE`
+     and Stop blocking (D42).
    - whether the system SQLite allows loadable extensions (for vectors later)
 6. **Tracker mirror depth** in M4: is reading status and title enough?
 7. **Turso:** revisit at 1.0, or when a Swift binding appears.
