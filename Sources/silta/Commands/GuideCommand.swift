@@ -129,6 +129,8 @@ struct GuideCommand: OutputCommand {
         ask`.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \
+        A subtask of your own claimed task (`task add --parent AC-12`) starts as todo, not \
+        as a proposal, so it needs no --approved. \
         When the human asked in this chat to add the task for later, pass their words as \
         --approved so it becomes todo without triage (D39); do not ask again.
         If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta \

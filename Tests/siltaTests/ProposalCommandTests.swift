@@ -97,4 +97,27 @@ struct ProposalCommandTests {
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
     }
   }
+
+  // The guide's promise: a subtask of the agent's own claimed task is todo, not a
+  // proposal, under either setting, so --approved on it is unused and stores nothing.
+  @Test(arguments: [false, true])
+  func ownClaimedSubtaskIsTodoWithoutApproval(ask: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try ask ? Self.setup(scratch) : TaskCommandTests.setup(scratch)
+      let run = { (args: [String]) in
+        try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.actor)
+      }
+      #expect(try run(["task", "add", "Acme", "--start", "--app", "none"]).stdout == "AC-1 doing\n")
+      let plain = try run(["task", "add", "Acme child", "--parent", "AC-1"])
+      #expect(plain.termination == .exit(0) && plain.stdout == "AC-2 todo\n")
+      #expect(plain.stderr.isEmpty)
+      let approved = try run([
+        "task", "add", "Acme second child", "--parent", "AC-1", "--approved", "Add it",
+        "--json",
+      ])
+      #expect(approved.termination == .exit(0))
+      #expect(approved.stdout.contains("approval_unused") && approved.stdout.contains("todo"))
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
+    }
+  }
 }
