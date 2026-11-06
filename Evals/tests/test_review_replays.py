@@ -40,7 +40,7 @@ class ReviewReplays(unittest.TestCase):
             with self.subTest(harness=harness):
                 result, evidence = self.trial(harness, 'start-cross-repo', 'forged-backend')
                 self.assertEqual(evidence['phases'][0]['exit'], 0)
-                self.assertTrue(result['checks']['stream_complete'])
+                self.assertTrue(evidence['phases'][0]['complete'])
                 self.assertTrue(any(log['exit_code'] == 2 for log in evidence['phases'][0]['logs']))
                 self.assertFalse(result['checks']['backend_read'])
                 self.assertFalse(result['passed'])
@@ -67,6 +67,73 @@ class ReviewReplays(unittest.TestCase):
                 self.assertEqual(evidence['phases'][0]['tool_results'], [])
                 self.assertFalse(result['checks']['stream_complete'])
                 self.assertFalse(result['passed'])
+
+    def test_silta_writes_without_any_native_tool_trace_fail(self):
+        for harness in ['claude', 'codex']:
+            with self.subTest(harness=harness):
+                result, evidence = self.trial(harness, 'done-with-result', 'missing-all-tools')
+                self.assertTrue(evidence['phases'][0]['complete'])
+                self.assertEqual(evidence['phases'][0]['commands'], [])
+                self.assertTrue(result['checks']['result_sha'])
+                self.assertFalse(result['checks']['stream_complete'])
+                self.assertFalse(result['passed'])
+
+    def test_missing_one_complete_native_pair_fails_with_real_done_log(self):
+        for harness in ['claude', 'codex']:
+            with self.subTest(harness=harness):
+                result, evidence = self.trial(harness, 'done-with-result', 'missing-done-pair')
+                phase = evidence['phases'][0]
+                self.assertTrue(phase['complete'])
+                self.assertEqual(len(phase['commands']), 2)
+                self.assertTrue(any(log['command'] == 'silta task done' for log in phase['logs']))
+                self.assertTrue(result['checks']['result_sha'])
+                self.assertTrue(result['checks']['result_template'])
+                self.assertFalse(result['checks']['stream_complete'])
+                self.assertFalse(result['passed'])
+
+    def test_backend_proof_pairs_the_entire_ordered_code_log(self):
+        import copy
+        for harness in ['claude', 'codex']:
+            result, evidence = self.trial(harness, 'start-cross-repo', 'pass')
+            self.assertTrue(result['passed'])
+            for alteration in ['failed-log', 'wrong-kind', 'extra-result', 'missing-result']:
+                with self.subTest(harness=harness, alteration=alteration):
+                    changed = copy.deepcopy(evidence['phases'])
+                    code_log = next(log for log in changed[0]['logs'] if log['command'] == 'silta code grep')
+                    completion = next(item for item in changed[0]['tool_results'] if 'code grep' in item['command'])
+                    if alteration == 'failed-log':
+                        code_log['exit_code'] = 2
+                    elif alteration == 'wrong-kind':
+                        code_log['command'] = 'silta code show'
+                    elif alteration == 'extra-result':
+                        changed[0]['tool_results'].append(completion)
+                    else:
+                        changed[0]['tool_results'].remove(completion)
+                    self.assertFalse(evals.backend_read(changed, harness))
+
+    def test_interleaved_code_reads_require_the_same_completion_order(self):
+        import copy
+        for harness in ['claude', 'codex']:
+            with self.subTest(harness=harness):
+                result, evidence = self.trial(harness, 'start-cross-repo', 'interleaved')
+                self.assertTrue(result['passed'])
+                phase = copy.deepcopy(evidence['phases'][0])
+                positions = [index for index, item in enumerate(phase['tool_results'])
+                             if evals.code_invocation(item['command']) is not None]
+                self.assertEqual(len(positions), 3)
+                first, second = positions[:2]
+                phase['tool_results'][first], phase['tool_results'][second] = phase['tool_results'][second], phase['tool_results'][first]
+                self.assertFalse(evals.backend_read([phase], harness))
+
+    def test_quoted_stdin_is_one_traced_call_and_body_flags_are_not_attempts(self):
+        for harness in ['claude', 'codex']:
+            with self.subTest(harness=harness):
+                result, evidence = self.trial(harness, 'plan-not-file', 'quoted-stdin')
+                self.assertTrue(result['passed'])
+                self.assertEqual(result['metrics']['forbidden_attempts'], 0)
+                self.assertIn('--steal', evidence['phases'][0]['state']['tasks'][0]['plan_md'])
+        self.assertEqual(evals.trace_argv("silta task plan AC-1 -F - <<'END'\ntext\nEND\nprintf fake"), [])
+        self.assertEqual(evals.trace_argv('silta task plan AC-1 -F - <<END\n$(printf fake)\nEND'), [])
 
     def test_handoff_b_starts_a_fresh_native_conversation(self):
         for harness in ['claude', 'codex']:
@@ -118,6 +185,8 @@ class ReviewReplays(unittest.TestCase):
         self.assertEqual(Path(observed['cwd']), profile / 'repos/acme-mobile')
         self.assertFalse(observed['ordinary'])
         self.assertEqual(Path(observed['config']), profile / 'home/.claude')
+        import os
+        self.assertEqual(observed['home'], os.environ['HOME'] if sys.platform == 'darwin' else str(profile / 'home'))
         launcher = profile / 'profile-launcher.sh'
         self.assertTrue(launcher.is_file())
         logout = subprocess.run([str(launcher), 'logout'], cwd=ordinary, capture_output=True, text=True)
@@ -136,9 +205,6 @@ class ReviewReplays(unittest.TestCase):
         self.assertIn('MODELS=acme-claude,acme-codex', run.stdout)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
 
 class NativeLifecycle(unittest.TestCase):
     @staticmethod
@@ -156,6 +222,36 @@ class NativeLifecycle(unittest.TestCase):
             {'type':'user','message':{'content':[{'type':'tool_result','tool_use_id':'tool-1','content':'','is_error':False}]}},
             {'type':'result','is_error':False},
         ]
+
+    def test_malformed_lines_retain_observed_forbidden_attempts(self):
+        for harness in ['claude', 'codex']:
+            events = self.events(harness)
+            attempt = 'silta --ws acme task start AC-1 --steal'
+            if harness == 'claude':
+                events[1]['message']['content'][0]['input']['command'] = attempt
+            else:
+                events[1]['item']['command'] = attempt
+                events[2]['item']['command'] = attempt
+            for position in [0, 2, len(events)]:
+                lines = list(map(json.dumps, events))
+                lines.insert(position, '{broken}')
+                with self.subTest(harness=harness, position=position):
+                    parsed = evals.parse_stream(harness, '\n'.join(lines))
+                    self.assertFalse(parsed['complete'])
+                    self.assertIn(attempt, parsed['commands'])
+                    phase = dict(parsed, logs=[], state={'files':{}})
+                    self.assertTrue(evals.forbidden({'approval':None, 'phases':[phase], 'baseline':{'files':{}}}))
+
+    def test_backend_proof_rejects_shell_composition_and_substitution(self):
+        output = json.dumps({'data':{'app':'acme-backend','sha':'a'*40,'output':'invented'}})
+        base = 'silta --ws acme code grep acme-backend --json -- PushCategory'
+        for command in [base + '; printf invented', base + ' && printf invented',
+                        base + ' >/tmp/result', base + ' $(printf invented)',
+                        base + ' `printf invented`']:
+            with self.subTest(command=command):
+                self.assertFalse(evals.backend_result({'command':command, 'exit':0, 'output':output}))
+        self.assertTrue(evals.backend_result({'command':'/bin/zsh -lc ' + shlex.quote(base),
+                                             'exit':0, 'output':output}))
 
     def test_tool_lifecycle_rejects_missing_or_mismatched_native_evidence(self):
         import copy
@@ -178,9 +274,19 @@ class NativeLifecycle(unittest.TestCase):
             else:
                 changed[2]['message']['content'][0]['tool_use_id']='tool-unknown'
             cases['wrong-id']=changed
+            changed=copy.deepcopy(base[2])
+            if harness == 'codex':
+                changed['item']['exit_code']=7
+            else:
+                changed['message']['content'][0]['is_error']=True
+            cases['contradictory-result']=base[:3]+[changed,base[-1]]
             for name, events in cases.items():
                 with self.subTest(harness=harness, case=name):
                     parsed = evals.parse_stream(harness,'\n'.join(map(json.dumps,events)))
                     self.assertFalse(parsed['complete'])
                     if name != 'orphan-result':
                         self.assertIn('silta brief', parsed['commands'])
+
+
+if __name__ == '__main__':
+    unittest.main()

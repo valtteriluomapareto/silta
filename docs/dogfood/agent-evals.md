@@ -35,7 +35,9 @@ file hashes supply the automatic grades. The stub operator/reviewer oracle is
 explicitly labeled synthetic. [The guarantee inventory](../../Evals/tests/guarantees.json)
 links each predicate to its scenario and variant; the fault script replaces each
 predicate with unconditional success, checks that its focused negative-evidence
-assertion fails, and restores the source even on error. It writes
+assertion fails, and restores the source even on error. Two additional runner mutations reuse A’s conversation for B or overwrite a
+nonzero client exit; each re-executes its actual-CLI stub test and must fail on
+the observed conversation/exit assertion. The script writes
 `planted-faults.json` in the report directory. Do not run source mutations in
 parallel with verification or another agent editing this checkout.
 
@@ -51,8 +53,10 @@ normal environment; the runner does this for fixture Git operations as well.
 eval_claude=$(command -v claude)
 eval_codex=$(command -v codex)
 # Set the exact model names selected in the clients by the maintainer.
-read -r -p 'Claude model: ' eval_claude_model
-read -r -p 'Codex model: ' eval_codex_model
+printf 'Claude model: '
+read -r eval_claude_model
+printf 'Codex model: '
+read -r eval_codex_model
 Evals/run.sh --silta .build/debug/silta --live --harness claude \
   --client "$eval_claude" --model "$eval_claude_model" \
   --output artifacts/evals/claude-live --repeats 3
@@ -64,7 +68,9 @@ Evals/run.sh --silta .build/debug/silta --live --harness codex \
 JSON-subset YAML in [matrix.yaml](../../Evals/matrix.yaml) records the default
 repeat count and harness inventory; select model names explicitly for live runs.
 Use `--scenario <id>` for a smaller run. The runner prints the complete `env -i …`
-login command for each trial. Run that exact command in another terminal, sign in
+login command for each trial. Its persisted `profile-launcher.sh` enters the
+Acme mobile fixture before launching the isolated client, regardless of the other
+terminal’s current directory. Run that exact command in another terminal, sign in
 afresh, then type `signed-in` at the waiting runner. Codex uses fresh file-backed
 credentials in temporary CODEX_HOME. Claude uses a fresh claude.ai login under
 CLAUDE_CONFIG_DIR. Do not use Console sign-in without an API key. On macOS, Claude
@@ -93,7 +99,19 @@ The adapters use [Claude's documented print/stream interface](https://code.claud
 and [Codex's documented JSONL exec interface](https://learn.chatgpt.com/docs/non-interactive-mode).
 Their argv/event handling is stub-tested; current installed-client behavior and
 model performance require these live runs. Native lifecycle metadata is ignored;
-missing terminal events, malformed evidence and nonzero exits fail.
+missing or mismatched tool completions, activity after termination, missing
+terminal events, malformed evidence and nonzero exits fail. Tool starts and
+completions must match by native ID. Every non-hook Silta log entry must also
+match its own native completion in command and exit order; removing a whole
+start/completion pair therefore fails. A single literal invocation or one quoted
+stdin heredoc is supported for this correspondence; compound or ambiguous
+invocations cannot receive an automatic integrity pass. Parseable attempts remain
+in metrics even when another stream line is malformed. Backend proof accepts only a literal
+`silta code show/grep` invocation (optionally shell-wrapped), reconciles the entire
+ordered code-call set with Silta logs and requires matching command/exit evidence.
+Compound commands, redirections and substitutions cannot supply automatic proof.
+An approval exempts only its exact observed invocation, never another command in
+the same phase.
 
 ## Policy coverage and evidence review
 
@@ -198,7 +216,8 @@ link a durable CI artifact containing the same archive. Do not claim the M1 exit
 criterion until both harnesses' four core live scenarios pass over three repeats.
 
 Live profiles remain at the generated `profile-location.txt` paths for explicit
-logout. Use the same printed environment to exit/log out of each fresh client
-profile, then remove only those trial mktemp directories. Never repair a real
+logout. Use each trial’s persisted `profile-launcher.sh` to exit/log out of that fresh
+client profile (for example, run the launcher with `logout` for clients that support
+that command, or start it interactively and log out), then remove only those trial mktemp directories. Never repair a real
 profile or delete the maintainer's harness home. Offline trial roots are deleted
 after evidence collection because they contain no authentication.

@@ -32,11 +32,34 @@ if phase and variant.startswith('present-'):
     assert '--resume' in sys.argv or 'resume' in sys.argv
 
 
-events = []
+recording = json.loads((ROOT / 'tests/recordings' / f'{scenario}-{os.environ["SI_EVAL_RECORDING"]}.json').read_text())
+
+
+omitted_ids = set()
 
 
 def emit(value):
-    events.append(value)
+    if recording.get('omit_command'):
+        item = value.get('item', {})
+        if value['type'] == 'assistant':
+            item = value['message']['content'][0]
+        identifier = item.get('id')
+        command_text = item.get('command', item.get('input', {}).get('command', ''))
+        if recording['omit_command'] in command_text:
+            omitted_ids.add(identifier)
+        if identifier in omitted_ids or value['type'] == 'user' and any(
+                block.get('tool_use_id') in omitted_ids for block in value['message']['content']):
+            return
+    if recording.get('omit_all_tools') and (
+            value['type'] == 'user'
+            or value['type'] == 'assistant' and any(item['type'] == 'tool_use' for item in value['message']['content'])
+            or value['type'] in ('item.started', 'item.completed') and value.get('item', {}).get('type') == 'command_execution'):
+        return
+    if recording.get('omit_completions') and (
+            value['type'] == 'user' or value['type'] == 'item.completed'
+            and value.get('item', {}).get('type') == 'command_execution'):
+        return
+    print(json.dumps(value), flush=True)
 
 
 def message(text):
@@ -74,7 +97,6 @@ elif 'resume' in sys.argv:
     conversation = sys.argv[-2]
 emit({'type': 'system', 'subtype': 'init', 'session_id': conversation} if harness == 'claude'
      else {'type': 'thread.started', 'thread_id': conversation})
-recording = json.loads((ROOT / 'tests/recordings' / f'{scenario}-{os.environ["SI_EVAL_RECORDING"]}.json').read_text())
 for action in recording['phases'][phase]:
     if 'args' in action:
         command(['silta', '--ws', 'acme', *[arg.format(sha=sha) for arg in action['args']]], action.get('stdin'))
@@ -109,10 +131,4 @@ for action in recording['phases'][phase]:
 emit({'type': 'result', 'is_error': False, 'usage': {'input_tokens': 10, 'output_tokens': 5}}
      if harness == 'claude' else {'type': 'turn.completed', 'usage': {'input_tokens': 10, 'output_tokens': 5}})
 
-for event in events:
-    if recording.get('omit_completions') and (
-            event['type'] == 'user' or event['type'] == 'item.completed'
-            and event.get('item', {}).get('type') == 'command_execution'):
-        continue
-    print(json.dumps(event), flush=True)
 sys.exit(recording.get('exit_code', 0))

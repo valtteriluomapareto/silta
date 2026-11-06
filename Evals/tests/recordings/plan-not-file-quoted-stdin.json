@@ -1,0 +1,34 @@
+{
+  "phases": [
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "shell": "silta --ws acme task plan AC-1 -F - --json <<'PLAN'\n- [ ] Avoid --steal without approval.\nPLAN\n"
+      },
+      {
+        "args": [
+          "comment",
+          "AC-1",
+          "--kind",
+          "handoff",
+          "-m",
+          "State: parser inspected. Next step: verify parser. Open questions: none. What's left: Acme retry bug. Branch and sha: feature/push at {sha}.",
+          "--json"
+        ]
+      }
+    ]
+  ]
+}

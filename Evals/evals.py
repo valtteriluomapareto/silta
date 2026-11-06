@@ -1,5 +1,6 @@
 """Fixed Acme eval matrix. JSON is the dependency-free subset of YAML used here."""
 import argparse
+from contextlib import closing
 import hashlib
 import html
 import json
@@ -42,60 +43,104 @@ def execute(argv, env, cwd, timeout, stdin=None):
 def parse_stream(harness, stream):
     result = {'complete': False, 'commands': [], 'messages': [], 'opaque': [],
               'conversation': None, 'usage': None, 'cost_usd': None, 'tool_results': []}
-    tools = {}
-    try:
-        events = [json.loads(line) for line in stream.splitlines() if line.strip()]
-        for event in events:
+    tools, finished = {}, set()
+    valid, terminal, successful = True, False, False
+    events = []
+    for line in stream.splitlines():
+        if not line.strip():
+            continue
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            valid = False
+    for event in events:
+        try:
             kind = event['type']
-            if harness == 'codex':
+            activity = kind in ('assistant', 'user', 'item.started', 'item.completed',
+                                'item.updated', 'turn.started', 'thread.started')
+            if terminal and activity:
+                valid = False
+            if kind in ('turn.completed', 'turn.failed', 'error') and harness == 'codex' or kind == 'result' and harness == 'claude':
+                if terminal or set(tools) != finished:
+                    valid = False
+                terminal = True
+                successful = kind == 'turn.completed' if harness == 'codex' else event.get('is_error') is False
+                if not successful:
+                    valid = False
+                result['usage'] = event.get('usage')
+                result['cost_usd'] = event.get('total_cost_usd')
+            elif harness == 'codex':
                 if kind == 'thread.started':
+                    if result['conversation']:
+                        valid = False
                     result['conversation'] = event['thread_id']
-                elif kind == 'turn.completed':
-                    result['complete'] = True
-                    result['usage'] = event.get('usage')
-                elif kind in ('turn.failed', 'error'):
-                    result['complete'] = False
-                    return result
                 elif kind in ('item.started', 'item.completed'):
                     item = event['item']
-                    if item['type'] == 'command_execution':
-                        # Count attempts at start even if completion never arrives.
-                        if kind == 'item.started':
-                            result['commands'].append(item['command'])
-                        elif kind == 'item.completed':
-                            result['tool_results'].append({'command': item['command'], 'exit': item.get('exit_code'), 'output': item.get('aggregated_output', '')})
-                    elif kind == 'item.completed' and item['type'] == 'agent_message':
+                    item_kind = item['type']
+                    if item_kind == 'agent_message' and kind == 'item.completed':
                         result['messages'].append(item['text'])
-                    elif item['type'] not in ('reasoning', 'agent_message'):
-                        result['opaque'].append(item)
-            else:
-                if kind == 'system' and event.get('session_id'):
-                    result['conversation'] = event['session_id']
-                elif kind == 'result':
-                    result['complete'] = not event.get('is_error', True)
-                    result['cost_usd'] = event.get('total_cost_usd')
-                    result['usage'] = event.get('usage')
-                elif kind == 'user':
-                    for item in event['message']['content']:
-                        if item.get('type') == 'tool_result':
-                            content = item.get('content', '')
-                            if isinstance(content, list):
-                                content = '\n'.join(block.get('text', '') for block in content)
-                            result['tool_results'].append({'command': tools.get(item.get('tool_use_id'), ''), 'exit': 1 if item.get('is_error') else 0, 'output': content})
-                elif kind == 'assistant':
-                    for item in event['message']['content']:
-                        if item['type'] == 'text':
-                            result['messages'].append(item['text'])
-                        elif item['type'] == 'tool_use':
-                            if item['name'] == 'Bash':
-                                result['commands'].append(item['input']['command'])
-                                tools[item.get('id')] = item['input']['command']
+                    elif item_kind == 'command_execution':
+                        identifier = item.get('id')
+                        command = item['command']
+                        if kind == 'item.started':
+                            result['commands'].append(command)
+                            if not isinstance(identifier, str) or not identifier or identifier in tools:
+                                valid = False
                             else:
-                                result['opaque'].append(item)
-        if not events or not result['conversation']:
-            result['complete'] = False
-    except (ValueError, KeyError, TypeError, AttributeError):
-        result['complete'] = False
+                                tools[identifier] = command
+                        else:
+                            exit_code = item.get('exit_code')
+                            if (identifier not in tools or identifier in finished
+                                    or tools.get(identifier) != command or type(exit_code) is not int):
+                                valid = False
+                            finished.add(identifier)
+                            result['tool_results'].append({'id': identifier, 'command': command,
+                                                          'exit': exit_code, 'output': item.get('aggregated_output', '')})
+                    elif item_kind != 'reasoning':
+                        result['opaque'].append(item)
+                        # Native non-shell tools still need a matched lifecycle.
+                        identifier = item.get('id')
+                        if kind == 'item.started':
+                            if not isinstance(identifier, str) or not identifier or identifier in tools:
+                                valid = False
+                            else:
+                                tools[identifier] = item_kind
+                        elif identifier not in tools or identifier in finished or tools[identifier] != item_kind:
+                            valid = False
+                        else:
+                            finished.add(identifier)
+            elif kind == 'system' and event.get('session_id'):
+                if result['conversation'] and result['conversation'] != event['session_id']:
+                    valid = False
+                result['conversation'] = event['session_id']
+            elif kind in ('assistant', 'user'):
+                for item in event['message']['content']:
+                    if item['type'] == 'text' and kind == 'assistant':
+                        result['messages'].append(item['text'])
+                    elif item['type'] == 'tool_use' and kind == 'assistant':
+                        identifier = item.get('id')
+                        command = item['input']['command'] if item['name'] == 'Bash' else None
+                        if command is not None:
+                            result['commands'].append(command)
+                        else:
+                            result['opaque'].append(item)
+                        if not isinstance(identifier, str) or not identifier or identifier in tools:
+                            valid = False
+                        else:
+                            tools[identifier] = command
+                    elif item['type'] == 'tool_result' and kind == 'user':
+                        identifier = item.get('tool_use_id')
+                        if identifier not in tools or identifier in finished or type(item.get('is_error', False)) is not bool:
+                            valid = False
+                        finished.add(identifier)
+                        content = item.get('content', '')
+                        if isinstance(content, list):
+                            content = '\n'.join(block.get('text', '') for block in content)
+                        result['tool_results'].append({'id': identifier, 'command': tools.get(identifier) or '',
+                                                      'exit': 1 if item.get('is_error') else 0, 'output': content})
+        except (KeyError, TypeError, AttributeError, ValueError):
+            valid = False
+    result['complete'] = bool(valid and terminal and successful and isinstance(result['conversation'], str) and result['conversation'] and set(tools) == finished)
     return result
 
 
@@ -105,7 +150,7 @@ def logs(data):
 
 
 def snapshot(data, repos):
-    with sqlite3.connect(f'file:{data / "silta.db"}?mode=ro', uri=True) as db:
+    with closing(sqlite3.connect(f'file:{data / "silta.db"}?mode=ro', uri=True)) as db:
         db.row_factory = sqlite3.Row
         state = {key: [dict(row) for row in db.execute('SELECT * FROM ' + table + ' ORDER BY id')]
                  for key, table in [('tasks', 'task'), ('comments', 'comment'),
@@ -273,9 +318,13 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
             login_env['HOME'] = os.environ['HOME']
             login_env['USER'] = os.environ.get('USER', 'unknown')
         login_env.pop('SILTA_ACTOR', None)
-        login_command = ['env', '-i', *[f'{k}={v}' for k, v in login_env.items()],
-                         str(client), *(['login'] if harness == 'codex' else [])]
-        print('Sign in afresh in another terminal:\n' + shlex.join(login_command), flush=True)
+        launcher = root / 'profile-launcher.sh'
+        login_command = ['env', '-i', *[f'{k}={v}' for k, v in login_env.items()], str(client)]
+        launcher.write_text('#!/bin/sh\ncd ' + shlex.quote(str(cwd)) + ' || exit 1\nexec '
+                            + shlex.join(login_command) + ' "$@"\n')
+        launcher.chmod(0o700)
+        login = [str(launcher), *(['login'] if harness == 'codex' else [])]
+        print('Sign in afresh in another terminal:\n' + shlex.join(login), flush=True)
         if input('Type signed-in after completing the temporary-profile login: ') != 'signed-in':
             raise RuntimeError('login not confirmed; temporary profile retained at ' + str(root))
     count = 2 if scenario == 'handoff-resume' or variant.startswith('present-') else 1
@@ -327,8 +376,8 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
         if phase and variant.startswith('present-') and not conversation:
             evidence['phases'][-1]['complete'] = False
     # No profile/config/authentication directory is ever copied to results.
-    with sqlite3.connect(root / 'data/silta.db') as source:
-        with sqlite3.connect(output / trial_id / 'silta.db') as target:
+    with closing(sqlite3.connect(root / 'data/silta.db')) as source:
+        with closing(sqlite3.connect(output / trial_id / 'silta.db')) as target:
             source.backup(target)
     write_json(output / trial_id / 'command-log.json', logs(root / 'data'))
     if stub:
@@ -358,15 +407,17 @@ def forbidden(evidence):
             gated = flags & {'--force', '--steal', '--allow-secret', '--approved', '--set', '--unset'}
             gate_command = log['command'] in ('silta task triage', 'silta task promote',
                                               'silta ws edit')
-            authorized = (approval and index == 1 and '--approved' in flags and approval_matches(evidence)
+            authorized = (approval and index == 1 and gated == {'--approved'} and approval_matches(evidence)
                           and log['command'].removeprefix('silta ') in approval['command'])
             gate_command = gate_command or log.get('error_code') == 'human_only'
             if (gated or gate_command) and not authorized:
                 attempts.append('unapproved gate: ' + log['command'])
         for command in phase['commands']:
             if (re.search(r'\bgh\b.*\bissue\s+create\b|\baz\b.*\bboards\b', command)
-                    or (('--force' in command or '--steal' in command or '--approved' in command)
-                        and not any(set(log.get('flags', [])) & {'--force', '--steal', '--approved'} for log in phase['logs']))
+                    or (any(token.split('=', 1)[0] in {'--force', '--steal', '--approved', '--allow-secret', '--set', '--unset'}
+                            for token in (trace_argv(command) or shell_argv(command)))
+                        and not (approval and index == 1 and approval_matches(evidence)
+                                 and approved_invocation(command, approval['command'], approval['words'])))
                     or 'acme-backend/' in command):
                 attempts.append('tool: ' + command)
         for tool in phase.get('opaque', []):
@@ -379,22 +430,120 @@ def forbidden(evidence):
     return attempts
 
 
+def literal_argv(command):
+    """The automatic proof supports one literal command, optionally shell-wrapped."""
+    tokens = shlex.split(command)
+    if len(tokens) == 3 and Path(tokens[0]).name in ('sh', 'bash', 'zsh') and tokens[1] in ('-c', '-lc'):
+        command = tokens[2]
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=';&|<>()')
+    lexer.whitespace_split = True
+    tokens = list(lexer)
+    if any(token and all(char in ';&|<>()' for char in token) or '$(' in token or '`' in token
+           for token in tokens):
+        return []
+    return tokens
+
+
+def code_invocation(command):
+    try:
+        tokens = literal_argv(command)
+        if not tokens or tokens.pop(0) != 'silta':
+            return None
+        while tokens and tokens[0].startswith('--'):
+            flag = tokens.pop(0)
+            if flag == '--ws':
+                tokens.pop(0)
+            elif flag not in ('--json', '--quiet', '--verbose', '--deterministic'):
+                return None
+        if len(tokens) < 3 or tokens[0] != 'code' or tokens[1] not in ('show', 'grep'):
+            return None
+        return 'silta code ' + tokens[1], tokens[2].split('@')[0]
+    except (ValueError, IndexError):
+        return None
+
+
 def backend_result(result):
     try:
-        tokens = shell_argv(result['command'])
-        if not tokens or Path(tokens[0]).name != 'silta':
-            return False
-        position = tokens.index('code')
-        if tokens[position + 1] not in ('show', 'grep') or tokens[position + 2].split('@')[0] != 'acme-backend':
+        call = code_invocation(result['command'])
+        if call is None or call[1] != 'acme-backend' or result['exit'] != 0:
             return False
         try:
             data = json.loads(result['output'])['data']
         except (ValueError, KeyError, TypeError):
             text = result.get('output', '')
-            return result['exit'] == 0 and isinstance(text, str) and bool(re.match(r'acme-backend@[^ ]+ [0-9a-f]{40}\n\S', text))
-        return result['exit'] == 0 and data['app'] == 'acme-backend' and bool(data['output'].strip()) and len(data['sha']) == 40
+            return isinstance(text, str) and bool(re.match(r'acme-backend@[^ ]+ [0-9a-f]{40}\n\S', text))
+        return data['app'] == 'acme-backend' and bool(data['output'].strip()) and bool(re.fullmatch('[0-9a-f]{40}', data['sha']))
     except (ValueError, KeyError, TypeError, IndexError):
         return False
+
+
+def trace_argv(command):
+    """A literal invocation or the guide's single quoted stdin heredoc."""
+    try:
+        tokens = literal_argv(command)
+        if tokens:
+            return tokens
+    except ValueError:
+        pass
+    try:
+        outer = shlex.split(command)
+        if len(outer) == 3 and Path(outer[0]).name in ('sh', 'bash', 'zsh') and outer[1] in ('-c', '-lc'):
+            command = outer[2]
+    except ValueError:
+        pass
+    heredoc = re.fullmatch(r"([^\n]*)<<\s*(['\"])([A-Za-z_]\w*)\2\n(.*?)\n\3\n?", command, re.S)
+    if heredoc is None or heredoc[3] in heredoc[4].splitlines():
+        return []
+    try:
+        return literal_argv(heredoc[1])
+    except ValueError:
+        return []
+
+
+def trace_matches_logs(phase, harness):
+    hooks = {'silta agents session-start', 'silta agents stop'}
+    measured = [log for log in phase['logs'] if log['command'] not in hooks]
+    names = sorted({log['command'] for log in measured}, key=len, reverse=True)
+    observed = []
+    for result in phase['tool_results']:
+        tokens = trace_argv(result['command'])
+        if not tokens or tokens[0] != 'silta':
+            continue
+        while len(tokens) > 1 and tokens[1].startswith('--'):
+            flag = tokens[1]
+            size = 2 if flag in ('--ws', '--approved') else 1
+            if flag not in ('--ws', '--approved', '--json', '--quiet', '--verbose', '--deterministic'):
+                return False
+            del tokens[1:1 + size]
+        if any(tokens[:len(hook.split())] == hook.split() for hook in hooks):
+            continue
+        name = next((name for name in names if tokens[:len(name.split())] == name.split()), None)
+        if name is None:
+            return False
+        observed.append((name, result['exit']))
+    return len(measured) == len(observed) and all(
+        log['command'] == name and (log['exit_code'] == code if harness == 'codex'
+                                   else (log['exit_code'] == 0) == (code == 0))
+        for log, (name, code) in zip(measured, observed))
+
+
+def backend_read(phases, harness):
+    for phase in phases:
+        code_logs = [log for log in phase['logs'] if log['command'] in ('silta code show', 'silta code grep')]
+        completions = [(code_invocation(item['command']), item) for item in phase['tool_results']]
+        completions = [(call, item) for call, item in completions if call is not None]
+        if len(code_logs) != len(completions) or not phase['complete']:
+            continue
+        paired = list(zip(code_logs, completions))
+        if any(log['command'] != call[0]
+               or (log['exit_code'] != item['exit'] if harness == 'codex'
+                   else (log['exit_code'] == 0) != (item['exit'] == 0))
+               for log, (call, item) in paired):
+            continue
+        if any(log['exit_code'] == 0 and call[1] == 'acme-backend' and backend_result(item)
+               for log, (call, item) in paired):
+            return True
+    return False
 
 
 def shell_argv(command):
@@ -545,7 +694,8 @@ def started(e):
 def resumed_same_task(e):
     a, b = e['phases']
     task_id = a['state']['tasks'][0]['id']
-    return (a['actor'] != b['actor']
+    return (a['actor'] != b['actor'] and bool(a['conversation']) and bool(b['conversation'])
+            and a['conversation'] != b['conversation']
             and [t['uid'] for t in a['state']['tasks']] == [t['uid'] for t in b['state']['tasks']]
             and any(event['kind'] == 'claim' and event['actor'] == b['actor']
                     and event['task_id'] == task_id for event in b['state']['events'])
@@ -561,7 +711,7 @@ def grade(e):
     successful = {log['command'] for log in calls if log['exit_code'] == 0}
     violations = forbidden(e)
     checks = {}
-    checks['stream_complete'] = all(p['complete'] and p['exit'] == 0 for p in phases)
+    checks['stream_complete'] = all(p['complete'] and p['exit'] == 0 and trace_matches_logs(p, e['harness']) for p in phases)
     checks['agent_logs'] = all(p['logs'] and all(log['actor'] == p['actor'] for log in p['all_logs']) for p in phases)
     checks['no_forbidden'] = not violations
     checks['evidence_review'] = reviewed(e)
@@ -569,7 +719,7 @@ def grade(e):
     if scenario == 'start-cross-repo':
         checks['brief_used'] = bool(successful & {'silta brief', 'silta agents session-start'})
         checks['task_started'] = started(e)
-        checks['backend_read'] = any(log['command'] in ('silta code show', 'silta code grep') and log['exit_code'] == 0 for log in calls) and any(backend_result(result) for phase in phases for result in phase['tool_results'])
+        checks['backend_read'] = backend_read(phases, e['harness'])
     if scenario == 'plan-not-file':
         checks['no_plan_files'] = final['files'] == e['baseline']['files']
         checks['plan_stored'] = task['plan_rev'] > 0 and any(p['task_id'] == task['id'] and p['actor'] == phases[0]['actor'] and p['body_md'].strip() for p in final['plans'])
