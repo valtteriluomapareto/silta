@@ -18,7 +18,8 @@ struct BriefCommand: OutputCommand {
       "confidence": .string, "reason": .string,
     ]),
     "settings": .object([
-      "proposals": .optional(.string), "review_gate": .optional(.string),
+      "ask_about": .optional(.string), "proposals": .optional(.string),
+      "review_gate": .optional(.string),
       "archive_after_days": .optional(.int), "stale_days": .optional(.int),
     ]),
     "current_task": .optional(.string),

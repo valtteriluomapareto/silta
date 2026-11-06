@@ -164,6 +164,7 @@ private struct RestoreValidation {
     do {
       _ = try settings.reviewGate
       _ = try settings.proposals
+      _ = try settings.askAbout
       _ = try settings.archiveAfterDays
       _ = try settings.staleDays
     } catch let error as WorkspaceError {

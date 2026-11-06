@@ -11,8 +11,13 @@ struct WorkspaceSettings: Sendable {
     case triage, ask
   }
 
+  enum AskAbout: String, CaseIterable, Sendable {
+    case standard, short
+  }
+
   enum CodingKeys: String, CodingKey, CaseIterable {
     case proposals
+    case askAbout = "ask_about"
     case reviewGate = "review_gate"
     case archiveAfterDays = "archive_after_days"
     case staleDays = "stale_days"
@@ -45,6 +50,17 @@ struct WorkspaceSettings: Sendable {
       guard let policy = Proposals(rawValue: word) else {
         throw WorkspaceError.unknownSetting(
           workspace, key: "proposals", value: try WorkspaceConfig.json(Self.masked(word)))
+      }
+      return policy
+    }
+  }
+
+  var askAbout: AskAbout {
+    get throws {
+      let word: String = try value(.askAbout, default: AskAbout.standard.rawValue)
+      guard let policy = AskAbout(rawValue: word) else {
+        throw WorkspaceError.unknownSetting(
+          workspace, key: "ask_about", value: try WorkspaceConfig.json(Self.masked(word)))
       }
       return policy
     }

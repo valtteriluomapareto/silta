@@ -16,3 +16,12 @@ extension WorkspaceSettings.ReviewGate {
     }
   }
 }
+
+extension WorkspaceSettings.AskAbout {
+  var gloss: String {
+    switch self {
+    case .standard: "ask about scope, dependencies, public APIs and the short list"
+    case .short: "ask only about what others see, deletes, irreversible steps, money"
+    }
+  }
+}
