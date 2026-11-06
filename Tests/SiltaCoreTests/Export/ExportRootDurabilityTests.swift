@@ -6,6 +6,37 @@ import Synchronization
 import Testing
 
 struct ExportRootDurabilityTests {
+  @Test func retryThroughRootAliasFlushesResolvedAncestors() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let actual = scratch.appending(path: "actual")
+      let root = actual.appending(path: "new-parent/exports")
+      let failed = ExportMoves(sync: { url in
+        if url.standardizedFileURL.path == actual.standardizedFileURL.path {
+          throw StorageError.ioFailure
+        }
+        try ExportDurability.sync(url)
+      })
+      #expect(throws: ExportError.self) {
+        try ExportPublishTests.export(store, home, root, failed)
+      }
+      let alias = scratch.appending(path: "alias")
+      try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+      let synced = Mutex<[String]>([])
+      let retry = ExportMoves(sync: { url in
+        try ExportDurability.sync(url)
+        synced.withLock { $0.append(url.standardizedFileURL.path) }
+      })
+      _ = try ExportPublishTests.export(store, home, alias, retry)
+      let paths = synced.withLock { $0 }
+      withKnownIssue("#14: root alias retry omits resolved ancestors") {
+        #expect(paths.contains(actual.standardizedFileURL.path))
+        #expect(paths.contains(root.deletingLastPathComponent().standardizedFileURL.path))
+      }
+    }
+  }
+
   @Test func ancestorFailureStillReportsExistingWorkDirectories() throws {
 
     try withScratchDirectory { scratch in

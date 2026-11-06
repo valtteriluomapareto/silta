@@ -90,7 +90,7 @@ struct BackupCommandTests {
         return try await group.reduce(into: [String]()) { $0.append($1) }
       }
       #expect(Set(paths).count == 6)
-      for path in paths where FileManager.default.fileExists(atPath: path) { try Self.check(path) }
+      for path in paths { try Self.check(path) }
       let retained = try FileManager.default.contentsOfDirectory(atPath: directory.path)
         .filter { $0.contains("-manual-") && $0.hasSuffix(".db") }
       #expect(retained.count == 7)
