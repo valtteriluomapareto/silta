@@ -9,7 +9,8 @@ struct AgentHealthTests {
   static func setup(_ scratch: URL) throws -> [String: String] {
     _ = try SiltaBinary.run(["init"], in: scratch, environment: now)
     #expect(
-      try AgentsInstallTests.apply(["install", "--stop-hook"], in: scratch).termination == .exit(0))
+      try AgentsInstallTests.apply(["install", "--stop-hook"], in: scratch, environment: now)
+        .termination == .exit(0))
     let bin = scratch.appending(path: "bin")
     try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
     for (name, path) in [

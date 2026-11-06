@@ -103,6 +103,22 @@ Check tool results, not just the model's claim. A successful sibling-control wri
 makes this run inconclusive: another grant or managed policy is active. The exclusion
 keys and writable-root field are in the [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
 
+While installed, run `h "$si35_binary" doctor --install` and record each `install.*`
+line. In this fixture, the Claude hook-evidence warnings are expected until the Claude
+step runs. `claude.version` is unknown when Claude lives outside `si35_path` (for
+example `~/.local/bin`).
+
+After login and the first run, Codex rewrites its own `config.toml`. It appends
+tables such as `[projects."<fixture>"]` after Silta's root. Before the
+`removed-proof` run, `cat "$si35_home/.codex/config.toml"`. Expect Codex's tables
+untouched, and `writable_roots = []` with no `SILTA_HOME` entry. The empty array
+is expected (D42). A `conflict` refusal at uninstall is a failure; record it rather
+than editing the file.
+
+Inside an interactive Codex session started with `exclude_tmpdir_env_var=true`,
+`silta brief` can fail with `env` because `/usr/bin/git`'s xcrun shim cannot write
+its cache. This comes from the disabled TMPDIR, not from Silta (SI-2/6).
+
 ## Claude: loading, propagation and Stop
 
 On macOS launch with the real HOME/USER and the isolated configuration:
@@ -151,6 +167,22 @@ settings/authentication created by the harnesses remain. Never repair a real pro
 
 Report harness versions, pass/fail/inconclusive for each check, actual refusal codes
 and redacted evidence. Keep auth files and unredacted transcripts out of the repo.
-Exit the isolated clients and log out of these temporary profiles before deleting
-only the mktemp directories created above. Do not mark D42's live checks
-verified until these results exist.
+Do not mark D42's live checks verified until these results exist.
+
+Log out before deleting anything:
+- Codex: `h "$si35_codex" logout`.
+- Claude: open it once more with the launcher from the Claude step, then type `/logout`.
+  Its macOS keychain item is scoped to the temporary `CLAUDE_CONFIG_DIR`, and deleting
+  the directory does not remove it. If a run ended without `/logout`, look in
+  Keychain Access for a `Claude Code-credentials` item. Your real login has an item
+  with the same prefix, so delete only one you can identify as the temporary one.
+
+Then delete only the mktemp directories created above:
+
+```bash
+rm -rf "$si35_home" "$si35_data" "$si35_fixture" "$si35_control"
+```
+
+macOS may clear `$TMPDIR` between sessions. If the fixture folders are gone,
+rebuild from "Prepare the fixture" and log in again; never point the variables at
+real directories.
