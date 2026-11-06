@@ -628,3 +628,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     a manual add/remove-element instruction that retains existing entries; foreign
     quoted keys are not decoded. This avoids depending on where Codex's TOML editor
     places trailing comments and keeps independent roots when `SILTA_HOME` changes.
+  - ↳ 2026-11-06: Live re-run after the value-ownership fix on **codex-cli 0.166.0**
+    (SI-2/7). The grant, the denied sibling and **post-uninstall revocation** passed.
+    Codex had appended its own `[projects]` table after Silta's root; uninstall left
+    that table intact, removed only the root, and left `writable_roots = []`.
+    `doctor --install` passed every owned piece and matched the Codex baseline.
+    OpenCode live discovery remains unverified.
