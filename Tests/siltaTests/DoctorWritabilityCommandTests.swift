@@ -7,10 +7,16 @@ import Testing
 struct DoctorWritabilityCommandTests {
   private let environment = ["SILTA_NOW": "2023-11-14T22:13:20.000Z"]
 
-  private func permissions(_ file: FileHandle) throws -> mode_t {
+  private func permissions(_ file: FileHandle) throws -> Int {
     var info = stat()
     try #require(fstat(file.fileDescriptor, &info) == 0)
-    return info.st_mode & 0o7777
+    return Int(info.st_mode & 0o7777)
+  }
+
+  private func permissions(_ directory: URL) throws -> Int {
+    try #require(
+      FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber
+    ).intValue
   }
 
   @Test(arguments: ["file", "directory-write", "directory-search"])
@@ -35,14 +41,11 @@ struct DoctorWritabilityCommandTests {
           ? !FileManager.default.isExecutableFile(atPath: target.path)
           : !FileManager.default.isWritableFile(atPath: target.path))
       let fileMode = try permissions(handle)
-      let directoryMode = try #require(
-        FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber)
+      let directoryMode = try permissions(home)
       let result = try SiltaBinary.run(
         ["doctor", "--json"], in: scratch, environment: environment)
       #expect(try permissions(handle) == fileMode)
-      #expect(
-        try FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber
-          == directoryMode)
+      #expect(try permissions(home) == directoryMode)
       #expect(result.termination == .exit(9))
       let json = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])

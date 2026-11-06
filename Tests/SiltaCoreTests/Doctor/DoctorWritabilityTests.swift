@@ -6,10 +6,16 @@ import Testing
 @testable import SiltaCore
 
 struct DoctorWritabilityTests {
-  private func permissions(_ file: FileHandle) throws -> mode_t {
+  private func permissions(_ file: FileHandle) throws -> Int {
     var info = stat()
     try #require(fstat(file.fileDescriptor, &info) == 0)
-    return info.st_mode & 0o7777
+    return Int(info.st_mode & 0o7777)
+  }
+
+  private func permissions(_ directory: URL) throws -> Int {
+    try #require(
+      FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber
+    ).intValue
   }
 
   private func inspect(_ home: URL) async -> DoctorReport {
@@ -44,13 +50,10 @@ struct DoctorWritabilityTests {
           ? !FileManager.default.isExecutableFile(atPath: home.path)
           : !FileManager.default.isWritableFile(atPath: target.path))
       let fileMode = try permissions(handle)
-      let directoryMode = try #require(
-        FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber)
+      let directoryMode = try permissions(home)
       let report = await inspect(home)
       #expect(try permissions(handle) == fileMode)
-      #expect(
-        try FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber
-          == directoryMode)
+      #expect(try permissions(home) == directoryMode)
       let check = try #require(report.checks.first { $0.id == "database.writable" })
       #expect(check.status == .fail)
       #expect(check.nextBy == .human)
