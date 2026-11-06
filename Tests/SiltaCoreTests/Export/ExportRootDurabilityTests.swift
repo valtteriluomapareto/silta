@@ -7,20 +7,26 @@ import Testing
 
 struct ExportRootDurabilityTests {
   @Test func completedExportCanBeRetriedThroughRootAlias() throws {
-    withKnownIssue("#14: completed exports are refused through root aliases") {
-      try withScratchDirectory { scratch in
-        let home = scratch.appending(path: "home")
-        let store = try ExportFixture.make(home)
-        let root = scratch.appending(path: "actual/new-parent/exports")
-        _ = try ExportPublishTests.export(store, home, root, ExportMoves())
-        let before = try ExportServiceTests.tree(root.appending(path: "acme"))
-        let alias = scratch.appending(path: "alias")
-        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
-        let result = try ExportPublishTests.export(store, home, alias, ExportMoves())
-        #expect(result.leftovers.isEmpty)
-        #expect(try ExportServiceTests.tree(root.appending(path: "acme")) == before)
+
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let root = scratch.appending(path: "actual/new-parent/exports")
+      _ = try ExportPublishTests.export(store, home, root, ExportMoves())
+      let before = try ExportServiceTests.tree(root.appending(path: "acme"))
+      let alias = scratch.appending(path: "alias")
+      try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+      let result = try ExportPublishTests.export(store, home, alias, ExportMoves())
+      #expect(result.leftovers.isEmpty)
+      #expect(try ExportServiceTests.tree(root.appending(path: "acme")) == before)
+      let foreign = root.appending(path: "acme/keep.txt")
+      try Data("Acme".utf8).write(to: foreign)
+      #expect(throws: ExportError.self) {
+        try ExportPublishTests.export(store, home, alias, ExportMoves())
       }
+      #expect(try Data(contentsOf: foreign) == Data("Acme".utf8))
     }
+
   }
 
   @Test func retryThroughRootAliasFlushesResolvedAncestors() throws {

@@ -279,7 +279,8 @@ package enum ExportService {
     // An entry that can't be read could hold anything, so it refuses rather than counts
     // as empty.
     var unreadable: String?
-    let base = target.standardizedFileURL.path
+    // Enumeration reports the resolved tree even when the export root is an alias.
+    let base = target.resolvingSymlinksInPath().standardizedFileURL.path
     let found = FileManager.default.enumerator(
       at: target, includingPropertiesForKeys: [.isDirectoryKey], options: [],
       errorHandler: { url, _ in
