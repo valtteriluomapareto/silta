@@ -17,6 +17,18 @@ struct AgentInstallTarget {
   private static let frontmatter =
     "---\nname: silta\ndescription: Use Silta for context, "
     + "backlog, plans and handoffs across repositories.\n---\n"
+  /// A pointer, not a copy: the binary owns the rules, so upgrades never leave the skill stale.
+  static let skill =
+    """
+    # Silta
+
+    Use Silta for cross-repo work, another app or backend, branch-as-app repos, plans,
+    handoffs, review requests and meeting decisions. Trivial single-repo edits need no
+    task.
+
+    Run `silta guide` for the current rules, or `silta guide <topic>` for one section.
+    Run `silta brief` at session start unless the hook already printed it.
+    """ + "\n"
 
   static func selected(claude: Bool, codex: Bool, root: String) throws -> [Self] {
     let instructions = """
@@ -29,7 +41,7 @@ struct AgentInstallTarget {
     var targets: [Self] = []
     if claude {
       targets += [
-        Self(path: ".claude/skills/silta/SKILL.md", body: GuideCommand.manual(), whole: true),
+        Self(path: ".claude/skills/silta/SKILL.md", body: Self.skill, whole: true),
         Self(path: ".claude/CLAUDE.md", body: instructions, whole: false),
       ]
     }
