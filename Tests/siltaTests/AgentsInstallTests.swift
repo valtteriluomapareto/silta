@@ -1,9 +1,28 @@
 import Darwin
+import CryptoKit
 import Foundation
 import SiltaTestSupport
 import Testing
 
 struct AgentsInstallTests {
+  static let frontmatter =
+    "---\nname: silta\ndescription: Use Silta for context, "
+    + "backlog, plans and handoffs across repositories.\n---\n"
+  static let legacyBody = """
+    # When to use Silta
+    Use Silta for cross-repo work. Keep plans and results in Silta.
+
+    # Recipes
+    Examples use the fictional Acme workspace and task AC-12.
+    """ + "\n"
+
+  /// An owned block as an older binary wrote it: the seal covers the origin and body.
+  static func ownedBlock(_ body: String) -> String {
+    let digest = SHA256.hash(data: Data(("new:" + body).utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    return "\n<!-- silta:begin \(digest):new -->\n" + body + "<!-- silta:end -->\n"
+  }
+
   static func run(
     _ args: [String], in scratch: URL, environment: [String: String] = [:]
   ) throws -> CLIResult {
@@ -60,19 +79,44 @@ struct AgentsInstallTests {
     }
   }
 
-  @Test func selectionAndSkillParity() throws {
+  @Test func selectionAndSkillStub() throws {
     try withScratchDirectory { scratch in
       try Self.write("Acme poison", ".codex/config.toml", in: scratch)
       #expect(try Self.apply(["install", "--claude"], in: scratch).termination == .exit(0))
       let skill = try Self.read(".claude/skills/silta/SKILL.md", in: scratch)
-      #expect(skill.hasPrefix("---\nname: silta\ndescription:"))
+      #expect(skill.hasPrefix(Self.frontmatter))
+      Golden.forTests().check(skill, "agents-install-skill.md")
       let guide = try SiltaBinary.run(["guide"], in: scratch)
-      #expect(skill.contains(guide.stdout))
+      #expect(!skill.contains(guide.stdout))
+      #expect(!skill.contains("# Recipes"))
+      #expect(skill.contains("`silta guide <topic>`"))
+      #expect(skill.contains("`silta brief` at session start"))
       #expect(try Self.read(".codex/config.toml", in: scratch) == "Acme poison")
       #expect(try Self.apply(["uninstall", "--claude"], in: scratch).termination == .exit(0))
       #expect(
         !FileManager.default.fileExists(
           atPath: scratch.appending(path: "home/.claude/skills/silta/SKILL.md").path))
+    }
+  }
+
+  @Test func reinstallReplacesAnOlderSkillBody() throws {
+    try withScratchDirectory { scratch in
+      let installed = Self.frontmatter + Self.ownedBlock(Self.legacyBody)
+      try Self.write(installed, ".claude/skills/silta/SKILL.md", in: scratch)
+      let preview = try Self.data(Self.run(["install", "--claude", "--json"], in: scratch))
+      let changes = try #require(preview["changes"] as? [[String: String]])
+      let change = try #require(changes.first { $0["path"] == ".claude/skills/silta/SKILL.md" })
+      let diff = try #require(change["diff"])
+      #expect(diff.contains("-# Recipes"))
+      #expect(diff.contains("+Run `silta guide`"))
+      #expect(try Self.read(".claude/skills/silta/SKILL.md", in: scratch) == installed)
+      #expect(try Self.apply(["install", "--claude"], in: scratch).termination == .exit(0))
+      let updated = try Self.read(".claude/skills/silta/SKILL.md", in: scratch)
+      #expect(!updated.contains("# Recipes"))
+      Golden.forTests().check(updated, "agents-install-skill.md")
+      #expect(
+        try Self.data(Self.run(["install", "--claude", "--json"], in: scratch))["changes"]
+          as? [[String: String]] == [])
     }
   }
 
