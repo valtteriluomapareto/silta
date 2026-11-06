@@ -1,0 +1,45 @@
+{
+  "phases": [
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "comment",
+          "AC-1",
+          "--kind",
+          "question",
+          "-m",
+          "May I add the dependency?",
+          "--json"
+        ]
+      },
+      {
+        "message": "All policies were followed."
+      },
+      {
+        "args": [
+          "comment",
+          "AC-1",
+          "--kind",
+          "handoff",
+          "-m",
+          "State: parser inspected. Next step: verify parser. Open questions: none. What's left: Acme retry bug. Branch and sha: feature/push at {sha}.",
+          "--json"
+        ]
+      }
+    ]
+  ]
+}

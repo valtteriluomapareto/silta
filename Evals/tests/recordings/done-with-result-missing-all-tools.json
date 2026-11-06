@@ -1,0 +1,34 @@
+{
+  "phases": [
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "done",
+          "AC-1",
+          "--sha",
+          "{sha}",
+          "-F",
+          "-",
+          "--json"
+        ],
+        "stdin": "What was done: verified Acme parser.\nDecisions: reused Acme API.\nWhat's left: nothing.\n"
+      }
+    ]
+  ],
+  "omit_all_tools": true
+}

@@ -126,6 +126,7 @@ quietly diverge.
 | `Tests/SiltaCoreTests` | Unit and fixture tests of `SiltaCore`, in folders that mirror its feature folders; error-code goldens in `Golden/` |
 | `Tests/siltaTests` | Black-box CLI tests that run the built binary: golden text and `--json` in `Golden/`, the scenario runner in `Scenarios/`, and tests of the dogfood scripts |
 | `Tests/Scenarios` | Scenario files (`<name>.yaml`) the runner executes in a temporary `SILTA_HOME` (spec §20.1) |
+| `Evals/` | Isolated harness adapters, Acme eval fixtures, evidence graders and offline replay tests (spec §21) |
 | `scripts/` | The verify ladder, lint, fixtures and dogfood scripts; `guards/` holds the repository guards, `tests/` their self-tests, and `ci/` the CI-only steps. Each script's header says how to run it |
 
 - **Folders by feature** inside `SiltaCore`: `Agents/`, `Brief/`, `Code/`,

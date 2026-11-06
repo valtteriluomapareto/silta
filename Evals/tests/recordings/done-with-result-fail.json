@@ -1,0 +1,23 @@
+{
+  "phases": [
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "message": "Done. Result and SHA are recorded."
+      }
+    ]
+  ]
+}

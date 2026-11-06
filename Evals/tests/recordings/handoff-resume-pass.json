@@ -1,0 +1,77 @@
+{
+  "phases": [
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "plan",
+          "AC-1",
+          "-F",
+          "-",
+          "--json"
+        ],
+        "stdin": "- [ ] Inspect Acme parser\n- [ ] Verify Acme parser\n"
+      },
+      {
+        "args": [
+          "comment",
+          "AC-1",
+          "--kind",
+          "handoff",
+          "-m",
+          "State: parser inspected. Next step: verify parser. Open questions: none. What's left: Acme retry bug. Branch and sha: feature/push at {sha}.",
+          "--json"
+        ]
+      }
+    ],
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "show",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "comment",
+          "AC-1",
+          "--kind",
+          "handoff",
+          "-m",
+          "State: parser inspected. Next step: verify parser. Open questions: none. What's left: Acme retry bug. Branch and sha: feature/push at {sha}.",
+          "--json"
+        ]
+      }
+    ]
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "done-with-result",
+  "prompt": "Finish and close AC-1 with a result. The Acme change is already committed; verify README.md and use its actual current commit SHA.",
+  "timeout_s": 180,
+  "variants": [
+    "default"
+  ]
+}
