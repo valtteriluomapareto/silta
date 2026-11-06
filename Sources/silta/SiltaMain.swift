@@ -64,6 +64,7 @@ enum SiltaMain {
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = logFlags(flags)
+      entry.sessionMatchesActor = suppliedSession(environment.actor, hook: hookDeadline != nil)
       if hookDeadline != nil {
         let completion = BriefHookCompletion(rendered: rendered, entry: entry)
         if let watchdog {
@@ -82,6 +83,11 @@ enum SiltaMain {
       if let informational = informationalResult(arguments, mode: mode) { return informational }
       return OutputRouter.render(.failure(error), mode: mode)
     }
+  }
+
+  private static func suppliedSession(_ actor: ActorID, hook: Bool) -> Bool? {
+    guard !hook, case .agent(_, let session) = actor else { return nil }
+    return ProcessInfo.processInfo.environment["SILTA_SESSION"] == session
   }
 
   private static func environmentSnapshot(_ arguments: [String], hook: Bool) throws -> [String:

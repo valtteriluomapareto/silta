@@ -609,6 +609,16 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     owned content, independently of placement: sealed Markdown spans and the selected
     Codex path element. Markdown blocks retain their offsets. TOML editing stays
     narrowly bounded rather than adding a general parser dependency.
+  - ↳ 2026-11-06: Last live-verified versions are **Claude Code 2.1.314** and
+    **codex-cli 0.166.0**, verified **2026-11-06** (SI-2/4–6). Claude skill loading,
+    shell `SILTA_SESSION` propagation, SessionStart and Stop, and actor consistency
+    passed. Codex's writable-root grant and denied-sibling control passed;
+    post-uninstall revocation still awaits live acceptance after the value-ownership
+    fix. Claude acceptance used the real HOME with isolated `CLAUDE_CONFIG_DIR`
+    and `SILTA_HOME` because an empty HOME prevents OAuth keychain storage.
+    OpenCode 1.19.5 is observed only; live discovery remains unverified.
+    `doctor` compares installation metadata against these baselines without
+    launching a harness. Metadata agreement does not establish runtime behavior.
   - ↳ 2026-11-06: The effective `SILTA_HOME` path value in
     `[sandbox_workspace_write].writable_roots` is the Codex ownership marker.
     Install adds it once and uninstall removes only its exact decoded UTF-8 value;

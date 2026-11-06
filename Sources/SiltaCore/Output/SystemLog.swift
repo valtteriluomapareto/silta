@@ -43,7 +43,8 @@ package final class SystemLog: Log {
     let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
     try handle.write(contentsOf: record.data)
     try verbose?.write(contentsOf: record.data)
-    try prune(at: entry.timestamp)
+    // A health inspection appends its result without removing retained evidence.
+    if entry.command != "silta doctor" { try prune(at: entry.timestamp) }
   }
 
   private func prune(at timestamp: Date) throws {

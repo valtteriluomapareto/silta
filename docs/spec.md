@@ -1719,7 +1719,7 @@ silta init [--scan <dir>…] [--slug <slug>] [--prefix <prefix>]   [M1] create D
 silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] config as YAML (validated on save, "did you mean"); -F for agents
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
-silta doctor [--fix]                             [M1]
+silta doctor [--install] [--fix]                 [M1]
 silta guide [<topic>] (including refs)            [M1]
 
 # context
@@ -1886,6 +1886,10 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - exit code and error code
   - ms; busy retries, git calls and git ms join when the first command counts them
   - warnings
+  - `session_matches_actor` on ordinary agent commands: whether the original shell
+    `SILTA_SESSION` equals the resolved actor's session. This boolean carries no
+    environment values; hooks omit it because they synthesize the session.
+    Legacy lines omit it and cannot prove propagation.
 
   `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
   `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`, `status` (logged as
@@ -1912,8 +1916,10 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   are never used to attribute a timeout.
 
   Evals and the dogfood report read these logs (§21, §22.1).
-- **`silta doctor [--fix]`** checks:
-  - **Install:** PATH, the hook and skill, the Codex writable root and marker.
+- **`silta doctor [--install] [--fix]`** checks:
+  - **Install:** PATH, owned Claude/shared OpenCode skills and instruction blocks,
+    optional Claude hooks, the effective Codex writable-root value, retained hook
+    execution and session propagation evidence, and harness version metadata.
   - **Database:** `PRAGMA integrity_check` and `foreign_key_check`, FTS integrity,
     schema versions on both DBs, WAL size, index age.
   - **Git:** git path and version, dead repo paths, stale fetches, orphaned worktree
@@ -1954,17 +1960,61 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   | `git.overrides` | Worktree override marker presence |
   | `data.claims` | Claim expiry |
   | `data.backup` | File-only backup evidence and recorded daily backup |
-  | `install.path` | Skipped until installer diagnostics |
-  | `install.hook` | Skipped until installer diagnostics |
-  | `install.skill` | Skipped until installer diagnostics |
-  | `install.codex_root` | Skipped until installer diagnostics |
-  | `install.codex_marker` | Skipped until installer diagnostics |
+  | `install.path` | `silta` executable on the current PATH; hook-shell PATH can differ |
+  | `install.hook` | Claude SessionStart owned group |
+  | `install.skill` | Claude skill in effective Claude config directory |
+  | `install.codex_root` | Effective `SILTA_HOME` writable-root value |
+  | `install.codex_marker` | Codex AGENTS.md sealed instruction block (not a TOML marker) |
+  | `install.claude.instructions` | Claude CLAUDE.md sealed instruction block |
+  | `install.claude.stop` | Optional Claude Stop owned group |
+  | `install.opencode.skill` | Shared skill at HOME/.claude/skills; discovery remains unverified |
+  | `install.claude.session_start` | Last retained SessionStart execution |
+  | `install.claude.last_stop` | Last retained Stop execution |
+  | `install.claude.session` | Propagation observed in the latest hook session |
+  | `install.claude.version` | Installed metadata versus D42 live baseline |
+  | `install.codex.version` | Installed metadata versus D42 live baseline |
+  | `install.codex.session_start` | Skipped: no Silta hook integration |
+  | `install.codex.last_stop` | Skipped: no Silta hook integration |
+  | `install.codex.session` | Skipped: no hook-session propagation evidence |
+  | `install.opencode.version` | Installed metadata; no live-verified baseline |
+  | `install.opencode.session_start` | Skipped: no Silta hook integration |
+  | `install.opencode.last_stop` | Skipped: no Silta hook integration |
+  | `install.opencode.session` | Skipped: no hook-session propagation evidence |
   | `index.integrity` | Skipped until M3 |
   | `index.foreign_keys` | Skipped until M3 |
   | `index.schema` | Skipped until M3 |
   | `index.fts` | Skipped until M3 |
   | `index.age` | Skipped until M3 |
   | `app.version` | Skipped until M5 |
+
+  `doctor --install` is the strict read-only harness health check: it reports only
+  `install.*`, bypasses database access and git diagnostics, and leaves all existing
+  home files byte-for-byte unchanged except appending its command log. Missing,
+  corrupt or locked SQLite files do not prevent it. Broad doctor retains SQLite's
+  ordinary read-lock coordination, which can update WAL/SHM sidecars.
+
+  Install checks honor `CLAUDE_CONFIG_DIR` and `CODEX_HOME` independently; OpenCode's
+  documented shared-skill path remains HOME/.claude/skills. Ownership is checked
+  with the installer parsers and compared to current expected content. Missing or
+  stale pieces warn, damaged ownership/unreadable files fail, and absent optional
+  hooks are skipped. No content is repaired. Every non-pass install check has `next`.
+  Hook evidence reports the latest timestamp, exit code and milliseconds per event;
+  error codes and warnings prevent an exit-0 pass. Propagation requires an ordinary
+  command after the latest successful SessionStart, in the same actor session, with
+  `session_matches_actor:true`; its latest matching ordinary command wins. The newest
+  SessionStart/Stop record must also name that actor: a newer Stop without its own
+  SessionStart cannot inherit an older session's positive evidence. Hook records
+  with unexpected actor tools remain visible and cannot pass. Legacy,
+  absent, future or incomplete evidence cannot pass. Equal timestamps use append
+  order. Retained JSONL inspection is bounded to 90 files, 1 MiB each, 16 MiB total;
+  unreadable/malformed/truncated evidence makes health unknown rather than reusing
+  an older success. No harness is launched, even for `--version`: recognized native
+  Claude `claude/versions/X` and Homebrew `Caskroom/codex/X/bin/codex` or
+  `Cellar/opencode/X/bin/opencode` paths supply metadata-derived versions. Unsupported
+  layouts and missing executables are unknown. Drift from D42 warns with human-owned
+  live-acceptance next; unknown metadata suggests a human-owned manual version check.
+  Metadata agreement does not prove runtime behavior. Doctor appends its ordinary
+  command log without pruning old evidence; supported fixes remain separate.
 
   WAL above 64 MiB warns and suggests inspecting open handles. Claim timestamps
   missing, invalid or at least 2 h old warn, using the same expiry boundary as task

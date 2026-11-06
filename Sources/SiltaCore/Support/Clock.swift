@@ -25,7 +25,7 @@ package struct SystemClock: Clock {
 }
 
 /// The UTC calendar day of an instant, as `YYYY-MM-DD`. Names daily logs and backups.
-func utcDay(_ date: Date) -> String {
+package func utcDay(_ date: Date) -> String {
   String(date.formatted(.iso8601).prefix(10))
 }
 
@@ -49,7 +49,7 @@ func utcTimestamp(_ date: Date) -> String {
 /// ISO 8601 parsing alone is lenient: it accepts offsets, short fractions and
 /// out-of-range components. A canonical timestamp is one that `utcTimestamp`
 /// writes back byte for byte.
-func utcInstant(_ raw: String) -> Date? {
+package func utcInstant(_ raw: String) -> Date? {
   do {
     let date = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(raw)
     return utcTimestamp(date) == raw ? date : nil

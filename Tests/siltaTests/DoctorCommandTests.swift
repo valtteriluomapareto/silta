@@ -51,4 +51,17 @@ struct DoctorCommandTests {
       }
     }
   }
+  @Test func focusedInstallReportMatchesContractWithoutDatabase() throws {
+    try withScratchDirectory { scratch in
+      for flags in [[], ["--quiet"], ["--json"], ["--quiet", "--json"]] {
+        let result = try SiltaBinary.run(
+          ["doctor", "--install"] + flags, in: scratch, environment: environment)
+        #expect(result.termination == .exit(0))
+        #expect(result.stderr.isEmpty)
+        Golden.forTests().check(
+          result.stdout, flags.contains("--json") ? "doctor-install.json" : "doctor-install.txt")
+      }
+    }
+  }
+
 }

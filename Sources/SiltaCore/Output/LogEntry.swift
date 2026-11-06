@@ -24,6 +24,9 @@ package struct LogEntry: Encodable, Equatable, Sendable {
   /// Warning codes only; never message bodies.
   package var warnings: [String] = []
 
+  /// Original shell SILTA_SESSION matches the resolved actor; absent on hooks/legacy logs.
+  package var sessionMatchesActor: Bool?
+
   /// Records the command name and safe identifiers, never command argument values.
   package init(timestamp: Date, command: String, actor: String, exitCode: Int32, milliseconds: Int)
   {
