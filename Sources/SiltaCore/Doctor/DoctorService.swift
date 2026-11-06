@@ -8,7 +8,8 @@ package enum DoctorService {
     "database.wal",
     "git.version", "git.repos", "git.bindings", "git.fetch", "git.overrides", "data.claims",
     "data.backup",
-    "install.path", "install.hook", "install.skill", "install.codex_root", "install.codex_marker",
+    "install.path", "install.hook", "install.skill", "install.codex_root",
+    "install.codex.instructions",
     "index.integrity", "index.foreign_keys", "index.schema", "index.fts", "index.age",
     "app.version",
   ]

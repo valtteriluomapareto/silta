@@ -1982,7 +1982,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   Check ids and their order are a contract: ids are never renamed or removed, only
   added. New ids may be inserted into the display order; consumers key by id,
   never by array index. Computed ids absent from the named order remain visible at
-  the end. Unavailable checks retain their own id with status `skipped`:
+  the end. An id added since the last release becomes permanent when that release
+  ships it; until then it may still change with an agent-experience review (D16).
+  Unavailable checks retain their own id with status `skipped`:
 
   | Id (display order) | Check / availability |
   |---|---|
@@ -2002,7 +2004,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   | `install.hook` | Claude SessionStart owned group |
   | `install.skill` | Claude skill in effective Claude config directory |
   | `install.codex_root` | Effective `SILTA_HOME` writable-root value |
-  | `install.codex_marker` | Codex AGENTS.md sealed instruction block (not a TOML marker) |
+  | `install.codex.instructions` | Codex AGENTS.md sealed instruction block |
   | `install.claude.instructions` | Claude CLAUDE.md sealed instruction block |
   | `install.claude.stop` | Optional Claude Stop owned group |
   | `install.opencode.skill` | Shared skill at HOME/.claude/skills; discovery remains unverified |
@@ -2011,13 +2013,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   | `install.claude.session` | Propagation observed in the latest hook session |
   | `install.claude.version` | Installed metadata versus D42 live baseline |
   | `install.codex.version` | Installed metadata versus D42 live baseline |
-  | `install.codex.session_start` | Skipped: no Silta hook integration |
-  | `install.codex.last_stop` | Skipped: no Silta hook integration |
-  | `install.codex.session` | Skipped: no hook-session propagation evidence |
+  | `install.codex.hooks` | Skipped: no Silta hook integration; nothing to recover |
   | `install.opencode.version` | Installed metadata; no live-verified baseline |
-  | `install.opencode.session_start` | Skipped: no Silta hook integration |
-  | `install.opencode.last_stop` | Skipped: no Silta hook integration |
-  | `install.opencode.session` | Skipped: no hook-session propagation evidence |
+  | `install.opencode.hooks` | Skipped: no Silta hook integration; nothing to recover |
   | `index.integrity` | Skipped until M3 |
   | `index.foreign_keys` | Skipped until M3 |
   | `index.schema` | Skipped until M3 |
