@@ -1093,6 +1093,16 @@ with YAML name/description frontmatter and contains the versioned `silta guide`.
 Uninstall removes only unedited ownership, retaining unrelated Markdown/TOML bytes,
 JSON values, permissions and empty user files. Ownership remains recognizable if
 `SILTA_HOME` changes.
+Codex may append its own tables before Silta's trailing end marker. The original
+sealed grant prefix remains owned: its optional sandbox table header and single
+emitted writable-roots line must still match exactly. Install/reinstall moves only
+Silta's end marker before the foreign suffix; uninstall removes only the sealed
+grant and markers. Foreign bytes retain their exact encoding, whitespace and order.
+Preview names the marker action and preserved UTF-8 byte count without showing
+foreign content. A required separating newline is retained and disclosed on removal.
+If Silta owns the sandbox header, foreign assignments in that table refuse because
+removing the header would change their scope. Every rendered TOML document must
+still satisfy the supported syntax below.
 Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
 nonregular/multiply linked files and files over 1 MiB are refused before writes.
 Permission preservation uses refusal rather than copying security metadata: nonempty
@@ -1106,13 +1116,16 @@ preview refuses. OS-managed provenance is not copied or treated as access permis
 Targets come from explicit absolute `HOME`; a selected harness's nonmatching
 `CODEX_HOME` or `CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. Unselected
 overrides are ignored. The Codex grant uses the
-effective `SILTA_HOME`. The conservative TOML editor supports bare single-line
-keys/tables and refuses existing user-owned writable-root definitions or ambiguous
-syntax. Supported values are JSON-compatible strings, finite numbers, booleans and
+effective `SILTA_HOME`. The conservative TOML editor supports single-line
+assignments with one bare or JSON-compatible double-quoted key, and table paths
+with bare or JSON-compatible double-quoted segments, including Codex model slugs
+and project paths. It refuses existing user-owned writable-root definitions on
+install or ambiguous syntax. Supported values are JSON-compatible strings, finite numbers, booleans and
 arrays, and single-quoted literal strings; inline comments, dates, multiline values
 and inline tables are refused. Duplicate/conflicting names refuse across the
-complete document, including the owned table. Dotted assignments, arrays of tables
-and reopening an implicitly introduced parent table require manual integration. It never changes sandbox mode, trust or authentication. A human must inspect
+complete document using decoded table identities, including the owned table. Dotted
+assignments, arrays of tables and reopening an implicitly introduced parent table
+require manual integration. It never changes sandbox mode, trust or authentication. A human must inspect
 such refusals; there is no overwrite flag. Configuring a root does not prove it is
 effective in a managed harness (D42).
 

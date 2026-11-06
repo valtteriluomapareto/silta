@@ -609,3 +609,15 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     validated ownership spans, independently of placement, and an owned TOML table
     retains its offset. Namespace validation stays a documented conservative subset
     rather than adding a general TOML parser dependency.
+  - ↳ 2026-11-06: Codex 0.166.0 was observed inserting its own tables before the
+    installer's trailing end-marker comment. Ownership authenticates the exact
+    historical grant prefix (optional sandbox header plus its emitted roots line),
+    preserving a foreign suffix byte-for-byte. Reinstall moves only the end marker;
+    uninstall removes only sealed ownership and retains a necessary line separator.
+    Preview discloses marker action and preserved byte count, never foreign content
+    or a separate content fingerprint. Unsafe assignment scope still refuses.
+    Quoted table segments and single assignment keys (including model NUX slugs)
+    use decoded namespace identities throughout validation.
+    Anchoring alone cannot repair existing installs or guarantee editor placement;
+    a separate ownership record adds state and migration without improving the
+    exact-byte contract. No TOML serialization or parser dependency is introduced.

@@ -1,0 +1,7 @@
+# Preserve <bytes> unowned TOML bytes in place; remove Silta ownership around them.
+-
+-# silta:begin <digest>:keep
+-[sandbox_workspace_write]
+-writable_roots = ["<root>"]
+-# silta:end
+-

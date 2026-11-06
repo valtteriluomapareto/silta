@@ -53,7 +53,15 @@ struct AgentInstallTarget {
       before, toml: path.hasSuffix(".toml"), existed: !before.isEmpty, refusal: refusal)
     let new = try AgentOwnedBlock(
       after, toml: path.hasSuffix(".toml"), existed: !after.isEmpty, refusal: refusal)
-    return AgentInstallPlan.difference(old.span, new.span)
+    let diff = AgentInstallPlan.difference(old.span, new.span)
+    var notices: [String] = []
+    if old.preservedBytes > 0 {
+      let action = new.owned ? "move # silta:end before them" : "remove Silta ownership around them"
+      notices.append("# Preserve \(old.preservedBytes) unowned TOML bytes in place; \(action).")
+    }
+    if !new.owned, old.retainsSeparator { notices.append("# Retain the separating newline.") }
+    if !diff.isEmpty { notices.append(diff) }
+    return notices.joined(separator: "\n")
   }
 
   func replace(
@@ -73,7 +81,11 @@ struct AgentInstallTarget {
       text, toml: path.hasSuffix(".toml"), existed: existed, refusal: refusal)
     if whole, !original.isEmpty, !block.owned { try refusal() }
     if whole, !block.outside.isEmpty { try refusal() }
-    if uninstall { return block.outside }
-    return (whole ? Self.frontmatter : "") + (try block.render(body, refusal: refusal))
+    let result =
+      uninstall
+      ? block.outside
+      : (whole ? Self.frontmatter : "") + (try block.render(body, refusal: refusal))
+    if path.hasSuffix(".toml"), !AgentTOML.acceptsDocument(result) { try refusal() }
+    return result
   }
 }
