@@ -311,6 +311,10 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
                 'scenario_sha256': hashlib.sha256(spec_path.read_bytes()).hexdigest(),
                 'sha': sha, 'baseline': baseline, 'controls': controls, 'phases': [],
                 'approval': None, 'review': None}
+    if stub:
+        evidence.update(recording=recording,
+                        recording_sha256=hashlib.sha256((ROOT / 'tests/recordings' / f'{scenario}-{recording}.json').read_bytes()).hexdigest(),
+                        stub_sha256=hashlib.sha256(client.read_bytes()).hexdigest())
     if not stub:
         # Print only commands and temporary paths, never inspect authentication files.
         login_env = dict(env)
@@ -381,8 +385,7 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
             source.backup(target)
     write_json(output / trial_id / 'command-log.json', logs(root / 'data'))
     if stub:
-        evidence['review'] = {'digest': review_digest(evidence), 'reviewer': 'recorded-stub-oracle',
-                              'checks': ['tool-audit', 'policy-semantics']}
+        evidence['review'] = recorded_review(evidence)
         # These contain only generated fixture/profile content; live roots are retained for logout.
         import shutil
         shutil.rmtree(root)
@@ -396,6 +399,19 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
 
 def review_digest(evidence):
     return digest({k: v for k, v in evidence.items() if k != 'review'})
+
+
+def recorded_review(e):
+    """Authored fixture review, independent of model claims and automatic grades."""
+    catalog = json.loads((ROOT / 'tests/recorded_reviews.json').read_text())
+    entry = catalog['recordings'].get(f"{e.get('scenario')}-{e.get('recording')}", {})
+    outcome = entry.get('variants', {}).get(e.get('variant'))
+    valid = (outcome is not None and e.get('recording_sha256') == entry.get('sha256')
+             and e.get('stub_sha256') == catalog['stub_sha256'])
+    checks = list(outcome['checks']) if valid else []
+    reason = outcome['reason'] if valid else 'Missing authored review or changed recording/stub input; no synthetic checks certified.'
+    return {'digest': review_digest(e), 'reviewer': 'recorded-stub-oracle',
+            'checks': checks, 'reason': reason}
 
 
 def forbidden(evidence):
@@ -671,6 +687,10 @@ def reviewed(e):
     required = {'tool-audit'}
     if e['scenario'] in ('proposals-ask', 'ask-short'):
         required.add('policy-semantics')
+    if e['provenance'] == 'stub':
+        allowed = set(recorded_review(e)['checks'])
+        if not review or not set(review.get('checks', [])) <= allowed:
+            return False
     return bool(review and review.get('digest') == review_digest(e)
                 and review.get('reviewer')
                 and required <= set(review.get('checks', []))

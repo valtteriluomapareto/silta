@@ -24,7 +24,8 @@ python3 -B Evals/tests/plant_faults.py artifacts/evals/stub-proof
 The output directory must not exist. The default matrix has both adapters, all six
 scenarios and three repeats. A policy scenario passes a repeat only when **all**
 its variants pass. `--recording fail --repeats 1` replays the authored failing
-behavior per scenario and must exit 1. Neither path discovers or launches an
+behavior per scenario and must exit 1. Every individual scenario × variant × adapter
+trial must fail; aggregate failures cannot hide a passing negative control. Neither path discovers or launches an
 installed model client, even for a version check. `scripts/verify.sh full` includes
 the offline unittest suite after the Swift scenario tier.
 
@@ -32,12 +33,22 @@ The stub executes recorded actions through the actual Silta binary, emitting the
 Claude or Codex native event shape. The paired recordings are authored fixtures,
 not transcripts of a model run. SQLite snapshots, command logs, command output and
 file hashes supply the automatic grades. The stub operator/reviewer oracle is
-explicitly labeled synthetic. [The guarantee inventory](../../Evals/tests/guarantees.json)
+explicitly labeled synthetic. [Authored recorded reviews](../../Evals/tests/recorded_reviews.json)
+provide the checklist and reason for every recording/variant, independently of
+model claims or grader results. Recording and stub hashes bind those grants to
+reviewed inputs; unknown/drifted inputs receive no certification. Missing semantic
+checks cannot be inserted by renaming the synthetic reviewer. Live human reviews
+remain separate and digest-bound; no keyword grammar grades their language.
+The authored failing ask-short controls withhold `policy-semantics` because they
+never ask about customer-visible text, even under standard/repository-rule guidance.
+[The guarantee inventory](../../Evals/tests/guarantees.json)
 links each predicate to its scenario and variant; the fault script replaces each
 predicate with unconditional success, checks that its focused negative-evidence
 assertion fails, and restores the source even on error. Two additional runner mutations reuse A’s conversation for B or overwrite a
 nonzero client exit; each re-executes its actual-CLI stub test and must fail on
-the observed conversation/exit assertion. The script writes
+the observed conversation/exit assertion. A further mutation restores blanket
+synthetic certification and must fail the four actual policy-control replays.
+The script writes
 `planted-faults.json` in the report directory. Do not run source mutations in
 parallel with verification or another agent editing this checkout.
 

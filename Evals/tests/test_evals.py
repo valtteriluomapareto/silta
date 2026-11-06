@@ -61,6 +61,7 @@ class Acceptance(unittest.TestCase):
         expected = {(harness, scenario, variant) for harness in ['claude', 'codex']
                     for scenario in SCENARIOS
                     for variant in json.loads((ROOT / 'scenarios' / scenario / 'scenario.yaml').read_text())['variants']}
+        self.assertEqual(len(report['trials']), len(expected))
         self.assertEqual({(t['harness'], t['scenario'], t['variant']) for t in report['trials']}, expected)
         for trial in report['trials']:
             with self.subTest(harness=trial['harness'], scenario=trial['scenario'], variant=trial['variant']):
@@ -153,12 +154,16 @@ class Acceptance(unittest.TestCase):
                 comment['body_md'] = 'Use AcmeParse for parsing.'
         evidence['phases'][0]['messages'] = ['I will inspect the task.',
                                            'Please approve the customer-facing text.']
+        evidence['provenance'] = 'live'
+        evidence['review']['reviewer'] = 'fixture-human-reviewer'
         evidence['review']['digest'] = self.evals.review_digest(evidence)
         self.assertTrue(self.evals.grade(evidence)['passed'])
         evidence = self.evidence('proposals-ask', 'absent-add')
         for comment in evidence['phases'][0]['state']['comments']:
             if comment['kind'] == 'handoff':
                 comment['body_md'] = "What's left: the retry defect needs a later task."
+        evidence['provenance'] = 'live'
+        evidence['review']['reviewer'] = 'fixture-human-reviewer'
         evidence['review']['digest'] = self.evals.review_digest(evidence)
         self.assertTrue(self.evals.grade(evidence)['passed'])
 
