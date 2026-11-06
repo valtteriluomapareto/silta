@@ -1556,7 +1556,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     Staged files and directories are flushed before publication. The publication's
     directory entries are flushed before removing the previous tree. If that final
     flush fails, the error says the new tree was written and names the retained
-    recovery directory instead of claiming the previous target is unchanged.
+    work directory instead of claiming the previous target is unchanged. On a first
+    export the retained work directory can be empty; the new tree is at the target.
     The tree is owned by export: edits to it are overwritten by the next export.
   - **Git commit.** `--commit` requires an existing Git work tree at the export root,
     checked before writing. Under the export lock it runs `git add -A -- <workspace>`,

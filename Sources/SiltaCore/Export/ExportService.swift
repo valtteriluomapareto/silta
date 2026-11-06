@@ -135,7 +135,7 @@ package enum ExportService {
           error: error,
           leftovers: crashed + [
             ExportLeftover(
-              path: work, reason: "holds recovery data after a publication flush failed")
+              path: work, reason: "was retained after a publication flush failed")
           ])
       }
       throw failing(error)

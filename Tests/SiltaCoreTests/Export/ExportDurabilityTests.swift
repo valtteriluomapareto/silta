@@ -30,10 +30,14 @@ struct ExportDurabilityTests {
           return
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: work).isEmpty)
-        withKnownIssue("#14: first publication retains an empty work directory") {
-          #expect(failure.message.contains("work directory is retained"))
-          #expect(!failure.message.contains("Recovery data"))
-        }
+        #expect(failure.message.contains("work directory is retained"))
+        #expect(!failure.message.contains("Recovery data"))
+        let rendered = OutputRouter.render(
+          .failure(failure), mode: OutputMode(json: true, quiet: false))
+        let masked = rendered.stdout.replacingOccurrences(of: work, with: "<work>")
+          .replacingOccurrences(of: scratch.path, with: "<scratch>")
+          .replacingOccurrences(of: scratch.standardizedFileURL.path, with: "<scratch>")
+        Golden.forTests().check(masked, "export-publication-unconfirmed.json")
       }
     }
   }

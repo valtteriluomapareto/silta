@@ -67,7 +67,7 @@ package enum ExportError: CodedError, Equatable {
         + "check the repository's identity, permissions and hooks."
     case .publicationUnconfirmed(let path, let kept):
       "The export tree was written to \(path), but publication could not be flushed to disk. "
-        + "Recovery data is kept at \(kept); ask the human to inspect it before deleting anything."
+        + "The work directory is retained at \(kept); ask the human to inspect it before deleting anything."
     case .notAnExport(let path, let entry, _):
       "\(path) is not a silta export: \(entry). "
         + "Export replaces only a previous export, so it changed nothing."
