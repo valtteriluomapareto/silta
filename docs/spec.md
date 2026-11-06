@@ -1460,7 +1460,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **Daily backup (M1):** on the first write of each day, `VACUUM INTO
   $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
   first.
-- **`silta export [--ws] [--to]`** writes a byte-identical tree for the same
+- **`silta backup`** takes an on-demand whole-database SQLite snapshot, including
+  every workspace regardless of `--ws`, and reports its path. It publishes a complete
+  `backups/silta-<day>-manual-<ms>-<unique>.db` from staging owned by that invocation.
+  Concurrent invocations use distinct names. It keeps seven on-demand files separately
+  from daily and pre-restore backups; neither retention class evicts the other.
+  It does not export a text tree or run Git, and never advances `last_backup_day`.
+- **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
   keyed by `uid`; display refs are included for readability. Machine-local state is
   never written: repo paths, worktree overrides and task worktrees. Values the user
@@ -1532,7 +1538,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     (`.DS_Store` aside; listed files may be missing). Anything else is refused for the
     human to decide. A target that overlaps a registered repo is refused, so workspace
     data never lands in a code repo. Exports are serialised, each reading its
-    snapshot under the lock, so the last one written is the latest state. The new
+    snapshot under the lock, so the last one written is the latest state. Lock
+    acquisition retries for at most five seconds of spacing, then answers `busy`.
+    The new
     tree is staged in a directory of export's own next to the target, created under a
     unique name, and swapped in, so a reader sees one tree or the other, never a mix;
     a volume without an atomic swap moves the old tree aside first, and puts it back,
@@ -1545,7 +1553,20 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     export can't list. An entry export can't read refuses the target. When even the
     no-swap fallback can't move the previous tree back, the error names where it is
     kept and its `next` moves it back only while the target is still absent.
+    Staged files and directories are flushed before publication. The publication's
+    directory entries are flushed before removing the previous tree. If that final
+    flush fails, the error says the new tree was written and names the retained
+    recovery directory instead of claiming the previous target is unchanged.
     The tree is owned by export: edits to it are overwritten by the next export.
+  - **Git commit.** `--commit` requires an existing Git work tree at the export root,
+    checked before writing. Under the export lock it runs `git add -A -- <workspace>`,
+    checks the staged diff for that path, and commits only that path when it changed.
+    Other staged paths remain staged. Git has closed stdin and terminal prompts disabled.
+    The receipt's `sha` is present only when this invocation made a commit; an unchanged
+    export makes none. Manifest files (and the manifest itself) ignored by Git produce
+    `export_ignored` warnings naming their paths; the disk tree remains complete.
+    A Git failure after publication reports that the tree was written and retrying
+    the same export is safe, preserving coverage and leftover warnings.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace. `<dir>` is the `<root>/<workspace>` that
   holds `manifest.json`; the workspace comes from the tree, and a `--ws` naming
@@ -2061,7 +2082,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   WAL and backup checks always run, even when the truth database is missing or
   unreadable. Published backup evidence excludes symlinks, empty files, invalid or
-  future dates, and unrelated names. Daily backup presence is checked against
+  future dates, and unrelated names. On-demand snapshots count as published recovery
+  evidence, but never as daily coverage. Daily backup presence is checked against
   `meta.last_backup_day`: blank means the first write has not yet needed a backup;
   idle time alone does not warn. A recorded daily backup must exist as a nonempty
   regular file. Pre-migration snapshots are listed as recovery evidence but do not

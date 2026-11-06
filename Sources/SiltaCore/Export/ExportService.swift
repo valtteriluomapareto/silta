@@ -10,10 +10,14 @@ package struct ExportResult: Encodable, Sendable {
   package let path: String
   /// The number of files in the tree, the manifest included.
   package let files: Int
+  /// The new commit, absent when no commit was made.
+  package var sha: String?
   /// Work directories left for the human, with why. Reported as warnings, not data.
   package var leftovers: [ExportLeftover] = []
+  /// Git coverage warnings, reported alongside leftovers.
+  package var gitWarnings: [OutputWarning] = []
 
-  enum CodingKeys: String, CodingKey { case workspace, path, files }
+  enum CodingKeys: String, CodingKey { case workspace, path, files, sha }
 }
 
 /// A directory export left for the human to look at, and why.
@@ -54,6 +58,7 @@ package struct ExportFailure: WarnedFailure, Equatable {
 struct ExportMoves: Sendable {
   var swap: @Sendable (String, String) -> Int32 = { renamex_np($0, $1, UInt32(RENAME_SWAP)) }
   var rename: @Sendable (String, String) -> Int32 = { Darwin.rename($0, $1) }
+  var sync: @Sendable (URL) throws -> Void = { try ExportDurability.sync($0) }
 }
 
 /// Writes export trees to disk (spec §15).
@@ -61,26 +66,39 @@ package enum ExportService {
   /// Writes `<root>/<workspace>` from one read transaction. The target must be absent,
   /// empty or a previous export, and outside every registered repo; it is replaced by
   /// a staged tree in one swap, under a lock in `home` that serialises exports. Throws
-  /// `ExportError`, `StorageError` or `WorkspaceError`; on failure the target is as it was.
+  /// `ExportError`, `StorageError` or `WorkspaceError`; publication errors name retained recovery data.
   package static func export(
-    workspace slug: String, to root: URL, store: DatabaseStore, home: URL
+    workspace slug: String, to root: URL, store: DatabaseStore, home: URL,
+    clock: any Clock = SystemClock()
   ) throws -> ExportResult {
-    try export(workspace: slug, to: root, store: store, home: home, moves: ExportMoves())
+    try store.initialize()
+    let lock = try exportLock(home: home, clock: clock)
+    defer { withExtendedLifetime(lock) {} }
+    return try write(workspace: slug, to: root, store: store, moves: ExportMoves())
   }
 
   static func export(
     workspace slug: String, to root: URL, store: DatabaseStore, home: URL, moves: ExportMoves
   ) throws -> ExportResult {
     try store.initialize()
+    let lock = try exportLock(home: home, clock: SystemClock())
+    defer { withExtendedLifetime(lock) {} }
+    return try write(workspace: slug, to: root, store: store, moves: moves)
+  }
+
+  static func exportLock(home: URL, clock: any Clock) throws -> BoundedFileLock {
+    do {
+      return try BoundedFileLock(home.appending(path: "export.lock"), clock: clock)
+    } catch StorageError.busy { throw ExportError.busy }
+  }
+
+  /// The caller holds the export lock, including through any Git operation.
+  static func write(
+    workspace slug: String, to root: URL, store: DatabaseStore, moves: ExportMoves
+  ) throws -> ExportResult {
     let root = root.standardizedFileURL
     let target = root.appending(path: slug, directoryHint: .isDirectory)
     let failed = ExportError.unwritable(path: root.path, workspace: slug)
-    // Locked before the read, so a later export always publishes a later state.
-    let lock = Darwin.open(home.appending(path: "export.lock").path, O_CREAT | O_RDWR, 0o600)
-    guard lock >= 0 else { throw failed }
-    defer { close(lock) }
-    guard flock(lock, LOCK_EX) == 0 else { throw failed }
-    defer { flock(lock, LOCK_UN) }
     let (files, repos) = try store.read { db in
       (
         try ExportTree.render(db, workspace: slug),
@@ -112,6 +130,14 @@ package enum ExportService {
       try checkTarget(target, workspace: slug)
       kept = try publish(files, to: target, prefix: prefix, workspace: slug, moves: moves)
     } catch let error as ExportError {
+      if case .publicationUnconfirmed(_, let work) = error {
+        throw ExportFailure(
+          error: error,
+          leftovers: crashed + [
+            ExportLeftover(
+              path: work, reason: "holds recovery data after a publication flush failed")
+          ])
+      }
       throw failing(error)
     } catch {
       throw failing(failed)
@@ -143,6 +169,7 @@ package enum ExportService {
           at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: file)
       }
+      try ExportDurability.stage(files, tree: staging, moves: moves)
     } catch {
       discard()
       throw error
@@ -152,10 +179,10 @@ package enum ExportService {
         discard()
         throw SwapFailure()
       }
-      return retire(work, replaced: nil, workspace: workspace)
+      return try finish(work, replaced: nil, target: target, workspace: workspace, moves: moves)
     }
     if moves.swap(staging.path, target.path) == 0 {
-      return retire(work, replaced: staging, workspace: workspace)
+      return try finish(work, replaced: staging, target: target, workspace: workspace, moves: moves)
     }
     guard errno == ENOTSUP || errno == EINVAL, moves.rename(target.path, previous.path) == 0 else {
       discard()
@@ -169,7 +196,19 @@ package enum ExportService {
       discard()
       throw SwapFailure()
     }
-    return retire(work, replaced: previous, workspace: workspace)
+    return try finish(work, replaced: previous, target: target, workspace: workspace, moves: moves)
+  }
+
+  private static func finish(
+    _ work: URL, replaced: URL?, target: URL, workspace: String, moves: ExportMoves
+  ) throws -> [ExportLeftover] {
+    do {
+      try moves.sync(work)
+      try moves.sync(target.deletingLastPathComponent())
+    } catch {
+      throw ExportError.publicationUnconfirmed(path: target.path, kept: work.path)
+    }
+    return retire(work, replaced: replaced, workspace: workspace)
   }
 
   /// Removes the work directory once the tree it holds is export's own, checked again
