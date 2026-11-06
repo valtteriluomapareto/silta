@@ -139,7 +139,8 @@ struct ExportLeftoverTests {
           _ = try ExportServiceTests.export(store, home, to: root)
           Issue.record("an unsyncable root was published")
         } catch let failure as ExportFailure {
-          #expect(failure.error == .unwritable(path: root.path, workspace: "acme"))
+          #expect(
+            failure.error == .unwritable(path: root.standardizedFileURL.path, workspace: "acme"))
           #expect(failure.leftovers.map(\.reason) == ["could not be listed for work directories"])
         }
         #expect(!FileManager.default.fileExists(atPath: root.appending(path: "acme").path))
