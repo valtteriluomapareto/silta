@@ -85,7 +85,8 @@ extension AgentHealthTests {
       let checks = try Self.checks(scratch, env)
       let id =
         fault == "settings"
-        ? "install.hook" : fault == "foreign-root" ? "install.codex_root" : "install.codex_marker"
+        ? "install.hook"
+        : fault == "foreign-root" ? "install.codex_root" : "install.codex.instructions"
       #expect(
         (try Self.check(id, in: checks)["status"] as? String == "pass")
           == ["foreign", "foreign-root"].contains(fault))
@@ -220,13 +221,16 @@ extension AgentHealthTests {
         env[key] = path.path
       }
       let checks = try Self.checks(scratch, env)
-      for id in ["install.skill", "install.hook", "install.codex_root", "install.codex_marker"] {
+      for id in [
+        "install.skill", "install.hook", "install.codex_root", "install.codex.instructions",
+      ] {
         #expect(try Self.check(id, in: checks)["status"] as? String == "pass")
       }
       try Data("\n<!-- silta:begin broken -->\n".utf8).write(
         to: scratch.appending(path: "effective-.codex/AGENTS.md"))
       let damaged = try Self.checks(scratch, env)
-      #expect(try Self.check("install.codex_marker", in: damaged)["status"] as? String == "fail")
+      #expect(
+        try Self.check("install.codex.instructions", in: damaged)["status"] as? String == "fail")
       #expect(try Self.check("install.hook", in: damaged)["status"] as? String == "pass")
       #expect(try Self.check("install.codex_root", in: damaged)["status"] as? String == "pass")
     }

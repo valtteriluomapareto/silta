@@ -29,12 +29,11 @@ enum AgentHealth {
     checks += AgentHealthLogs.inspect(home: home, at: now)
     checks += versions(environment)
     let order = [
-      "install.path", "install.hook", "install.skill", "install.codex_root", "install.codex_marker",
-      "install.claude.instructions", "install.claude.stop", "install.opencode.skill",
-      "install.claude.session_start", "install.claude.last_stop", "install.claude.session",
-      "install.claude.version", "install.codex.version", "install.codex.session_start",
-      "install.codex.last_stop", "install.codex.session", "install.opencode.version",
-      "install.opencode.session_start", "install.opencode.last_stop", "install.opencode.session",
+      "install.path", "install.hook", "install.skill", "install.codex_root",
+      "install.codex.instructions", "install.claude.instructions", "install.claude.stop",
+      "install.opencode.skill", "install.claude.session_start", "install.claude.last_stop",
+      "install.claude.session", "install.claude.version", "install.codex.version",
+      "install.codex.hooks", "install.opencode.version", "install.opencode.hooks",
     ]
     return order.compactMap { id in checks.first { $0.id == id } }
   }
@@ -47,7 +46,7 @@ enum AgentHealth {
       let targets = try AgentInstallTarget.selected(claude: true, codex: true, root: home.path)
       for (index, target) in targets.enumerated() {
         let ids = [
-          "install.skill", "install.claude.instructions", "install.codex_marker",
+          "install.skill", "install.claude.instructions", "install.codex.instructions",
           "install.codex_root",
         ]
         let root = index < 2 ? claude : codex
@@ -76,17 +75,10 @@ enum AgentHealth {
     for (name, baseline) in [("claude", "2.1.314"), ("codex", "0.166.0"), ("opencode", nil)] {
       checks.append(version(name, baseline: baseline, environment: environment))
       if name != "claude" {
-        for (suffix, label) in [
-          ("session_start", "SessionStart"), ("last_stop", "Stop"),
-          ("session", "SILTA_SESSION propagation"),
-        ] {
-          checks.append(
-            DoctorCheck(
-              id: "install.\(name).\(suffix)", status: .skipped,
-              message:
-                "\(name): \(label) has no Silta hook integration; no hook-session evidence is available.",
-              next: ["silta agents install --help"]))
-        }
+        checks.append(
+          DoctorCheck(
+            id: "install.\(name).hooks", status: .skipped,
+            message: "\(name): no Silta hook integration; no hook-session evidence is available."))
       }
     }
     return checks
@@ -110,7 +102,7 @@ enum AgentHealth {
       guard let old = try AgentHealthFiles.read(root: root, path: path) else {
         return DoctorCheck(
           id: id, status: .warning,
-          message: "\(id): owned piece is absent in the effective configuration directory.",
+          message: "owned piece is absent in the effective configuration directory.",
           next: next, nextBy: overridden ? .human : .agent)
       }
       let expected = try target.replace(old, existed: true, uninstall: false) {
@@ -120,14 +112,15 @@ enum AgentHealth {
       return DoctorCheck(
         id: id, status: intact ? .pass : .warning,
         message: intact
-          ? "\(id): owned piece is intact and current."
-          : "\(id): owned piece is missing or stale; preview the expected content.",
+          ? "owned piece is intact and current."
+          : "owned piece is missing or stale; preview the expected content.",
         next: intact ? [] : next, nextBy: overridden ? .human : .agent)
     } catch {
       return DoctorCheck(
         id: id, status: .fail,
         message:
-          "\(id): cannot safely read or validate ownership; inspect the effective configuration directory.",
+          "cannot safely read or validate ownership; "
+          + "inspect the effective configuration directory.",
         next: [inspection, "silta agents install --help"], nextBy: .human)
     }
   }
