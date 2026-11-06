@@ -6,6 +6,15 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct GitRunnerTests {
+  @Test func standardInputIsClosed() async throws {
+    try await withScratchDirectory { scratch in
+      let result = try await SystemGitRunner(executable: "/bin/cat").run(
+        GitRequest(arguments: [], directory: scratch))
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.isEmpty)
+    }
+  }
+
   @Test(arguments: [false, true]) func gitContract(scripted: Bool) async throws {
     try await withScratchDirectory { scratch in
       let request = GitRequest(

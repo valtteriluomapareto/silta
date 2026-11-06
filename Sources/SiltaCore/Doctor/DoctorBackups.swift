@@ -19,10 +19,11 @@ struct DoctorBackups {
       var published = 0
       for file in files {
         let name = file.lastPathComponent
-        guard
-          name.wholeMatch(
-            of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-before-[A-Za-z0-9]+-[0-9]+)?\.db/) != nil
-        else { continue }
+        let standard = name.wholeMatch(
+          of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-before-[A-Za-z0-9]+-[0-9]+)?\.db/)
+        let manual = name.wholeMatch(
+          of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}-manual-[0-9]+-[A-Za-z0-9]{6}\.db/)
+        guard standard != nil || manual != nil else { continue }
         let values = try file.resourceValues(forKeys: [
           .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey,
         ])

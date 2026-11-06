@@ -1,6 +1,8 @@
-/// Export failures. Each leaves the target as it was (spec §15), except `previousKept`,
-/// which says where the previous tree is.
+/// Export and restore failures (spec §15). Publication and Git failures explicitly
+/// distinguish a written tree or retained recovery data from pre-write refusals.
 package enum ExportError: CodedError, Equatable {
+  /// Another export held the lock through the bounded wait.
+  case busy
   /// The target exists but is not exactly a previous export; `entry` says why, e.g.
   /// "it holds README.md".
   case notAnExport(path: String, entry: String, workspace: String)
@@ -24,13 +26,20 @@ package enum ExportError: CodedError, Equatable {
   case restoreConflict(String)
   /// The tree's manifest is not the one the human approved.
   case manifestChanged(approved: String, directory: String)
+  /// Git preflight refused before the export write.
+  case notWorkTree(root: String)
+  /// Git failed after publication; rerunning the export refreshes its owned paths.
+  case gitFailed(root: String, workspace: String)
+  /// The tree was published but the rename could not be flushed; recovery data stays.
+  case publicationUnconfirmed(path: String, kept: String)
 
   /// Target and repo refusals leave the choice of directory to the human.
   package var code: ErrorCode {
     switch self {
+    case .busy: .busy
     case .notAnExport, .restoreConflict, .manifestChanged: .conflict
-    case .insideRepo, .invalidTree, .notATree, .otherWorkspace: .invalid
-    case .unsupported, .unwritable, .previousKept: .env
+    case .insideRepo, .invalidTree, .notATree, .otherWorkspace, .notWorkTree: .invalid
+    case .unsupported, .unwritable, .previousKept, .gitFailed, .publicationUnconfirmed: .env
     }
   }
 
@@ -38,14 +47,27 @@ package enum ExportError: CodedError, Equatable {
   /// is the agent's.
   package var nextBy: NextBy {
     switch self {
-    case .notATree(_, _, .some), .otherWorkspace, .manifestChanged: .agent
+    case .notATree(_, _, .some), .otherWorkspace, .manifestChanged, .notWorkTree, .busy: .agent
     default: .human
     }
   }
 
+  /// Retry spacing after export lock contention.
+  package var retryAfter: Int? { self == .busy ? 5 : nil }
+
   /// What was refused, with the path it concerns.
   package var message: String {
     switch self {
+    case .busy:
+      "Another export holds the export lock; retry the same invocation once after retry_after_s."
+    case .notWorkTree(let root):
+      "\(root) is not an existing Git work tree; nothing was exported."
+    case .gitFailed:
+      "The export tree was written, but Git did not complete. It is safe to retry the same export; "
+        + "check the repository's identity, permissions and hooks."
+    case .publicationUnconfirmed(let path, let kept):
+      "The export tree was written to \(path), but publication could not be flushed to disk. "
+        + "The work directory is retained at \(kept); ask the human to inspect it before deleting anything."
     case .notAnExport(let path, let entry, _):
       "\(path) is not a silta export: \(entry). "
         + "Export replaces only a previous export, so it changed nothing."
@@ -77,6 +99,16 @@ package enum ExportError: CodedError, Equatable {
   /// A directory the human picks, for the same workspace, or a newer binary.
   package var next: [String] {
     switch self {
+    case .busy: ["silta export"]
+    case .notWorkTree(let root):
+      [
+        "git -C " + shellWord(root) + " rev-parse --is-inside-work-tree",
+        "silta export --help",
+      ]
+    case .gitFailed(let root, let workspace):
+      [workspaceCommand("silta export --to " + shellWord(root) + " --commit", workspace: workspace)]
+    case .publicationUnconfirmed(_, let kept):
+      ["/bin/ls -la " + shellWord(kept)]
     case .notAnExport(_, _, let workspace):
       [workspaceCommand("silta export --to <empty or export directory>", workspace: workspace)]
     case .insideRepo(_, _, let workspace):

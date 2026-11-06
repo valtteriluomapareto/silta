@@ -121,8 +121,9 @@ struct ExportLeftoverTests {
     }
   }
 
-  /// A root export can't list is reported, not taken as having no leftovers.
-  @Test func anUnlistableRootIsReported() throws {
+  /// An unreadable root cannot be synced before publication; the refusal still warns
+  /// that leftover work directories could not be listed.
+  @Test func anUnlistableRootIsRefusedWithALeftoverWarning() throws {
     do {
       try withScratchDirectory { scratch in
         let home = scratch.appending(path: "home")
@@ -134,8 +135,15 @@ struct ExportLeftoverTests {
           try? FileManager.default.setAttributes(  // best-effort, so the scratch can be removed
             [.posixPermissions: 0o700], ofItemAtPath: root.path)
         }
-        let result = try ExportServiceTests.export(store, home, to: root)
-        #expect(result.leftovers.map(\.reason) == ["could not be listed for work directories"])
+        do {
+          _ = try ExportServiceTests.export(store, home, to: root)
+          Issue.record("an unsyncable root was published")
+        } catch let failure as ExportFailure {
+          #expect(
+            failure.error == .unwritable(path: root.standardizedFileURL.path, workspace: "acme"))
+          #expect(failure.leftovers.map(\.reason) == ["could not be listed for work directories"])
+        }
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "acme").path))
       }
     }
   }
