@@ -7,31 +7,31 @@ import Testing
 
 struct ExportRootDurabilityTests {
   @Test func ancestorFailureStillReportsExistingWorkDirectories() throws {
-    withKnownIssue("#14: ancestor failure bypasses leftover warnings") {
-      try withScratchDirectory { scratch in
-        let home = scratch.appending(path: "home")
-        let store = try ExportFixture.make(home)
-        let root = scratch.appending(path: "exports").standardizedFileURL
-        let leftover = root.appending(path: ".acme.export-retained")
-        try FileManager.default.createDirectory(at: leftover, withIntermediateDirectories: true)
-        let moves = ExportMoves(sync: { url in
-          if url.standardizedFileURL == scratch.standardizedFileURL {
-            throw StorageError.ioFailure
-          }
-          try ExportDurability.sync(url)
-        })
-        do {
-          _ = try ExportPublishTests.export(store, home, root, moves)
-          Issue.record("the ancestor flush fault was ignored")
-        } catch let failure as ExportFailure {
-          #expect(failure.warnings.map(\.code) == ["export_leftover"])
-          #expect(
-            failure.leftovers.map { URL(filePath: $0.path).lastPathComponent } == [
-              leftover.lastPathComponent
-            ])
+
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let root = scratch.appending(path: "exports").standardizedFileURL
+      let leftover = root.appending(path: ".acme.export-retained")
+      try FileManager.default.createDirectory(at: leftover, withIntermediateDirectories: true)
+      let moves = ExportMoves(sync: { url in
+        if url.standardizedFileURL == scratch.standardizedFileURL {
+          throw StorageError.ioFailure
         }
+        try ExportDurability.sync(url)
+      })
+      do {
+        _ = try ExportPublishTests.export(store, home, root, moves)
+        Issue.record("the ancestor flush fault was ignored")
+      } catch let failure as ExportFailure {
+        #expect(failure.warnings.map(\.code) == ["export_leftover"])
+        #expect(
+          failure.leftovers.map { URL(filePath: $0.path).lastPathComponent } == [
+            leftover.lastPathComponent
+          ])
       }
     }
+
   }
 
   @Test func newRootAncestorNamesAreSyncedBeforePublication() throws {

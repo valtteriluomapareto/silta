@@ -115,7 +115,7 @@ package enum ExportService {
       }
     }
     do {
-      try ExportDurability.prepareRoot(root, moves: moves)
+      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     } catch {
       throw failed
     }
@@ -128,6 +128,7 @@ package enum ExportService {
     let kept: [ExportLeftover]
     do {
       try checkTarget(target, workspace: slug)
+      try ExportDurability.syncAncestors(of: root, moves: moves)
       kept = try publish(files, to: target, prefix: prefix, workspace: slug, moves: moves)
     } catch let error as ExportError {
       if case .publicationUnconfirmed(_, let work) = error {

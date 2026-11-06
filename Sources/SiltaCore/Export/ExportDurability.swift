@@ -5,8 +5,7 @@ import Foundation
 enum ExportDurability {
   /// Flushes the pathname's dependencies on every attempt. An existing directory
   /// may have survived an earlier preparation failure without its name being flushed.
-  static func prepareRoot(_ root: URL, moves: ExportMoves) throws {
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  static func syncAncestors(of root: URL, moves: ExportMoves) throws {
     var parent = root.deletingLastPathComponent()
     while true {
       try moves.sync(parent)
