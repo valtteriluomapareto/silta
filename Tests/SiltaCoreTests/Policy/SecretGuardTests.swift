@@ -338,6 +338,16 @@ extension SecretGuardTests {
     }
   }
 
+  // Uppercase B is part of the base64url alphabet, so a body that contains one is
+  // redacted whole, whether the B opens or closes the body.
+  @Test func anthropicKeysRedactAnUppercaseBInTheBody() {
+    let body = String(repeating: "Q", count: 94)
+    for text in ["B" + body, body + "B"] {
+      let key = "sk-" + "ant-api03-" + text
+      #expect(SecretGuard.redacted("token " + key + " end") == "token [REDACTED:anthropic] end")
+    }
+  }
+
   // At least 80 characters after the prefix make a key, whatever the tag; anything
   // shorter is a fragment.
   @Test func anthropicKeysNeedEightyCharactersAfterThePrefix() {
