@@ -68,7 +68,8 @@ struct AgentHealthTests {
       let env = try Self.setup(scratch)
       let checks = try Self.checks(scratch, env)
       for id in [
-        "install.path", "install.skill", "install.claude.instructions", "install.codex_marker",
+        "install.path", "install.skill", "install.claude.instructions",
+        "install.codex.instructions",
         "install.codex_root", "install.hook", "install.claude.stop", "install.claude.version",
         "install.codex.version",
       ] {
@@ -81,10 +82,7 @@ struct AgentHealthTests {
       #expect(
         try Self.check("install.opencode.version", in: checks)["status"] as? String == "warning")
       #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "launched").path))
-      for check in checks
-      where (check["id"] as? String)?.hasPrefix("install.") == true
-        && (check["status"] as? String) != "pass"
-      {
+      for check in checks where ["warning", "fail"].contains(check["status"] as? String ?? "") {
         #expect(!(check["next"] as? [String] ?? []).isEmpty)
       }
     }
@@ -123,9 +121,9 @@ struct AgentHealthTests {
       let checks = try Self.checks(scratch, env)
       let ids = [
         "skill": "install.skill", "claude": "install.claude.instructions",
-        "codex": "install.codex_marker", "root": "install.codex_root", "start": "install.hook",
-        "stop": "install.claude.stop", "missing": "install.codex_marker",
-        "symlink": "install.codex_marker",
+        "codex": "install.codex.instructions", "root": "install.codex_root",
+        "start": "install.hook", "stop": "install.claude.stop",
+        "missing": "install.codex.instructions", "symlink": "install.codex.instructions",
       ]
       let result = try Self.check(try #require(ids[fault]), in: checks)
       #expect(result["status"] as? String != "pass")

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import GRDB
 
@@ -19,7 +20,8 @@ extension DoctorService {
         evidence + " 'PRAGMA integrity_check;'", evidence + " 'PRAGMA foreign_key_check;'",
         evidence + " '.schema'",
       ]
-    let missing = !FileManager.default.fileExists(atPath: store.path)
+    var info = stat()
+    let missing = stat(store.path, &info) != 0 && errno == ENOENT
     if missing || !FileManager.default.isReadableFile(atPath: store.path) {
       let first: DoctorCheck
       if missing {
@@ -41,8 +43,9 @@ extension DoctorService {
             "Database access is denied by file permissions; "
             + "inspect access before diagnosing corruption.",
           next: (inspectBackups ? [backups.listing] : []) + [
-            "/bin/ls -l " + shellWord(store.path)
-          ])
+            "/bin/ls -ld " + shellWord(store.path) + " "
+              + shellWord(URL(filePath: store.path).deletingLastPathComponent().path)
+          ], nextBy: .human)
       }
       return [first] + skipped(["database.foreign_keys", "database.schema"] + dependentIDs)
         + [backups.check(expectedDay: nil)]

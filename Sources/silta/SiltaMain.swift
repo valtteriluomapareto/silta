@@ -198,7 +198,9 @@ enum SiltaMain {
     arguments: [String], context: CommandContext
   ) -> CommandFailure {
     let path = commandPath(arguments)
-    if error.code == .busy { return CommandFailure(error: error, next: [path]) }
+    if error.code == .busy {
+      return CommandFailure(error: error, next: [(command as? ExportCommand)?.retryCommand ?? path])
+    }
     var next = error.next
     let ownNext =
       if case .step = error as? TaskError { true } else {

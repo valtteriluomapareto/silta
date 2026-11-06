@@ -49,20 +49,26 @@ struct StorageBackup {
     }
   }
 
-  func prune() throws {
+  func prune(manual: Bool = false, keeping: URL? = nil) throws {
     let directory = home.appending(path: "backups")
     let backups = try FileManager.default.contentsOfDirectory(
       at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]
     )
     .filter {
-      guard
-        $0.lastPathComponent.wholeMatch(
+      let name = $0.lastPathComponent
+      let recognized =
+        manual
+        ? name.wholeMatch(of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}-manual-[0-9]+-[A-Za-z0-9]{6}\.db/)
+          != nil
+        : name.wholeMatch(
           of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-before-[A-Za-z0-9]+-[0-9]+)?\.db/) != nil
+      guard recognized
       else { return false }
       return try isRegularFile($0)
     }
+    .filter { $0.standardizedFileURL != keeping?.standardizedFileURL }
     .sorted { $0.lastPathComponent < $1.lastPathComponent }
-    for file in backups.dropLast(7) {
+    for file in backups.dropLast(keeping == nil ? 7 : 6) {
       try FileManager.default.removeItem(at: file)
     }
   }

@@ -25,6 +25,25 @@ They're summarised here so every decision has one index.
     every registered repo, staged and swapped so a reader never sees a mixed tree.
     `restore` will be human-only except `--dry-run`, because it replaces settings
     (D39).
+  - ↳ update (2026-11-06, S14c): `export --commit` holds the export lock through
+    path-scoped Git operations and returns a SHA only for a new commit. A failed
+    commit leaves staged export files that a retry may refresh; unrelated staged
+    files stay out of the commit. Ignored manifest paths are warnings even on failure.
+    Files and directories are synced before publication, then rename directories
+    before retiring the previous tree; a failed publication sync keeps recovery data.
+    Export lock retries have five seconds of spacing before `busy`. `backup` is a
+    whole-database SQLite snapshot, with unique staging/publication and separate
+    seven-file on-demand retention. It does not run export or Git; doctor counts it
+    as recovery evidence without satisfying daily coverage.
+    Injected `ENOTSUP` tests cover the no-`RENAME_SWAP` fallback, rollback and a
+    retained previous tree. CI has no exFAT/SMB volume: these tests do not establish
+    real-volume behavior or survival of power loss.
+    - Pathname durability includes the supplied and symlink-resolved export root's
+      complete ancestor chains, flushed through the filesystem root before staging
+      on every invocation. Stopping at
+      the first existing directory is insufficient after a crash or preparation
+      failure leaves an unflushed name. No preparation provenance or recursive
+      directory cleanup is needed.
 - **D4: CLI only, `--json` everywhere.** No MCP server and no daemon.
 - **D5: Agent writes are gated.** Unsolicited tasks start as `proposed`, doc edits are
   proposals, and some commands are human-only. Since D38, an agent runs those with
@@ -634,3 +653,13 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     that table intact, removed only the root, and left `writable_roots = []`.
     `doctor --install` passed every owned piece and matched the Codex baseline.
     OpenCode live discovery remains unverified.
+
+- **D43: Doctor diagnoses; existing explicit commands own recovery.**
+  `doctor` has no `--fix` option. Owned installation repair uses `agents install`
+  preview and its apply token; WAL remains observation-only with active-reader
+  inspection. Doctor never silently edits shell or harness files, initializes,
+  migrates, restores, fetches, clears claims or deletes overrides (spec §19).
+  `database.writable` adds a no-write permission preflight for the existing truth
+  file and its resolved parent directory, without promising subsequent SQLite
+  writes. Inaccessible paths fail with human-owned inspection instead of being
+  mistaken for missing storage and suggesting initialization.

@@ -4,10 +4,12 @@ package import Foundation
 package enum DoctorService {
   /// Stable display order, matching spec §19. New checks are added without renaming ids.
   static let checkOrder = [
-    "database.integrity", "database.foreign_keys", "database.schema", "database.wal",
+    "database.integrity", "database.foreign_keys", "database.schema", "database.writable",
+    "database.wal",
     "git.version", "git.repos", "git.bindings", "git.fetch", "git.overrides", "data.claims",
     "data.backup",
-    "install.path", "install.hook", "install.skill", "install.codex_root", "install.codex_marker",
+    "install.path", "install.hook", "install.skill", "install.codex_root",
+    "install.codex.instructions",
     "index.integrity", "index.foreign_keys", "index.schema", "index.fts", "index.age",
     "app.version",
   ]
@@ -21,6 +23,7 @@ package enum DoctorService {
   {
     let backups = DoctorBackups(home: home, at: now)
     var checks = database(store, backups: backups, at: now)
+    checks.append(writability(store.path))
     checks.append(wal(home))
     checks.append(await gitVersion(git))
     return DoctorReport(checks: orderedChecks(checks))

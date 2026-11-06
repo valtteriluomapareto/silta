@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"<scratch>/work is not an existing Git work tree; nothing was exported.","next":["git -C '<scratch>/work' rev-parse --is-inside-work-tree","silta export --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

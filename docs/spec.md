@@ -1461,7 +1461,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **Daily backup (M1):** on the first write of each day, `VACUUM INTO
   $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
   first.
-- **`silta export [--ws] [--to]`** writes a byte-identical tree for the same
+- **`silta backup`** takes an on-demand whole-database SQLite snapshot, including
+  every workspace regardless of `--ws`, and reports its path. It publishes a complete
+  `backups/silta-<day>-manual-<ms>-<unique>.db` from staging owned by that invocation.
+  Concurrent invocations use distinct names. It keeps seven on-demand files separately
+  from daily and pre-restore backups; neither retention class evicts the other.
+  It does not export a text tree or run Git, and never advances `last_backup_day`.
+- **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
   keyed by `uid`; display refs are included for readability. Machine-local state is
   never written: repo paths, worktree overrides and task worktrees. Values the user
@@ -1533,7 +1539,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     (`.DS_Store` aside; listed files may be missing). Anything else is refused for the
     human to decide. A target that overlaps a registered repo is refused, so workspace
     data never lands in a code repo. Exports are serialised, each reading its
-    snapshot under the lock, so the last one written is the latest state. The new
+    snapshot under the lock, so the last one written is the latest state. Lock
+    acquisition retries for at most five seconds of spacing, then answers `busy`.
+    The new
     tree is staged in a directory of export's own next to the target, created under a
     unique name, and swapped in, so a reader sees one tree or the other, never a mix;
     a volume without an atomic swap moves the old tree aside first, and puts it back,
@@ -1546,7 +1554,25 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     export can't list. An entry export can't read refuses the target. When even the
     no-swap fallback can't move the previous tree back, the error names where it is
     kept and its `next` moves it back only while the target is still absent.
+    The export root's ancestor directories, both as supplied and with symlinks
+    resolved, are flushed through the filesystem root before staging on every
+    attempt: an existing directory may have survived an
+    earlier interrupted preparation without its name being durable.
+    Staged files and directories are flushed before publication. The publication's
+    directory entries are flushed before removing the previous tree. If that final
+    flush fails, the error says the new tree was written and names the retained
+    work directory instead of claiming the previous target is unchanged. On a first
+    export the retained work directory can be empty; the new tree is at the target.
     The tree is owned by export: edits to it are overwritten by the next export.
+  - **Git commit.** `--commit` requires an existing Git work tree at the export root,
+    checked before writing. Under the export lock it runs `git add -A -- <workspace>`,
+    checks the staged diff for that path, and commits only that path when it changed.
+    Other staged paths remain staged. Git has closed stdin and terminal prompts disabled.
+    The receipt's `sha` is present only when this invocation made a commit; an unchanged
+    export makes none. Manifest files (and the manifest itself) ignored by Git produce
+    `export_ignored` warnings naming their paths; the disk tree remains complete.
+    A Git failure after publication reports that the tree was written and retrying
+    the same export is safe, preserving coverage and leftover warnings.
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace. `<dir>` is the `<root>/<workspace>` that
   holds `manifest.json`; the workspace comes from the tree, and a `--ws` naming
@@ -1722,7 +1748,7 @@ silta init [--scan <dir>…] [--slug <slug>] [--prefix <prefix>]   [M1] create D
 silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] config as YAML (validated on save, "did you mean"); -F for agents
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
-silta doctor [--install] [--fix]                 [M1]
+silta doctor [--install]                         [M1]
 silta guide [<topic>] (including refs)            [M1]
 
 # context
@@ -1926,12 +1952,13 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   are never used to attribute a timeout.
 
   Evals and the dogfood report read these logs (§21, §22.1).
-- **`silta doctor [--install] [--fix]`** checks:
+- **`silta doctor [--install]`** checks:
   - **Install:** PATH, owned Claude/shared OpenCode skills and instruction blocks,
     optional Claude hooks, the effective Codex writable-root value, retained hook
     execution and session propagation evidence, and harness version metadata.
   - **Database:** `PRAGMA integrity_check` and `foreign_key_check`, FTS integrity,
-    schema versions on both DBs, WAL size, index age.
+    schema versions on both DBs, truth database file and containing-directory
+    write access, WAL size, index age.
   - **Git:** git path and version, dead repo paths, stale fetches, orphaned worktree
     overrides.
   - **Data:** stale claims (at least 2 h), backup age, CLI vs app version skew.
@@ -1955,13 +1982,16 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   Check ids and their order are a contract: ids are never renamed or removed, only
   added. New ids may be inserted into the display order; consumers key by id,
   never by array index. Computed ids absent from the named order remain visible at
-  the end. Unavailable checks retain their own id with status `skipped`:
+  the end. An id added since the last release becomes permanent when that release
+  ships it; until then it may still change with an agent-experience review (D16).
+  Unavailable checks retain their own id with status `skipped`:
 
   | Id (display order) | Check / availability |
   |---|---|
   | `database.integrity` | SQLite or stored-value integrity, or operational read failure |
   | `database.foreign_keys` | Foreign-key integrity |
   | `database.schema` | Truth schema and writer compatibility |
+  | `database.writable` | Truth file write and resolved containing-directory write/search permission preflight |
   | `database.wal` | File-only WAL size |
   | `git.version` | Fixed git path and version |
   | `git.repos` | Bound repository paths |
@@ -1974,7 +2004,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   | `install.hook` | Claude SessionStart owned group |
   | `install.skill` | Claude skill in effective Claude config directory |
   | `install.codex_root` | Effective `SILTA_HOME` writable-root value |
-  | `install.codex_marker` | Codex AGENTS.md sealed instruction block (not a TOML marker) |
+  | `install.codex.instructions` | Codex AGENTS.md sealed instruction block |
   | `install.claude.instructions` | Claude CLAUDE.md sealed instruction block |
   | `install.claude.stop` | Optional Claude Stop owned group |
   | `install.opencode.skill` | Shared skill at HOME/.claude/skills; discovery remains unverified |
@@ -1983,13 +2013,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   | `install.claude.session` | Propagation observed in the latest hook session |
   | `install.claude.version` | Installed metadata versus D42 live baseline |
   | `install.codex.version` | Installed metadata versus D42 live baseline |
-  | `install.codex.session_start` | Skipped: no Silta hook integration |
-  | `install.codex.last_stop` | Skipped: no Silta hook integration |
-  | `install.codex.session` | Skipped: no hook-session propagation evidence |
+  | `install.codex.hooks` | Skipped: no Silta hook integration; nothing to recover |
   | `install.opencode.version` | Installed metadata; no live-verified baseline |
-  | `install.opencode.session_start` | Skipped: no Silta hook integration |
-  | `install.opencode.last_stop` | Skipped: no Silta hook integration |
-  | `install.opencode.session` | Skipped: no hook-session propagation evidence |
+  | `install.opencode.hooks` | Skipped: no Silta hook integration; nothing to recover |
   | `index.integrity` | Skipped until M3 |
   | `index.foreign_keys` | Skipped until M3 |
   | `index.schema` | Skipped until M3 |
@@ -2062,7 +2088,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   WAL and backup checks always run, even when the truth database is missing or
   unreadable. Published backup evidence excludes symlinks, empty files, invalid or
-  future dates, and unrelated names. Daily backup presence is checked against
+  future dates, and unrelated names. On-demand snapshots count as published recovery
+  evidence, but never as daily coverage. Daily backup presence is checked against
   `meta.last_backup_day`: blank means the first write has not yet needed a backup;
   idle time alone does not warn. A recorded daily backup must exist as a nonempty
   regular file. Pre-migration snapshots are listed as recovery evidence but do not
@@ -2081,7 +2108,22 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   not a `.db` file. Unknown backup metadata describes only available files and the
   unreadable last backup day; it does not itself suggest restoration.
 
-  Installation checks and `--fix` follow installer formats when available.
+  Doctor is diagnostic-only; there is no `--fix` option. Recovery uses the explicit
+  commands in each check. Owned installation pieces are updated only through
+  `silta agents install` preview and its apply token (§11); doctor never edits shell
+  or harness files. WAL remains observation-only, with reader inspection rather
+  than an automatic checkpoint. Permissions require human inspection, not guessed
+  permission changes.
+
+  `database.writable` independently checks the existing truth file's effective
+  write access and its resolved containing directory's write and search access,
+  including a symlinked database target. A confirmed missing file is skipped;
+  inaccessible or uninspectable paths and non-regular targets fail. Denied access
+  never suggests initializing the database. Failures provide human-owned inspection
+  of both paths and do not prevent independent readable checks. This is a permission
+  preflight without probe writes or permission changes: a pass does not guarantee
+  free space, stable access, or that a later SQLite write will succeed. Broad doctor
+  can still update SQLite coordination sidecars as described above.
   A passing diagnostic run does not certify skipped checks. Check warnings live
   in `data.checks`; envelope and command-log warnings describe command/environment
   warnings. Failures before CLI environment setup are not logged.
