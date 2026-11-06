@@ -15,9 +15,13 @@ struct AgentsInstallTests {
     return try #require(try GuideContractTests.object(result.stdout)["data"] as? [String: Any])
   }
 
-  static func apply(_ args: [String], in scratch: URL) throws -> CLIResult {
-    let preview = try data(run(args + ["--json"], in: scratch))
-    return try run(args + ["--apply", try #require(preview["token"] as? String)], in: scratch)
+  static func apply(_ args: [String], in scratch: URL, environment: [String: String] = [:])
+    throws -> CLIResult
+  {
+    let preview = try data(run(args + ["--json"], in: scratch, environment: environment))
+    return try run(
+      args + ["--apply", try #require(preview["token"] as? String)], in: scratch,
+      environment: environment)
   }
 
   static func write(_ text: String, _ path: String, in scratch: URL) throws {
