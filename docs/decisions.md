@@ -38,8 +38,9 @@ They're summarised here so every decision has one index.
     Injected `ENOTSUP` tests cover the no-`RENAME_SWAP` fallback, rollback and a
     retained previous tree. CI has no exFAT/SMB volume: these tests do not establish
     real-volume behavior or survival of power loss.
-    - Pathname durability includes the export root's complete ancestor chain, flushed
-      through the filesystem root before staging on every invocation. Stopping at
+    - Pathname durability includes the supplied and symlink-resolved export root's
+      complete ancestor chains, flushed through the filesystem root before staging
+      on every invocation. Stopping at
       the first existing directory is insufficient after a crash or preparation
       failure leaves an unflushed name. No preparation provenance or recursive
       directory cleanup is needed.

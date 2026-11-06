@@ -30,10 +30,8 @@ struct ExportRootDurabilityTests {
       })
       _ = try ExportPublishTests.export(store, home, alias, retry)
       let paths = synced.withLock { $0 }
-      withKnownIssue("#14: root alias retry omits resolved ancestors") {
-        #expect(paths.contains(actual.standardizedFileURL.path))
-        #expect(paths.contains(root.deletingLastPathComponent().standardizedFileURL.path))
-      }
+      #expect(paths.contains(actual.standardizedFileURL.path))
+      #expect(paths.contains(root.deletingLastPathComponent().standardizedFileURL.path))
     }
   }
 

@@ -5,13 +5,17 @@ import Foundation
 enum ExportDurability {
   /// Flushes the pathname's dependencies on every attempt. An existing directory
   /// may have survived an earlier preparation failure without its name being flushed.
+  /// Both chains matter when that path is retried through a root alias.
   static func syncAncestors(of root: URL, moves: ExportMoves) throws {
-    var parent = root.deletingLastPathComponent()
-    while true {
-      try moves.sync(parent)
-      let ancestor = parent.deletingLastPathComponent()
-      if ancestor == parent { return }
-      parent = ancestor
+    var synced: Set<String> = []
+    for path in [root, root.resolvingSymlinksInPath()] {
+      var parent = path.deletingLastPathComponent()
+      while synced.insert(parent.path).inserted {
+        try moves.sync(parent)
+        let ancestor = parent.deletingLastPathComponent()
+        if ancestor == parent { break }
+        parent = ancestor
+      }
     }
   }
 
