@@ -30,7 +30,7 @@ struct DoctorWritabilityTests {
         try? FileManager.default.setAttributes(
           [.posixPermissions: kind == "file" ? 0o600 : 0o700], ofItemAtPath: target.path)
       }  // restore fixture access
-      #expect(
+      try #require(
         kind == "directory-search"
           ? !FileManager.default.isExecutableFile(atPath: home.path)
           : !FileManager.default.isWritableFile(atPath: target.path))
@@ -98,7 +98,7 @@ struct DoctorWritabilityTests {
         try? FileManager.default.setAttributes(
           [.posixPermissions: 0o700], ofItemAtPath: target.path)
       }  // restore fixture access
-      #expect(!FileManager.default.isWritableFile(atPath: target.path))
+      try #require(!FileManager.default.isWritableFile(atPath: target.path))
       let report = await inspect(home)
       let check = try #require(report.checks.first { $0.id == "database.writable" })
       #expect(check.status == .fail)

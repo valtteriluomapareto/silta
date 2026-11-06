@@ -21,7 +21,7 @@ struct DoctorWritabilityCommandTests {
         try? FileManager.default.setAttributes(
           [.posixPermissions: kind == "file" ? 0o600 : 0o700], ofItemAtPath: target.path)
       }  // restore fixture access
-      #expect(
+      try #require(
         kind == "directory-search"
           ? !FileManager.default.isExecutableFile(atPath: target.path)
           : !FileManager.default.isWritableFile(atPath: target.path))
