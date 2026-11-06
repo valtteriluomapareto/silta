@@ -20,6 +20,7 @@ struct BackupCommandTests {
   }
 
   static func check(_ path: String) throws {
+    try #require(FileManager.default.fileExists(atPath: path))
     let queue = try DatabaseQueue(path: path)
     let values = try queue.read { db in
       (
@@ -65,9 +66,18 @@ struct BackupCommandTests {
     }
   }
 
-  @Test func concurrentRunsPublishDistinctCompleteSnapshots() async throws {
+  @Test func concurrentRunsPublishAndPruneAtRetentionCapacity() async throws {
     try await withScratchDirectory { scratch in
       try ExportCommandTests.seed(scratch)
+      let directory = scratch.appending(path: "silta-home/backups")
+      let seedPaths = try (0..<7).map { _ in try Self.path(Self.run(scratch)) }
+      let seedPath = try #require(seedPaths.last)
+      let restore = directory.appending(path: "silta-2023-11-14-before-restore-1700000000000.db")
+      try FileManager.default.copyItem(at: URL(filePath: seedPath), to: restore)
+      let inventory = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+      #expect(inventory.filter { $0.contains("-manual-") && $0.hasSuffix(".db") }.count == 7)
+      let before = inventory.filter { !$0.contains("-manual-") }
+      let preserved = try before.map { try Data(contentsOf: directory.appending(path: $0)) }
       let paths = try await withThrowingTaskGroup(of: String.self) { group in
         for _ in 0..<6 {
           group.addTask {
@@ -80,7 +90,14 @@ struct BackupCommandTests {
         return try await group.reduce(into: [String]()) { $0.append($1) }
       }
       #expect(Set(paths).count == 6)
-      for path in paths { try Self.check(path) }
+      for path in paths where FileManager.default.fileExists(atPath: path) { try Self.check(path) }
+      let retained = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        .filter { $0.contains("-manual-") && $0.hasSuffix(".db") }
+      #expect(retained.count == 7)
+      for name in retained { try Self.check(directory.appending(path: name).path) }
+      for (name, data) in zip(before, preserved) {
+        #expect(try Data(contentsOf: directory.appending(path: name)) == data)
+      }
     }
   }
 }

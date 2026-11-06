@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import GRDB
 @testable import SiltaCore
@@ -5,6 +6,25 @@ import SiltaTestSupport
 import Testing
 
 struct BackupServiceTests {
+  @Test func heldBackupLockPreventsPublicationAndPruning() throws {
+    try withScratchDirectory { home in
+      let store = try ExportFixture.make(home)
+      let clock = FakeClock(now: StorageSchemaTests.instant)
+      for _ in 0..<7 { _ = try BackupService.backup(store: store, home: home, clock: clock) }
+      let directory = home.appending(path: "backups")
+      let before = try ExportServiceTests.tree(directory)
+      let descriptor = open(home.appending(path: "backup.lock").path, O_CREAT | O_RDWR, 0o600)
+      try #require(descriptor >= 0)
+      defer { close(descriptor) }
+      try #require(flock(descriptor, LOCK_EX | LOCK_NB) == 0)
+      #expect(throws: StorageError.busy) {
+        try BackupService.backup(store: store, home: home, clock: clock)
+      }
+      #expect(abs(clock.now().timeIntervalSince(StorageSchemaTests.instant) - 5) < 0.00001)
+      #expect(try ExportServiceTests.tree(directory) == before)
+    }
+  }
+
   @Test func retentionKeepsTheSnapshotWhosePathIsReturned() throws {
     try withScratchDirectory { home in
       let store = try ExportFixture.make(home)
