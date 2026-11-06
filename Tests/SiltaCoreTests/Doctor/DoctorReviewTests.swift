@@ -86,7 +86,7 @@ struct DoctorReviewTests {
       #expect(
         ids.isSuperset(of: [
           "install.path", "install.hook", "install.skill", "install.codex_root",
-          "install.codex_marker", "index.integrity", "index.foreign_keys", "index.schema",
+          "install.codex.instructions", "index.integrity", "index.foreign_keys", "index.schema",
           "index.fts", "index.age",
         ]))
     }
