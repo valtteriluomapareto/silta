@@ -260,6 +260,7 @@ extension DogfoodLogTests {
     [
       (["--ws", "acme", "export", "--to", "exports"], "acme"),
       (["--ws", "acme", "restore", "exports/acme", "--dry-run"], "acme"),
+      (["--ws", "acme", "backup"], nil),
     ]
   }
 
