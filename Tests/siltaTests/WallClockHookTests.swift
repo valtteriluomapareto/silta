@@ -42,6 +42,22 @@ struct WallClockHookTests {
     }
   }
 
+  @Test func hookPreservesShortAskPolicyAtMinimumBudget() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try brief.settings(#"{"ask_about":"short"}"#, scratch)
+      let flags = ["--budget", "1"]
+      let short = try run(flags + ["--short"], repo, scratch)
+      #expect(
+        short.stdout.contains(
+          "ask_about: short (ask only about what others see, deletes, irreversible steps, money)"))
+      #expect(try run(flags + ["--hook"], repo, scratch) == short)
+      let data = try fixture.data(run(flags + ["--hook", "--json"], repo, scratch))
+      #expect(data["settings"] as? [String: String] == ["ask_about": "short"])
+      #expect(try brief.hookTimeoutCount(scratch) == 0)
+    }
+  }
+
   /// The parallel suite skips this comparison when a busy machine trips the deadline;
   /// here the hook must finish in time.
   @Test func hookOutputMatchesTheShortBriefWithinTheDeadline() throws {

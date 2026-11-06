@@ -47,7 +47,7 @@ also needs `gh` 2.48 or later, for `gh api --slurp`.
    Don't start slice work on a new machine until this check passes.
 
 The workspace YAML sets no `proposals` setting (spec §8, D39), so the default
-applies. `ask_about` waits for S13. Add either only after the maintainer chooses it;
+applies. `ask_about` also defaults to `standard`. Add either only after the maintainer chooses it;
 `ws edit` is human-only. The import does not apply those policies itself.
 
 ## Work a slice

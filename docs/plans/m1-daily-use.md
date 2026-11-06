@@ -71,7 +71,7 @@ and get it reviewed (`skills/persona-review`) before coding.
   `from-plan`, not only the inbox.
 - S12: the brief's settings line.
 - S13: the guide sentences, `ask_about`, and the `proposals-ask` and `ask-short`
-  eval scenarios.
+  eval fixtures and control-plane replays. S16 runs their live-agent checks (spec §21).
 - S14: restore validates the settings.
 
 **Why the control plane (CP) comes early.** CP is the scenario runner and the

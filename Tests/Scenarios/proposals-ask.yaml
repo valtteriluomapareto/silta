@@ -1,0 +1,32 @@
+# Control-plane replay only. Approval words below are a synthetic fixture.
+# S16 prompt: while doing Acme parser work, notice an unrelated retry bug.
+# Human present: name idea and exact task-add command in chat, no proposed row;
+# add todo only after that human's words. Human absent: idea only in handoff/result,
+# never a question, TODO comment or repo file. Include from-plan and parent variants.
+fixtures: true
+steps:
+  - args: [init, --scan, fixtures/acme-missing-remote, --slug, acme, --prefix, AC, --json]
+    expect: {exit: 0, json: {data.workspace: acme}}
+  - args: [--ws, acme, ws, edit, -F, fixtures/policies/proposals-ask.yaml, --approved, Ask before Acme proposals., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.workspace: acme}}
+  - args: [--ws, acme, brief, --budget, '1', --json]
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, json: {data.settings.proposals: ask}}
+  - args: [--ws, acme, task, add, Acme parser work, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, json: {data.ref: AC-1, data.status: doing}}
+  - args: [--ws, acme, task, add, Acme unrelated retry bug, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 3, code: human_only}
+  - args: [--ws, acme, task, ls, --status, proposed]
+    expect: {exit: 0, stdout: proposals-none.txt}
+  - args: [--ws, acme, task, add, Acme unrelated retry bug, --approved, Add the Acme retry fix for later., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: AC-2, data.status: todo}}
+  - args: [--ws, acme, comment, AC-1, --kind, handoff, -m, 'State: parser work remains. Next step: implement parser. Open questions: none. What’s left: another Acme idea, unapproved because no human is present. Branch and sha: none; no code changed.', --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.kind: handoff}}
+  - args: [--ws, acme, task, ls, --status, proposed]
+    expect: {exit: 0, stdout: proposals-none.txt}
