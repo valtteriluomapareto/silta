@@ -59,13 +59,12 @@ struct AgentInstallRoundTwoTests {
   @Test(arguments: [0, 1], [".codex/AGENTS.md", ".claude/CLAUDE.md", ".codex/config.toml"])
   func renderedUTF8BoundaryRoundTripsOrRefuses(excess: Int, path: String) throws {
     try withScratchDirectory { scratch in
-      let selection = path.hasPrefix(".codex") ? "--codex" : "--claude"
       try AgentsInstallTests.write("", path, in: scratch)
       #expect(
-        try AgentsInstallTests.apply(["install", selection], in: scratch).termination == .exit(0))
+        try AgentsInstallTests.apply(["install"], in: scratch).termination == .exit(0))
       let overhead = try AgentsInstallTests.read(path, in: scratch).utf8.count
       #expect(
-        try AgentsInstallTests.apply(["uninstall", selection], in: scratch).termination == .exit(0))
+        try AgentsInstallTests.apply(["uninstall"], in: scratch).termination == .exit(0))
       let commentBytes = path.hasSuffix(".toml") ? 2 : 0
       let bytes = Self.limit - overhead + excess - commentBytes
       let padding = String(repeating: "é", count: bytes / 2) + (bytes % 2 == 0 ? "" : "A")
@@ -82,7 +81,13 @@ struct AgentInstallRoundTwoTests {
           try AgentsInstallTests.data(AgentsInstallTests.run(["install", "--json"], in: scratch))[
             "changes"] as? [[String: String]] == [])
         #expect(try AgentsInstallTests.apply(["uninstall"], in: scratch).termination == .exit(0))
-        #expect(try Self.snapshot(scratch) == before)
+        var expected = before
+        if path == ".codex/config.toml", let state = before[path] {
+          expected[path] = FileState(
+            bytes: Data((original + Self.table + "writable_roots = []\n").utf8),
+            metadata: state.metadata)
+        }
+        #expect(try Self.snapshot(scratch) == expected)
       }
     }
   }
@@ -119,7 +124,7 @@ struct AgentInstallRoundTwoTests {
   func userTableUpdateShowsOnlyOwnedChanges(json: Bool) throws {
     try withScratchDirectory { scratch in
       let original = try Self.userTable(in: scratch)
-      let root = scratch.resolvingSymlinksInPath().appending(path: "silta-home").path
+      let root = scratch.appending(path: "silta-home").path
       let moved = ["SILTA_HOME": root + "/relocated"]
       let result = try AgentsInstallTests.run(
         ["install", "--codex"] + (json ? ["--json"] : []), in: scratch, environment: moved)
@@ -137,24 +142,23 @@ struct AgentInstallRoundTwoTests {
           ["install", "--codex", "--apply", token], in: scratch, environment: moved
         ).termination == .exit(0))
       let updated = try AgentsInstallTests.read(".codex/config.toml", in: scratch)
-      let expected = original.replacingOccurrences(of: root, with: root + "/relocated")
-      let normalize: (String) -> String = {
-        $0.replacingOccurrences(
-          of: #"# silta:begin [0-9a-f]{64}:"#, with: "# silta:begin <digest>:",
-          options: .regularExpression)
-      }
-      #expect(normalize(updated) == normalize(expected))
+      let expected = original.replacingOccurrences(
+        of: "[\"" + root + "\"]", with: "[\"" + root + "\", \"" + root + "/relocated\"]")
+      #expect(Data(updated.utf8) == Data(expected.utf8))
     }
   }
 
   @Test(arguments: ["install", "uninstall"])
-  func changedUserTableScopeRefusesBeforeWrites(operation: String) throws {
+  func identicalValueInAnotherTableIsNotOwned(operation: String) throws {
     try withScratchDirectory { scratch in
-      let original = try Self.userTable(in: scratch)
-      let changed = original.replacingOccurrences(
-        of: Self.table, with: Self.table + "[private_scope]\n")
-      try AgentsInstallTests.write(changed, ".codex/config.toml", in: scratch)
-      try Self.refusesWithoutWrites([operation], in: scratch, reason: "edited or ambiguous")
+      let root = try AgentValueGrantTests.quoted(AgentValueGrantTests.root(scratch))
+      let original = "[private_scope]\nwritable_roots = [\(root)]\n"
+      try AgentsInstallTests.write(original, ".codex/config.toml", in: scratch)
+      #expect(
+        try AgentsInstallTests.apply([operation, "--codex"], in: scratch).termination == .exit(0))
+      let expected =
+        operation == "install" ? original + Self.table + "writable_roots = [\(root)]\n" : original
+      #expect(try AgentValueGrantTests.bytes(scratch) == Data(expected.utf8))
     }
   }
 }

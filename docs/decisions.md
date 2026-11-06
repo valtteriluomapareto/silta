@@ -606,6 +606,15 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     nonpreservable ownership and inheritable parent ACLs refuse before writes.
     OS-managed provenance is not treated as access permissions. Supported uid/gid
     and POSIX modes bind confirmation. Public configuration diffs come only from
-    validated ownership spans, independently of placement, and an owned TOML table
-    retains its offset. Namespace validation stays a documented conservative subset
-    rather than adding a general TOML parser dependency.
+    owned content, independently of placement: sealed Markdown spans and the selected
+    Codex path element. Markdown blocks retain their offsets. TOML editing stays
+    narrowly bounded rather than adding a general parser dependency.
+  - ↳ 2026-11-06: The effective `SILTA_HOME` path value in
+    `[sandbox_workspace_write].writable_roots` is the Codex ownership marker.
+    Install adds it once and uninstall removes only its exact decoded UTF-8 value;
+    other roots and foreign bytes stay intact. No TOML markers, authenticated
+    prefixes, migration or ownership store are used. Empty containers remain because
+    their creation cannot be proven from a value marker. Unsupported shapes receive
+    a manual add/remove-element instruction that retains existing entries; foreign
+    quoted keys are not decoded. This avoids depending on where Codex's TOML editor
+    places trailing comments and keeps independent roots when `SILTA_HOME` changes.
