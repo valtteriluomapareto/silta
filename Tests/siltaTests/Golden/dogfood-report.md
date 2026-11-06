@@ -38,6 +38,7 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 
 - `silta agents install`
 - `silta agents uninstall`
+- `silta backup`
 - `silta brief`
 - `silta code grep`
 - `silta code log`

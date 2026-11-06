@@ -211,6 +211,11 @@ extension ExportError: ErrorExamples {
       .otherWorkspace(tree: "acme", given: "beta", directory: "/tmp/acme-notes/acme"),
       .restoreConflict("workspace beta already has the tree's task prefix"),
       .manifestChanged(approved: "a1b2c3d4e5f6", directory: "/tmp/acme-notes/acme"),
+      .notWorkTree(root: "/tmp/acme-notes"),
+      .busy,
+      .gitFailed(root: "/tmp/acme-notes", workspace: "acme"),
+      .publicationUnconfirmed(
+        path: "/tmp/acme-notes/acme", kept: "/tmp/acme-notes/.acme.export-abc123"),
       .previousKept(
         path: "/tmp/acme-notes/.acme.export-abc123/previous", target: "/tmp/acme-notes/acme",
         workspace: "acme"),
@@ -232,6 +237,15 @@ extension ExportFailure: ErrorExamples {
   }
 }
 
+extension ExportGitFailure: ErrorExamples {
+  static var examples: [ExportGitFailure] {
+    [
+      ExportGitFailure(
+        failure: .gitFailed(root: "/tmp/acme-notes", workspace: "acme"), warnings: [])
+    ]
+  }
+}
+
 /// Proves every `ErrorCode` is produced by some error type (spec §16, D22).
 ///
 /// This shows each code is *mapped* by a registered type's examples, not that a
@@ -244,7 +258,7 @@ struct ErrorReachabilityTests {
     ScanError.self, CommentError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,
-    ExportError.self, ExportFailure.self,
+    ExportError.self, ExportFailure.self, ExportGitFailure.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
