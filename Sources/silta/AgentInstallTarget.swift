@@ -39,7 +39,7 @@ struct AgentInstallTarget {
       let encoded = String(data: try encoder.encode(root), encoding: .utf8) ?? ""
       targets += [
         Self(path: ".codex/AGENTS.md", body: instructions, whole: false),
-        Self(path: ".codex/config.toml", body: "writable_roots = [\(encoded)]\n", whole: false),
+        Self(path: ".codex/config.toml", body: encoded, whole: false),
       ]
     }
     return targets
@@ -49,10 +49,14 @@ struct AgentInstallTarget {
     _ before: String, _ after: String, refusal: () throws -> Never
   ) throws -> String {
     if whole { return AgentInstallPlan.difference(before, after) }
+    if path.hasSuffix(".toml") {
+      let sign = before.utf8.count < after.utf8.count ? "+" : "-"
+      return "\(sign)sandbox_workspace_write.writable_roots \(sign)= \(body)"
+    }
     let old = try AgentOwnedBlock(
-      before, toml: path.hasSuffix(".toml"), existed: !before.isEmpty, refusal: refusal)
+      before, existed: !before.isEmpty, refusal: refusal)
     let new = try AgentOwnedBlock(
-      after, toml: path.hasSuffix(".toml"), existed: !after.isEmpty, refusal: refusal)
+      after, existed: !after.isEmpty, refusal: refusal)
     return AgentInstallPlan.difference(old.span, new.span)
   }
 
@@ -64,16 +68,29 @@ struct AgentInstallTarget {
         original, existed: existed, uninstall: uninstall, stop: stopHook,
         refusal: refusal)
     }
+    if path.hasSuffix(".toml") {
+      return try AgentTOML.replace(original, value: body, uninstall: uninstall, refusal: refusal)
+    }
     var text = original
     if whole {
       guard text.isEmpty || text.hasPrefix(Self.frontmatter) else { try refusal() }
       text = text.isEmpty ? "" : String(text.dropFirst(Self.frontmatter.count))
     }
     let block = try AgentOwnedBlock(
-      text, toml: path.hasSuffix(".toml"), existed: existed, refusal: refusal)
+      text, existed: existed, refusal: refusal)
     if whole, !original.isEmpty, !block.owned { try refusal() }
     if whole, !block.outside.isEmpty { try refusal() }
     if uninstall { return block.outside }
-    return (whole ? Self.frontmatter : "") + (try block.render(body, refusal: refusal))
+    return (whole ? Self.frontmatter : "") + block.render(body)
+  }
+
+  func refusalReason(uninstall: Bool) -> String {
+    guard path.hasSuffix(".toml") else { return "edited or ambiguous ownership/configuration" }
+    let location = "[sandbox_workspace_write].writable_roots"
+    let action =
+      uninstall
+      ? "remove only \(body) from \(location) yourself; retain all other entries"
+      : "retain all other entries and add \(body) to \(location); if the key is absent, add this line yourself: writable_roots = [\(body)]"
+    return "unsupported or ambiguous TOML; " + action
   }
 }

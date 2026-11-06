@@ -76,7 +76,7 @@ struct AgentsInstallTests {
     }
   }
 
-  @Test func ownershipSurvivesRelocationAndRefusesEdits() throws {
+  @Test func markdownOwnershipSurvivesRelocationAndRefusesEdits() throws {
     try withScratchDirectory { scratch in
       #expect(try Self.apply(["install", "--codex"], in: scratch).termination == .exit(0))
       let config = try Self.read(".codex/config.toml", in: scratch)
@@ -128,7 +128,7 @@ struct AgentsInstallTests {
         try Self.write("<!-- silta:begin broken -->\n", ".codex/AGENTS.md", in: scratch)
       case "roots":
         try Self.write(
-          "[sandbox_workspace_write]\nwritable_roots = [\"/acme\"]\n", ".codex/config.toml",
+          "[sandbox_workspace_write]\nwritable_roots = [1]\n", ".codex/config.toml",
           in: scratch)
       default: env["CODEX_HOME"] = scratch.path
       }
@@ -164,7 +164,9 @@ struct AgentsInstallTests {
         atPath: scratch.appending(path: "home/.codex/config.toml").path)
       #expect((attrs[.posixPermissions] as? NSNumber)?.intValue == 0o640)
       #expect(try Self.apply(["uninstall", "--codex"], in: scratch).termination == .exit(0))
-      #expect(try Self.read(".codex/config.toml", in: scratch) == original)
+      #expect(
+        try Self.read(".codex/config.toml", in: scratch) == original + AgentValueGrantTests.table
+          + "writable_roots = []\n")
     }
   }
 
@@ -206,7 +208,7 @@ struct AgentsInstallTests {
       #expect(try Self.read(".codex/AGENTS.md", in: scratch).isEmpty)
       #expect(
         try Self.read(".codex/config.toml", in: scratch)
-          == "[sandbox_workspace_write]\nnetwork_access = false\n")
+          == "[sandbox_workspace_write]\nnetwork_access = false\nwritable_roots = []\n")
       #expect(
         try Self.data(Self.run(["uninstall", "--json"], in: scratch))["changes"]
           as? [[String: String]] == [])
@@ -227,8 +229,8 @@ struct AgentsInstallTests {
         let diff = try #require(change["diff"])
         let bytes = diff.components(separatedBy: "\n").map { String($0.dropFirst()) }.joined(
           separator: "\n")
-        #expect(try Self.read(path, in: scratch) == bytes)
         if path == ".codex/AGENTS.md" {
+          #expect(try Self.read(path, in: scratch) == bytes)
           Golden.forTests().check(
             diff.replacingOccurrences(
               of: #"[0-9a-f]{64}"#, with: "<digest>", options: .regularExpression) + "\n",
@@ -249,16 +251,12 @@ struct AgentsInstallTests {
 }
 
 extension AgentsInstallTests {
-  @Test(arguments: ["origin", "table-tail"])
-  func editedOwnershipAndTableScopeRefuse(kind: String) throws {
+  @Test func editedMarkdownOwnershipRefuses() throws {
     try withScratchDirectory { scratch in
       #expect(try Self.apply(["install", "--codex"], in: scratch).termination == .exit(0))
-      let path = kind == "origin" ? ".codex/AGENTS.md" : ".codex/config.toml"
+      let path = ".codex/AGENTS.md"
       let original = try Self.read(path, in: scratch)
-      let edited =
-        kind == "origin"
-        ? original.replacingOccurrences(of: ":new", with: ":keep")
-        : original + "network_access = true\n"
+      let edited = original.replacingOccurrences(of: ":new", with: ":keep")
       try Self.write(edited, path, in: scratch)
       #expect(
         try Self.run(["uninstall", "--codex", "--json"], in: scratch).termination == .exit(6))

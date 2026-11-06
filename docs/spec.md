@@ -1080,8 +1080,9 @@ silta code ls   <app>[@<ref>] [<dir>]
 
 ### `silta agents install`
 
-Writes idempotent, content-hashed ownership blocks. Preview is the default (also
-`--dry-run`), with only the changed spans, target paths and a confirmation token;
+Writes idempotent, content-hashed Markdown blocks and a value-owned Codex grant.
+Preview is the default (also `--dry-run`), showing only owned edits, target paths
+and a confirmation token;
 unrelated configuration is omitted. `--apply <token>` confirms that exact preview
 without a TTY prompt. Changes to source bytes, file modes, target selection or paths
 invalidate the token (`conflict`, exit 6); run the same preview again. Never combine
@@ -1091,8 +1092,15 @@ Default selection is Claude and Codex. `--claude` or `--codex` restricts both in
 and uninstall; unselected paths are never inspected. The shared Claude skill starts
 with YAML name/description frontmatter and contains the versioned `silta guide`.
 Uninstall removes only unedited ownership, retaining unrelated Markdown/TOML bytes,
-JSON values, permissions and empty user files. Ownership remains recognizable if
-`SILTA_HOME` changes.
+JSON values, permissions and empty user files. Markdown ownership remains recognizable
+if `SILTA_HOME` changes. In Codex's `[sandbox_workspace_write].writable_roots`, only
+the exact decoded UTF-8 path value of effective `SILTA_HOME` is owned. Install adds
+it once; an existing single occurrence is a no-op. Uninstall removes that one
+string token and a necessary comma, retaining every other byte. Different
+`SILTA_HOME` values are independent grants; Silta never removes a previous root
+implicitly. Empty keys, tables and files remain because value ownership provides
+no proof that Silta created their containers. There are no TOML ownership comments
+or separate ownership records.
 Edited/malformed blocks, ambiguous Codex configuration, symlinks under HOME,
 nonregular/multiply linked files and files over 1 MiB are refused before writes.
 Permission preservation uses refusal rather than copying security metadata: nonempty
@@ -1106,18 +1114,22 @@ preview refuses. OS-managed provenance is not copied or treated as access permis
 Targets come from explicit absolute `HOME`; a selected harness's nonmatching
 `CODEX_HOME` or `CLAUDE_CONFIG_DIR` is an `env` refusal before config reads. Unselected
 overrides are ignored. The Codex grant uses the
-effective `SILTA_HOME`. The conservative TOML editor supports bare single-line
-keys/tables and refuses existing user-owned writable-root definitions or ambiguous
-syntax. Supported values are JSON-compatible strings, finite numbers, booleans and
-arrays, and single-quoted literal strings; inline comments, dates, multiline values
-and inline tables are refused. Duplicate/conflicting names refuse across the
-complete document, including the owned table. Dotted assignments, arrays of tables
-and reopening an implicitly introduced parent table require manual integration. It never changes sandbox mode, trust or authentication. A human must inspect
-such refusals; there is no overwrite flag. Configuring a root does not prove it is
+effective `SILTA_HOME`. The bounded TOML editor locates only the canonical bare
+sandbox table and writable-roots key with a single-line JSON-compatible string
+array. Foreign single-line values and opaque Codex TUI/model-availability/project
+tables retain their exact bytes, including quoted model slugs and project paths;
+the editor does not decode their keys. Duplicate matching roots, duplicate raw
+definitions, escaped/quoted target aliases, dotted assignments, multiline values,
+inline tables and unsupported shapes refuse before writes. The refusal tells the
+human to add/remove only the selected root and retain other entries; a line recipe
+is conditional on an absent key. It never changes sandbox mode, trust or
+authentication. There is no overwrite flag. Configuring a root does not prove it is
 effective in a managed harness (D42).
 
 Installers serialize with an advisory lock on HOME and preflight all selected
-targets. Public diffs are extracted from validated owned spans; unrelated text never becomes diff context. An owned TOML table retains its insertion offset.
+targets. Markdown diffs come from validated owned spans; Codex diffs show only the
+selected root's element delta. Unrelated text and foreign root values never become
+diff context. Markdown blocks retain their insertion offsets.
 Each file replacement is atomic; multiple replacements are not one
 transaction. An I/O failure names the failing target/cause and completed paths, asks
 the human to inspect permissions/structure, then offers a fresh preview/retry;

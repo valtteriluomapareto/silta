@@ -5,26 +5,21 @@ struct AgentOwnedBlock {
   let outside: String
   let owned: Bool
   let span: String
-  private let ownsTable: Bool
   private let origin: String
   private let start: String
   private let end: String
   private let seal: String
-  private let toml: Bool
   private let offset: Int
 
-  init(_ original: String, toml: Bool, existed: Bool, refusal: () throws -> Never) throws {
-    self.toml = toml
-    if toml, !AgentTOML.acceptsDocument(original) { try refusal() }
-    start = toml ? "\n# silta:begin " : "\n<!-- silta:begin "
-    end = toml ? "# silta:end\n" : "<!-- silta:end -->\n"
-    seal = toml ? "\n" : " -->\n"
+  init(_ original: String, existed: Bool, refusal: () throws -> Never) throws {
+    start = "\n<!-- silta:begin "
+    end = "<!-- silta:end -->\n"
+    seal = " -->\n"
     var text = original
     var origin = existed ? "keep" : "new"
     var offset = text.count
     var hadOwnership = false
     var span = ""
-    var ownsTable = false
     if let begin = text.range(of: start), let finish = text.range(of: end),
       begin.upperBound < finish.lowerBound,
       let header = text.range(of: seal, range: begin.upperBound..<finish.lowerBound)
@@ -35,12 +30,6 @@ struct AgentOwnedBlock {
       origin = String(fields[1])
       guard AgentInstallPlan.hash(Data((origin + ":" + owned).utf8)) == fields[0] else {
         try refusal()
-      }
-      ownsTable = toml && owned.hasPrefix("[sandbox_workspace_write]\n")
-      if ownsTable {
-        try Self.validateTableTail(String(text[finish.upperBound...]), refusal: refusal)
-      } else if toml {
-        try Self.validateGrantScope(String(text[..<begin.lowerBound]), refusal: refusal)
       }
       span = String(text[begin.lowerBound..<finish.upperBound])
       offset = text.distance(from: text.startIndex, to: begin.lowerBound)
@@ -53,75 +42,15 @@ struct AgentOwnedBlock {
     self.offset = offset
     self.owned = hadOwnership
     self.span = span
-    self.ownsTable = ownsTable
   }
 
-  func render(_ body: String, refusal: () throws -> Never) throws -> String {
+  func render(_ body: String) -> String {
     var text = outside
-    var insertion = text.index(text.startIndex, offsetBy: offset)
-    var content = body
-    if toml {
-      let tableEnd = try tomlTableEnd(refusal: refusal)
-      if ownsTable {
-        guard tableEnd == nil else { try refusal() }
-        content = "[sandbox_workspace_write]\n" + body
-      } else if let tableEnd {
-        if !owned { insertion = tableEnd }
-      } else {
-        insertion = text.endIndex
-        content = "[sandbox_workspace_write]\n" + body
-      }
-    }
+    let insertion = text.index(text.startIndex, offsetBy: offset)
     let block =
-      start + AgentInstallPlan.hash(Data((origin + ":" + content).utf8)) + ":" + origin
-      + seal + content + end
+      start + AgentInstallPlan.hash(Data((origin + ":" + body).utf8)) + ":" + origin
+      + seal + body + end
     text.insert(contentsOf: block, at: insertion)
     return text
-  }
-
-  private static func validateGrantScope(_ prefix: String, refusal: () throws -> Never) throws {
-    let section = prefix.components(separatedBy: "\n").map {
-      $0.trimmingCharacters(in: .whitespaces)
-    }.last { $0.hasPrefix("[") }
-    guard section == "[sandbox_workspace_write]" else { try refusal() }
-  }
-
-  private static func validateTableTail(_ tail: String, refusal: () throws -> Never) throws {
-    let first = tail.components(separatedBy: "\n").map {
-      $0.trimmingCharacters(in: .whitespaces)
-    }.first { !$0.isEmpty && !$0.hasPrefix("#") }
-    if let first, !first.hasPrefix("[") { try refusal() }
-  }
-
-  private func tomlTableEnd(refusal: () throws -> Never) throws -> String.Index? {
-    var position = outside.startIndex
-    var section: String?
-    var tableEnd: String.Index?
-    for line in outside.components(separatedBy: "\n") {
-      let text = line.trimmingCharacters(in: .whitespaces)
-      let next =
-        outside.index(position, offsetBy: line.count + 1, limitedBy: outside.endIndex)
-        ?? outside.endIndex
-      if !text.isEmpty, !text.hasPrefix("#") {
-        try Self.validateTOMLLine(text, refusal: refusal)
-        if text.hasPrefix("[") {
-          section = text
-          if section == "[sandbox_workspace_write]" {
-            guard tableEnd == nil else { try refusal() }
-            tableEnd = next
-          }
-        } else if section == "[sandbox_workspace_write]", text.hasPrefix("writable_roots") {
-          try refusal()
-        }
-      }
-      position = next
-    }
-    return tableEnd
-  }
-
-  private static func validateTOMLLine(_ text: String, refusal: () throws -> Never) throws {
-    guard AgentTOML.accepts(text),
-      !text.contains("sandbox_workspace_write") || text == "[sandbox_workspace_write]"
-    else { try refusal() }
   }
 }

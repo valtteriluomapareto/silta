@@ -45,7 +45,7 @@ struct AgentInstallPrivacyTests {
       Self.check(try AgentsInstallTests.run(["install"] + flags, in: scratch))
       Self.check(try AgentsInstallTests.run(["install", "--dry-run"] + flags, in: scratch))
       Self.check(try AgentsInstallTests.run(["install", "--help"] + flags, in: scratch))
-      let root = scratch.resolvingSymlinksInPath().appending(path: "silta-home").path
+      let root = scratch.appending(path: "silta-home").path
       let movedRoot = root + "/relocated"
       let moved = ["SILTA_HOME": movedRoot]
       let preview = try AgentsInstallTests.run(
@@ -66,13 +66,9 @@ struct AgentInstallPrivacyTests {
         try AgentsInstallTests.run(
           ["install", "--apply", token] + flags, in: scratch, environment: moved))
       let updated = try AgentsInstallTests.read(".codex/config.toml", in: scratch)
-      let expected = original.replacingOccurrences(of: root, with: movedRoot)
-      let normalize: (String) -> String = {
-        $0.replacingOccurrences(
-          of: #"# silta:begin [0-9a-f]{64}:"#,
-          with: "# silta:begin <digest>:", options: .regularExpression)
-      }
-      #expect(normalize(updated) == normalize(expected))
+      let expected = original.replacingOccurrences(
+        of: "[\"" + root + "\"]", with: "[\"" + root + "\", \"" + movedRoot + "\"]")
+      #expect(Data(updated.utf8) == Data(expected.utf8))
       let remove = try AgentsInstallTests.run(["uninstall", "--json"], in: scratch)
       Self.check(remove)
       let removalToken = try #require(try AgentsInstallTests.data(remove)["token"] as? String)

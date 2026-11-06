@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import SiltaCore
 
-/// Owns only authenticated blocks, leaving every byte outside them intact.
+/// Plans owned edits while binding confirmation to every source and rendered byte.
 struct AgentInstallPlan {
   struct Edit {
     let path: String
@@ -27,7 +27,7 @@ struct AgentInstallPlan {
       let old = String(data: before ?? Data(), encoding: .utf8) ?? ""
       let after = try target.replace(
         old, existed: before != nil, uninstall: uninstall,
-        refusal: { throw files.refusal(path, "edited or ambiguous ownership/configuration") })
+        refusal: { throw files.refusal(path, target.refusalReason(uninstall: uninstall)) })
       guard after.utf8.count <= AgentInstallFiles.maximumBytes else {
         throw files.refusal(path, "rendered file exceeds the 1 MiB readable limit")
       }
@@ -42,8 +42,8 @@ struct AgentInstallPlan {
           ? try AgentHookSettings.diff(old, after)
           : try target.previewDiff(
             old, after,
-            refusal: { throw files.refusal(path, "edited or ambiguous ownership/configuration") })
-        let keepEmpty = old.contains(":keep" + (path.hasSuffix(".toml") ? "\n" : " -->\n"))
+            refusal: { throw files.refusal(path, target.refusalReason(uninstall: uninstall)) })
+        let keepEmpty = old.contains(":keep -->\n")
         edits.append(
           Edit(
             path: path, before: before,
