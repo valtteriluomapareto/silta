@@ -1090,7 +1090,8 @@ invalidate the token (`conflict`, exit 6); run the same preview again. Never com
 
 Default selection is Claude and Codex. `--claude` or `--codex` restricts both install
 and uninstall; unselected paths are never inspected. The shared Claude skill starts
-with YAML name/description frontmatter and contains the versioned `silta guide`.
+with YAML name/description frontmatter and holds a short stub that points at
+`silta guide`, so a binary upgrade never leaves the skill stale.
 Uninstall removes only unedited ownership, retaining unrelated Markdown/TOML bytes,
 JSON values, permissions and empty user files. Markdown ownership remains recognizable
 if `SILTA_HOME` changes. In Codex's `[sandbox_workspace_write].writable_roots`, only
@@ -1138,7 +1139,7 @@ the installer lock. Hook runtime must be installed before settings that referenc
 
 | Target | Content |
 |---|---|
-| `~/.claude/skills/silta/SKILL.md` | The skill (outline below). OpenCode reads it too unless it's disabled. |
+| `~/.claude/skills/silta/SKILL.md` | The skill: when to use Silta, `silta guide`/`silta guide <topic>` for the current rules, and `silta brief` at session start. OpenCode reads it too unless it's disabled. |
 | `~/.claude/CLAUDE.md` block | 5 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
 | Claude Code **SessionStart hook** (`--hook`) | `silta agents session-start` consumes hook JSON, exports `SILTA_SESSION`, then runs the short bounded brief; silent if unregistered or on error. |
 | Claude Code **Stop hook** (`--stop-hook`; D42, live run unverified) | `silta agents stop` consumes hook JSON and asks for handoff on fresh own claims with writes since handoff; loop continuations skip |
@@ -1202,8 +1203,9 @@ attribution. Live continuation behavior remains unverified; follow the
 
 ### `silta guide`
 
-The full agent manual, printed by the binary and versioned with it, so Codex,
-OpenCode and others get the same text as the skill. `silta guide <topic>` prints one
+The full agent manual, printed by the binary and versioned with it. The installed
+skill points at it instead of copying it, and Codex's block does the same, so every
+harness reads the rules the binary ships. `silta guide <topic>` prints one
 section. Topics are `when`, `start`, `recipes`, `human`, `questions`, `blocked`,
 `handoff`, `reviews`, `refusals`, `refs` and `output`, also listed in `guide --help`.
 Topic names match exactly (case-sensitive). An unknown topic returns `invalid`,

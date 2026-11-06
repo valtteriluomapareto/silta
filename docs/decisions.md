@@ -424,7 +424,7 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
       never cuts that line.
     - `brief --json` always has a `settings` object, which is empty when everything
       is the default.
-    - `silta guide`, and the skill that copies it, stay the same in every workspace.
+    - `silta guide`, and the skill that points at it, stay the same in every workspace.
       Each non-default value gets one conditional sentence there. A guide that
       varied per workspace would need storage and location resolution, and the
       static skill couldn't follow it.

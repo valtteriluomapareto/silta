@@ -261,10 +261,6 @@ private struct GuideManual: Encodable, Sendable {
 }
 
 extension GuideCommand {
-  static func manual() -> String {
-    render(sections)
-  }
-
   private static func render(_ selected: [Section]) -> String {
     selected.map { section in
       section.text

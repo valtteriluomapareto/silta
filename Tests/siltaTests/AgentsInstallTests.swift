@@ -60,14 +60,18 @@ struct AgentsInstallTests {
     }
   }
 
-  @Test func selectionAndSkillParity() throws {
+  @Test func selectionAndSkillStub() throws {
     try withScratchDirectory { scratch in
       try Self.write("Acme poison", ".codex/config.toml", in: scratch)
       #expect(try Self.apply(["install", "--claude"], in: scratch).termination == .exit(0))
       let skill = try Self.read(".claude/skills/silta/SKILL.md", in: scratch)
-      #expect(skill.hasPrefix("---\nname: silta\ndescription:"))
+      #expect(skill.hasPrefix(AgentInstallSkillStubTests.frontmatter))
+      Golden.forTests().check(skill, "agents-install-skill.md")
       let guide = try SiltaBinary.run(["guide"], in: scratch)
-      #expect(skill.contains(guide.stdout))
+      #expect(!skill.contains(guide.stdout))
+      #expect(!skill.contains("# Recipes"))
+      #expect(skill.contains("`silta guide <topic>`"))
+      #expect(skill.contains("`silta brief` at session start"))
       #expect(try Self.read(".codex/config.toml", in: scratch) == "Acme poison")
       #expect(try Self.apply(["uninstall", "--claude"], in: scratch).termination == .exit(0))
       #expect(
