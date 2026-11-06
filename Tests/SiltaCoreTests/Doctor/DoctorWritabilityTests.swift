@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import SiltaTestSupport
 import Testing
@@ -5,6 +6,12 @@ import Testing
 @testable import SiltaCore
 
 struct DoctorWritabilityTests {
+  private func permissions(_ file: FileHandle) throws -> mode_t {
+    var info = stat()
+    try #require(fstat(file.fileDescriptor, &info) == 0)
+    return info.st_mode & 0o7777
+  }
+
   private func inspect(_ home: URL) async -> DoctorReport {
     await DoctorService.inspect(
       store: StorageSchemaTests.store(home), home: home,
@@ -23,6 +30,8 @@ struct DoctorWritabilityTests {
       try store.initialize()
       let file = URL(filePath: store.path)
       let before = try Data(contentsOf: file)
+      let handle = try FileHandle(forReadingFrom: file)
+      defer { try? handle.close() }  // best-effort fixture cleanup
       let target = kind == "file" ? file : home
       let mode = kind == "file" ? 0o400 : kind == "directory-write" ? 0o500 : 0o600
       try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: target.path)
@@ -34,7 +43,14 @@ struct DoctorWritabilityTests {
         kind == "directory-search"
           ? !FileManager.default.isExecutableFile(atPath: home.path)
           : !FileManager.default.isWritableFile(atPath: target.path))
+      let fileMode = try permissions(handle)
+      let directoryMode = try #require(
+        FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber)
       let report = await inspect(home)
+      #expect(try permissions(handle) == fileMode)
+      #expect(
+        try FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber
+          == directoryMode)
       let check = try #require(report.checks.first { $0.id == "database.writable" })
       #expect(check.status == .fail)
       #expect(check.nextBy == .human)

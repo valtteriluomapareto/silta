@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import SiltaTestSupport
 import Testing
@@ -6,6 +7,12 @@ import Testing
 struct DoctorWritabilityCommandTests {
   private let environment = ["SILTA_NOW": "2023-11-14T22:13:20.000Z"]
 
+  private func permissions(_ file: FileHandle) throws -> mode_t {
+    var info = stat()
+    try #require(fstat(file.fileDescriptor, &info) == 0)
+    return info.st_mode & 0o7777
+  }
+
   @Test(arguments: ["file", "directory-write", "directory-search"])
   func deniedAccessReturnsEnvironmentFailure(kind: String) throws {
     try withScratchDirectory { scratch in
@@ -13,6 +20,8 @@ struct DoctorWritabilityCommandTests {
         SiltaBinary.run(["init"], in: scratch, environment: environment).termination == .exit(0))
       let home = scratch.appending(path: "silta-home")
       let file = home.appending(path: "silta.db")
+      let handle = try FileHandle(forReadingFrom: file)
+      defer { try? handle.close() }  // best-effort fixture cleanup
       let target = kind == "file" ? file : home
       try FileManager.default.setAttributes(
         [.posixPermissions: kind == "file" ? 0o400 : kind == "directory-write" ? 0o500 : 0o600],
@@ -25,8 +34,15 @@ struct DoctorWritabilityCommandTests {
         kind == "directory-search"
           ? !FileManager.default.isExecutableFile(atPath: target.path)
           : !FileManager.default.isWritableFile(atPath: target.path))
+      let fileMode = try permissions(handle)
+      let directoryMode = try #require(
+        FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber)
       let result = try SiltaBinary.run(
         ["doctor", "--json"], in: scratch, environment: environment)
+      #expect(try permissions(handle) == fileMode)
+      #expect(
+        try FileManager.default.attributesOfItem(atPath: home.path)[.posixPermissions] as? NSNumber
+          == directoryMode)
       #expect(result.termination == .exit(9))
       let json = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
