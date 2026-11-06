@@ -634,3 +634,13 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     that table intact, removed only the root, and left `writable_roots = []`.
     `doctor --install` passed every owned piece and matched the Codex baseline.
     OpenCode live discovery remains unverified.
+
+- **D43: Doctor diagnoses; existing explicit commands own recovery.**
+  `doctor` has no `--fix` option. Owned installation repair uses `agents install`
+  preview and its apply token; WAL remains observation-only with active-reader
+  inspection. Doctor never silently edits shell or harness files, initializes,
+  migrates, restores, fetches, clears claims or deletes overrides (spec §19).
+  `database.writable` adds a no-write permission preflight for the existing truth
+  file and its resolved parent directory, without promising subsequent SQLite
+  writes. Inaccessible paths fail with human-owned inspection instead of being
+  mistaken for missing storage and suggesting initialization.

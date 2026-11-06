@@ -2,6 +2,7 @@ fail: database.integrity: Database "<silta-home>/silta.db" is missing. Initializ
   ask human: silta init
 skipped: database.foreign_keys: Requires a readable, compatible database.
 skipped: database.schema: Requires a readable, compatible database.
+skipped: database.writable: Database is missing; write access cannot be checked.
 pass: database.wal: WAL is at most 64 MiB.
 pass: git.version: Git is available at /usr/bin/git.
 skipped: git.repos: Requires a readable, compatible database.
