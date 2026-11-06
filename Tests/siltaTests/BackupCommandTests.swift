@@ -1,0 +1,59 @@
+import Foundation
+import GRDB
+import SiltaCore
+import SiltaTestSupport
+import Testing
+
+@Suite(.timeLimit(.minutes(1)))
+struct BackupCommandTests {
+  static func run(_ scratch: URL) throws -> CLIResult {
+    try SiltaBinary.run(["backup", "--json"], in: scratch, environment: ExportCommandTests.environment)
+  }
+
+  static func path(_ result: CLIResult) throws -> String {
+    #expect(result.termination == .exit(0), "\(result.stdout)")
+    let json = try #require(try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+    let data = try #require(json["data"] as? [String: Any])
+    return try #require(data["path"] as? String)
+  }
+
+  static func check(_ path: String) throws {
+    let queue = try DatabaseQueue(path: path)
+    let values = try queue.read { db in
+      (try String.fetchOne(db, sql: "PRAGMA integrity_check"),
+       try String.fetchOne(db, sql: "SELECT title FROM task WHERE seq=1"))
+    }
+    #expect(values.0 == "ok")
+    #expect(values.1 == "0123: on #x")
+  }
+
+  @Test func independentRetentionAndDoctorDailyCoverage() throws {
+    try withScratchDirectory { scratch in
+      try ExportCommandTests.seed(scratch)
+      let directory = scratch.appending(path: "silta-home/backups")
+      let before = try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
+      var paths: Set<String> = []
+      for _ in 0..<9 { paths.insert(try Self.path(Self.run(scratch))) }
+      #expect(paths.count == 9)
+      let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+      #expect(names.filter { $0.contains("-manual-") && $0.hasSuffix(".db") }.count == 7)
+      for name in before { #expect(names.contains(name)) }
+      for name in names where name.contains("-manual-") { try Self.check(directory.appending(path: name).path) }
+      try FileManager.default.removeItem(at: directory.appending(path: "silta-2023-11-14.db"))
+      let doctor = try SiltaBinary.run(["doctor", "--json"], in: scratch, environment: ExportCommandTests.environment)
+      #expect(doctor.stdout.contains("The recorded daily backup is missing or invalid."))
+    }
+  }
+
+  @Test func concurrentRunsPublishDistinctCompleteSnapshots() async throws {
+    try await withScratchDirectory { scratch in
+      try ExportCommandTests.seed(scratch)
+      let paths = try await withThrowingTaskGroup(of: String.self) { group in
+        for _ in 0..<6 { group.addTask { try Self.path(Self.run(scratch)) } }
+        return try await group.reduce(into: [String]()) { $0.append($1) }
+      }
+      #expect(Set(paths).count == 6)
+      for path in paths { try Self.check(path) }
+    }
+  }
+}
