@@ -10,7 +10,9 @@ enum AgentHealthFiles {
     else {
       throw TaskError.input
     }
-    var directory = open(root, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+    let trimmed = root.reversed().drop(while: { $0 == "/" }).reversed()
+    let normalized = trimmed.isEmpty ? "/" : String(trimmed)
+    var directory = open(normalized, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
     if directory < 0, errno == ENOENT { return nil }
     guard directory >= 0 else { throw TaskError.input }
     defer { close(directory) }

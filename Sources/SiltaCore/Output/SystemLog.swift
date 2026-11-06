@@ -36,12 +36,7 @@ package final class SystemLog: Log {
 
   private func write(_ entry: LogEntry) throws {
     let record = try Self.prepared(entry)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    let url = directory.appending(path: record.name)
-    let descriptor = open(url.path, O_WRONLY | O_CREAT | O_APPEND, 0o600)
-    guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-    let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-    try handle.write(contentsOf: record.data)
+    try Self.append(directory: directory, name: record.name, data: record.data)
     try verbose?.write(contentsOf: record.data)
     // A health inspection appends its result without removing retained evidence.
     if entry.command != "silta doctor" { try prune(at: entry.timestamp) }

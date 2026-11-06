@@ -6,49 +6,49 @@ import Testing
 extension AgentHealthTests {
   @Test(arguments: ["malformed", "truncated", "future", "oversized"])
   func invalidEvidenceRecoveryPreservesThenQuarantinesTheDiagnosedLog(_ kind: String) throws {
-    withKnownIssue("SI-60/14: invalid evidence has no diagnosed-home recovery") {
-      try withScratchDirectory { scratch in
-        let env = try Self.setup(scratch)
-        let directory = scratch.appending(path: "silta-home/log")
-        let day = kind == "future" ? "2026-11-07" : "2026-11-06"
-        let file = directory.appending(path: day + ".jsonl")
-        let healthy = try Self.healthyHistory()
-        let bytes =
-          kind == "oversized"
-          ? Data(repeating: 65, count: 1_048_577)
-          : Data(
-            (kind == "malformed"
-              ? "{broken\n" + healthy : kind == "truncated" ? String(healthy.dropLast()) : healthy)
-              .utf8)
-        try bytes.write(to: file)
-        let check = try Self.check("install.claude.session", in: Self.checks(scratch, env))
-        #expect(check["status"] as? String == "warning")
-        #expect(check["next_by"] as? String == "human")
-        #expect((check["message"] as? String)?.contains(file.path) == true)
-        let next = try #require(check["next"] as? [String])
-        let backup = scratch.appending(path: "preserved-evidence")
-        let quarantine = scratch.appending(path: "quarantined-evidence")
-        let preserve = try #require(next.first { $0.contains("/bin/cp -pR") })
-        let move = try #require(next.first { $0.contains("/bin/mv") })
-        let retry = try #require(next.last)
-        #expect(retry.contains(scratch.appending(path: "silta-home").path))
-        #expect(retry.contains("silta doctor --install"))
-        for command in [
-          preserve.replacingOccurrences(of: "<new-backup-path>", with: backup.path),
-          move.replacingOccurrences(of: "<new-quarantine-path>", with: quarantine.path),
-        ] {
-          let result = try SiltaBinary.runProcess(
-            URL(filePath: "/bin/sh"), ["-c", command], in: scratch, environment: env)
-          #expect(result.termination == .exit(0), "\(result.stderr)")
-        }
-        #expect(try Data(contentsOf: backup).starts(with: bytes))
-        #expect(try Data(contentsOf: quarantine) == Data(contentsOf: backup))
-        try Self.logs(healthy, scratch)
-        let result = try SiltaBinary.runProcess(
-          URL(filePath: "/bin/sh"), ["-c", retry], in: scratch, environment: env)
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("pass: install.claude.session:"))
+    try withScratchDirectory { scratch in
+      let env = try Self.setup(scratch)
+      let directory = scratch.appending(path: "silta-home/log")
+      let day = kind == "future" ? "2026-11-07" : "2026-11-06"
+      let file = directory.appending(path: day + ".jsonl")
+      let healthy = try Self.healthyHistory()
+      let bytes =
+        kind == "oversized"
+        ? Data(repeating: 65, count: 1_048_577)
+        : Data(
+          (kind == "malformed"
+            ? "{broken\n" + healthy : kind == "truncated" ? String(healthy.dropLast()) : healthy)
+            .utf8)
+      try bytes.write(to: file)
+      let check = try Self.check("install.claude.session", in: Self.checks(scratch, env))
+      #expect(check["status"] as? String == "warning")
+      #expect(check["next_by"] as? String == "human")
+      #expect((check["message"] as? String)?.contains(file.path) == true)
+      let next = try #require(check["next"] as? [String])
+      let backup = scratch.appending(path: "preserved evidence")
+      let quarantine = scratch.appending(path: "quarantined evidence")
+      let preserve = try #require(next.first { $0.contains("/bin/cp -pR") })
+      let move = try #require(next.first { $0.contains("/bin/mv") })
+      let retry = try #require(next.last)
+      #expect(retry.contains(scratch.appending(path: "silta-home").path))
+      #expect(retry.contains("silta doctor --install"))
+      func run(_ command: String) throws -> CLIResult {
+        try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-c", command], in: scratch, environment: env)
       }
+      let preserved = try run(
+        preserve.replacingOccurrences(of: "<new-backup-path>", with: backup.path))
+      #expect(preserved.termination == .exit(0))
+      let inspected = try Data(contentsOf: backup)
+      #expect(inspected.starts(with: bytes))
+      let moved = try run(
+        move.replacingOccurrences(of: "<new-quarantine-path>", with: quarantine.path))
+      #expect(moved.termination == .exit(0))
+      #expect(try Data(contentsOf: quarantine) == inspected)
+      try Self.logs(healthy, scratch)
+      let result = try run(retry)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("pass: install.claude.session:"))
     }
   }
 
@@ -101,10 +101,8 @@ extension AgentHealthTests {
       let check = try Self.check("install.claude.session", in: Self.checks(scratch, env))
       #expect(check["status"] as? String == (over ? "warning" : "pass"))
       if over {
-        withKnownIssue("SI-60/14: retained file bound lacks its diagnosis") {
-          #expect((check["message"] as? String)?.contains("90-file limit") == true)
-          #expect((check["message"] as? String)?.contains(directory.path) == true)
-        }
+        #expect((check["message"] as? String)?.contains("90-file limit") == true)
+        #expect((check["message"] as? String)?.contains(directory.path) == true)
       }
     }
   }

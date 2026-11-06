@@ -1890,6 +1890,13 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     `SILTA_SESSION` equals the resolved actor's session. This boolean carries no
     environment values; hooks omit it because they synthesize the session.
     Legacy lines omit it and cannot prove propagation.
+  - Early hook failures, including input decoding and environment assembly, append
+    one body-free `env` / `hook_failed` attempt through the same exclusive completion
+    owner as successful hooks and timeouts. They retain quiet exit 0 and record elapsed
+    duration. Untrusted attribution uses an unknown actor; payloads and error bodies
+    are never recorded. A valid `stop_hook_active:true` is an intentional quiet skip,
+    not a failed attempt. An unresolvable data home or unsafe log destination cannot
+    receive a record; diagnostics remain best effort rather than choosing another home.
 
   `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
   `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`, `status` (logged as
@@ -1991,10 +1998,15 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   `install.*`, bypasses database access and git diagnostics, and leaves all existing
   home files byte-for-byte unchanged except appending its command log. Missing,
   corrupt or locked SQLite files do not prevent it. Broad doctor retains SQLite's
-  ordinary read-lock coordination, which can update WAL/SHM sidecars.
+  ordinary read-lock coordination, which can update WAL/SHM sidecars. Log append
+  traverses directories descriptor-relatively without following links and writes
+  only a regular file with one hardlink. Unsafe targets are skipped without pruning;
+  normal, early-failure and watchdog completion use the same append protection.
 
   Install checks honor `CLAUDE_CONFIG_DIR` and `CODEX_HOME` independently; OpenCode's
-  documented shared-skill path remains HOME/.claude/skills. Ownership is checked
+  documented shared-skill path remains HOME/.claude/skills. Configured roots lose
+  trailing separators before no-follow inspection, without resolving links.
+  Ownership is checked
   with the installer parsers and compared to current expected content. Missing or
   stale pieces warn, damaged ownership/unreadable files fail, and absent optional
   hooks are skipped. No content is repaired. Every non-pass install check has `next`.
@@ -2002,13 +2014,22 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   error codes and warnings prevent an exit-0 pass. Propagation requires an ordinary
   command after the latest successful SessionStart, in the same actor session, with
   `session_matches_actor:true`; its latest matching ordinary command wins. The newest
-  SessionStart/Stop record must also name that actor: a newer Stop without its own
+  SessionStart/Stop record must also be healthy and name that actor: a newer Stop without its own
   SessionStart cannot inherit an older session's positive evidence. Hook records
   with unexpected actor tools remain visible and cannot pass. Legacy,
   absent, future or incomplete evidence cannot pass. Equal timestamps use append
   order. Retained JSONL inspection is bounded to 90 files, 1 MiB each, 16 MiB total;
   unreadable/malformed/truncated evidence makes health unknown rather than reusing
-  an older success. No harness is launched, even for `--version`: recognized native
+  an older success. Inventory stops at the 91st retained-looking name, before parsing
+  files, and reports the 90-file bound even if that extra name would also fail date
+  validation. A valid 90-day window has at most 90 canonical daily names.
+  Invalid evidence reports the affected path or bound and human-owned recovery for
+  the diagnosed home: preserve to a chosen absent backup outside the log directory,
+  inspect that copy, explicitly decide whether to quarantine the offending evidence
+  to a chosen absent path, then rerun with the diagnosed `SILTA_HOME`. No evidence is
+  automatically repaired or moved. This recovery is distinct from live acceptance;
+  a fresh isolated harness run cannot clear damaged retained evidence in another home.
+  No harness is launched, even for `--version`: recognized native
   Claude `claude/versions/X` and Homebrew `Caskroom/codex/X/bin/codex` or
   `Cellar/opencode/X/bin/opencode` paths supply metadata-derived versions. Unsupported
   layouts and missing executables are unknown. Drift from D42 warns with human-owned
