@@ -58,6 +58,14 @@ class Acceptance(unittest.TestCase):
         report = json.loads((output / 'report.json').read_text())
         self.assertEqual(len(report['groups']), 12)
         self.assertTrue(all(g['pass_rate'] == 0 for g in report['groups']))
+        expected = {(harness, scenario, variant) for harness in ['claude', 'codex']
+                    for scenario in SCENARIOS
+                    for variant in json.loads((ROOT / 'scenarios' / scenario / 'scenario.yaml').read_text())['variants']}
+        self.assertEqual({(t['harness'], t['scenario'], t['variant']) for t in report['trials']}, expected)
+        for trial in report['trials']:
+            with self.subTest(harness=trial['harness'], scenario=trial['scenario'], variant=trial['variant']):
+                self.assertNotIn('infrastructure', trial['checks'])
+                self.assertFalse(trial['passed'])
 
     def test_grader_guarantees(self):
         # Each row is a separate negative evidence test and source-fault target.
