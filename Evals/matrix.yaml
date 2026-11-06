@@ -1,0 +1,7 @@
+{
+  "repeats": 3,
+  "harnesses": {
+    "claude": "maintainer-selects-model",
+    "codex": "maintainer-selects-model"
+  }
+}

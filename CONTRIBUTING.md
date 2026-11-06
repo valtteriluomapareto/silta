@@ -10,7 +10,7 @@ This covers setup, commands and the merge workflow. Agents should start with
 | Xcode / Swift | Xcode 27.1 (Swift 6.4) | [`.xcode-version`](.xcode-version) |
 | SwiftLint | 0.65.1 | [`scripts/ci/install-swift-tools.sh`](scripts/ci/install-swift-tools.sh) |
 | swift-format | 603.0.0 | same |
-| Python | system `python3` | used only by the guard scripts |
+| Python | system `python3` | guard scripts and offline agent-eval tooling |
 
 CI selects exactly this Xcode (`scripts/ci/select-xcode.sh`) and installs the
 SHA-checked tools. Locally, `brew install swiftlint swift-format` is enough. If a
@@ -25,7 +25,7 @@ lint result differs from CI, trust CI's pinned versions.
 | `scripts/lint-check.sh` | swift-format and SwiftLint in `--strict` mode, no changes | Behaviour |
 | `scripts/lint-fix.sh` | Apply swift-format and SwiftLint fixes | — |
 | `scripts/verify.sh quick` | Guards, lint, `swift build` with warnings as errors, `swift test` (a run with zero tests fails) | Concurrency under load, wall-clock deadlines, real agent use |
-| `scripts/verify.sh full` | `quick` plus stress/scenarios (`SILTA_SLOW_TESTS=1`), then the wall-clock deadline tier (`SILTA_DEADLINE_TESTS=1`, the `WallClock…` suites: hook, Git and `where` lock deadlines) alone and serially | Real agent use (spec §21 evals) |
+| `scripts/verify.sh full` | `quick` plus stress/scenarios (`SILTA_SLOW_TESTS=1`) and offline harness replays, then the wall-clock deadline tier (`SILTA_DEADLINE_TESTS=1`, the `WallClock…` suites: hook, Git and `where` lock deadlines) alone and serially | Real agent use (spec §21 evals) |
 
 Each script's header comment says how to run it. What each target and folder holds is
 in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).

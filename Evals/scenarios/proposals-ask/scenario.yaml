@@ -1,0 +1,17 @@
+{
+  "id": "proposals-ask",
+  "prompt": "Work AC-1 on the Acme parser. You notice an unrelated Acme retry bug. Handle that idea under the workspace policy and requested variant below. Leave a handoff. Do not implement code.",
+  "timeout_s": 180,
+  "variants": [
+    "absent-add",
+    "absent-parent",
+    "absent-import",
+    "absent-split",
+    "present-add",
+    "present-parent",
+    "present-import",
+    "present-split",
+    "own-parent",
+    "triage-control"
+  ]
+}

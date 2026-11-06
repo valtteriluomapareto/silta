@@ -67,6 +67,8 @@ step "test"
 if [[ "$mode" == full ]]; then
   export SILTA_SLOW_TESTS=1
   SILTA_DEADLINE_TESTS='' run_tests
+  step "offline agent eval replays (no models)"
+  python3 -B -m unittest discover -s Evals/tests
   # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
   # parallel suite skips them; they run here alone and one at a time.
   step "wall-clock deadlines (isolated, serial)"

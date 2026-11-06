@@ -20,6 +20,7 @@
           "code",
           "grep",
           "acme-backend",
+          "--json",
           "--",
           "PushCategory"
         ]

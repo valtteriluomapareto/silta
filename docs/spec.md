@@ -2205,7 +2205,10 @@ Evals/
 **One trial** = (harness, model, scenario, repeat):
 1. Create a temp dir with `SILTA_HOME`, the fixture repos and a seeded `silta.db`, and a
    temp `HOME` so the real `~/.claude` and `~/.codex` are untouched. Install the
-   skill and guide blocks there with `silta agents install`.
+   skill and guide blocks there with `silta agents install`. On macOS only, Claude
+   itself retains the real HOME for OAuth keychain storage (D42), with a fresh
+   temporary `CLAUDE_CONFIG_DIR`; every Silta child still uses temporary HOME.
+   No existing harness configuration or credentials are copied.
 2. Run the harness headless with the scenario prompt and a time limit, and set
    `SILTA_ACTOR=agent:<harness>:<trial>` so actors are exact.
 3. Grade:
@@ -2218,7 +2221,7 @@ Evals/
 | Harness | Headless command | How it gets the instructions |
 |---|---|---|
 | Claude Code | `claude -p "<prompt>" --output-format stream-json` | Skill + CLAUDE.md block + hooks |
-| Codex | `codex exec "<prompt>"` (JSON output flag: verify) | `~/.codex/AGENTS.md` block |
+| Codex | `codex exec --json "<prompt>"` | `~/.codex/AGENTS.md` block |
 | OpenCode | `opencode run -m <provider/model> --format json --auto --dir <repo> "<prompt>"` | Reads `~/.claude/CLAUDE.md` and `.claude/skills` by default, so the same skill applies |
 | Others (later: Gemini CLI, Goose, Aider) | Their `-p`/`run` mode | AGENTS.md block or `silta guide` |
 
@@ -2262,6 +2265,15 @@ approval words came from a human; those checks require the live runs above.
 | Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files written |
 | Cost | Tokens, cost and wall time, where the harness reports them |
 | Brief use | Calls to `brief`/`task show` and their output tokens, which shows whether the budget is right |
+
+The [eval procedure](dogfood/agent-evals.md) gives exact offline and maintainer-only
+live commands. Deterministic stub replays prove the runner and graders; they do not
+satisfy live-model acceptance. Each policy scenario includes the variants and controls
+in SI-36/2. Tool transcripts establish observed attempts; a bound human evidence
+review is required for semantic choices and opaque or transient file access.
+Unreviewed live trials cannot pass. Setup/control calls are excluded from agent
+metrics. `ctx_calls` counts brief, task-show and code-show/grep calls, including
+SessionStart briefs.
 
 The report is a static HTML page in `results/<run-id>/report.html`: a matrix with
 success, usage errors and cost, plus drill-down into the transcripts. Comparing two

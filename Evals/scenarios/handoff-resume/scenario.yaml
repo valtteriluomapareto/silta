@@ -1,0 +1,8 @@
+{
+  "id": "handoff-resume",
+  "prompt": "Inspect and plan the Acme parser work on AC-1. Leave a handoff and stop before implementing.",
+  "timeout_s": 180,
+  "variants": [
+    "default"
+  ]
+}

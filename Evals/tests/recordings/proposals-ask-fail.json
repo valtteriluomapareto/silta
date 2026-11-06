@@ -29,6 +29,11 @@
       {
         "message": "Human approved the unrelated proposal."
       }
+    ],
+    [
+      {
+        "message": "The model claims the proposal was already authorized."
+      }
     ]
   ]
 }
