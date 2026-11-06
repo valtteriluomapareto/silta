@@ -1553,6 +1553,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     export can't list. An entry export can't read refuses the target. When even the
     no-swap fallback can't move the previous tree back, the error names where it is
     kept and its `next` moves it back only while the target is still absent.
+    The export root's ancestor directories are flushed through the filesystem root
+    before staging, on every attempt: an existing directory may have survived an
+    earlier interrupted preparation without its name being durable.
     Staged files and directories are flushed before publication. The publication's
     directory entries are flushed before removing the previous tree. If that final
     flush fails, the error says the new tree was written and names the retained

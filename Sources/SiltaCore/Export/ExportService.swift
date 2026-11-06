@@ -115,7 +115,7 @@ package enum ExportService {
       }
     }
     do {
-      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+      try ExportDurability.prepareRoot(root, moves: moves)
     } catch {
       throw failed
     }

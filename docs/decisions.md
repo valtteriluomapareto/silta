@@ -38,6 +38,11 @@ They're summarised here so every decision has one index.
     Injected `ENOTSUP` tests cover the no-`RENAME_SWAP` fallback, rollback and a
     retained previous tree. CI has no exFAT/SMB volume: these tests do not establish
     real-volume behavior or survival of power loss.
+    - Pathname durability includes the export root's complete ancestor chain, flushed
+      through the filesystem root before staging on every invocation. Stopping at
+      the first existing directory is insufficient after a crash or preparation
+      failure leaves an unflushed name. No preparation provenance or recursive
+      directory cleanup is needed.
 - **D4: CLI only, `--json` everywhere.** No MCP server and no daemon.
 - **D5: Agent writes are gated.** Unsolicited tasks start as `proposed`, doc edits are
   proposals, and some commands are human-only. Since D38, an agent runs those with

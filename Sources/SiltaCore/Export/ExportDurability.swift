@@ -3,6 +3,19 @@ import Foundation
 
 /// Flushes staged bytes and names before publication and the rename before retirement.
 enum ExportDurability {
+  /// Flushes the pathname's dependencies on every attempt. An existing directory
+  /// may have survived an earlier preparation failure without its name being flushed.
+  static func prepareRoot(_ root: URL, moves: ExportMoves) throws {
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    var parent = root.deletingLastPathComponent()
+    while true {
+      try moves.sync(parent)
+      let ancestor = parent.deletingLastPathComponent()
+      if ancestor == parent { return }
+      parent = ancestor
+    }
+  }
+
   static func sync(_ url: URL) throws {
     let descriptor = open(url.path, O_RDONLY)
     guard descriptor >= 0 else { throw StorageError.ioFailure }
