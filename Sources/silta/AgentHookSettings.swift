@@ -88,6 +88,19 @@ enum AgentHookSettings {
     }
   }
 
+  /// Nil means optional ownership is absent; false means an obsolete sealed hook.
+  static func intact(_ original: String, event: String) throws -> Bool? {
+    let root = try AgentJSON.object(original)
+    guard root["hooks"] == nil || root["hooks"] is [String: Any] else { throw TaskError.input }
+    let hooks = root["hooks"] as? [String: Any] ?? [:]
+    guard hooks[event] == nil || hooks[event] is [[String: Any]] else { throw TaskError.input }
+    let groups = hooks[event] as? [[String: Any]] ?? []
+    let found = try ownership(groups, event: event, origin: .keep) { throw TaskError.input }
+    guard let index = found.index else { return nil }
+    return NSDictionary(dictionary: groups[index]).isEqual(
+      to: group(event: event, origin: found.origin))
+  }
+
   static func diff(_ old: String, _ new: String) throws -> String {
     let before = try owned(old), after = try owned(new)
     return

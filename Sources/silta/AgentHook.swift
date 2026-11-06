@@ -5,16 +5,14 @@ import SiltaCore
 /// The shared process deadline is armed before this gateway can read stdin.
 enum AgentHook {
   static func environment(_ snapshot: [String: String], stop: Bool = false) throws -> [String:
-    String]
+    String]?
   {
     let data = try readInput()
     let input = try JSONDecoder().decode(AgentHookInput.self, from: data)
-    if stop, try JSONDecoder().decode(AgentStopInput.self, from: data).active == true {
-      throw SeamError.invalidSession
-    }
     guard ActorID.parse("agent:claude:" + input.sessionID) != nil else {
       throw SeamError.invalidSession
     }
+    if stop, try JSONDecoder().decode(AgentStopInput.self, from: data).active == true { return nil }
     if !stop {
       guard let file = snapshot["CLAUDE_ENV_FILE"], !file.isEmpty else {
         throw SeamError.invalidSession

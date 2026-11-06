@@ -11,6 +11,7 @@ final class HookWatchdog: @unchecked Sendable {
     var timedOut = false
     var phase = Phase.armed
     var record: (path: String, data: Data)?
+    var entry: LogEntry?
   }
   private let command: String
   private let flags: [String]
@@ -34,9 +35,13 @@ final class HookWatchdog: @unchecked Sendable {
   func prepare(snapshot: [String: String], deterministic: Bool) {
     do {
       let home = try SiltaHome.resolve(environment: snapshot, deterministic: deterministic)
-      let actor = try ActorID.detect(
-        environment: snapshot, terminal: .system(), session: "hook-timeout")
-      prepare(home: home.url, actor: actor, at: SystemClock().now())
+      let actor = try? ActorID.detect(  // Invalid attribution must not hide a failed attempt.
+        environment: snapshot, terminal: .system(), session: "hook-unattributed")
+      let supplied = home.permitsDeterminism ? snapshot["SILTA_NOW"].flatMap(utcInstant) : nil
+      let timestamp = supplied.flatMap { $0.timeIntervalSince1970 >= 0 ? $0 : nil }
+      prepare(
+        home: home.url, actor: actor ?? .agent(tool: "unknown", session: "hook-unattributed"),
+        at: timestamp ?? SystemClock().now())
     } catch {}  // Best-effort fallback before environment assembly succeeds.
   }
 
@@ -55,9 +60,13 @@ final class HookWatchdog: @unchecked Sendable {
       entry.warnings = ["hook_timeout"]
       let record = try SystemLog.prepared(entry)
       let directory = home.appending(path: "log")
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
       let path = directory.appending(path: record.name).path
-      state.withLock { if $0.phase == .armed { $0.record = (path, record.data) } }
+      state.withLock {
+        if $0.phase == .armed {
+          $0.record = (path, record.data)
+          $0.entry = entry
+        }
+      }
     } catch {}  // Timeout diagnostics must never obstruct the command.
   }
 
@@ -94,13 +103,19 @@ final class HookWatchdog: @unchecked Sendable {
     }
   }
 
+  /// Completes a failed attempt even when input or environment assembly never succeeded.
+  func failed(milliseconds: Int) {
+    guard var entry = state.withLock({ $0.entry }) else { return }
+    entry.milliseconds = milliseconds
+    entry.errorCode = .env
+    entry.warnings = ["hook_failed"]
+    finish(entry)
+  }
+
   private func append(path: String, data: Data) {
-    let descriptor = open(path, O_WRONLY | O_CREAT | O_APPEND | O_NONBLOCK, 0o600)
-    guard descriptor >= 0 else { return }
-    defer { close(descriptor) }
-    var info = stat()
-    guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return }
-    _ = data.withUnsafeBytes { write(descriptor, $0.baseAddress, $0.count) }
+    let url = URL(filePath: path)
+    try? SystemLog.append(  // Best-effort diagnostics skip unsafe targets.
+      directory: url.deletingLastPathComponent(), name: url.lastPathComponent, data: data)
   }
 
   private func fire() {

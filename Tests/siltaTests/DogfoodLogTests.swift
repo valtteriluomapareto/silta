@@ -83,7 +83,7 @@ struct DogfoodLogTests {
       #expect(
         Set(entries[2].keys) == [
           "timestamp", "command", "actor", "exit_code", "milliseconds", "flags", "warnings",
-          "workspace", "app",
+          "workspace", "app", "session_matches_actor",
         ])
     }
   }

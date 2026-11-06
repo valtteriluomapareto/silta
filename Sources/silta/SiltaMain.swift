@@ -38,7 +38,9 @@ enum SiltaMain {
     let timer = ContinuousClock()
     let started = timer.now
     do {
-      let snapshot = try environmentSnapshot(arguments, hook: hookDeadline != nil)
+      guard let snapshot = try environmentSnapshot(arguments, hook: hookDeadline != nil) else {
+        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+      }
       let environment: SiltaEnvironment
       if let hookDeadline {
         environment = try await BriefHook.environment(
@@ -64,19 +66,15 @@ enum SiltaMain {
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = logFlags(flags)
+      entry.sessionMatchesActor = suppliedSession(environment.actor, hook: hookDeadline != nil)
       if hookDeadline != nil {
-        let completion = BriefHookCompletion(rendered: rendered, entry: entry)
-        if let watchdog {
-          watchdog.finish(completion.entry)
-        } else {
-          environment.log.record(completion.entry)
-        }
-        return completion.rendered
+        return completeHook(rendered, entry: entry, watchdog: watchdog, log: environment.log)
       }
       environment.log.record(entry)
       return rendered
     } catch {
       if hookDeadline != nil {
+        watchdog?.failed(milliseconds: elapsedMilliseconds(started.duration(to: timer.now)))
         return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
       }
       if let informational = informationalResult(arguments, mode: mode) { return informational }
@@ -84,8 +82,22 @@ enum SiltaMain {
     }
   }
 
+  private static func completeHook(
+    _ rendered: Rendered, entry: LogEntry,
+    watchdog: HookWatchdog?, log: any Log
+  ) -> Rendered {
+    let completion = BriefHookCompletion(rendered: rendered, entry: entry)
+    if let watchdog { watchdog.finish(completion.entry) } else { log.record(completion.entry) }
+    return completion.rendered
+  }
+
+  private static func suppliedSession(_ actor: ActorID, hook: Bool) -> Bool? {
+    guard !hook, case .agent(_, let session) = actor else { return nil }
+    return ProcessInfo.processInfo.environment["SILTA_SESSION"] == session
+  }
+
   private static func environmentSnapshot(_ arguments: [String], hook: Bool) throws -> [String:
-    String]
+    String]?
   {
     let snapshot = ProcessInfo.processInfo.environment
     let path = commandPath(arguments)

@@ -51,4 +51,34 @@ struct DoctorCommandTests {
       }
     }
   }
+  @Test func focusedInstallReportMatchesContractWithoutDatabase() throws {
+    try withScratchDirectory { scratch in
+      for flags in [[], ["--quiet"], ["--json"], ["--quiet", "--json"]] {
+        let result = try SiltaBinary.run(
+          ["doctor", "--install"] + flags, in: scratch, environment: environment)
+        #expect(result.termination == .exit(0))
+        #expect(result.stderr.isEmpty)
+        Golden.forTests().check(
+          result.stdout, flags.contains("--json") ? "doctor-install.json" : "doctor-install.txt")
+      }
+    }
+  }
+
+  @Test func invalidLogHasScopedRecoveryInBothOutputModes() throws {
+    try withScratchDirectory { scratch in
+      let directory = scratch.appending(path: "silta-home/log")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      try Data("{broken\n".utf8).write(to: directory.appending(path: "2023-11-14.jsonl"))
+      for flags in [[], ["--quiet"], ["--json"]] {
+        let result = try SiltaBinary.run(
+          ["doctor", "--install"] + flags, in: scratch, environment: environment)
+        #expect(result.termination == .exit(0))
+        #expect(result.stderr.isEmpty)
+        Golden.forTests().check(
+          normalize(result.stdout, scratch),
+          flags.contains("--json") ? "doctor-invalid-log.json" : "doctor-invalid-log.txt")
+      }
+    }
+  }
+
 }

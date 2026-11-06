@@ -2,9 +2,18 @@
 
 Run outside the coding sandbox, in an interactive terminal, from a checkout
 containing all installer/SessionStart/Stop changes. Harness configuration stays
-inside a fresh temporary HOME; Silta data uses a separate temporary SILTA_HOME.
+inside temporary directories; Silta data uses a separate temporary SILTA_HOME.
+Claude on macOS keeps the real HOME/USER for keychain access while its
+CLAUDE_CONFIG_DIR remains temporary.
 Keep the temporary directories until you have recorded the result. Never copy
 existing configuration or credentials into them.
+
+For routine inspection, use `silta doctor --install`: the
+[read-only health report](../spec.md#19-observability) inspects owned pieces,
+retained hook evidence and version metadata without launching a harness. Rerun
+only the affected live checks below when the report identifies a problem or
+missing acceptance evidence. The [D42 baseline](../decisions.md#agent-harness-evidence-2026-11-05)
+distinguishes live verification from installation metadata.
 
 ## Prepare the fixture
 
@@ -12,6 +21,8 @@ From the Silta checkout, run this Bash setup. `h` is the only launcher used belo
 It clears inherited actor, session, provider and harness overrides.
 
 ```bash
+si35_real_home="$HOME"
+si35_real_user="$USER"
 si35_binary="$PWD/.build/debug/silta"
 si35_home=$(mktemp -d)
 si35_data=$(mktemp -d)
@@ -94,12 +105,20 @@ keys and writable-root field are in the [configuration reference](https://learn.
 
 ## Claude: loading, propagation and Stop
 
-Run `h "$si35_claude"` and sign in with a fresh **claude.ai** login for this temporary
-config directory. Avoid Console sign-in without an API key: that mode is not fully
+On macOS launch with the real HOME/USER and the isolated configuration:
+
+```bash
+h /usr/bin/env HOME="$si35_real_home" USER="$si35_real_user" "$si35_claude"
+```
+
+An empty HOME can prevent OAuth keychain storage (SI-2/5–6). Never choose
+**Reset To Defaults** in the keychain dialog; stop the login and use the launcher
+above. Sign in with a fresh **claude.ai** login for this temporary config directory. Avoid Console sign-in without an API key: that mode is not fully
 separated by CLAUDE_CONFIG_DIR. The directory scopes ordinary credentials and the
 macOS credential entry, as described in [Claude authentication](https://code.claude.com/docs/en/authentication).
 
-Verify the SessionStart brief appears automatically. Then give this prompt:
+Verify a SessionStart record in the temporary command log. Its brief is injected
+as context and need not appear in the TUI (SI-2/6). Then give this prompt:
 
 > This is the isolated Acme fixture. Load the Silta skill using the harness skill
 > mechanism. Check that SILTA_SESSION is present without printing its value. Create
@@ -108,7 +127,7 @@ Verify the SessionStart brief appears automatically. Then give this prompt:
 > response without a handoff. If the Stop hook requests a continuation, follow its
 > scoped command with a short handoff body. Touch only these temporary roots.
 
-Record actual skill loading, automatic brief, subsequent shell session presence,
+Record actual skill loading, the SessionStart log record, subsequent shell session presence,
 actor consistency between the hook log and created task, one Stop continuation,
 successful handoff and no continuation loop. Do not infer propagation merely from
 reading the environment file. The [hook reference](https://code.claude.com/docs/en/hooks)
@@ -133,5 +152,5 @@ settings/authentication created by the harnesses remain. Never repair a real pro
 Report harness versions, pass/fail/inconclusive for each check, actual refusal codes
 and redacted evidence. Keep auth files and unredacted transcripts out of the repo.
 Exit the isolated clients and log out of these temporary profiles before deleting
-only the four mktemp directories created above. Do not mark D42's live checks
+only the mktemp directories created above. Do not mark D42's live checks
 verified until these results exist.

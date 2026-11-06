@@ -10,11 +10,47 @@ skipped: git.fetch: Requires a readable, compatible database.
 skipped: git.overrides: Requires a readable, compatible database.
 skipped: data.claims: Requires a readable, compatible database.
 warning: data.backup: No published backups found; the last backup day could not be read.
-skipped: install.path: Installer diagnostics are not available yet.
-skipped: install.hook: Installer diagnostics are not available yet.
-skipped: install.skill: Installer diagnostics are not available yet.
-skipped: install.codex_root: Installer diagnostics are not available yet.
-skipped: install.codex_marker: Installer diagnostics are not available yet.
+warning: install.path: silta is not executable on PATH; installed hooks cannot find it.
+  next: command -v silta
+  next: silta agents install --help
+skipped: install.hook: Claude SessionStart: optional owned hook is absent.
+  next: silta agents install --claude --hook --dry-run
+warning: install.skill: install.skill: owned piece is absent in the effective configuration directory.
+  next: silta agents install --claude --dry-run
+warning: install.codex_root: install.codex_root: owned piece is absent in the effective configuration directory.
+  next: silta agents install --codex --dry-run
+warning: install.codex_marker: install.codex_marker: owned piece is absent in the effective configuration directory.
+  next: silta agents install --codex --dry-run
+warning: install.claude.instructions: install.claude.instructions: owned piece is absent in the effective configuration directory.
+  next: silta agents install --claude --dry-run
+skipped: install.claude.stop: Claude Stop: optional owned hook is absent.
+  next: silta agents install --claude --stop-hook --dry-run
+warning: install.opencode.skill: install.opencode.skill: owned piece is absent in the effective configuration directory.
+  next: silta agents install --claude --dry-run
+warning: install.claude.session_start: Claude SessionStart: no retained hook record.
+  ask human: Read docs/dogfood/agents-acceptance.md in a Silta checkout and rerun the affected live checks in isolated homes.
+warning: install.claude.last_stop: Claude Stop: no retained hook record.
+  ask human: Read docs/dogfood/agents-acceptance.md in a Silta checkout and rerun the affected live checks in isolated homes.
+warning: install.claude.session: Claude SILTA_SESSION propagation not established in the latest hook session (missing, legacy, mismatched or incomplete evidence).
+  ask human: Read docs/dogfood/agents-acceptance.md in a Silta checkout and rerun the affected live checks in isolated homes.
+warning: install.claude.version: claude: installed metadata version unknown (missing executable or unsupported installation layout); last live-verified 2.1.314 on 2026-11-06.
+  ask human: claude --version
+warning: install.codex.version: codex: installed metadata version unknown (missing executable or unsupported installation layout); last live-verified 0.166.0 on 2026-11-06.
+  ask human: codex --version
+skipped: install.codex.session_start: codex: SessionStart has no Silta hook integration; no hook-session evidence is available.
+  next: silta agents install --help
+skipped: install.codex.last_stop: codex: Stop has no Silta hook integration; no hook-session evidence is available.
+  next: silta agents install --help
+skipped: install.codex.session: codex: SILTA_SESSION propagation has no Silta hook integration; no hook-session evidence is available.
+  next: silta agents install --help
+warning: install.opencode.version: opencode: installed metadata version unknown (missing executable or unsupported installation layout); no live-verified baseline (D42).
+  ask human: opencode --version
+skipped: install.opencode.session_start: opencode: SessionStart has no Silta hook integration; no hook-session evidence is available.
+  next: silta agents install --help
+skipped: install.opencode.last_stop: opencode: Stop has no Silta hook integration; no hook-session evidence is available.
+  next: silta agents install --help
+skipped: install.opencode.session: opencode: SILTA_SESSION propagation has no Silta hook integration; no hook-session evidence is available.
+  next: silta agents install --help
 skipped: index.integrity: Index diagnostics are not available yet.
 skipped: index.foreign_keys: Index diagnostics are not available yet.
 skipped: index.schema: Index diagnostics are not available yet.
