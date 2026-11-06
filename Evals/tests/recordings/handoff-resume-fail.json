@@ -1,0 +1,55 @@
+{
+  "phases": [
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "plan",
+          "AC-1",
+          "-F",
+          "-",
+          "--json"
+        ],
+        "stdin": "- [ ] Inspect Acme parser\n- [ ] Verify Acme parser\n"
+      }
+    ],
+    [
+      {
+        "args": [
+          "task",
+          "show",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "plan",
+          "AC-1",
+          "-F",
+          "-",
+          "--json"
+        ],
+        "stdin": "- [ ] Inspect Acme parser\n- [ ] Verify Acme parser\n"
+      },
+      {
+        "message": "I resumed correctly."
+      }
+    ]
+  ]
+}

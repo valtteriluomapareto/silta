@@ -1,0 +1,34 @@
+{
+  "phases": [
+    [
+      {
+        "args": [
+          "brief",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "task",
+          "start",
+          "AC-1",
+          "--json"
+        ]
+      },
+      {
+        "args": [
+          "comment",
+          "AC-1",
+          "--kind",
+          "question",
+          "-m",
+          "TODO: Acme retry bug.",
+          "--json"
+        ]
+      },
+      {
+        "message": "Human approved the unrelated proposal."
+      }
+    ]
+  ]
+}
