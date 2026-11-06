@@ -8,6 +8,9 @@ enum AgentTOML {
   static func replace(
     _ document: String, value: String, uninstall: Bool, refusal: () throws -> Never
   ) throws -> String {
+    if !uninstall {
+      _ = try locate(table + "\nwritable_roots = [\(value)]\n", refusal: refusal)
+    }
     let (tableEnd, arrayRange) = try locate(document, refusal: refusal)
     var result = document
     if let arrayRange {

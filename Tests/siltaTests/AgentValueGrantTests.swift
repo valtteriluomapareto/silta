@@ -137,27 +137,25 @@ extension AgentValueGrantTests {
     "", table + "network_access = false\n", table + "writable_roots = [\"/acme/foreign\"]\n",
   ])
   func unlocatableHomeRefusesBeforeAnySelectedWrite(original: String) throws {
-    withKnownIssue("SI-59/37: generated root is refused by later edits") {
-      try withScratchDirectory { scratch in
-        if !original.isEmpty { try AgentsInstallTests.write(original, Self.path, in: scratch) }
-        let env = ["SILTA_HOME": scratch.appending(path: "acme'''/data").path]
-        let before = try AgentInstallRoundTwoTests.snapshot(scratch)
-        let preview = try AgentsInstallTests.run(
-          ["install", "--json"], in: scratch, environment: env)
-        let response = try GuideContractTests.object(preview.stdout)
-        let token =
-          (response["data"] as? [String: Any])?["token"] as? String
-          ?? String(repeating: "0", count: 64)
-        #expect(preview.termination == .exit(6))
-        #expect(preview.stdout.contains("add this line yourself"))
-        #expect(preview.stdout.contains("retain all other entries"))
-        #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
-        let apply = try AgentsInstallTests.run(
-          ["install", "--apply", token, "--json"], in: scratch, environment: env)
-        #expect(apply.termination == .exit(6))
-        #expect(apply.stdout.contains("add this line yourself"))
-        #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
-      }
+    try withScratchDirectory { scratch in
+      if !original.isEmpty { try AgentsInstallTests.write(original, Self.path, in: scratch) }
+      let env = ["SILTA_HOME": scratch.appending(path: "acme'''/data").path]
+      let before = try AgentInstallRoundTwoTests.snapshot(scratch)
+      let preview = try AgentsInstallTests.run(
+        ["install", "--json"], in: scratch, environment: env)
+      let response = try GuideContractTests.object(preview.stdout)
+      let token =
+        (response["data"] as? [String: Any])?["token"] as? String
+        ?? String(repeating: "0", count: 64)
+      #expect(preview.termination == .exit(6))
+      #expect(preview.stdout.contains("add this line yourself"))
+      #expect(preview.stdout.contains("retain all other entries"))
+      #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
+      let apply = try AgentsInstallTests.run(
+        ["install", "--apply", token, "--json"], in: scratch, environment: env)
+      #expect(apply.termination == .exit(6))
+      #expect(apply.stdout.contains("add this line yourself"))
+      #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
     }
   }
 
