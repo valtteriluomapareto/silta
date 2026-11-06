@@ -169,6 +169,16 @@ struct ExportCommitTests {
       #expect(
         FileManager.default.fileExists(
           atPath: scratch.appending(path: "work/acme/manifest.json").path))
+      if rules == "acme/\n" {
+        let head = try SiltaBinary.runProcess(
+          URL(filePath: "/usr/bin/git"), ["rev-parse", "--verify", "HEAD"], in: scratch)
+        #expect(head.termination == .exit(128))
+        #expect(!result.stdout.contains("\"sha\""))
+      } else {
+        let names = try Self.git(["ls-tree", "-r", "--name-only", "HEAD"], scratch)
+        #expect(names.contains("acme/manifest.json"))
+        #expect(!names.contains("acme/tasks/"))
+      }
     }
   }
 }

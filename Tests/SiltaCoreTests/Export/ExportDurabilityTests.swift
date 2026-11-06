@@ -6,6 +6,38 @@ import Synchronization
 import Testing
 
 struct ExportDurabilityTests {
+  @Test func firstPublicationSyncFailureNamesAnEmptyWorkDirectoryAccurately() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let published = Mutex(false)
+      let moves = ExportMoves(
+        rename: { from, to in
+          let result = Darwin.rename(from, to)
+          if result == 0 { published.withLock { $0 = true } }
+          return result
+        },
+        sync: { url in
+          if published.withLock({ $0 }) { throw StorageError.ioFailure }
+          try ExportDurability.sync(url)
+        })
+      do {
+        _ = try ExportPublishTests.export(store, home, scratch.appending(path: "exports"), moves)
+        Issue.record("publication sync failure was ignored")
+      } catch let failure as ExportFailure {
+        guard case .publicationUnconfirmed(_, let work) = failure.error else {
+          Issue.record("wrong failure: \(failure)")
+          return
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: work).isEmpty)
+        withKnownIssue("#14: first publication retains an empty work directory") {
+          #expect(failure.message.contains("work directory is retained"))
+          #expect(!failure.message.contains("Recovery data"))
+        }
+      }
+    }
+  }
+
   @Test func filesAndDirectoriesAreSyncedBeforeSwap() throws {
     try withScratchDirectory { scratch in
       let prepared = try ExportPublishTests.changeAndPrepare(scratch)
