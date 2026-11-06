@@ -1,0 +1,7 @@
+acme / platform / api [high: exact_ref]
+branch: api
+settings: proposals: ask (ask in chat before adding a task); ask_about: short (ask only about what others see, deletes, irreversible steps, money)
+task: none
+(brief trimmed; see more)
+more: silta --ws 'acme' task ls
+more: silta --ws 'acme' ws show

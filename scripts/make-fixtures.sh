@@ -4,6 +4,7 @@
 #   scripts/make-fixtures.sh <empty-directory>
 set -euo pipefail
 [[ $# == 1 ]] || { echo 'usage: make-fixtures.sh <empty-directory>' >&2; exit 64; }
+fixture_policies="$(cd "$(dirname "${BASH_SOURCE[0]}")/../Tests/Fixtures/policies" && pwd -P)"
 destination="$1"
 mkdir -p "$destination"
 shopt -s nullglob dotglob
@@ -69,3 +70,5 @@ g -C "$destination/acme-detached" checkout -q --detach origin/api
 g clone -q --depth 1 --branch api "file://$destination/acme-origin.git" "$destination/acme-shallow"
 g clone -q "$destination/acme-origin.git" "$destination/acme-missing-remote"
 g -C "$destination/acme-missing-remote" remote remove origin
+
+cp -R "$fixture_policies" "$destination/policies"

@@ -200,7 +200,7 @@ private struct WorkspaceValidation {
         if value.int == nil || (value.int ?? -1) < 0 {
           problem(value, "\(key) must be a nonnegative integer")
         }
-      } else if key == "review_gate" || key == "proposals" {
+      } else if ["review_gate", "proposals", "ask_about"].contains(key) {
         validatePolicy(value, key: key)
       } else if value.tag != Tag(.str) || (value.string ?? "").isEmpty {
         problem(value, "\(key) must be a nonempty string")
@@ -209,21 +209,23 @@ private struct WorkspaceValidation {
   }
 
   mutating func validatePolicy(_ value: Node, key: String) {
-    let gate = key == "review_gate"
-    let words =
-      gate
-      ? WorkspaceSettings.ReviewGate.allCases.map(\.rawValue)
-      : WorkspaceSettings.Proposals.allCases.map(\.rawValue)
-    let accepted =
-      gate ? "review_gate must be none, any or human" : "proposals must be triage or ask"
+    let policies: [(word: String, gloss: String)]
+    let accepted: String
+    switch key {
+    case "review_gate":
+      policies = WorkspaceSettings.ReviewGate.allCases.map { ($0.rawValue, $0.gloss) }
+      accepted = "review_gate must be none, any or human"
+    case "ask_about":
+      policies = WorkspaceSettings.AskAbout.allCases.map { ($0.rawValue, $0.gloss) }
+      accepted = "ask_about must be standard or short"
+    default:
+      policies = WorkspaceSettings.Proposals.allCases.map { ($0.rawValue, $0.gloss) }
+      accepted = "proposals must be triage or ask"
+    }
+    let words = policies.map(\.word)
     let text = value.scalar?.string ?? ""
     if ["on", "off", "yes", "no", "true", "false", "y", "n"].contains(text.lowercased()) {
-      let gloss =
-        gate
-        ? WorkspaceSettings.ReviewGate.allCases.map { "\($0.rawValue): \($0.gloss)" }.joined(
-          separator: "; ") + "."
-        : WorkspaceSettings.Proposals.allCases.map { "\($0.rawValue): \($0.gloss)" }.joined(
-          separator: "; ") + "."
+      let gloss = policies.map { "\($0.word): \($0.gloss)" }.joined(separator: "; ") + "."
       problem(value, accepted + ". " + gloss + " Ask the human which policy to use.")
     } else if value.tag != Tag(.str) || text.isEmpty {
       problem(value, accepted)

@@ -110,6 +110,10 @@ struct GuideCommand: OutputCommand {
         Ask about scope changes, a new dependency, a public API/schema/migration, anything \
         another app or the customer sees, deleting what you did not create, anything \
         irreversible, and money.
+        If brief shows `ask_about: short`, decide and record scope, dependency and public \
+        API/schema/migration choices, and ask only about anything another app or the customer \
+        sees, deleting what you did not create, anything irreversible, and money; repository \
+        rules and human-only gates still apply.
         Put all approvals, proposals to triage and questions in one message. Except for the \
         task-creation exception below, approval words mean only what the human wrote in this \
         chat in reply to your message that named that exact command. One answer covers the \

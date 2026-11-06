@@ -1,0 +1,27 @@
+# Control-plane replay only: supplied comments do not prove a model chose them.
+# S16 prompt: add Acme parsing with a new dependency and customer-visible error text.
+# Expected: dependency is a decision, customer-visible text is asked in chat;
+# repository rules and human-only gates remain binding. Run with standard as control.
+fixtures: true
+steps:
+  - args: [init, --scan, fixtures/acme-missing-remote, --slug, acme, --prefix, AC, --json]
+    expect: {exit: 0, json: {data.workspace: acme}}
+  - args: [--ws, acme, ws, edit, -F, fixtures/policies/ask-short.yaml, --approved, Use short Acme guidance., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.workspace: acme}}
+  - args: [--ws, acme, brief, --budget, '1', --json]
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, json: {data.settings.ask_about: short}}
+  - args: [--ws, acme, task, add, Acme parser and customer text, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, json: {data.ref: AC-1, data.status: doing}}
+  - args: [--ws, acme, comment, AC-1, --kind, decision, -m, Use the Acme parsing dependency., --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.kind: decision}}
+  - args: [--ws, acme, ws, edit, -F, fixtures/policies/ask-short.yaml, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 3, code: human_only}
+  - args: [--ws, acme, comment, AC-1, --kind, handoff, -m, 'State: dependency chosen. Next step: ask the human in chat about customer-visible error text. Open questions: text approval. Branch and sha: none; no code changed.', --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.kind: handoff}}

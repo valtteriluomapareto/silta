@@ -1,0 +1,4 @@
+workspace: {slug: acme, name: Acme, task_prefix: AC}
+settings: {proposals: ask}
+repos: [{slug: acme-missing-remote}]
+apps: [{slug: acme-missing-remote, repo: acme-missing-remote, ref: master}]

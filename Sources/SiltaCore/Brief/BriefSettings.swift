@@ -3,6 +3,7 @@ import Foundation
 /// Typed non-default settings, with independently bounded diagnostics for unsupported keys.
 package struct BriefSettings: Encodable, Sendable {
   var proposals: String?
+  var askAbout: String?
   var reviewGate: String?
   var archiveAfterDays: Int?
   var staleDays: Int?
@@ -10,6 +11,7 @@ package struct BriefSettings: Encodable, Sendable {
   var warnings: [OutputWarning] = []
 
   enum CodingKeys: String, CodingKey {
+    case askAbout = "ask_about"
     case proposals, reviewGate = "review_gate"
     case archiveAfterDays = "archive_after_days", staleDays = "stale_days"
   }
@@ -77,6 +79,11 @@ package struct BriefSettings: Encodable, Sendable {
       let typed = try settings.proposals
       guard typed != (try defaults.proposals) else { return nil }
       proposals = typed.rawValue
+      return (typed.rawValue, typed.gloss)
+    case .askAbout:
+      let typed = try settings.askAbout
+      guard typed != (try defaults.askAbout) else { return nil }
+      askAbout = typed.rawValue
       return (typed.rawValue, typed.gloss)
     case .reviewGate:
       let typed = try settings.reviewGate
