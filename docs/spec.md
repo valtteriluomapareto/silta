@@ -1748,7 +1748,7 @@ silta init [--scan <dir>…] [--slug <slug>] [--prefix <prefix>]   [M1] create D
 silta ws edit [<ws>] [-F <file>] | ws show [<ws>] | ws ls | ws use <ws>   [M1] config as YAML (validated on save, "did you mean"); -F for agents
 silta repo fetch [<repo>]                        [M1]
 silta agents install [--claude] [--codex] [--hook] [--stop-hook] | uninstall   [M1]
-silta doctor [--install] [--fix]                 [M1]
+silta doctor [--install]                         [M1]
 silta guide [<topic>] (including refs)            [M1]
 
 # context
@@ -1952,12 +1952,13 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   are never used to attribute a timeout.
 
   Evals and the dogfood report read these logs (§21, §22.1).
-- **`silta doctor [--install] [--fix]`** checks:
+- **`silta doctor [--install]`** checks:
   - **Install:** PATH, owned Claude/shared OpenCode skills and instruction blocks,
     optional Claude hooks, the effective Codex writable-root value, retained hook
     execution and session propagation evidence, and harness version metadata.
   - **Database:** `PRAGMA integrity_check` and `foreign_key_check`, FTS integrity,
-    schema versions on both DBs, WAL size, index age.
+    schema versions on both DBs, truth database file and containing-directory
+    write access, WAL size, index age.
   - **Git:** git path and version, dead repo paths, stale fetches, orphaned worktree
     overrides.
   - **Data:** stale claims (at least 2 h), backup age, CLI vs app version skew.
@@ -1988,6 +1989,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   | `database.integrity` | SQLite or stored-value integrity, or operational read failure |
   | `database.foreign_keys` | Foreign-key integrity |
   | `database.schema` | Truth schema and writer compatibility |
+  | `database.writable` | Truth file write and resolved containing-directory write/search permission preflight |
   | `database.wal` | File-only WAL size |
   | `git.version` | Fixed git path and version |
   | `git.repos` | Bound repository paths |
@@ -2108,7 +2110,22 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   not a `.db` file. Unknown backup metadata describes only available files and the
   unreadable last backup day; it does not itself suggest restoration.
 
-  Installation checks and `--fix` follow installer formats when available.
+  Doctor is diagnostic-only; there is no `--fix` option. Recovery uses the explicit
+  commands in each check. Owned installation pieces are updated only through
+  `silta agents install` preview and its apply token (§11); doctor never edits shell
+  or harness files. WAL remains observation-only, with reader inspection rather
+  than an automatic checkpoint. Permissions require human inspection, not guessed
+  permission changes.
+
+  `database.writable` independently checks the existing truth file's effective
+  write access and its resolved containing directory's write and search access,
+  including a symlinked database target. A confirmed missing file is skipped;
+  inaccessible or uninspectable paths and non-regular targets fail. Denied access
+  never suggests initializing the database. Failures provide human-owned inspection
+  of both paths and do not prevent independent readable checks. This is a permission
+  preflight without probe writes or permission changes: a pass does not guarantee
+  free space, stable access, or that a later SQLite write will succeed. Broad doctor
+  can still update SQLite coordination sidecars as described above.
   A passing diagnostic run does not certify skipped checks. Check warnings live
   in `data.checks`; envelope and command-log warnings describe command/environment
   warnings. Failures before CLI environment setup are not logged.

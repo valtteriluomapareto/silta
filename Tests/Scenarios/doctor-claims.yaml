@@ -11,7 +11,15 @@ steps:
   - args: [doctor, --ws, absent, --json]
     expect:
       exit: 0
-      json: {ok: true, data.checks.0.status: pass, data.checks.9.id: data.claims, data.checks.9.status: pass, data.checks.11.id: install.path, data.checks.11.status: warning}
+      json:
+        ok: true
+        data.checks.0.status: pass
+        data.checks.3.id: database.writable
+        data.checks.3.status: pass
+        data.checks.10.id: data.claims
+        data.checks.10.status: pass
+        data.checks.12.id: install.path
+        data.checks.12.status: warning
   - args: [task, show, FI-1, --json]
     env: {SILTA_ACTOR: 'agent:codex:later'}
     expect: {exit: 0, json: {data.status: doing, data.claimed_by: 'agent:codex:acme'}}

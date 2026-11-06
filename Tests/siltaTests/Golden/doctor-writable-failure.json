@@ -1,0 +1,1 @@
+{"id":"database.writable","message":"Database file lacks write access; doctor changes no permissions.","next":["/bin/ls -ld '<silta-home>/silta.db' '<silta-home>'"],"next_by":"human","next_omitted":0,"status":"fail"}
