@@ -235,6 +235,17 @@ written first. The Tester reviewer checks it.
   (task text, comments, plans, file contents), so secrets and project data can't
   leak into logs (review).
 
+### Help pages
+
+Every command's help has an abstract of one sentence, at most 80 characters,
+ending in a period and naming human-only commands. The usage line is accurate;
+each argument and option gets one line, with enumerated values and defaults. The
+discussion is at most six lines and covers only effects a caller must know.
+Global options appear in their own titled group; test knobs stay hidden. Help
+contains no repository paths, milestone or decision ids, roadmap language, or a
+paragraph copied from another command. It points to `silta guide <topic>` for
+rules instead of repeating them.
+
 ## 8. Doc comments (D28)
 
 - **`///` is required on every `public` declaration** (lint: `missing_docs`) and on
