@@ -2,6 +2,8 @@
 from collections import Counter
 from datetime import datetime
 
+_WORK_LIMIT = 4096
+
 
 def native_interval(call):
     start, end = call.get('native_start'), call.get('native_end')
@@ -42,10 +44,15 @@ def match_calls(calls, logs, harness):
     if (required - available or exits - observed_exits
             or (not unknown and sum(required.values()) != len(logs))):
         return False
+    if len(calls) * (len(calls) - 1) > _WORK_LIMIT:
+        return None
     intervals = [native_interval(call) for call in calls]
-    before = {(a, b) for a in range(len(calls)) for b in range(len(calls)) if a != b
-              and (intervals[a][1] < intervals[b][0] if intervals[a] and intervals[b] else a < b)}
-    predecessors = [{a for a, b in before if b == index} for index in range(len(calls))]
+    before, predecessors = [], [set() for _ in calls]
+    for a in range(len(calls)):
+        for b in range(len(calls)):
+            if a != b and (intervals[a][1] < intervals[b][0] if intervals[a] and intervals[b] else a < b):
+                before.append((a, b))
+                predecessors[b].add(a)
     lengths = tuple(map(len, chains))
 
     def search(relax):
@@ -58,7 +65,7 @@ def match_calls(calls, logs, harness):
                 continue
             seen.add(state)
             # Reaching the bound is missing proof, not acceptance or failure.
-            if len(seen) > 4096:
+            if len(seen) + len(stack) > _WORK_LIMIT:
                 return None
             if index == len(logs) and cursors == lengths:
                 if relax:

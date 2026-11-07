@@ -160,7 +160,15 @@ def parse_shell(program, *, audit=False):
                                    'jobs', 'fg', 'bg', 'disown', 'kill', 'logout', 'hash',
                                    'unhash', 'autoload', 'emulate', 'zmodload', 'disable',
                                    'functions', 'unfunction', 'bind', 'let', 'coproc',
-                                   'noglob', 'nocorrect', 'limit', 'unlimit', 'suspend')
+                                   'noglob', 'nocorrect', 'limit', 'unlimit', 'suspend',
+                                   'fc', 'history', 'print', 'pushln', 'r', 'sched', '-',
+                                   'chdir', 'bye', 'dirs', 'bindkey', 'float', 'integer',
+                                   'private', 'rehash', 'getln', 'vared', 'ttyctl', 'zle',
+                                   'zcompile', 'zformat', 'zparseopts', 'zregexparse', 'zstyle',
+                                   'complete', 'compgen', 'compadd', 'compctl', 'compcall',
+                                   'comparguments', 'compdescribe', 'compfiles', 'compgroups',
+                                   'compquote', 'compset', 'comptags', 'comptry', 'compvalues')
+                        or Path(command[0]).name == 'printf' and '-v' in command[1:]
                         or Path(command[0]).name in ('sh', 'bash', 'zsh')
                         or re.match(r'[A-Za-z_]\w*=', command[0])):
                     result.opaque = True

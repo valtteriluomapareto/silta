@@ -779,7 +779,12 @@ def trace_matches_logs(phase, harness):
                     return False
                 if any(argv[:len(hook.split())] == hook.split() for hook in hooks):
                     continue
-                name = next((name for name in names if argv[:len(name.split())] == name.split()), None)
+                root_help = len(argv) == 1 or argv[1:] == ['-h'] or argv[1] == 'help'
+                name = next((name for name in names if argv[:len(name.split())] == name.split()
+                             and (name != 'silta' or root_help)
+                             and (name not in ('silta task', 'silta ws', 'silta repo', 'silta code',
+                                               'silta agents', 'silta session')
+                                  or all(word.startswith('-') for word in argv[len(name.split()):]))), None)
                 if name is None:
                     return False
                 code = result['exit'] if parsed.single() else None

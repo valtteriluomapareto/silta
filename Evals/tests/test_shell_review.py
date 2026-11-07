@@ -56,17 +56,19 @@ class ShellReview(unittest.TestCase):
                 self.assertTrue(parse_shell(command).opaque)
         self.assertFalse(parse_shell('printf literal; arbitrary-executable argument; silta brief').opaque)
         from test_pilot_replay import replay
-        e = replay(ROOT / 'tests/pilot/400k/codex-done-with-result-default-1')
-        first = e['phases'][0]['tool_results'][0]
-        before = first['command']
-        first['command'] = "trap 'gh issue create --title Acme' EXIT; ls -la"
-        e['phases'][0]['commands'][0] = first['command']
-        e['review'] = {'reviewer': 'fixture-reviewer', 'checks': ['tool-audit'], 'digest': evals.review_digest(e)}
-        self.assertNotEqual(before, first['command'])
-        result = evals.grade(e)
-        self.assertFalse(evals.reviewed(e))
-        self.assertFalse(result['passed'])
-        self.assertIsNone(result['checks']['stream_complete'])
+        for hidden in ["trap 'gh issue create --title Acme' EXIT; ls -la",
+                       "print -s 'gh issue create --title Acme'; print -s 'printf harmless'; fc -s 1; ls -la"]:
+            e = replay(ROOT / 'tests/pilot/400k/codex-done-with-result-default-1')
+            first = e['phases'][0]['tool_results'][0]
+            before = first['command']
+            first['command'] = hidden
+            e['phases'][0]['commands'][0] = first['command']
+            e['review'] = {'reviewer': 'fixture-reviewer', 'checks': ['tool-audit'], 'digest': evals.review_digest(e)}
+            self.assertNotEqual(before, first['command'])
+            result = evals.grade(e)
+            self.assertFalse(evals.reviewed(e))
+            self.assertFalse(result['passed'])
+            self.assertIsNone(result['checks']['stream_complete'])
 
     def test_matching_budget_precedes_graph_setup_but_not_coverage_checks(self):
         from trace_matching import match_calls
@@ -146,6 +148,7 @@ class ShellReview(unittest.TestCase):
         root = next(row for row in evidence['phases'][0]['logs'] if row['command'] == 'silta' and '--help' in row['flags'])
         self.assertEqual(evals.normalized_silta(['silta', '--help']), ['silta'])
         for command, logs in [('silta --help', [root]),
+                              ('silta --ws acme --help', [root]),
                               ('silta --help; silta brief', [root, log('brief')])]:
             p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], copy.deepcopy(logs))
             self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
@@ -153,6 +156,12 @@ class ShellReview(unittest.TestCase):
                               ('silta --help; silta task done AC-1 -m result', [root, root])]:
             p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], copy.deepcopy(logs))
             self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
+        source = json.loads((ROOT / 'tests/pilot/400k/codex-start-cross-repo-default-1/evidence.json').read_text())
+        for group in ['task', 'code']:
+            row = next(row for row in source['phases'][0]['logs'] if row['command'] == 'silta ' + group
+                       and '--help' in row['flags'])
+            p = phase({'A': 'silta ' + group + ' --help'}, [('A', 'started'), ('A', 'completed')], [row])
+            self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
         for command, group in [('silta task done AC-1 -m result', 'task'),
                                ('silta code grep acme-backend -- X', 'code')]:
             p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log(group)])
