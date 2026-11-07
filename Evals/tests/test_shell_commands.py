@@ -61,6 +61,11 @@ class ShellCommands(unittest.TestCase):
     def test_compound_exit_does_not_claim_each_segment_status(self):
         phase = self.phase('silta where; echo ---; silta brief', [('silta where', 2), ('silta brief', 0)])
         self.assertIs(evals.trace_matches_logs(phase, 'codex'), True)
+        phase['tool_results'][0]['command'] = 'silta where'
+        phase['logs'] = phase['logs'][:1]
+        self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
+        phase = self.phase('silta where 2>&1 | head', [('silta where', 2)])
+        self.assertIs(evals.trace_matches_logs(phase, 'codex'), True)
 
     def test_multiline_input_pipelines_remain_opaque(self):
         for command in ['cat input |\nsilta task plan AC-1 -F -',
@@ -69,6 +74,7 @@ class ShellCommands(unittest.TestCase):
             for rendered in [command, '/bin/zsh -lc ' + shlex.quote(command)]:
                 with self.subTest(command=rendered):
                     self.assertTrue(parse_shell(rendered).opaque)
+        self.assertFalse(parse_shell('echo data | cat\nsilta brief').opaque)
 
     def test_trailing_newline_keeps_single_invocation_exit_proof(self):
         for command in ['silta brief\n', '\nsilta brief\n\n', 'silta brief;\n']:
@@ -76,6 +82,11 @@ class ShellCommands(unittest.TestCase):
                 phase = self.phase(command, [('silta brief', 2)], code=0)
                 self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
                 self.assertEqual(parse_shell(command).single(), ['silta', 'brief'])
+        output = json.dumps({'data': {'app': 'acme-backend', 'sha': 'a' * 40, 'output': 'actual'}})
+        self.assertTrue(evals.backend_result({'command': 'silta code grep acme-backend -- X\n',
+                                              'exit': 0, 'output': output}))
+        self.assertTrue(evals.approved_invocation("silta task add --app none --approved 'Acme words'\n",
+                                                 'silta task add --app none\n', 'Acme words'))
 
     def test_shell_continuations_cannot_hide_gate_flags_or_command_names(self):
         parsed = parse_shell('gh issue cr\\\neate --title Acme')
@@ -84,13 +95,11 @@ class ShellCommands(unittest.TestCase):
         parsed = parse_shell('silta task start AC-1 --st\\\neal')
         self.assertFalse(parsed.opaque)
         self.assertEqual(parsed.invocations[-1][-1], '--steal')
+        evidence = {'baseline': {'files': {}}, 'phases': [{'logs': [], 'state': {'files': {}},
+                    'commands': ['gh issue cr\\\neate --title Acme', 'silta task start AC-1 --st\\\neal']}]}
+        self.assertEqual(len(evals.forbidden(evidence)), 2)
         parsed = parse_shell("silta comment AC-1 -m 'literal\\\nbody'")
         self.assertEqual(parsed.invocations[-1][-1], 'literal\\\nbody')
-        phase['tool_results'][0]['command'] = 'silta where'
-        phase['logs'] = phase['logs'][:1]
-        self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
-        phase = self.phase('silta where 2>&1 | head', [('silta where', 2)])
-        self.assertIs(evals.trace_matches_logs(phase, 'codex'), True)
 
     def test_conditional_and_opaque_calls_need_review_not_pass_or_exception(self):
         for command, logs in [('silta where && silta brief', [('silta where', 2)]),

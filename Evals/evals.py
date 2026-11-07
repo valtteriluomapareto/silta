@@ -913,8 +913,12 @@ def approval_matches(e):
     phases = e['phases']
     if len(phases) != 2 or not approval:
         return False
-    before = phases[0]['state']
-    after = phases[1]['state']
+    before = phases[0].get('state')
+    after = phases[1].get('state')
+    if not all(isinstance(state, dict)
+               and isinstance(state.get('tasks'), list)
+               and isinstance(state.get('approvals'), list) for state in (before, after)):
+        return False
     rows = after['approvals'][len(e['baseline']['approvals']):]
     expected_source = ('scripted-operator' if e.get('operator') == 'scripted'
                        else ('stub-operator' if e['provenance'] == 'stub' else 'operator-stdin'))

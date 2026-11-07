@@ -65,15 +65,18 @@ def _lex(program, audit=False):
             words.append(('operator', operator))
             index += len(operator)
             continue
-        start, quote = index, None
+        raw_parts, quote = [], None
         while index < len(program):
             char = program[index]
             if char == '\\' and quote != "'":
                 if index + 1 == len(program):
                     raise ValueError('trailing escape')
+                if program[index + 1] != '\n':
+                    raw_parts.append(program[index:index + 2])
                 index += 2
                 continue
             if char in "'\"":
+                raw_parts.append(char)
                 if quote is None:
                     quote = char
                 elif quote == char:
@@ -82,10 +85,13 @@ def _lex(program, audit=False):
                 continue
             if quote is None and char in ' \t\r\n;&|<>(){}':
                 break
+            raw_parts.append(char)
             index += 1
         if quote:
             raise ValueError('unbalanced quote')
-        raw = program[start:index]
+        raw = ''.join(raw_parts)
+        if not raw:
+            continue
         # shlex only decodes a word already delimited by the quote-aware scanner.
         decoded = shlex.split(raw)
         if len(decoded) != 1:
@@ -133,6 +139,7 @@ def parse_shell(program, *, audit=False):
         def finish():
             nonlocal command, heredoc
             if command:
+                result.composed |= bool(result.commands)
                 result.commands.append(command)
                 if Path(command[0]).name == 'silta':
                     if incoming_pipe:
@@ -172,10 +179,12 @@ def parse_shell(program, *, audit=False):
             elif value in (';', '&&', '||', '|', '\n'):
                 if not command and value != '\n':
                     raise ValueError('empty simple command')
+                had_command = bool(command)
                 finish()
-                result.composed = True
+                result.composed |= value in ('&&', '||', '|')
                 result.conditional |= value in ('&&', '||')
-                incoming_pipe = value == '|'
+                if value != '\n' or had_command:
+                    incoming_pipe = value == '|'
                 previous = value if value != '\n' else previous
             else:
                 raise ValueError('unsupported operator')
