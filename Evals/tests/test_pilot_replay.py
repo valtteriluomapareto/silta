@@ -35,9 +35,9 @@ class PilotReplay(unittest.TestCase):
                     self.assertTrue(result['checks']['result_sha'])
                     self.assertTrue(result['checks']['result_template'])
                 elif evidence['scenario'] == 'start-cross-repo':
-                    # Native completions/logs interleave: this is a real ordered
-                    # trace mismatch, independently of the shell parser.
-                    self.assertFalse(result['checks']['stream_complete'])
+                    # Native and recorded log intervals permit interleaving;
+                    # ambiguous association needs review rather than rejection.
+                    self.assertIsNone(result['checks']['stream_complete'])
                 else:
                     self.assertFalse(result['checks']['infrastructure'])
                 self.assertFalse(result['passed'], 'Live pilot has no bound tool-audit review')
