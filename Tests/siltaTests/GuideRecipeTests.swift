@@ -12,7 +12,7 @@ struct GuideRecipeTests {
       let guide = try fixture.run(["guide"]).stdout
       let blocks = Self.blocks(guide)
       try #require(blocks.count == 7)
-      #expect(blocks[2].contains("silta task submit AC-12"))
+      #expect(blocks[2].contains("silta --ws acme task submit AC-12"))
       for index in [0, 1, 3, 4, 5, 6, 2] {
         if index == 4 {
           _ = try fixture.run([
@@ -62,7 +62,7 @@ struct GuideRecipeTests {
           .replacingOccurrences(of: "<[^>]+>", with: "example", options: .regularExpression)
         command = command.replacingOccurrences(of: " --help", with: "")
         // This inline command names the family; supply its required title.
-        if command == "silta task add" { command += " 'Acme proposal' --app none" }
+        if command == "silta --ws acme task add" { command += " 'Acme proposal' --app none" }
         let result = try fixture.execute(command + " --json", task: "AC-1")
         let root = try GuideContractTests.object(result.stdout)
         let error = root["error"] as? [String: Any]

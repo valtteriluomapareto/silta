@@ -53,14 +53,17 @@ extension GuideCommand {
       text: """
         # Session start
         If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. \
-        Once you choose a task, run `silta brief --task AC-12`, then `silta task start AC-12`. \
-        Text is the default; use --json only to parse output.
-        Workspace commands use --ws, then the current workspace from `ws use`, then the \
-        registered repository here. Location fallback never saves a selection. If the current \
-        workspace differs from the one in `brief`, pass --ws explicitly; `where`, `brief` and \
-        status resolve location first. For several matching workspaces, inspect the scoped \
-        candidates and retry with --ws.
-        For "work the backlog", run `silta task ls --status todo`, optionally with --app. \
+        Once you choose a task, run `silta --ws acme brief --task AC-12`, then `silta --ws acme \
+        task start AC-12`. \
+        Replace acme with the workspace from your brief. Text is the default; use --json only \
+        to parse output.
+        Workspace commands use --ws, then the registered repository here, then the default \
+        from `ws use` outside registered repositories. Commands here follow the workspace \
+        in `brief`; use --ws for intentional cross-workspace work. Inference never saves a \
+        selection. For several matching workspaces, inspect the scoped candidates and retry \
+        with --ws.
+        For "work the backlog", run `silta --ws acme task ls --status todo`, optionally with \
+        --app. \
         Start the first task; skip subtasks whose parent another session claims and skip \
         claimed tasks. Finish with a result before starting the next; continue until empty or \
         the human stops you.
@@ -70,12 +73,12 @@ extension GuideCommand {
       text: """
         # Recipes
         Examples use the fictional Acme workspace and task AC-12. Replace names and paths with \
-        refs from your brief; add --ws acme when outside that workspace.
+        refs from your brief. Examples carry --ws acme explicitly, including outside repositories.
 
         Read another app without checking out its branch:
         ```sh
-        silta code grep platform-api -- 'Auth'
-        silta code show platform-api -- 'src/Auth.swift'
+        silta --ws acme code grep platform-api -- 'Auth'
+        silta --ws acme code show platform-api -- 'src/Auth.swift'
         ```
 
         Use task add for a new task, task plan for a chosen task's checklist, and from-plan to \
@@ -85,23 +88,24 @@ extension GuideCommand {
         source by default. --delete is not human-only; it removes only an unchanged untracked \
         source after commit and refuses harness files.
         ```sh
-        silta task add --start 'Implement Acme sign-in' --app platform-api
-        silta task plan AC-12 -F - <<'PLAN'
+        silta --ws acme task add --start 'Implement Acme sign-in' --app platform-api
+        silta --ws acme task plan AC-12 -F - <<'PLAN'
         - [ ] Inspect the API
         - [ ] Implement and verify sign-in
         PLAN
-        silta task plan AC-12 --step 1 --done
-        silta task from-plan /tmp/acme-plan.md --dry-run
-        silta task from-plan /tmp/acme-plan.md
+        silta --ws acme task plan AC-12 --step 1 --done
+        silta --ws acme task from-plan /tmp/acme-plan.md --dry-run
+        silta --ws acme task from-plan /tmp/acme-plan.md
         ```
         Use top-level checkboxes for numbered plan steps. A plan and a result go through stdin \
         with a quoted heredoc, so shell substitutions stay literal.
 
-        Submit for review with `silta task submit AC-12`. Finish when the required review gate \
+        Submit for review with `silta --ws acme task submit AC-12`. Finish when the required \
+        review gate \
         is met; app tasks need their actual commit sha:
         ```sh
-        silta task submit AC-12
-        silta task done AC-12 --sha <commit-sha> -F - <<'RESULT'
+        silta --ws acme task submit AC-12
+        silta --ws acme task done AC-12 --sha <commit-sha> -F - <<'RESULT'
         What was done: implemented and verified Acme sign-in.
         Decisions: reused the existing authentication API.
         What's left: nothing.
@@ -113,6 +117,7 @@ extension GuideCommand {
       text: """
         # Working for the human
         The human talks to you; you run Silta. Decide and record routine choices with `silta \
+        --ws acme \
         comment AC-12 --kind decision -m 'Reuse the existing authentication API.'`, then carry \
         on.
         Ask about scope changes, a new dependency, a public API/schema/migration, anything \
@@ -143,13 +148,14 @@ extension GuideCommand {
         When the human asked in this chat to add the task for later, pass their words as \
         --approved so it becomes todo without triage (D39); do not ask again.
         If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta \
+        --ws acme \
         task add` command in your message, then add only the approved ideas with --approved. \
         Without a human, list ideas under "What's left" in a handoff/result, never in a \
         question, TODO comment or file.
         When no answer can come, leave a question for @me listing pending commands, write a \
         handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved \
         ideas in the handoff/result instead of that question. For "what needs me?", run \
-        `silta inbox --for me` and relay the displayed choices in one short message. \
+        `silta --ws acme inbox --for me` and relay the displayed choices in one short message. \
         Apply "the rest" only to proposals you showed; ask before running triage.
         """ + "\n"),
     Section(
@@ -159,10 +165,12 @@ extension GuideCommand {
         Ask in chat. Record a question only when blocked beyond this session. Questions \
         default to @me; name recipients explicitly when needed:
         ```sh
-        silta comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'
+        silta --ws acme comment AC-12 --kind question --to me -m 'Which callback URL should \
+        Acme use?'
         ```
         Answer with --kind answer and --reply-to <question-ref>. The asker or current task \
-        claimer can accept an answer with `silta comment accept <answer-ref>`. Answer only as \
+        claimer can accept an answer with `silta --ws acme comment accept <answer-ref>`. Answer \
+        only as \
         an addressee, or to relay the human's chat answer. Never accept your own answer to a \
         question for @me. An answer comment never supplies approval words for a human-only \
         command.
@@ -176,10 +184,11 @@ extension GuideCommand {
         another task can unblock you, keep doing useful work; block only when none remains.
         Leave a handoff before blocking; blocking releases any remaining claim.
         ```sh
-        silta comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain \
+        silta --ws acme comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain \
         callback URL; Open questions: callback URL; Branch and sha: feature/acme-sign-in at \
         <commit-sha>.'
-        silta task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'
+        silta --ws acme task block AC-12 --on ext:acme -m 'Need the identity provider callback \
+        URL.'
         ```
         Silta sends nothing: tell the human exactly what to ask whom, then pick other work. \
         Never unblock with open blockers without the human's approval, and never put "waiting \
@@ -194,7 +203,7 @@ extension GuideCommand {
         again. Run `silta session check` to find fresh own claims needing handoff across all \
         workspaces; follow each printed scoped command with the handoff body on stdin.
         ```sh
-        silta comment AC-12 --kind handoff -F - <<'HANDOFF'
+        silta --ws acme comment AC-12 --kind handoff -F - <<'HANDOFF'
         State: API inspected; implementation remains.
         Next step: implement sign-in and run the verification checks.
         Open questions: none.
@@ -203,16 +212,18 @@ extension GuideCommand {
         ```
         In the next session, resume with:
         ```sh
-        silta task show AC-12
-        silta task start AC-12
+        silta --ws acme task show AC-12
+        silta --ws acme task start AC-12
         ```
         """ + "\n"),
     Section(
       topic: "reviews",
       text: """
         # Reviews
-        Use `silta task submit AC-12` to request review. Read discussion with `silta task show \
-        AC-12`. Reply to the actual finding ref with `silta comment AC-12 --reply-to AC-12/3 \
+        Use `silta --ws acme task submit AC-12` to request review. Read discussion with `silta \
+        --ws acme task show \
+        AC-12`. Reply to the actual finding ref with `silta --ws acme comment AC-12 --reply-to \
+        AC-12/3 \
         -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the \
         proving test. Do not resolve review threads yourself unless assigned that \
         responsibility.

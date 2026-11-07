@@ -6,7 +6,7 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(2)))
 struct WorkspaceLocationTests {
-  static let environment = TaskCommandTests.fixed
+  static let environment = TaskCommandTests.fixed.merging(["EDITOR": "/usr/bin/false"]) { $1 }
 
   static func run(_ args: [String], _ scratch: URL, _ cwd: URL? = nil) throws -> CLIResult {
     try SiltaBinary.run(args, in: scratch, cwd: cwd, environment: environment)
@@ -118,12 +118,12 @@ struct WorkspaceLocationTests {
     }
   }
 
-  @Test func explicitAndCurrentSelectionWinAndInvalidSelectionsRefuse() throws {
+  @Test func explicitSelectionWinsAndInvalidDefaultsRefuseOutsideRepositories() throws {
     try withScratchDirectory { scratch in
       let (repo, store) = try Self.setup(scratch)
       try Self.secondWorkspace(scratch)
       try #require(try Self.run(["ws", "use", "beta"], scratch).termination == .exit(0))
-      let current = try Self.run(["task", "show", "BE-1"], scratch, repo)
+      let current = try Self.run(["task", "show", "BE-1"], scratch)
       #expect(current.termination == .exit(0))
       #expect(try Self.lastLog(scratch)["workspace"] as? String == "beta")
       #expect(
@@ -139,7 +139,7 @@ struct WorkspaceLocationTests {
       try store.write {
         try $0.database.execute(sql: "UPDATE meta SET value='stale' WHERE key='current_workspace'")
       }
-      let stale = try Self.run(["task", "show", "AC-1"], scratch, repo)
+      let stale = try Self.run(["task", "show", "AC-1"], scratch)
       #expect(stale.termination == .exit(2))
       #expect(stale.stderr.contains("No matching workspace is selected"))
       #expect(try Self.lastLog(scratch)["workspace"] == nil)

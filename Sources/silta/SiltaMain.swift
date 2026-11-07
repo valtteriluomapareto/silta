@@ -134,6 +134,7 @@ enum SiltaMain {
 
   /// Parses and executes using the environment already assembled by the command boundary.
   static func execute(_ arguments: [String], context: CommandContext) async -> CommandExecution {
+    var context = context
     let mode = context.mode
     var command: any ParsableCommand
     do {
@@ -159,11 +160,10 @@ enum SiltaMain {
     }
     let store = context.environment.db
     let explicitWorkspace = outputCommand.global.ws
-    var selectionFailure: (any Error)?
     do {
-      try await prepareWorkspace(&outputCommand, context: context)
+      try await prepareWorkspace(&outputCommand, context: &context)
     } catch {
-      selectionFailure = error
+      context.environment.workspaceSelection = .failure(error)
     }
     do {
       var output = try await outputCommand.execute(context)
@@ -178,11 +178,8 @@ enum SiltaMain {
         scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store),
         command: loggedPath(arguments, outputCommand))
     } catch {
-      // Preparation cannot outrank an operation's earlier authorization or input refusal.
-      let failure: any Error =
-        if case .notFound? = error as? WorkspaceError { selectionFailure ?? error } else { error }
       return failedExecution(
-        failure, command: outputCommand,
+        error, command: outputCommand,
         explicitWorkspace: explicitWorkspace, arguments: arguments, context: context)
     }
   }
@@ -230,7 +227,10 @@ enum SiltaMain {
     if workspace == nil, usesWorkspace,
       !(error is ActorError)
     {
-      do { workspace = try WorkspaceSelection.resolve(in: context.environment.db) } catch {
+      do {
+        workspace = try WorkspaceSelection.resolve(
+          in: context.environment.db, prepared: context.environment.workspaceSelection)
+      } catch {
         workspace = nil
       }
     }
@@ -250,7 +250,10 @@ enum SiltaMain {
   ) -> [String] {
     var target = edit.workspace ?? edit.global.ws
     if target == nil {
-      do { target = try WorkspaceSelection.resolve(in: context.environment.db) } catch {
+      do {
+        target = try WorkspaceSelection.resolve(
+          in: context.environment.db, prepared: context.environment.workspaceSelection)
+      } catch {
         target = nil
       }
     }
@@ -268,7 +271,7 @@ extension SiltaMain {
   /// Captures selection once for synchronous services, recovery and attribution.
   /// Commands execute once even when preparation fails, preserving stdin and early gates.
   private static func prepareWorkspace(
-    _ command: inout any OutputCommand, context: CommandContext
+    _ command: inout any OutputCommand, context: inout CommandContext
   ) async throws {
     let source = type(of: command).workspaceSource
     guard source == .option || source == .argument,
@@ -279,9 +282,11 @@ extension SiltaMain {
       try context.environment.actor.requireHuman(
         command: "silta ws edit -F <file>", approved: command.global.approved)
     }
-    command.global.ws = try await WorkspaceSelection.fallback(
+    let selected = try await WorkspaceSelection.fallback(
       path: URL(filePath: FileManager.default.currentDirectoryPath),
       environment: context.environment)
+    context.environment.workspaceSelection = .success(selected)
+    command.global.ws = selected
   }
 
   private static func failedExecution(
@@ -297,7 +302,8 @@ extension SiltaMain {
     }
     return CommandExecution(
       rendered: OutputRouter.render(.failure(failure), mode: context.mode),
-      scope: CommandScope.failure(command, store: context.environment.db),
+      scope: CommandScope.failure(
+        command, store: context.environment.db, prepared: context.environment.workspaceSelection),
       command: loggedPath(arguments, command))
   }
 }

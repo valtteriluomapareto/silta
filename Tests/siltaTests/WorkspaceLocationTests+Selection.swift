@@ -61,26 +61,27 @@ extension WorkspaceLocationTests {
       let brief = try Self.run(["brief", "--json"], scratch, frontend)
       try #require(brief.termination == .exit(0), "\(brief.stdout)\(brief.stderr)")
       #expect(try Self.lastLog(scratch)["workspace"] as? String == "acme")
-      withKnownIssue("SI-67/15: current workspace silently overrides the repository") {
-        let code = try Self.run(["code", "grep", "backend", "--", "needle"], scratch, frontend)
-        #expect(code.termination == .exit(0), "\(code.stdout)\(code.stderr)")
-        #expect(code.stdout.contains("Acme needle"))
-        #expect(!code.stdout.contains("Beta needle"))
-        #expect(try Self.lastLog(scratch)["workspace"] as? String == "acme")
-        let added = try Self.run(
-          ["task", "add", "Follow Acme brief", "--start"], scratch, frontend)
-        #expect(added.termination == .exit(0))
-        #expect(added.stdout.contains("AC-2"))
-        #expect(try Self.lastLog(scratch)["workspace"] as? String == "acme")
-        let betaCount = try store.read {
-          try Int.fetchOne(
-            $0,
-            sql:
-              "SELECT count(*) FROM task JOIN workspace ON workspace.id=task.workspace_id WHERE workspace.slug='beta'"
-          )
-        }
-        #expect(betaCount == 1)
+      let code = try Self.run(["code", "grep", "backend", "--", "needle"], scratch, frontend)
+      #expect(code.termination == .exit(0), "\(code.stdout)\(code.stderr)")
+      #expect(code.stdout.contains("Acme needle"))
+      #expect(!code.stdout.contains("Beta needle"))
+      #expect(try Self.lastLog(scratch)["workspace"] as? String == "acme")
+      let added = try Self.run(
+        ["task", "add", "Follow Acme brief", "--start"], scratch, frontend)
+      #expect(added.termination == .exit(0))
+      #expect(added.stdout.contains("AC-2"))
+      #expect(try Self.lastLog(scratch)["workspace"] as? String == "acme")
+      let betaCount = try store.read {
+        try Int.fetchOne(
+          $0,
+          sql:
+            """
+            SELECT count(*) FROM task JOIN workspace ON workspace.id=task.workspace_id
+            WHERE workspace.slug='beta'
+            """
+        )
       }
+      #expect(betaCount == 1)
       let explicit = try Self.run(
         ["--ws", "beta", "code", "grep", "backend", "--", "needle"], scratch, frontend)
       #expect(explicit.termination == .exit(0))
@@ -90,6 +91,12 @@ extension WorkspaceLocationTests {
         try store.read {
           try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='current_workspace'")
         } == "beta")
+      try store.write {
+        try $0.database.execute(sql: "UPDATE meta SET value='stale' WHERE key='current_workspace'")
+      }
+      let stale = try Self.run(["task", "show", "AC-1"], scratch, frontend)
+      #expect(stale.termination == .exit(0))
+      #expect(try Self.lastLog(scratch)["workspace"] as? String == "acme")
     }
   }
 
@@ -122,55 +129,71 @@ extension WorkspaceLocationTests {
       try #require(!paths.contains { $0.lowercased() == tree.path.lowercased() })
       let shown = try Self.run(["task", "show", "AC-1"], scratch, tree)
       let loggedWorkspace = try Self.lastLog(scratch)["workspace"] as? String
-      withKnownIssue("SI-67/16: current selection hides a new linked worktree's workspace") {
-        #expect(shown.termination == .exit(0), "\(shown.stdout)\(shown.stderr)")
-        #expect(shown.stdout.contains("acme request"))
-        #expect(loggedWorkspace == "acme")
-      }
+      #expect(shown.termination == .exit(0), "\(shown.stdout)\(shown.stderr)")
+      #expect(shown.stdout.contains("acme request"))
+      #expect(loggedWorkspace == "acme")
       #expect(
         try store.read { try String.fetchAll($0, sql: "SELECT path FROM repo_path") } == paths)
     }
   }
 
+  static func refusedLocation(_ scratch: URL, broken: Bool) throws -> (URL, DatabaseStore) {
+    let (repo, store) = try Self.disjointWorkspaces(scratch)
+    if broken {
+      try "broken\n".write(
+        to: repo.appending(path: ".git/HEAD"), atomically: true, encoding: .utf8)
+    } else {
+      let tree = scratch.appending(path: "ambiguous-tree")
+      _ = try Self.git(
+        ["worktree", "add", "-q", "-b", "ambiguous", tree.path], scratch: scratch, cwd: repo)
+      try store.write {
+        try $0.database.execute(
+          sql:
+            """
+            INSERT INTO repo(uid,workspace_id,slug)
+            SELECT 'shared',id,'shared' FROM workspace WHERE slug='beta'
+            """
+        )
+        try $0.database.execute(
+          sql: "INSERT INTO repo_path(repo_id,path) SELECT id,? FROM repo WHERE uid='shared'",
+          arguments: [tree.path])
+      }
+    }
+    return (repo, store)
+  }
+
   @Test(arguments: [false, true])
   func locationRefusalCannotWriteThroughCurrentWorkspace(broken: Bool) throws {
     try withScratchDirectory { scratch in
-      let (repo, store) = try Self.disjointWorkspaces(scratch)
-      if broken {
-        try "broken\n".write(
-          to: repo.appending(path: ".git/HEAD"), atomically: true, encoding: .utf8)
-      } else {
-        let tree = scratch.appending(path: "ambiguous-tree")
-        _ = try Self.git(
-          ["worktree", "add", "-q", "-b", "ambiguous", tree.path], scratch: scratch, cwd: repo)
-        try store.write {
-          try $0.database.execute(
-            sql:
-              "INSERT INTO repo(uid,workspace_id,slug) SELECT 'shared',id,'shared' FROM workspace WHERE slug='beta'"
-          )
-          try $0.database.execute(
-            sql: "INSERT INTO repo_path(repo_id,path) SELECT id,? FROM repo WHERE uid='shared'",
-            arguments: [tree.path])
-        }
+      let (repo, store) = try Self.refusedLocation(scratch, broken: broken)
+      let config = scratch.appending(path: "workspace.yaml")
+      let yaml = try Self.run(["--ws", "beta", "ws", "show"], scratch)
+      try #require(yaml.termination == .exit(0))
+      try yaml.stdout.write(to: config, atomically: true, encoding: .utf8)
+      for args in [
+        ["task", "add", "Must refuse", "--start"], ["ws", "show"],
+        ["ws", "edit", "--approved", "Edit Acme workspace"],
+        ["ws", "edit", "-F", config.path, "--approved", "Edit Acme workspace"],
+      ] {
+        let result = try Self.run(args + ["--json"], scratch, repo)
+        #expect(result.termination == .exit(broken ? 9 : 4), "\(result.stdout)\(result.stderr)")
+        #expect(try Self.lastLog(scratch)["workspace"] == nil)
       }
-      withKnownIssue("SI-67/15: failed location selection must not fall through to current") {
-        for args in [
-          ["task", "add", "Must refuse", "--start"], ["ws", "show"],
-          ["ws", "edit", "--approved", "Edit Acme workspace"],
-        ] {
-          let result = try Self.run(args + ["--json"], scratch, repo)
-          #expect(result.termination == .exit(broken ? 9 : 4), "\(result.stdout)\(result.stderr)")
-          #expect(try Self.lastLog(scratch)["workspace"] == nil)
-        }
-        let count = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") }
-        #expect(count == 2)
-      }
+      let count = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") }
+      #expect(count == 2)
+      let missingFile = try Self.run(
+        ["ws", "edit", "-F", "missing", "--approved", "Edit workspace", "--json"], scratch, repo)
+      #expect(missingFile.termination == .exit(9))
+      #expect(missingFile.stdout.contains("UTF-8 workspace YAML"))
+      #expect(try Self.lastLog(scratch)["workspace"] == nil)
       for (args, exit) in [
         (["task", "add", "Acme", "--allow-secret"], 3),
         (["task", "add", "Acme", "-F", "missing"], 1),
       ] {
         let result = try Self.run(args + ["--json"], scratch, repo)
         #expect(result.termination == .exit(Int32(exit)))
+        #expect(try Self.lastLog(scratch)["workspace"] == nil)
+        #expect(!result.stdout.contains("silta --ws 'beta'"))
       }
     }
   }

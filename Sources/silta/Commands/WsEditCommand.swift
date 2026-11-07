@@ -12,7 +12,7 @@ struct WsEditCommand: WorkspaceArgumentCommand {
 
   @OptionGroup var global: GlobalOptions
 
-  @Argument(help: "The workspace slug; defaults to the current workspace.")
+  @Argument(help: "The workspace slug; defaults to repository location, then the saved default.")
   var workspace: String?
 
   var workspaceArgument: String? { workspace }
@@ -30,11 +30,13 @@ struct WsEditCommand: WorkspaceArgumentCommand {
       let text = try read(file)
       selected = try WorkspaceEditor.apply(
         text, slug: workspace ?? global.ws, store: environment.db, actor: environment.actor,
-        identity: (environment.ids, environment.clock.now()), approved: global.approved)
+        identity: (environment.ids, environment.clock.now()), approved: global.approved,
+        prepared: environment.workspaceSelection)
     } else {
       selected = try WorkspaceEditor.edit(
         slug: workspace ?? global.ws, store: environment.db, actor: environment.actor,
-        identity: (environment.ids, environment.clock.now()), approved: global.approved
+        identity: (environment.ids, environment.clock.now()), approved: global.approved,
+        prepared: environment.workspaceSelection
       ) { file in
         let process = Process()
         process.executableURL = URL(filePath: "/bin/sh")

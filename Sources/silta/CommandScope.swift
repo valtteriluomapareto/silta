@@ -18,13 +18,18 @@ struct CommandScope {
   }
 
   /// A failed command names the workspace its source resolves to, when it still exists.
-  static func failure(_ command: any OutputCommand, store: DatabaseStore) -> Self {
+  static func failure(
+    _ command: any OutputCommand, store: DatabaseStore,
+    prepared: Result<String?, any Error>? = nil
+  ) -> Self {
     switch type(of: command).workspaceSource {
     case .none: return Self()
-    case .option, .location: return resolve(command.global.ws, app: command.appSlug, store: store)
+    case .option, .location:
+      return resolve(command.global.ws, app: command.appSlug, store: store, prepared: prepared)
     case .argument:
       guard let command = command as? any WorkspaceArgumentCommand else { return Self() }
-      return resolve(command.workspaceArgument ?? command.global.ws, app: nil, store: store)
+      return resolve(
+        command.workspaceArgument ?? command.global.ws, app: nil, store: store, prepared: prepared)
     }
   }
 
@@ -46,11 +51,14 @@ struct CommandScope {
     return !sources.isEmpty && sources.allSatisfy { $0 == .option } ? .option : .none
   }
 
-  private static func resolve(_ slug: String?, app appSlug: String?, store: DatabaseStore)
+  private static func resolve(
+    _ slug: String?, app appSlug: String?, store: DatabaseStore,
+    prepared: Result<String?, any Error>? = nil
+  )
     -> Self
   {
     do {
-      let workspace = try WorkspaceSelection.resolve(slug, in: store)
+      let workspace = try WorkspaceSelection.resolve(slug, in: store, prepared: prepared)
       return Self(workspace: workspace, app: app(appSlug, workspace: workspace, store: store))
     } catch {
       // A workspace that doesn't exist stays out of the log; the command reports it.
@@ -71,7 +79,8 @@ extension CommandContext {
   /// The workspace a command acts on: explicit or prepared `slug`, else current (spec §19).
   /// Commands resolve it once and pass it on, so the log names what they acted on.
   func workspace(_ slug: String?) throws -> String {
-    try WorkspaceSelection.resolve(slug, in: environment.db)
+    try WorkspaceSelection.resolve(
+      slug, in: environment.db, prepared: environment.workspaceSelection)
   }
 
   /// The workspace task operations act on for `slug`, through `TaskService`'s own

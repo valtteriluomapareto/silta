@@ -1,8 +1,8 @@
 silta schema  Describe the commands, their flags, their --json data and the error codes.
 silta ws ls  List workspaces; ask in chat before editing configuration.
-silta ws use  Select the current workspace.
+silta ws use  Set the default workspace outside registered repositories.
 silta ws edit  Edit workspace YAML (human-only).
-silta ws show  Print the current workspace YAML without editing it.
+silta ws show  Print the selected workspace YAML without editing it.
 silta init  Initialize or scan repos; select with ws use; configuration editing is human-only.
 silta repo fetch  Fetch a repo, or all registered repos in the workspace, without prompting.
 silta task add  Add a proposal; --start claims work requested by the human.
@@ -46,7 +46,7 @@ silta backup  Create a whole-database SQLite snapshot.
 details: silta schema <command>
 
 global flags:
-  --ws <ws>  optional: Use this workspace instead of the current selection.
+  --ws <ws>  optional: Use this workspace instead of repository location or the saved default.
   --approved <approved>  optional: The human's words approving this command in chat.
   --json  optional: Print the JSON envelope on stdout instead of text.
   --quiet  optional: Hide success text; warnings and errors still show.

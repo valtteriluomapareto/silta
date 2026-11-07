@@ -35,7 +35,8 @@ package struct TaskService: Sendable {
   }
 
   func selected() throws -> String {
-    try WorkspaceSelection.resolve(workspace, in: environment.db)
+    try WorkspaceSelection.resolve(
+      workspace, in: environment.db, prepared: environment.workspaceSelection)
   }
 
   /// The workspace this service's operations resolve, for the command log (spec §19);

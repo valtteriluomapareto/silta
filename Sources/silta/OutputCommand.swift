@@ -37,10 +37,10 @@ protocol WorkspaceArgumentCommand: OutputCommand {
 enum WorkspaceSource {
   /// The command acts on no workspace.
   case none
-  /// `--ws`, else the current workspace, else the registered repository's workspace.
+  /// `--ws`, else the registered repository workspace, else the outside default.
   case option
   /// The command owns location-first resolution and any selection fallback.
   case location
-  /// The command's slug argument, else `--ws`, current selection or repository fallback.
+  /// The command's slug argument, else `--ws`, repository location or the outside default.
   case argument
 }

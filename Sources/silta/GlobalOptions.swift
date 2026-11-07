@@ -2,7 +2,7 @@ import ArgumentParser
 
 /// Flags every command accepts, before or after the subcommand (spec §16).
 struct GlobalOptions: ParsableArguments {
-  @Option(help: "Use this workspace instead of the current selection.")
+  @Option(help: "Use this workspace instead of repository location or the saved default.")
   var ws: String?
 
   @Option(parsing: .unconditional, help: "The human's words approving this command in chat.")

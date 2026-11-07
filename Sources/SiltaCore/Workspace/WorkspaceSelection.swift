@@ -3,12 +3,30 @@ import GRDB
 
 /// Selects an existing workspace from explicit, stored or repository context.
 package enum WorkspaceSelection {
-  /// Captures the current selection, or infers a unique workspace from Git common-directory
-  /// identity. Missing storage or an unregistered location returns nil without writes.
-  /// Stale current selections refuse; multiple matching workspaces are ambiguous.
+  /// Captures a unique registered Git common-directory workspace, else the current
+  /// selection outside registered repositories. Missing selection returns nil without writes.
+  /// Ambiguous or broken location refuses; stale current refuses only when needed.
   package static func fallback(path: URL, environment: SiltaEnvironment) async throws -> String? {
     let store = environment.db
     guard FileManager.default.fileExists(atPath: store.path) else { return nil }
+    let repositories = try LocationRepository.all(workspace: nil, in: store)
+    if !repositories.isEmpty {
+      let directory = try LocationPath.canonical(path)
+      if let common = try await LocationGit(runner: environment.git, directory: directory)
+        .commonDirectory()
+      {
+        var workspaces = Set<String>()
+        for repository in repositories {
+          guard FileManager.default.fileExists(atPath: repository.path) else { continue }
+          let registered = LocationGit(
+            runner: environment.git, directory: URL(filePath: repository.path))
+          let expected = try? await registered.commonDirectory()  // Skip stale registrations.
+          if expected == common { workspaces.insert(repository.workspace) }
+        }
+        guard workspaces.count <= 1 else { throw WorkspaceError.ambiguous(workspaces.sorted()) }
+        if let workspace = workspaces.first { return workspace }
+      }
+    }
     let current = try store.read { db in
       let selected = try String.fetchOne(
         db, sql: "SELECT value FROM meta WHERE key='current_workspace'")
@@ -22,28 +40,19 @@ package enum WorkspaceSelection {
       return selected
     }
     if let current { return current }
-    let repositories = try LocationRepository.all(workspace: nil, in: store)
-    guard !repositories.isEmpty else { return nil }
-    let directory = try LocationPath.canonical(path)
-    guard
-      let common = try await LocationGit(runner: environment.git, directory: directory)
-        .commonDirectory()
-    else { return nil }
-    var workspaces = Set<String>()
-    for repository in repositories {
-      guard FileManager.default.fileExists(atPath: repository.path) else { continue }
-      let registered = LocationGit(
-        runner: environment.git, directory: URL(filePath: repository.path))
-      let expected = try? await registered.commonDirectory()  // Skip stale registrations.
-      if expected == common { workspaces.insert(repository.workspace) }
-    }
-    guard workspaces.count <= 1 else { throw WorkspaceError.ambiguous(workspaces.sorted()) }
-    return workspaces.first
+    return nil
   }
 
-  /// Uses an explicit slug, or the current workspace recorded in meta. A slug that names
-  /// no workspace is `unknown`, so the refusal names it.
-  package static func resolve(_ slug: String? = nil, in store: DatabaseStore) throws -> String {
+  /// Uses an explicit slug, else an authoritative prepared outcome, else stored current.
+  /// Captured slugs are revalidated; captured absence/failure never rereads current.
+  package static func resolve(
+    _ slug: String? = nil, in store: DatabaseStore,
+    prepared: Result<String?, any Error>? = nil
+  ) throws -> String {
+    if slug == nil, let prepared {
+      guard let selected = try prepared.get() else { throw WorkspaceError.notFound }
+      return try resolve(selected, in: store)
+    }
     let missing = slug.map(WorkspaceError.unknown) ?? .notFound
     guard FileManager.default.fileExists(atPath: store.path) else { throw missing }
     return try store.read { db in
