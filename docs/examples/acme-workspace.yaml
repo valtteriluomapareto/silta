@@ -1,0 +1,65 @@
+# Identity, optional display name and the prefix used for new task references.
+workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }
+
+# Stored workspace policies; omit defaults you do not need to override.
+settings:
+  review_gate: "none"  # none, any or human approval required before done
+  archive_after_days: 14  # days before finished tasks leave normal listings
+  stale_days: 90  # age at which documentation counts as stale
+  proposals: "triage"  # triage keeps proposed tasks; ask asks in chat instead
+  ask_about: "standard"  # standard or short guidance for agent questions
+
+# Registered clones. remote records provenance; local paths stay on each machine.
+repos:
+  - { slug: "platform", remote: "git@example.com:acme/platform.git" }
+  - { slug: "mobile" }
+  - { slug: "sales" }
+  - { slug: "pdf-service" }
+
+# repo plus ref identifies an app, including several apps on different branches.
+# subpath selects code within a ref; prod_ref identifies its production branch.
+# lifecycle can mark legacy code; summary tells agents what the app does.
+apps:
+  - { slug: "platform-legacy", repo: "platform", ref: "origin/master", lifecycle: "legacy",
+      summary: "Legacy staff portal. No CI." }
+  - { slug: "platform-portal", repo: "platform", ref: "origin/portal", prod_ref: "origin/portal-prod",
+      summary: "Web portal: server API + SPA." }
+  - { slug: "platform-crm-ui", repo: "platform", ref: "origin/portal", subpath: "crm-ui",
+      summary: "Back-office UI embedded in the CRM." }
+  - { slug: "platform-api", repo: "platform", ref: "origin/api", prod_ref: "origin/api-prod",
+      summary: "API-only backend for the mobile app: token auth, handoff, well-known files." }
+  - { slug: "mobile", repo: "mobile", ref: "origin/main", summary: "Flutter app." }
+  - { slug: "sales", repo: "sales", ref: "origin/main", summary: "New sales portal; replaces platform-legacy." }
+  - { slug: "pdf-service", repo: "pdf-service", ref: "origin/main", summary: "PDF rendering: POST /api/pdf/{configId}." }
+
+# Reachable app environments, identified by app and name, with their base URL.
+environments:
+  - { app: "platform-api", name: "test", url: "https://api.test.acme.example" }
+  - { app: "platform-api", name: "prod", url: "https://api.acme.example" }
+
+# Named external dependencies an edge can target as service:<slug>.
+services: [ "crm", "identity-provider", "e-signature", "cms", "push", "crash-reporting", "mobile-ci" ]
+
+# from and to name apps (or a service); kind classifies the relationship.
+# summary explains it; code points to app-relative evidence with app:path.
+edges:
+  - { from: "mobile", to: "platform-api", kind: "http-api",
+      summary: "Login → one-time code → token/refresh; data endpoints",
+      code: [ "platform-api:src/Api/Controllers/AuthController.cs",
+              "platform-api:src/Api/Controllers/HandoffController.cs" ] }
+  - { from: "sales", to: "pdf-service", kind: "http-api", summary: "POST api/pdf/{configId}" }
+  - { from: "platform-portal", to: "service:crm", kind: "sdk", summary: "Reads and writes CRM records" }
+  - { from: "platform-api", to: "service:identity-provider", kind: "auth", summary: "Strong authentication" }
+  - { from: "mobile", to: "service:push", kind: "sdk", summary: "Push notifications" }
+
+# Search vocabulary: a canonical topic and optional alternative names.
+topics:
+  - { slug: "messaging", aliases: [ "viestit", "messages" ] }
+  - { slug: "mobile-auth", aliases: [ "kirjautuminen", "handoff", "nonce" ] }
+  - { slug: "reports", aliases: [ "raportit" ] }
+  - { slug: "pdf-forms", aliases: [ "lomakkeet" ] }
+
+# Read-only external note trees, with optional include and exclude globs.
+sources:
+  - { kind: "notes", root: "~/notes", include: [ "projects/acme/*.md" ],
+      exclude: [ "**/PEOPLE.md", "**/1-1/**" ] }

@@ -2587,52 +2587,8 @@ including workspaces using the default; older writers must update before writing
 | `agent_doc_writes` | `propose`, `direct` | `direct`: agents edit docs without approval (§9) | M2 |
 
 When writing a workspace's YAML, leave out keys that keep their default, so a later
-change of default reaches the workspace. The example below sets the existing keys
-only to show the shape; the workspace tests apply it, so each slice adds its key here
-when it ships.
-
-```yaml
-workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }
-settings: { review_gate: "none", archive_after_days: 14, stale_days: 90, proposals: "triage", ask_about: "standard" }
-repos:
-  - { slug: "platform", remote: "git@example.com:acme/platform.git" }   # several apps on branches
-  - { slug: "mobile" }
-  - { slug: "sales" }
-  - { slug: "pdf-service" }
-apps:
-  - { slug: "platform-legacy", repo: "platform", ref: "origin/master", lifecycle: "legacy",
-      summary: "Legacy staff portal. No CI." }
-  - { slug: "platform-portal", repo: "platform", ref: "origin/portal", prod_ref: "origin/portal-prod",
-      summary: "Web portal: server API + SPA." }
-  - { slug: "platform-crm-ui", repo: "platform", ref: "origin/portal", subpath: "crm-ui",
-      summary: "Back-office UI embedded in the CRM." }
-  - { slug: "platform-api", repo: "platform", ref: "origin/api", prod_ref: "origin/api-prod",
-      summary: "API-only backend for the mobile app: token auth, handoff, well-known files." }
-  - { slug: "mobile", repo: "mobile", ref: "origin/main", summary: "Flutter app." }
-  - { slug: "sales", repo: "sales", ref: "origin/main", summary: "New sales portal; replaces platform-legacy." }
-  - { slug: "pdf-service", repo: "pdf-service", ref: "origin/main", summary: "PDF rendering: POST /api/pdf/{configId}." }
-environments:
-  - { app: "platform-api", name: "test", url: "https://api.test.acme.example" }
-  - { app: "platform-api", name: "prod", url: "https://api.acme.example" }
-services: [ "crm", "identity-provider", "e-signature", "cms", "push", "crash-reporting", "mobile-ci" ]
-edges:
-  - { from: "mobile", to: "platform-api", kind: "http-api",
-      summary: "Login → one-time code → token/refresh; data endpoints",
-      code: [ "platform-api:src/Api/Controllers/AuthController.cs",
-              "platform-api:src/Api/Controllers/HandoffController.cs" ] }
-  - { from: "sales", to: "pdf-service", kind: "http-api", summary: "POST api/pdf/{configId}" }
-  - { from: "platform-portal", to: "service:crm", kind: "sdk", summary: "Reads and writes CRM records" }
-  - { from: "platform-api", to: "service:identity-provider", kind: "auth", summary: "Strong authentication" }
-  - { from: "mobile", to: "service:push", kind: "sdk", summary: "Push notifications" }
-topics:
-  - { slug: "messaging", aliases: [ "viestit", "messages" ] }
-  - { slug: "mobile-auth", aliases: [ "kirjautuminen", "handoff", "nonce" ] }
-  - { slug: "reports", aliases: [ "raportit" ] }
-  - { slug: "pdf-forms", aliases: [ "lomakkeet" ] }
-sources:
-  - { kind: "notes", root: "~/notes", include: [ "projects/acme/*.md" ],
-      exclude: [ "**/PEOPLE.md", "**/1-1/**" ] }
-```
+change of default reaches the workspace. The [annotated Acme example](examples/acme-workspace.yaml)
+sets the existing keys to show the shape; its CLI acceptance test applies it.
 
 Promotion order in this example: `master` → `portal` → `api`, then test → prod via
 merge branches.
