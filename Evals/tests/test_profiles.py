@@ -15,6 +15,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import evals
+from profile_history import HISTORY_FILES, UNCLASSIFIED_MEMORY
 
 
 class Profiles(unittest.TestCase):
@@ -35,6 +36,17 @@ class Profiles(unittest.TestCase):
             '        if alias or os.path.basename(path) in ("auth.json", ".credentials.json") or path in os.environ["FORBIDDEN_CONFIG"].split(os.pathsep):\n'
             '            raise AssertionError("FORBIDDEN_PROFILE_READ_COPY: " + path)\n'
             'sys.addaudithook(guard)\n')
+        with (self.root / 'guard/sitecustomize.py').open('a') as guard:
+            guard.write('if "FORCED_TIMEOUT_READY" in os.environ:\n'
+                        '    import subprocess\n'
+                        '    original = subprocess.Popen.communicate\n'
+                        '    def communicate(child, *args, **kwargs):\n'
+                        '        if "/harnesses/" in str(child.args[0]) and not getattr(child, "timed_out", False):\n'
+                        '            with open(os.environ["FORCED_TIMEOUT_READY"]) as ready: ready.readline()\n'
+                        '            child.timed_out = True\n'
+                        '            raise subprocess.TimeoutExpired(child.args, kwargs["timeout"])\n'
+                        '        return original(child, *args, **kwargs)\n'
+                        '    subprocess.Popen.communicate = communicate\n')
         self.env = dict(os.environ, HOME=str(self.root / 'real'), SILTA_HOME=str(self.root / 'data'),
                         TMPDIR=str(self.root / 'tmp'), PYTHONPATH=str(self.root / 'guard'), PYTHONDONTWRITEBYTECODE='1',
                         FORBIDDEN_CONFIG=os.pathsep.join(str(self.root / p) for p in ('real/.codex/config.toml', 'real/.claude/settings.json', 'real/.claude.json')))
@@ -44,6 +56,11 @@ class Profiles(unittest.TestCase):
         journal = self.root / (harness + '-' + mode + '.jsonl')
         if mode == 'cancel':
             os.mkfifo(journal.with_suffix('.signal'))
+        env = dict(self.env)
+        if mode == 'timeout':
+            ready = journal.with_suffix('.ready')
+            os.mkfifo(ready)
+            env['FORCED_TIMEOUT_READY'] = str(ready)
         client = self.root / ('fake-' + harness + '-' + mode)
         client.write_text('#!/bin/sh\nexec ' + shlex.join([sys.executable, '-B', str(ROOT / 'tests/fake_profile_client.py'),
                           str(journal), harness, mode]) + ' "$@"\n')
@@ -55,7 +72,7 @@ class Profiles(unittest.TestCase):
             argv += ['--max-trial-tokens', str(cap)]
         if operator is not None:
             argv += ['--operator', operator]
-        child = subprocess.Popen(argv, env=self.env, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        child = subprocess.Popen(argv, env=env, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.addCleanup(lambda: child.kill() if child.poll() is None else None)
         text, commands, next_command = [], [], False
         for line in child.stdout:
@@ -184,16 +201,72 @@ class Profiles(unittest.TestCase):
             identities.extend(p['conversation'] for p in phases)
         self.assertEqual(len(set(identities)), 4)
 
-    def test_nonzero_native_exit_still_uninstalls_and_cleans_each_trial(self):
-        output, report, entries, _, _ = self.run_live('codex', 'nonzero')
-        self.assertFalse(report['aborted'])
-        self.assertEqual(len(report['trials']), 2)
-        for trial in report['trials']:
-            evidence = json.loads((output / trial['evidence']).read_text())
-            self.assertEqual(evidence['phases'][0]['exit'], 7)
-            self.assertFalse(trial['passed'])
-            self.assertTrue((output / trial['id'] / 'cleanup.json').exists())
-        self.assertFalse(any(Path(e['trial']).exists() for e in entries if e['event'] == 'model'))
+    def assert_aborted_trial(self, output, report, entries, text, exit_code, known_tokens=15):
+        self.assertTrue(report['aborted'], 'Returned failure reused the shared profile')
+        self.assertEqual(report['planned_trials'], 2)
+        self.assertEqual(report['attempted_trials'], 1)
+        self.assertEqual(report['completed_trials'], 0)
+        models = [e for e in entries if e['event'] == 'model']
+        self.assertEqual(len(models), 1, 'Another native process launched after failure')
+        root = Path(models[0]['trial'])
+        self.addCleanup(shutil.rmtree, root, True)
+        self.assertTrue((root / 'data/silta.db').exists(), 'Failed runtime was deleted')
+        self.assertIn(str(root), text)
+        trial, = report['trials']
+        self.assertFalse(trial['checks']['infrastructure'])
+        self.assertEqual(trial['metrics']['tokens'], known_tokens)
+        evidence = json.loads((output / trial['evidence']).read_text())
+        phase, = evidence['phases']
+        self.assertEqual(phase['exit'], exit_code)
+        self.assertEqual(phase['tokens'], known_tokens)
+        self.assertTrue((output / trial['id'] / 'phase-0.jsonl').is_file())
+        self.assertTrue((output / trial['id'] / 'silta.db').is_file())
+        self.assertTrue((output / trial['id'] / 'cleanup.json').is_file())
+
+    def test_returned_token_limit_aborts_and_retains_failed_trial(self):
+        output, report, entries, text, _ = self.run_live('codex', cap=1)
+        self.assert_aborted_trial(output, report, entries, text, 'token-limit')
+
+    def test_returned_timeout_aborts_and_retains_failed_trial(self):
+        for harness in ('claude', 'codex'):
+            with self.subTest(harness=harness):
+                output, report, entries, text, _ = self.run_live(harness, 'timeout')
+                self.assert_aborted_trial(output, report, entries, text, 'timeout')
+
+    def test_missing_usage_aborts_and_retains_failed_trial(self):
+        output, report, entries, text, _ = self.run_live('codex', 'missing-usage', cap=100)
+        self.assert_aborted_trial(output, report, entries, text, 'usage-unavailable', known_tokens=None)
+
+    def test_native_transport_failures_abort_before_next_phase(self):
+        for harness in ('claude', 'codex'):
+            for mode in ('nonzero', 'stream-error', 'malformed'):
+                with self.subTest(harness=harness, mode=mode):
+                    output, report, entries, text, _ = self.run_live(harness, mode, scenario='handoff-resume')
+                    self.assert_aborted_trial(output, report, entries, text, 7 if mode == 'nonzero' else 0)
+
+    def test_all_supported_history_and_memory_is_unreadable_to_later_trials(self):
+        for harness in ('claude', 'codex'):
+            with self.subTest(harness=harness):
+                _, report, entries, _, _ = self.run_live(harness)
+                self.assertFalse(report['aborted'])
+                models = [e for e in entries if e['event'] == 'model']
+                self.assertEqual(len(models), 2)
+                seeded = [e for e in entries if e['event'] == 'history-seeded']
+                self.assertEqual(len(seeded), 2)
+                for event in seeded:
+                    self.assertEqual(set(event['files']), set(HISTORY_FILES[harness]))
+                self.assertEqual(models[1]['old_answer_files'], [], 'Earlier answers readable in native state')
+                for name in HISTORY_FILES[harness]:
+                    self.assertFalse((Path(models[1]['profile']) / name).exists(), 'History survives final cleanup: ' + name)
+
+    def test_unclassified_memory_aborts_instead_of_reusing_profile(self):
+        for harness in ('claude', 'codex'):
+            with self.subTest(harness=harness):
+                output, report, entries, text, _ = self.run_live(harness, 'unclassified-memory')
+                self.assert_aborted_trial(output, report, entries, text, 0)
+                model = next(e for e in entries if e['event'] == 'model')
+                path = Path(model['profile']) / UNCLASSIFIED_MEMORY[harness]
+                self.assertIn('PREVIOUS_TRIAL_ANSWER:', path.read_text())
 
     def test_token_cap_does_not_include_previous_trial_native_sessions(self):
         output, report, _, _, _ = self.run_live('codex', cap=20)

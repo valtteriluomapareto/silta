@@ -11,6 +11,7 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import evals
+from profile_history import HISTORY_FILES, UNCLASSIFIED_MEMORY
 
 journal, harness, mode, *args = sys.argv[1:]
 journal = Path(journal)
@@ -73,6 +74,10 @@ state = {'event': 'model', 'profile': str(profile), 'home': os.environ['HOME'], 
          'old_session_exists': bool(old and (profile / 'sessions' / (old['actor'].split(':')[-1] + '.jsonl')).exists()),
          'old_config': bool(old and 'PRIVATE_TRIAL_CONFIG' in config_text),
          'real_config': 'REAL_PROFILE_SENTINEL' in config_text}
+answer_files = list(HISTORY_FILES[harness])
+answer_files += ['config.toml'] if harness == 'codex' else ['settings.json', '.claude.json', '../.claude.json']
+state['old_answer_files'] = [name for name in answer_files if old and (profile / name).is_file()
+                             and ('PREVIOUS_TRIAL_ANSWER:' + old['actor']).encode() in (profile / name).read_bytes()]
 record(state)
 if harness == 'claude' and state['scratch']:
     scratch = Path(state['scratch'])
@@ -122,6 +127,13 @@ def hook(event):
 hook('SessionStart')
 emit({'type': 'system', 'session_id': conversation} if harness == 'claude'
      else {'type': 'thread.started', 'thread_id': conversation})
+if mode == 'timeout':
+    emit({'type': 'result', 'is_error': False, 'usage': {'input_tokens': 10, 'output_tokens': 5}} if harness == 'claude'
+         else {'type': 'turn.completed', 'usage': {'input_tokens': 10, 'output_tokens': 5}})
+    with journal.with_suffix('.ready').open('w') as ready:
+        ready.write('ready\n')
+    read_end, write_end = os.pipe()
+    os.read(read_end, 1)
 recording = json.loads((ROOT / 'tests/recordings' / (scenario + '-pass.json')).read_text())
 for index, action in enumerate(recording['phases'][phase]):
     if 'message' in action:
@@ -148,6 +160,18 @@ for index, action in enumerate(recording['phases'][phase]):
          'exit_code': run.returncode, 'aggregated_output': run.stdout + run.stderr}})
     assert run.returncode == 0, run.stdout + run.stderr
 hook('Stop')
+answer = 'PREVIOUS_TRIAL_ANSWER:' + actor
+for name in HISTORY_FILES[harness]:
+    if mode == 'runtime-link' and name.startswith('cache/'):
+        continue
+    path = profile / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({'display': answer, 'session_id': session}) + '\n')
+record({'event': 'history-seeded', 'trial': str(trial_root), 'files': list(HISTORY_FILES[harness])})
+if mode == 'unclassified-memory':
+    path = profile / UNCLASSIFIED_MEMORY[harness]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(answer)
 if harness == 'claude':
     (profile / 'projects').mkdir(exist_ok=True)
     (profile / 'projects/previous-trial').write_text('PRIVATE_TRIAL_HISTORY')
@@ -155,11 +179,16 @@ if harness == 'claude':
 if harness == 'codex':
     if 'PRIVATE_TRIAL_CONFIG' not in config.read_text():
         with config.open('a') as output:
-            output.write('\n[projects.' + json.dumps(str(Path.cwd())) + ']\ntrust_level="trusted"\n# PRIVATE_TRIAL_CONFIG\n')
+            output.write('\n[projects.' + json.dumps(str(Path.cwd())) + ']\ntrust_level="trusted"\n# PRIVATE_TRIAL_CONFIG ' + answer + '\n')
 else:
     settings = json.loads(config.read_text())
-    settings['privateTrialState'] = 'PRIVATE_TRIAL_CONFIG'
+    settings['privateTrialState'] = 'PRIVATE_TRIAL_CONFIG ' + answer
     config.write_text(json.dumps(settings))
+    global_config = profile / '.claude.json'
+    global_state = json.loads(global_config.read_text())
+    global_state['projects'] = {str(Path.cwd()): {'answer': answer}}
+    global_config.write_text(json.dumps(global_state))
+    (profile.parent / '.claude.json').write_text(json.dumps(global_state))
 if mode == 'unknown':
     (profile / 'unknown-opaque').touch()
 if mode == 'runtime-link':
@@ -168,12 +197,18 @@ if mode == 'corrupt':
     target = profile / ('AGENTS.md' if harness == 'codex' else 'CLAUDE.md')
     target.write_text(target.read_text().replace('Read `silta brief`', 'Altered `silta brief`'))
 count = 2 if phase and ('resume' in args or '--resume' in args) else 1
-if harness == 'codex':
+if harness == 'codex' and mode != 'missing-usage':
     (profile / 'sessions').mkdir(exist_ok=True)
     (profile / 'sessions' / (session + '.jsonl')).write_text('\n'.join(map(json.dumps, [
         {'type': 'session_meta', 'payload': {'id': conversation}},
         {'type': 'event_msg', 'payload': {'type': 'token_count', 'info': {
             'total_token_usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}}}}])) + '\n')
-emit({'type': 'result', 'is_error': False, 'usage': {'input_tokens': 10, 'output_tokens': 5}} if harness == 'claude'
-     else {'type': 'turn.completed', 'usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}})
+if mode == 'malformed':
+    print('invalid native JSON', flush=True)
+terminal = ({'type': 'result', 'is_error': mode == 'stream-error', 'usage': {'input_tokens': 10, 'output_tokens': 5}}
+            if harness == 'claude' else {'type': 'turn.failed' if mode == 'stream-error' else 'turn.completed',
+                                        'usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}})
+if mode == 'missing-usage':
+    terminal.pop('usage')
+emit(terminal)
 sys.exit(7 if mode == 'nonzero' else 0)
