@@ -63,7 +63,7 @@ struct GuideReferenceTests {
     source: TaskDetails, db: Database
   ) throws {
     if kind == "diff" {
-      #expect(notes.contains("M2"))
+      #expect(notes.contains("not supported"))
       let full = ref.hasPrefix("#-") ? "diff:lib/push/categories.dart" + ref : ref
       #expect(
         throws: TaskError.invalid(

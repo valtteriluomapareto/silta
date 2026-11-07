@@ -14,7 +14,7 @@ struct WsListCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.none
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let workspaces = try WorkspaceSelection.list(in: context.environment.db)

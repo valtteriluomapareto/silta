@@ -1,0 +1,154 @@
+### silta comment
+
+OVERVIEW: Post discussion or change a thread's state.
+
+The default subcommand is `comment post`; run its help for post options.
+Ask: silta comment AC-1 --kind question -m "Which API?"
+Answer: silta comment AC-1 --kind answer --reply-to AC-1/1 -m "Use v2."
+Accept an answer with `comment accept`; replies normalize to their root.
+A claimer's handoff releases only that claimer's claim.
+See `silta guide questions` for recipient, relay and approval rules.
+
+USAGE: silta comment [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  resolve                 Resolve discussion threads atomically.
+  reopen                  Reopen discussion threads atomically.
+  delete                  Soft-delete your own post, retaining its ref and
+                          thread.
+  accept                  Accept an answer as the asker or current claimer and
+                          resolve the thread.
+
+  See 'silta help comment <subcommand>' for detailed help.
+
+### silta comment accept
+
+OVERVIEW: Accept an answer as the asker or current claimer and resolve the
+thread.
+
+USAGE: silta comment accept [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref>
+
+ARGUMENTS:
+  <ref>                   The live answer ref to accept.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta comment delete
+
+OVERVIEW: Soft-delete your own post, retaining its ref and thread.
+
+USAGE: silta comment delete [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref>
+
+ARGUMENTS:
+  <ref>                   The exact post to delete, including a root or reply.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta comment post
+
+OVERVIEW: Post task discussion; a claimer's handoff releases its claim.
+
+USAGE: silta comment post [<options>] <target>
+
+ARGUMENTS:
+  <target>                The task reference.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  -m, --message <message> Supply the markdown body; default is none.
+  -F <F>                  Read UTF-8 from a file or stdin; default is none.
+  --allow-secret          Retain detected secrets with human approval; default
+                          is off. Retry with file input.
+  --kind <kind>           One of comment, question, answer, decision or
+                          handoff; default is comment. A handoff names state,
+                          next step, open questions and branch/sha.
+  --reply-to <reply-to>   Join this post's thread; default is none.
+  --to <to>               Recipient: complete actor or me; default is none.
+  --from <from>           Cite a note; default is none.
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta comment reopen
+
+OVERVIEW: Reopen discussion threads atomically.
+
+USAGE: silta comment reopen [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <refs> ...
+
+ARGUMENTS:
+  <refs>                  Thread refs; -m creates one reply per changed thread.
+                          Replies select their root.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  -m, --message <message> Supply the markdown body; default is none.
+  -F <F>                  Read UTF-8 from a file or stdin; default is none.
+  --allow-secret          Retain detected secrets with human approval; default
+                          is off. Retry with file input.
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta comment resolve
+
+OVERVIEW: Resolve discussion threads atomically.
+
+USAGE: silta comment resolve [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <refs> ...
+
+ARGUMENTS:
+  <refs>                  Thread refs; -m creates one reply per changed thread.
+                          Replies select their root.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  -m, --message <message> Supply the markdown body; default is none.
+  -F <F>                  Read UTF-8 from a file or stdin; default is none.
+  --allow-secret          Retain detected secrets with human approval; default
+                          is off. Retry with file input.
+  --version               Show the version.
+  -h, --help              Show help information.

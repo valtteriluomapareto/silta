@@ -13,14 +13,15 @@ struct WhereCommand: OutputCommand {
     "candidates": .array(.object(["app": .string, "ref": .string])),
   ])
 
-  @OptionGroup var global: GlobalOptions
-  @Option(help: "Inspect this directory instead of the current one.") var path: String?
-  @Option(help: "Select one of this path's candidate apps.") var app: String?
-  @Option(help: "Use this task before session or branch task evidence.") var task: String?
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
+  @Option(help: "Inspect this directory; default is the current one.") var path: String?
+  @Option(help: "Select one candidate app; default is inferred.") var app: String?
+  @Option(help: "Use this task; default is session or branch evidence.") var task: String?
   @Option(
-    name: .customLong("set"), help: "Set this worktree's override (human-only when changing it).")
+    name: .customLong("set"), help: "Set this worktree's override; default is none. Human-only.")
   var setApp: String?
-  @Flag(help: "Remove this worktree's override (human-only when changing it).") var unset = false
+  @Flag(help: "Remove this worktree's override; default is off. Human-only then.")
+  var unset = false
 
   var appSlug: String? { app ?? setApp }
 

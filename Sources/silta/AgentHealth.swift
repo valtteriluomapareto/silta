@@ -199,12 +199,12 @@ enum AgentHealth {
       message =
         "\(name): installed metadata version \(version); "
         + (baseline.map { "last live-verified \($0) on 2026-11-06." }
-          ?? "no live-verified baseline (D42).")
+          ?? "no live-verified baseline.")
     } else {
       message =
         "\(name): installed metadata version unknown (missing executable or unsupported installation layout); "
         + (baseline.map { "last live-verified \($0) on 2026-11-06." }
-          ?? "no live-verified baseline (D42).")
+          ?? "no live-verified baseline.")
     }
     return DoctorCheck(
       id: "install.\(name).version", status: matches ? .pass : .warning,

@@ -1,0 +1,44 @@
+### silta repo
+
+OVERVIEW: Operate on registered repositories.
+
+USAGE: silta repo [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  fetch                   Fetch a repo, or all registered repos in the
+                          workspace, without prompting.
+
+  See 'silta help repo <subcommand>' for detailed help.
+
+### silta repo fetch
+
+OVERVIEW: Fetch a repo, or all registered repos in the workspace, without
+prompting.
+
+USAGE: silta repo fetch [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<repo>]
+
+ARGUMENTS:
+  <repo>                  The repository slug; omitted means all registered
+                          repos.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.

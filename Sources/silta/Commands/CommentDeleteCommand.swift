@@ -7,7 +7,7 @@ struct CommentDeleteCommand: OutputCommand {
   static let dataShape = CommentOutput.mutationShape
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @Argument(help: "The exact post to delete, including a root or reply.") var ref: String
 
   func execute(_ context: CommandContext) throws -> CommandOutput {

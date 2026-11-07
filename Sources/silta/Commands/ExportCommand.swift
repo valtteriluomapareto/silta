@@ -19,7 +19,7 @@ struct ExportCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Option(
     help: ArgumentHelp(
@@ -29,7 +29,7 @@ struct ExportCommand: OutputCommand {
 
   @Flag(
     help: ArgumentHelp(
-      "Commit only the workspace subtree in an existing Git work tree. "
+      "Commit only the workspace subtree; default is off. "
         + "Ignored files produce warnings; an unchanged tree makes no commit.")
   )
   var commit = false

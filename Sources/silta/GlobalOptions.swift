@@ -2,21 +2,21 @@ import ArgumentParser
 
 /// Flags every command accepts, before or after the subcommand (spec §16).
 struct GlobalOptions: ParsableArguments {
-  @Option(help: "Use this workspace instead of repository location or the saved default.")
+  @Option(help: "Use a workspace; default is inferred or saved.")
   var ws: String?
 
-  @Option(parsing: .unconditional, help: "The human's words approving this command in chat.")
+  @Option(parsing: .unconditional, help: "The human's chat approval; default is none.")
   var approved: String?
 
-  @Flag(help: "Print the JSON envelope on stdout instead of text.")
+  @Flag(help: "Print JSON; default is text.")
   var json = false
 
-  @Flag(help: "Hide success text; warnings and errors still show.")
+  @Flag(help: "Hide success text; default is off.")
   var quiet = false
 
-  @Flag(help: "Allow deterministic overrides outside temporary homes; never at the real home.")
+  @Flag(help: .hidden)
   var deterministic = false
 
-  @Flag(help: "Mirror command diagnostics to stderr.")
+  @Flag(help: "Mirror diagnostics; default is off.")
   var verbose = false
 }

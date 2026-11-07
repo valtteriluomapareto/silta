@@ -1,0 +1,124 @@
+### silta code
+
+OVERVIEW: Read another app's committed code without checking out a branch.
+
+USAGE: silta code [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  show                    Read a committed file, optionally selecting lines.
+  grep                    Search committed text, returning app-relative paths
+                          and line numbers.
+  log                     List commit SHA and subject at the selected ref.
+  ls                      List immediate committed names in an app-relative
+                          directory.
+
+  See 'silta help code <subcommand>' for detailed help.
+
+### silta code grep
+
+OVERVIEW: Search committed text, returning app-relative paths and line numbers.
+
+USAGE: silta code grep [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--prod] [--fetch] <target> <pattern> [<pathspec>]
+
+ARGUMENTS:
+  <target>                App slug, optionally followed by @ref.
+  <pattern>               Extended regular expression (git grep -E); put
+                          option-like ones after --.
+  <pathspec>              Optional relative wildcard pathspec; a leading : (Git
+                          magic) is unsupported.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --prod                  Read the app's production ref; default is off.
+  --fetch                 Fetch first; default is off. Failures stop the read.
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta code log
+
+OVERVIEW: List commit SHA and subject at the selected ref.
+
+USAGE: silta code log [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--prod] [--fetch] <target> [<path>] [-n <n>]
+
+ARGUMENTS:
+  <target>                App slug, optionally followed by @ref.
+  <path>                  Optional app-relative literal path.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --prod                  Read the app's production ref; default is off.
+  --fetch                 Fetch first; default is off. Failures stop the read.
+  -n <n>                  Positive commit limit (default 20).
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta code ls
+
+OVERVIEW: List immediate committed names in an app-relative directory.
+
+USAGE: silta code ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--prod] [--fetch] <target> [<directory>]
+
+ARGUMENTS:
+  <target>                App slug, optionally followed by @ref.
+  <directory>             Optional app-relative literal directory.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --prod                  Read the app's production ref; default is off.
+  --fetch                 Fetch first; default is off. Failures stop the read.
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta code show
+
+OVERVIEW: Read a committed file, optionally selecting lines.
+
+USAGE: silta code show [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--prod] [--fetch] <target> <path> [--lines <lines>]
+
+ARGUMENTS:
+  <target>                App slug, optionally followed by @ref.
+  <path>                  App-relative literal file path.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --prod                  Read the app's production ref; default is off.
+  --fetch                 Fetch first; default is off. Failures stop the read.
+  --lines <lines>         Line N or inclusive range A-B; default is at most 400
+                          lines.
+  --version               Show the version.
+  -h, --help              Show help information.

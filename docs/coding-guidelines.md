@@ -238,7 +238,7 @@ written first. The Tester reviewer checks it.
 ### Help pages
 
 Every command's help has an abstract of one sentence, at most 80 characters,
-ending in a period and naming human-only commands. The usage line is accurate;
+ending in a period and saying `(human-only)` when it is. The usage line is accurate;
 each argument and option gets one line, with enumerated values and defaults. The
 discussion is at most six lines and covers only effects a caller must know.
 Global options appear in their own titled group; test knobs stay hidden. Help

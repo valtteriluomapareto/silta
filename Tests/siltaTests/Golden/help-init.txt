@@ -1,0 +1,30 @@
+### silta init
+
+OVERVIEW: Initialize or scan repos; `ws edit` is human-only.
+
+`init --scan` scans roots and two child levels without fetching.
+A new workspace derives its slug and task prefix from the first directory.
+Values keep typed case and use letters, digits, _ or -, like `ws edit`.
+A --ws scan refreshes that workspace, matching slug without regard to case.
+It takes no slug or prefix; a none-named clone is refused with its path.
+Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC
+
+USAGE: silta init [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--scan <scan> ...] [--slug <slug>] [--prefix <prefix>]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --scan <scan>           Scan directories to two child levels; default is
+                          none. An existing workspace only refreshes registered
+                          repo paths.
+  --slug <slug>           Slug for a new workspace; defaults to the first
+                          directory's lowercased name.
+  --prefix <prefix>       Task prefix; defaults to the slug's first two
+                          letters, uppercased.
+  --version               Show the version.
+  -h, --help              Show help information.

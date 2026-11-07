@@ -26,17 +26,18 @@ struct RestoreCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.none
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The export tree: <root>/<workspace>, holding manifest.json.")
   var dir: String
 
-  @Flag(help: "Check and report the restore, then roll it back.")
+  @Flag(help: "Check and report the restore, then roll it back; default is off.")
   var dryRun = false
 
   @Option(
     help: ArgumentHelp(
-      "The manifest sha256 prefix the dry run printed; a different tree is refused.",
+      "The manifest sha256 prefix the dry run printed; default is none. "
+        + "A different tree is refused.",
       valueName: "sha"))
   var manifest: String?
 

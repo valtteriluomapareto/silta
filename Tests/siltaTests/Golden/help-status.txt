@@ -1,0 +1,20 @@
+### silta status
+
+OVERVIEW: Print a one-line status: workspace, app, inbox count and your claimed
+tasks.
+
+Bare silta runs this. It is a read: no fetch, no index write. inbox counts what
+silta inbox shows for you; claimed lists your exact session's claims.
+
+USAGE: silta status [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.

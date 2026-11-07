@@ -18,21 +18,22 @@ struct TaskFromPlanCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "UTF-8 Markdown file, or - for stdin (the default).") var file = "-"
 
-  @Option(help: "The existing parent task reference; created tasks inherit its app.")
+  @Option(help: "The existing parent task reference; default is none.")
   var parent: String?
 
-  @Flag(help: "Create at most ten subtasks instead of a checklist.") var split = false
+  @Flag(help: "Create at most ten subtasks; default is off.") var split = false
 
-  @Flag(help: "Preview content and statuses without creating tasks.") var dryRun = false
+  @Flag(help: "Preview without creating tasks; default is off.") var dryRun = false
 
-  @Flag(help: "Remove an unchanged untracked source after commit; never a harness file.")
+  @Flag(help: "Remove an unchanged untracked source; default is off.")
   var delete = false
 
-  @Flag(help: "Retain detected secrets (human-only).") var allowSecret = false
+  @Flag(help: "Retain detected secrets; default is off. Human-only.")
+  var allowSecret = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     var options = TaskImport()

@@ -9,19 +9,20 @@ struct AgentsCommand: ParsableCommand {
       AgentsInstallCommand.self, AgentsUninstallCommand.self, AgentsSessionStartCommand.self,
       AgentsStopCommand.self,
     ])
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 }
 
 struct AgentInstallOptions: ParsableArguments {
-  @Flag(help: "Select Claude instructions and its shared OpenCode skill.") var claude = false
-  @Flag(help: "Select Codex instructions and the effective SILTA_HOME writable root.") var codex =
+  @Flag(help: "Select Claude instructions and its shared OpenCode skill; default is both.")
+  var claude = false
+  @Flag(help: "Select Codex instructions and its writable root; default is both.") var codex =
     false
-  @Flag(help: "Preview only (the default); never combine with --apply.") var dryRun = false
-  @Option(help: "Apply exactly the preview identified by this token; no interactive prompt.")
+  @Flag(help: "Preview only; default is on.") var dryRun = false
+  @Option(help: "Apply exactly this preview token; default is none.")
   var apply: String?
-  @Flag(help: "Install Claude SessionStart; uninstall removes owned hooks without this flag.")
+  @Flag(help: "Install Claude SessionStart; default is off.")
   var hook = false
-  @Flag(help: "Install Claude Stop handoff checks and the required SessionStart hook.")
+  @Flag(help: "Install Claude Stop checks and SessionStart; default is off.")
   var stopHook = false
 
   func execute(_ context: CommandContext, uninstall: Bool) throws -> CommandOutput {
@@ -71,19 +72,15 @@ struct AgentInstallOptions: ParsableArguments {
 struct AgentsInstallCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "install", abstract: "Preview owned harness edits; confirm with --apply <token>.",
-    discussion: "Defaults to Claude and Codex. Unrelated content and file modes are retained. "
-      + "Edited ownership, symlinks and ambiguous Codex root definitions are refused. "
-      + "ACLs, non-provenance extended attributes, file flags, special mode bits and ownership "
-      + "that replacement cannot retain are refused before writes. "
-      + "Replacements are atomic per file, not across files; a failure lists completed paths. "
-      + "--hook opts into SessionStart; --stop-hook adds Stop and requires SessionStart. "
-      + "No hook flag leaves settings unread during install. "
-      + "Hook JSON must have no duplicate keys and only exact safe-integer numbers; "
-      + "other numeric forms require manual integration. Uninstall removes selected owned hooks. "
+    discussion: "Defaults to Claude and Codex; preview exactly what --apply will write.\n"
+      + "Retains unrelated content and file modes; refuses unsafe or ambiguous roots.\n"
+      + "Replacements are atomic per file, not across files; failures list paths.\n"
+      + "--hook opts into SessionStart; --stop-hook adds Stop and needs it.\n"
+      + "Hook JSON needs exact safe integers; other forms need manual work.\n"
       + "Real harness acceptance is separate from installation.")
   static let workspaceSource = WorkspaceSource.none
   static let dataShape = AgentInstallResult.shape
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @OptionGroup var options: AgentInstallOptions
   func execute(_ context: CommandContext) throws -> CommandOutput {
     try options.execute(context, uninstall: false)
@@ -93,10 +90,14 @@ struct AgentsInstallCommand: OutputCommand {
 struct AgentsUninstallCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "uninstall", abstract: "Preview removal of selected, unedited Silta ownership.",
-    discussion: AgentsInstallCommand.configuration.discussion)
+    discussion: "Previews removal of only owned, unedited Silta content.\n"
+      + "Defaults to Claude and Codex; --claude or --codex selects one.\n"
+      + "Unrelated settings and hooks remain untouched.\n"
+      + "Uninstall rejects --hook and --stop-hook; it removes selected hooks.\n"
+      + "A changed preview token requires a fresh preview.")
   static let workspaceSource = WorkspaceSource.none
   static let dataShape = AgentInstallResult.shape
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @OptionGroup var options: AgentInstallOptions
   func execute(_ context: CommandContext) throws -> CommandOutput {
     try options.execute(context, uninstall: true)

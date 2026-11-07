@@ -16,7 +16,7 @@ struct StatusCommand: OutputCommand {
     "claimed": .optional(.array(.object(["ref": .string, "title": .string]))),
   ])
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let report = try await StatusService(environment: context.environment).resolve(

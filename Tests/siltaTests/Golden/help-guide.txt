@@ -1,0 +1,23 @@
+### silta guide
+
+OVERVIEW: Read the agent manual, or one topic.
+
+Topic names are exact (case-sensitive). Topics: when, start, recipes, human,
+questions, blocked, handoff, reviews, refusals, refs, output
+
+USAGE: silta guide [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<topic>]
+
+ARGUMENTS:
+  <topic>                 One exact topic from the list above; omitted prints
+                          the full manual.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.

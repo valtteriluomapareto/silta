@@ -13,7 +13,7 @@ struct SchemaCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.none
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "A command's name, e.g. `task ls`; a group's name lists the group.")
   var command: [String] = []

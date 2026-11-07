@@ -10,14 +10,14 @@ struct WsEditCommand: WorkspaceArgumentCommand {
 
   static let workspaceSource = WorkspaceSource.argument
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The workspace slug; defaults to repository location, then the saved default.")
   var workspace: String?
 
   var workspaceArgument: String? { workspace }
 
-  @Option(name: .customShort("F"), help: "Read UTF-8 YAML from a file, or - for stdin.")
+  @Option(name: .customShort("F"), help: "Read UTF-8 YAML from a file or stdin; default is none.")
   var file: String?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {

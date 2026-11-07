@@ -51,12 +51,19 @@ struct AgentInstallReviewTests {
 
   @Test func bothHelpRoutesExplainSelectionAndRecovery() throws {
     try withScratchDirectory { scratch in
-      for operation in ["install", "uninstall"] {
+      let routes: [String: [String]] = [
+        "install": ["Defaults to Claude and Codex;", "not across files"],
+        "uninstall": [
+          "Defaults to Claude and Codex;", "Unrelated settings and hooks remain untouched.",
+        ],
+      ]
+      for (operation, requiredText) in routes {
         let result = try AgentsInstallTests.run([operation, "--help"], in: scratch)
         #expect(result.termination == .exit(0))
         let text = result.stdout.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        #expect(text.contains("Defaults to Claude and Codex."))
-        #expect(text.contains("not across files"))
+        for phrase in requiredText {
+          #expect(text.contains(phrase), "\(operation) help is missing \(phrase)")
+        }
       }
     }
   }

@@ -11,7 +11,7 @@ struct HelpCommandTests {
       var byTopLevel: [String: [(route: String, text: String)]] = [:]
       for route in routes {
         let words = route.split(separator: " ").map(String.init)
-        let arguments = (words.count == 1 ? words : Array(words.dropFirst())) + ["--help"]
+        let arguments = (words.count == 1 ? [] : Array(words.dropFirst())) + ["--help"]
         let result = try SiltaBinary.run(arguments, in: scratch)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
@@ -44,7 +44,7 @@ struct HelpCommandTests {
     try withScratchDirectory { scratch in
       let examples = try helpRoutes(in: scratch).flatMap { route -> [[String]] in
         let words = route.split(separator: " ").map(String.init)
-        let arguments = (words.count == 1 ? words : Array(words.dropFirst())) + ["--help"]
+        let arguments = (words.count == 1 ? [] : Array(words.dropFirst())) + ["--help"]
         let result = try SiltaBinary.run(arguments, in: scratch)
         return result.stdout.split(separator: "\n")
           .filter { line in
@@ -106,15 +106,26 @@ struct HelpCommandTests {
     #expect(abstract.hasSuffix("."))
     #expect(abstract.filter { $0 == "." }.count == 1)
     #expect(!text.contains("--deterministic"))
-    #expect(text.contains("\nGLOBAL OPTIONS:"))
+    let globalOptions = try globalOptionsLines(lines)
+    #expect(!globalOptions.isEmpty)
+    for flag in ["--ws", "--approved", "--json", "--quiet", "--verbose"] {
+      #expect(globalOptions.contains { $0.hasPrefix("  \(flag)") }, "\(route) is missing \(flag)")
+    }
+    let usagePrefix =
+      route == "silta" ? "USAGE: silta" : "USAGE: silta " + route.dropFirst("silta ".count)
+    #expect(lines.contains { $0.hasPrefix(usagePrefix) })
     let discussion = try discussionLines(text)
     #expect(discussion.count <= 6)
   }
 
   private func checkRuntimeTextRules(_ text: String, route: String) throws {
     #expect(!text.contains("docs/"))
-    #expect(try Self.idMatches(in: text, pattern: #"(?<![A-Za-z0-9_-])M\d+(?![A-Za-z0-9_-])"#).isEmpty)
-    #expect(try Self.idMatches(in: text, pattern: #"(?<![A-Za-z0-9_-])D\d+(?![A-Za-z0-9_-])"#).isEmpty)
+    let milestones = try Self.idMatches(
+      in: text, pattern: #"(?<![A-Za-z0-9_-])M\d+(?![A-Za-z0-9_-])"#)
+    let decisions = try Self.idMatches(
+      in: text, pattern: #"(?<![A-Za-z0-9_-])D\d+(?![A-Za-z0-9_-])"#)
+    #expect(milestones.isEmpty)
+    #expect(decisions.isEmpty)
     #expect(
       !text.lowercased().contains("not yet")
         && !text.lowercased().contains("not available")
@@ -129,6 +140,15 @@ struct HelpCommandTests {
     let usageIndex = try #require(
       lines[(blankIndex + 1)...].firstIndex { $0.hasPrefix("USAGE: ") })
     return lines[(blankIndex + 1)..<usageIndex].filter { !$0.isEmpty }
+  }
+
+  private func globalOptionsLines(_ lines: [String]) throws -> [String] {
+    guard let headingIndex = lines.firstIndex(of: "GLOBAL OPTIONS:") else { return [] }
+    let followingHeading = lines[(headingIndex + 1)...].firstIndex { line in
+      !line.isEmpty && line == line.uppercased() && line.hasSuffix(":")
+    }
+    let endIndex = followingHeading ?? lines.endIndex
+    return lines[(headingIndex + 1)..<endIndex].filter { !$0.isEmpty }
   }
 
   private static func arguments(afterCommandIn line: String) -> [String]? {

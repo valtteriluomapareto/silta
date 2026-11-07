@@ -1,0 +1,107 @@
+### silta ws
+
+OVERVIEW: List, select and edit workspaces.
+
+USAGE: silta ws [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  ls                      List workspaces; ask in chat before editing
+                          configuration.
+  use                     Set the default workspace outside registered
+                          repositories.
+  edit                    Edit workspace YAML (human-only).
+  show                    Print the selected workspace YAML without editing it.
+
+  See 'silta help ws <subcommand>' for detailed help.
+
+### silta ws edit
+
+OVERVIEW: Edit workspace YAML (human-only).
+
+USAGE: silta ws edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<workspace>] [-F <F>]
+
+ARGUMENTS:
+  <workspace>             The workspace slug; defaults to repository location,
+                          then the saved default.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  -F <F>                  Read UTF-8 YAML from a file or stdin; default is none.
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta ws ls
+
+OVERVIEW: List workspaces; ask in chat before editing configuration.
+
+USAGE: silta ws ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta ws show
+
+OVERVIEW: Print the selected workspace YAML without editing it.
+
+USAGE: silta ws show [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<workspace>]
+
+ARGUMENTS:
+  <workspace>             The workspace slug; defaults to repository location,
+                          then the saved default.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta ws use
+
+OVERVIEW: Set the default workspace outside registered repositories.
+
+USAGE: silta ws use [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <workspace>
+
+ARGUMENTS:
+  <workspace>             The workspace slug to use outside registered
+                          repositories.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.

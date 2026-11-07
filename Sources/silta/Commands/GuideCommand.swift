@@ -11,7 +11,7 @@ struct GuideCommand: OutputCommand {
     "text": .string, "topics": .array(.string), "topic": .optional(.string),
   ])
   static let workspaceSource = WorkspaceSource.none
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @Argument(help: "One exact topic from the list above; omitted prints the full manual.") var topic:
     String?
 
@@ -84,7 +84,7 @@ extension GuideCommand {
         Use task add for a new task, task plan for a chosen task's checklist, and from-plan to \
         import an existing Markdown plan. An agent's import is proposed, counts against the \
         two-proposal cap and needs triage unless the human asked for it in this chat; then \
-        pass their words as --approved (D39). Preview imports before writing; imports keep the \
+        pass their words as --approved. Preview imports before writing; imports keep the \
         source by default. --delete is not human-only; it removes only an unchanged untracked \
         source after commit and refuses harness files.
         ```sh
@@ -134,8 +134,8 @@ extension GuideCommand {
         earlier instructions, comments, answers and handoffs never count. With no human in \
         this chat, never use --approved. Name the commands in a question for @me and leave a \
         handoff instead. Never invent approval words.
-        Human-only gates: `task promote`; task edit except your claimed task; doc \
-        edit/accept/reject (M2); effective `where --set/--unset` changes; task triage; --steal \
+        Human-only gates: `task promote`; task edit except your claimed task; effective \
+        `where --set/--unset` changes; task triage; --steal \
         over another session's fresh claim; --force past an unmet review gate; --allow-secret; \
         ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task \
         writes under `proposals: ask`. Before `restore`, run --dry-run and show the human its \
@@ -146,7 +146,7 @@ extension GuideCommand {
         as a proposal, so it needs no --approved; submit, block and handoff release the \
         claim. \
         When the human asked in this chat to add the task for later, pass their words as \
-        --approved so it becomes todo without triage (D39); do not ask again.
+        --approved so it becomes todo without triage; do not ask again.
         If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta \
         --ws acme \
         task add` command in your message, then add only the approved ideas with --approved. \
@@ -227,8 +227,6 @@ extension GuideCommand {
         -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the \
         proving test. Do not resolve review threads yourself unless assigned that \
         responsibility.
-        The M2 inbox take, task diff and task review workflow is not available in this \
-        version.
         """ + "\n"),
     Section(
       topic: "refusals",
@@ -245,7 +243,7 @@ extension GuideCommand {
       text: """
         # Reference grammar
         Bare task ids are accepted wherever a task is expected. The grammar is used in \
-        arguments and JSON. [[links]] in bodies are not yet resolved. Parsing a reference does \
+        arguments and JSON. [[links]] in bodies are not resolved. Parsing a reference does \
         not imply its target exists or is supported by a command.
 
         | Ref | Example | Notes |
@@ -253,18 +251,17 @@ extension GuideCommand {
         | Task | `AC-12` | `task:AC-12` is also accepted |
         | Comment | `AC-12/3` | the 3rd comment on AC-12 |
         | Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, \
-        `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring waits for M2 |
+        `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring is not supported |
         | App, topic | `app:platform-api`, `topic:messaging` | |
         | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix \
         optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
         | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
         | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | \
-        relative to the task's review subject; CLI resolution waits for the M2 subject \
-        producer |
+        relative to the task's review subject; CLI resolution is not supported |
         | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
         | URL | `url:https://dev.azure.com/…` | |
         | External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and \
-        ending with a letter or digit; something a task waits on, never an actor (D35) |
+        ending with a letter or digit; something a task waits on, never an actor |
         """ + "\n"),
     Section(
       topic: "output",

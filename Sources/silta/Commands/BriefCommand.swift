@@ -10,7 +10,7 @@ struct BriefCommand: OutputCommand {
       + "Hook mode has a 1.5 s process deadline and silently succeeds on errors; it never "
       + "fetches, indexes or migrates. The current task shows its newest handoff, your inbox "
       + "items on it and an open-question count; your other inbox items follow it. "
-      + "Decisions are not yet included.")
+      + "Decisions are absent from the brief.")
   static let workspaceSource = WorkspaceSource.location
   static let dataShape = Shape.object([
     "location": .object([
@@ -27,14 +27,14 @@ struct BriefCommand: OutputCommand {
     "more": .array(.string), "truncated": .bool,
   ])
 
-  @OptionGroup var global: GlobalOptions
-  @Option(help: "Select one of the repository's candidate apps.") var app: String?
-  @Option(help: "Read this task before session or branch task evidence.") var task: String?
-  @Option(help: "Add backlog context for a topic slug or alias; repeat to add topics.") var topic:
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
+  @Option(help: "Select one candidate app; default is inferred.") var app: String?
+  @Option(help: "Read this task; default is session or branch evidence.") var task: String?
+  @Option(help: "Add context for a topic; default is none. Repeat to add topics.") var topic:
     [String] = []
-  @Option(help: "Positive token budget, estimated as rendered characters / 4.") var budget: Int?
-  @Flag(help: "Default to an 800-token brief.") var short = false
-  @Flag(help: "Read bounded session-start context, silently ignoring errors.") var hook = false
+  @Option(help: "Token budget; default is 2500, or 800 with --short/--hook.") var budget: Int?
+  @Flag(help: "Use an 800-token brief; default is off.") var short = false
+  @Flag(help: "Read bounded session-start context; default is off.") var hook = false
   var appSlug: String? { app }
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

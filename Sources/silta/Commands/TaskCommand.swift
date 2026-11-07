@@ -12,5 +12,5 @@ struct TaskCommand: ParsableCommand {
       TaskBlockCommand.self, TaskUnblockCommand.self,
     ])
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 }

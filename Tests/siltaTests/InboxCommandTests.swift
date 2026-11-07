@@ -44,7 +44,7 @@ struct InboxCommandTests {
         try run(args + ["--all"]).stdout == "No attention for human:acme.\n"
           + InboxCorrectionCommandTests.scope + "\n")
       let help = try run(["comment", "--help"])
-      #expect(help.stdout.contains("docs/spec.md §8.1"))
+      #expect(help.stdout.contains("silta guide questions"))
     }
   }
 

@@ -1,0 +1,30 @@
+### silta restore
+
+OVERVIEW: Replace a workspace from an export tree (human-only, except
+--dry-run).
+
+<dir> is the <root>/<workspace> directory that holds manifest.json. The
+workspace's rows are replaced in one transaction, approvals are kept, and
+nothing is written on failure. Run --dry-run first and show the human what it
+reports.
+
+USAGE: silta restore [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <dir> [--dry-run] [--manifest <sha>]
+
+ARGUMENTS:
+  <dir>                   The export tree: <root>/<workspace>, holding
+                          manifest.json.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use a workspace; default is inferred or saved.
+  --approved <approved>   The human's chat approval; default is none.
+  --json                  Print JSON; default is text.
+  --quiet                 Hide success text; default is off.
+  --verbose               Mirror diagnostics; default is off.
+
+OPTIONS:
+  --dry-run               Check and report the restore, then roll it back;
+                          default is off.
+  --manifest <sha>        The manifest sha256 prefix the dry run printed;
+                          default is none. A different tree is refused.
+  --version               Show the version.
+  -h, --help              Show help information.

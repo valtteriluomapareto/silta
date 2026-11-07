@@ -9,26 +9,31 @@ struct TaskListCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
-  @Option(help: "Show this status.") var status: String?
+  @Option(
+    help: ArgumentHelp(
+      "Show this status: proposed, todo, doing, review, blocked, done or dropped; "
+        + "default is all.")
+  ) var status: String?
 
-  @Option(help: "Show this app.") var app: String?
+  @Option(help: "Show this app; default is all.") var app: String?
 
   var appSlug: String? { app }
 
-  @Option(help: "Show tasks blocked on this task, ext:party or URL.") var on: String?
+  @Option(help: "Show tasks blocked on this task, ext:party or URL; default is any.")
+  var on: String?
 
-  @Option(help: "Show this topic.") var topic: String?
+  @Option(help: "Show this topic; default is all.") var topic: String?
 
-  @Flag(help: "Show tasks created or claimed by this exact actor.") var mine = false
+  @Flag(help: "Show tasks created or claimed by this exact actor; default is off.") var mine = false
 
-  @Flag(help: "Include other actors' proposals; --status proposed implies it.")
+  @Flag(help: "Include other actors' proposals; default is off, except --status proposed.")
   var proposed = false
 
-  @Flag(help: "Include tasks promoted to a tracker.") var promoted = false
+  @Flag(help: "Include tasks promoted to a tracker; default is off.") var promoted = false
 
-  @Flag(help: "Include archived tasks.") var archived = false
+  @Flag(help: "Include archived tasks; default is off.") var archived = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     var filter = TaskFilter()
