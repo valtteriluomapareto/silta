@@ -237,7 +237,8 @@ Shell evidence uses a conservative shared grammar: quoted literal commands split
 on `;`, `&&`, `||`, `|` and newlines, and one quoted heredoc feeding Silta `-F -`.
 Substitutions at either wrapper or program level, input redirections/pipes into
 Silta, eval, functions, aliases, shell control/option builtins and parse errors
-are opaque. An opaque or conditional call leaves `stream_complete`
+are opaque. Word decoding preserves which escapes disappear before the wrapped
+program is parsed. An opaque or conditional call leaves `stream_complete`
 null when known ordered calls still match. Each call preserves segment order;
 overlapping native calls may interleave their log rows. Multiple associations,
 search exhaustion, or associations explained only by overlapping recorded log

@@ -2,7 +2,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-import shlex
 
 
 @dataclass
@@ -65,7 +64,7 @@ def _lex(program, audit=False):
             words.append(('operator', operator))
             index += len(operator)
             continue
-        raw_parts, quote = [], None
+        raw_parts, literal_parts, quote = [], [], None
         while index < len(program):
             char = program[index]
             if char == '\\' and quote != "'":
@@ -73,6 +72,10 @@ def _lex(program, audit=False):
                     raise ValueError('trailing escape')
                 if program[index + 1] != '\n':
                     raw_parts.append(program[index:index + 2])
+                    escaped = program[index + 1]
+                    if quote == '"' and escaped not in '$`"\\':
+                        literal_parts.append('\\')
+                    literal_parts.append(escaped)
                 index += 2
                 continue
             if char in "'\"":
@@ -81,22 +84,21 @@ def _lex(program, audit=False):
                     quote = char
                 elif quote == char:
                     quote = None
+                else:
+                    literal_parts.append(char)
                 index += 1
                 continue
             if quote is None and char in ' \t\r\n;&|<>(){}':
                 break
             raw_parts.append(char)
+            literal_parts.append(char)
             index += 1
         if quote:
             raise ValueError('unbalanced quote')
         raw = ''.join(raw_parts)
         if not raw:
             continue
-        # shlex only decodes a word already delimited by the quote-aware scanner.
-        decoded = shlex.split(raw)
-        if len(decoded) != 1:
-            raise ValueError('unsupported word')
-        words.append(('word', (decoded[0], raw)))
+        words.append(('word', (''.join(literal_parts), raw)))
     return words
 
 

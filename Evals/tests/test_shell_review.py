@@ -53,6 +53,25 @@ class ShellReview(unittest.TestCase):
         self.assertEqual(parsed.invocations[0][-1], '`literal` $HOME')
         self.assertFalse(parse_shell('sh -c ' + shlex.quote(direct)).opaque)
 
+    def test_literal_word_decoding_agrees_with_an_isolated_shell(self):
+        import os
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix='silta-literal-word-') as directory:
+            stub = Path(directory) / 'silta'
+            stub.write_text('#!' + sys.executable + '\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n')
+            stub.chmod(0o755)
+            env = {'HOME': directory, 'SILTA_HOME': directory + '/data', 'ZDOTDIR': directory,
+                   'PATH': directory + os.pathsep + '/usr/bin:/bin'}
+            for word in ["'one; && | two'", r'"literal \$HOME \`text\`"',
+                         r'"slash \q and quote \""', "''", r"'single \ and \" double'"]:
+                command = 'silta comment AC-1 -m ' + word
+                parsed = parse_shell(command)
+                self.assertFalse(parsed.opaque)
+                actual = subprocess.run(['/bin/sh', '-c', command], env=env, text=True, capture_output=True)
+                self.assertEqual(actual.returncode, 0, actual.stderr)
+                self.assertEqual(parsed.invocations[0][1:], json.loads(actual.stdout))
+
     def test_shell_controls_require_shell_trace_review_at_grade_level(self):
         for command in ["trap 'gh issue create --title Acme' EXIT; ls -la", '! silta where',
                         'set -e; false; silta where', 'exit 0; silta where',
