@@ -80,7 +80,7 @@ def render_trial(directory, trial):
                 issue(bound + '/' + field, 'raw/retained disagreement; both observations require investigation')
                 for index, value in enumerate(phase.get(field, [])):
                     alias = f'{prefix}/tool-{index}' if field == 'commands' else f'{prefix}/retained-{field}-{index}'
-                    print(alias, 'RETAINED', bound + f'/{field}/{index}', excerpt(value, bound + f'/{field}/{index}'))
+                    print(alias, 'RETAINED', bound + f'/{field}/{index}', value if field == 'messages' else excerpt(value, bound + f'/{field}/{index}'))
         if not phase.get('complete') or not parsed['complete']:
             issue(bound, 'native lifecycle incomplete; tool effects cannot be certified')
         tools, pending = {}, set()
