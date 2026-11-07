@@ -39,7 +39,7 @@ class Profiles(unittest.TestCase):
                         TMPDIR=str(self.root / 'tmp'), PYTHONPATH=str(self.root / 'guard'), PYTHONDONTWRITEBYTECODE='1',
                         FORBIDDEN_CONFIG=os.pathsep.join(str(self.root / p) for p in ('real/.codex/config.toml', 'real/.claude/settings.json', 'real/.claude.json')))
 
-    def run_live(self, harness, mode='normal', answer='signed-in', authenticate=True, scenario='plan-not-file', repeats=2, cap=None):
+    def run_live(self, harness, mode='normal', answer='signed-in', authenticate=True, scenario='plan-not-file', repeats=2, cap=None, operator=None):
         output = self.root / (harness + '-' + mode)
         journal = self.root / (harness + '-' + mode + '.jsonl')
         if mode == 'cancel':
@@ -53,6 +53,8 @@ class Profiles(unittest.TestCase):
                 '--scenario', scenario, '--repeats', str(repeats), '--output', str(output)]
         if cap is not None:
             argv += ['--max-trial-tokens', str(cap)]
+        if operator is not None:
+            argv += ['--operator', operator]
         child = subprocess.Popen(argv, env=self.env, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.addCleanup(lambda: child.kill() if child.poll() is None else None)
         text, commands, next_command = [], [], False
@@ -70,8 +72,11 @@ class Profiles(unittest.TestCase):
                     profile_root = Path(data['profile']).parent.parent
                     self.assertTrue(profile_root.name.startswith('silta-eval-'))
                     self.addCleanup(shutil.rmtree, profile_root, True)
-                child.stdin.write(answer + '\n')
-                child.stdin.flush()
+                if answer is not None:
+                    child.stdin.write(answer + '\n')
+                    child.stdin.flush()
+                if answer is None or mode == 'operator-eof':
+                    child.stdin.close()
                 if mode == 'cancel':
                     with journal.with_suffix('.signal').open() as signal_file:
                         native_pid = int(signal_file.readline())
@@ -236,8 +241,69 @@ class Profiles(unittest.TestCase):
             self.addCleanup(shutil.rmtree, Path(models[0]['trial']), True)
             self.assertIn(models[0]['trial'], text)
             self.assertFalse(report['trials'][0]['checks']['infrastructure'])
+            trial = report['trials'][0]
+            self.assertGreater(trial['metrics']['silta_calls'], 0, 'Known calls were discarded')
+            self.assertEqual(trial['metrics']['tokens'], 15)
+            evidence = json.loads((output / trial['evidence']).read_text())
+            self.assertEqual(len(evidence['phases']), 1)
+            audit = subprocess.run([sys.executable, '-B', str(ROOT / 'audit.py'), str(output)],
+                                   env=self.env, capture_output=True, text=True)
+            self.assertEqual(audit.returncode, 0, audit.stderr)
+            self.assertIn('PHASE phase-0', audit.stdout)
+            self.assertIn('FINAL tasks', audit.stdout)
             if mode == 'unknown':
                 self.assertTrue((Path(models[0]['profile']) / 'unknown-opaque').exists())
+
+    def test_review_preserves_aborted_zero_trial_report_and_exit(self):
+        output, report, _, _, _ = self.run_live('codex', answer=None, authenticate=False)
+        self.assertTrue(report['aborted'])
+        self.assertEqual(report['attempted_trials'], 0)
+        verdicts = self.root / 'empty-verdicts.json'
+        verdicts.write_text('{}')
+        run = subprocess.run([sys.executable, '-B', str(ROOT / 'review.py'), str(output), str(verdicts)],
+                             env=self.env, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 1, 'Review converted an aborted run to success')
+        updated = json.loads((output / 'report.json').read_text())
+        for key in ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials'):
+            self.assertEqual(updated[key], report[key])
+        self.assertIn('aborted', (output / 'report.html').read_text())
+
+    def test_operator_eof_retains_attempt_phase_evidence_and_known_usage(self):
+        output, report, entries, text, _ = self.run_live('codex', 'operator-eof', scenario='proposals-ask', repeats=1)
+        self.assertTrue(report['aborted'])
+        self.assertEqual(report['attempted_trials'], 5, 'Operator EOF dropped an attempted trial')
+        trial = report['trials'][-1]
+        self.assertEqual(trial['variant'], 'present-add')
+        self.assertFalse(trial['checks']['infrastructure'])
+        self.assertEqual(trial['metrics']['tokens'], 15)
+        evidence = json.loads((output / trial['evidence']).read_text())
+        self.assertEqual(len(evidence['phases']), 1)
+        self.assertTrue(evidence['phases'][0]['complete'])
+        model = [e for e in entries if e['event'] == 'model'][-1]
+        self.addCleanup(shutil.rmtree, Path(model['trial']), True)
+        self.assertTrue(Path(model['trial']).exists())
+        self.assertIn(model['trial'], text)
+
+    def test_present_continuation_keeps_conversation_auth_and_task_state(self):
+        output, report, entries, _, commands = self.run_live('codex', scenario='proposals-ask', repeats=1, operator='scripted')
+        self.assertFalse(report['aborted'])
+        self.assertEqual(len(commands), 1)
+        present = [trial for trial in report['trials'] if trial['variant'].startswith('present-')]
+        self.assertEqual(len(present), 4)
+        for trial in present:
+            evidence = json.loads((output / trial['evidence']).read_text())
+            first, second = evidence['phases']
+            self.assertTrue(first['complete'] and second['complete'])
+            self.assertEqual(first['conversation'], second['conversation'])
+            self.assertEqual(first['actor'], second['actor'])
+            self.assertEqual(first['state']['tasks'][0]['id'], second['state']['tasks'][0]['id'])
+            models = [e for e in entries if e['event'] == 'model' and e['actor'] == first['actor']]
+            self.assertEqual(len(models), 2)
+            self.assertEqual(models[0]['auth_inode'], models[1]['auth_inode'])
+            self.assertEqual(models[0]['data'], models[1]['data'])
+            for model in models:
+                self.assertEqual(model['grants'], [model['data']])
+            self.assertTrue((output / trial['id'] / 'cleanup.json').exists())
 
     def test_config_aliases_and_unexpected_grant_are_refused_without_reads(self):
         for mode in ('symlink-auth', 'hardlink-auth', 'unexpected-grant'):
@@ -292,6 +358,19 @@ class Profiles(unittest.TestCase):
         with patch('sys.stdout', console):
             profile.instructions()
         self.assertIn(str(trial), console.getvalue())
+
+    def test_unknown_temporary_home_entry_names_exact_owned_path(self):
+        output = self.root / 'profile-output'
+        output.mkdir()
+        profile = evals.RunProfile('codex', ROOT / 'tests/fake_profile_client.py', output,
+                                   evals.isolated_env, evals.execute)
+        self.addCleanup(shutil.rmtree, profile.root, True)
+        unknown = profile.home / 'unknown-state'
+        unknown.touch()
+        with self.assertRaises(RuntimeError) as caught:
+            profile.reset()
+        self.assertIn(str(unknown), str(caught.exception))
+        self.assertTrue(unknown.exists())
 
 
 if __name__ == '__main__':
