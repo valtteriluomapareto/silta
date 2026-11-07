@@ -1,6 +1,7 @@
 import Foundation
-@testable import SiltaCore
 import Testing
+
+@testable import SiltaCore
 
 /// A `CodedError` type and examples of every case it can produce.
 protocol ErrorExamples: CodedError {
@@ -69,7 +70,8 @@ extension SecretError: ErrorExamples {
 extension WorkspaceError: ErrorExamples {
   static var examples: [WorkspaceError] {
     [
-      .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"), .conflict,
+      .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"),
+      .ambiguous(["acme", "beta"]), .conflict,
       .editor, .input, .setting("acme", key: "review_gate", value: "\"robot\""),
       .unknownSetting("acme", key: "review_gate", value: "\"future\""),
     ]

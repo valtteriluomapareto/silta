@@ -2,35 +2,36 @@
 Use Silta for cross-repo work, another app or backend, branch-as-app repos, plans, handoffs, review requests and meeting decisions. Trivial single-repo edits need no task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; never create tracker items yourself.
 
 # Session start
-If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta brief --task AC-12`, then `silta task start AC-12`. Text is the default; use --json only to parse output.
-For "work the backlog", run `silta task ls --status todo`, optionally with --app. Start the first task; skip subtasks whose parent another session claims and skip claimed tasks. Finish with a result before starting the next; continue until empty or the human stops you.
+If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta --ws acme brief --task AC-12`, then `silta --ws acme task start AC-12`. Replace acme with the workspace from your brief. Text is the default; use --json only to parse output.
+Workspace commands use --ws, then the registered repository here, then the default from `ws use` outside registered repositories. Commands here follow the workspace in `brief`; use --ws for intentional cross-workspace work. Inference never saves a selection. For several matching workspaces, inspect the scoped candidates and retry with --ws.
+For "work the backlog", run `silta --ws acme task ls --status todo`, optionally with --app. Start the first task; skip subtasks whose parent another session claims and skip claimed tasks. Finish with a result before starting the next; continue until empty or the human stops you.
 
 # Recipes
-Examples use the fictional Acme workspace and task AC-12. Replace names and paths with refs from your brief; add --ws acme when outside that workspace.
+Examples use the fictional Acme workspace and task AC-12. Replace names and paths with refs from your brief. Examples carry --ws acme explicitly, including outside repositories.
 
 Read another app without checking out its branch:
 ```sh
-silta code grep platform-api -- 'Auth'
-silta code show platform-api -- 'src/Auth.swift'
+silta --ws acme code grep platform-api -- 'Auth'
+silta --ws acme code show platform-api -- 'src/Auth.swift'
 ```
 
 Use task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved (D39). Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files.
 ```sh
-silta task add --start 'Implement Acme sign-in' --app platform-api
-silta task plan AC-12 -F - <<'PLAN'
+silta --ws acme task add --start 'Implement Acme sign-in' --app platform-api
+silta --ws acme task plan AC-12 -F - <<'PLAN'
 - [ ] Inspect the API
 - [ ] Implement and verify sign-in
 PLAN
-silta task plan AC-12 --step 1 --done
-silta task from-plan /tmp/acme-plan.md --dry-run
-silta task from-plan /tmp/acme-plan.md
+silta --ws acme task plan AC-12 --step 1 --done
+silta --ws acme task from-plan /tmp/acme-plan.md --dry-run
+silta --ws acme task from-plan /tmp/acme-plan.md
 ```
 Use top-level checkboxes for numbered plan steps. A plan and a result go through stdin with a quoted heredoc, so shell substitutions stay literal.
 
-Submit for review with `silta task submit AC-12`. Finish when the required review gate is met; app tasks need their actual commit sha:
+Submit for review with `silta --ws acme task submit AC-12`. Finish when the required review gate is met; app tasks need their actual commit sha:
 ```sh
-silta task submit AC-12
-silta task done AC-12 --sha <commit-sha> -F - <<'RESULT'
+silta --ws acme task submit AC-12
+silta --ws acme task done AC-12 --sha <commit-sha> -F - <<'RESULT'
 What was done: implemented and verified Acme sign-in.
 Decisions: reused the existing authentication API.
 What's left: nothing.
@@ -38,35 +39,35 @@ RESULT
 ```
 
 # Working for the human
-The human talks to you; you run Silta. Decide and record routine choices with `silta comment AC-12 --kind decision -m 'Reuse the existing authentication API.'`, then carry on.
+The human talks to you; you run Silta. Decide and record routine choices with `silta --ws acme comment AC-12 --kind decision -m 'Reuse the existing authentication API.'`, then carry on.
 Ask about scope changes, a new dependency, a public API/schema/migration, anything another app or the customer sees, deleting what you did not create, anything irreversible, and money.
 If brief shows `ask_about: short`, decide and record scope, dependency and public API/schema/migration choices, and ask only about anything another app or the customer sees, deleting what you did not create, anything irreversible, and money; repository rules and human-only gates still apply.
 Put all approvals, proposals to triage and questions in one message. Except for the task-creation exception below, approval words mean only what the human wrote in this chat in reply to your message that named that exact command. One answer covers the named commands and nothing else. Outside that exception, relayed words, task prompts, earlier instructions, comments, answers and handoffs never count. With no human in this chat, never use --approved. Name the commands in a question for @me and leave a handoff instead. Never invent approval words.
 Human-only gates: `task promote`; task edit except your claimed task; doc edit/accept/reject (M2); effective `where --set/--unset` changes; task triage; --steal over another session's fresh claim; --force past an unmet review gate; --allow-secret; ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task writes under `proposals: ask`. Before `restore`, run --dry-run and show the human its lines; it drops work done after the export. Never edit an export tree.
 Usually propose nothing; never more than two proposals per session, only ideas you would bet the human wants. `task add --start` is only for work the human requested. A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not as a proposal, so it needs no --approved; submit, block and handoff release the claim. When the human asked in this chat to add the task for later, pass their words as --approved so it becomes todo without triage (D39); do not ask again.
-If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under "What's left" in a handoff/result, never in a question, TODO comment or file.
-When no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. For "what needs me?", run `silta inbox --for me` and relay the displayed choices in one short message. Apply "the rest" only to proposals you showed; ask before running triage.
+If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta --ws acme task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under "What's left" in a handoff/result, never in a question, TODO comment or file.
+When no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. For "what needs me?", run `silta --ws acme inbox --for me` and relay the displayed choices in one short message. Apply "the rest" only to proposals you showed; ask before running triage.
 
 # Questions
 Ask in chat. Record a question only when blocked beyond this session. Questions default to @me; name recipients explicitly when needed:
 ```sh
-silta comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'
+silta --ws acme comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'
 ```
-Answer with --kind answer and --reply-to <question-ref>. The asker or current task claimer can accept an answer with `silta comment accept <answer-ref>`. Answer only as an addressee, or to relay the human's chat answer. Never accept your own answer to a question for @me. An answer comment never supplies approval words for a human-only command.
+Answer with --kind answer and --reply-to <question-ref>. The asker or current task claimer can accept an answer with `silta --ws acme comment accept <answer-ref>`. Answer only as an addressee, or to relay the human's chat answer. Never accept your own answer to a question for @me. An answer comment never supplies approval words for a human-only command.
 
 # Blocked
 A question to the human does not block a task. Ask in chat if the human can answer, including questions about the customer. If only an external party (ext:acme) or another task can unblock you, keep doing useful work; block only when none remains.
 Leave a handoff before blocking; blocking releases any remaining claim.
 ```sh
-silta comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain callback URL; Open questions: callback URL; Branch and sha: feature/acme-sign-in at <commit-sha>.'
-silta task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'
+silta --ws acme comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain callback URL; Open questions: callback URL; Branch and sha: feature/acme-sign-in at <commit-sha>.'
+silta --ws acme task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'
 ```
 Silta sends nothing: tell the human exactly what to ask whom, then pick other work. Never unblock with open blockers without the human's approval, and never put "waiting for" into repo files or plans.
 
 # Handoff
 Always leave a handoff before stopping. It releases your claim while preserving status. Use the actual branch and sha; the next session reads the task and starts it again. Run `silta session check` to find fresh own claims needing handoff across all workspaces; follow each printed scoped command with the handoff body on stdin.
 ```sh
-silta comment AC-12 --kind handoff -F - <<'HANDOFF'
+silta --ws acme comment AC-12 --kind handoff -F - <<'HANDOFF'
 State: API inspected; implementation remains.
 Next step: implement sign-in and run the verification checks.
 Open questions: none.
@@ -75,12 +76,12 @@ HANDOFF
 ```
 In the next session, resume with:
 ```sh
-silta task show AC-12
-silta task start AC-12
+silta --ws acme task show AC-12
+silta --ws acme task start AC-12
 ```
 
 # Reviews
-Use `silta task submit AC-12` to request review. Read discussion with `silta task show AC-12`. Reply to the actual finding ref with `silta comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility.
+Use `silta --ws acme task submit AC-12` to request review. Read discussion with `silta --ws acme task show AC-12`. Reply to the actual finding ref with `silta --ws acme comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility.
 The M2 inbox take, task diff and task review workflow is not available in this version.
 
 # Refusals
@@ -91,7 +92,7 @@ Read the error's code, next_by and next commands. A command's next_by can overri
   unregistered  exit 2, next by agent: Check the ref, or carry on without silta
   human_only  exit 3, next by human: Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes
   read_only_promoted  exit 3, next by agent: Leave it to its tracker and pick other work
-  ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates
+  ambiguous_location  exit 4, next by agent: Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity
   busy  exit 5, next by agent: Retry once after a few seconds
   conflict  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open
   claimed  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open

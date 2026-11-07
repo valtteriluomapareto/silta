@@ -21,7 +21,7 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
   case humanOnly = "human_only"
   /// The task was promoted to a tracker and is read-only here.
   case readOnlyPromoted = "read_only_promoted"
-  /// Silta can't tell which app the working directory belongs to.
+  /// Silta can't tell which workspace or app the working directory belongs to.
   case ambiguousLocation = "ambiguous_location"
   /// The database stayed locked through every retry.
   case busy
@@ -79,7 +79,8 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
     case .humanOnly:
       "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` after they say yes"
     case .readOnlyPromoted: "Leave it to its tracker and pick other work"
-    case .ambiguousLocation: "Retry with `--app <slug>` from the candidates"
+    case .ambiguousLocation:
+      "Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity"
     case .busy: "Retry once after a few seconds"
     case .conflict, .claimed, .staleRev, .leaseTaken, .blocked:
       "Re-read, then decide; don't steal, and don't unblock while blockers are open"

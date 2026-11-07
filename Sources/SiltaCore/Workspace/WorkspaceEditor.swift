@@ -7,18 +7,19 @@ package enum WorkspaceEditor {
   package static func edit(
     slug: String?, store: DatabaseStore, actor: ActorID,
     identity: (ids: any IDGenerator, date: Date), approved: String? = nil,
-    editor: (URL) throws -> Int32
+    prepared: Result<String?, any Error>? = nil, editor: (URL) throws -> Int32
   ) throws -> String? {
     let target = slug.map { " " + shellWord($0) } ?? ""
     let approval = try actor.requireHuman(
       command: "silta ws edit" + target + " -F <file>", approved: approved)
+    if slug == nil { _ = try prepared?.get() }
     let available = try WorkspaceSelection.list(in: store)
     let initial: String
     var originalSlug = slug
     if slug == nil && available.isEmpty {
       initial = "workspace: {slug: acme, name: Acme, task_prefix: AC}\n"
     } else {
-      let selected = try WorkspaceSelection.resolve(slug, in: store)
+      let selected = try WorkspaceSelection.resolve(slug, in: store, prepared: prepared)
       originalSlug = selected
       initial = try store.read { try WorkspaceConfig.render(from: $0, slug: selected) }
     }
@@ -56,15 +57,17 @@ package enum WorkspaceEditor {
   /// Applies a UTF-8 YAML document with the same validation and write as an editor save.
   package static func apply(
     _ text: String, slug: String?, store: DatabaseStore, actor: ActorID,
-    identity: (ids: any IDGenerator, date: Date), approved: String? = nil
+    identity: (ids: any IDGenerator, date: Date), approved: String? = nil,
+    prepared: Result<String?, any Error>? = nil
   ) throws -> String? {
     let target = slug.map { " " + shellWord($0) } ?? ""
     let approval = try actor.requireHuman(
       command: "silta ws edit" + target + " -F <file>", approved: approved)
+    if slug == nil { _ = try prepared?.get() }
     let available = try WorkspaceSelection.list(in: store)
     let original =
       try slug == nil && available.isEmpty
-      ? nil : WorkspaceSelection.resolve(slug, in: store)
+      ? nil : WorkspaceSelection.resolve(slug, in: store, prepared: prepared)
     _ = try WorkspaceConfig.parse(text)
     if let original,
       try store.read({ try WorkspaceConfig.render(from: $0, slug: original) }) == text

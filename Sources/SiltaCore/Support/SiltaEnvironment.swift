@@ -2,6 +2,10 @@ package import Foundation
 
 /// Dependencies built once per command and explicitly passed to services.
 package struct SiltaEnvironment: Sendable {
+  /// A command's captured selection, including authoritative absence or failure.
+  /// Nil means services may resolve the stored current selection themselves.
+  package var workspaceSelection: Result<String?, any Error>?
+
   /// Supplies command time.
   package let clock: any Clock
   /// Creates persistent entity identifiers.
@@ -27,6 +31,7 @@ package struct SiltaEnvironment: Sendable {
     log: any Log, actor: ActorID, human: ActorID = .human(name: "unknown"),
     warnings: [OutputWarning] = []
   ) {
+    workspaceSelection = nil
     self.clock = clock
     self.ids = ids
     self.git = git

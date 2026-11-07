@@ -6,5 +6,5 @@ struct CommandContext: Sendable {
   /// `OutputRouter` alone decides what goes where.
   var mode: OutputMode
   /// The single environment assembled at the process boundary.
-  let environment: SiltaEnvironment
+  var environment: SiltaEnvironment
 }

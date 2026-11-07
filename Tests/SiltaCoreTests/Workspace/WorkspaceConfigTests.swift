@@ -24,12 +24,11 @@ struct WorkspaceConfigTests {
   @Test func appendixARoundTripsEverySection() throws {
     let repo = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent().deletingLastPathComponent()
-    let spec = try String(contentsOf: repo.appending(path: "docs/spec.md"), encoding: .utf8)
-    let appendix = try #require(spec.components(separatedBy: "```yaml\n").last)
-      .components(separatedBy: "```")[0]
+    let example = try String(
+      contentsOf: repo.appending(path: "docs/examples/acme-workspace.yaml"), encoding: .utf8)
     try withScratchDirectory { home in
       let store = Self.store(home)
-      try Self.apply(appendix, to: store)
+      try Self.apply(example, to: store)
       let rendered = try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") }
       Golden.forTests().check(rendered, "workspace.yaml")
       try Self.apply(rendered, to: store)
