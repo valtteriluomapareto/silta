@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -62,6 +63,24 @@ class NativeFailures(unittest.TestCase):
         for cap in (None, 100):
             with self.subTest(cap=cap):
                 self.check('codex', 'usage-parser' + ('-capped' if cap else ''), cap=cap)
+
+    def test_recovered_message_citations_resolve_to_the_matching_value(self):
+        output, report, _, _, _ = self.fixture.run_live('codex', 'usage-parser-citations', cap=100)
+        trial, = report['trials']
+        evidence = json.loads((output / trial['evidence']).read_text())
+        audit = subprocess.run([sys.executable, '-B', str(test_profiles.ROOT / 'audit.py'), str(output)],
+                               env=self.fixture.env, text=True, capture_output=True)
+        self.assertEqual(audit.returncode, 0, audit.stderr)
+        self.assertIn('MESSAGE NATIVE_STDOUT_SENTINEL', audit.stdout)
+        for line in audit.stdout.splitlines():
+            if '] MESSAGE ' not in line:
+                continue
+            pointer = re.search(r'evidence.json#(/phases/\d+/messages/\d+)', line)
+            if pointer:
+                value = evidence
+                for component in pointer[1].strip('/').split('/'):
+                    value = value[int(component)] if isinstance(value, list) else value[component]
+                self.assertEqual(value, line.split('] MESSAGE ', 1)[1])
 
     def test_late_interruptions_keep_exact_native_output(self):
         for harness, cap in (('claude', None), ('codex', None), ('codex', 100)):

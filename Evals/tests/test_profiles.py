@@ -99,6 +99,12 @@ class Profiles(unittest.TestCase):
                     + '    raise ValueError("INJECTED_STALE_USAGE_FAILURE")\n'
                     + 'evals.TokenBudget.execute = fail\nraise SystemExit(evals.main())\n')
             argv[2] = str(entry)
+        if mode.startswith('orphan-'):
+            entry = self.root / 'orphan-main.py'
+            entry.write_text('import sys\n' + 'sys.path.insert(0, ' + repr(str(ROOT / 'tests')) + ')\n'
+                + 'from orphan_support import configure\nconfigure(' + repr(str(journal)) + ', ' + repr(mode) + ')\n'
+                + 'import evals\nraise SystemExit(evals.main())\n')
+            argv[2] = str(entry)
         child = subprocess.Popen(argv, env=env, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.addCleanup(lambda: child.kill() if child.poll() is None else None)
         text, commands, next_command = [], [], False

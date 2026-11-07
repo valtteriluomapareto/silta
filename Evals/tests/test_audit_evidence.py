@@ -126,6 +126,18 @@ class AuditEvidence(unittest.TestCase):
         output = self.audit(e)
         self.assertRegex(output, r'phase-0/tool-0[^\n]*COMPLETED exit=unknown')
 
+    def test_raw_message_pointers_require_matching_retained_values(self):
+        for messages in ([], ['different'], ['shifted', 'BEFORE_TOOL', 'AFTER_TOOL']):
+            with self.subTest(messages=messages):
+                e = self.evidence()
+                e['phases'][0]['messages'] = messages
+                output = self.audit(e)
+                for line in output.splitlines():
+                    if 'phase-0/message-' in line and '] MESSAGE ' in line:
+                        self.assertNotIn('#/phases/0/messages/', line, 'Raw message points at absent or mismatched retained value')
+                        self.assertIn('fixture/phase-0.jsonl:', line)
+                self.assertIn('raw/retained disagreement', output)
+
     def test_incomplete_capture_citations_resolve_to_stream_metadata(self):
         e = self.evidence()
         e['phases'][0]['capture'] = {'streams': {'stdout': {'complete': False}, 'stderr': {'complete': False}}}
