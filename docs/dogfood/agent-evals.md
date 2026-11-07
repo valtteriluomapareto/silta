@@ -20,6 +20,7 @@ Evals/run.sh --silta .build/debug/silta \
   --stub Evals/tests/stub_harness.py --output artifacts/evals/stub-proof
 python3 -B Evals/tests/plant_faults.py artifacts/evals/stub-proof
 python3 -B Evals/tests/plant_open_faults.py artifacts/evals/open-faults.json
+python3 -B Evals/tests/plant_profile_faults.py artifacts/evals/profile-faults.json
 ```
 
 The output directory must not exist. The default matrix has both adapters, all six
@@ -53,6 +54,16 @@ The script writes
 `planted-faults.json` in the report directory. Do not run source mutations in
 parallel with verification or another agent editing this checkout.
 
+[Run-profile tests](../../Evals/tests/test_profiles.py) drive the actual default
+live CLI using explicit fake executables. They execute the real installer and
+Claude hooks, synchronize cancellation through a FIFO, and guard against opening
+or copying opaque authentication and decoy real config. Empty unreadable auth
+stand-ins must keep their inode/mode across trials. No real client, credential
+file or model is used. The profile fault script independently breaks the sign-in,
+data/log/history, install/uninstall, config/grant, credential and abort/logout
+guarantees; its JSON report records each detected fault. These proofs do not
+establish that a particular installed client version’s authentication works.
+
 ## Maintainer-only live runs
 
 These commands spend model quota. Run outside the coding sandbox, in an interactive
@@ -71,33 +82,99 @@ printf 'Codex model: '
 read -r eval_codex_model
 Evals/run.sh --silta .build/debug/silta --live --harness claude \
   --client "$eval_claude" --model "$eval_claude_model" \
-  --output artifacts/evals/claude-live --repeats 3
+  --core --output artifacts/evals/claude-live --repeats 3
 Evals/run.sh --silta .build/debug/silta --live --harness codex \
   --client "$eval_codex" --model "$eval_codex_model" \
-  --output artifacts/evals/codex-live --repeats 3
+  --core --output artifacts/evals/codex-live --repeats 3
 ```
 
 JSON-subset YAML in [matrix.yaml](../../Evals/matrix.yaml) records the default
 repeat count and harness inventory; select model names explicitly for live runs.
-Use `--scenario <id>` for a smaller run. The runner prints the complete `env -i …`
-login command for each trial. Its persisted `profile-launcher.sh` enters the
-Acme mobile fixture before launching the isolated client, regardless of the other
-terminal’s current directory. Run that exact command in another terminal, sign in
-afresh, then type `signed-in` at the waiting runner. Codex uses fresh file-backed
-credentials in temporary CODEX_HOME. Claude uses a fresh claude.ai login under
-CLAUDE_CONFIG_DIR. Do not use Console sign-in without an API key. On macOS, Claude
-itself keeps real HOME so the keychain works; every Silta invocation goes through
-a wrapper restoring temporary HOME. See [isolated acceptance](agents-acceptance.md).
+The commands above run the four core scenarios three times, with **two sign-ins
+in total**: one Claude login, then one Codex login. Use `--scenario <id>` for a
+smaller run, or omit `--core` to include the policy scenarios.
 
-Each trial has its own temporary HOME, SILTA_HOME, XDG directories and Acme repos.
-Installer preview/apply generates only those profiles' instructions, skills and
-Claude SessionStart/Stop hooks. No profile is read from the maintainer's home.
-Inherited provider/identity variables are discarded. The runner injects an exact
-actor/session per trial; handoff-resume has distinct A/B actors and fresh harness
-processes. Policy setup/old proposals and CLI controls are synthetic baseline data,
-excluded from measured agent calls and approval provenance. Only the subsequent
-operator reply can authorize a model action. A timeout kills the harness process
-group and fails that phase.
+For each default-provider invocation, the runner prints one login-only command
+through a persisted `profile-launcher.sh`. It enters a neutral temporary
+`acme-login` directory, regardless of the other terminal’s current directory.
+Run that exact command in another terminal and wait for it to exit successfully,
+then type `signed-in` at the waiting runner. Confirmation without a completed
+launcher login aborts before any trial. Codex uses `login` with fresh file-backed
+authentication under temporary CODEX_HOME; Claude uses `auth login` with fresh
+CLAUDE_CONFIG_DIR. No real configuration is imported. On macOS, only the native
+Claude client retains real HOME/USER for the keychain; the Silta wrapper restores
+temporary HOME. See [isolated acceptance](agents-acceptance.md),
+[Codex authentication](https://learn.chatgpt.com/docs/auth?surface=cli) and
+[Claude authentication](https://code.claude.com/docs/en/authentication).
+Claude’s dedicated `CLAUDE_CODE_TMPDIR` is also set explicitly: trial scratch
+data stays in the disposable trial tree, and login/logout scratch stays in the
+run profile. See [Claude application data](https://code.claude.com/docs/en/claude-directory#session-scratchpad-directory).
+
+The shared profile preserves opaque authentication in place. Each trial has fresh
+HOME, SILTA_HOME, XDG directories, Acme repos, actor/session and native conversation.
+Real installer preview/apply adds the current trial’s instructions, skills, Claude
+hooks and Codex writable-root grant. Uninstall preview/apply and a second empty
+preview prove removal before another trial starts. `cleanup.json` records these
+host operations separately from measured agent calls. The runner restores only
+known ordinary config files from its own post-login baseline, deletes named
+runtime histories/caches without reading them, and removes the old trial directory.
+Config symlinks/hardlinks and unexpected initial Codex writable roots are refused.
+Unknown profile entries or cleanup/ownership conflicts abort the remaining trials;
+the report exposes `aborted`, `planned_trials`, `attempted_trials` and
+`completed_trials` (attempts with no infrastructure failure). Relevant
+temporary roots are retained and listed in the final cleanup instructions for inspection.
+Completed phase evidence and known usage remain linked on operator EOF or cleanup
+failure. Applying verdicts with `review.py` preserves the abort status and trial
+counts; reviewing available evidence cannot make an aborted run succeed.
+Returned token-limit, timeout, unavailable-usage and native stream/process failures
+also abort reuse and retain the failed trial root. A failed native turn stops before
+another turn or trial launches. Parsing exceptions and `KeyboardInterrupt` follow
+the same abort path: stdout and stderr are captured before interpretation, and
+each harness has its own process group. Abort cleanup signals that whole group,
+even after its leader exits. An exited leader gets at most two seconds for inherited
+pipes to reach EOF; abort drain and reap share a two-second deadline (or the
+remaining post-exit deadline). Cutoff preserves available bytes and hashes, marks
+`capture.cleanup.drain_cut_short` and incomplete streams, and cannot pass even
+with a successful native terminal event. A completed-group EPERM race is retried
+only after reaping; persistent permission failures remain explicit.
+`phase-N.jsonl` and `phase-N.stderr` retain the native bytes (with a supplied
+provider key redacted), including invalid UTF-8. Evidence records each stream’s
+byte count, SHA-256, completeness and capture errors, plus the actual process exit
+when known. A decoding or schema error cannot turn those bytes into a success.
+
+Failure reports retain known terminal usage and measured calls. Codex recovery
+merges per-thread usage sources before taking the phase delta; cumulative usage
+without a valid thread identity stays unattributed, so the token total is unknown
+rather than charging an earlier turn again. Unavailable
+logs, snapshots and unchecked metrics stay `null`; the audit labels them
+`UNRESOLVED` rather than inferring effects from an empty or baseline state.
+Stage-tagged errors point at execution, usage, parsing or evidence enrichment.
+A failing enrichment helper is not retried to construct the failure report. Both
+`report.json` and `report.html` still mark the default-provider run aborted.
+This assumes the selected output directory remains writable; capture write errors
+are explicit and do not claim a complete stream or an alternate durable copy. Ordinary scenario grades and pending human evidence
+review still allow the planned repeats.
+A new client version that creates unfamiliar files needs an explicit disposable
+path classification before reuse; the runner does not guess which files are credentials.
+The [history fixture inventory](../../Evals/tests/profile_history.py) plants earlier
+answers in every supported disposable state location, including prompt history,
+session archives, project memory, state databases, caches and ordinary config.
+Later fake trials probe those files for earlier answers. Unclassified memory stores
+abort reuse and remain available for inspection. The selective mutations preserve
+only one history/memory location at a time, including `history.jsonl`, to prove
+that unrelated cleanup cannot mask retained content.
+
+Inherited provider/identity variables are discarded. Handoff-resume has distinct A/B
+actors and fresh conversations; human-present policy continuations resume only
+within their own trial. Synthetic setup/old proposals and CLI controls are excluded
+from measured agent calls and approval provenance. Only the subsequent operator
+reply can authorize a model action. Timeout or cancellation signals the
+runner-owned process group and attempts drain/reap within the cleanup deadline.
+When termination or pipe writers remain unconfirmed, the runner defers uninstall,
+reset, logout and removal. The cleanup receipt and audit identify the group and
+blocker; the final message lists retained roots and requires stopping and verifying
+writers before touching that profile. Cancellation retains the failed trial and
+aborts the remaining matrix.
 
 For `proposals-ask` human-present variants, the first turn ends before an approval.
 The runner displays the agent's actual messages and the exact command. Enter actual
@@ -227,12 +304,19 @@ models, repeats, commit and unresolved checks. Submit that comment. Alternativel
 link a durable CI artifact containing the same archive. Do not claim the M1 exit
 criterion until both harnesses' four core live scenarios pass over three repeats.
 
-Live profiles remain at the generated `profile-location.txt` paths for explicit
-logout. Use each trial’s persisted `profile-launcher.sh` to exit/log out of that fresh
-client profile (for example, run the launcher with `logout` for clients that support
-that command, or start it interactively and log out), then remove only those trial mktemp directories. Never repair a real
-profile or delete the maintainer's harness home. Offline trial roots are deleted
-after evidence collection because they contain no authentication.
+The default-provider run retains one authentication profile, named by the top-level
+`profile-location.txt`, for explicit maintainer logout. When native writer cleanup
+is confirmed safe, the runner prints one
+`Log out` command (`profile-launcher.sh auth logout` for Claude or
+`profile-launcher.sh logout` for Codex), then one `After logout, clean up:` command
+listing every retained owned temporary root, even after cancellation or a failure.
+Run those exact commands in that order. If cleanup is deferred, first follow the
+recorded process/writer blocker and verify it is safe; no logout/removal command
+is printed for an unconfirmed writer. The runner never reads, copies or
+automatically logs out authentication. Successful trial roots are already removed;
+per-trial `trial-location.txt` records their former locations. Never repair a real
+profile or delete the maintainer’s harness home. Fireworks retains its separate
+per-trial no-sign-in path; offline trial roots are deleted after evidence collection.
 
 ## Open-model runs
 

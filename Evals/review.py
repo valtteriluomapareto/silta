@@ -27,6 +27,7 @@ for trial in report['trials']:
     trial.update(evals.trial_labels(evidence))
 updated = evals.aggregate(report['trials'], report['provenance'])
 updated.update({key: report[key] for key in ('commit', 'dirty', 'binary_sha256')})
+updated.update({key: report[key] for key in evals.RUN_FIELDS if key in report})
 evals.write_json(args.results / 'report.json', updated)
 (args.results / 'report.html').write_text(evals.render_html(updated))
-raise SystemExit(0 if all(t['passed'] for t in updated['trials']) else 1)
+raise SystemExit(0 if not updated.get('aborted', False) and all(t['passed'] for t in updated['trials']) else 1)

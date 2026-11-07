@@ -163,36 +163,29 @@ class ReviewReplays(unittest.TestCase):
                           "'config':os.environ['CLAUDE_CONFIG_DIR'],'args':sys.argv[1:],"
                           "'ordinary':Path('CLAUDE.md').exists()}))\n")
         client.chmod(0o755)
-        actual_execute = evals.execute
-
-        def execute(argv, env, cwd, timeout, stdin=None):
-            if Path(argv[0]).parent == ROOT / 'harnesses':
-                return {'exit': 0, 'stdout': '\n'.join(map(json.dumps, [
-                    {'type':'system','session_id':'fake'}, {'type':'result','is_error':False}])), 'stderr':''}
-            return actual_execute(argv, env, cwd, timeout, stdin)
-
         output = self.root / 'launcher-output'
+        output.mkdir()
+        profile = evals.RunProfile('claude', client, output, evals.isolated_env, evals.execute)
+        self.addCleanup(shutil.rmtree, profile.root)
         capture = io.StringIO()
-        with patch.object(evals, 'execute', side_effect=execute), patch('builtins.input', return_value='signed-in'), contextlib.redirect_stdout(capture):
-            result = evals.run_trial(BINARY, 'claude', 'fake-client', 'plan-not-file',
-                                    'default', 1, client, output, stub=False)
-        profile = Path((output / result['id'] / 'profile-location.txt').read_text().strip())
-        self.addCleanup(shutil.rmtree, profile)
-        command = capture.getvalue().split('Sign in afresh in another terminal:\n', 1)[1].splitlines()[0]
-        run = subprocess.run(['/bin/zsh', '-c', command], cwd=ordinary, capture_output=True, text=True)
-        self.assertEqual(run.returncode, 0, run.stderr)
-        observed = json.loads(run.stdout)
-        self.assertEqual(Path(observed['cwd']), profile / 'repos/acme-mobile')
-        self.assertFalse(observed['ordinary'])
-        self.assertEqual(Path(observed['config']), profile / 'home/.claude')
-        import os
-        self.assertEqual(observed['home'], os.environ['HOME'] if sys.platform == 'darwin' else str(profile / 'home'))
-        launcher = profile / 'profile-launcher.sh'
-        self.assertTrue(launcher.is_file())
-        logout = subprocess.run([str(launcher), 'logout'], cwd=ordinary, capture_output=True, text=True)
+        def login(_):
+            command = capture.getvalue().split('Sign in once in another terminal:\n', 1)[1].splitlines()[0]
+            run = subprocess.run(['/bin/zsh', '-c', command], cwd=ordinary, capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            observed = json.loads(run.stdout)
+            self.assertEqual(Path(observed['cwd']), profile.root / 'acme-login')
+            self.assertFalse(observed['ordinary'])
+            self.assertEqual(Path(observed['config']), profile.directory)
+            import os
+            self.assertEqual(observed['home'], os.environ['HOME'] if sys.platform == 'darwin' else str(profile.home))
+            return 'signed-in'
+        with patch('builtins.input', side_effect=login), contextlib.redirect_stdout(capture):
+            profile.sign_in()
+            profile.instructions()
+        logout = subprocess.run([str(profile.launcher), 'auth', 'logout'], cwd=ordinary, capture_output=True, text=True)
         self.assertEqual(logout.returncode, 0, logout.stderr)
-        self.assertEqual(json.loads(logout.stdout)['args'], ['logout'])
-        self.assertEqual(Path(json.loads(logout.stdout)['cwd']), profile / 'repos/acme-mobile')
+        self.assertEqual(json.loads(logout.stdout)['args'], ['auth', 'logout'])
+        self.assertEqual(Path(json.loads(logout.stdout)['cwd']), profile.root / 'acme-login')
 
     def test_documented_model_prompts_run_under_zsh(self):
         text = (ROOT.parent / 'docs/dogfood/agent-evals.md').read_text()
@@ -259,6 +252,7 @@ class NativeLifecycle(unittest.TestCase):
             base = self.events(harness)
             parsed = evals.parse_stream(harness, '\n'.join(map(json.dumps, base)))
             self.assertTrue(parsed['complete'])
+            self.assertIsNone(evals.tokens(parsed['usage']), 'Absent usage must stay unknown')
             cases = {'missing-result':base[:2]+base[3:], 'orphan-result':[base[0],*base[2:]],
                      'duplicate-result':base[:3]+base[2:], 'duplicate-start':base[:2]+base[1:],
                      'missing-terminal':base[:3], 'duplicate-terminal':base+[base[-1]],
