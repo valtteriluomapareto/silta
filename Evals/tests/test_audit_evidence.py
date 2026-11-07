@@ -126,6 +126,18 @@ class AuditEvidence(unittest.TestCase):
         output = self.audit(e)
         self.assertRegex(output, r'phase-0/tool-0[^\n]*COMPLETED exit=unknown')
 
+    def test_incomplete_capture_citations_resolve_to_stream_metadata(self):
+        e = self.evidence()
+        e['phases'][0]['capture'] = {'streams': {'stdout': {'complete': False}, 'stderr': {'complete': False}}}
+        output = self.audit(e)
+        for stream in ('stdout', 'stderr'):
+            pointer = '/phases/0/capture/streams/' + stream
+            self.assertIn('UNRESOLVED fixture/evidence.json#' + pointer, output, 'Capture citation does not resolve')
+            value = e
+            for component in pointer.strip('/').split('/'):
+                value = value[int(component)] if isinstance(value, list) else value[component]
+            self.assertFalse(value['complete'])
+
     def test_missing_raw_and_missing_tool_result_are_unresolved(self):
         e = self.evidence()
         e['phases'][0]['tool_results'].pop(0)

@@ -42,6 +42,19 @@ class Capture(unittest.TestCase):
             for path in self.root.iterdir():
                 self.assertNotIn(KEY.encode(), path.read_bytes())
 
+    def test_recovered_usage_keeps_distinct_identities_and_rejects_ambiguity(self):
+        budget = TokenBudget(self.root / 'codex', 100)
+        budget.start_phase()
+        budget.native = {'a': 10, 'b': 20}
+        budget.phase_tokens = 30
+        usage = {'input_tokens': 10, 'output_tokens': 5}
+        self.assertEqual(budget.recover_phase(usage, 'a'), 35, 'Other identity usage lost during recovery')
+        budget.baseline = 15
+        budget.native, budget.terminal = {'a': 15}, {'a': 15}
+        budget.phase_tokens = None
+        self.assertIsNone(budget.recover_phase({'input_tokens': 20, 'output_tokens': 10}, None))
+        self.assertEqual(budget.recover_phase({'input_tokens': 20, 'output_tokens': 10}, 'a'), 15)
+
     def test_uncapped_interruption_replaces_communicate_buffer_without_duplication(self):
         capture = NativeCapture(self.root, 0)
         out, err = b'prefix\xfftail\n', b'stderr\n'

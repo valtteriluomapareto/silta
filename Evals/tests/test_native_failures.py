@@ -79,6 +79,29 @@ class NativeFailures(unittest.TestCase):
                 if helper == 'snapshot':
                     self.assertIsNone(evidence['phases'][-1]['state'])
 
+    def test_recovered_terminal_usage_supersedes_stale_known_count(self):
+        self.check('codex', 'stale-usage', cap=100, fault='stale_usage')
+
+    def test_second_turn_malformed_identity_does_not_double_charge_usage(self):
+        for cap in (None, 100):
+            with self.subTest(cap=cap):
+                output, report, entries, text, _ = self.fixture.run_live(
+                    'codex', 'second-thread' + ('-capped' if cap else ''), scenario='proposals-ask', repeats=1, operator='scripted', cap=cap)
+                self.assertTrue(report['aborted'])
+                self.assertEqual(report['attempted_trials'], 5)
+                trial = report['trials'][-1]
+                self.assertIsNone(trial['metrics']['tokens'], 'Unattributed cumulative usage was charged again')
+                models = [e for e in entries if e['event'] == 'model']
+                self.assertEqual(len(models), 6, 'Another model launched after malformed resumed identity')
+                directory = output / trial['id']
+                for number, model in enumerate(models[-2:]):
+                    self.assertTrue(Path(model['trial']).exists())
+                    self.assertIn(model['trial'], text)
+                    for stream, suffix in (('stdout', 'jsonl'), ('stderr', 'stderr')):
+                        self.assertEqual((directory / f'phase-{number}.{suffix}').read_bytes(),
+                                         Path(model[stream + '_oracle']).read_bytes())
+                self.assertIn('aborted', (output / 'report.html').read_text())
+
     def test_second_turn_exception_keeps_earlier_turns(self):
         self.check('codex', 'helper-second-turn', fault='snapshot', fault_after=2, scenario='handoff-resume')
 

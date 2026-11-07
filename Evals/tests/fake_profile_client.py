@@ -105,7 +105,14 @@ if '--resume' in args:
     conversation = args[args.index('--resume') + 1]
 
 
+pending_identity = None
+
+
 def emit(value):
+    global pending_identity
+    if mode.startswith('second-thread') and phase and 'thread_id' in value:
+        pending_identity = dict(value, thread_id=[])
+        return
     if mode.startswith('schema-'):
         item = value.get('item', {})
         blocks = value.get('message', {}).get('content', [])
@@ -148,6 +155,8 @@ def emit(value):
                 value['total_cost_usd'] = {'schema-cost': [], 'schema-cost-bool': True,
                                           'schema-cost-nan': float('nan')}[mode]
     encoded = (json.dumps(value) + '\n').encode()
+    if pending_identity and value.get('type') == 'turn.completed':
+        encoded = (json.dumps(pending_identity) + '\n').encode() + encoded
     with stdout_oracle.open('ab') as oracle:
         oracle.write(encoded)
     sys.stdout.buffer.write(encoded)

@@ -88,6 +88,16 @@ class Profiles(unittest.TestCase):
                    '        failed = True\n        raise OSError("INJECTED_CAPTURE_FAILURE")\n'
                    '    return original(path, value)\nPath.write_bytes = fail\n')
                 + 'raise SystemExit(evals.main())\n')
+            if fault == 'stale_usage':
+                entry.write_text('import sys\n' + 'sys.path.insert(0, ' + repr(str(ROOT)) + ')\nimport evals\n'
+                    + 'original = evals.TokenBudget.execute\n'
+                    + 'def fail(self, *args, **kwargs):\n'
+                    + '    original(self, *args, **kwargs)\n'
+                    + '    self.native[self.thread] = 10\n'
+                    + '    self.terminal.pop(self.thread, None)\n'
+                    + '    self.phase_tokens = 10\n'
+                    + '    raise ValueError("INJECTED_STALE_USAGE_FAILURE")\n'
+                    + 'evals.TokenBudget.execute = fail\nraise SystemExit(evals.main())\n')
             argv[2] = str(entry)
         child = subprocess.Popen(argv, env=env, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.addCleanup(lambda: child.kill() if child.poll() is None else None)
