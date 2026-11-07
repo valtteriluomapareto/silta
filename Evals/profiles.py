@@ -31,6 +31,8 @@ class RunProfile:
         cwd = self.root / 'acme-login'
         cwd.mkdir()
         login_env = dict(self.env)
+        if harness == 'claude':
+            login_env['CLAUDE_CODE_TMPDIR'] = self.env['TMPDIR']
         if harness == 'claude' and sys.platform == 'darwin':
             login_env['HOME'] = os.environ['HOME']
             login_env['USER'] = os.environ.get('USER', 'unknown')
@@ -70,7 +72,7 @@ class RunProfile:
         # may be removed; an unfamiliar entry stops reuse for human inspection.
         runtime = ({'sessions', 'archived_sessions', 'history.jsonl', 'session_index.jsonl', 'log', 'logs',
                     'tmp', 'shell_snapshots', 'models_cache.json', 'version.json', 'sqlite', 'skills',
-                    '.codex-global-state.json', 'capabilities.json', 'projects'} if self.harness == 'codex' else
+                    '.codex-global-state.json', 'capabilities.json'} if self.harness == 'codex' else
                    {'projects', 'debug', 'todos', 'tasks', 'plans', 'session-env', 'paste-cache', 'file-history',
                     'backups', 'shell-snapshots', 'cache', 'statsig', 'telemetry', '.cache', 'stats-cache.json',
                     'history.jsonl', 'skills'})
@@ -116,8 +118,8 @@ class RunProfile:
         return json.loads(result['stdout'])['data'] if json_output else result
 
     def finish_trial(self, root, destination, retain=False):
-        destination.mkdir(parents=True, exist_ok=True)
         try:
+            destination.mkdir(parents=True, exist_ok=True)
             if self.context:
                 args = ['agents', 'uninstall', '--' + self.harness]
                 preview = self.call(args, json_output=True)

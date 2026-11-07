@@ -24,7 +24,7 @@ FAULTS = [
      "                path.write_bytes(content + (('\\n[sandbox_workspace_write]\\nwritable_roots = ' + json.dumps([self.context[1]['SILTA_HOME']]) + '\\n').encode() if self.context and self.harness == 'codex' else b''))",
      SHARED, 'sandbox_workspace_write'),
     ('skipped_uninstall_apply', 'profiles.py', "                applied = self.call(args + ['--apply', preview['token']], json_output=True)",
-     '                applied = preview', SHARED, '1 != 2'),
+     '                applied = preview', SHARED, '1 != 3'),
     ('skipped_installer', 'evals.py', '        profile.install(binary, env, cwd)', '        pass', SHARED, 'Lists differ'),
     ('uninstall_conflict_continues', 'evals.py', '                if profile or isinstance(error, KeyboardInterrupt):',
      '                if isinstance(error, KeyboardInterrupt):', FAILURE, 'False is not true'),
@@ -39,7 +39,7 @@ FAULTS = [
      "        (self.directory / ('auth.json' if self.harness == 'codex' else '.credentials.json')).read_bytes()\n        self.reset()\n\n    def safe_config",
      SHARED, 'FORBIDDEN_PROFILE_READ_COPY'),
     ('opaque_auth_deleted', 'profiles.py', '        allowed = {p.name', '        runtime.add(auth)\n        allowed = {p.name',
-     SHARED, '0 != 2'),
+     SHARED, '0 != 3'),
     ('unexpected_login_grant', 'profiles.py', "            if config.get('sandbox_workspace_write', {}).get('writable_roots'):",
      '            if False:', 'test_config_aliases_and_unexpected_grant_are_refused_without_reads', 'False is not true'),
     ('missing_logout_command', 'profiles.py', "        print('Log out of the temporary profile:", "        print('Temporary profile:",
@@ -50,6 +50,15 @@ FAULTS = [
     ('conversation_reused_between_trials', 'evals.py', 'prompt, conversation], run_env',
      "prompt, ('reused-a' if profile and phase == 0 else conversation)], run_env",
      'test_handoff_sessions_are_distinct_within_each_shared_profile_trial', '3 != 4'),
+    ('claude_trial_scratch_unconfined', 'evals.py', "        env['CLAUDE_CODE_TMPDIR'] = env['TMPDIR']", '        pass',
+     'test_claude_scratch_is_trial_local_and_login_scratch_is_profile_local', 'None !='),
+    ('claude_login_scratch_unconfined', 'profiles.py', "            login_env['CLAUDE_CODE_TMPDIR'] = self.env['TMPDIR']", '            pass',
+     'test_claude_scratch_is_trial_local_and_login_scratch_is_profile_local', 'None !='),
+    ('successful_attempt_not_counted', 'evals.py', "t['checks'].get('infrastructure', True)", "t['checks'].get('infrastructure', False)",
+     SHARED, '0 != 3'),
+    ('receipt_failure_loses_retained_root', 'profiles.py', '        try:\n            destination.mkdir(parents=True, exist_ok=True)',
+     '        destination.mkdir(parents=True, exist_ok=True)\n        try:',
+     'test_receipt_directory_failure_retains_trial_for_final_cleanup', 'Lists differ'),
 ]
 
 

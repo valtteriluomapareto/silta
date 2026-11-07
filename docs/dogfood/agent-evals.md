@@ -106,6 +106,9 @@ Claude client retains real HOME/USER for the keychain; the Silta wrapper restore
 temporary HOME. See [isolated acceptance](agents-acceptance.md),
 [Codex authentication](https://learn.chatgpt.com/docs/auth?surface=cli) and
 [Claude authentication](https://code.claude.com/docs/en/authentication).
+Claude’s dedicated `CLAUDE_CODE_TMPDIR` is also set explicitly: trial scratch
+data stays in the disposable trial tree, and login/logout scratch stays in the
+run profile. See [Claude application data](https://code.claude.com/docs/en/claude-directory#session-scratchpad-directory).
 
 The shared profile preserves opaque authentication in place. Each trial has fresh
 HOME, SILTA_HOME, XDG directories, Acme repos, actor/session and native conversation.

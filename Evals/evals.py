@@ -225,6 +225,8 @@ def git(cwd, *args):
 
 def prepare(root, binary, harness, scenario, variant, profile=None):
     env = isolated_env(root)
+    if harness == 'claude':
+        env['CLAUDE_CODE_TMPDIR'] = env['TMPDIR']
     if profile:
         env['CODEX_HOME' if harness == 'codex' else 'CLAUDE_CONFIG_DIR'] = str(profile.directory)
     wrapper = root / 'bin/silta'
@@ -904,8 +906,9 @@ def render_html(report):
                     + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks']) + '</li>' for t in report['trials'])
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
-            '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
-            + '<p>' + escape({k: report[k] for k in ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials') if k in report}) + '</p>' + rows + '</table><ul>' + links + '</ul></html>')
+            + '<p>' + escape({k: report[k] for k in ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials') if k in report}) + '</p>'
+            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
+            + rows + '</table><ul>' + links + '</ul></html>')
 
 
 def main():
@@ -985,7 +988,7 @@ def main():
     report = aggregate(trials, 'stub' if args.stub else 'live')
     if profile:
         report.update(aborted=aborted, planned_trials=len(cases), attempted_trials=len(trials),
-                      completed_trials=sum(t['checks'].get('infrastructure', False) for t in trials))
+                      completed_trials=sum(t['checks'].get('infrastructure', True) for t in trials))
     report['commit'] = git(ROOT, 'rev-parse', 'HEAD')
     report['dirty'] = bool(git(ROOT, 'status', '--porcelain'))
     report['binary_sha256'] = hashlib.sha256(args.silta.read_bytes()).hexdigest()
