@@ -278,12 +278,17 @@ if mode.startswith('orphan-'):
     read_ready, write_ready = os.pipe()
     script = 'import os,sys;os.write(int(sys.argv[1]),b"x");os.close(int(sys.argv[1]));r,w=os.pipe();os.read(r,1)'
     descendant = subprocess.Popen([sys.executable, '-B', '-c', script, str(write_ready)],
-                                  pass_fds=(write_ready,), start_new_session='escaped' in mode)
+                                  pass_fds=(write_ready,), start_new_session='escaped' in mode,
+                                  stdout=subprocess.DEVNULL if mode.endswith('-stderr') else None,
+                                  stderr=subprocess.DEVNULL if mode.endswith('-stdout') else None)
     os.close(write_ready)
     os.read(read_ready, 1)
     os.close(read_ready)
     record({'event': 'descendant', 'pid': descendant.pid, 'pgid': os.getpgrp()})
-    if 'live-permission' in mode:
+    if 'live-timeout' in mode:
+        with journal.with_suffix('.ready').open('w') as ready:
+            ready.write('ready\n')
+    if 'live-' in mode:
         read_end, write_end = os.pipe()
         os.read(read_end, 1)
 if mode.startswith('bad-utf8'):

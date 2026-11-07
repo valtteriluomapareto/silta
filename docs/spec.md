@@ -2259,12 +2259,16 @@ Evals/
    evidence review preserves the run’s aborted status and trial counts.
    Returned transport/infrastructure failures, parsing exceptions and interruption
    also retain the failed trial root and abort remaining turns and trials. Capture
-   sanitized native stdout/stderr bytes before interpretation; kill, drain and
-   reap the owned process on interruption. Record byte hashes and capture
+   sanitized native stdout/stderr bytes before interpretation. Each harness owns
+   a process group; signal it on abort even after its leader exits. Bound inherited
+   pipe waiting after leader exit and all cleanup drain/reap operations. Record
+   cutoff/incomplete capture; terminal success cannot override cutoff. If group
+   termination or writers remain unconfirmed, retain roots and defer profile
+   mutation/logout/removal until a human verifies writers stopped. Record byte hashes and capture
    completeness, preserve known usage and calls, and leave unavailable evidence
    and unchecked metrics unknown. With a writable output directory, JSON and HTML
    reports still record an aborted run; ordinary scenario failures still repeat.
-   Print final explicit logout and cleanup commands. Fireworks uses
+   Print final explicit logout and cleanup commands when writer cleanup is safe. Fireworks uses
    isolated per-trial profiles without sign-in. On macOS only, Claude retains
    real HOME for its keychain (D42), with temporary `CLAUDE_CONFIG_DIR`; every
    Silta child still uses temporary HOME and SILTA_HOME.

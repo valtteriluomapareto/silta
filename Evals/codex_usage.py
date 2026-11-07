@@ -6,6 +6,7 @@ import selectors
 import signal
 import subprocess
 import time
+import process_cleanup
 
 
 def tokens(usage):
@@ -92,8 +93,8 @@ class TokenBudget:
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                  start_new_session=True)
         buffers = {'stdout': bytearray(), 'stderr': bytearray()}
-        failure = None
-        deadline = time.monotonic() + timeout
+        failure, aborted = None, None
+        deadline, post_exit = time.monotonic() + timeout, None
         try:
             with selectors.DefaultSelector() as selector:
                 selector.register(child.stdout, selectors.EVENT_READ, 'stdout')
@@ -108,40 +109,36 @@ class TokenBudget:
                     if capture:
                         capture.save(buffers['stdout'], buffers['stderr'], final=False)
                     total = self.observe(buffers['stdout'].decode(errors='replace'))
-                    if not failure:
-                        if total is not None and total > self.limit:
-                            failure = 'token-limit'
-                        elif time.monotonic() >= deadline:
-                            failure = 'timeout'
-                        if failure:
-                            try:
-                                os.killpg(child.pid, signal.SIGKILL)
-                            except ProcessLookupError:
-                                pass
-            try:
-                child.wait(timeout=max(0, deadline - time.monotonic()))
-            except subprocess.TimeoutExpired:
-                failure = failure or 'timeout'
-        finally:
-            if child.poll() is None:
+                    now = time.monotonic()
+                    if child.poll() is not None and post_exit is None:
+                        post_exit = now + process_cleanup.DRAIN_SECONDS
+                    if total is not None and total > self.limit:
+                        failure = 'token-limit'
+                    elif now >= deadline:
+                        failure = 'timeout'
+                    elif selector.get_map() and post_exit is not None and now >= post_exit:
+                        failure = 'drain-timeout'
+                    if failure:
+                        break
+            if not failure:
                 try:
-                    os.killpg(child.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            try:
-                out, err = child.communicate()
-                buffers['stdout'].extend(out or b'')
-                buffers['stderr'].extend(err or b'')
-                if capture:
-                    capture.save(buffers['stdout'], buffers['stderr'], process_exit=child.returncode)
-            finally:
-                child.stdout.close()
-                child.stderr.close()
+                    child.wait(timeout=max(0, deadline - time.monotonic()))
+                except subprocess.TimeoutExpired:
+                    failure = 'timeout'
+        except BaseException as error:
+            aborted = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'exception'
+            raise
+        finally:
+            process_cleanup.finish(child, failure or aborted or child.returncode, capture=capture, buffers=buffers,
+                                   deadline=post_exit if failure == 'drain-timeout' else None,
+                                   cutoff=failure == 'drain-timeout')
         total = self.observe(buffers['stdout'].decode(errors='replace'))
         if not failure and total is not None and total > self.limit:
             failure = 'token-limit'
         if self.phase_tokens is None and not failure:
             failure = 'usage-unavailable'
+        if capture and failure:
+            capture.cleanup['reason'] = failure
         self.finish_phase()
         return {'exit': failure or child.returncode, 'process_exit': child.returncode,
                 'tokens': self.phase_tokens,

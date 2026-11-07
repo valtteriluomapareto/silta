@@ -122,7 +122,7 @@ Config symlinks/hardlinks and unexpected initial Codex writable roots are refuse
 Unknown profile entries or cleanup/ownership conflicts abort the remaining trials;
 the report exposes `aborted`, `planned_trials`, `attempted_trials` and
 `completed_trials` (attempts with no infrastructure failure). Relevant
-temporary roots are retained and listed in the final cleanup command for inspection.
+temporary roots are retained and listed in the final cleanup instructions for inspection.
 Completed phase evidence and known usage remain linked on operator EOF or cleanup
 failure. Applying verdicts with `review.py` preserves the abort status and trial
 counts; reviewing available evidence cannot make an aborted run succeed.
@@ -130,7 +130,13 @@ Returned token-limit, timeout, unavailable-usage and native stream/process failu
 also abort reuse and retain the failed trial root. A failed native turn stops before
 another turn or trial launches. Parsing exceptions and `KeyboardInterrupt` follow
 the same abort path: stdout and stderr are captured before interpretation, and
-cancellation kills, drains and reaps the owned process before recording the failure.
+each harness has its own process group. Abort cleanup signals that whole group,
+even after its leader exits. An exited leader gets at most two seconds for inherited
+pipes to reach EOF; abort drain and reap share a two-second deadline (or the
+remaining post-exit deadline). Cutoff preserves available bytes and hashes, marks
+`capture.cleanup.drain_cut_short` and incomplete streams, and cannot pass even
+with a successful native terminal event. A completed-group EPERM race is retried
+only after reaping; persistent permission failures remain explicit.
 `phase-N.jsonl` and `phase-N.stderr` retain the native bytes (with a supplied
 provider key redacted), including invalid UTF-8. Evidence records each stream’s
 byte count, SHA-256, completeness and capture errors, plus the actual process exit
@@ -162,9 +168,13 @@ Inherited provider/identity variables are discarded. Handoff-resume has distinct
 actors and fresh conversations; human-present policy continuations resume only
 within their own trial. Synthetic setup/old proposals and CLI controls are excluded
 from measured agent calls and approval provenance. Only the subsequent operator
-reply can authorize a model action. Timeout or cancellation kills and reaps the
-runner-owned process group before cleanup. Cancellation retains the failed trial
-and aborts the remaining matrix.
+reply can authorize a model action. Timeout or cancellation signals the
+runner-owned process group and attempts drain/reap within the cleanup deadline.
+When termination or pipe writers remain unconfirmed, the runner defers uninstall,
+reset, logout and removal. The cleanup receipt and audit identify the group and
+blocker; the final message lists retained roots and requires stopping and verifying
+writers before touching that profile. Cancellation retains the failed trial and
+aborts the remaining matrix.
 
 For `proposals-ask` human-present variants, the first turn ends before an approval.
 The runner displays the agent's actual messages and the exact command. Enter actual
@@ -295,11 +305,14 @@ link a durable CI artifact containing the same archive. Do not claim the M1 exit
 criterion until both harnesses' four core live scenarios pass over three repeats.
 
 The default-provider run retains one authentication profile, named by the top-level
-`profile-location.txt`, for explicit maintainer logout. The runner prints one
+`profile-location.txt`, for explicit maintainer logout. When native writer cleanup
+is confirmed safe, the runner prints one
 `Log out` command (`profile-launcher.sh auth logout` for Claude or
 `profile-launcher.sh logout` for Codex), then one `After logout, clean up:` command
 listing every retained owned temporary root, even after cancellation or a failure.
-Run those exact commands in that order. The runner never reads, copies or
+Run those exact commands in that order. If cleanup is deferred, first follow the
+recorded process/writer blocker and verify it is safe; no logout/removal command
+is printed for an unconfirmed writer. The runner never reads, copies or
 automatically logs out authentication. Successful trial roots are already removed;
 per-trial `trial-location.txt` records their former locations. Never repair a real
 profile or delete the maintainer’s harness home. Fireworks retains its separate

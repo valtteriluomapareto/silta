@@ -9,6 +9,7 @@ class NativeCapture:
         self.key = key.encode()
         self.buffers, self.streams, self.errors = {}, {}, {}
         self.process_exit = None
+        self.cleanup = {}
         self.save(b'', b'', final=False)
 
     def save(self, stdout, stderr, final=True, process_exit=None):
@@ -35,4 +36,4 @@ class NativeCapture:
         return self.buffers.get(name, b'').decode('utf-8', errors=errors)
 
     def status(self):
-        return {'streams': dict(self.streams), 'errors': dict(self.errors), 'process_exit': self.process_exit}
+        return {'streams': dict(self.streams), 'errors': dict(self.errors), 'process_exit': self.process_exit, 'cleanup': dict(self.cleanup)}

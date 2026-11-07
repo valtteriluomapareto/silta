@@ -18,6 +18,8 @@ import tempfile
 from codex_usage import TokenBudget, tokens
 from profiles import RunProfile
 from native_capture import NativeCapture
+import process_cleanup
+import time
 
 ROOT = Path(__file__).resolve().parent
 SCENARIOS = sorted(p.parent.name for p in (ROOT / 'scenarios').glob('*/scenario.yaml'))
@@ -55,32 +57,50 @@ def execute(argv, env, cwd, timeout, stdin=None, capture=None):
     child = subprocess.Popen(argv, env=env, cwd=cwd, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              text=capture is None, start_new_session=True)
-    def finished(out, err, code):
-        if capture:
-            capture.save(out, err, process_exit=child.returncode)
-            return {'exit': code, 'process_exit': child.returncode,
-                    'stdout': capture.text('stdout'), 'stderr': capture.text('stderr')}
-        return {'exit': code, 'stdout': out, 'stderr': err}
+    out, err, code = b'', b'', None
+    cleanup_deadline, cutoff = None, False
     try:
-        out, err = child.communicate(stdin.encode() if capture and isinstance(stdin, str) else stdin, timeout=timeout)
-        return finished(out, err, child.returncode)
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(child.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        out, err = child.communicate()
-        return finished(out, err, 'timeout')
-    except BaseException:
-        try:
-            os.killpg(child.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        finally:
-            out, err = child.communicate()
-            if capture:
-                capture.save(out, err, process_exit=child.returncode)
+        if capture:
+            deadline, post_exit = time.monotonic() + timeout, None
+            pending = stdin.encode() if isinstance(stdin, str) else stdin
+            while True:
+                now = time.monotonic()
+                remaining = min(deadline, post_exit if post_exit is not None else deadline) - now
+                try:
+                    out, err = child.communicate(pending, timeout=max(0, min(0.1, remaining)))
+                    code = child.returncode
+                    break
+                except subprocess.TimeoutExpired as error:
+                    pending = None
+                    out, err = error.output or b'', error.stderr or b''
+                    now = time.monotonic()
+                    if child.poll() is not None and post_exit is None:
+                        post_exit = now + process_cleanup.DRAIN_SECONDS
+                    if now >= deadline:
+                        code = 'timeout'
+                        break
+                    if post_exit is not None and now >= post_exit:
+                        code, cutoff, cleanup_deadline = 'drain-timeout', True, post_exit
+                        break
+        else:
+            out, err = child.communicate(stdin, timeout=timeout)
+            code = child.returncode
+    except subprocess.TimeoutExpired as error:
+        out, err, code = error.output or b'', error.stderr or b'', 'timeout'
+    except BaseException as error:
+        process_cleanup.finish(child, 'interrupted' if isinstance(error, KeyboardInterrupt) else 'exception',
+                               capture=capture, initial=(out, err))
         raise
+    if code != 0 or capture:
+        out, err, cleanup = process_cleanup.finish(child, code, capture=capture, initial=(out, err),
+                                                    deadline=cleanup_deadline, cutoff=cutoff)
+    else:
+        cleanup = {}
+    if capture:
+        out, err = capture.text('stdout'), capture.text('stderr')
+    else:
+        out, err = [value.decode(errors='replace') if isinstance(value, bytes) else value for value in (out, err)]
+    return {'exit': code, 'process_exit': child.returncode, 'stdout': out, 'stderr': err, 'cleanup': cleanup}
 
 
 def empty_stream():
@@ -534,12 +554,29 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
                 observed['tokens'] = tokens(terminal_observation(harness, result['stdout'])['usage'])
         except (Exception, KeyboardInterrupt) as error:
             observed.update(terminal_observation(harness, capture.text('stdout', errors='replace')))
-            observed['exit'] = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'exception'
+            primary = capture.cleanup.get('reason')
+            observed['exit'] = (primary if primary in ('token-limit', 'timeout', 'drain-timeout', 'interrupted')
+                                else 'interrupted' if isinstance(error, KeyboardInterrupt) else 'exception')
             observed['process_exit'] = capture.process_exit
             count = tokens(observed['usage'])
             observed['tokens'] = (budget.recover_phase(observed['usage'], observed['conversation'])
                                   if budget else count)
             observed['errors'].append({'stage': stage, 'type': type(error).__name__, 'message': redact(str(error), key)})
+        cleanup = capture.cleanup
+        if cleanup.get('reason') == 'interrupted' and observed['exit'] == 0:
+            observed['exit'] = 'interrupted'
+        if cleanup.get('group_status') == 'unconfirmed' or cleanup.get('drain_cut_short') or cleanup.get('main_reaped') is False:
+            if profile:
+                profile.cleanup_blockers.append(cleanup)
+            observed['errors'].append({'stage': 'cleanup', 'type': 'UnconfirmedWriters',
+                'message': 'Native writer cleanup unconfirmed for group ' + str(cleanup.get('pgid'))
+                           + '; stop and verify writers before logout/removal'})
+        for name in ('group_error', 'drain_error', 'reap_error'):
+            if name in cleanup:
+                observed['errors'].append({'stage': 'cleanup-' + name, **cleanup[name]})
+        if cleanup.get('drain_cut_short'):
+            observed['complete'] = False
+            observed['errors'].append({'stage': 'drain', 'type': 'Deadline', 'message': 'Native output drain cut short; pipe writers remain unconfirmed'})
         observed['capture'] = capture.status()
         observed['transcript_sha256'] = capture.streams['stdout']['sha256']
         if scenario != 'handoff-resume':
@@ -1053,7 +1090,8 @@ def render_html(report):
                    ('harness', 'model', 'scenario', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
     links = ''.join('<li><a href="' + escape(t['evidence']) + '">' + escape(t['id']) + '</a>: '
                     + escape({k: t.get(k) for k in ('provider', 'operator', 'operator_source', 'reviewer')})
-                    + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks']) + '</li>' for t in report['trials'])
+                    + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks'])
+                    + (' error=' + escape(t['error']) if t.get('error') else '') + '</li>' for t in report['trials'])
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
             + status

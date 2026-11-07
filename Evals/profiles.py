@@ -28,6 +28,7 @@ class RunProfile:
         self.baseline = {}
         self.context = None
         self.retained = []
+        self.cleanup_blockers = []
         cwd = self.root / 'acme-login'
         cwd.mkdir()
         login_env = dict(self.env)
@@ -121,6 +122,11 @@ class RunProfile:
     def finish_trial(self, root, destination, retain=False):
         try:
             destination.mkdir(parents=True, exist_ok=True)
+            if self.cleanup_blockers:
+                retain = True
+                (destination / 'cleanup.json').write_text(json.dumps({'uninstalled': False, 'deferred': True,
+                    'processes': self.cleanup_blockers}, indent=2) + '\n')
+                return
             if self.context:
                 args = ['agents', 'uninstall', '--' + self.harness]
                 preview = self.call(args, json_output=True)
@@ -142,6 +148,11 @@ class RunProfile:
                 self.retained.append(root)
 
     def instructions(self):
+        if self.cleanup_blockers:
+            print('Cleanup deferred: stop and verify native groups and descendant pipe writers before logout or removing roots.', flush=True)
+            print('Unconfirmed process cleanup: ' + json.dumps(self.cleanup_blockers), flush=True)
+            print('Retained profile and trial roots: ' + shlex.join([str(self.root), *map(str, self.retained)]), flush=True)
+            return
         logout = ['logout'] if self.harness == 'codex' else ['auth', 'logout']
         print('Log out of the temporary profile:\n' + shlex.join([str(self.launcher), *logout]), flush=True)
         print('After logout, clean up:\n' + shlex.join(['rm', '-rf', '--', str(self.root),

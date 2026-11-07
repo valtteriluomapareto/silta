@@ -44,6 +44,9 @@ class Profiles(unittest.TestCase):
                         '        if "/harnesses/" in str(child.args[0]) and not getattr(child, "timed_out", False):\n'
                         '            with open(os.environ["FORCED_TIMEOUT_READY"]) as ready: ready.readline()\n'
                         '            child.timed_out = True\n'
+                        '            import time\n'
+                        '            clock = time.monotonic\n'
+                        '            time.monotonic = lambda: clock() + 1000\n'
                         '            raise subprocess.TimeoutExpired(child.args, kwargs["timeout"])\n'
                         '        return original(child, *args, **kwargs)\n'
                         '    subprocess.Popen.communicate = communicate\n')

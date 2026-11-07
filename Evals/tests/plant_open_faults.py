@@ -42,7 +42,7 @@ FAULTS = [
      "7 != 'token-limit'"),
     ('closed_pipe_exit', 'codex_usage.py', 'child.wait(timeout=max(0, deadline - time.monotonic()))',
      'pass', 'REVIEW.test_closed_pipes_do_not_kill_a_process_before_its_exit',
-     "Expected 'killpg' to not have been called"),
+     'Process killed before its exit'),
     ('matrix_loses_exit_on_bad_report', 'open_matrix.py', 'except (OSError, ValueError):',
      'except OSError:', 'REVIEW.test_malformed_optional_report_never_loses_model_exit_or_later_models',
      'json.decoder.JSONDecodeError'),

@@ -73,6 +73,9 @@ def render_trial(directory, trial):
             issue(bound + '/errors', json.dumps(error))
         if phase.get('schema_errors'):
             issue(bound + '/schema_errors', json.dumps(phase['schema_errors']))
+        cleanup = phase.get('capture', {}).get('cleanup', {})
+        if cleanup.get('drain_cut_short') or cleanup.get('group_status') == 'unconfirmed' or cleanup.get('main_reaped') is False:
+            issue(bound + '/capture/cleanup', 'verify native writers stopped before logout/removal: ' + json.dumps(cleanup))
         for stream, capture in phase.get('capture', {}).get('streams', {}).items():
             if not capture.get('complete'):
                 issue(bound + '/capture/streams/' + stream, 'capture incomplete; full output is unavailable')
@@ -103,7 +106,10 @@ def render_trial(directory, trial):
                 continue
             for kind, item in entries:
                 if kind == 'message':
-                    print(f'[{prefix}/message-{message_count} {locator} {bound}/messages/{message_count}] MESSAGE', item)
+                    retained_messages = phase.get('messages', [])
+                    retained = (bound + f'/messages/{message_count}' if message_count < len(retained_messages)
+                                and retained_messages[message_count] == item else '')
+                    print(f'[{prefix}/message-{message_count} {locator}' + (' ' + retained if retained else '') + '] MESSAGE', item)
                     message_count += 1
                     continue
                 if not isinstance(item, dict):

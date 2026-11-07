@@ -94,10 +94,11 @@ class OpenReview(unittest.TestCase):
                 budget.phase_tokens = 15
                 return 15
             with patch.object(codex_usage.subprocess, 'Popen', return_value=child):
-                with patch.object(budget, 'observe', side_effect=observed), patch.object(codex_usage.os, 'killpg') as kill, patch.object(codex_usage.selectors, 'DefaultSelector') as selector:
+                with patch.object(budget, 'observe', side_effect=observed), patch.object(codex_usage.os, 'killpg', side_effect=lambda *args: self.assertTrue(child.wait.called, 'Process killed before its exit')) as kill, patch.object(codex_usage.selectors, 'DefaultSelector') as selector:
                     selector.return_value.__enter__.return_value.get_map.return_value = {}
                     result = budget.execute(['fake-only'], {}, Path(directory), 1)
-            kill.assert_not_called()
+            self.assertTrue(child.wait.called)
+            kill.assert_called_once()
             self.assertEqual(result['exit'], 7)
 
     def test_malformed_optional_report_never_loses_model_exit_or_later_models(self):
