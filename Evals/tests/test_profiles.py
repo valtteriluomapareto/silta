@@ -79,7 +79,7 @@ class Profiles(unittest.TestCase):
                 + 'journal = Path(' + repr(str(journal)) + ')\n'
                 + 'def ready():\n    return journal.exists() and sum(json.loads(line)["event"] == "model" for line in journal.read_text().splitlines()) >= ' + str(fault_after) + '\n'
                 + ('original = evals.' + fault + '\ndef fail(*args, **kwargs):\n'
-                   '    if ready(): raise RuntimeError("INJECTED_' + fault.upper() + '_FAILURE")\n'
+                   '    if ready(): raise ' + ('AttributeError' if fault in ('metrics', 'parse_stream') else 'RuntimeError') + '("INJECTED_' + fault.upper() + '_FAILURE")\n'
                    '    return original(*args, **kwargs)\nevals.' + fault + ' = fail\n' if fault != 'capture' else
                    'original = Path.write_bytes\nfailed = False\n'
                    'def fail(path, value):\n    global failed\n'
@@ -132,6 +132,9 @@ class Profiles(unittest.TestCase):
             self.addCleanup(shutil.rmtree, Path((output / 'profile-location.txt').read_text().strip()), True)
         self.assertEqual(child.returncode, 1, transcript)
         self.assertTrue((output / 'report.json').exists(), transcript)
+        for artifact in output.rglob('*.json'):
+            self.assertNotIn(b'FORBIDDEN_PROFILE_READ_COPY', artifact.read_bytes(),
+                             'Controller attempted forbidden profile access')
         report = json.loads((output / 'report.json').read_text())
         observations = [json.loads(line) for line in journal.read_text().splitlines()] if journal.exists() else []
         return output, report, observations, transcript, commands

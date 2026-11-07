@@ -20,7 +20,7 @@ class NativeFailures(unittest.TestCase):
         output, report, entries, text, _ = self.fixture.run_live(harness, mode, cap=cap, fault=fault,
                                                                fault_after=fault_after, scenario=scenario)
         self.assertTrue(report['aborted'])
-        self.assertEqual(report['attempted_trials'], 1)
+        self.assertEqual(report['attempted_trials'], 1, 'Failure metrics prevented final trial aggregation')
         self.assertEqual(report['completed_trials'], 0)
         models = [e for e in entries if e['event'] == 'model']
         self.assertEqual(len(models), fault_after)

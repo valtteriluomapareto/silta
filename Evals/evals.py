@@ -4,6 +4,7 @@ from contextlib import closing
 import hashlib
 import html
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -16,6 +17,7 @@ import tempfile
 
 from codex_usage import TokenBudget, tokens
 from profiles import RunProfile
+from native_capture import NativeCapture
 
 ROOT = Path(__file__).resolve().parent
 SCENARIOS = sorted(p.parent.name for p in (ROOT / 'scenarios').glob('*/scenario.yaml'))
@@ -49,30 +51,80 @@ FIREWORKS_CONFIG = ('model_provider = "fireworks"\n'
                     'shell_environment_policy.exclude = ["FIREWORKS_API_KEY"]\n')
 
 
-def execute(argv, env, cwd, timeout, stdin=None):
+def execute(argv, env, cwd, timeout, stdin=None, capture=None):
     child = subprocess.Popen(argv, env=env, cwd=cwd, stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             text=True, start_new_session=True)
+                             text=capture is None, start_new_session=True)
+    def finished(out, err, code):
+        if capture:
+            capture.save(out, err, process_exit=child.returncode)
+            return {'exit': code, 'process_exit': child.returncode,
+                    'stdout': capture.text('stdout'), 'stderr': capture.text('stderr')}
+        return {'exit': code, 'stdout': out, 'stderr': err}
     try:
-        out, err = child.communicate(stdin, timeout=timeout)
-        return {'exit': child.returncode, 'stdout': out, 'stderr': err}
+        out, err = child.communicate(stdin.encode() if capture and isinstance(stdin, str) else stdin, timeout=timeout)
+        return finished(out, err, child.returncode)
     except subprocess.TimeoutExpired:
-        os.killpg(child.pid, signal.SIGKILL)
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
         out, err = child.communicate()
-        return {'exit': 'timeout', 'stdout': out, 'stderr': err}
+        return finished(out, err, 'timeout')
     except BaseException:
         try:
             os.killpg(child.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         finally:
-            child.communicate()
+            out, err = child.communicate()
+            if capture:
+                capture.save(out, err, process_exit=child.returncode)
         raise
 
 
+def empty_stream():
+    return {'complete': False, 'commands': [], 'messages': [], 'opaque': [],
+            'conversation': None, 'usage': None, 'cost_usd': None, 'tool_results': []}
+
+
+def valid_number(value):
+    return (type(value) is int and value >= 0
+            or type(value) is float and math.isfinite(value) and value >= 0)
+
+
+def finite_json(value):
+    if isinstance(value, dict):
+        return all(finite_json(item) for item in value.values())
+    if isinstance(value, list):
+        return all(finite_json(item) for item in value)
+    return type(value) is not float or math.isfinite(value)
+
+
+def terminal_observation(harness, stream):
+    """Recover only typed terminal metadata, without interpreting tool effects."""
+    result = empty_stream()
+    for line in stream.splitlines():
+        try:
+            event = json.loads(line)
+            kind = event.get('type')
+            identity = event.get('thread_id') if harness == 'codex' else event.get('session_id')
+            if isinstance(identity, str) and identity:
+                result['conversation'] = identity
+            if kind == ('turn.completed' if harness == 'codex' else 'result'):
+                if tokens(event.get('usage')) is not None:
+                    usage = event['usage']
+                    result['usage'] = usage if finite_json(usage) else {name: usage[name] for name in ('input_tokens', 'output_tokens')}
+                cost = event.get('total_cost_usd')
+                if valid_number(cost):
+                    result['cost_usd'] = cost
+        except (ValueError, TypeError, AttributeError, RecursionError):
+            continue
+    return result
+
+
 def parse_stream(harness, stream):
-    result = {'complete': False, 'commands': [], 'messages': [], 'opaque': [],
-              'conversation': None, 'usage': None, 'cost_usd': None, 'tool_results': []}
+    result = empty_stream()
     tools, finished = {}, set()
     valid, terminal, successful = True, False, False
     events = []
@@ -170,7 +222,34 @@ def parse_stream(harness, stream):
                                                       'exit': 1 if item.get('is_error') else 0, 'output': content})
         except (KeyError, TypeError, AttributeError, ValueError):
             valid = False
-    result['complete'] = bool(valid and terminal and successful and isinstance(result['conversation'], str) and result['conversation'] and set(tools) == finished)
+    schema_errors = []
+    for field in ('commands', 'messages'):
+        if any(not isinstance(value, str) for value in result[field]):
+            schema_errors.append(field)
+            result[field] = [value for value in result[field] if isinstance(value, str)]
+    accepted = [value for value in result['tool_results'] if isinstance(value.get('command'), str)
+                and isinstance(value.get('id'), str) and isinstance(value.get('output'), str)
+                and type(value.get('exit')) is int]
+    if len(accepted) != len(result['tool_results']):
+        schema_errors.append('tool_results')
+        result['tool_results'] = accepted
+    if result['usage'] is not None and (tokens(result['usage']) is None or not finite_json(result['usage'])):
+        schema_errors.append('usage')
+        result['usage'] = None
+    cost = result['cost_usd']
+    if cost is not None and not valid_number(cost):
+        schema_errors.append('cost_usd')
+        result['cost_usd'] = None
+    if result['conversation'] is not None and not isinstance(result['conversation'], str):
+        schema_errors.append('conversation')
+        result['conversation'] = None
+    opaque = [item for item in result['opaque'] if finite_json(item)]
+    if len(opaque) != len(result['opaque']):
+        schema_errors.append('opaque')
+        result['opaque'] = opaque
+    if schema_errors:
+        result['schema_errors'] = schema_errors
+    result['complete'] = bool(valid and not schema_errors and terminal and successful and isinstance(result['conversation'], str) and result['conversation'] and set(tools) == finished)
     return result
 
 
@@ -350,8 +429,11 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
                             recording, provider, operator, max_trial_tokens, root, profile)
         failed = (result['checks'].get('infrastructure') is False
                   or result['checks'].get('stream_complete') is False)
-    except BaseException:
-        profile.finish_trial(root, destination, retain=True)
+    except BaseException as error:
+        try:
+            profile.finish_trial(root, destination, retain=True)
+        except BaseException as cleanup:
+            raise RuntimeError(type(error).__name__ + ': ' + str(error) + '; cleanup: ' + str(cleanup)) from cleanup
         raise
     profile.finish_trial(root, destination, retain=failed)
     if failed:
@@ -385,6 +467,8 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
         evidence.update(recording=recording,
                         recording_sha256=hashlib.sha256((ROOT / 'tests/recordings' / f'{scenario}-{recording}.json').read_bytes()).hexdigest(),
                         stub_sha256=hashlib.sha256(client.read_bytes()).hexdigest())
+    command_log = logs(root / 'data')
+    cursor = len(command_log)
     count = 2 if scenario == 'handoff-resume' or variant.startswith('present-') else 1
     conversation = ''
     for phase in range(count):
@@ -393,7 +477,6 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
                          SI_EVAL_SCENARIO=scenario, SI_EVAL_VARIANT=variant,
                          SI_EVAL_PHASE=str(phase), SI_EVAL_SHA=sha,
                          SI_EVAL_HARNESS=harness, SI_EVAL_RECORDING=recording)
-        cursor = len(logs(root / 'data'))
         prompt = phase_prompt(spec, variant, root, phase)
         if phase and variant.startswith('present-'):
             previous = evidence['phases'][0]
@@ -421,46 +504,80 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
                 run_env['USER'] = os.environ.get('USER', 'unknown')
         if key and not stub:
             run_env['FIREWORKS_API_KEY'] = key
-        if budget and max_trial_tokens is None:
-            budget.start_phase()
-        launch = budget.execute if max_trial_tokens is not None else execute
-        result = redact(launch([str(ROOT / 'harnesses' / (harness + '.sh')), str(client), model,
-                               prompt, conversation], run_env, cwd, spec['timeout_s']), key)
-        if budget and max_trial_tokens is None:
-            budget.observe(result['stdout'])
-            result['tokens'] = budget.phase_tokens
-            budget.finish_phase()
-        native = parse_stream(harness, result['stdout'])
-        if scenario != 'handoff-resume':
-            conversation = native['conversation'] or ''
-        phase_logs = logs(root / 'data')[cursor:]
-        exact = [entry for entry in phase_logs if entry.get('actor') == actor]
-        evidence['phases'].append({**native, 'exit': result['exit'], 'actor': actor,
-                                   'logs': exact, 'all_logs': phase_logs,
-                                   'state': snapshot(root / 'data', root / 'repos'),
-                                   'process_exit': result.get('process_exit', result['exit']),
-                                   'transcript_sha256': hashlib.sha256(result['stdout'].encode()).hexdigest(),
-                                   'tokens': result.get('tokens', tokens(native['usage']))})
         trial_dir = output / trial_id
-        trial_dir.mkdir(parents=True, exist_ok=True)
-        (trial_dir / f'phase-{phase}.jsonl').write_text(result['stdout'])
-        (trial_dir / f'phase-{phase}.stderr').write_text(result['stderr'])
+        capture = NativeCapture(trial_dir, phase, key)
+        observed = {**empty_stream(), 'actor': actor, 'exit': 'not-started', 'process_exit': None,
+                    'logs': None, 'all_logs': None, 'state': None, 'tokens': None,
+                    'capture': capture.status(), 'transcript_sha256': capture.streams['stdout']['sha256'], 'errors': []}
+        evidence['phases'].append(observed)
+        write_json(trial_dir / 'evidence.json', redact(evidence, key))
+        stage = 'execute'
+        try:
+            if budget and max_trial_tokens is None:
+                budget.start_phase()
+            launch = budget.execute if max_trial_tokens is not None else execute
+            result = redact(launch([str(ROOT / 'harnesses' / (harness + '.sh')), str(client), model,
+                                   prompt, conversation], run_env, cwd, spec['timeout_s'], capture=capture), key)
+            observed.update(exit=result['exit'], process_exit=result.get('process_exit', result['exit']))
+            stage = 'decode'
+            result['stdout'], result['stderr'] = capture.text('stdout'), capture.text('stderr')
+            stage = 'usage'
+            if budget and max_trial_tokens is None:
+                budget.observe(result['stdout'])
+                result['tokens'] = budget.phase_tokens
+                budget.finish_phase()
+            stage = 'native-parse'
+            observed.update(parse_stream(harness, result['stdout']))
+            observed['tokens'] = result.get('tokens', tokens(observed['usage']))
+            if observed['tokens'] is None and not observed['complete']:
+                observed['tokens'] = tokens(terminal_observation(harness, result['stdout'])['usage'])
+        except (Exception, KeyboardInterrupt) as error:
+            observed.update(terminal_observation(harness, capture.text('stdout', errors='replace')))
+            observed['exit'] = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'exception'
+            observed['process_exit'] = capture.process_exit
+            count = tokens(observed['usage'])
+            before = getattr(budget, 'before', {}).get(observed['conversation'], 0) if budget else 0
+            observed['tokens'] = (budget.phase_tokens if budget and budget.phase_tokens is not None
+                                  else max(0, count - before) if count is not None else None)
+            observed['errors'].append({'stage': stage, 'type': type(error).__name__, 'message': redact(str(error), key)})
+        observed['capture'] = capture.status()
+        observed['transcript_sha256'] = capture.streams['stdout']['sha256']
+        if scenario != 'handoff-resume':
+            conversation = observed['conversation'] or ''
+        try:
+            command_log = logs(root / 'data')
+            phase_logs = command_log[cursor:]
+            exact = [entry for entry in phase_logs if entry.get('actor') == actor]
+            observed.update(all_logs=phase_logs, logs=exact)
+            cursor = len(command_log)
+        except (Exception, KeyboardInterrupt) as error:
+            command_log = None
+            observed['errors'].append({'stage': 'logs', 'type': type(error).__name__, 'message': redact(str(error), key)})
+        try:
+            observed['state'] = snapshot(root / 'data', root / 'repos')
+        except (Exception, KeyboardInterrupt) as error:
+            observed['errors'].append({'stage': 'snapshot', 'type': type(error).__name__, 'message': redact(str(error), key)})
         if profile:
-            write_json(trial_dir / 'evidence.json', evidence)
+            write_json(trial_dir / 'evidence.json', redact(evidence, key))
         if phase and variant.startswith('present-') and not conversation:
-            evidence['phases'][-1]['complete'] = False
-        if result['exit'] in ('token-limit', 'timeout', 'usage-unavailable'):
-            evidence['infrastructure_error'] = result['exit']
+            observed['complete'] = False
+        if observed['errors']:
+            evidence['infrastructure_error'] = '; '.join(item['stage'] + ': ' + item['type'] + ': ' + item['message'] for item in observed['errors'])
             break
-        if profile and (result['exit'] != 0 or not evidence['phases'][-1]['complete']
-                        or not trace_matches_logs(evidence['phases'][-1], harness)):
-            evidence['infrastructure_error'] = 'Native stream incomplete, mismatched or failed; exit=' + str(result['exit'])
+        if observed['exit'] in ('token-limit', 'timeout', 'usage-unavailable'):
+            evidence['infrastructure_error'] = observed['exit']
+            break
+        try:
+            if profile and (observed['exit'] != 0 or not observed['complete'] or not trace_matches_logs(observed, harness)):
+                evidence['infrastructure_error'] = 'Native stream incomplete, mismatched or failed; exit=' + str(observed['exit'])
+                break
+        except (Exception, KeyboardInterrupt) as error:
+            evidence['infrastructure_error'] = 'native-validation: ' + type(error).__name__ + ': ' + redact(str(error), key)
             break
     # No profile/config/authentication directory is ever copied to results.
     with closing(sqlite3.connect(root / 'data/silta.db')) as source:
         with closing(sqlite3.connect(root / 'export.db')) as target:
             source.backup(target)
-    command_log = logs(root / 'data')
     safe = redact(evidence, key)
     if safe != evidence or (key and key.encode() in (root / 'export.db').read_bytes()):
         safe['infrastructure_error'] = 'secret-in-data; database export withheld'
@@ -579,6 +696,8 @@ def backend_result(result):
 
 def trace_argv(command):
     """A literal invocation or the guide's single quoted stdin heredoc."""
+    if not isinstance(command, str):
+        return []
     try:
         tokens = literal_argv(command)
         if tokens:
@@ -812,7 +931,7 @@ def grade(e):
     phases = e['phases']
     if e.get('infrastructure_error'):
         return {'passed': False, 'checks': {'infrastructure': False},
-                'error': e['infrastructure_error'], 'violations': [], 'metrics': metrics(e)}
+                'error': e['infrastructure_error'], 'violations': [], 'metrics': failure_metrics(e)}
     final = phases[-1]['state']
     task = final['tasks'][0]
     calls = [log for phase in phases for log in phase['logs']]
@@ -871,6 +990,24 @@ def grade(e):
             'violations': violations}
 
 
+def known_sum(values):
+    values = list(values)
+    return sum(values) if values and all(valid_number(value) for value in values) else None
+
+
+def failure_metrics(e):
+    """Use completed observations only; no fallible grading helpers are retried."""
+    phases = e.get('phases', [])
+    logs_known = bool(phases) and all(isinstance(p.get('logs'), list) for p in phases)
+    calls = [row for p in phases for row in (p.get('logs') or [])]
+    return {'silta_calls': len(calls) if logs_known else None,
+            'ctx_calls': sum(row.get('command') in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for row in calls) if logs_known else None,
+            'usage_errors': None, 'forbidden_attempts': None,
+            'usage': [p.get('usage') for p in phases],
+            'tokens': known_sum(p.get('tokens') for p in phases),
+            'cost_usd': known_sum(p.get('cost_usd') for p in phases)}
+
+
 def metrics(e):
     phases = e['phases']
     calls = [log for phase in phases for log in phase['logs']]
@@ -897,10 +1034,10 @@ def aggregate(trials, provenance):
         successes = sum(all(t['passed'] for t in selected if t['repeat'] == repeat) for repeat in repeats)
         groups.append({'harness': harness, 'model': model, 'scenario': scenario, 'repeats': len(repeats),
                        'pass_rate': successes / len(repeats), 'all_repeats_pass': successes == len(repeats),
-                       'silta_calls': sum(t['metrics']['silta_calls'] for t in selected),
-                       'ctx_calls': sum(t['metrics']['ctx_calls'] for t in selected),
-                       'usage_errors': sum(t['metrics']['usage_errors'] for t in selected),
-                       'forbidden_attempts': sum(t['metrics']['forbidden_attempts'] for t in selected),
+                       'silta_calls': known_sum(t['metrics']['silta_calls'] for t in selected),
+                       'ctx_calls': known_sum(t['metrics']['ctx_calls'] for t in selected),
+                       'usage_errors': known_sum(t['metrics']['usage_errors'] for t in selected),
+                       'forbidden_attempts': known_sum(t['metrics']['forbidden_attempts'] for t in selected),
                        'cost_usd': sum(t['metrics']['cost_usd'] for t in selected)
                        if all(t['metrics'].get('cost_usd') is not None for t in selected) else None})
     return {'provenance': provenance, 'groups': groups, 'trials': trials,
@@ -974,7 +1111,7 @@ def main():
                                   variant, repeat, (args.stub or args.client).resolve(),
                                   args.output, bool(args.stub), args.recording, args.provider,
                                   args.operator, args.max_trial_tokens, profile=profile)
-            except (OSError, RuntimeError, ValueError, KeyError, TypeError, EOFError, KeyboardInterrupt) as error:
+            except (Exception, KeyboardInterrupt) as error:
                 trial_id = f'{harness}-{scenario}-{variant}-{repeat}'
                 failure = {'id': trial_id, 'scenario': scenario, 'variant': variant,
                            'harness': harness, 'model': args.model, 'repeat': repeat,
@@ -988,9 +1125,11 @@ def main():
                 evidence_path = args.output / trial_id / 'evidence.json'
                 if evidence_path.is_file():
                     evidence = json.loads(evidence_path.read_text())
-                    evidence['infrastructure_error'] = failure['error']
+                    previous = evidence.get('infrastructure_error')
+                    evidence['infrastructure_error'] = (previous + '; finalize: ' + failure['error']
+                                                        if previous and previous != failure['error'] else failure['error'])
                     write_json(evidence_path, evidence)
-                    failure.update(grade(evidence))
+                    failure.update(passed=False, checks={'infrastructure': False}, metrics=failure_metrics(evidence))
                     failure.update(trial_labels(evidence))
                     failure['evidence'] = trial_id + '/evidence.json'
                 else:
@@ -1001,7 +1140,7 @@ def main():
             trials.append(trial)
             if aborted:
                 break
-    except (OSError, RuntimeError, ValueError, EOFError, KeyboardInterrupt) as error:
+    except (Exception, KeyboardInterrupt) as error:
         aborted = True
         write_json(args.output / 'abort.json', {'error': redact(str(error) or type(error).__name__, secret)})
     finally:

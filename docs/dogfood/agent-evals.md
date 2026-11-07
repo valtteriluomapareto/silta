@@ -128,7 +128,22 @@ failure. Applying verdicts with `review.py` preserves the abort status and trial
 counts; reviewing available evidence cannot make an aborted run succeed.
 Returned token-limit, timeout, unavailable-usage and native stream/process failures
 also abort reuse and retain the failed trial root. A failed native turn stops before
-another turn or trial launches. Ordinary scenario grades and pending human evidence
+another turn or trial launches. Parsing exceptions and `KeyboardInterrupt` follow
+the same abort path: stdout and stderr are captured before interpretation, and
+cancellation kills, drains and reaps the owned process before recording the failure.
+`phase-N.jsonl` and `phase-N.stderr` retain the native bytes (with a supplied
+provider key redacted), including invalid UTF-8. Evidence records each stream’s
+byte count, SHA-256, completeness and capture errors, plus the actual process exit
+when known. A decoding or schema error cannot turn those bytes into a success.
+
+Failure reports retain known terminal usage and measured calls. Unavailable
+logs, snapshots and unchecked metrics stay `null`; the audit labels them
+`UNRESOLVED` rather than inferring effects from an empty or baseline state.
+Stage-tagged errors point at execution, usage, parsing or evidence enrichment.
+A failing enrichment helper is not retried to construct the failure report. Both
+`report.json` and `report.html` still mark the default-provider run aborted.
+This assumes the selected output directory remains writable; capture write errors
+are explicit and do not claim a complete stream or an alternate durable copy. Ordinary scenario grades and pending human evidence
 review still allow the planned repeats.
 A new client version that creates unfamiliar files needs an explicit disposable
 path classification before reuse; the runner does not guess which files are credentials.

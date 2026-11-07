@@ -71,6 +71,7 @@ class OpenReview(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             budget = codex_usage.TokenBudget(directory, 50)
             child = Mock(pid=1234, returncode=7, stdout=io.BytesIO(), stderr=io.BytesIO())
+            child.communicate.return_value = (b'', b'')
             child.poll.return_value = 7
             def observed(_):
                 budget.phase_tokens = 100
@@ -87,6 +88,7 @@ class OpenReview(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             budget = codex_usage.TokenBudget(directory, 50)
             child = Mock(pid=1234, returncode=7, stdout=io.BytesIO(), stderr=io.BytesIO())
+            child.communicate.return_value = (b'', b'')
             child.poll.side_effect = lambda: child.returncode if child.wait.called else None
             def observed(_):
                 budget.phase_tokens = 15

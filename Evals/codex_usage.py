@@ -74,7 +74,7 @@ class TokenBudget:
         if self.phase_tokens is not None:
             self.spent += self.phase_tokens
 
-    def execute(self, argv, env, cwd, timeout):
+    def execute(self, argv, env, cwd, timeout, capture=None):
         self.start_phase()
         child = subprocess.Popen(argv, env=env, cwd=cwd, stdin=subprocess.DEVNULL,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -93,6 +93,8 @@ class TokenBudget:
                             buffers[event.data].extend(chunk)
                         else:
                             selector.unregister(event.fileobj)
+                    if capture:
+                        capture.save(buffers['stdout'], buffers['stderr'], final=False)
                     total = self.observe(buffers['stdout'].decode(errors='replace'))
                     if not failure:
                         if total is not None and total > self.limit:
@@ -114,9 +116,15 @@ class TokenBudget:
                     os.killpg(child.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-            child.wait()
-            child.stdout.close()
-            child.stderr.close()
+            try:
+                out, err = child.communicate()
+                buffers['stdout'].extend(out or b'')
+                buffers['stderr'].extend(err or b'')
+                if capture:
+                    capture.save(buffers['stdout'], buffers['stderr'], process_exit=child.returncode)
+            finally:
+                child.stdout.close()
+                child.stderr.close()
         total = self.observe(buffers['stdout'].decode(errors='replace'))
         if not failure and total is not None and total > self.limit:
             failure = 'token-limit'

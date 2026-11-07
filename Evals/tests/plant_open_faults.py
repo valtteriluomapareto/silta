@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 TEST = 'test_open_models.OpenModels.'
 FAULTS = [
-    ('key_echo_export', 'evals.py', "return value.replace(secret, '[REDACTED]')", 'return value',
+    ('key_echo_export', 'native_capture.py', "raw.replace(self.key, b'[REDACTED]') if self.key else raw", 'raw',
      'test_fake_key_absent_from_shell_console_and_every_export', 'unexpectedly found'),
     ('key_in_agent_shell', 'evals.py', 'shell_environment_policy.exclude = ["FIREWORKS_API_KEY"]',
      'shell_environment_policy.exclude = ["UNRELATED"]',
@@ -79,7 +79,7 @@ FAULTS = [
     ('audit_invents_exit_success', 'audit.py', "item.get('exit_code', 'unknown')", "item.get('exit_code', 0)",
      'test_audit_evidence.AuditEvidence.test_missing_native_exit_is_unknown_instead_of_success',
      "Regex didn't match"),
-    ('unbound_transcript_order', 'evals.py', "'transcript_sha256': hashlib.sha256(result['stdout'].encode()).hexdigest(),", '',
+    ('unbound_transcript_order', 'evals.py', "        observed['transcript_sha256'] = capture.streams['stdout']['sha256']", "        observed.pop('transcript_sha256', None)",
      'test_unattended_cli.UnattendedCLI.test_actual_matrix_core_pilot_has_no_input_and_exact_coverage',
      'Missing bound transcript hash'),
     ('unattended_login_prompt', 'evals.py', "if args.live and args.provider == 'default':", 'if args.live:',

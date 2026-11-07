@@ -157,8 +157,8 @@ class OpenModels(unittest.TestCase):
 
     def test_usage_cap_kills_before_terminal_and_prevents_next_phase(self):
         execute = evals.TokenBudget.execute
-        def bounded(budget, argv, env, cwd, timeout):
-            return execute(budget, argv, env, cwd, min(timeout, 5))
+        def bounded(budget, argv, env, cwd, timeout, capture=None):
+            return execute(budget, argv, env, cwd, min(timeout, 5), capture=capture)
         with patch.object(evals.TokenBudget, 'execute', bounded):
             result, evidence, _ = self.trial(behavior='overflow', cap=50)
         self.assertEqual(len(evidence['phases']), 1)

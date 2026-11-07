@@ -2257,8 +2257,13 @@ Evals/
    Unknown state or ownership conflicts abort the run and retain owned roots for
    inspection. Preserve completed phase evidence and known metrics on failure;
    evidence review preserves the run’s aborted status and trial counts.
-   Returned transport/infrastructure failures also retain the failed trial root
-   and abort remaining turns and trials; ordinary scenario failures still repeat.
+   Returned transport/infrastructure failures, parsing exceptions and interruption
+   also retain the failed trial root and abort remaining turns and trials. Capture
+   sanitized native stdout/stderr bytes before interpretation; kill, drain and
+   reap the owned process on interruption. Record byte hashes and capture
+   completeness, preserve known usage and calls, and leave unavailable evidence
+   and unchecked metrics unknown. With a writable output directory, JSON and HTML
+   reports still record an aborted run; ordinary scenario failures still repeat.
    Print final explicit logout and cleanup commands. Fireworks uses
    isolated per-trial profiles without sign-in. On macOS only, Claude retains
    real HOME for its keychain (D42), with temporary `CLAUDE_CONFIG_DIR`; every
