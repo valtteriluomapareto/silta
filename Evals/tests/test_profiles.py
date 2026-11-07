@@ -51,10 +51,10 @@ class Profiles(unittest.TestCase):
                         TMPDIR=str(self.root / 'tmp'), PYTHONPATH=str(self.root / 'guard'), PYTHONDONTWRITEBYTECODE='1',
                         FORBIDDEN_CONFIG=os.pathsep.join(str(self.root / p) for p in ('real/.codex/config.toml', 'real/.claude/settings.json', 'real/.claude.json')))
 
-    def run_live(self, harness, mode='normal', answer='signed-in', authenticate=True, scenario='plan-not-file', repeats=2, cap=None, operator=None):
+    def run_live(self, harness, mode='normal', answer='signed-in', authenticate=True, scenario='plan-not-file', repeats=2, cap=None, operator=None, fault=None, fault_after=1):
         output = self.root / (harness + '-' + mode)
         journal = self.root / (harness + '-' + mode + '.jsonl')
-        if mode == 'cancel':
+        if mode == 'cancel' or mode.startswith('late-cancel'):
             os.mkfifo(journal.with_suffix('.signal'))
         env = dict(self.env)
         if mode == 'timeout':
@@ -72,6 +72,23 @@ class Profiles(unittest.TestCase):
             argv += ['--max-trial-tokens', str(cap)]
         if operator is not None:
             argv += ['--operator', operator]
+        if fault:
+            entry = self.root / 'instrumented-main.py'
+            entry.write_text('import sys, json\nfrom pathlib import Path\n'
+                + 'sys.path.insert(0, ' + repr(str(ROOT)) + ')\nimport evals\n'
+                + 'journal = Path(' + repr(str(journal)) + ')\n'
+                + 'def ready():\n    return journal.exists() and sum(json.loads(line)["event"] == "model" for line in journal.read_text().splitlines()) >= ' + str(fault_after) + '\n'
+                + ('original = evals.' + fault + '\ndef fail(*args, **kwargs):\n'
+                   '    if ready(): raise RuntimeError("INJECTED_' + fault.upper() + '_FAILURE")\n'
+                   '    return original(*args, **kwargs)\nevals.' + fault + ' = fail\n' if fault != 'capture' else
+                   'original = Path.write_bytes\nfailed = False\n'
+                   'def fail(path, value):\n    global failed\n'
+                   '    oracle = journal.with_name(journal.stem + ".0.stdout")\n'
+                   '    if path.name == "phase-0.jsonl" and ready() and oracle.exists() and b"turn.completed" in oracle.read_bytes() and not failed:\n'
+                   '        failed = True\n        raise OSError("INJECTED_CAPTURE_FAILURE")\n'
+                   '    return original(path, value)\nPath.write_bytes = fail\n')
+                + 'raise SystemExit(evals.main())\n')
+            argv[2] = str(entry)
         child = subprocess.Popen(argv, env=env, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.addCleanup(lambda: child.kill() if child.poll() is None else None)
         text, commands, next_command = [], [], False
@@ -94,7 +111,7 @@ class Profiles(unittest.TestCase):
                     child.stdin.flush()
                 if answer is None or mode == 'operator-eof':
                     child.stdin.close()
-                if mode == 'cancel':
+                if mode == 'cancel' or mode.startswith('late-cancel'):
                     with journal.with_suffix('.signal').open() as signal_file:
                         native_pid = int(signal_file.readline())
                     self.native_pid = native_pid

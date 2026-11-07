@@ -60,11 +60,15 @@ home = trial_root / 'home'
 data = Path(os.environ['SILTA_HOME'])
 assert data == trial_root / 'data'
 previous = [json.loads(line) for line in journal.read_text().splitlines()]
+call_index = sum(e['event'] == 'model' for e in previous)
+stdout_oracle = journal.with_name(journal.stem + f'.{call_index}.stdout')
+stderr_oracle = journal.with_name(journal.stem + f'.{call_index}.stderr')
 old = next((item for item in reversed(previous) if item['event'] == 'model' and item['trial'] != str(trial_root)), None)
 config = profile / ('config.toml' if harness == 'codex' else 'settings.json')
 config_text = config.read_text()
 grants = tomllib.loads(config_text).get('sandbox_workspace_write', {}).get('writable_roots', []) if harness == 'codex' else []
 state = {'event': 'model', 'profile': str(profile), 'home': os.environ['HOME'], 'trial': str(trial_root),
+         'stdout_oracle': str(stdout_oracle), 'stderr_oracle': str(stderr_oracle),
          'scratch': os.environ.get('CLAUDE_CODE_TMPDIR'),
          'data': str(data), 'actor': actor, 'auth_inode': auth.stat().st_ino,
          'auth_mode': auth.stat().st_mode & 0o777, 'grants': grants,
@@ -102,7 +106,42 @@ if '--resume' in args:
 
 
 def emit(value):
-    print(json.dumps(value), flush=True)
+    if mode.startswith('schema-'):
+        item = value.get('item', {})
+        blocks = value.get('message', {}).get('content', [])
+        if mode == 'schema-command':
+            if item.get('type') == 'command_execution':
+                item['command'] = 42
+            for block in blocks:
+                if block.get('type') == 'tool_use' and block.get('name') == 'Bash':
+                    block['input']['command'] = 42
+        if mode == 'schema-message':
+            if item.get('type') == 'agent_message':
+                item['text'] = [item['text']]
+            for block in blocks:
+                if block.get('type') == 'text':
+                    block['text'] = [block['text']]
+        if mode == 'schema-thread':
+            if 'thread_id' in value:
+                value['thread_id'] = []
+            if 'session_id' in value:
+                value['session_id'] = []
+        if mode == 'schema-tool':
+            if item.get('type') == 'command_execution':
+                value['item'] = []
+            if blocks:
+                value['message']['content'] = 42
+        if value.get('type') in ('result', 'turn.completed'):
+            if mode == 'schema-usage':
+                value['usage'] = []
+            if mode.startswith('schema-cost'):
+                value['total_cost_usd'] = {'schema-cost': [], 'schema-cost-bool': True,
+                                          'schema-cost-nan': float('nan')}[mode]
+    encoded = (json.dumps(value) + '\n').encode()
+    with stdout_oracle.open('ab') as oracle:
+        oracle.write(encoded)
+    sys.stdout.buffer.write(encoded)
+    sys.stdout.buffer.flush()
 
 
 def message(text):
@@ -210,5 +249,26 @@ terminal = ({'type': 'result', 'is_error': mode == 'stream-error', 'usage': {'in
                                         'usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}})
 if mode == 'missing-usage':
     terminal.pop('usage')
+message('NATIVE_STDOUT_SENTINEL')
+stderr = b'NATIVE_STDERR_SENTINEL\n'
+stderr_oracle.write_bytes(stderr)
+sys.stderr.buffer.write(stderr)
+sys.stderr.buffer.flush()
 emit(terminal)
+if mode == 'bad-utf8':
+    raw = b'\xff\n'
+    with stdout_oracle.open('ab') as oracle:
+        oracle.write(raw)
+    sys.stdout.buffer.write(raw)
+    sys.stdout.buffer.flush()
+if mode.startswith('usage-parser'):
+    native_log = profile / 'sessions' / (session + '.jsonl')
+    events = [json.loads(line) for line in native_log.read_text().splitlines()]
+    events[0]['payload'].pop('id')
+    native_log.write_text('\n'.join(map(json.dumps, events)) + '\n')
+if mode.startswith('late-cancel'):
+    with journal.with_suffix('.signal').open('w') as signal_file:
+        signal_file.write(str(os.getpid()) + '\n')
+    read_end, write_end = os.pipe()
+    os.read(read_end, 1)
 sys.exit(7 if mode == 'nonzero' else 0)
