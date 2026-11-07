@@ -137,3 +137,7 @@ class ShellReview(unittest.TestCase):
                               ('silta --help; silta brief', [root, log('brief')])]:
             p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], copy.deepcopy(logs))
             self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
+        for command, logs in [('silta task done AC-1 -m result', [root]),
+                              ('silta --help; silta task done AC-1 -m result', [root, root])]:
+            p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], copy.deepcopy(logs))
+            self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
