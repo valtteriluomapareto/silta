@@ -61,6 +61,31 @@ class ShellCommands(unittest.TestCase):
     def test_compound_exit_does_not_claim_each_segment_status(self):
         phase = self.phase('silta where; echo ---; silta brief', [('silta where', 2), ('silta brief', 0)])
         self.assertIs(evals.trace_matches_logs(phase, 'codex'), True)
+
+    def test_multiline_input_pipelines_remain_opaque(self):
+        for command in ['cat input |\nsilta task plan AC-1 -F -',
+                        'cat input |\n\nsilta task plan AC-1 -F -',
+                        'cat input | # comment\nsilta task plan AC-1 -F -']:
+            for rendered in [command, '/bin/zsh -lc ' + shlex.quote(command)]:
+                with self.subTest(command=rendered):
+                    self.assertTrue(parse_shell(rendered).opaque)
+
+    def test_trailing_newline_keeps_single_invocation_exit_proof(self):
+        for command in ['silta brief\n', '\nsilta brief\n\n', 'silta brief;\n']:
+            with self.subTest(command=command):
+                phase = self.phase(command, [('silta brief', 2)], code=0)
+                self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
+                self.assertEqual(parse_shell(command).single(), ['silta', 'brief'])
+
+    def test_shell_continuations_cannot_hide_gate_flags_or_command_names(self):
+        parsed = parse_shell('gh issue cr\\\neate --title Acme')
+        self.assertFalse(parsed.opaque)
+        self.assertEqual(parsed.commands, [['gh', 'issue', 'create', '--title', 'Acme']])
+        parsed = parse_shell('silta task start AC-1 --st\\\neal')
+        self.assertFalse(parsed.opaque)
+        self.assertEqual(parsed.invocations[-1][-1], '--steal')
+        parsed = parse_shell("silta comment AC-1 -m 'literal\\\nbody'")
+        self.assertEqual(parsed.invocations[-1][-1], 'literal\\\nbody')
         phase['tool_results'][0]['command'] = 'silta where'
         phase['logs'] = phase['logs'][:1]
         self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
