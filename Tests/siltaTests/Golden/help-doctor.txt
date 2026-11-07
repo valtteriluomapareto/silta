@@ -1,0 +1,26 @@
+### silta doctor
+
+OVERVIEW: Diagnose database, git and data across all workspaces without
+repairs.
+
+--ws does not filter; --install skips SQLite and git.
+Harness checks are read without launches; broad inspection can update SQLite
+sidecars.
+Snapshot recovery is human-only: stop clients; preserve home WAL/SHM sidecars.
+Copy the snapshot as silta.db to a fresh home without old sidecars; doctor it.
+`silta restore` consumes an export directory, not a snapshot.
+
+USAGE: silta doctor [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--install]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --install               Inspect harness installation and logs only.
+  --version               Show the version.
+  -h, --help              Show help information.

@@ -3,7 +3,7 @@ silta ws ls  List workspaces; ask in chat before editing configuration.
 silta ws use  Set the default workspace outside registered repositories.
 silta ws edit  Edit workspace YAML (human-only).
 silta ws show  Print the selected workspace YAML without editing it.
-silta init  Initialize or scan repos; select with ws use; configuration editing is human-only.
+silta init  Initialize or scan repos; select with ws use; ws edit is human-only.
 silta repo fetch  Fetch a repo, or all registered repos in the workspace, without prompting.
 silta task add  Add a proposal; --start claims work requested by the human.
 silta task ls  List workspace tasks, including your own proposals.
@@ -15,7 +15,7 @@ silta task drop  Drop an open task and record why.
 silta task plan  Store a plan revision or tick a top-level checkbox.
 silta task from-plan  Import Markdown steps; preview or safely remove the source.
 silta task edit  Edit task fields; approval is needed unless you hold its claim.
-silta task triage  Accept or drop proposals in one approved batch.
+silta task triage  Accept or drop proposals in one approved batch (human-only).
 silta task archive  Hide a task from the default backlog.
 silta task keep  Keep a task visible regardless of its closed age.
 silta task link  Link a task to a reference in this workspace or an external URL.
@@ -46,11 +46,10 @@ silta backup  Create a whole-database SQLite snapshot.
 details: silta schema <command>
 
 global flags:
-  --ws <ws>  optional: Use this workspace instead of repository location or the saved default.
-  --approved <approved>  optional: The human's words approving this command in chat.
-  --json  optional: Print the JSON envelope on stdout instead of text.
+  --ws <ws>  optional: Use this workspace; default is inferred or saved.
+  --approved <approved>  optional: The human's words approving this command in chat; default is none.
+  --json  optional: Print the JSON envelope on stdout; default is text.
   --quiet  optional: Hide success text; warnings and errors still show.
-  --deterministic  optional: Allow deterministic overrides outside temporary homes; never at the real home.
   --verbose  optional: Mirror command diagnostics to stderr.
 
 error codes:

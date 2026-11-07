@@ -9,7 +9,7 @@ struct TaskSubmitCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The task reference.") var ref: String
 

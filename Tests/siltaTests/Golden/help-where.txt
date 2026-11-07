@@ -1,0 +1,24 @@
+### silta where
+
+OVERVIEW: Resolve the workspace, repository and app for a local path.
+
+USAGE: silta where [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--path <path>] [--app <app>] [--task <task>] [--set <set>] [--unset]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --path <path>           Inspect this directory; default is the current one.
+  --app <app>             Select one candidate app; default is inferred.
+  --task <task>           Use this task; default is session or branch evidence.
+  --set <set>             Set this worktree's override; human-only when
+                          changing it.
+  --unset                 Remove this worktree's override; human-only when
+                          changing it.
+  --version               Show the version.
+  -h, --help              Show help information.

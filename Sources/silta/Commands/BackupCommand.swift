@@ -10,7 +10,7 @@ struct BackupCommand: OutputCommand {
   )
   static let dataShape = Shape.object(["path": .string])
   static let workspaceSource = WorkspaceSource.none
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let environment = context.environment

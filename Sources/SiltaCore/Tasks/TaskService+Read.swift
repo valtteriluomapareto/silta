@@ -2,7 +2,9 @@ import Foundation
 import GRDB
 
 extension TaskService {
-  static let statuses = ["proposed", "todo", "doing", "review", "blocked", "done", "dropped"]
+  package static let statuses = [
+    "proposed", "todo", "doing", "review", "blocked", "done", "dropped",
+  ]
 
   static let query = """
     SELECT task.*,workspace.task_prefix,app.slug AS app_slug,repo_path.path AS repo_path,

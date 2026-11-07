@@ -9,7 +9,7 @@ struct AgentsSessionStartCommand: OutputCommand {
     shouldDisplay: false)
   static let workspaceSource = WorkspaceSource.none
   static let dataShape = BriefCommand.dataShape
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let report = try await BriefService(environment: context.environment).resolve(

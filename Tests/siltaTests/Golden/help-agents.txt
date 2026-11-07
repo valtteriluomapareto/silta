@@ -1,0 +1,92 @@
+### silta agents
+
+OVERVIEW: Preview and safely apply harness integration.
+
+USAGE: silta agents [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  install                 Preview owned harness edits; confirm with --apply
+                          <token>.
+  uninstall               Preview removal of selected, unedited Silta ownership.
+
+  See 'silta help agents <subcommand>' for detailed help.
+
+### silta agents install
+
+OVERVIEW: Preview owned harness edits; confirm with --apply <token>.
+
+Defaults to Claude and Codex; preview exactly what --apply will write.
+Retains unrelated content and file modes; refuses unsafe or ambiguous roots.
+Replacements are atomic per file, not across files; failures list paths.
+--hook opts into SessionStart; no hook leaves settings unread.
+Hook JSON needs exact safe integers; other forms need manual work.
+Real harness acceptance is separate from installation.
+
+USAGE: silta agents install [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--claude] [--codex] [--dry-run] [--apply <apply>] [--hook] [--stop-hook]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --claude                Select Claude instructions and its shared OpenCode
+                          skill; default is both.
+  --codex                 Select Codex instructions and its SILTA_HOME writable
+                          root; default is both.
+  --dry-run               Preview only (the default); never combine with
+                          --apply.
+  --apply <apply>         Apply exactly the preview identified by this token;
+                          no interactive prompt.
+  --hook                  Install Claude SessionStart.
+  --stop-hook             Install Claude Stop handoff checks and the required
+                          SessionStart hook.
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta agents uninstall
+
+OVERVIEW: Preview removal of selected, unedited Silta ownership.
+
+Previews removal of only owned, unedited Silta content.
+Defaults to Claude and Codex; --claude or --codex selects one.
+Unrelated settings and hooks remain untouched.
+Uninstall removes selected hooks without extra hook flags.
+A changed preview token requires a fresh preview.
+
+USAGE: silta agents uninstall [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--claude] [--codex] [--dry-run] [--apply <apply>]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --claude                Select Claude instructions and its shared OpenCode
+                          skill; default is both.
+  --codex                 Select Codex instructions and its SILTA_HOME writable
+                          root; default is both.
+  --dry-run               Preview only (the default); never combine with
+                          --apply.
+  --apply <apply>         Apply exactly the preview identified by this token;
+                          no interactive prompt.
+  --version               Show the version.
+  -h, --help              Show help information.

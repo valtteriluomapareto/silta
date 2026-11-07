@@ -8,7 +8,7 @@ struct AgentsStopCommand: OutputCommand {
     abstract: "Claude Stop protocol; silent failure and loop guard.", shouldDisplay: false)
   static let workspaceSource = WorkspaceSource.none
   static let dataShape = SessionCheckCommand.dataShape
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let result = SessionCheckData(

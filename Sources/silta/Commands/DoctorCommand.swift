@@ -7,14 +7,12 @@ struct DoctorCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "doctor",
     abstract: "Diagnose database, git and data across all workspaces without repairs.",
-    discussion:
-      "--ws does not filter this global report. "
-      + "Harness integrity and retained hook evidence are inspected without launches. "
-      + "--install reports only that group, without opening SQLite; broad inspection can update "
-      + "SQLite coordination sidecars. Index and app checks are skipped. "
-      + "SQLite .db snapshot recovery is a human decision: stop all clients, preserve the original "
-      + "home including WAL/SHM files, then copy the chosen snapshot as silta.db into a fresh home "
-      + "without old sidecars and inspect it with doctor. silta restore takes an export directory."
+    discussion: "--ws does not filter; --install skips SQLite and git.\n"
+      + "Harness checks are read without launches; broad inspection can update SQLite "
+      + "sidecars.\n"
+      + "Snapshot recovery is human-only: stop clients; preserve home WAL/SHM sidecars.\n"
+      + "Copy the snapshot as silta.db to a fresh home without old sidecars; doctor it.\n"
+      + "`silta restore` consumes an export directory, not a snapshot."
   )
   static let dataShape = Shape.object([
     "checks": .array(
@@ -24,11 +22,8 @@ struct DoctorCommand: OutputCommand {
       ]))
   ])
 
-  @OptionGroup var global: GlobalOptions
-  @Flag(
-    help:
-      "Inspect harness installation and logs only; never open SQLite or run git diagnostics."
-  )
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
+  @Flag(help: "Inspect harness installation and logs only.")
   var install = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

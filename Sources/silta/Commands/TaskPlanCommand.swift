@@ -12,16 +12,20 @@ struct TaskPlanCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Option(help: "Require the current revision to match this nonnegative value.")
+  @Option(help: "Require this nonnegative revision; default is none.")
   var ifRev: Int?
 
-  @Option(help: "Top-level checkbox number, from 1; checked entries count, fenced examples do not.")
+  @Option(
+    help: ArgumentHelp(
+      "Top-level checkbox number, from 1; checked entries count, fenced examples do not; "
+        + "default is none.")
+  )
   var step: Int?
 
   @Flag(help: "Mark the selected checkbox done.") var done = false

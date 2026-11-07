@@ -6,10 +6,11 @@ import SiltaCore
 struct TaskBody: ParsableArguments {
   @Option(
     name: [.customShort("m"), .long], parsing: .unconditional,
-    help: "Supply the markdown body.")
+    help: "Supply the markdown body; default is none.")
   var message: String?
 
-  @Option(name: .customShort("F"), help: "Read UTF-8 from a file, or - for stdin.")
+  @Option(
+    name: .customShort("F"), help: "Read UTF-8 from a file, or - for stdin; default is none.")
   var file: String?
 
   @Flag(help: "Retain detected secrets (human-only; use file input for a body retry).")

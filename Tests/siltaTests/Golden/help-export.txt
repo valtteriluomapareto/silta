@@ -1,0 +1,29 @@
+### silta export
+
+OVERVIEW: Write one workspace as a deterministic text tree for backup and diff.
+
+The tree goes to <root>/<workspace>. It replaces only an absent, empty or
+previously exported directory, never one inside a registered repo. Repo paths
+and worktrees are not written; configured values are written as stored. It
+stages in a hidden .<workspace>.export-XXXXXX next to the tree; one it can't
+remove, or a crash left, is an export_leftover warning for the human.
+Unreadable entries refuse the target.
+
+USAGE: silta export [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--to <root>] [--commit]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --to <root>             The export root; the tree goes to <root>/<workspace>.
+                          Defaults to $SILTA_HOME/exports.
+  --commit                Commit only the workspace subtree in an existing Git
+                          work tree. Ignored files produce warnings; an
+                          unchanged tree makes no commit.
+  --version               Show the version.
+  -h, --help              Show help information.

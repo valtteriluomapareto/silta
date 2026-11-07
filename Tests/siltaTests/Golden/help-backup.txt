@@ -1,0 +1,21 @@
+### silta backup
+
+OVERVIEW: Create a whole-database SQLite snapshot.
+
+Includes every workspace, regardless of --ws. Keeps seven on-demand snapshots
+separately from daily and pre-restore backups. Does not export or commit a text
+tree.
+
+USAGE: silta backup [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.

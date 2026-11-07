@@ -39,7 +39,7 @@ warning: install.claude.version: claude: installed metadata version unknown (mis
 warning: install.codex.version: codex: installed metadata version unknown (missing executable or unsupported installation layout); last live-verified 0.166.0 on 2026-11-06.
   ask human: codex --version
 skipped: install.codex.hooks: codex: no Silta hook integration; no hook-session evidence is available.
-warning: install.opencode.version: opencode: installed metadata version unknown (missing executable or unsupported installation layout); no live-verified baseline (D42).
+warning: install.opencode.version: opencode: installed metadata version unknown (missing executable or unsupported installation layout); no live-verified baseline.
   ask human: opencode --version
 skipped: install.opencode.hooks: opencode: no Silta hook integration; no hook-session evidence is available.
 skipped: index.integrity: Index diagnostics are not available yet.

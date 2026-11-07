@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 struct GuideReferenceTests {
   @Test func referenceExamplesResolveOrHaveLabeledRefusals() async throws {
@@ -63,7 +64,7 @@ struct GuideReferenceTests {
     source: TaskDetails, db: Database
   ) throws {
     if kind == "diff" {
-      #expect(notes.contains("M2"))
+      #expect(notes.contains("review subject"))
       let full = ref.hasPrefix("#-") ? "diff:lib/push/categories.dart" + ref : ref
       #expect(
         throws: TaskError.invalid(

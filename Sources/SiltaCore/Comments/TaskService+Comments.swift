@@ -94,8 +94,9 @@ extension TaskService {
   }
 
   func checkedComment(_ input: CommentDraft, command: String) throws -> (CommentDraft, Bool) {
-    guard ["comment", "question", "answer", "decision", "handoff"].contains(input.kind) else {
-      throw CommentError.invalid("Use comment, question, answer, decision or handoff.")
+    guard CommentDraft.kinds.contains(input.kind) else {
+      let values = CommentDraft.kinds.dropLast().joined(separator: ", ")
+      throw CommentError.invalid("Use \(values) or \(CommentDraft.kinds.last ?? "").")
     }
     guard !input.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw CommentError.bodyRequired(command)

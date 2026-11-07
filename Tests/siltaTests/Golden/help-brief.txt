@@ -1,0 +1,35 @@
+### silta brief
+
+OVERVIEW: Read budgeted local context for the current task.
+
+An explicit budget overrides the 2500-token default (800 for short/hook). Tiny
+budgets retain location, task reference, settings and complete more commands.
+Hook mode has a 1.5 s process deadline and silently succeeds on errors; it
+never fetches, indexes or migrates. The current task shows its newest handoff,
+your inbox items on it and an open-question count; your other inbox items
+follow it. Decisions are absent from the brief.
+
+USAGE: silta brief [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--app <app>] [--task <task>] [--topic <topic> ...] [--budget <budget>] [--short] [--hook]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --app <app>             Select one of this repository's candidate apps;
+                          default is inferred.
+  --task <task>           Read this task; default is session or branch evidence.
+  --topic <topic>         Add context for a topic slug or alias; default is
+                          none. Repeat to add topics.
+  --budget <budget>       Positive token budget, estimated as rendered
+                          characters / 4; default is 2500, or 800 with
+                          --short/--hook.
+  --short                 Use an 800-token brief.
+  --hook                  Read bounded session-start context, silently ignoring
+                          errors.
+  --version               Show the version.
+  -h, --help              Show help information.

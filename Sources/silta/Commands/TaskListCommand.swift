@@ -3,23 +3,28 @@ import SiltaCore
 
 struct TaskListCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "ls", abstract: "List workspace tasks, including your own proposals.")
+    commandName: "ls",
+    abstract: "List workspace tasks, including your own proposals.")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.summaryShape)])
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
-  @Option(help: "Show this status.") var status: String?
+  @Option(
+    help: ArgumentHelp(
+      "Show this status: \(TaskService.statuses.joined(separator: ", ")); default is all.")
+  ) var status: String?
 
-  @Option(help: "Show this app.") var app: String?
+  @Option(help: "Show this app; default is all.") var app: String?
 
   var appSlug: String? { app }
 
-  @Option(help: "Show tasks blocked on this task, ext:party or URL.") var on: String?
+  @Option(help: "Show tasks blocked on this task, ext:party or URL; default is any.")
+  var on: String?
 
-  @Option(help: "Show this topic.") var topic: String?
+  @Option(help: "Show this topic; default is all.") var topic: String?
 
   @Flag(help: "Show tasks created or claimed by this exact actor.") var mine = false
 
