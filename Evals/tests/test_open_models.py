@@ -48,6 +48,7 @@ class OpenModels(unittest.TestCase):
 
     def test_fake_key_absent_from_shell_console_and_every_export(self):
         result, evidence, profile = self.trial(behavior='echo')
+        self.assertEqual(evidence['phases'][0]['exit'], 0, (self.output / result['id'] / 'phase-0.stderr').read_text())
         self.assertTrue(evidence['phases'][0]['complete'])
         self.assertEqual([p['exit'] for p in evidence['phases']], [0, 0])
         self.assertFalse((profile / 'profile-launcher.sh').exists())
@@ -110,6 +111,11 @@ class OpenModels(unittest.TestCase):
             altered[key] = value
             self.assertFalse(evals.approval_matches(altered))
 
+        unsolicited = copy.deepcopy(evidence)
+        unsolicited['phases'][0]['messages'] = ['The model claims it followed policy.']
+        unsolicited['approval']['phase_digest'] = evals.digest(unsolicited['phases'][0])
+        self.assertFalse(evals.approval_matches(unsolicited))
+
     def test_scripted_denial_records_source_and_sends_no_approval(self):
         result, evidence, _ = self.trial(recording='fail')
         self.assertEqual(evidence['approval']['source'], 'scripted-operator')
@@ -120,7 +126,11 @@ class OpenModels(unittest.TestCase):
         self.assertFalse(evals.approval_matches(evidence))
 
     def test_usage_cap_kills_before_terminal_and_prevents_next_phase(self):
-        result, evidence, _ = self.trial(behavior='overflow', cap=50)
+        execute = evals.TokenBudget.execute
+        def bounded(budget, argv, env, cwd, timeout):
+            return execute(budget, argv, env, cwd, min(timeout, 5))
+        with patch.object(evals.TokenBudget, 'execute', bounded):
+            result, evidence, _ = self.trial(behavior='overflow', cap=50)
         self.assertEqual(len(evidence['phases']), 1)
         self.assertEqual(evidence['phases'][0]['exit'], 'token-limit')
         self.assertFalse(result['checks']['infrastructure'])
@@ -181,6 +191,40 @@ class OpenModels(unittest.TestCase):
                          'scripted-operator', 'claude-coordinator', evals.review_digest(evidence), result['evidence'],
                          'silta task start', 'exit=0']:
             self.assertIn(expected, audit.stdout)
+
+    def test_invalid_unattended_options_reject_before_launch(self):
+        base = ['evals.py', '--silta', str(BINARY), '--live', '--client', str(FAKE),
+                '--model', 'fake', '--output', str(self.output / 'unused')]
+        for flags in [['--harness', 'claude', '--provider', 'fireworks'],
+                      ['--harness', 'both', '--operator', 'scripted'],
+                      ['--harness', 'codex', '--max-trial-tokens', '0'],
+                      ['--harness', 'codex', '--core', '--scenario', 'ask-short']]:
+            with self.subTest(flags=flags), patch.object(sys, 'argv', base + flags):
+                with patch.object(evals, 'run_trial', side_effect=AssertionError('Unexpected launch')):
+                    with contextlib.redirect_stderr(self.console), self.assertRaises(SystemExit) as stopped:
+                        evals.main()
+                    self.assertEqual(stopped.exception.code, 2)
+        self.assertNotIn(KEY, self.console.getvalue())
+
+    def test_coordinator_review_labels_report_and_never_overrides_failure(self):
+        result, evidence, _ = self.trial()
+        self.assertFalse(result['checks']['evidence_review'])
+        evals.write_json(self.output / 'report.json', evals.aggregate([result], 'live'))
+        verdicts = {result['id']: {'digest': evals.review_digest(evidence), 'reviewer': 'claude-coordinator',
+                                 'checks': ['tool-audit', 'policy-semantics'], 'citations': ['phase-0.jsonl']}}
+        evals.write_json(self.output / 'verdicts.json', verdicts)
+        report = json.loads((self.output / 'report.json').read_text())
+        report.update(commit='fixture', dirty=False, binary_sha256='fixture')
+        evals.write_json(self.output / 'report.json', report)
+        applied = subprocess.run([sys.executable, '-B', str(ROOT / 'review.py'), str(self.output),
+                                  str(self.output / 'verdicts.json')], capture_output=True, text=True)
+        self.assertEqual(applied.returncode, 0, applied.stderr)
+        self.assertIn('claude-coordinator', (self.output / 'report.html').read_text())
+        report = json.loads((self.output / 'report.json').read_text())
+        self.assertEqual(report['trials'][0]['reviewer'], 'claude-coordinator')
+        evidence['phases'][0]['exit'] = 7
+        evidence['review'] = dict(verdicts[result['id']], digest=evals.review_digest(evidence))
+        self.assertFalse(evals.grade(evidence)['passed'])
 
     def test_sequential_matrix_retains_each_exit_and_uses_bounded_unattended_flags(self):
         matrix = importlib.import_module('open_matrix')

@@ -19,6 +19,7 @@ python3 -B -m unittest discover -s Evals/tests
 Evals/run.sh --silta .build/debug/silta \
   --stub Evals/tests/stub_harness.py --output artifacts/evals/stub-proof
 python3 -B Evals/tests/plant_faults.py artifacts/evals/stub-proof
+python3 -B Evals/tests/plant_open_faults.py artifacts/evals/open-faults.json
 ```
 
 The output directory must not exist. The default matrix has both adapters, all six
@@ -232,3 +233,90 @@ client profile (for example, run the launcher with `logout` for clients that sup
 that command, or start it interactively and log out), then remove only those trial mktemp directories. Never repair a real
 profile or delete the maintainer's harness home. Offline trial roots are deleted
 after evidence collection because they contain no authentication.
+
+## Open-model runs
+
+These are additional experiments, **not the M1 exit criterion**. The coordinator
+reviews their evidence; the maintainer checks that report. Claude Code and Codex
+with their own models still need their live acceptance runs for issue #18.
+Do not run the commands below during offline verification.
+
+Use a terminal with `FIREWORKS_API_KEY` already supplied by the operator's secret
+manager. Never put its value in arguments, files, shell history or a prompt. The
+runner reads only that environment variable; it never discovers credential files.
+The temporary Codex config uses the same Fireworks provider block as
+[scripts/dogfood-codex.sh](../../scripts/dogfood-codex.sh): `env_key`, Responses API,
+and high reasoning effort. No sign-in launcher or confirmation is needed.
+Only the native Codex launch receives the key; fixture Git keeps its ordinary
+HOME/config/identity environment with that one variable removed, and Silta gets
+its isolated environment. Codex's shell policy excludes `FIREWORKS_API_KEY`.
+The [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+describes `env_key` and shell exclusions; exclusions match the repository's
+working launcher rather than introducing a second policy format.
+
+Run the four core scenarios once with DeepSeek first:
+
+```bash
+eval_codex=$(command -v codex)
+python3 -B Evals/open_matrix.py --silta .build/debug/silta \
+  --client "$eval_codex" --core --max-trial-tokens 50000 \
+  --models accounts/fireworks/models/deepseek-v4p1-flash-1017 \
+  --output artifacts/evals/open-pilot
+```
+
+After reviewing the pilot, run all 22 variants once for each of the three models:
+
+```bash
+python3 -B Evals/open_matrix.py --silta .build/debug/silta \
+  --client "$eval_codex" --max-trial-tokens 50000 \
+  --models accounts/fireworks/models/deepseek-v4p1-flash-1017 \
+    accounts/fireworks/models/kimi-k3p1-pro accounts/fireworks/models/glm-5p3 \
+  --output artifacts/evals/open
+```
+
+Models run sequentially. Each model's folder uses the final model-id component as
+its slug. `matrix.json` preserves each subprocess exit and token total, including
+failures. The default is one repeat; expand only if the results differ
+informatively. The cap above is an operator-selected starting limit, not a pricing
+estimate. A direct run uses `Evals/run.sh --live --harness codex --provider fireworks
+--operator scripted --max-trial-tokens 50000` with explicit `--silta`, `--client`,
+`--model`, `--output` and `--repeats 1`.
+
+The scripted operator is **synthetic approval**, not a human response. For each
+`present-*` trial it sends `Add the Acme retry fix for later.` only when phase 0
+contains that variant's exact proposal command; otherwise it sends an empty
+reply. Both branches record `scripted-operator`; the report shows that source.
+An unsolicited reply cannot satisfy approval provenance. Other policy questions
+remain in the messages for independent semantic review.
+
+Tokens are native input plus output; cached input and reasoning output are already
+included. Codex session `token_count` cumulative counters and terminal JSONL usage
+are reconciled without adding overlapping counts, including resume and fresh
+handoff sessions. `--max-trial-tokens` kills the process group on observed overflow,
+stops further trial phases and records infrastructure failure. Missing usage under
+a cap also fails infrastructure. The cap can overshoot by an in-flight request;
+unreported usage cannot be estimated, and the scenario timeout still applies.
+Unknown tokens/cost remain null, never zero estimates. Output is buffered, with
+exact key echoes redacted before parsing/export; contaminated Silta evidence fails
+and its database export is withheld. Profiles stay temporary and are never copied
+into reports. Offline fake-key tests prove the configuration and export boundaries;
+actual Codex/Fireworks shell filtering and usage compatibility require the pilot.
+
+For each model, produce an audit digest and apply coordinator verdicts using the
+existing digest-bound review format described above:
+
+```bash
+python3 -B Evals/audit.py artifacts/evals/open/deepseek-v4p1-flash-1017 \
+  > artifacts/evals/open/deepseek-audit.txt
+python3 -B Evals/review.py artifacts/evals/open/deepseek-v4p1-flash-1017 \
+  artifacts/evals/open/deepseek-verdicts.json
+```
+
+The digest lists every Silta and native shell command/exit, unmatched attempts,
+opaque/native file tools, file hash changes, policy messages, evidence path and
+review digest. Verdicts may name `claude-coordinator`; JSON and HTML label that
+reviewer separately from the operator. Automatic failures cannot be overridden.
+Exit 1 after unattended execution can mean pending evidence review or a failed
+check; the audit prints both separately. Preserve `matrix.json`'s original process
+exits after review. Attach the reviewed reports, digests and verdicts to issue #18
+using the archive/attachment procedure above, clearly labeled open-model evidence.
