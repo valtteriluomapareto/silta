@@ -65,6 +65,12 @@ class OpenModels(unittest.TestCase):
         self.assertEqual(result['metrics']['tokens'], 30)
         self.assertIsNone(result['metrics']['cost_usd'])
 
+    def test_fake_client_rejects_key_hidden_in_raw_toml_comment(self):
+        with patch.object(evals, 'FIREWORKS_CONFIG', evals.FIREWORKS_CONFIG + '# ' + KEY + '\n'):
+            result, evidence, _ = self.trial()
+        self.assertNotEqual(evidence['phases'][0]['process_exit'], 0, 'Raw config key comment escaped detection')
+        self.assertIn('Raw config contains fake key', (self.output / result['id'] / 'phase-0.stderr').read_text())
+
     def test_key_never_reaches_setup_or_git_and_errors_are_sanitized(self):
         ordinary = os.environ['HOME']
         original = evals.subprocess.check_output
