@@ -59,6 +59,22 @@ FAULTS = [
     ('receipt_failure_loses_retained_root', 'profiles.py', '        try:\n            destination.mkdir(parents=True, exist_ok=True)',
      '        destination.mkdir(parents=True, exist_ok=True)\n        try:',
      'test_receipt_directory_failure_retains_trial_for_final_cleanup', 'Lists differ'),
+    ('cleanup_discards_known_evidence', 'evals.py', '                if evidence_path.is_file():', '                if False:',
+     FAILURE, 'Known calls were discarded'),
+    ('operator_eof_discards_attempt', 'evals.py',
+     'except (OSError, RuntimeError, ValueError, KeyError, TypeError, EOFError, KeyboardInterrupt) as error:',
+     'except (OSError, RuntimeError, ValueError, KeyError, TypeError, KeyboardInterrupt) as error:',
+     'test_operator_eof_retains_attempt_phase_evidence_and_known_usage', 'Operator EOF dropped an attempted trial'),
+    ('operator_eof_loses_completed_phase', 'evals.py', "        if profile:\n            write_json(trial_dir / 'evidence.json', evidence)",
+     '        if profile:\n            pass', 'test_operator_eof_retains_attempt_phase_evidence_and_known_usage', 'Completed phase usage lost'),
+    ('review_loses_run_lifecycle', 'review.py', 'updated.update({key: report[key] for key in evals.RUN_FIELDS if key in report})',
+     'pass', 'test_review_preserves_aborted_zero_trial_report_and_exit', 'Review converted an aborted run to success'),
+    ('review_aborted_empty_run_passes', 'review.py', "not updated.get('aborted', False) and all", 'all',
+     'test_review_preserves_aborted_zero_trial_report_and_exit', 'Review converted an aborted run to success'),
+    ('present_turn_starts_fresh', 'evals.py', "if scenario != 'handoff-resume':", 'if False:',
+     'test_present_continuation_keeps_conversation_auth_and_task_state', ' != '),
+    ('unknown_home_path_omitted', 'profiles.py', "'Unknown temporary HOME entry retained: ' + str(path)",
+     "'Unknown temporary HOME entry retained'", 'test_unknown_temporary_home_entry_names_exact_owned_path', 'not found in'),
 ]
 
 

@@ -123,6 +123,9 @@ Unknown profile entries or cleanup/ownership conflicts abort the remaining trial
 the report exposes `aborted`, `planned_trials`, `attempted_trials` and
 `completed_trials` (attempts with no infrastructure failure). Relevant
 temporary roots are retained and listed in the final cleanup command for inspection.
+Completed phase evidence and known usage remain linked on operator EOF or cleanup
+failure. Applying verdicts with `review.py` preserves the abort status and trial
+counts; reviewing available evidence cannot make an aborted run succeed.
 A new client version that creates unfamiliar files needs an explicit disposable
 path classification before reuse; the runner does not guess which files are credentials.
 

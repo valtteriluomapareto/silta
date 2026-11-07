@@ -85,8 +85,9 @@ class RunProfile:
             elif path.name not in allowed:
                 raise RuntimeError('Unknown profile entry retained: ' + str(path))
         home_entries = {self.directory.name} | {p.name for p in self.configs if p.parent == self.home}
-        if any(p.name not in home_entries for p in self.home.iterdir()):
-            raise RuntimeError('Unknown temporary HOME entry retained')
+        for path in self.home.iterdir():
+            if path.name not in home_entries:
+                raise RuntimeError('Unknown temporary HOME entry retained: ' + str(path))
         for path in self.configs:
             self.safe_config(path)
         for path in disposable:

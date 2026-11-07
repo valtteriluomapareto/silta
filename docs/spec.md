@@ -2255,7 +2255,9 @@ Evals/
    the trial root before the next trial. The shared profile retains no earlier
    Silta data, hook logs, installed pieces or Codex writable-root grants.
    Unknown state or ownership conflicts abort the run and retain owned roots for
-   inspection. Print final explicit logout and cleanup commands. Fireworks uses
+   inspection. Preserve completed phase evidence and known metrics on failure;
+   evidence review preserves the run’s aborted status and trial counts.
+   Print final explicit logout and cleanup commands. Fireworks uses
    isolated per-trial profiles without sign-in. On macOS only, Claude retains
    real HOME for its keychain (D42), with temporary `CLAUDE_CONFIG_DIR`; every
    Silta child still uses temporary HOME and SILTA_HOME.

@@ -275,7 +275,7 @@ class Profiles(unittest.TestCase):
         trial = report['trials'][-1]
         self.assertEqual(trial['variant'], 'present-add')
         self.assertFalse(trial['checks']['infrastructure'])
-        self.assertEqual(trial['metrics']['tokens'], 15)
+        self.assertEqual(trial['metrics'].get('tokens'), 15, 'Completed phase usage lost')
         evidence = json.loads((output / trial['evidence']).read_text())
         self.assertEqual(len(evidence['phases']), 1)
         self.assertTrue(evidence['phases'][0]['complete'])
@@ -293,10 +293,11 @@ class Profiles(unittest.TestCase):
         for trial in present:
             evidence = json.loads((output / trial['evidence']).read_text())
             first, second = evidence['phases']
-            self.assertTrue(first['complete'] and second['complete'])
             self.assertEqual(first['conversation'], second['conversation'])
+            self.assertTrue(first['complete'] and second['complete'])
             self.assertEqual(first['actor'], second['actor'])
-            self.assertEqual(first['state']['tasks'][0]['id'], second['state']['tasks'][0]['id'])
+            self.assertLessEqual({task['id'] for task in first['state']['tasks']},
+                                 {task['id'] for task in second['state']['tasks']})
             models = [e for e in entries if e['event'] == 'model' and e['actor'] == first['actor']]
             self.assertEqual(len(models), 2)
             self.assertEqual(models[0]['auth_inode'], models[1]['auth_inode'])

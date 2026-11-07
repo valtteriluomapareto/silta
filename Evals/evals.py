@@ -19,6 +19,7 @@ from profiles import RunProfile
 
 ROOT = Path(__file__).resolve().parent
 SCENARIOS = sorted(p.parent.name for p in (ROOT / 'scenarios').glob('*/scenario.yaml'))
+RUN_FIELDS = ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials')
 
 
 def digest(value):
@@ -440,6 +441,8 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
         trial_dir.mkdir(parents=True, exist_ok=True)
         (trial_dir / f'phase-{phase}.jsonl').write_text(result['stdout'])
         (trial_dir / f'phase-{phase}.stderr').write_text(result['stderr'])
+        if profile:
+            write_json(trial_dir / 'evidence.json', evidence)
         if phase and variant.startswith('present-') and not conversation:
             evidence['phases'][-1]['complete'] = False
         if result['exit'] in ('token-limit', 'timeout', 'usage-unavailable'):
@@ -899,6 +902,8 @@ def aggregate(trials, provenance):
 
 def render_html(report):
     escape = lambda value: html.escape(str(value), quote=True)
+    status = ('<p>' + escape({k: report[k] for k in RUN_FIELDS if k in report}) + '</p>'
+              if 'aborted' in report else '')
     rows = ''.join('<tr>' + ''.join('<td>' + escape(g[key]) + '</td>' for key in
                    ('harness', 'model', 'scenario', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
     links = ''.join('<li><a href="' + escape(t['evidence']) + '">' + escape(t['id']) + '</a>: '
@@ -906,7 +911,7 @@ def render_html(report):
                     + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks']) + '</li>' for t in report['trials'])
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
-            + '<p>' + escape({k: report[k] for k in ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials') if k in report}) + '</p>'
+            + status
             + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
             + rows + '</table><ul>' + links + '</ul></html>')
 
@@ -961,7 +966,7 @@ def main():
                                   variant, repeat, (args.stub or args.client).resolve(),
                                   args.output, bool(args.stub), args.recording, args.provider,
                                   args.operator, args.max_trial_tokens, profile=profile)
-            except (OSError, RuntimeError, ValueError, KeyError, TypeError, KeyboardInterrupt) as error:
+            except (OSError, RuntimeError, ValueError, KeyError, TypeError, EOFError, KeyboardInterrupt) as error:
                 trial_id = f'{harness}-{scenario}-{variant}-{repeat}'
                 failure = {'id': trial_id, 'scenario': scenario, 'variant': variant,
                            'harness': harness, 'model': args.model, 'repeat': repeat,
@@ -972,7 +977,16 @@ def main():
                                        'usage_errors': 0, 'forbidden_attempts': 0},
                            'evidence': trial_id + '/failure.json'}
                 failure = redact(failure, secret)
-                write_json(args.output / failure['evidence'], failure)
+                evidence_path = args.output / trial_id / 'evidence.json'
+                if evidence_path.is_file():
+                    evidence = json.loads(evidence_path.read_text())
+                    evidence['infrastructure_error'] = failure['error']
+                    write_json(evidence_path, evidence)
+                    failure.update(grade(evidence))
+                    failure.update(trial_labels(evidence))
+                    failure['evidence'] = trial_id + '/evidence.json'
+                else:
+                    write_json(args.output / failure['evidence'], failure)
                 trial = failure
                 if profile or isinstance(error, KeyboardInterrupt):
                     aborted = True

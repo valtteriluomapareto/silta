@@ -89,7 +89,7 @@ scenario = next(s for s in evals.SCENARIOS if scenario_actor.startswith(s + '-')
 variant = scenario_actor.removeprefix(scenario + '-').rsplit('-', 2)[0]
 sha = (Path.cwd() / '.git/refs/heads/feature/push').read_text().strip()
 session = actor.split(':')[-1]
-conversation = profile.parent.parent.name + '-' + session
+conversation = profile.parent.parent.name + '-' + session + '-' + str(sum(e['event'] == 'model' for e in previous))
 if 'resume' in args:
     conversation = args[-2]
 if '--resume' in args:
