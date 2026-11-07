@@ -44,6 +44,17 @@ class OpenReview(unittest.TestCase):
                 self.assertEqual(budget.observe(stream(thread)), 30)
                 self.assertLessEqual(budget.observe(stream(thread)), budget.limit)
 
+    def test_terminal_usage_is_cumulative_across_resume_without_session_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            budget = codex_usage.TokenBudget(directory, 35)
+            budget.start_phase()
+            self.assertEqual(budget.observe(stream('a')), 15)
+            budget.finish_phase()
+            budget.start_phase()
+            self.assertEqual(budget.observe(stream('a', 25)), 30)
+            self.assertEqual(budget.phase_tokens, 15)
+            self.assertEqual(budget.observe(stream('a', 25)), 30)
+
     def test_duplicate_native_files_reconcile_by_session_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

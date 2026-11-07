@@ -54,6 +54,8 @@ if behavior == 'contaminate':
 for line in result.stdout.splitlines():
     event = json.loads(line)
     if event['type'] == 'turn.completed':
+        if phase and 'resume' in args:
+            event['usage'] = {'input_tokens': 20, 'output_tokens': 10}
         if behavior == 'echo':
             print(json.dumps({'type': 'item.completed', 'item': {'type': 'agent_message',
                   'text': 'Echo: ' + key + ' Config: ' + json.dumps(config)}}))

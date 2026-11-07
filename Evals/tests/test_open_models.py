@@ -145,6 +145,18 @@ class OpenModels(unittest.TestCase):
         self.assertEqual(evidence['phases'][1]['exit'], 'token-limit')
         self.assertFalse(result['checks']['infrastructure'])
 
+    def test_uncapped_native_cumulative_usage_is_counted_once(self):
+        result, evidence, _ = self.trial(cap=None)
+        self.assertEqual(evidence['phases'][1]['usage'], {'input_tokens': 20, 'output_tokens': 10})
+        self.assertEqual(result['metrics']['tokens'], 30)
+
+    def test_fresh_handoff_token_budget_adds_distinct_threads(self):
+        result, evidence, _ = self.trial(scenario='handoff-resume', variant='default', cap=20)
+        self.assertNotEqual(evidence['phases'][0]['conversation'], evidence['phases'][1]['conversation'])
+        self.assertEqual(result['metrics']['tokens'], 30)
+        self.assertEqual(evidence['phases'][1]['exit'], 'token-limit')
+        self.assertFalse(result['checks']['infrastructure'])
+
     def test_missing_usage_under_cap_fails_closed(self):
         result, _, _ = self.trial(scenario='plan-not-file', variant='default', behavior='missing-usage')
         self.assertFalse(result['checks']['infrastructure'])
