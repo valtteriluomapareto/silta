@@ -36,6 +36,7 @@ def match_calls(calls, logs, harness):
 
     chains = [call['chain'] for call in calls]
     unknown = any(None in chain for chain in chains)
+    uncertain = any(call.get('usage_only') for call in calls)
     required = Counter(name for chain in chains for entry in chain if entry is not None for name in [entry[0]])
     available = Counter(row['command'] for row in logs)
     exits = Counter((entry[0], status(entry[1])) for chain in chains for entry in chain
@@ -82,7 +83,7 @@ def match_calls(calls, logs, harness):
                     if not valid:
                         continue
                 solutions += 1
-                if unknown or relax or solutions == 2:
+                if unknown or uncertain or relax or solutions == 2:
                     return solutions
                 continue
             for call, cursor in enumerate(cursors):
@@ -100,6 +101,8 @@ def match_calls(calls, logs, harness):
                 if index == len(logs):
                     continue
                 row = logs[index]
+                if cursor in calls[call].get('usage_only', ()) and (row.get('error_code') != 'usage' or row['exit_code'] == 0):
+                    continue
                 if entry is not None and (row['command'] != entry[0]
                         or entry[1] is not None and status(row['exit_code']) != status(entry[1])):
                     continue
@@ -113,7 +116,7 @@ def match_calls(calls, logs, harness):
     if strict is None:
         return None
     if strict:
-        return None if unknown or strict > 1 else True
+        return None if unknown or uncertain or strict > 1 else True
     # Native order remains the default. Only overlapping measured call spans may
     # explain a conflicting association, and that explanation needs review.
     relaxed = search(True)

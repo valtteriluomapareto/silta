@@ -145,9 +145,10 @@ class ShellReview(unittest.TestCase):
 
     def test_default_comment_log_cannot_certify_explicit_subcommands(self):
         for operation in ['post', 'accept', 'resolve', 'reopen', 'delete']:
-            command = 'silta comment ' + operation + ' AC-1/1'
-            p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log('comment')])
-            self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
+            for prefix in ['', '--json ', '--ws acme ']:
+                command = 'silta comment ' + prefix + operation + ' AC-1/1'
+                p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log('comment')])
+                self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
         p = phase({'A': 'silta comment AC-1 -m Acme'}, [('A', 'started'), ('A', 'completed')], [log('comment')])
         self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
 

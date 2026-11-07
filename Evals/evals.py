@@ -761,6 +761,26 @@ def normalized_silta(argv):
     return argv
 
 
+_GROUP_LOGS = ('silta', 'silta task', 'silta ws', 'silta repo', 'silta code',
+               'silta agents', 'silta session')
+
+
+def command_log_match(argv, name):
+    path = name.split()
+    if argv[:len(path)] != path:
+        return False
+    remainder = argv[len(path):]
+    if name == 'silta':
+        return not remainder or remainder == ['-h'] or remainder[0] == 'help'
+    if name in _GROUP_LOGS:
+        return all(word.startswith('-') for word in remainder)
+    if name == 'silta comment':
+        tail = normalized_silta(['silta', *remainder])
+        if not tail or len(tail) > 1 and tail[1] in ('post', 'accept', 'resolve', 'reopen', 'delete'):
+            return False
+    return True
+
+
 def trace_matches_logs(phase, harness):
     """False is a provable mismatch; None needs explicit bound shell-trace review."""
     hooks = {'silta agents session-start', 'silta agents stop'}
@@ -769,7 +789,7 @@ def trace_matches_logs(phase, harness):
     calls = []
     for result in phase['tool_results']:
         parsed = parse_shell(result['command'])
-        chain = []
+        chain, usage_only = [], []
         if parsed.opaque or parsed.conditional:
             chain.append(None)
         else:
@@ -779,18 +799,20 @@ def trace_matches_logs(phase, harness):
                     return False
                 if any(argv[:len(hook.split())] == hook.split() for hook in hooks):
                     continue
-                root_help = len(argv) == 1 or argv[1:] == ['-h'] or argv[1] == 'help'
-                name = next((name for name in names if argv[:len(name.split())] == name.split()
-                             and (name != 'silta' or root_help)
-                             and (name not in ('silta task', 'silta ws', 'silta repo', 'silta code',
-                                               'silta agents', 'silta session')
-                                  or all(word.startswith('-') for word in argv[len(name.split()):]))), None)
+                name = next((name for name in names if command_log_match(argv, name)), None)
+                if name is None and (not parsed.single() or result['exit'] != 0):
+                    name = next((name for name in names if name in _GROUP_LOGS
+                                 and argv[:len(name.split())] == name.split()
+                                 and any(row['command'] == name and row.get('error_code') == 'usage'
+                                         and row['exit_code'] != 0 for row in measured)), None)
+                    if name is not None:
+                        usage_only.append(len(chain))
                 if name is None:
                     return False
                 code = result['exit'] if parsed.single() else None
                 chain.append((name, code))
         if chain:
-            calls.append(dict(result, chain=chain))
+            calls.append(dict(result, chain=chain, usage_only=tuple(usage_only)))
     return match_calls(calls, measured, harness)
 
 

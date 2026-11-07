@@ -241,7 +241,9 @@ are opaque. An opaque or conditional call leaves `stream_complete`
 null when known ordered calls still match. Each call preserves segment order;
 overlapping native calls may interleave their log rows. Multiple associations,
 search exhaustion, or associations explained only by overlapping recorded log
-intervals also require shell-trace review. Provably sequential reorderings still
+intervals also require shell-trace review. A shorter group usage-error log that
+cannot establish the exact command path requires review too; successful group
+or default-comment logs cannot certify longer operations. Provably sequential reorderings still
 fail. The audit identifies the native citations and retained event intervals.
 Also certify `shell-trace` only after reconciling that call's actual executions,
 exits and ordered Silta logs; ordinary `tool-audit` alone does not certify it.
