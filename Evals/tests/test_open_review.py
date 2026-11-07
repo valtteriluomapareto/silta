@@ -29,6 +29,21 @@ def native(path, thread, n):
 
 
 class OpenReview(unittest.TestCase):
+    def test_matrix_keeps_known_tokens_and_unknown_trial_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'matrix'
+            def launch(argv):
+                output = Path(argv[argv.index('--output') + 1])
+                output.mkdir()
+                (output / 'report.json').write_text(json.dumps({'tokens': 123, 'unknown_token_trials': 2}))
+                return subprocess.CompletedProcess(argv, 1)
+            with patch.object(open_matrix.subprocess, 'run', side_effect=launch):
+                self.assertEqual(open_matrix.main(['--silta', 'fake-only', '--client', 'fake-only',
+                    '--models', 'acme/a', '--max-trial-tokens', '50', '--output', str(root)]), 1)
+            model = json.loads((root / 'matrix.json').read_text())['models'][0]
+            self.assertEqual(model['tokens'], 123)
+            self.assertEqual(model['unknown_token_trials'], 2)
+
     def test_late_cumulative_resume_usage_is_not_charged_twice(self):
         for resumed in [True, False]:
             with self.subTest(resumed=resumed), tempfile.TemporaryDirectory() as directory:

@@ -16,6 +16,8 @@ def observations(harness, event):
         item = event['item']
         if item['type'] == 'agent_message' and kind == 'item.completed':
             yield 'message', item['text']
+        elif kind == 'item.completed' and evals.native_diagnostic(item):
+            yield 'diagnostic', item
         elif item['type'] != 'reasoning':
             yield kind.split('.')[1], item
     elif harness == 'claude' and kind in ('assistant', 'user'):
@@ -105,6 +107,9 @@ def render_trial(directory, trial):
                 issue(locator, 'unparsed native observation: ' + excerpt(line, locator))
                 continue
             for kind, item in entries:
+                if kind == 'diagnostic':
+                    print(locator, 'NATIVE DIAGNOSTIC', excerpt(item, locator))
+                    continue
                 if kind == 'message':
                     retained_messages = phase.get('messages', [])
                     retained = (bound + f'/messages/{message_count}' if message_count < len(retained_messages)
@@ -147,8 +152,10 @@ def render_trial(directory, trial):
                     if command is None:
                         issue(citation, 'opaque/native tool effects require investigation')
                     else:
-                        argv = evals.trace_argv(command)
-                        if not argv or Path(argv[0]).name != 'silta':
+                        parsed_shell = evals.parse_shell(command)
+                        if parsed_shell.opaque or parsed_shell.conditional:
+                            issue(citation, 'opaque/conditional shell: reconcile ordered Silta logs and certify shell-trace review')
+                        if not parsed_shell.invocations or len(parsed_shell.commands) != len(parsed_shell.invocations):
                             issue(citation, 'shell/program effects beyond output and snapshots are unverified')
                 else:
                     if kind == 'completed':

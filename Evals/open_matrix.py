@@ -40,7 +40,8 @@ def main(argv=None):
         except (OSError, ValueError):
             report = {}
         models.append({'model': model, 'output': str(output), 'exit': result.returncode,
-                       'tokens': report.get('tokens') if isinstance(report, dict) else None})
+                       'tokens': report.get('tokens') if isinstance(report, dict) else None,
+                       'unknown_token_trials': report.get('unknown_token_trials') if isinstance(report, dict) else None})
         (args.output / 'matrix.json').write_text(json.dumps({'models': models}, indent=2) + '\n')
     return 0 if all(m['exit'] == 0 for m in models) else 1
 

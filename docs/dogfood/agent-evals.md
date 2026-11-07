@@ -233,7 +233,16 @@ were named before approval, absent-human ideas appear only under What's left, al
 import/parent outcomes match the variant, short uses a dependency decision while
 asking about each retained reason, and standard/repository rules retain dependency
 approval. Check that handoff bodies and decision comments concern the actual task.
-The automatic checks cannot be overridden by a reviewer.
+Shell evidence uses a conservative shared grammar: quoted literal commands split
+on `;`, `&&`, `||`, `|` and newlines, and one quoted heredoc feeding Silta `-F -`.
+Substitutions, input redirections/pipes into Silta, eval, functions, aliases and
+parse errors are opaque. An opaque or conditional call leaves `stream_complete`
+null when known ordered calls still match. The audit identifies its native citation.
+Also certify `shell-trace` only after reconciling that call's actual executions,
+exits and ordered Silta logs; ordinary `tool-audit` alone does not certify it.
+A known trace mismatch or incomplete native lifecycle remains false and cannot be
+overridden by a reviewer. A compound program's exit is not each segment's exit;
+exact exit matching is available only for an isolated literal invocation.
 
 Create `verdicts.json` outside the profile directories, with an entry per reviewed
 trial. Obtain its digest without reading any profile/config files:
@@ -386,7 +395,10 @@ stops further trial phases and records infrastructure failure, including on the
 final usage read. The original subprocess exit is retained separately. Missing usage under
 a cap also fails infrastructure. The cap can overshoot by an in-flight request;
 unreported usage cannot be estimated, and the scenario timeout still applies.
-Unknown tokens/cost remain null, never zero estimates. Output is buffered, with
+Unknown per-trial tokens/cost remain null. Report and matrix token totals sum the
+known trial counts and include `unknown_token_trials`; zero with unknown trials
+means no known usage, not a zero-cost estimate. An absent report leaves model
+usage unavailable. Output is buffered, with
 exact key echoes redacted before parsing/export; contaminated Silta evidence fails
 and its database export is withheld. Profiles stay temporary and are never copied
 into reports. Offline fake-key tests prove the configuration and export boundaries;
