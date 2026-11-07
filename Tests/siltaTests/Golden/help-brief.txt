@@ -12,20 +12,24 @@ follow it. Decisions are absent from the brief.
 USAGE: silta brief [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--app <app>] [--task <task>] [--topic <topic> ...] [--budget <budget>] [--short] [--hook]
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  --app <app>             Select one candidate app; default is inferred.
+  --app <app>             Select one of this repository's candidate apps;
+                          default is inferred.
   --task <task>           Read this task; default is session or branch evidence.
-  --topic <topic>         Add context for a topic; default is none. Repeat to
-                          add topics.
-  --budget <budget>       Token budget; default is 2500, or 800 with
+  --topic <topic>         Add context for a topic slug or alias; default is
+                          none. Repeat to add topics.
+  --budget <budget>       Positive token budget, estimated as rendered
+                          characters / 4; default is 2500, or 800 with
                           --short/--hook.
-  --short                 Use an 800-token brief; default is off.
-  --hook                  Read bounded session-start context; default is off.
+  --short                 Use an 800-token brief.
+  --hook                  Read bounded session-start context, silently ignoring
+                          errors.
   --version               Show the version.
   -h, --help              Show help information.

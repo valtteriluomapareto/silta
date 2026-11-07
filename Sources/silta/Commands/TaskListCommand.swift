@@ -3,7 +3,12 @@ import SiltaCore
 
 struct TaskListCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "ls", abstract: "List workspace tasks, including your own proposals.")
+    commandName: "ls",
+    abstract: "List workspace tasks, including your own proposals.",
+    usage:
+      "silta task ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] "
+      + "[--status <status>] [--app <app>] [--on <on>] [--topic <topic>] [--mine] "
+      + "[--proposed] [--promoted] [--archived]")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.summaryShape)])
 
@@ -13,8 +18,7 @@ struct TaskListCommand: OutputCommand {
 
   @Option(
     help: ArgumentHelp(
-      "Show this status: proposed, todo, doing, review, blocked, done or dropped; "
-        + "default is all.")
+      "Show this status: \(TaskService.statuses.joined(separator: ", ")); default is all.")
   ) var status: String?
 
   @Option(help: "Show this app; default is all.") var app: String?
@@ -26,14 +30,14 @@ struct TaskListCommand: OutputCommand {
 
   @Option(help: "Show this topic; default is all.") var topic: String?
 
-  @Flag(help: "Show tasks created or claimed by this exact actor; default is off.") var mine = false
+  @Flag(help: "Show tasks created or claimed by this exact actor.") var mine = false
 
-  @Flag(help: "Include other actors' proposals; default is off, except --status proposed.")
+  @Flag(help: "Include other actors' proposals; --status proposed implies it.")
   var proposed = false
 
-  @Flag(help: "Include tasks promoted to a tracker; default is off.") var promoted = false
+  @Flag(help: "Include tasks promoted to a tracker.") var promoted = false
 
-  @Flag(help: "Include archived tasks; default is off.") var archived = false
+  @Flag(help: "Include archived tasks.") var archived = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     var filter = TaskFilter()

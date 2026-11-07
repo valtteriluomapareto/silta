@@ -5,7 +5,7 @@ import SiltaCore
 struct InitCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "init",
-    abstract: "Initialize or scan repos; `ws edit` is human-only.",
+    abstract: "Initialize or scan repos; select with ws use; ws edit is human-only.",
     discussion: "`init --scan` scans roots and two child levels without fetching.\n"
       + "A new workspace derives its slug and task prefix from the first directory.\n"
       + "Values keep typed case and use letters, digits, _ or -, like `ws edit`.\n"
@@ -35,7 +35,8 @@ struct InitCommand: OutputCommand {
 
   @Option(
     help: ArgumentHelp(
-      "Task prefix; defaults to the slug's first two letters, uppercased."))
+      "Task prefix; task refs read <prefix>-<n>, e.g. AC-1; defaults to the slug's first "
+        + "two letters, uppercased."))
   var prefix: String?
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

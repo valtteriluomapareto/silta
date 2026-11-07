@@ -28,13 +28,18 @@ struct BriefCommand: OutputCommand {
   ])
 
   @OptionGroup(title: "Global Options") var global: GlobalOptions
-  @Option(help: "Select one candidate app; default is inferred.") var app: String?
+  @Option(help: "Select one of this repository's candidate apps; default is inferred.") var app:
+    String?
   @Option(help: "Read this task; default is session or branch evidence.") var task: String?
-  @Option(help: "Add context for a topic; default is none. Repeat to add topics.") var topic:
-    [String] = []
-  @Option(help: "Token budget; default is 2500, or 800 with --short/--hook.") var budget: Int?
-  @Flag(help: "Use an 800-token brief; default is off.") var short = false
-  @Flag(help: "Read bounded session-start context; default is off.") var hook = false
+  @Option(help: "Add context for a topic slug or alias; default is none. Repeat to add topics.")
+  var topic: [String] = []
+  @Option(
+    help: .init(
+      "Positive token budget, estimated as rendered characters / 4; "
+        + "default is 2500, or 800 with --short/--hook."))
+  var budget: Int?
+  @Flag(help: "Use an 800-token brief.") var short = false
+  @Flag(help: "Read bounded session-start context, silently ignoring errors.") var hook = false
   var appSlug: String? { app }
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

@@ -23,7 +23,7 @@ struct DoctorCommand: OutputCommand {
   ])
 
   @OptionGroup(title: "Global Options") var global: GlobalOptions
-  @Flag(help: "Inspect harness installation and logs only; default is off.")
+  @Flag(help: "Inspect harness installation and logs only.")
   var install = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

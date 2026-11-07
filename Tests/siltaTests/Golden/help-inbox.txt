@@ -11,15 +11,16 @@ clear attention.
 USAGE: silta inbox [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--for <for>] [--all]
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --for <for>             Complete actor or me; defaults to the caller.
-  --all                   Show every item; default is off. Includes proposals
-                          older than 14 days.
+  --all                   Show every item, including proposals older than 14
+                          days.
   --version               Show the version.
   -h, --help              Show help information.

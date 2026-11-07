@@ -2,12 +2,17 @@ import Foundation
 import GRDB
 
 extension TaskService {
+  /// The accepted `--rel` values for task links.
+  package static let relations = ["cites", "about", "source", "relates"]
+
   /// Resolves a concrete reference and inserts an idempotent typed link.
   package func link(_ ref: String, target raw: String, relation: String = "cites") throws
     -> TaskResult
   {
-    guard ["cites", "about", "source", "relates"].contains(relation) else {
-      throw TaskError.invalid("Use cites, about, source or relates; blocked_by is reserved.")
+    guard Self.relations.contains(relation) else {
+      let values = Self.relations.dropLast().joined(separator: ", ")
+      throw TaskError.invalid(
+        "Use \(values) or \(Self.relations.last ?? ""); blocked_by is reserved.")
     }
     let command = "silta task link " + shellWord(ref) + " '<target>' --rel " + shellWord(relation)
     let content = try linkContent(raw, command: command)

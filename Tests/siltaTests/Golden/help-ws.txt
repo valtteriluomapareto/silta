@@ -5,11 +5,12 @@ OVERVIEW: List, select and edit workspaces.
 USAGE: silta ws [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -36,14 +37,16 @@ ARGUMENTS:
                           then the saved default.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  -F <F>                  Read UTF-8 YAML from a file or stdin; default is none.
+  -F <F>                  Read UTF-8 YAML from a file, or - for stdin; default
+                          is none.
   --version               Show the version.
   -h, --help              Show help information.
 
@@ -54,11 +57,12 @@ OVERVIEW: List workspaces; ask in chat before editing configuration.
 USAGE: silta ws ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -75,11 +79,12 @@ ARGUMENTS:
                           then the saved default.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -96,11 +101,12 @@ ARGUMENTS:
                           repositories.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.

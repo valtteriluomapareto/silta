@@ -9,10 +9,11 @@ struct TaskBody: ParsableArguments {
     help: "Supply the markdown body; default is none.")
   var message: String?
 
-  @Option(name: .customShort("F"), help: "Read UTF-8 from a file or stdin; default is none.")
+  @Option(
+    name: .customShort("F"), help: "Read UTF-8 from a file, or - for stdin; default is none.")
   var file: String?
 
-  @Flag(help: "Retain detected secrets with human approval; default is off. Retry with file input.")
+  @Flag(help: "Retain detected secrets (human-only; use file input for a body retry).")
   var allowSecret = false
 
   /// The body flag passed, as an approval row names it: `-m <text>` or `-F <file>`.

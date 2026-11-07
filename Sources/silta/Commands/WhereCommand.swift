@@ -18,9 +18,9 @@ struct WhereCommand: OutputCommand {
   @Option(help: "Select one candidate app; default is inferred.") var app: String?
   @Option(help: "Use this task; default is session or branch evidence.") var task: String?
   @Option(
-    name: .customLong("set"), help: "Set this worktree's override; default is none. Human-only.")
+    name: .customLong("set"), help: "Set this worktree's override; human-only when changing it.")
   var setApp: String?
-  @Flag(help: "Remove this worktree's override; default is off. Human-only then.")
+  @Flag(help: "Remove this worktree's override; human-only when changing it.")
   var unset = false
 
   var appSlug: String? { app ?? setApp }

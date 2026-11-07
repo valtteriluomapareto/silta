@@ -54,6 +54,7 @@ Ask in chat. Record a question only when blocked beyond this session. Questions 
 silta --ws acme comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'
 ```
 Answer with --kind answer and --reply-to <question-ref>. The asker or current task claimer can accept an answer with `silta --ws acme comment accept <answer-ref>`. Answer only as an addressee, or to relay the human's chat answer. Never accept your own answer to a question for @me. An answer comment never supplies approval words for a human-only command.
+@me always means human:<USER>, regardless of who runs the command.
 
 # Blocked
 A question to the human does not block a task. Ask in chat if the human can answer, including questions about the customer. If only an external party (ext:acme) or another task can unblock you, keep doing useful work; block only when none remains.
@@ -81,7 +82,7 @@ silta --ws acme task start AC-12
 ```
 
 # Reviews
-Use `silta --ws acme task submit AC-12` to request review. Read discussion with `silta --ws acme task show AC-12`. Reply to the actual finding ref with `silta --ws acme comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility.
+Use `silta --ws acme task submit AC-12` to request review. Read discussion with `silta --ws acme task show AC-12`. Reply to the actual finding ref with `silta --ws acme comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility. Post findings as roots, not replies to a handoff; closed code spans and fences are examples, not mentions.
 
 # Refusals
 Read the error's code, next_by and next commands. A command's next_by can override the code default. Never use --force, --steal, `where --set/--unset`, `task promote` or --allow-secret on your own initiative; name the exact command, wait for the human's reply in this chat, then pass their words through --approved. Never create tracker items or repo plan files. With no human in this chat, see `silta guide human`.
@@ -109,11 +110,11 @@ Bare task ids are accepted wherever a task is expected. The grammar is used in a
 |---|---|---|
 | Task | `AC-12` | `task:AC-12` is also accepted |
 | Comment | `AC-12/3` | the 3rd comment on AC-12 |
-| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring is not supported |
+| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | Stored refs resolve |
 | App, topic | `app:platform-api`, `topic:messaging` | |
 | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
 | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
-| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject; CLI resolution is not supported |
+| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
 | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
 | URL | `url:https://dev.azure.com/…` | |
 | External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor |

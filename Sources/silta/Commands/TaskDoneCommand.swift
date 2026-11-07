@@ -16,12 +16,16 @@ struct TaskDoneCommand: OutputCommand {
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Option(help: "Record this commit; default is attribution from the repository.") var sha: String?
+  @Option(
+    help: .init(
+      "Record this commit from the task's repository; "
+        + "default is attribution from the repository."))
+  var sha: String?
 
-  @Flag(help: "Skip commit attribution; default is off.") var noSha = false
+  @Flag(help: "Skip commit attribution.") var noSha = false
 
   @Flag(
-    help: "Override an unmet review gate; default is off. Human-only and needs -F <file>.")
+    help: "Override an unmet review gate; human-only then, and needs -F <file>.")
   var force = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

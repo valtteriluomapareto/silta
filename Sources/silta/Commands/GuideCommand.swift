@@ -174,6 +174,7 @@ extension GuideCommand {
         an addressee, or to relay the human's chat answer. Never accept your own answer to a \
         question for @me. An answer comment never supplies approval words for a human-only \
         command.
+        @me always means human:<USER>, regardless of who runs the command.
         """ + "\n"),
     Section(
       topic: "blocked",
@@ -226,7 +227,8 @@ extension GuideCommand {
         AC-12/3 \
         -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the \
         proving test. Do not resolve review threads yourself unless assigned that \
-        responsibility.
+        responsibility. Post findings as roots, not replies to a handoff; closed code spans \
+        and fences are examples, not mentions.
         """ + "\n"),
     Section(
       topic: "refusals",
@@ -251,13 +253,13 @@ extension GuideCommand {
         | Task | `AC-12` | `task:AC-12` is also accepted |
         | Comment | `AC-12/3` | the 3rd comment on AC-12 |
         | Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, \
-        `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring is not supported |
+        `doc:mobile-auth-flow@4/2` | Stored refs resolve |
         | App, topic | `app:platform-api`, `topic:messaging` | |
         | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix \
         optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
         | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
         | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | \
-        relative to the task's review subject; CLI resolution is not supported |
+        relative to the task's review subject |
         | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
         | URL | `url:https://dev.azure.com/…` | |
         | External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and \

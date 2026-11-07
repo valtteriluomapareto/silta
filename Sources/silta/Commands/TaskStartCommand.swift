@@ -14,7 +14,7 @@ struct TaskStartCommand: OutputCommand {
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Flag(help: "Override another session's fresh claim; default is off. Human-only then.")
+  @Flag(help: "Override another session's fresh claim; human-only then.")
   var steal = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

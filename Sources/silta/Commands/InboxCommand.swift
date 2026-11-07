@@ -31,7 +31,7 @@ struct InboxCommand: OutputCommand {
   @OptionGroup(title: "Global Options") var global: GlobalOptions
   @Option(name: .customLong("for"), help: "Complete actor or me; defaults to the caller.")
   var target: String?
-  @Flag(help: "Show every item; default is off. Includes proposals older than 14 days.")
+  @Flag(help: "Show every item, including proposals older than 14 days.")
   var all = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {

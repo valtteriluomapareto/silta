@@ -14,10 +14,10 @@ struct TaskTriageCommand: OutputCommand {
 
   @OptionGroup var body: TaskBody
 
-  @Option(parsing: .upToNextOption, help: "Proposal refs to accept; default is none. Repeatable.")
+  @Option(parsing: .upToNextOption, help: "Proposal refs to accept; repeat or list several.")
   var accept: [String] = []
 
-  @Option(parsing: .upToNextOption, help: "Proposal refs to drop; default is none. Repeatable.")
+  @Option(parsing: .upToNextOption, help: "Proposal refs to drop; repeat or list several.")
   var drop: [String] = []
 
   @Option(help: "Priority for accepted proposals: 1, 2 or 3; default keeps each own.")

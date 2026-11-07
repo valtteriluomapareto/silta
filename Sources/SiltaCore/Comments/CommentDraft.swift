@@ -1,8 +1,11 @@
 /// Input for an append-only task discussion post.
 package struct CommentDraft: Sendable {
+  /// The accepted `--kind` values.
+  package static let kinds = ["comment", "question", "answer", "decision", "handoff"]
+
   /// The Markdown content, at most 8000 Unicode scalars.
   package var body: String
-  /// One of comment, question, answer, decision or handoff.
+  /// One of `CommentDraft.kinds`.
   package var kind: String
   let explicitKind: Bool
   /// A post whose thread this reply joins.

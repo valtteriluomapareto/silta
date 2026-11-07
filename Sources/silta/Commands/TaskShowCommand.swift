@@ -14,7 +14,7 @@ struct TaskShowCommand: OutputCommand {
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Flag(help: "Include full discussion and events; default is off.") var timeline = false
+  @Flag(help: "Include full discussion and attributed event history.") var timeline = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     // Keep one scope for the read, resume hint and shared task log resolver.

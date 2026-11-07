@@ -29,7 +29,7 @@ struct ExportCommand: OutputCommand {
 
   @Flag(
     help: ArgumentHelp(
-      "Commit only the workspace subtree; default is off. "
+      "Commit only the workspace subtree in an existing Git work tree. "
         + "Ignored files produce warnings; an unchanged tree makes no commit.")
   )
   var commit = false

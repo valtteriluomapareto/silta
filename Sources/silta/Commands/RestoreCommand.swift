@@ -31,7 +31,7 @@ struct RestoreCommand: OutputCommand {
   @Argument(help: "The export tree: <root>/<workspace>, holding manifest.json.")
   var dir: String
 
-  @Flag(help: "Check and report the restore, then roll it back; default is off.")
+  @Flag(help: "Check and report the restore, then roll it back.")
   var dryRun = false
 
   @Option(

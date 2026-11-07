@@ -13,14 +13,14 @@ Copy a chosen snapshot to a fresh home, then inspect it with doctor.
 USAGE: silta doctor [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--install]
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  --install               Inspect harness installation and logs only; default
-                          is off.
+  --install               Inspect harness installation and logs only.
   --version               Show the version.
   -h, --help              Show help information.

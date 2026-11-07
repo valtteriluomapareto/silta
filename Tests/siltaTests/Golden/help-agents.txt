@@ -5,11 +5,12 @@ OVERVIEW: Preview and safely apply harness integration.
 USAGE: silta agents [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -29,29 +30,32 @@ OVERVIEW: Preview owned harness edits; confirm with --apply <token>.
 Defaults to Claude and Codex; preview exactly what --apply will write.
 Retains unrelated content and file modes; refuses unsafe or ambiguous roots.
 Replacements are atomic per file, not across files; failures list paths.
---hook opts into SessionStart; --stop-hook adds Stop and needs it.
+--hook opts into SessionStart; no hook leaves settings unread.
 Hook JSON needs exact safe integers; other forms need manual work.
 Real harness acceptance is separate from installation.
 
 USAGE: silta agents install [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--claude] [--codex] [--dry-run] [--apply <apply>] [--hook] [--stop-hook]
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --claude                Select Claude instructions and its shared OpenCode
                           skill; default is both.
-  --codex                 Select Codex instructions and its writable root;
-                          default is both.
-  --dry-run               Preview only; default is on.
-  --apply <apply>         Apply exactly this preview token; default is none.
-  --hook                  Install Claude SessionStart; default is off.
-  --stop-hook             Install Claude Stop checks and SessionStart; default
-                          is off.
+  --codex                 Select Codex instructions and its SILTA_HOME writable
+                          root; default is both.
+  --dry-run               Preview only (the default); never combine with
+                          --apply.
+  --apply <apply>         Apply exactly the preview identified by this token;
+                          no interactive prompt.
+  --hook                  Install Claude SessionStart.
+  --stop-hook             Install Claude Stop handoff checks and the required
+                          SessionStart hook.
   --version               Show the version.
   -h, --help              Show help information.
 
@@ -62,27 +66,27 @@ OVERVIEW: Preview removal of selected, unedited Silta ownership.
 Previews removal of only owned, unedited Silta content.
 Defaults to Claude and Codex; --claude or --codex selects one.
 Unrelated settings and hooks remain untouched.
-Uninstall rejects --hook and --stop-hook; it removes selected hooks.
+Uninstall removes selected hooks without extra hook flags.
 A changed preview token requires a fresh preview.
 
-USAGE: silta agents uninstall [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--claude] [--codex] [--dry-run] [--apply <apply>] [--hook] [--stop-hook]
+USAGE: silta agents uninstall [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--claude] [--codex] [--dry-run] [--apply <apply>]
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --claude                Select Claude instructions and its shared OpenCode
                           skill; default is both.
-  --codex                 Select Codex instructions and its writable root;
-                          default is both.
-  --dry-run               Preview only; default is on.
-  --apply <apply>         Apply exactly this preview token; default is none.
-  --hook                  Install Claude SessionStart; default is off.
-  --stop-hook             Install Claude Stop checks and SessionStart; default
-                          is off.
+  --codex                 Select Codex instructions and its SILTA_HOME writable
+                          root; default is both.
+  --dry-run               Preview only (the default); never combine with
+                          --apply.
+  --apply <apply>         Apply exactly the preview identified by this token;
+                          no interactive prompt.
   --version               Show the version.
   -h, --help              Show help information.

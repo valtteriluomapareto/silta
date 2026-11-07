@@ -5,11 +5,12 @@ OVERVIEW: Read another app's committed code without checking out a branch.
 USAGE: silta code [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -39,15 +40,16 @@ ARGUMENTS:
                           magic) is unsupported.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  --prod                  Read the app's production ref; default is off.
-  --fetch                 Fetch first; default is off. Failures stop the read.
+  --prod                  Read the app's production ref.
+  --fetch                 Fetch first (needs network); failures stop the read.
   --version               Show the version.
   -h, --help              Show help information.
 
@@ -62,15 +64,16 @@ ARGUMENTS:
   <path>                  Optional app-relative literal path.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  --prod                  Read the app's production ref; default is off.
-  --fetch                 Fetch first; default is off. Failures stop the read.
+  --prod                  Read the app's production ref.
+  --fetch                 Fetch first (needs network); failures stop the read.
   -n <n>                  Positive commit limit (default 20).
   --version               Show the version.
   -h, --help              Show help information.
@@ -86,15 +89,16 @@ ARGUMENTS:
   <directory>             Optional app-relative literal directory.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  --prod                  Read the app's production ref; default is off.
-  --fetch                 Fetch first; default is off. Failures stop the read.
+  --prod                  Read the app's production ref.
+  --fetch                 Fetch first (needs network); failures stop the read.
   --version               Show the version.
   -h, --help              Show help information.
 
@@ -109,16 +113,17 @@ ARGUMENTS:
   <path>                  App-relative literal file path.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  --prod                  Read the app's production ref; default is off.
-  --fetch                 Fetch first; default is off. Failures stop the read.
-  --lines <lines>         Line N or inclusive range A-B; default is at most 400
-                          lines.
+  --prod                  Read the app's production ref.
+  --fetch                 Fetch first (needs network); failures stop the read.
+  --lines <lines>         Positive line N or inclusive range A-B; default is at
+                          most 400 lines.
   --version               Show the version.
   -h, --help              Show help information.

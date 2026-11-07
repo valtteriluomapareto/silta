@@ -18,19 +18,19 @@ struct TaskPlanCommand: OutputCommand {
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Option(help: "Require this revision; default is none.")
+  @Option(help: "Require this nonnegative revision; default is none.")
   var ifRev: Int?
 
   @Option(
     help: ArgumentHelp(
-      "Top-level checkbox number; checked entries count, fenced examples do not; "
+      "Top-level checkbox number, from 1; checked entries count, fenced examples do not; "
         + "default is none.")
   )
   var step: Int?
 
-  @Flag(help: "Mark the selected checkbox done; default is off.") var done = false
+  @Flag(help: "Mark the selected checkbox done.") var done = false
 
-  @Flag(help: "Mark the selected checkbox undone; default is off.") var undo = false
+  @Flag(help: "Mark the selected checkbox undone.") var undo = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let service = TaskService(

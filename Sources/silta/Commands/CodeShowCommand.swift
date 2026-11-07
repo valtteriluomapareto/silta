@@ -11,7 +11,7 @@ struct CodeShowCommand: OutputCommand {
   @OptionGroup var options: CodeOptions
   @Argument(help: "App slug, optionally followed by @ref.") var target: String
   @Argument(help: "App-relative literal file path.") var path: String
-  @Option(help: "Line N or inclusive range A-B; default is at most 400 lines.")
+  @Option(help: "Positive line N or inclusive range A-B; default is at most 400 lines.")
   var lines: String?
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

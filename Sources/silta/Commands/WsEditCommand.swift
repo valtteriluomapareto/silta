@@ -17,7 +17,8 @@ struct WsEditCommand: WorkspaceArgumentCommand {
 
   var workspaceArgument: String? { workspace }
 
-  @Option(name: .customShort("F"), help: "Read UTF-8 YAML from a file or stdin; default is none.")
+  @Option(
+    name: .customShort("F"), help: "Read UTF-8 YAML from a file, or - for stdin; default is none.")
   var file: String?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {

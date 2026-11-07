@@ -1,22 +1,23 @@
 ### silta comment
 
-OVERVIEW: Post discussion or change a thread's state.
+OVERVIEW: Post task discussion; a claimer's handoff releases its claim.
 
-The default subcommand is `comment post`; run its help for post options.
+The default subcommand is `comment post`; see `silta comment post --help`.
 Ask: silta comment AC-1 --kind question -m "Which API?"
 Answer: silta comment AC-1 --kind answer --reply-to AC-1/1 -m "Use v2."
-Accept an answer with `comment accept`; replies normalize to their root.
-A claimer's handoff releases only that claimer's claim.
-See `silta guide questions` for recipient, relay and approval rules.
+Accept (asker or current claimer): silta comment accept AC-1/2.
+Post findings as roots; replies normalize to their root.
+A claimer's handoff releases its claim; see `silta guide questions`.
 
 USAGE: silta comment [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -43,11 +44,12 @@ ARGUMENTS:
   <ref>                   The live answer ref to accept.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -63,11 +65,12 @@ ARGUMENTS:
   <ref>                   The exact post to delete, including a root or reply.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   --version               Show the version.
@@ -83,23 +86,28 @@ ARGUMENTS:
   <target>                The task reference.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   -m, --message <message> Supply the markdown body; default is none.
-  -F <F>                  Read UTF-8 from a file or stdin; default is none.
-  --allow-secret          Retain detected secrets with human approval; default
-                          is off. Retry with file input.
-  --kind <kind>           One of comment, question, answer, decision or
-                          handoff; default is comment. A handoff names state,
-                          next step, open questions and branch/sha.
-  --reply-to <reply-to>   Join this post's thread; default is none.
-  --to <to>               Recipient: complete actor or me; default is none.
-  --from <from>           Cite a note; default is none.
+  -F <F>                  Read UTF-8 from a file, or - for stdin; default is
+                          none.
+  --allow-secret          Retain detected secrets (human-only; use file input
+                          for a body retry).
+  --kind <kind>           One of comment, question, answer, decision, handoff;
+                          default is comment. A handoff names state, next step,
+                          open questions and branch/sha.
+  --reply-to <reply-to>   Join this post's thread; replies normalize to its
+                          root; default is none.
+  --to <to>               Recipient: complete actor or me; repeatable, default
+                          none. Questions default to the human; @me means
+                          human:<USER>.
+  --from <from>           Cite a note: reference; default is none.
   --version               Show the version.
   -h, --help              Show help information.
 
@@ -114,17 +122,19 @@ ARGUMENTS:
                           Replies select their root.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   -m, --message <message> Supply the markdown body; default is none.
-  -F <F>                  Read UTF-8 from a file or stdin; default is none.
-  --allow-secret          Retain detected secrets with human approval; default
-                          is off. Retry with file input.
+  -F <F>                  Read UTF-8 from a file, or - for stdin; default is
+                          none.
+  --allow-secret          Retain detected secrets (human-only; use file input
+                          for a body retry).
   --version               Show the version.
   -h, --help              Show help information.
 
@@ -139,16 +149,18 @@ ARGUMENTS:
                           Replies select their root.
 
 GLOBAL OPTIONS:
-  --ws <ws>               Use a workspace; default is inferred or saved.
-  --approved <approved>   The human's chat approval; default is none.
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
   --json                  Print JSON; default is text.
-  --quiet                 Hide success text; default is off.
-  --verbose               Mirror diagnostics; default is off.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
   -m, --message <message> Supply the markdown body; default is none.
-  -F <F>                  Read UTF-8 from a file or stdin; default is none.
-  --allow-secret          Retain detected secrets with human approval; default
-                          is off. Retry with file input.
+  -F <F>                  Read UTF-8 from a file, or - for stdin; default is
+                          none.
+  --allow-secret          Retain detected secrets (human-only; use file input
+                          for a body retry).
   --version               Show the version.
   -h, --help              Show help information.

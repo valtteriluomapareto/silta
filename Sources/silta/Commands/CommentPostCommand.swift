@@ -14,14 +14,20 @@ struct CommentPostCommand: OutputCommand {
   @Argument(help: "The task reference.") var target: String
   @Option(
     help: .init(
-      "One of comment, question, answer, decision or handoff; default is comment. "
+      "One of \(CommentDraft.kinds.joined(separator: ", ")); default is comment. "
         + "A handoff names state, next step, open questions and branch/sha.")
   )
   var kind: String?
-  @Option(help: "Join this post's thread; default is none.") var replyTo: String?
-  @Option(name: .customLong("to"), help: "Recipient: complete actor or me; default is none.")
+  @Option(help: "Join this post's thread; replies normalize to its root; default is none.")
+  var replyTo: String?
+  @Option(
+    name: .customLong("to"),
+    help: .init(
+      "Recipient: complete actor or me; repeatable, default none. "
+        + "Questions default to the human; @me means human:<USER>."))
   var recipients: [String] = []
-  @Option(name: .customLong("from"), help: "Cite a note; default is none.") var source: String?
+  @Option(name: .customLong("from"), help: "Cite a note: reference; default is none.")
+  var source: String?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let workspace = try context.workspace(global.ws)

@@ -1,4 +1,5 @@
 import Foundation
+import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -7,6 +8,7 @@ struct HelpCommandTests {
   @Test func everyHelpRouteMatchesGoldenAndRules() throws {
     try withScratchDirectory { scratch in
       let routes = try helpRoutes(in: scratch)
+      let schemaAbstracts = try self.schemaAbstracts(in: scratch)
       #expect(routes.count > 40, "help route discovery unexpectedly shrank")
       var byTopLevel: [String: [(route: String, text: String)]] = [:]
       for route in routes {
@@ -15,7 +17,10 @@ struct HelpCommandTests {
         let result = try SiltaBinary.run(arguments, in: scratch)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
-        try checkHelpRules(result.stdout, route: route)
+        let abstract = try checkHelpRules(result.stdout, route: route)
+        if let schemaAbstract = schemaAbstracts[route] {
+          #expect(abstract == schemaAbstract, "\(route) help and schema summaries differ")
+        }
         let topLevel = words.count == 1 ? "silta" : words[1]
         byTopLevel[topLevel, default: []].append((route, result.stdout))
       }
@@ -42,26 +47,40 @@ struct HelpCommandTests {
 
   @Test func existingExamplesParseWithTheRootParser() throws {
     try withScratchDirectory { scratch in
-      let examples = try helpRoutes(in: scratch).flatMap { route -> [[String]] in
-        let words = route.split(separator: " ").map(String.init)
-        let arguments = (words.count == 1 ? [] : Array(words.dropFirst())) + ["--help"]
-        let result = try SiltaBinary.run(arguments, in: scratch)
-        return result.stdout.split(separator: "\n")
-          .filter { line in
-            line.hasPrefix("Example:") || line.hasPrefix("Ask:")
-              || line.hasPrefix("Answer:") || line.hasPrefix("Accept:")
+      typealias Example = (route: String, arguments: [String])
+      let fixture = WhereCommandTests()
+      _ = try fixture.setup(scratch)
+      let examples = try helpRoutes(in: scratch)
+        .flatMap { route -> [Example] in
+          let words = route.split(separator: " ").map(String.init)
+          let arguments = (words.count == 1 ? [] : Array(words.dropFirst())) + ["--help"]
+          let result = try SiltaBinary.run(arguments, in: scratch)
+          let labelled = result.stdout.split(separator: "\n")
+            .filter { line in
+              line.hasPrefix("Example:") || line.hasPrefix("Ask:")
+                || line.hasPrefix("Answer:") || line.hasPrefix("Accept:")
+            }
+          return try labelled.map { line in
+            let arguments = try #require(
+              Self.arguments(afterCommandIn: String(line)), "\(route) has no command: \(line)")
+            return (route, arguments)
           }
-          .compactMap { line in
-            Self.arguments(afterCommandIn: String(line))
-          }
-      }
+        }
       #expect(!examples.isEmpty, "no existing examples were found")
-      for arguments in examples {
-        let result = try SiltaBinary.run(arguments + ["--json"], in: scratch)
+      for example in examples {
+        try checkExampleValues(example.arguments, route: example.route)
+        let result = try SiltaBinary.run(example.arguments + ["--json"], in: scratch)
         let error = try Self.errorCode(result.stdout)
-        #expect(error != "usage", "\(arguments) does not parse")
+        #expect(error != "usage", "\(example.route) example does not parse: \(example.arguments)")
       }
     }
+  }
+
+  @Test func idRulesExcludeOperandsAndCatchRanges() throws {
+    #expect(try Self.idMatches(in: "--prefix D12", pattern: Self.decisionPattern).isEmpty)
+    #expect(try Self.idMatches(in: "platform-api@M3:path", pattern: Self.milestonePattern).isEmpty)
+    #expect(!(try Self.idMatches(in: "D10-12", pattern: Self.decisionPattern)).isEmpty)
+    #expect(!(try Self.idMatches(in: "M10-12", pattern: Self.milestonePattern)).isEmpty)
   }
 
   @Test func deterministicRemainsAHiddenWorkingFlag() throws {
@@ -91,7 +110,8 @@ struct HelpCommandTests {
     return routes.sorted()
   }
 
-  private func checkHelpRules(_ text: String, route: String) throws {
+  @discardableResult
+  private func checkHelpRules(_ text: String, route: String) throws -> String {
     try checkRuntimeTextRules(text, route: route)
     let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
     let overviewIndex = try #require(lines.firstIndex { $0.hasPrefix("OVERVIEW: ") })
@@ -102,34 +122,77 @@ struct HelpCommandTests {
     }
     let abstract = abstractLines.map { $0.trimmingCharacters(in: .whitespaces) }
       .joined(separator: " ")
-    #expect(abstract.count <= 80)
-    #expect(abstract.hasSuffix("."))
-    #expect(abstract.filter { $0 == "." }.count == 1)
-    #expect(!text.contains("--deterministic"))
+    #expect(abstract.count <= 80, "\(route) abstract is too long")
+    #expect(abstract.hasSuffix("."), "\(route) abstract must end with a period")
+    #expect(
+      abstract.filter { $0 == "." }.count == 1, "\(route) abstract must be one sentence")
+    #expect(!text.contains("--deterministic"), "\(route) shows the deterministic test knob")
     let globalOptions = try globalOptionsLines(lines)
-    #expect(!globalOptions.isEmpty)
+    #expect(!globalOptions.isEmpty, "\(route) has no global options group")
     for flag in ["--ws", "--approved", "--json", "--quiet", "--verbose"] {
-      #expect(globalOptions.contains { $0.hasPrefix("  \(flag)") }, "\(route) is missing \(flag)")
+      #expect(
+        globalOptions.contains { $0.hasPrefix("  \(flag)") },
+        "\(route) is missing \(flag)")
     }
     let usagePrefix =
       route == "silta" ? "USAGE: silta" : "USAGE: silta " + route.dropFirst("silta ".count)
-    #expect(lines.contains { $0.hasPrefix(usagePrefix) })
+    let usageLines = lines.filter { $0.hasPrefix(usagePrefix) }
+    #expect(!usageLines.isEmpty, "\(route) has no accurate usage line")
+    #expect(
+      !usageLines.contains { $0.hasSuffix("<options>") },
+      "\(route) uses a bare <options> usage line")
     let discussion = try discussionLines(text)
-    #expect(discussion.count <= 6)
+    #expect(discussion.count <= 6, "\(route) discussion is too long")
+    if route == "silta agents uninstall" {
+      #expect(!text.contains("--hook"), "\(route) advertises install-only hooks")
+      #expect(!text.contains("--stop-hook"), "\(route) advertises install-only hooks")
+    }
+    return abstract
   }
 
   private func checkRuntimeTextRules(_ text: String, route: String) throws {
-    #expect(!text.contains("docs/"))
+    #expect(!text.contains("docs/"), "\(route) names a repository path")
     let milestones = try Self.idMatches(
-      in: text, pattern: #"(?<![A-Za-z0-9_-])M\d+(?![A-Za-z0-9_-])"#)
+      in: text, pattern: Self.milestonePattern)
     let decisions = try Self.idMatches(
-      in: text, pattern: #"(?<![A-Za-z0-9_-])D\d+(?![A-Za-z0-9_-])"#)
-    #expect(milestones.isEmpty)
-    #expect(decisions.isEmpty)
+      in: text, pattern: Self.decisionPattern)
+    #expect(milestones.isEmpty, "\(route) names a milestone: \(milestones)")
+    #expect(decisions.isEmpty, "\(route) names a decision: \(decisions)")
     #expect(
       !text.lowercased().contains("not yet")
         && !text.lowercased().contains("not available")
-        && !text.lowercased().contains("waits for"))
+        && !text.lowercased().contains("waits for"),
+      "\(route) contains roadmap text")
+  }
+
+  private func checkExampleValues(_ arguments: [String], route: String) throws {
+    let allowedValues: [String: Set<String>] = [
+      "--kind": Set(CommentDraft.kinds),
+      "--status": Set(TaskService.statuses),
+      "--rel": Set(TaskService.relations),
+    ]
+    for (index, argument) in arguments.enumerated() {
+      guard let allowed = allowedValues[argument] else { continue }
+      let hasValue = index + 1 < arguments.count
+      #expect(hasValue, "\(route) example omits a value for \(argument)")
+      guard hasValue else { continue }
+      #expect(
+        allowed.contains(arguments[index + 1]),
+        "\(route) example has an invalid \(argument) value: \(arguments[index + 1])")
+    }
+  }
+
+  private func schemaAbstracts(in scratch: URL) throws -> [String: String] {
+    let result = try SiltaBinary.run(["schema", "--json"], in: scratch)
+    let root = try Self.object(result.stdout)
+    let data = try #require(root["data"] as? [String: Any])
+    let commands = try #require(data["commands"] as? [[String: Any]])
+    var abstracts: [String: String] = [:]
+    for command in commands {
+      abstracts[try #require(command["name"] as? String)] =
+        try #require(command["abstract"] as? String)
+    }
+    return abstracts
   }
 
   private func discussionLines(_ text: String) throws -> [String] {
@@ -186,12 +249,21 @@ struct HelpCommandTests {
   }
 
   private static func idMatches(in text: String, pattern: String) throws -> [String] {
+    let operands = try NSRegularExpression(pattern: #"(--[A-Za-z0-9-]+) [^ ]+"#)
+    let checked = operands.stringByReplacingMatches(
+      in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "$1")
     let regex = try NSRegularExpression(pattern: pattern)
-    let range = NSRange(text.startIndex..., in: text)
-    return regex.matches(in: text, range: range).compactMap { match in
-      Range(match.range, in: text).map { String(text[$0]) }
+    let range = NSRange(checked.startIndex..., in: checked)
+    return regex.matches(in: checked, range: range).compactMap { match in
+      Range(match.range, in: checked).map { String(checked[$0]) }
     }
   }
+
+  private static let milestonePattern =
+    #"(?<![A-Za-z0-9_@:-])M\d+(?:-\d+)?(?![A-Za-z0-9_@:-])"#
+
+  private static let decisionPattern =
+    #"(?<![A-Za-z0-9_@:-])D\d+(?:-\d+)?(?![A-Za-z0-9_@:-])"#
 
   private static func object(_ json: String) throws -> [String: Any] {
     let root = try #require(

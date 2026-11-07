@@ -3,10 +3,10 @@ import SiltaCore
 
 /// Shared selection flags and output for the four concrete code reads.
 struct CodeOptions: ParsableArguments {
-  @Flag(help: "Read the app's production ref; default is off.")
+  @Flag(help: "Read the app's production ref.")
   var prod = false
 
-  @Flag(help: "Fetch first; default is off. Failures stop the read.")
+  @Flag(help: "Fetch first (needs network); failures stop the read.")
   var fetch = false
 
   static let dataShape = Shape.object([

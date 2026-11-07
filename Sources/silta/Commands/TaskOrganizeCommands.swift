@@ -60,7 +60,10 @@ struct TaskLinkCommand: OutputCommand {
   @Argument(help: "The target reference (task, doc, app, topic, code, plan, note or url).")
   var target: String
 
-  @Option(help: "Relation: cites, about, source or relates; default is cites.")
+  @Option(
+    help: .init(
+      "Relation: \(TaskService.relations.joined(separator: ", ")); "
+        + "blocked_by belongs to block."))
   var rel = "cites"
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let linked = try TaskService(environment: context.environment, workspace: global.ws)
