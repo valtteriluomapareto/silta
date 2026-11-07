@@ -15,7 +15,7 @@ from shell_commands import parse_shell
 class ShellCommands(unittest.TestCase):
     def test_compounds_preserve_quotes_and_invocation_order(self):
         for separator in [';', '&&', '||', '|', '\n']:
-            command = "silta where " + separator + " echo 'semi; && || | literal' ; silta brief"
+            command = "silta where " + separator + " echo 'semi; && || | literal' ; silta brief\n"
             for rendered in [command, '/bin/zsh -lc ' + shlex.quote(command)]:
                 with self.subTest(command=rendered):
                     parsed = parse_shell(rendered)

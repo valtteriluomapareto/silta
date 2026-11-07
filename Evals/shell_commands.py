@@ -157,6 +157,7 @@ def parse_shell(program, *, audit=False):
                 decoded, raw = value
                 result.opaque |= _expands(raw)
                 command.append(decoded)
+                previous = None
             elif kind == 'heredoc':
                 heredoc = True
                 result.composed = True
