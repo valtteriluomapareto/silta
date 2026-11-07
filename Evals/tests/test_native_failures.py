@@ -83,7 +83,19 @@ class NativeFailures(unittest.TestCase):
         self.check('codex', 'helper-second-turn', fault='snapshot', fault_after=2, scenario='handoff-resume')
 
     def test_invalid_utf8_is_retained_byte_for_byte(self):
-        self.check('codex', 'bad-utf8')
+        for cap in (None, 100):
+            with self.subTest(cap=cap):
+                self.check('codex', 'bad-utf8' + ('-capped' if cap else ''), cap=cap)
+
+    def test_nested_nonfinite_fields_do_not_escape_into_failure_evidence(self):
+        for harness in ('claude', 'codex'):
+            for field in ('thread-nan', 'usage-nan', 'opaque-nan'):
+                with self.subTest(harness=harness, field=field):
+                    report, evidence = self.check(harness, 'schema-' + field)
+                    def invalid(value):
+                        self.fail('Nonfinite value escaped into parsed evidence: ' + value)
+                    json.loads(json.dumps(report), parse_constant=invalid)
+                    json.loads(json.dumps(evidence), parse_constant=invalid)
 
 
 if __name__ == '__main__':

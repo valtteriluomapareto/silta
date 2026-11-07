@@ -121,19 +121,29 @@ def emit(value):
             for block in blocks:
                 if block.get('type') == 'text':
                     block['text'] = [block['text']]
-        if mode == 'schema-thread':
+        if mode in ('schema-thread', 'schema-thread-nan'):
+            invalid = [] if mode == 'schema-thread' else float('nan')
             if 'thread_id' in value:
-                value['thread_id'] = []
+                value['thread_id'] = invalid
             if 'session_id' in value:
-                value['session_id'] = []
+                value['session_id'] = invalid
+        if mode == 'schema-opaque-nan':
+            if item.get('type') == 'command_execution':
+                item.update(type='file_change', extra=float('nan'))
+            for block in blocks:
+                if block.get('type') == 'tool_use':
+                    block.update(name='Write')
+                    block['input']['extra'] = float('nan')
         if mode == 'schema-tool':
             if item.get('type') == 'command_execution':
                 value['item'] = []
-            if blocks:
+            if any(block.get('type') in ('tool_use', 'tool_result') for block in blocks):
                 value['message']['content'] = 42
         if value.get('type') in ('result', 'turn.completed'):
             if mode == 'schema-usage':
                 value['usage'] = []
+            if mode == 'schema-usage-nan':
+                value['usage']['extra'] = float('nan')
             if mode.startswith('schema-cost'):
                 value['total_cost_usd'] = {'schema-cost': [], 'schema-cost-bool': True,
                                           'schema-cost-nan': float('nan')}[mode]
@@ -255,7 +265,7 @@ stderr_oracle.write_bytes(stderr)
 sys.stderr.buffer.write(stderr)
 sys.stderr.buffer.flush()
 emit(terminal)
-if mode == 'bad-utf8':
+if mode.startswith('bad-utf8'):
     raw = b'\xff\n'
     with stdout_oracle.open('ab') as oracle:
         oracle.write(raw)
