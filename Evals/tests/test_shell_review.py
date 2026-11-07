@@ -143,6 +143,23 @@ class ShellReview(unittest.TestCase):
         e['review']['checks'].append('shell-trace')
         self.assertTrue(evals.reviewed(e))
 
+    def test_default_comment_log_cannot_certify_explicit_subcommands(self):
+        for operation in ['post', 'accept', 'resolve', 'reopen', 'delete']:
+            command = 'silta comment ' + operation + ' AC-1/1'
+            p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log('comment')])
+            self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
+        p = phase({'A': 'silta comment AC-1 -m Acme'}, [('A', 'started'), ('A', 'completed')], [log('comment')])
+        self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
+
+    def test_recorded_invalid_group_usage_is_reviewable_and_exit_still_matters(self):
+        source = json.loads((ROOT / 'tests/pilot/400k/codex-start-cross-repo-default-1/evidence.json').read_text())
+        row = next(row for row in source['phases'][0]['logs']
+                   if row['command'] == 'silta task' and row.get('error_code') == 'usage')
+        p = phase({'A': 'silta task comments AC-1'}, [('A', 'started'), ('A', 'completed')], [row], exits={'A': 1})
+        self.assertIsNone(evals.trace_matches_logs(p, 'codex'))
+        p['tool_results'][0]['exit'] = 0
+        self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
+
     def test_root_help_literal_and_compound_use_real_root_log_shape(self):
         evidence = json.loads((ROOT / 'tests/pilot/400k/codex-plan-not-file-default-1/evidence.json').read_text())
         root = next(row for row in evidence['phases'][0]['logs'] if row['command'] == 'silta' and '--help' in row['flags'])
