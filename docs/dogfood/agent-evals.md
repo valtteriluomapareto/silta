@@ -290,10 +290,14 @@ An unsolicited reply cannot satisfy approval provenance. Other policy questions
 remain in the messages for independent semantic review.
 
 Tokens are native input plus output; cached input and reasoning output are already
-included. Codex session `token_count` cumulative counters and terminal JSONL usage
-are reconciled by native `session_meta`/thread identity without adding
+included. Codex session `token_count` counters and terminal JSONL usage are both
+[cumulative per thread](https://github.com/openai/codex/blob/main/codex-rs/exec/src/event_processor_with_jsonl_output.rs),
+as emitted by `usage_from_last_total`. Their maxima are reconciled by native `session_meta`/thread identity without adding
 overlapping counts, including late counters, copied logs, resume and fresh handoff
-sessions. Counters without a session identity fail infrastructure. `--max-trial-tokens` kills the process group on observed overflow,
+sessions, including uncapped runs. Counters without a session identity fail
+infrastructure. The synthetic Codex emitter follows the same cumulative resume
+contract; its authored-review hash is deliberately updated without changing any
+recording actions or semantic verdicts. `--max-trial-tokens` kills the process group on observed overflow,
 stops further trial phases and records infrastructure failure, including on the
 final usage read. The original subprocess exit is retained separately. Missing usage under
 a cap also fails infrastructure. The cap can overshoot by an in-flight request;

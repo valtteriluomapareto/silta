@@ -333,7 +333,7 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
     if provider == 'fireworks':
         config = Path(env['CODEX_HOME']) / 'config.toml'
         config.write_text(FIREWORKS_CONFIG + config.read_text())
-    if max_trial_tokens is not None:
+    if harness == 'codex':
         budget = TokenBudget(env['CODEX_HOME'], max_trial_tokens)
     baseline = snapshot(root / 'data', root / 'repos')
     evidence = {'id': trial_id, 'harness': harness, 'model': model, 'scenario': scenario,
@@ -395,11 +395,17 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
             if harness == 'claude' and sys.platform == 'darwin':
                 run_env['HOME'] = os.environ['HOME']
                 run_env['USER'] = os.environ.get('USER', 'unknown')
-        if key:
+        if key and not stub:
             run_env['FIREWORKS_API_KEY'] = key
-        launch = budget.execute if budget else execute
+        if budget and max_trial_tokens is None:
+            budget.start_phase()
+        launch = budget.execute if max_trial_tokens is not None else execute
         result = redact(launch([str(ROOT / 'harnesses' / (harness + '.sh')), str(client), model,
                                prompt, conversation], run_env, cwd, spec['timeout_s']), key)
+        if budget and max_trial_tokens is None:
+            budget.observe(result['stdout'])
+            result['tokens'] = budget.phase_tokens
+            budget.finish_phase()
         native = parse_stream(harness, result['stdout'])
         if scenario != 'handoff-resume':
             conversation = native['conversation'] or ''

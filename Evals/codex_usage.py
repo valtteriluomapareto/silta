@@ -60,7 +60,7 @@ class TokenBudget:
         if self.current_terminal is not None:
             if not isinstance(self.thread, str) or not self.thread:
                 raise ValueError('Native terminal usage missing thread identity')
-            terminal[self.thread] = terminal.get(self.thread, 0) + self.current_terminal
+            terminal[self.thread] = max(terminal.get(self.thread, 0), self.current_terminal)
         identities = self.native.keys() | terminal.keys()
         total = sum(max(self.native.get(key, 0), terminal.get(key, 0)) for key in identities) if identities else None
         known = (self.current_terminal is not None or
@@ -70,7 +70,7 @@ class TokenBudget:
 
     def finish_phase(self):
         if self.current_terminal is not None:
-            self.terminal[self.thread] = self.terminal.get(self.thread, 0) + self.current_terminal
+            self.terminal[self.thread] = max(self.terminal.get(self.thread, 0), self.current_terminal)
         if self.phase_tokens is not None:
             self.spent += self.phase_tokens
 
