@@ -87,7 +87,7 @@ class UnattendedCLI(unittest.TestCase):
             self.assertIn('infrastructure', trial['checks'], 'CLI cap forwarding was lost')
             self.assertFalse(trial['checks']['infrastructure'], 'CLI cap forwarding was lost')
             evidence = json.loads((directory / trial['evidence']).read_text())
-            self.assertEqual(evidence['phases'][0]['exit'], 'token-limit')
+            self.assertEqual(evidence['phases'][0]['exit'], 'token-limit', evidence['phases'][0].get('errors'))
             self.assertEqual(len(evidence['phases']), 1)
             self.assertIsNone(evidence['approval'])
 
