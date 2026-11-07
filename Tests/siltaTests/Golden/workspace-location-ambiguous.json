@@ -1,0 +1,1 @@
+{"error":{"code":"ambiguous_location","message":"This repository belongs to several workspaces. Retry the original command with --ws and a workspace from the candidates.","next":["silta --ws 'acme' ws show","silta --ws 'beta' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
