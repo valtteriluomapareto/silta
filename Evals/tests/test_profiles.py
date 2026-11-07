@@ -275,6 +275,24 @@ class Profiles(unittest.TestCase):
                 self.assertIn('FORBIDDEN_PROFILE_READ_COPY', run.stderr)
                 self.assertNotIn('PermissionError', run.stderr)
 
+    def test_receipt_directory_failure_retains_trial_for_final_cleanup(self):
+        output = self.root / 'profile-output'
+        output.mkdir()
+        profile = evals.RunProfile('codex', ROOT / 'tests/fake_profile_client.py', output,
+                                   evals.isolated_env, evals.execute)
+        self.addCleanup(shutil.rmtree, profile.root, True)
+        trial = self.root / 'trial'
+        trial.mkdir()
+        blocked = self.root / 'blocked'
+        blocked.write_text('Owned output-directory conflict')
+        with self.assertRaises(OSError):
+            profile.finish_trial(trial, blocked / 'receipt')
+        self.assertEqual(profile.retained, [trial])
+        console = io.StringIO()
+        with patch('sys.stdout', console):
+            profile.instructions()
+        self.assertIn(str(trial), console.getvalue())
+
 
 if __name__ == '__main__':
     unittest.main()
