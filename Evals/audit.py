@@ -75,7 +75,7 @@ def render_trial(directory, trial):
             issue(bound + '/schema_errors', json.dumps(phase['schema_errors']))
         for stream, capture in phase.get('capture', {}).get('streams', {}).items():
             if not capture.get('complete'):
-                issue(bound + '/capture/' + stream, 'capture incomplete; full output is unavailable')
+                issue(bound + '/capture/streams/' + stream, 'capture incomplete; full output is unavailable')
         try:
             raw = raw_path.read_bytes()
         except OSError:

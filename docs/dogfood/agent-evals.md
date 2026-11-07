@@ -136,7 +136,10 @@ provider key redacted), including invalid UTF-8. Evidence records each stream’
 byte count, SHA-256, completeness and capture errors, plus the actual process exit
 when known. A decoding or schema error cannot turn those bytes into a success.
 
-Failure reports retain known terminal usage and measured calls. Unavailable
+Failure reports retain known terminal usage and measured calls. Codex recovery
+merges per-thread usage sources before taking the phase delta; cumulative usage
+without a valid thread identity stays unattributed, so the token total is unknown
+rather than charging an earlier turn again. Unavailable
 logs, snapshots and unchecked metrics stay `null`; the audit labels them
 `UNRESOLVED` rather than inferring effects from an empty or baseline state.
 Stage-tagged errors point at execution, usage, parsing or evidence enrichment.

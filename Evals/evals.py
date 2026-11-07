@@ -537,9 +537,8 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
             observed['exit'] = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'exception'
             observed['process_exit'] = capture.process_exit
             count = tokens(observed['usage'])
-            before = getattr(budget, 'before', {}).get(observed['conversation'], 0) if budget else 0
-            observed['tokens'] = (budget.phase_tokens if budget and budget.phase_tokens is not None
-                                  else max(0, count - before) if count is not None else None)
+            observed['tokens'] = (budget.recover_phase(observed['usage'], observed['conversation'])
+                                  if budget else count)
             observed['errors'].append({'stage': stage, 'type': type(error).__name__, 'message': redact(str(error), key)})
         observed['capture'] = capture.status()
         observed['transcript_sha256'] = capture.streams['stdout']['sha256']

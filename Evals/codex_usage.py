@@ -74,6 +74,18 @@ class TokenBudget:
         if self.phase_tokens is not None:
             self.spent += self.phase_tokens
 
+    def recover_phase(self, usage, identity):
+        count = tokens(usage)
+        if count is not None and (not isinstance(identity, str) or not identity):
+            return None
+        if count is None and self.phase_tokens is None:
+            return None
+        counts = {key: max(self.native.get(key, 0), self.terminal.get(key, 0))
+                  for key in self.native.keys() | self.terminal.keys()}
+        if count is not None:
+            counts[identity] = max(counts.get(identity, 0), count)
+        return max(0, sum(counts.values()) - self.baseline, self.phase_tokens or 0)
+
     def execute(self, argv, env, cwd, timeout, capture=None):
         self.start_phase()
         child = subprocess.Popen(argv, env=env, cwd=cwd, stdin=subprocess.DEVNULL,
