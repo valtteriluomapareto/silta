@@ -101,18 +101,17 @@ Counts are normalised per agent session and per active day.
 
 1. **Choose a small scope:** two to four related repos with real cross-repo work, the
    workspace slug and the task prefix.
-2. **Install:** `silta agents install` (S13 defines who runs it and how the diff is
-   approved). It writes only user-level files, never the team's repos, and gives Codex
-   its writable root before anything else needs it. Check that a session in an
-   unregistered repo prints nothing, and that the hook stays inside its 1.5 s budget.
-3. **Scan only the chosen repos:**
-   `silta init --scan <repo dir>… --slug <slug> --prefix <XX>` (slice DF3-a). A scan of
-   a whole projects directory would register every clone under it.
-4. **Fill the workspace with an agent,** using the setup prompt below.
-5. **Turn on measurement:** create the check-in task, write the decision rules into
+2. **Install and configure:** follow [getting started](../getting-started.md). Agent
+   installation and removal are previews until rerunning the printed command with
+   `--apply <token>`. Those changes write only user-level files, never the team's repos;
+   check that a session in an unregistered repo prints nothing and that the hook stays
+   inside its 1.5 s budget. A scan of a whole projects directory registers every clone
+   under it.
+3. **Fill the workspace with an agent,** using the setup prompt below.
+4. **Turn on measurement:** create the check-in task, write the decision rules into
    it as its description, and run the first private report as week 0.
-6. **Roll back if needed:** `silta agents uninstall` removes the hook and blocks; the
-   data stays.
+5. **Roll back if needed:** preview `silta agents uninstall`, then apply the preview's
+   token; the hook and blocks are removed and the data stays.
 
 **Setup prompt (draft; it becomes `silta guide setup` after it has worked once):**
 

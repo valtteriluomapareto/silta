@@ -1,48 +1,67 @@
 # Silta
 
-A local bridge between your coding agents, your repos and what was decided.
+Silta is a local context hub and backlog that keeps coding agents oriented across your repos and sessions.
 
-Silta (Finnish for *bridge*, as in a ship's *komentosilta*) gives every agent session
-the picture when it starts. It shows the app it's in, the apps it talks to (even when
-they live on other branches of the same repo), the task at hand, the last handoff and
-recent decisions. It also gives agents a local backlog with plans, questions, handoffs
-and reviews, so they stop filing tickets in the team tracker or leaving plan files in
-repos.
+Coding agent work loses its thread:
 
-- **CLI** (`silta`) for agents. Claude Code, Codex, OpenCode and others use it through
-  their shell tool.
-- **macOS app** (later) for you: triage, review and sign off.
-- **One Swift core** on a local SQLite database. No server, no MCP, no daemon.
+- Every session starts blind to the app, related services and work already underway.
+- Context gets copied into chats and pasted between agents by hand.
+- Plans and decisions leak into repository files or the team tracker.
+
+Silta lets agents record that context once and retrieve it where they work. A Claude
+Code SessionStart hook prints a brief; other agents, including Codex, run `silta brief`
+themselves:
+
+```text
+acme / platform / api [high: explicit]
+branch: api
+task: AC-2
+doing: Acme task (app: portal)
+plan (revision 0):
+1 done
+2. [ ] Acme next
+app: api
+```
+
+## When it pays off
+
+- You have several repos or apps, including apps represented by branches of one repo.
+- Work spans sessions and needs a handoff, review or decision to survive the chat.
+- Several agents work in sequence or in parallel.
+- You work through agents and want plans and decisions out of chat and out of repos.
+
+## When not to use it
+
+- You use one repo for short tasks: `AGENTS.md` and git already do the job.
+- You need team coordination: Silta is single-user, local and has no sync; your team
+  tracker remains the record of committed work.
+- You need a server, MCP integration or a web UI.
+- You are not on macOS 15 or later.
 
 ## Status
 
-The first milestone (M1, daily use) is in progress; its slices are in
-[`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md). The design is in
-[`docs/spec.md`](docs/spec.md). Silta is built with Silta: the current dogfooding
-stage is in [`AGENTS.md`](AGENTS.md#dogfooding).
-
-The CLI has these commands today: `init`, `ws`, `repo fetch`, `where`, `code`,
-`task`, `comment`, `inbox` (discussion only so far), `brief`, `doctor`, `schema` and
-`guide`. Run `silta --help` for the list and `silta guide` for the agent manual. Not
-built yet: agent install, export and restore (spec §16 marks each command's
-milestone).
+Silta is pre-1.0 and currently provides a CLI, not the planned macOS app.
 
 ## Install
 
-Silta needs macOS 15 and Xcode 27.1 (Swift 6.4). From a clean `main` that matches
+Silta needs macOS 15 and Xcode 27.1 (Swift 6.4). From a clean `main` matching
 `origin/main`:
 
 ```sh
 scripts/install-dev.sh
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-It builds a release binary and installs it as `~/.local/bin/silta`. Data lives in
-`~/.silta`, or in `SILTA_HOME` when set.
+Data lives in `~/.silta`, or in `SILTA_HOME` when set. Follow
+[Getting started](docs/getting-started.md) to configure your first workspace and task.
 
-## Contributing
+## Learn more
 
-Agents start at [`AGENTS.md`](AGENTS.md); humans at [`CONTRIBUTING.md`](CONTRIBUTING.md).
-Everything runs through `scripts/verify.sh`.
+- `silta --help` lists commands; each command has its own `--help`.
+- `silta guide` and `silta schema` are the agent manuals.
+- [The design](docs/spec.md) explains the product and technical model.
+- Agents contributing to Silta start at [`AGENTS.md`](AGENTS.md); humans at
+  [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
