@@ -14,13 +14,19 @@ struct WorkspaceExampleTests {
         ], in: scratch, environment: TaskCommandTests.actor)
       #expect(edited.termination == .exit(0), "\(edited.stderr)")
 
-      let shown = try SiltaBinary.run(["ws", "show", "acme"], in: scratch)
+      let shown = try SiltaBinary.run(["ws", "show", "acme", "--json"], in: scratch)
       #expect(shown.termination == .exit(0), "\(shown.stderr)")
+      let envelope = try #require(
+        JSONSerialization.jsonObject(with: Data(shown.stdout.utf8)) as? [String: Any])
+      let data = try #require(envelope["data"] as? [String: Any])
+      let yaml = try #require(data["yaml"] as? String)
+      let apps = try #require(yaml.components(separatedBy: "\napps:\n").last)
+        .components(separatedBy: "\nenvironments:")[0]
       for app in [
         "platform-legacy", "platform-portal", "platform-crm-ui", "platform-api",
         "mobile", "sales", "pdf-service",
       ] {
-        #expect(shown.stdout.contains(app))
+        #expect(apps.contains("\"slug\":\"\(app)\""))
       }
     }
   }

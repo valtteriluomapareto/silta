@@ -1,4 +1,4 @@
-# Identity, optional display name and the prefix used for new task references.
+# Required workspace identity, display name and task prefix for new task references.
 workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }
 
 # Stored workspace policies; omit defaults you do not need to override.
@@ -32,6 +32,8 @@ apps:
   - { slug: "sales", repo: "sales", ref: "origin/main", summary: "New sales portal; replaces platform-legacy." }
   - { slug: "pdf-service", repo: "pdf-service", ref: "origin/main", summary: "PDF rendering: POST /api/pdf/{configId}." }
 
+# Example promotion: master → portal → api, then test → prod via merge branches.
+
 # Reachable app environments, identified by app and name, with their base URL.
 environments:
   - { app: "platform-api", name: "test", url: "https://api.test.acme.example" }
@@ -59,7 +61,7 @@ topics:
   - { slug: "reports", aliases: [ "raportit" ] }
   - { slug: "pdf-forms", aliases: [ "lomakkeet" ] }
 
-# Read-only external note trees, with optional include and exclude globs.
+# External note trees stored for later search. root and include are required; exclude is optional.
 sources:
   - { kind: "notes", root: "~/notes", include: [ "projects/acme/*.md" ],
       exclude: [ "**/PEOPLE.md", "**/1-1/**" ] }

@@ -106,11 +106,10 @@ Counts are normalised per agent session and per active day.
    `--apply <token>`. Those changes write only user-level files, never the team's repos;
    check that a session in an unregistered repo prints nothing and that the hook stays
    inside its 1.5 s budget. A scan of a whole projects directory registers every clone
-   under it.
-3. **Fill the workspace with an agent,** using the setup prompt below.
-4. **Turn on measurement:** create the check-in task, write the decision rules into
+   under it. Use the setup prompt below to review real app details and settings.
+3. **Turn on measurement:** create the check-in task, write the decision rules into
    it as its description, and run the first private report as week 0.
-5. **Roll back if needed:** preview `silta agents uninstall`, then apply the preview's
+4. **Roll back if needed:** preview `silta agents uninstall`, then apply the preview's
    token; the hook and blocks are removed and the data stays.
 
 **Setup prompt (draft; it becomes `silta guide setup` after it has worked once):**

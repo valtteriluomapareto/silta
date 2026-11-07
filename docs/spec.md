@@ -2590,9 +2590,6 @@ When writing a workspace's YAML, leave out keys that keep their default, so a la
 change of default reaches the workspace. The [annotated Acme example](examples/acme-workspace.yaml)
 sets the existing keys to show the shape; its CLI acceptance test applies it.
 
-Promotion order in this example: `master` → `portal` → `api`, then test → prod via
-merge branches.
-
 ## Appendix B — Database alternatives considered (2026-11-02)
 
 Requirement: many short-lived processes writing to the same store, from Swift, with

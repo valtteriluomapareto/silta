@@ -14,6 +14,8 @@ The examples call the workspace `acme` and use the task prefix `AC`; substitute 
 From a clean `main` checkout that matches `origin/main`:
 
 ```sh
+git clone https://github.com/valtteriluomapareto/silta.git
+cd silta
 scripts/install-dev.sh
 export PATH="$HOME/.local/bin:$PATH"
 silta --help
@@ -32,24 +34,20 @@ silta where
 ```
 
 The scan registers repositories and discovers likely apps, but those apps still need
-descriptions and production refs. The workspace is selected from a repository you enter;
-use `--ws acme` when working outside one.
+descriptions and may still need production refs. The workspace is selected from a
+registered repository you enter; use `--ws acme` when working outside one.
 
-## 4. Describe the apps and their connections
+## 4. Connect your agents
 
-Inspect the full configuration with `silta --ws acme ws show`. Read the repositories'
-READMEs and update each app's summary, repo branch, production branch and any subpath.
-Add deployment environments and the APIs or external services each app calls.
+Install Codex before its agent edits the workspace so it receives the writable Silta
+data root. Codex has no session hooks; your Codex agent runs `silta brief` at session
+start itself. Preview its user-level instructions and writable data root with:
 
-See the [annotated Acme workspace](examples/acme-workspace.yaml) for the complete YAML
-shape, including several apps on branches of one repository. Start from the YAML shown
-for your workspace: saving replaces the configuration, and omitted rows are removed.
+```sh
+silta agents install --codex
+```
 
-`ws edit` changes configuration and therefore needs human approval. After reviewing the
-YAML, apply it with `silta --ws acme ws edit -F <file>`; if run by an agent, it will name
-the human approval step. Do not put secrets or private notes into the file.
-
-## 5. Connect your agents
+Copy the preview's token into `silta agents install --codex --apply <token>` after review.
 
 For Claude Code, preview the user-level instructions, skill and SessionStart hook:
 
@@ -63,23 +61,41 @@ Read the entire preview, copy its token into the displayed apply command and rer
 silta agents install --claude --hook --apply <token>
 ```
 
-Repeat the preview with `--codex` too if you use Codex and want its instructions and
-writable data root. Codex has no session hooks; your Codex agent runs `silta brief` at
-session start itself. Then check the installation:
+Check the installation:
 
 ```sh
 silta doctor --install
 ```
+
+Your selected integrations' `install.*` rows should pass. Warnings for harnesses you do
+not use, or for missing hook evidence before the first session, are expected.
+
+## 5. Describe the apps and their connections
+
+Inspect the full configuration with `silta --ws acme ws show`. Read the repositories'
+READMEs and update each app's summary, repo branch, production branch and any subpath.
+Add deployment environments and the APIs or external services each app calls.
+
+See the [annotated Acme workspace](examples/acme-workspace.yaml) for the complete YAML
+shape, including several apps on branches of one repository. Start from the YAML shown
+for your workspace: saving replaces the configuration, and omitted rows are removed.
+
+Run `silta ws edit acme` to open your editor with the current YAML; no approval flag is
+needed at your own terminal. If an agent fills in the configuration, approve it in chat
+and the agent passes your words as `--approved`. Do not put secrets or private notes into
+the file.
 
 ## 6. Start the first task
 
 From a registered repository, tell your agent: **"Add a task for X and start it."** The
 agent creates and claims the work, then can read context with `silta brief`.
 
-You can check the current location, agent claims and your attention queue at any time:
+Check your location, inbox count and own claims with `silta`; list the agent's work and
+your attention queue with:
 
 ```sh
 silta
+silta task ls
 silta inbox --for me
 ```
 
@@ -100,7 +116,7 @@ of all workspaces before changing or removing that data.
 
 | Symptom | What to do |
 |---|---|
-| The Claude hook prints nothing | Run `silta brief` from a registered repo, then `silta doctor --install`; sessions outside registered repos have no brief. |
+| The Claude hook prints nothing | Check that the hook shell's `PATH` finds `silta`; run `silta brief` from a registered repo and `silta doctor --install`. Sessions outside registered repos have no brief. |
 | `ambiguous_location` | Inspect `silta where --path <dir>`, then retry with the suggested `--ws <workspace>` or `--app <app>`. |
-| `claimed` | Another agent session holds the task. Pick other work or ask that agent; do not take over its claim yourself. |
+| `claimed` | Pick other work or ask the holding agent. A human may run `silta task start <ref> --steal` when that session is dead. |
 | Unknown workspace | Run `silta ws ls` and use an exact listed slug with `--ws <workspace>`. |

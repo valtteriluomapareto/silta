@@ -20,7 +20,13 @@ doing: Acme task (app: portal)
 plan (revision 0):
 1 done
 2. [ ] Acme next
+description:
+Acme task body
 app: api
+summary: Acme API
+environment: prod https://api.acme.example
+AGENTS.md: <repo>/AGENTS.md
+neighbour: api -> service:push [uses] Acme push
 ```
 
 ## When it pays off
@@ -40,7 +46,7 @@ app: api
 
 ## Status
 
-Silta is pre-1.0 and currently provides a CLI, not the planned macOS app.
+Pre-1.0, CLI only.
 
 ## Install
 
@@ -48,6 +54,8 @@ Silta needs macOS 15 and Xcode 27.1 (Swift 6.4). From a clean `main` matching
 `origin/main`:
 
 ```sh
+git clone https://github.com/valtteriluomapareto/silta.git
+cd silta
 scripts/install-dev.sh
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -59,7 +67,6 @@ Data lives in `~/.silta`, or in `SILTA_HOME` when set. Follow
 
 - `silta --help` lists commands; each command has its own `--help`.
 - `silta guide` and `silta schema` are the agent manuals.
-- [The design](docs/spec.md) explains the product and technical model.
 - Agents contributing to Silta start at [`AGENTS.md`](AGENTS.md); humans at
   [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
