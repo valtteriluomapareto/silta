@@ -46,6 +46,37 @@ FAULTS = [
     ('matrix_loses_exit_on_bad_report', 'open_matrix.py', 'except (OSError, ValueError):',
      'except OSError:', 'REVIEW.test_malformed_optional_report_never_loses_model_exit_or_later_models',
      'json.decoder.JSONDecodeError'),
+    ('raw_config_comment_key', 'evals.py', 'config.write_text(FIREWORKS_CONFIG + config.read_text())',
+     "config.write_text(FIREWORKS_CONFIG + config.read_text() + '# ' + key + '\\n')",
+     'test_fake_key_absent_from_shell_console_and_every_export', 'Raw config contains fake key'),
+    ('key_in_auxiliary_profile_file', 'evals.py', 'config.write_text(FIREWORKS_CONFIG + config.read_text())',
+     "config.write_text(FIREWORKS_CONFIG + config.read_text()); (Path(env['HOME']) / 'leak.txt').write_text(key)",
+     'test_fake_key_absent_from_shell_console_and_every_export', 'Fake key in written file'),
+    ('cli_hidden_core_input', 'evals.py', "    secret = os.environ.get('FIREWORKS_API_KEY', '') if args.provider == 'fireworks' else ''",
+     "    if args.live and args.core: input('Unexpected core prompt')\n    secret = os.environ.get('FIREWORKS_API_KEY', '') if args.provider == 'fireworks' else ''",
+     'test_unattended_cli.UnattendedCLI.test_actual_matrix_core_pilot_has_no_input_and_exact_coverage',
+     'Unattended CLI requested input'),
+    ('cli_cap_forwarding', 'evals.py', 'args.operator, args.max_trial_tokens)', 'args.operator, None)',
+     'test_unattended_cli.UnattendedCLI.test_actual_cli_low_cap_stops_before_present_second_phase',
+     'CLI cap forwarding was lost'),
+    ('cli_operator_forwarding', 'evals.py', 'args.operator, args.max_trial_tokens)', "'interactive', args.max_trial_tokens)",
+     'test_unattended_cli.UnattendedCLI.test_actual_cli_scripted_grant_and_empty_denial',
+     'Unattended CLI requested input'),
+    ('audit_loses_tool_output', 'audit.py', "excerpt(output, locator + ' ' + retained)", "'<omitted>'",
+     'test_audit_evidence.AuditEvidence.test_audit_exposes_outputs_full_state_order_and_intermediate_files',
+     "'OPAQUE_PROGRAM_READ_BACKEND_SECRET_SENTINEL' not found"),
+    ('audit_loses_state_rows', 'audit.py', "TABLES = ('tasks', 'plans', 'comments', 'approvals', 'events')", 'TABLES = ()',
+     'test_audit_evidence.AuditEvidence.test_audit_exposes_outputs_full_state_order_and_intermediate_files',
+     "'STORED_PLAN_BODY' not found"),
+    ('audit_loses_intermediate_files', 'audit.py', "files(before.get('files', {}), state['files'],", 'files({}, {},',
+     'test_audit_evidence.AuditEvidence.test_audit_exposes_outputs_full_state_order_and_intermediate_files',
+     "'intermediate.txt' not found"),
+    ('audit_invents_exit_success', 'audit.py', "item.get('exit_code', 'unknown')", "item.get('exit_code', 0)",
+     'test_audit_evidence.AuditEvidence.test_missing_native_exit_is_unknown_instead_of_success',
+     "Regex didn't match"),
+    ('unbound_transcript_order', 'evals.py', "'transcript_sha256': hashlib.sha256(result['stdout'].encode()).hexdigest(),", '',
+     'test_unattended_cli.UnattendedCLI.test_actual_matrix_core_pilot_has_no_input_and_exact_coverage',
+     'Missing bound transcript hash'),
     ('unattended_login_prompt', 'evals.py', "if not stub and provider != 'fireworks':", 'if not stub:',
      'test_fake_key_absent_from_shell_console_and_every_export', 'Unattended input prompt'),
     ('unattended_operator_prompt', 'evals.py', "if operator == 'scripted':", 'if False:',
@@ -64,7 +95,10 @@ def main():
             raise SystemExit('Non-unique mutation marker: ' + name)
         try:
             path.write_text(original.replace(marker, replacement))
-            run = subprocess.run([sys.executable, '-B', '-m', 'unittest', (test.replace('REVIEW.', 'test_open_review.OpenReview.') if test.startswith('REVIEW.') else TEST + test)],
+            qualified = test.replace('REVIEW.', 'test_open_review.OpenReview.')
+            if '.' not in qualified:
+                qualified = TEST + qualified
+            run = subprocess.run([sys.executable, '-B', '-m', 'unittest', qualified],
                                  cwd=ROOT / 'tests', text=True, capture_output=True)
             detected = run.returncode != 0 and expected in run.stderr
             results.append({'guarantee': name, 'detected': detected, 'exit': run.returncode})

@@ -55,15 +55,39 @@ class OpenModels(unittest.TestCase):
         report = evals.aggregate([result], 'live')
         evals.write_json(self.output / 'report.json', report)
         (self.output / 'report.html').write_text(evals.render_html(report))
-        for path in self.output.rglob('*'):
-            if path.is_file():
-                self.assertNotIn(KEY.encode(), path.read_bytes(), str(path))
+        self.assertTrue(profile.name.startswith('silta-eval-'))
+        self.assertTrue(profile.resolve().is_relative_to(Path(tempfile.gettempdir()).resolve()))
+        self.assert_no_key_in_written_files([self.output, profile])
         self.assertNotIn(KEY, self.console.getvalue())
         self.assertIn('[REDACTED]', (self.output / result['id'] / 'phase-0.stderr').read_text())
         self.assertEqual(result['provider'], 'fireworks')
         self.assertEqual(result['operator_source'], 'scripted-operator')
         self.assertEqual(result['metrics']['tokens'], 30)
         self.assertIsNone(result['metrics']['cost_usd'])
+
+    def assert_no_key_in_written_files(self, roots):
+        for root in roots:
+            self.assertFalse(root.is_symlink(), 'Never scan a foreign symlink')
+            anchor = root.resolve()
+            for path in root.rglob('*'):
+                self.assertFalse(path.is_symlink(), 'Never scan a foreign symlink')
+                if path.is_file():
+                    self.assertTrue(path.resolve().is_relative_to(anchor))
+                    self.assertNotIn(KEY.encode(), path.read_bytes(), 'Fake key in written file: ' + str(path))
+
+    def test_written_file_scan_rejects_foreign_symlinks_before_reading(self):
+        with tempfile.TemporaryDirectory(prefix='silta-foreign-test-') as directory:
+            foreign = Path(directory) / 'outside'
+            foreign.write_text(KEY)
+            link = self.output / 'foreign'
+            link.symlink_to(foreign)
+            original = Path.read_bytes
+            def read(path):
+                self.assertNotEqual(path, link, 'Foreign symlink was read')
+                return original(path)
+            with patch.object(Path, 'read_bytes', read):
+                with self.assertRaisesRegex(AssertionError, 'Never scan a foreign symlink'):
+                    self.assert_no_key_in_written_files([self.output])
 
     def test_fake_client_rejects_key_hidden_in_raw_toml_comment(self):
         with patch.object(evals, 'FIREWORKS_CONFIG', evals.FIREWORKS_CONFIG + '# ' + KEY + '\n'):

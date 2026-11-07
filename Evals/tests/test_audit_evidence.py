@@ -22,7 +22,7 @@ class AuditEvidence(unittest.TestCase):
 
     def evidence(self, harness='codex'):
         tools = [('tool-0', 'printf hidden', 'OPAQUE_PROGRAM_READ_BACKEND_SECRET_SENTINEL'),
-                 ('tool-1', 'printf long', 'START' + 'x' * 10000 + 'HIDDEN_OUTPUT_TAIL')]
+                 ('tool-1', 'printf long', 'START' + 'x' * 5000 + 'MIDDLE_UNSEEN_SENTINEL' + 'x' * 5000 + 'HIDDEN_OUTPUT_TAIL')]
         if harness == 'codex':
             events = [{'type': 'thread.started', 'thread_id': 'a'},
                       {'type': 'item.completed', 'item': {'type': 'agent_message', 'text': 'BEFORE_TOOL'}}]
@@ -83,8 +83,18 @@ class AuditEvidence(unittest.TestCase):
                     self.assertIn(expected, output)
                 self.assertLess(output.index('BEFORE_TOOL'), output.index('OPAQUE_PROGRAM_READ_BACKEND_SECRET_SENTINEL'))
                 self.assertLess(output.index('OPAQUE_PROGRAM_READ_BACKEND_SECRET_SENTINEL'), output.index('AFTER_TOOL'))
+                self.assertNotIn('MIDDLE_UNSEEN_SENTINEL', output)
                 self.assertIn('phase-1/files', output)
+                self.assertIn('SNAPSHOT after phase-0/tool-2', output)
                 self.assertIn('FINAL FILE', output)
+
+    def test_transcript_hash_binds_actual_trial_order_for_review(self):
+        e = self.evidence()
+        self.assertEqual(e['phases'][0]['transcript_sha256'], hashlib.sha256((self.trial / 'phase-0.jsonl').read_bytes()).hexdigest())
+        output = self.audit(e)
+        self.assertNotIn('unbound or changed transcript', output)
+        e['phases'][0].pop('transcript_sha256')
+        self.assertIn('unbound or changed transcript', self.audit(e))
 
     def test_changed_raw_and_retained_observations_remain_visible_and_unresolved(self):
         e = self.evidence()
@@ -95,6 +105,17 @@ class AuditEvidence(unittest.TestCase):
         for expected in ['RETAINED_OUTPUT_SENTINEL', 'RETAINED_MESSAGE_SENTINEL', 'RAW_CHANGED_MESSAGE',
                          'UNRESOLVED', 'transcript', 'tool_results/0', 'messages/0']:
             self.assertIn(expected, output)
+
+    def test_missing_native_exit_is_unknown_instead_of_success(self):
+        e = self.evidence()
+        transcript = self.trial / 'phase-0.jsonl'
+        events = [json.loads(line) for line in transcript.read_text().splitlines()]
+        completion = next(event['item'] for event in events if event.get('type') == 'item.completed'
+                          and event.get('item', {}).get('id') == 'tool-0')
+        completion.pop('exit_code')
+        transcript.write_text('\n'.join(json.dumps(event) for event in events) + '\n')
+        output = self.audit(e)
+        self.assertRegex(output, r'phase-0/tool-0[^\n]*COMPLETED exit=unknown')
 
     def test_missing_raw_and_missing_tool_result_are_unresolved(self):
         e = self.evidence()

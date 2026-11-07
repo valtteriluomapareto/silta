@@ -1,4 +1,5 @@
 """Real CLI/matrix paths with explicit fake client, fake key and input tripwire."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -54,6 +55,11 @@ class UnattendedCLI(unittest.TestCase):
             self.assertNotIn('infrastructure', trial['checks'])
             self.assertTrue(trial['checks']['stream_complete'])
             self.assertEqual([key for key, value in trial['checks'].items() if not value], ['evidence_review'])
+            evidence = json.loads((directory / 'fixture-pass' / trial['evidence']).read_text())
+            for number, phase in enumerate(evidence['phases']):
+                transcript = directory / 'fixture-pass' / trial['id'] / f'phase-{number}.jsonl'
+                self.assertIn('transcript_sha256', phase, 'Missing bound transcript hash')
+                self.assertEqual(phase['transcript_sha256'], hashlib.sha256(transcript.read_bytes()).hexdigest())
         self.assertEqual(json.loads((directory / 'matrix.json').read_text())['models'][0]['exit'], 1)
 
     def policy(self, model, cap, output):
@@ -78,6 +84,7 @@ class UnattendedCLI(unittest.TestCase):
         directory, report = self.policy('fixture-pass', 10, 'capped')
         self.assertEqual(len(report['trials']), 10)
         for trial in report['trials']:
+            self.assertIn('infrastructure', trial['checks'], 'CLI cap forwarding was lost')
             self.assertFalse(trial['checks']['infrastructure'], 'CLI cap forwarding was lost')
             evidence = json.loads((directory / trial['evidence']).read_text())
             self.assertEqual(evidence['phases'][0]['exit'], 'token-limit')

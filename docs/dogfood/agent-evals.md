@@ -318,9 +318,31 @@ python3 -B Evals/review.py artifacts/evals/open/deepseek-v4p1-flash-1017 \
   artifacts/evals/open/deepseek-verdicts.json
 ```
 
-The digest lists every Silta and native shell command/exit, unmatched attempts,
-opaque/native file tools, file hash changes, policy messages, evidence path and
-review digest. Verdicts may name `claude-coordinator`; JSON and HTML label that
+The digest lists each tool start/result and its exit and output, with the agent's
+messages in native order. A citation such as `phase-0/tool-2` includes the native
+ID, transcript path/line and bound evidence JSON pointer. Transcript SHA256 is
+part of the phase evidence and review digest. Changed/missing transcripts or
+raw/retained disagreements are unresolved; both observations remain visible.
+
+Tool outputs use a 2,000-character head/tail excerpt. Truncation states the omitted
+count and full source locator; inspect omitted material before certifying it.
+Messages and task/plan/comment/approval/event rows retain their bodies. Baseline,
+per-phase row/file deltas and final rows/files expose intermediate state even when
+a file disappears before the end. Snapshot citations say after which phase/tool
+boundary they were collected; they do not attribute a change to that last tool.
+Native file operations are reported/unverified, and arbitrary shell/program effects
+between snapshots remain unresolved. Each trial ends with an unresolved count;
+resolve those observations before granting `tool-audit` or `policy-semantics`.
+Legacy evidence without a transcript hash cannot establish bound native ordering.
+
+The offline acceptance runs the actual matrix/core and runner/present/cap entry
+points with an explicitly fake client and key. A test-only Python input tripwire
+records even caught input attempts. Raw byte scans cover the owned profile and
+exported files without following symlinks; TOML comments are included. The fault
+inventory removes CLI cap/operator forwarding, inserts a core prompt and leaks a
+fake key in a raw config comment, in addition to the audit omission controls.
+
+Verdicts may name `claude-coordinator`; JSON and HTML label that
 reviewer separately from the operator. Automatic failures cannot be overridden.
 Exit 1 after unattended execution can mean pending evidence review or a failed
 check; the audit prints both separately. Preserve `matrix.json`'s original process

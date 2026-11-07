@@ -14,7 +14,9 @@ model_index = args.index('--model') + 1
 _, scenario, variant, recording, behavior = args[model_index].split(':')
 key = os.environ['FIREWORKS_API_KEY']
 assert key.startswith('fake-si63-'), 'Only fake credentials permitted'
-config = tomllib.loads((Path(os.environ['CODEX_HOME']) / 'config.toml').read_text())
+raw_config = (Path(os.environ['CODEX_HOME']) / 'config.toml').read_bytes()
+assert key.encode() not in raw_config, 'Raw config contains fake key'
+config = tomllib.loads(raw_config.decode())
 assert config['model_provider'] == 'fireworks'
 assert config['model_providers']['fireworks'] == {
     'name': 'Fireworks', 'base_url': 'https://api.fireworks.ai/inference/v1',

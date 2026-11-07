@@ -415,6 +415,7 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
                                    'logs': exact, 'all_logs': phase_logs,
                                    'state': snapshot(root / 'data', root / 'repos'),
                                    'process_exit': result.get('process_exit', result['exit']),
+                                   'transcript_sha256': hashlib.sha256(result['stdout'].encode()).hexdigest(),
                                    'tokens': result.get('tokens', tokens(native['usage']))})
         trial_dir = output / trial_id
         trial_dir.mkdir(parents=True, exist_ok=True)
