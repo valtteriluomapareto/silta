@@ -24,7 +24,7 @@ struct TaskDoneCommand: OutputCommand {
 
   @Flag(help: "Skip commit attribution.") var noSha = false
 
-  @Flag(help: "Override an unmet review gate; human-only then, with -m or -F.")
+  @Flag(help: "Override an unmet review gate; human-only then; a result is optional.")
   var force = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

@@ -7,7 +7,7 @@ struct CommentCommand: ParsableCommand {
     discussion: "The default subcommand is `comment post`; see `silta comment post --help`.\n"
       + "Ask: silta comment AC-1 --kind question -m \"Which API?\"\n"
       + "Answer: silta comment AC-1 --kind answer --reply-to AC-1/1 -m \"Use v2.\"\n"
-      + "Accept (asker or current claimer): silta comment accept AC-1/2.\n"
+      + "Accept (asker or current claimer): silta comment accept AC-1/2\n"
       + "Post findings as roots; replies normalize to their root.\n"
       + "A claimer's handoff releases its claim; see `silta guide questions`.",
     subcommands: [

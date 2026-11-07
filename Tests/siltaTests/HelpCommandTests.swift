@@ -94,7 +94,12 @@ struct HelpCommandTests {
         in: "Example: silta task add --prefix D12", pattern: Self.decisionPattern,
         commandValueOptions: options
       ).isEmpty)
+    #expect(try Self.idMatches(in: "app:D12", pattern: Self.decisionPattern).isEmpty)
     #expect(try Self.idMatches(in: "platform-api@M3:path", pattern: Self.milestonePattern).isEmpty)
+    #expect(
+      !(try Self.idMatches(
+        in: "run silta guide refs, then --approved (D39)", pattern: Self.decisionPattern,
+        commandValueOptions: options)).isEmpty)
     #expect(!(try Self.idMatches(in: "D10-12", pattern: Self.decisionPattern)).isEmpty)
     #expect(!(try Self.idMatches(in: "M10-12", pattern: Self.milestonePattern)).isEmpty)
   }
@@ -257,8 +262,7 @@ extension HelpCommandTests {
 
   fileprivate static func arguments(afterCommandIn line: String) -> [String]? {
     guard let range = line.range(of: "silta ") else { return nil }
-    var command = String(line[range.upperBound...])
-    while command.last == "." { command.removeLast() }
+    let command = String(line[range.upperBound...])
     return shellWords(command)
   }
 
@@ -313,15 +317,15 @@ extension HelpCommandTests {
   }
 
   fileprivate static let milestonePattern =
-    #"(?<![A-Za-z0-9_@-])M\d+(?:-\d+)?(?![A-Za-z0-9_-])"#
+    #"(?<![A-Za-z0-9_@:-])M\d+(?:-\d+)?(?![A-Za-z0-9_-])"#
 
   fileprivate static let decisionPattern =
-    #"(?<![A-Za-z0-9_@-])D\d+(?:-\d+)?(?![A-Za-z0-9_-])"#
+    #"(?<![A-Za-z0-9_@:-])D\d+(?:-\d+)?(?![A-Za-z0-9_-])"#
 
   fileprivate static func commandCheckedLine(
     _ line: String, commandValueOptions: Set<String>
   ) -> String {
-    guard line.contains("silta ") || line.contains("`") else { return line }
+    guard line.contains("`") || Self.isCommandLine(line) else { return line }
     var checked = ""
     var rest = line[...]
     while !rest.isEmpty {
@@ -347,6 +351,14 @@ extension HelpCommandTests {
       }
     }
     return checked
+  }
+
+  fileprivate static func isCommandLine(_ line: String) -> Bool {
+    let trimmed = line.trimmingCharacters(in: .whitespaces)
+    if trimmed.hasPrefix("silta ") { return true }
+    guard let separator = trimmed.range(of: ": silta ") else { return false }
+    let label = trimmed[trimmed.startIndex..<separator.lowerBound]
+    return !label.contains("`") && !label.contains("silta")
   }
 
   fileprivate static func removingOptionOperands(

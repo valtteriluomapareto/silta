@@ -155,8 +155,8 @@ OPTIONS:
   --sha <sha>             Record this commit from the task's repository;
                           default is attribution from the repository.
   --no-sha                Skip commit attribution.
-  --force                 Override an unmet review gate; human-only then, with
-                          -m or -F.
+  --force                 Override an unmet review gate; human-only then; a
+                          result is optional.
   --version               Show the version.
   -h, --help              Show help information.
 
