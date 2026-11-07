@@ -5,6 +5,7 @@ from pathlib import Path
 import shlex
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -47,7 +48,10 @@ class ShellReview(unittest.TestCase):
                         'set -e; false; silta where', 'exit 0; silta where',
                         'return 0; silta where', 'export SILTA_ACTOR=other; silta brief',
                         'unset SILTA_HOME; silta brief', 'shopt -s expand_aliases; silta brief',
-                        'setopt aliases; silta brief', 'enable -n silta; silta brief']:
+                        'setopt aliases; silta brief', 'enable -n silta; silta brief',
+                        "print -s 'gh issue create --title Acme'; fc -s 1; silta brief",
+                        'history -s unknown; silta brief', 'r; silta brief',
+                        'printf -v SILTA_HOME /tmp/acme; silta brief']:
             with self.subTest(command=command):
                 self.assertTrue(parse_shell(command).opaque)
         self.assertFalse(parse_shell('printf literal; arbitrary-executable argument; silta brief').opaque)
@@ -63,6 +67,14 @@ class ShellReview(unittest.TestCase):
         self.assertFalse(evals.reviewed(e))
         self.assertFalse(result['passed'])
         self.assertIsNone(result['checks']['stream_complete'])
+
+    def test_matching_budget_precedes_graph_setup_but_not_coverage_checks(self):
+        from trace_matching import match_calls
+        calls = [{'chain': [('silta where', 0)]} for _ in range(65)]
+        logs = [log('where') for _ in calls]
+        with patch('trace_matching.native_interval', side_effect=AssertionError('Unbounded graph setup')):
+            self.assertIsNone(match_calls(calls, logs, 'codex'))
+            self.assertIs(match_calls(calls, logs[:-1], 'codex'), False)
 
     def assert_heredoc_retention(self, wrap):
         body = "literal --steal $(not-expanded) `not-expanded`\nsecond line\n"
@@ -140,4 +152,8 @@ class ShellReview(unittest.TestCase):
         for command, logs in [('silta task done AC-1 -m result', [root]),
                               ('silta --help; silta task done AC-1 -m result', [root, root])]:
             p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], copy.deepcopy(logs))
+            self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
+        for command, group in [('silta task done AC-1 -m result', 'task'),
+                               ('silta code grep acme-backend -- X', 'code')]:
+            p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log(group)])
             self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
