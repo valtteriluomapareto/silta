@@ -106,6 +106,15 @@ class AuditEvidence(unittest.TestCase):
                          'UNRESOLVED', 'transcript', 'tool_results/0', 'messages/0']:
             self.assertIn(expected, output)
 
+    def test_retained_messages_remain_complete_during_disagreement(self):
+        e = self.evidence()
+        message = 'a' * 2500 + 'LONG_RETAINED_MESSAGE_MIDDLE' + 'z' * 2500
+        e['phases'][0]['messages'][0] = message
+        output = self.audit(e)
+        self.assertIn(message, output)
+        self.assertIn('UNRESOLVED', output)
+        self.assertIn('fixture/evidence.json#/phases/0/messages/0', output)
+
     def test_missing_native_exit_is_unknown_instead_of_success(self):
         e = self.evidence()
         transcript = self.trial / 'phase-0.jsonl'
