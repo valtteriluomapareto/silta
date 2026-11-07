@@ -89,6 +89,11 @@ def render_trial(directory, trial):
         if not phase.get('transcript_sha256') or hashlib.sha256(raw).hexdigest() != phase['transcript_sha256']:
             issue(bound + '/transcript_sha256', 'unbound or changed transcript; raw order/content is unverified: ' + source)
         parsed = evals.parse_stream(e['harness'], raw.decode(errors='replace'))
+        if isinstance(phase.get('logs'), list):
+            print(bound, 'SHELL TRACE', evals.trace_matches_logs(parsed | {'logs': phase['logs']}, e['harness']))
+        for result in parsed['tool_results']:
+            print(bound, 'NATIVE CALL INTERVAL', result['id'],
+                  result.get('native_start'), result.get('native_end'))
         for field in ('commands', 'messages', 'tool_results', 'opaque'):
             if parsed[field] != phase.get(field, []):
                 issue(bound + '/' + field, 'raw/retained disagreement; both observations require investigation')

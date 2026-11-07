@@ -22,6 +22,15 @@ def replay(folder):
 
 
 class PilotReplay(unittest.TestCase):
+    def test_pilot_overlapping_call_subset_matches_both_arrival_orders(self):
+        evidence = replay(ROOT / 'tests/pilot/400k/codex-start-cross-repo-default-1')
+        phase = evidence['phases'][0]
+        calls = [row for row in phase['tool_results'] if row['id'] in ('item_17', 'item_18')]
+        self.assertEqual(len(calls), 2)
+        logs = phase['logs'][6:9]
+        for results in [calls, calls[::-1]]:
+            self.assertIs(evals.trace_matches_logs({'tool_results': results, 'logs': logs}, 'codex'), True)
+
     def test_four_native_pilot_trials_grade_without_crashing(self):
         folders = list((ROOT / 'tests/pilot/400k').iterdir())
         self.assertEqual(len(folders), 4)

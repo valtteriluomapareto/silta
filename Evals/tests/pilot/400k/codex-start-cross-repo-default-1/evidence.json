@@ -1002,7 +1002,7 @@
           "command": "/bin/zsh -lc \"ls -la; echo \\\"---\\\"; rg --files -g 'AGENTS.md' -g '\"'!node_modules'\"' . .. 2>/dev/null | head -50\"",
           "exit": 0,
           "id": "item_2",
-          "output": "total 8\ndrwxr-xr-x@  4 valtsu  staff  128 Nov  7 15:09 .\ndrwxr-xr-x@  4 valtsu  staff  128 Nov  7 15:09 ..\ndrwxr-xr-x@ 12 valtsu  staff  384 Nov  7 15:09 .git\n-rw-r--r--@  1 valtsu  staff   33 Nov  7 15:09 README.md\n---\n"
+          "output": "total 8\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:09 .\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:09 ..\ndrwxr-xr-x@ 12 acme  staff  384 Nov  7 15:09 .git\n-rw-r--r--@  1 acme  staff   33 Nov  7 15:09 README.md\n---\n"
         },
         {
           "command": "/bin/zsh -lc 'pwd; which silta; silta where; echo \"---\"; silta brief'",

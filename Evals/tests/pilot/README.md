@@ -8,13 +8,15 @@ or provider is contacted by these replays.
 
 Copies normalize the temporary trial roots to `/tmp/acme-eval`, user paths to
 `/Users/acme`, the public model account path to `acme-pilot-model`, and UUIDs to
-stable hashed Acme identifiers. The stray quote in handoff-resume's malformed
+stable hashed Acme identifiers. Directory-listing owner names are normalized to
+`acme` too. The stray quote in handoff-resume's malformed
 path remains, as do cap-stopped streams and actual command/log ordering. Transcript
 hashes are historical source hashes, not certifications of the normalized bytes;
 tests reparse the streams and do not apply the original review digest.
 
 The successful done-with-result turn passes stream completeness. The successful
-start-cross-repo turn has interleaved command completions and logs that fail ordered
-matching. Plan-not-file and handoff-resume hit their token caps and retain those
+start-cross-repo turn has concurrent native calls and overlapping recorded log
+intervals. Its timing-only associations require shell-trace review rather than
+being rejected as an inconsistent total order. Plan-not-file and handoff-resume hit their token caps and retain those
 infrastructure failures. Opaque shell calls require explicit bound shell-trace
 review; no fixture invents that review or erases a native failure.

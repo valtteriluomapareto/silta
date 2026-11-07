@@ -235,9 +235,14 @@ asking about each retained reason, and standard/repository rules retain dependen
 approval. Check that handoff bodies and decision comments concern the actual task.
 Shell evidence uses a conservative shared grammar: quoted literal commands split
 on `;`, `&&`, `||`, `|` and newlines, and one quoted heredoc feeding Silta `-F -`.
-Substitutions, input redirections/pipes into Silta, eval, functions, aliases and
-parse errors are opaque. An opaque or conditional call leaves `stream_complete`
-null when known ordered calls still match. The audit identifies its native citation.
+Substitutions at either wrapper or program level, input redirections/pipes into
+Silta, eval, functions, aliases, shell control/option builtins and parse errors
+are opaque. An opaque or conditional call leaves `stream_complete`
+null when known ordered calls still match. Each call preserves segment order;
+overlapping native calls may interleave their log rows. Multiple associations,
+search exhaustion, or associations explained only by overlapping recorded log
+intervals also require shell-trace review. Provably sequential reorderings still
+fail. The audit identifies the native citations and retained event intervals.
 Also certify `shell-trace` only after reconciling that call's actual executions,
 exits and ordered Silta logs; ordinary `tool-audit` alone does not certify it.
 A known trace mismatch or incomplete native lifecycle remains false and cannot be

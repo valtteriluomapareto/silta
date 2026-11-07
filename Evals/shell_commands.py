@@ -133,6 +133,7 @@ def parse_shell(program, *, audit=False):
         if (not audit and len(words) == 3 and all(kind == 'word' for kind, _ in words)
                 and Path(words[0][1][0]).name in ('sh', 'bash', 'zsh')
                 and words[1][1][0] in ('-c', '-lc')):
+            result.opaque |= any(_expands(raw) for _, (_, raw) in words)
             words = _lex(words[2][1][0])
         command, heredoc, previous, incoming_pipe = [], False, None, False
 
@@ -151,7 +152,15 @@ def parse_shell(program, *, audit=False):
                     result.opaque = True
                 if (Path(command[0]).name in ('eval', 'alias', 'unalias', 'function', 'source', '.', 'exec',
                                    'env', 'command', 'builtin', 'sudo', 'time', 'if', 'then',
-                                   'else', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac')
+                                   'else', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac',
+                                   'trap', '!', 'set', 'unset', 'export', 'readonly', 'local',
+                                   'declare', 'typeset', 'shopt', 'setopt', 'unsetopt', 'enable',
+                                   'exit', 'return', 'break', 'continue', 'shift', 'getopts',
+                                   'read', 'cd', 'pushd', 'popd', 'umask', 'ulimit', 'wait',
+                                   'jobs', 'fg', 'bg', 'disown', 'kill', 'logout', 'hash',
+                                   'unhash', 'autoload', 'emulate', 'zmodload', 'disable',
+                                   'functions', 'unfunction', 'bind', 'let', 'coproc',
+                                   'noglob', 'nocorrect', 'limit', 'unlimit', 'suspend')
                         or Path(command[0]).name in ('sh', 'bash', 'zsh')
                         or re.match(r'[A-Za-z_]\w*=', command[0])):
                     result.opaque = True

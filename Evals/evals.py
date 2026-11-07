@@ -17,6 +17,7 @@ import tempfile
 
 from codex_usage import TokenBudget, tokens
 from shell_commands import parse_shell
+from trace_matching import match_calls
 from profiles import RunProfile
 from native_capture import NativeCapture
 import process_cleanup
@@ -152,7 +153,7 @@ def native_diagnostic(item):
 
 def parse_stream(harness, stream):
     result = empty_stream()
-    tools, finished = {}, set()
+    tools, finished, starts = {}, set(), {}
     valid, terminal, successful = True, False, False
     events = []
     for line in stream.splitlines():
@@ -162,7 +163,7 @@ def parse_stream(harness, stream):
             events.append(json.loads(line))
         except ValueError:
             valid = False
-    for event in events:
+    for position, event in enumerate(events):
         try:
             kind = event['type']
             activity = kind in ('assistant', 'user', 'item.started', 'item.completed',
@@ -197,6 +198,7 @@ def parse_stream(harness, stream):
                                 valid = False
                             else:
                                 tools[identifier] = command
+                                starts[identifier] = position
                         else:
                             exit_code = item.get('exit_code')
                             if (identifier not in tools or identifier in finished
@@ -204,7 +206,8 @@ def parse_stream(harness, stream):
                                 valid = False
                             finished.add(identifier)
                             result['tool_results'].append({'id': identifier, 'command': command,
-                                                          'exit': exit_code, 'output': item.get('aggregated_output', '')})
+                                                          'exit': exit_code, 'output': item.get('aggregated_output', ''),
+                                                          'native_start': starts.get(identifier), 'native_end': position})
                     elif (native_diagnostic(item) and kind == 'item.completed'
                           and item['id'] not in tools):
                         result['opaque'].append(item)
@@ -240,6 +243,7 @@ def parse_stream(harness, stream):
                             valid = False
                         else:
                             tools[identifier] = command
+                            starts[identifier] = position
                     elif item['type'] == 'tool_result' and kind == 'user':
                         identifier = item.get('tool_use_id')
                         if identifier not in tools or identifier in finished or type(item.get('is_error', False)) is not bool:
@@ -249,7 +253,8 @@ def parse_stream(harness, stream):
                         if isinstance(content, list):
                             content = '\n'.join(block.get('text', '') for block in content)
                         result['tool_results'].append({'id': identifier, 'command': tools.get(identifier) or '',
-                                                      'exit': 1 if item.get('is_error') else 0, 'output': content})
+                                                      'exit': 1 if item.get('is_error') else 0, 'output': content,
+                                                      'native_start': starts.get(identifier), 'native_end': position})
         except (KeyError, TypeError, AttributeError, ValueError):
             valid = False
     schema_errors = []
@@ -745,6 +750,8 @@ def normalized_silta(argv):
     argv = argv[:]
     while len(argv) > 1 and argv[1].startswith('--'):
         flag = argv[1]
+        if flag == '--help' and len(argv) == 2:
+            return [argv[0]]
         size = 2 if flag in ('--ws', '--approved') else 1
         if flag not in ('--ws', '--approved', '--json', '--quiet', '--verbose', '--deterministic'):
             return []
@@ -759,40 +766,27 @@ def trace_matches_logs(phase, harness):
     hooks = {'silta agents session-start', 'silta agents stop'}
     measured = [log for log in phase['logs'] if log['command'] not in hooks]
     names = sorted({log['command'] for log in measured}, key=len, reverse=True)
-    pattern, uncertain = [], False
+    calls = []
     for result in phase['tool_results']:
         parsed = parse_shell(result['command'])
+        chain = []
         if parsed.opaque or parsed.conditional:
-            # Execution/branch effects cannot be inferred from an opaque program.
-            # A wildcard records uncertainty, never an automatic certification.
-            pattern.append(None)
-            uncertain = True
-            continue
-        for argv in parsed.invocations:
-            argv = normalized_silta(argv)
-            if not argv:
-                return False
-            if any(argv[:len(hook.split())] == hook.split() for hook in hooks):
-                continue
-            name = next((name for name in names if argv[:len(name.split())] == name.split()), None)
-            if name is None:
-                return False
-            code = result['exit'] if parsed.single() else None
-            pattern.append((name, code))
-    # A position set bounds unknown effects to that native call's location.
-    positions = {0}
-    for entry in pattern:
-        if entry is None:
-            positions = set(range(min(positions), len(measured) + 1)) if positions else set()
-            continue
-        name, code = entry
-        positions = {n + 1 for n in positions if n < len(measured)
-                     and measured[n]['command'] == name
-                     and (code is None or (measured[n]['exit_code'] == code if harness == 'codex'
-                          else (measured[n]['exit_code'] == 0) == (code == 0)))}
-    if len(measured) not in positions:
-        return False
-    return None if uncertain else True
+            chain.append(None)
+        else:
+            for argv in parsed.invocations:
+                argv = normalized_silta(argv)
+                if not argv:
+                    return False
+                if any(argv[:len(hook.split())] == hook.split() for hook in hooks):
+                    continue
+                name = next((name for name in names if argv[:len(name.split())] == name.split()), None)
+                if name is None:
+                    return False
+                code = result['exit'] if parsed.single() else None
+                chain.append((name, code))
+        if chain:
+            calls.append(dict(result, chain=chain))
+    return match_calls(calls, measured, harness)
 
 
 def backend_read(phases, harness):
@@ -944,6 +938,9 @@ def reviewed(e):
         required.add('policy-semantics')
     if any(parse_shell(command).opaque or parse_shell(command).conditional
            for phase in e.get('phases', []) for command in phase['commands']):
+        required.add('shell-trace')
+    if any(isinstance(phase.get('logs'), list) and trace_matches_logs(phase, e['harness']) is None
+           for phase in e.get('phases', [])):
         required.add('shell-trace')
     if e['provenance'] == 'stub':
         allowed = set(recorded_review(e)['checks'])

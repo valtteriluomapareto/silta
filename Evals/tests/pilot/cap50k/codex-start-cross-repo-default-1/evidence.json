@@ -515,7 +515,7 @@
           "command": "/bin/zsh -lc 'cd /tmp/acme-eval && ls -la && echo --- && ls repos data 2>/dev/null'",
           "exit": 0,
           "id": "item_6",
-          "output": "total 16\ndrwx------@     9 valtsu  staff      288 Nov  7 15:06 .\ndrwx------@ 55213 valtsu  staff  1766816 Nov  7 15:06 ..\ndrwxr-xr-x@     3 valtsu  staff       96 Nov  7 15:06 bin\ndrwxr-xr-x@     8 valtsu  staff      256 Nov  7 15:06 data\ndrwxr-xr-x@     4 valtsu  staff      128 Nov  7 15:06 home\n-rw-r--r--@     1 valtsu  staff       59 Nov  7 15:06 input.md\ndrwxr-xr-x@     4 valtsu  staff      128 Nov  7 15:06 repos\ndrwxr-xr-x@     3 valtsu  staff       96 Nov  7 15:06 tmp\n-rw-r--r--@     1 valtsu  staff      228 Nov  7 15:06 workspace.yaml\n---\ndata:\nbackups\nlog\nmigration.lock\nsilta.db\nsilta.db-shm\nsilta.db-wal\n\nrepos:\nacme-backend\nacme-mobile\n"
+          "output": "total 16\ndrwx------@     9 acme  staff      288 Nov  7 15:06 .\ndrwx------@ 55213 acme  staff  1766816 Nov  7 15:06 ..\ndrwxr-xr-x@     3 acme  staff       96 Nov  7 15:06 bin\ndrwxr-xr-x@     8 acme  staff      256 Nov  7 15:06 data\ndrwxr-xr-x@     4 acme  staff      128 Nov  7 15:06 home\n-rw-r--r--@     1 acme  staff       59 Nov  7 15:06 input.md\ndrwxr-xr-x@     4 acme  staff      128 Nov  7 15:06 repos\ndrwxr-xr-x@     3 acme  staff       96 Nov  7 15:06 tmp\n-rw-r--r--@     1 acme  staff      228 Nov  7 15:06 workspace.yaml\n---\ndata:\nbackups\nlog\nmigration.lock\nsilta.db\nsilta.db-shm\nsilta.db-wal\n\nrepos:\nacme-backend\nacme-mobile\n"
         },
         {
           "command": "/bin/zsh -lc 'silta guide 2>&1 | head -150'",
@@ -533,7 +533,7 @@
           "command": "/bin/zsh -lc 'cd /tmp/acme-eval/repos && ls -la acme-backend acme-mobile; echo ---; cat acme-mobile/AGENTS.md 2>/dev/null; echo ---; cat acme-backend/AGENTS.md 2>/dev/null'",
           "exit": 1,
           "id": "item_11",
-          "output": "acme-backend:\ntotal 8\ndrwxr-xr-x@  4 valtsu  staff  128 Nov  7 15:06 .\ndrwxr-xr-x@  4 valtsu  staff  128 Nov  7 15:06 ..\ndrwxr-xr-x@ 12 valtsu  staff  384 Nov  7 15:06 .git\n-rw-r--r--@  1 valtsu  staff   33 Nov  7 15:06 README.md\n\nacme-mobile:\ntotal 8\ndrwxr-xr-x@  4 valtsu  staff  128 Nov  7 15:06 .\ndrwxr-xr-x@  4 valtsu  staff  128 Nov  7 15:06 ..\ndrwxr-xr-x@ 12 valtsu  staff  384 Nov  7 15:06 .git\n-rw-r--r--@  1 valtsu  staff   33 Nov  7 15:06 README.md\n---\n---\n"
+          "output": "acme-backend:\ntotal 8\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:06 .\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:06 ..\ndrwxr-xr-x@ 12 acme  staff  384 Nov  7 15:06 .git\n-rw-r--r--@  1 acme  staff   33 Nov  7 15:06 README.md\n\nacme-mobile:\ntotal 8\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:06 .\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:06 ..\ndrwxr-xr-x@ 12 acme  staff  384 Nov  7 15:06 .git\n-rw-r--r--@  1 acme  staff   33 Nov  7 15:06 README.md\n---\n---\n"
         },
         {
           "command": "/bin/zsh -lc 'cd /tmp/acme-eval && silta --ws acme brief --task AC-1 2>&1; echo ---; silta --ws acme task start AC-1 2>&1'",

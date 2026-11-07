@@ -73,6 +73,8 @@ class ShellReview(unittest.TestCase):
         self.assertTrue(parsed['complete'])
         self.assertEqual(parsed['commands'], [command])
         self.assertEqual(parsed['tool_results'][0]['command'], command)
+        self.assertEqual(parsed['tool_results'][0]['native_start'], 1)
+        self.assertEqual(parsed['tool_results'][0]['native_end'], 2)
         self.assertIn(body, parsed['commands'][0])
         self.assertIn(body, shlex.split(parsed['tool_results'][0]['command'])[2] if wrap else parsed['tool_results'][0]['command'])
         self.assertFalse(parse_shell(command).opaque)
@@ -113,6 +115,19 @@ class ShellReview(unittest.TestCase):
         self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
         p['logs'][0]['exit_code'] = 1
         self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
+        sequential = [('A', 'started'), ('A', 'completed'), ('B', 'started'), ('B', 'completed')]
+        p = phase(commands, sequential, [log('where', 2), log('where')], exits={'B': 2})
+        self.assertIs(evals.trace_matches_logs(p, 'codex'), False)
+
+    def test_ambiguous_association_requires_explicit_bound_shell_trace_review(self):
+        p = phase({'A': 'silta brief', 'B': 'silta brief'},
+                  [('A', 'started'), ('B', 'started'), ('B', 'completed'), ('A', 'completed')],
+                  [log('brief'), log('brief')])
+        e = {'phases': [p], 'harness': 'codex', 'scenario': 'fixture', 'provenance': 'live'}
+        e['review'] = {'reviewer': 'fixture-reviewer', 'checks': ['tool-audit'], 'digest': evals.review_digest(e)}
+        self.assertFalse(evals.reviewed(e))
+        e['review']['checks'].append('shell-trace')
+        self.assertTrue(evals.reviewed(e))
 
     def test_root_help_literal_and_compound_use_real_root_log_shape(self):
         evidence = json.loads((ROOT / 'tests/pilot/400k/codex-plan-not-file-default-1/evidence.json').read_text())
