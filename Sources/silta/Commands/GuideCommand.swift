@@ -30,6 +30,9 @@ struct GuideCommand: OutputCommand {
       text: text, quiet: text, data: GuideManual(text: text, topics: topics, topic: topic))
   }
 
+}
+
+extension GuideCommand {
   private struct Section: Sendable {
     let topic: String
     let text: String
@@ -52,6 +55,11 @@ struct GuideCommand: OutputCommand {
         If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. \
         Once you choose a task, run `silta brief --task AC-12`, then `silta task start AC-12`. \
         Text is the default; use --json only to parse output.
+        Workspace commands use --ws, then the current workspace from `ws use`, then the \
+        registered repository here. Location fallback never saves a selection. If the current \
+        workspace differs from the one in `brief`, pass --ws explicitly; `where`, `brief` and \
+        status resolve location first. For several matching workspaces, inspect the scoped \
+        candidates and retry with --ws.
         For "work the backlog", run `silta task ls --status todo`, optionally with --app. \
         Start the first task; skip subtasks whose parent another session claims and skip \
         claimed tasks. Finish with a result before starting the next; continue until empty or \

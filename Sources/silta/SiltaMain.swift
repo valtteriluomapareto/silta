@@ -147,7 +147,7 @@ enum SiltaMain {
       return CommandExecution(
         rendered: parseFailure(error, arguments: arguments, mode: mode), scope: scope)
     }
-    guard let outputCommand = command as? any OutputCommand else {
+    guard var outputCommand = command as? any OutputCommand else {
       // The root or a command group: ArgumentParser answers with help.
       do {
         try command.run()
@@ -158,6 +158,13 @@ enum SiltaMain {
       }
     }
     let store = context.environment.db
+    let explicitWorkspace = outputCommand.global.ws
+    var selectionFailure: (any Error)?
+    do {
+      try await prepareWorkspace(&outputCommand, context: context)
+    } catch {
+      selectionFailure = error
+    }
     do {
       var output = try await outputCommand.execute(context)
       let approvalWarnings = context.environment.actor.approvalWarnings(
@@ -170,18 +177,13 @@ enum SiltaMain {
         rendered: OutputRouter.render(.success(output), mode: mode),
         scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store),
         command: loggedPath(arguments, outputCommand))
-    } catch let error as any CodedError {
-      let recovered = recovery(
-        error, command: outputCommand, arguments: arguments, context: context)
-      return CommandExecution(
-        rendered: OutputRouter.render(.failure(recovered), mode: mode),
-        scope: CommandScope.failure(outputCommand, store: store),
-        command: loggedPath(arguments, outputCommand))
     } catch {
-      return CommandExecution(
-        rendered: OutputRouter.render(.failure(error), mode: mode),
-        scope: CommandScope.failure(outputCommand, store: store),
-        command: loggedPath(arguments, outputCommand))
+      // Preparation cannot outrank an operation's earlier authorization or input refusal.
+      let failure: any Error =
+        if case .notFound? = error as? WorkspaceError { selectionFailure ?? error } else { error }
+      return failedExecution(
+        failure, command: outputCommand,
+        explicitWorkspace: explicitWorkspace, arguments: arguments, context: context)
     }
   }
 
@@ -216,7 +218,9 @@ enum SiltaMain {
     {
       next = ["silta task edit " + shellWord(edit.ref) + " --print", path + " --help"]
     }
-    if let edit = command as? WsEditCommand, error is WorkspaceError, error.code != .notFound {
+    if let edit = command as? WsEditCommand, error is WorkspaceError,
+      error.code != .notFound, error.code != .ambiguousLocation
+    {
       next = workspaceRecovery(error, edit: edit, context: context)
     }
     var workspace = command.global.ws
@@ -258,4 +262,42 @@ enum SiltaMain {
     return [repair]
   }
 
+}
+
+extension SiltaMain {
+  /// Captures selection once for synchronous services, recovery and attribution.
+  /// Commands execute once even when preparation fails, preserving stdin and early gates.
+  private static func prepareWorkspace(
+    _ command: inout any OutputCommand, context: CommandContext
+  ) async throws {
+    let source = type(of: command).workspaceSource
+    guard source == .option || source == .argument,
+      command.global.ws == nil,
+      (command as? any WorkspaceArgumentCommand)?.workspaceArgument == nil
+    else { return }
+    if command is WsEditCommand {
+      try context.environment.actor.requireHuman(
+        command: "silta ws edit -F <file>", approved: command.global.approved)
+    }
+    command.global.ws = try await WorkspaceSelection.fallback(
+      path: URL(filePath: FileManager.default.currentDirectoryPath),
+      environment: context.environment)
+  }
+
+  private static func failedExecution(
+    _ error: any Error, command: any OutputCommand,
+    explicitWorkspace: String?, arguments: [String], context: CommandContext
+  ) -> CommandExecution {
+    var failure: any Error = error
+    if let coded = failure as? any CodedError {
+      var recoveryCommand = command
+      // Approval hints retain caller selection; operation logs retain captured selection.
+      if coded is ActorError { recoveryCommand.global.ws = explicitWorkspace }
+      failure = recovery(coded, command: recoveryCommand, arguments: arguments, context: context)
+    }
+    return CommandExecution(
+      rendered: OutputRouter.render(.failure(failure), mode: context.mode),
+      scope: CommandScope.failure(command, store: context.environment.db),
+      command: loggedPath(arguments, command))
+  }
 }

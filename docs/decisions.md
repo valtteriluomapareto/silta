@@ -663,3 +663,17 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   file and its resolved parent directory, without promising subsequent SQLite
   writes. Inaccessible paths fail with human-owned inspection instead of being
   mistaken for missing storage and suggesting initialization.
+
+- **D44: Workspace commands fall back to a unique registered repository workspace.**
+  Explicit workspace selection wins over `current_workspace`, which wins over location.
+  Invalid explicit and stale current selections refuse rather than redirecting a write.
+  Git common-directory identity includes linked worktrees; distinct matching workspaces
+  refuse with scoped read-only candidates. App ambiguity does not block workspace
+  selection. Inference never persists a selection. `where`, `brief` and status retain
+  their location-first rules (spec §16). Authorization and input refusals retain their
+  existing order; preparation failures surface only when an operation needs selection.
+  Captured selection also supplies recovery and command-log attribution (spec §19).
+  Retry-only recovery would interrupt every initial command and cannot safely replay
+  stdin writes. Having `init --scan` persist a default would route later repositories
+  through that selection. Neither alternative addresses the fresh-install workflow as
+  directly as a nonpersistent fallback.

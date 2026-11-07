@@ -1,8 +1,46 @@
-import Foundation
+package import Foundation
 import GRDB
 
-/// Selects workspaces without invoking location inference.
+/// Selects an existing workspace from explicit, stored or repository context.
 package enum WorkspaceSelection {
+  /// Captures the current selection, or infers a unique workspace from Git common-directory
+  /// identity. Missing storage or an unregistered location returns nil without writes.
+  /// Stale current selections refuse; multiple matching workspaces are ambiguous.
+  package static func fallback(path: URL, environment: SiltaEnvironment) async throws -> String? {
+    let store = environment.db
+    guard FileManager.default.fileExists(atPath: store.path) else { return nil }
+    let current = try store.read { db in
+      let selected = try String.fetchOne(
+        db, sql: "SELECT value FROM meta WHERE key='current_workspace'")
+      if let selected,
+        try Bool.fetchOne(
+          db, sql: "SELECT EXISTS(SELECT 1 FROM workspace WHERE slug=?)",
+          arguments: [selected]) != true
+      {
+        throw WorkspaceError.notFound
+      }
+      return selected
+    }
+    if let current { return current }
+    let repositories = try LocationRepository.all(workspace: nil, in: store)
+    guard !repositories.isEmpty else { return nil }
+    let directory = try LocationPath.canonical(path)
+    guard
+      let common = try await LocationGit(runner: environment.git, directory: directory)
+        .commonDirectory()
+    else { return nil }
+    var workspaces = Set<String>()
+    for repository in repositories {
+      guard FileManager.default.fileExists(atPath: repository.path) else { continue }
+      let registered = LocationGit(
+        runner: environment.git, directory: URL(filePath: repository.path))
+      let expected = try? await registered.commonDirectory()  // Skip stale registrations.
+      if expected == common { workspaces.insert(repository.workspace) }
+    }
+    guard workspaces.count <= 1 else { throw WorkspaceError.ambiguous(workspaces.sorted()) }
+    return workspaces.first
+  }
+
   /// Uses an explicit slug, or the current workspace recorded in meta. A slug that names
   /// no workspace is `unknown`, so the refusal names it.
   package static func resolve(_ slug: String? = nil, in store: DatabaseStore) throws -> String {
