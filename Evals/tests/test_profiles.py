@@ -100,17 +100,17 @@ class Profiles(unittest.TestCase):
     def test_one_signin_and_fresh_data_hooks_config_grants_per_trial(self):
         for harness in ('claude', 'codex'):
             with self.subTest(harness=harness):
-                output, report, entries, text, commands = self.run_live(harness)
+                output, report, entries, text, commands = self.run_live(harness, repeats=3)
                 self.assertEqual(len(commands), 1, 'Sign-in must be run-scoped')
-                self.assertEqual(len(report['trials']), 2)
+                self.assertEqual(len(report['trials']), 3)
                 self.assertFalse(report['aborted'])
-                self.assertEqual(report['completed_trials'], 2)
+                self.assertEqual(report['completed_trials'], 3)
                 models = [e for e in entries if e['event'] == 'model']
-                self.assertEqual(len(models), 2)
+                self.assertEqual(len(models), 3)
                 self.assertEqual(len({m['profile'] for m in models}), 1)
                 self.assertEqual(len({m['auth_inode'] for m in models}), 1)
-                self.assertEqual(len({m['data'] for m in models}), 2)
-                self.assertEqual(len({m['actor'] for m in models}), 2)
+                self.assertEqual(len({m['data'] for m in models}), 3)
+                self.assertEqual(len({m['actor'] for m in models}), 3)
                 auth = Path(models[0]['profile']) / ('auth.json' if harness == 'codex' else '.credentials.json')
                 self.assertEqual(auth.stat().st_ino, models[0]['auth_inode'])
                 self.assertEqual(auth.stat().st_mode & 0o777, 0)
@@ -139,7 +139,7 @@ class Profiles(unittest.TestCase):
                 self.assertEqual(text.count('After logout, clean up:'), 1)
                 if harness == 'claude':
                     hooks = [e for e in entries if e['event'] in ('SessionStart', 'Stop')]
-                    self.assertEqual(len(hooks), 4)
+                    self.assertEqual(len(hooks), 6)
                     for hook in hooks:
                         self.assertEqual(hook['exit'], 0)
                         if hook['event'] == 'SessionStart':
@@ -198,6 +198,17 @@ class Profiles(unittest.TestCase):
             evidence = json.loads((output / trial['evidence']).read_text())
             self.assertEqual(evidence['phases'][0]['exit'], 0)
             self.assertEqual(trial['metrics']['tokens'], 15)
+
+    def test_claude_scratch_is_trial_local_and_login_scratch_is_profile_local(self):
+        _, report, entries, _, _ = self.run_live('claude')
+        self.assertFalse(report['aborted'])
+        login = next(e for e in entries if e['event'] == 'login')
+        self.assertEqual(login['scratch'], str(Path(login['profile']).parent.parent / 'tmp'))
+        models = [e for e in entries if e['event'] == 'model']
+        self.assertEqual(len(models), 2)
+        for model in models:
+            self.assertEqual(model['scratch'], str(Path(model['trial']) / 'tmp'))
+            self.assertFalse((Path(model['trial']) / 'tmp/trial-scratch').exists())
 
     def test_missing_confirmation_or_marker_aborts_before_any_trial(self):
         for mode, answer in [('declined', 'no'), ('no-marker', 'signed-in')]:

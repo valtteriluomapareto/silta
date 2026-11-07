@@ -42,6 +42,7 @@ if login:
         with config.open('a') as output:
             output.write('\n[sandbox_workspace_write]\nwritable_roots=["/acme/unexpected"]\n')
     info = {'event': 'login', 'profile': str(profile), 'home': os.environ['HOME'],
+            'scratch': os.environ.get('CLAUDE_CODE_TMPDIR'),
             'cwd': os.getcwd(), 'auth_inode': auth.stat().st_ino}
     record(info)
     print(json.dumps(info))
@@ -63,6 +64,7 @@ config = profile / ('config.toml' if harness == 'codex' else 'settings.json')
 config_text = config.read_text()
 grants = tomllib.loads(config_text).get('sandbox_workspace_write', {}).get('writable_roots', []) if harness == 'codex' else []
 state = {'event': 'model', 'profile': str(profile), 'home': os.environ['HOME'], 'trial': str(trial_root),
+         'scratch': os.environ.get('CLAUDE_CODE_TMPDIR'),
          'data': str(data), 'actor': actor, 'auth_inode': auth.stat().st_ino,
          'auth_mode': auth.stat().st_mode & 0o777, 'grants': grants,
          'old_data_exists': bool(old and Path(old['data']).exists()),
@@ -72,6 +74,10 @@ state = {'event': 'model', 'profile': str(profile), 'home': os.environ['HOME'], 
          'old_config': bool(old and 'PRIVATE_TRIAL_CONFIG' in config_text),
          'real_config': 'REAL_PROFILE_SENTINEL' in config_text}
 record(state)
+if harness == 'claude' and state['scratch']:
+    scratch = Path(state['scratch'])
+    scratch.mkdir(parents=True, exist_ok=True)
+    (scratch / 'trial-scratch').write_text('PRIVATE_TRIAL_SCRATCH')
 if mode == 'cancel':
     with journal.with_suffix('.signal').open('w') as signal_file:
         signal_file.write(str(os.getpid()) + '\n')
@@ -142,8 +148,9 @@ for index, action in enumerate(recording['phases'][phase]):
          'exit_code': run.returncode, 'aggregated_output': run.stdout + run.stderr}})
     assert run.returncode == 0, run.stdout + run.stderr
 hook('Stop')
-(profile / 'projects').mkdir(exist_ok=True)
-(profile / 'projects/previous-trial').write_text('PRIVATE_TRIAL_HISTORY')
+if harness == 'claude':
+    (profile / 'projects').mkdir(exist_ok=True)
+    (profile / 'projects/previous-trial').write_text('PRIVATE_TRIAL_HISTORY')
 (data / 'log/hook-sentinel').write_text('PRIVATE_HOOK_STATE')
 if harness == 'codex':
     if 'PRIVATE_TRIAL_CONFIG' not in config.read_text():
