@@ -1,0 +1,31 @@
+fixtures: true
+steps:
+  - args: [init, --scan, ., --slug, acme, --prefix, AC, --json]
+    cwd: fixtures
+    expect: {exit: 0, json: {data.workspace: acme}}
+  - args: [init, --scan, ., --slug, beta, --prefix, BE, --json]
+    cwd: default-beta
+    expect: {exit: 0, json: {data.workspace: beta}}
+  - args: [ws, use, beta, --json]
+    expect: {exit: 0, json: {data.workspace: beta}}
+  - args: [--ws, acme, task, add, Acme request, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: AC-1}}
+  - args: [task, show, AC-1, --json]
+    cwd: fixtures/acme-platform
+    expect: {exit: 0, json: {data.ref: AC-1, data.title: Acme request}}
+  - args: [code, grep, acme-platform-api, --json, --, Acme]
+    cwd: fixtures/acme-platform
+    expect: {exit: 0, json: {data.app: acme-platform-api}}
+  - args: [task, add, Acme follow-up, --start, --json]
+    cwd: fixtures/acme-portal-worktree
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: AC-2}}
+  - args: [task, show, AC-2, --json]
+    cwd: fixtures/acme-platform
+    expect: {exit: 0, json: {data.title: Acme follow-up}}
+  - args: [task, add, Beta default, --start, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: BE-1}}
+  - args: [task, show, BE-1, --json]
+    expect: {exit: 0, json: {data.title: Beta default}}

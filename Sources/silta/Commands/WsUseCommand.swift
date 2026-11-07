@@ -3,7 +3,7 @@ import SiltaCore
 
 struct WsUseCommand: WorkspaceArgumentCommand {
   static let configuration = CommandConfiguration(
-    commandName: "use", abstract: "Select the current workspace.")
+    commandName: "use", abstract: "Set the default workspace outside registered repositories.")
 
   static let dataShape = Shape.object(["workspace": .string])
 
@@ -11,15 +11,18 @@ struct WsUseCommand: WorkspaceArgumentCommand {
 
   @OptionGroup var global: GlobalOptions
 
-  @Argument(help: "The workspace slug to select.")
+  @Argument(help: "The workspace slug to use outside registered repositories.")
   var workspace: String
 
   var workspaceArgument: String? { workspace }
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     try WorkspaceSelection.use(workspace, in: context.environment.db)
-    return CommandOutput(text: "Using workspace \(workspace).", data: Data(workspace: workspace))
-      .reporting(workspace)
+    return CommandOutput(
+      text: "Default workspace outside registered repositories: \(workspace).",
+      data: Data(workspace: workspace)
+    )
+    .reporting(workspace)
   }
 
   private struct Data: Encodable {

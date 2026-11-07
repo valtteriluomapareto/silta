@@ -1,1 +1,1 @@
-Using workspace acme.
+Default workspace outside registered repositories: acme.

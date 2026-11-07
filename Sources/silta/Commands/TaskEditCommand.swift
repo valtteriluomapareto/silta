@@ -48,7 +48,8 @@ struct TaskEditCommand: OutputCommand {
       return CommandOutput(
         text: printed.document, quiet: printed.document,
         data: Printed(
-          ref: printed.task.ref, status: printed.task.status, document: printed.document))
+          ref: printed.task.ref, status: printed.task.status, document: printed.document)
+      ).reporting(context.taskWorkspace(global.ws))
     }
     let result = try service.edit(ref, allowSecret: allowSecret) { original in
       if let file { return try read(file) }

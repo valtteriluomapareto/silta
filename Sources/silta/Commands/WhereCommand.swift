@@ -6,7 +6,7 @@ struct WhereCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "where",
     abstract: "Resolve the workspace, repository and app for a local path.")
-  static let workspaceSource = WorkspaceSource.option
+  static let workspaceSource = WorkspaceSource.location
   static let dataShape = Shape.object([
     "workspace": .string, "repo": .string, "app": .optional(.string),
     "branch": .any, "head": .string, "confidence": .string, "reason": .string,

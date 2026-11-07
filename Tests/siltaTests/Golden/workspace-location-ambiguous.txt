@@ -1,0 +1,3 @@
+error: This repository belongs to several workspaces. Retry the original command with --ws and a workspace from the candidates. [ambiguous_location]
+next: silta --ws 'acme' ws show
+next: silta --ws 'beta' ws show

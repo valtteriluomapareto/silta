@@ -11,7 +11,7 @@ struct BriefCommand: OutputCommand {
       + "fetches, indexes or migrates. The current task shows its newest handoff, your inbox "
       + "items on it and an open-question count; your other inbox items follow it. "
       + "Decisions are not yet included.")
-  static let workspaceSource = WorkspaceSource.option
+  static let workspaceSource = WorkspaceSource.location
   static let dataShape = Shape.object([
     "location": .object([
       "workspace": .string, "repo": .string, "app": .any, "branch": .any,

@@ -663,3 +663,22 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   file and its resolved parent directory, without promising subsequent SQLite
   writes. Inaccessible paths fail with human-owned inspection instead of being
   mistaken for missing storage and suggesting initialization.
+
+- **D44: Workspace commands follow their registered repository context.**
+  Explicit workspace selection wins over unique Git common-directory location; the
+  stored current workspace is a default outside registered repositories. Linked
+  worktrees need no separate registration. Multiple workspace matches or broken cwd
+  metadata refuse even if a current workspace exists. Stale current selection refuses
+  only outside registered repositories. App ambiguity does not block workspace
+  selection, and inference never persists selection (spec §16).
+  Authorization and input refusals retain their order. A command's captured selection,
+  including absence or failure, is authoritative at synchronous selection boundaries;
+  execution, recovery and logs cannot reread current state through a failed preparation.
+  Explicit names still override preparation; captured slugs are revalidated (spec §19).
+  - ↳ 2026-11-07: The current-before-location rule is superseded by location-before-current.
+    Independent use showed that it silently returned Beta backend content and created
+    Beta tasks while an Acme repository's brief reported Acme. Coordinator option (b)
+    makes the visible repository context authoritative. Mismatch refusal would require
+    routine retries and safe reconstruction of stdin writes; recipes alone cannot
+    enforce scope because agents do not reliably propagate `--ws`. Guide recipes still
+    carry an explicit workspace to support intentional cross-workspace/outside work.

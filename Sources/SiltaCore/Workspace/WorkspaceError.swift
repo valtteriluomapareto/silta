@@ -17,6 +17,9 @@ package enum WorkspaceError: CodedError {
   /// No workspace has the slug the caller named.
   case unknown(String)
 
+  /// The repository has registrations in several workspaces and no selection overrides it.
+  case ambiguous([String])
+
   /// Removing a configured row would break an existing reference.
   case conflict
 
@@ -31,6 +34,7 @@ package enum WorkspaceError: CodedError {
     switch self {
     case .invalid, .setting, .unknownSetting: .invalid
     case .notFound, .unknown: .notFound
+    case .ambiguous: .ambiguousLocation
     case .conflict: .conflict
     case .editor, .input: .env
     }
@@ -47,6 +51,9 @@ package enum WorkspaceError: CodedError {
         + "it may come from a newer silta. Ask the human before choosing or changing the policy."
     case .notFound: "No matching workspace is selected."
     case .unknown(let slug): "No workspace is named \(TaskError.shown(slug))."
+    case .ambiguous:
+      "This repository belongs to several workspaces. "
+        + "Retry the original command with --ws and a workspace from the candidates."
     case .conflict: "Configuration conflicts with an existing reference or unique value."
     case .editor: "The editor could not be started; check EDITOR."
     case .input: "Could not read UTF-8 workspace YAML; check the file path and permissions."
@@ -59,6 +66,7 @@ package enum WorkspaceError: CodedError {
     case .setting(let workspace, _, _), .unknownSetting(let workspace, _, _):
       ["silta --ws " + shellWord(workspace) + " ws show"]
     case .notFound, .unknown: ["silta ws ls"]
+    case .ambiguous(let workspaces): workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
     case .input: ["silta ws edit -F <file>"]
     default: ["silta ws edit"]
     }

@@ -1,8 +1,8 @@
 silta schema  Describe the commands, their flags, their --json data and the error codes.
 silta ws ls  List workspaces; ask in chat before editing configuration.
-silta ws use  Select the current workspace.
+silta ws use  Set the default workspace outside registered repositories.
 silta ws edit  Edit workspace YAML (human-only).
-silta ws show  Print the current workspace YAML without editing it.
+silta ws show  Print the selected workspace YAML without editing it.
 silta init  Initialize or scan repos; select with ws use; configuration editing is human-only.
 silta repo fetch  Fetch a repo, or all registered repos in the workspace, without prompting.
 silta task add  Add a proposal; --start claims work requested by the human.
@@ -46,7 +46,7 @@ silta backup  Create a whole-database SQLite snapshot.
 details: silta schema <command>
 
 global flags:
-  --ws <ws>  optional: Use this workspace instead of the current selection.
+  --ws <ws>  optional: Use this workspace instead of repository location or the saved default.
   --approved <approved>  optional: The human's words approving this command in chat.
   --json  optional: Print the JSON envelope on stdout instead of text.
   --quiet  optional: Hide success text; warnings and errors still show.
@@ -60,7 +60,7 @@ error codes:
   unregistered  exit 2, next by agent: Check the ref, or carry on without silta
   human_only  exit 3, next by human: Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes
   read_only_promoted  exit 3, next by agent: Leave it to its tracker and pick other work
-  ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates
+  ambiguous_location  exit 4, next by agent: Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity
   busy  exit 5, next by agent: Retry once after a few seconds
   conflict  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open
   claimed  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open

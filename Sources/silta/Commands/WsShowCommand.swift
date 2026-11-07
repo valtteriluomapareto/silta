@@ -3,7 +3,7 @@ import SiltaCore
 
 struct WsShowCommand: WorkspaceArgumentCommand {
   static let configuration = CommandConfiguration(
-    commandName: "show", abstract: "Print the current workspace YAML without editing it.")
+    commandName: "show", abstract: "Print the selected workspace YAML without editing it.")
 
   static let dataShape = Shape.object(["workspace": .string, "yaml": .string])
 
@@ -11,7 +11,7 @@ struct WsShowCommand: WorkspaceArgumentCommand {
 
   @OptionGroup var global: GlobalOptions
 
-  @Argument(help: "The workspace slug; defaults to the current workspace.")
+  @Argument(help: "The workspace slug; defaults to repository location, then the saved default.")
   var workspace: String?
 
   var workspaceArgument: String? { workspace }

@@ -1223,7 +1223,12 @@ settings (D39). It covers:
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
   Not for trivial single-repo edits.
 - **Session start.** If the hook already printed the brief, don't run it again. Once a
-  task is chosen, run `silta brief --task AC-n`.
+  task is chosen, run `silta brief --task AC-n`. Teach the [workspace selection
+  precedence](#16-cli): explicit workspace, registered repository location, then the
+  saved default outside registered repositories. Commands in a unique registered
+  repository agree with its brief; intentional cross-workspace work uses `--ws`.
+  Inference never persists selection. Recipes carry the brief workspace explicitly. Workspace ambiguity uses
+  `--ws`; app ambiguity uses `--app`.
 - **Recipes**, copy-paste ready:
   - `code grep/show` for other apps
   - `task add --start`
@@ -1616,6 +1621,28 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 
 **Conventions:**
 - Every command accepts `--ws`, `--json` and `--quiet`.
+- Workspace commands (`task`, `comment`, `inbox`, `code`, `repo fetch`, `export`,
+  `ws show|edit`) select the explicit `--ws` (or workspace slug argument for `ws`),
+  else the unique workspace of the registered repository containing cwd, else the
+  current workspace saved by `ws use` outside registered repositories. The slug argument wins over `--ws` for `ws`.
+  An unknown explicit workspace refuses. A stale current workspace refuses outside
+  registered repositories; it cannot block a unique registered location.
+  Location fallback matches canonical Git common directories, including linked
+  worktrees, nested directories and symlinks; app ambiguity does not prevent workspace
+  selection. Duplicate registrations within one workspace count once. Missing or broken
+  registered paths are skipped; broken cwd Git metadata returns `env` when inference
+  is needed. Multiple matching workspaces return `ambiguous_location` (exit 4), with
+  scoped read-only `ws show` candidates and instructions to retry using `--ws`.
+  Without a location match, current selection applies; absent selection preserves
+  the existing refusal or starter `ws edit` behavior. Ambiguous or broken location
+  refuses even with a valid current selection, before any workspace mutation. Inference
+  never saves `current_workspace`, initializes storage, or outranks an earlier input
+  or authorization refusal. Preparation never replays commands or consumes stdin.
+  Command logs use the resolved existing workspace (§19), including the captured
+  outside default after a location no-match. Ambiguous/broken selection, or absence
+  of both location and default, carries no workspace tag.
+  `where`, `brief` and status retain their location-first rules. Help, usage errors
+  and commands without workspace scope do not infer a workspace.
 - Bodies come from `-m <text>` or `-F <file|->`. With neither on a TTY, `$EDITOR`
   opens.
 - Refs follow §5.1.
@@ -1733,7 +1760,7 @@ run.
 | 2 | `not_found`, `unregistered` | Check the ref, or carry on without silta |
 | 3 | `human_only` | Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes |
 | 3 | `read_only_promoted` | Leave it to its tracker and pick other work |
-| 4 | `ambiguous_location` | Retry with `--app <slug>` from the candidates |
+| 4 | `ambiguous_location` | Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity |
 | 5 | `busy` | Retry once after a few seconds |
 | 6 | `conflict`, `claimed`, `stale_rev`, `lease_taken`, `blocked` | Re-read, then decide; don't steal, and don't unblock while blockers are open |
 | 7 | `gate` | Request a review or ask the human |
@@ -1928,14 +1955,18 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     receive a record; diagnostics remain best effort rather than choosing another home.
 
   `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
-  `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`, `status` (logged as
+  `inbox`, `export`, `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`,
+  `status` (logged as
   `silta status` also when bare `silta` runs it), and a successful `init --scan`.
   - A successful command logs the workspace it resolved and acted on (`--ws`, its
-    slug argument, or the current workspace), or the one `init --scan` or `ws edit`
-    created. It is the command's own resolution, so a command that reports none is
-    logged without one.
-  - A failed command logs the workspace its `--ws`, slug argument or current
-    selection names, when that workspace exists.
+    slug argument, unique repository location, or the captured outside default), or
+    the one `init --scan` or `ws edit` created. It is the command's own resolution,
+    so a command that reports none is logged without one.
+  - A failed workspace-selected command logs its existing explicit or captured
+    workspace, including a captured outside default. Authoritative absence or failed
+    preparation stays untagged even when a valid current workspace is stored.
+    Location-led commands without a prepared scope retain explicit/current failure
+    attribution; their successful output supplies its own resolved scope.
   - A `usage` error on a `task` or `repo` command, or on the `task` or `repo` group
     itself (an unknown subcommand), logs `--ws` or the current workspace. A `usage`
     error on `ws show|edit|use` stays untagged, since its slug argument is unknown.
@@ -2525,8 +2556,10 @@ Scan success names the human edit command and explicit workspace selection.
 keep their timestamps, while failed and unattempted repos remain unchanged. Git runs
 noninteractively, and network/authentication failures ask a human to repair the environment.
 
-`ws use <slug>` records the current workspace. With no workspace yet, a human's
-`ws edit` opens starter YAML. Otherwise it edits the explicit or current workspace.
+`ws use <slug>` records the default workspace for commands outside registered
+repositories; it never overrides a unique registered cwd location. With no workspace yet, a human's
+`ws edit` opens starter YAML. Otherwise it edits the workspace selected by the
+[CLI precedence](#16-cli).
 An unchanged valid file or nonzero editor exit makes no changes; validation problems are
 reopened as comments above the YAML.
 

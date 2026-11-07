@@ -37,7 +37,7 @@ struct ErrorCodeTests {
     3:
       "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` "
       + "after they say yes",
-    4: "Retry with `--app <slug>` from the candidates",
+    4: "Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity",
     5: "Retry once after a few seconds",
     6: "Re-read, then decide; don't steal, and don't unblock while blockers are open",
     7: "Request a review or ask the human",

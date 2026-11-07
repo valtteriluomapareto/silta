@@ -5,7 +5,7 @@ import SiltaCore
 /// printing it. Every `silta` command conforms.
 protocol OutputCommand: ParsableCommand {
   /// Supplies explicit workspace context for recovery commands.
-  var global: GlobalOptions { get }
+  var global: GlobalOptions { get set }
 
   /// The shape of the `data` in this command's `--json` output, published by
   /// `silta schema`.
@@ -37,8 +37,10 @@ protocol WorkspaceArgumentCommand: OutputCommand {
 enum WorkspaceSource {
   /// The command acts on no workspace.
   case none
-  /// `--ws`, else the current workspace.
+  /// `--ws`, else the registered repository workspace, else the outside default.
   case option
-  /// The command's slug argument, else `--ws`, else the current workspace.
+  /// The command owns location-first resolution and any selection fallback.
+  case location
+  /// The command's slug argument, else `--ws`, repository location or the outside default.
   case argument
 }
