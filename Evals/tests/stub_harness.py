@@ -128,7 +128,8 @@ for action in recording['phases'][phase]:
                       'gate': 'the human-only workspace settings command'}.get(variant, 'customer-visible error text')
             message('May I change customer-visible error text?'
                     + (' May I change ' + reason + '?' if reason != 'customer-visible error text' else ''))
+multiplier = 2 if harness == 'codex' and 'resume' in sys.argv else 1
 emit({'type': 'result', 'is_error': False, 'usage': {'input_tokens': 10, 'output_tokens': 5}}
-     if harness == 'claude' else {'type': 'turn.completed', 'usage': {'input_tokens': 10, 'output_tokens': 5}})
+     if harness == 'claude' else {'type': 'turn.completed', 'usage': {'input_tokens': 10 * multiplier, 'output_tokens': 5 * multiplier}})
 
 sys.exit(recording.get('exit_code', 0))

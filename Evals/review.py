@@ -24,6 +24,7 @@ for trial in report['trials']:
     evidence['review'] = verdict
     evals.write_json(evidence_path, evidence)
     trial.update(evals.grade(evidence))
+    trial.update(evals.trial_labels(evidence))
 updated = evals.aggregate(report['trials'], report['provenance'])
 updated.update({key: report[key] for key in ('commit', 'dirty', 'binary_sha256')})
 evals.write_json(args.results / 'report.json', updated)
