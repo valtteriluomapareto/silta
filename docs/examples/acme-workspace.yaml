@@ -61,7 +61,7 @@ topics:
   - { slug: "reports", aliases: [ "raportit" ] }
   - { slug: "pdf-forms", aliases: [ "lomakkeet" ] }
 
-# External note trees stored for later search. root and include are required; exclude is optional.
+# External note trees stored for later search. kind, root and include are required; exclude is optional.
 sources:
   - { kind: "notes", root: "~/notes", include: [ "projects/acme/*.md" ],
       exclude: [ "**/PEOPLE.md", "**/1-1/**" ] }

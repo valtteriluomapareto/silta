@@ -39,9 +39,9 @@ registered repository you enter; use `--ws acme` when working outside one.
 
 ## 4. Connect your agents
 
-Install Codex before its agent edits the workspace so it receives the writable Silta
-data root. Codex has no session hooks; your Codex agent runs `silta brief` at session
-start itself. Preview its user-level instructions and writable data root with:
+If you use Codex, install it before its agent edits the workspace so it receives the
+writable Silta data root. Codex has no session hooks; your Codex agent runs `silta brief`
+at session start itself. Preview its user-level instructions and writable data root with:
 
 ```sh
 silta agents install --codex
@@ -67,8 +67,8 @@ Check the installation:
 silta doctor --install
 ```
 
-Your selected integrations' `install.*` rows should pass. Warnings for harnesses you do
-not use, or for missing hook evidence before the first session, are expected.
+The path, hook, skill and instructions rows should pass; version and session rows can warn
+until you've run a session. Warnings for harnesses you do not use are expected.
 
 ## 5. Describe the apps and their connections
 
