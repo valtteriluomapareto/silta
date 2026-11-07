@@ -19,42 +19,58 @@ def tokens(usage):
 class TokenBudget:
     def __init__(self, codex_home, limit):
         self.home, self.limit = Path(codex_home), limit
-        self.totals = {}
+        self.native, self.terminal = {}, {}
         self.spent = 0
         self.phase_tokens = None
 
     def start_phase(self):
-        self.baseline = sum(self.totals.values())
+        self.baseline = self.spent
+        self.before = {key: max(self.native.get(key, 0), self.terminal.get(key, 0))
+                       for key in self.native.keys() | self.terminal.keys()}
+        self.thread, self.current_terminal = None, None
         self.phase_tokens = None
 
     def observe(self, stdout):
+        for line in stdout.splitlines():
+            try:
+                event = json.loads(line)
+                if event.get('type') == 'thread.started':
+                    self.thread = event.get('thread_id')
+                elif event.get('type') == 'turn.completed':
+                    self.current_terminal = tokens(event.get('usage'))
+            except (ValueError, AttributeError):
+                continue
         for path in (self.home / 'sessions').rglob('*.jsonl'):
+            identity = None
             for line in path.read_text(errors='replace').splitlines():
                 try:
                     event = json.loads(line)
                     payload = event.get('payload', {})
-                    if event.get('type') == 'event_msg' and payload.get('type') == 'token_count':
-                        total = tokens((payload.get('info') or {}).get('total_token_usage'))
-                        if total is not None and total > self.totals.get(path, 0):
-                            self.totals[path] = total
+                    if event.get('type') == 'session_meta':
+                        identity = payload.get('id')
+                    count = (tokens((payload.get('info') or {}).get('total_token_usage'))
+                             if event.get('type') == 'event_msg' and payload.get('type') == 'token_count' else None)
                 except (ValueError, TypeError, AttributeError):
                     continue
-        delta = sum(self.totals.values()) - self.baseline
-        candidates = [delta] if delta > 0 else []
-        for line in stdout.splitlines():
-            try:
-                event = json.loads(line)
-                if event.get('type') == 'turn.completed':
-                    count = tokens(event.get('usage'))
-                    if count is not None:
-                        candidates.append(count)
-            except (ValueError, AttributeError):
-                continue
-        if candidates:
-            self.phase_tokens = max([self.phase_tokens or 0, *candidates])
-        return None if self.phase_tokens is None else self.spent + self.phase_tokens
+                if count is not None:
+                    if not isinstance(identity, str) or not identity:
+                        raise ValueError('Native token_count missing session_meta identity')
+                    self.native[identity] = max(count, self.native.get(identity, 0))
+        terminal = dict(self.terminal)
+        if self.current_terminal is not None:
+            if not isinstance(self.thread, str) or not self.thread:
+                raise ValueError('Native terminal usage missing thread identity')
+            terminal[self.thread] = terminal.get(self.thread, 0) + self.current_terminal
+        identities = self.native.keys() | terminal.keys()
+        total = sum(max(self.native.get(key, 0), terminal.get(key, 0)) for key in identities) if identities else None
+        known = (self.current_terminal is not None or
+                 self.thread in self.native and self.native[self.thread] > self.before.get(self.thread, 0))
+        self.phase_tokens = max(0, total - self.baseline) if known and total is not None else None
+        return total
 
     def finish_phase(self):
+        if self.current_terminal is not None:
+            self.terminal[self.thread] = self.terminal.get(self.thread, 0) + self.current_terminal
         if self.phase_tokens is not None:
             self.spent += self.phase_tokens
 
@@ -88,6 +104,10 @@ class TokenBudget:
                                 os.killpg(child.pid, signal.SIGKILL)
                             except ProcessLookupError:
                                 pass
+            try:
+                child.wait(timeout=max(0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                failure = failure or 'timeout'
         finally:
             if child.poll() is None:
                 try:
@@ -98,8 +118,11 @@ class TokenBudget:
             child.stdout.close()
             child.stderr.close()
         total = self.observe(buffers['stdout'].decode(errors='replace'))
-        if total is None and not failure:
+        if not failure and total is not None and total > self.limit:
+            failure = 'token-limit'
+        if self.phase_tokens is None and not failure:
             failure = 'usage-unavailable'
         self.finish_phase()
-        return {'exit': failure or child.returncode, 'tokens': self.phase_tokens,
+        return {'exit': failure or child.returncode, 'process_exit': child.returncode,
+                'tokens': self.phase_tokens,
                 **{k: bytes(v).decode(errors='replace') for k, v in buffers.items()}}

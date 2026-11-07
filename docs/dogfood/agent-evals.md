@@ -291,9 +291,11 @@ remain in the messages for independent semantic review.
 
 Tokens are native input plus output; cached input and reasoning output are already
 included. Codex session `token_count` cumulative counters and terminal JSONL usage
-are reconciled without adding overlapping counts, including resume and fresh
-handoff sessions. `--max-trial-tokens` kills the process group on observed overflow,
-stops further trial phases and records infrastructure failure. Missing usage under
+are reconciled by native `session_meta`/thread identity without adding
+overlapping counts, including late counters, copied logs, resume and fresh handoff
+sessions. Counters without a session identity fail infrastructure. `--max-trial-tokens` kills the process group on observed overflow,
+stops further trial phases and records infrastructure failure, including on the
+final usage read. The original subprocess exit is retained separately. Missing usage under
 a cap also fails infrastructure. The cap can overshoot by an in-flight request;
 unreported usage cannot be estimated, and the scenario timeout still applies.
 Unknown tokens/cost remain null, never zero estimates. Output is buffered, with

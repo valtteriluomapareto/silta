@@ -158,21 +158,23 @@ class OpenModels(unittest.TestCase):
         def record(name, n, tail=''):
             data = {'type': 'event_msg', 'payload': {'type': 'token_count', 'info': {'total_token_usage': {
                 'input_tokens': n, 'cached_input_tokens': n, 'output_tokens': 5, 'reasoning_output_tokens': 5}}}}
-            (sessions / name).write_text(json.dumps(data) + '\n' + tail)
+            (sessions / name).write_text(json.dumps({'type': 'session_meta', 'payload': {'id': name[0]}}) + '\n' + json.dumps(data) + '\n' + tail)
         budget.start_phase()
         record('a.jsonl', 10, '{"partial":')
-        self.assertEqual(budget.observe(''), 15)
-        self.assertEqual(budget.observe(''), 15)
+        thread = json.dumps({'type': 'thread.started', 'thread_id': 'a'}) + '\n'
+        self.assertEqual(budget.observe(thread), 15)
+        self.assertEqual(budget.observe(thread), 15)
         terminal = json.dumps({'type': 'turn.completed', 'usage': {'input_tokens': 10, 'output_tokens': 5}})
-        self.assertEqual(budget.observe(terminal), 15)
+        self.assertEqual(budget.observe(thread + terminal), 15)
         budget.finish_phase()
         budget.start_phase()
         record('a.jsonl', 25)
-        self.assertEqual(budget.observe(terminal), 30)
+        self.assertEqual(budget.observe(thread + terminal), 30)
         budget.finish_phase()
         budget.start_phase()
         record('b.jsonl', 10)
-        self.assertEqual(budget.observe(terminal), 45)
+        thread = json.dumps({'type': 'thread.started', 'thread_id': 'b'}) + '\n'
+        self.assertEqual(budget.observe(thread + terminal), 45)
 
     def test_audit_includes_failed_commands_opaque_files_messages_and_review_identity(self):
         result, evidence, _ = self.trial()
@@ -189,7 +191,7 @@ class OpenModels(unittest.TestCase):
         self.assertEqual(audit.returncode, 0, audit.stderr)
         for expected in ['unmatched shell attempt', 'unmatched', 'file_change', 'new.txt', 'Exact command:',
                          'scripted-operator', 'claude-coordinator', evals.review_digest(evidence), result['evidence'],
-                         'silta task start', 'exit=0']:
+                         'silta task start', 'exit=0', 'APPROVAL', evidence['approval']['words']]:
             self.assertIn(expected, audit.stdout)
 
     def test_invalid_unattended_options_reject_before_launch(self):

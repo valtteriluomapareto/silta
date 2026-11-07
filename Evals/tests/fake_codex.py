@@ -31,7 +31,7 @@ trial = Path(os.environ['HOME']).parent
 if behavior == 'overflow':
     sessions = Path(os.environ['CODEX_HOME']) / 'sessions'
     sessions.mkdir(exist_ok=True)
-    (sessions / 'native.jsonl').write_text(json.dumps({'type': 'event_msg', 'payload': {
+    (sessions / 'native.jsonl').write_text(json.dumps({'type': 'session_meta', 'payload': {'id': 'overflow'}}) + '\n' + json.dumps({'type': 'event_msg', 'payload': {
         'type': 'token_count', 'info': {'total_token_usage': {'input_tokens': 60, 'output_tokens': 40}}}}) + '\n')
     print(json.dumps({'type': 'thread.started', 'thread_id': 'overflow'}), flush=True)
     # A pipe with its writer held open stays blocked until the supervisor kills us.

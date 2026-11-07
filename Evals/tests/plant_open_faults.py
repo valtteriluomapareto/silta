@@ -25,10 +25,23 @@ FAULTS = [
      'test_scripted_denial_records_source_and_sends_no_approval', "'Add the Acme retry fix for later.' != ''"),
     ('unsolicited_reply_grading', 'evals.py', "and approval['command'] in '\\n'.join(phases[0]['messages'])", 'and True',
      'test_scripted_grant_is_bound_and_cannot_impersonate_human', 'True is not false'),
-    ('inflight_token_cap', 'codex_usage.py', 'total is not None and total > self.limit', 'False',
+    ('inflight_token_cap', 'codex_usage.py', 'if total is not None and total > self.limit:', 'if False:',
      'test_usage_cap_kills_before_terminal_and_prevents_next_phase', "'timeout' != 'token-limit'"),
-    ('trial_cumulative_tokens', 'codex_usage.py', 'self.spent += self.phase_tokens', 'self.spent = 0',
-     'test_two_turn_cap_counts_native_usage_once_and_preserves_failure', "0 != 'token-limit'"),
+    ('trial_cumulative_tokens', 'codex_usage.py', 'self.terminal[self.thread] = self.terminal.get(self.thread, 0) + self.current_terminal',
+     'self.terminal[self.thread] = 0',
+     'test_two_turn_cap_counts_native_usage_once_and_preserves_failure', '15 != 30'),
+    ('late_resume_identity', 'codex_usage.py', 'max(self.native.get(key, 0), terminal.get(key, 0))',
+     'self.native.get(key, 0) + terminal.get(key, 0)',
+     'REVIEW.test_late_cumulative_resume_usage_is_not_charged_twice', '60 != 30'),
+    ('final_read_cap', 'codex_usage.py', 'if not failure and total is not None and total > self.limit:',
+     'if False:', 'REVIEW.test_final_usage_observation_still_enforces_cap_and_retains_native_exit',
+     "7 != 'token-limit'"),
+    ('closed_pipe_exit', 'codex_usage.py', 'child.wait(timeout=max(0, deadline - time.monotonic()))',
+     'pass', 'REVIEW.test_closed_pipes_do_not_kill_a_process_before_its_exit',
+     "Expected 'killpg' to not have been called"),
+    ('matrix_loses_exit_on_bad_report', 'open_matrix.py', 'except (OSError, ValueError):',
+     'except OSError:', 'REVIEW.test_malformed_optional_report_never_loses_model_exit_or_later_models',
+     'json.decoder.JSONDecodeError'),
     ('unattended_login_prompt', 'evals.py', "if not stub and provider != 'fireworks':", 'if not stub:',
      'test_fake_key_absent_from_shell_console_and_every_export', 'Unattended input prompt'),
     ('unattended_operator_prompt', 'evals.py', "if operator == 'scripted':", 'if False:',
@@ -47,7 +60,7 @@ def main():
             raise SystemExit('Non-unique mutation marker: ' + name)
         try:
             path.write_text(original.replace(marker, replacement))
-            run = subprocess.run([sys.executable, '-B', '-m', 'unittest', TEST + test],
+            run = subprocess.run([sys.executable, '-B', '-m', 'unittest', (test.replace('REVIEW.', 'test_open_review.OpenReview.') if test.startswith('REVIEW.') else TEST + test)],
                                  cwd=ROOT / 'tests', text=True, capture_output=True)
             detected = run.returncode != 0 and expected in run.stderr
             results.append({'guarantee': name, 'detected': detected, 'exit': run.returncode})

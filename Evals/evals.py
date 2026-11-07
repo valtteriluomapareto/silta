@@ -408,6 +408,7 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
         evidence['phases'].append({**native, 'exit': result['exit'], 'actor': actor,
                                    'logs': exact, 'all_logs': phase_logs,
                                    'state': snapshot(root / 'data', root / 'repos'),
+                                   'process_exit': result.get('process_exit', result['exit']),
                                    'tokens': result.get('tokens', tokens(native['usage']))})
         trial_dir = output / trial_id
         trial_dir.mkdir(parents=True, exist_ok=True)

@@ -18,12 +18,14 @@ def main():
         print('provider=', evidence.get('provider'), 'model=', trial['model'],
               'operator=', evidence.get('operator'), 'source=', (evidence.get('approval') or {}).get('source'),
               'reviewer=', (evidence.get('review') or {}).get('reviewer'))
+        if evidence.get('approval'):
+            print('APPROVAL', json.dumps(evidence['approval'], sort_keys=True))
         print('digest=', evals.review_digest(evidence), 'tokens=', trial['metrics'].get('tokens'))
         failed = [key for key, passed in trial['checks'].items() if not passed and key != 'evidence_review']
         print('automatic failures=', failed, 'review=', trial['checks'].get('evidence_review', 'unavailable'),
               'error=', trial.get('error'))
         for phase in evidence.get('phases', []):
-            print('PHASE', phase['actor'], 'exit=' + str(phase['exit']))
+            print('PHASE', phase['actor'], 'exit=' + str(phase['exit']), 'process_exit=' + str(phase.get('process_exit', phase['exit'])))
             for log in phase['all_logs']:
                 print('SILTA', log['command'], 'exit=' + str(log['exit_code']))
             unmatched = list(phase['tool_results'])
