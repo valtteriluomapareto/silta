@@ -126,8 +126,19 @@ temporary roots are retained and listed in the final cleanup command for inspect
 Completed phase evidence and known usage remain linked on operator EOF or cleanup
 failure. Applying verdicts with `review.py` preserves the abort status and trial
 counts; reviewing available evidence cannot make an aborted run succeed.
+Returned token-limit, timeout, unavailable-usage and native stream/process failures
+also abort reuse and retain the failed trial root. A failed native turn stops before
+another turn or trial launches. Ordinary scenario grades and pending human evidence
+review still allow the planned repeats.
 A new client version that creates unfamiliar files needs an explicit disposable
 path classification before reuse; the runner does not guess which files are credentials.
+The [history fixture inventory](../../Evals/tests/profile_history.py) plants earlier
+answers in every supported disposable state location, including prompt history,
+session archives, project memory, state databases, caches and ordinary config.
+Later fake trials probe those files for earlier answers. Unclassified memory stores
+abort reuse and remain available for inspection. The selective mutations preserve
+only one history/memory location at a time, including `history.jsonl`, to prove
+that unrelated cleanup cannot mask retained content.
 
 Inherited provider/identity variables are discarded. Handoff-resume has distinct A/B
 actors and fresh conversations; human-present policy continuations resume only

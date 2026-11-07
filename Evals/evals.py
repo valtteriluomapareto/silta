@@ -348,10 +348,14 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
     try:
         result = _run_trial(binary, harness, model, scenario, variant, repeat, client, output, stub,
                             recording, provider, operator, max_trial_tokens, root, profile)
+        failed = (result['checks'].get('infrastructure') is False
+                  or result['checks'].get('stream_complete') is False)
     except BaseException:
         profile.finish_trial(root, destination, retain=True)
         raise
-    profile.finish_trial(root, destination)
+    profile.finish_trial(root, destination, retain=failed)
+    if failed:
+        raise RuntimeError(result.get('error') or 'Native stream did not complete successfully')
     return result
 
 
@@ -447,6 +451,10 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
             evidence['phases'][-1]['complete'] = False
         if result['exit'] in ('token-limit', 'timeout', 'usage-unavailable'):
             evidence['infrastructure_error'] = result['exit']
+            break
+        if profile and (result['exit'] != 0 or not evidence['phases'][-1]['complete']
+                        or not trace_matches_logs(evidence['phases'][-1], harness)):
+            evidence['infrastructure_error'] = 'Native stream incomplete, mismatched or failed; exit=' + str(result['exit'])
             break
     # No profile/config/authentication directory is ever copied to results.
     with closing(sqlite3.connect(root / 'data/silta.db')) as source:

@@ -292,7 +292,7 @@ class Profiles(unittest.TestCase):
         for mode, answer in [('declined', 'no'), ('no-marker', 'signed-in')]:
             output, report, entries, text, commands = self.run_live('codex', mode, answer, authenticate=False)
             self.assertTrue(report['aborted'])
-            self.assertEqual(report['trials'], [])
+            self.assertEqual(report['trials'], [], 'Trial launched without login confirmation')
             self.assertFalse(any(e['event'] == 'model' for e in entries))
             self.assertEqual(len(commands), 1)
             self.assertEqual(text.count('Log out '), 1)
@@ -359,10 +359,8 @@ class Profiles(unittest.TestCase):
 
     def test_present_continuation_keeps_conversation_auth_and_task_state(self):
         output, report, entries, _, commands = self.run_live('codex', scenario='proposals-ask', repeats=1, operator='scripted')
-        self.assertFalse(report['aborted'])
         self.assertEqual(len(commands), 1)
         present = [trial for trial in report['trials'] if trial['variant'].startswith('present-')]
-        self.assertEqual(len(present), 4)
         for trial in present:
             evidence = json.loads((output / trial['evidence']).read_text())
             first, second = evidence['phases']
@@ -378,6 +376,8 @@ class Profiles(unittest.TestCase):
             for model in models:
                 self.assertEqual(model['grants'], [model['data']])
             self.assertTrue((output / trial['id'] / 'cleanup.json').exists())
+        self.assertEqual(len(present), 4)
+        self.assertFalse(report['aborted'])
 
     def test_config_aliases_and_unexpected_grant_are_refused_without_reads(self):
         for mode in ('symlink-auth', 'hardlink-auth', 'unexpected-grant'):
