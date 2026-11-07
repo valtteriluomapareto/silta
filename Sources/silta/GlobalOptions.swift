@@ -10,7 +10,7 @@ struct GlobalOptions: ParsableArguments {
     help: "The human's words approving this command in chat; default is none.")
   var approved: String?
 
-  @Flag(help: "Print JSON; default is text.")
+  @Flag(help: "Print the JSON envelope on stdout; default is text.")
   var json = false
 
   @Flag(help: "Hide success text; warnings and errors still show.")

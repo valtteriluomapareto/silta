@@ -49,40 +49,30 @@ struct AgentInstallOptions: ParsableArguments {
   }
 
   static func run(_ context: CommandContext, input: AgentInstallInput) throws -> CommandOutput {
-    let uninstall = input.uninstall
-    let claude = input.claude
-    let codex = input.codex
-    let dryRun = input.dryRun
+    let command = "silta agents " + (input.uninstall ? "uninstall" : "install")
     let apply = input.apply
-    let hook = input.hook
-    let stopHook = input.stopHook
-    let command = "silta agents " + (uninstall ? "uninstall" : "install")
-    guard !(hook || stopHook) || (!uninstall && (claude || !codex)) else {
-      throw UsageError.invalid(
-        message: "--hook/--stop-hook require selected Claude during install; "
-          + "uninstall removes all selected owned hooks without hook flags.", command: command)
-    }
-    guard !dryRun || apply == nil else {
+    try validateHooks(input, command: command)
+    guard !input.dryRun || input.apply == nil else {
       throw UsageError.invalid(message: "Choose --dry-run or --apply <token>.", command: command)
     }
     let selected =
-      (claude ? " --claude" : "") + (codex ? " --codex" : "") + (hook ? " --hook" : "")
-      + (stopHook ? " --stop-hook" : "")
+      (input.claude ? " --claude" : "") + (input.codex ? " --codex" : "")
+      + (input.hook ? " --hook" : "") + (input.stopHook ? " --stop-hook" : "")
     let preview = command + selected
     let files = try AgentInstallFiles(
-      preview: preview, claude: claude || !codex, codex: codex || !claude)
+      preview: preview, claude: input.claude || !input.codex, codex: input.codex || !input.claude)
     defer { files.close() }
     var targets = try AgentInstallTarget.selected(
-      claude: claude || !codex, codex: codex || !claude,
+      claude: input.claude || !input.codex, codex: input.codex || !input.claude,
       root: context.environment.home.url.path)
-    if claude || !codex, hook || stopHook || uninstall {
+    if input.claude || !input.codex, input.hook || input.stopHook || input.uninstall {
       targets.append(
         AgentInstallTarget(
           path: ".claude/settings.json", body: "", whole: false,
-          settings: true, stopHook: stopHook))
+          settings: true, stopHook: input.stopHook))
     }
-    let plan = try AgentInstallPlan(files: files, targets: targets, uninstall: uninstall)
-    if let apply {
+    let plan = try AgentInstallPlan(files: files, targets: targets, uninstall: input.uninstall)
+    if let apply = input.apply {
       guard apply == plan.token else {
         throw AgentInstallError(.conflict, "Preview changed; review a fresh diff.", next: [preview])
       }
@@ -96,6 +86,18 @@ struct AgentInstallOptions: ParsableArguments {
       + diff + (diff.isEmpty ? "" : "\n")
       + (apply == nil ? "Apply: \(preview) --apply \(plan.token)" : "")
     return CommandOutput(text: text, quiet: apply == nil ? text : "", data: result)
+  }
+
+  private static func validateHooks(_ input: AgentInstallInput, command: String) throws {
+    guard !input.uninstall || !(input.hook || input.stopHook) else {
+      throw UsageError.invalid(
+        message: "--hook/--stop-hook require selected Claude during install; "
+          + "uninstall removes all selected owned hooks without hook flags.", command: command)
+    }
+    guard !(input.hook || input.stopHook) || (input.claude || !input.codex) else {
+      throw UsageError.invalid(
+        message: "--hook/--stop-hook require selected Claude during install.", command: command)
+    }
   }
 }
 
@@ -125,6 +127,8 @@ struct AgentUninstallOptions: ParsableArguments {
   @Flag(help: "Preview only (the default); never combine with --apply.") var dryRun = false
   @Option(help: "Apply exactly the preview identified by this token; no interactive prompt.")
   var apply: String?
+  @Flag(help: .hidden) var hook = false
+  @Flag(help: .hidden) var stopHook = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     var input = AgentInstallInput()
@@ -133,6 +137,8 @@ struct AgentUninstallOptions: ParsableArguments {
     input.codex = codex
     input.dryRun = dryRun
     input.apply = apply
+    input.hook = hook
+    input.stopHook = stopHook
     return try AgentInstallOptions.run(context, input: input)
   }
 }

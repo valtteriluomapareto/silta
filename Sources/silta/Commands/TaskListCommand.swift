@@ -4,11 +4,7 @@ import SiltaCore
 struct TaskListCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "ls",
-    abstract: "List workspace tasks, including your own proposals.",
-    usage:
-      "silta task ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] "
-      + "[--status <status>] [--app <app>] [--on <on>] [--topic <topic>] [--mine] "
-      + "[--proposed] [--promoted] [--archived]")
+    abstract: "List workspace tasks, including your own proposals.")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.summaryShape)])
 

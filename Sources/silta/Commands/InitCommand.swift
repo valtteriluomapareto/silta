@@ -8,7 +8,7 @@ struct InitCommand: OutputCommand {
     abstract: "Initialize or scan repos; select with ws use; ws edit is human-only.",
     discussion: "`init --scan` scans roots and two child levels without fetching.\n"
       + "A new workspace derives its slug and task prefix from the first directory.\n"
-      + "Values keep typed case and use letters, digits, _ or -, like `ws edit`.\n"
+      + "Values keep case, use letters, digits, _ or -, and start/end alphanumeric.\n"
       + "A --ws scan refreshes that workspace, matching slug without regard to case.\n"
       + "It takes no slug or prefix; a none-named clone is refused with its path.\n"
       + "Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC")

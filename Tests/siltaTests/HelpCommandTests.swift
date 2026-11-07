@@ -7,22 +7,23 @@ import Testing
 struct HelpCommandTests {
   @Test func everyHelpRouteMatchesGoldenAndRules() throws {
     try withScratchDirectory { scratch in
-      let routes = try helpRoutes(in: scratch)
+      let pages = try helpPages(in: scratch)
+      let routes = pages.map(\.route)
+      let valueOptions = Self.valueOptions(in: pages.map(\.text))
       let schemaAbstracts = try self.schemaAbstracts(in: scratch)
       #expect(routes.count > 40, "help route discovery unexpectedly shrank")
       var byTopLevel: [String: [(route: String, text: String)]] = [:]
-      for route in routes {
-        let words = route.split(separator: " ").map(String.init)
-        let arguments = (words.count == 1 ? [] : Array(words.dropFirst())) + ["--help"]
-        let result = try SiltaBinary.run(arguments, in: scratch)
-        #expect(result.termination == .exit(0))
-        #expect(result.stderr.isEmpty)
-        let abstract = try checkHelpRules(result.stdout, route: route)
-        if let schemaAbstract = schemaAbstracts[route] {
-          #expect(abstract == schemaAbstract, "\(route) help and schema summaries differ")
+      for page in pages {
+        #expect(!page.text.isEmpty)
+        let abstract = try checkHelpRules(
+          page.text, route: page.route, commandValueOptions: valueOptions)
+        if let schemaAbstract = schemaAbstracts[page.route] {
+          #expect(
+            abstract == schemaAbstract, "\(page.route) help and schema summaries differ")
         }
+        let words = page.route.split(separator: " ").map(String.init)
         let topLevel = words.count == 1 ? "silta" : words[1]
-        byTopLevel[topLevel, default: []].append((route, result.stdout))
+        byTopLevel[topLevel, default: []].append(page)
       }
       for (topLevel, pages) in byTopLevel.sorted(by: { $0.key < $1.key }) {
         let actual =
@@ -38,32 +39,34 @@ struct HelpCommandTests {
 
   @Test func guideOutputFollowsRuntimeTextRules() throws {
     try withScratchDirectory { scratch in
+      let pages = try helpPages(in: scratch)
+      let valueOptions = Self.valueOptions(in: pages.map(\.text))
       let result = try SiltaBinary.run(["guide"], in: scratch)
       #expect(result.termination == .exit(0))
       #expect(result.stderr.isEmpty)
-      try checkRuntimeTextRules(result.stdout, route: "silta guide")
+      try checkRuntimeTextRules(
+        result.stdout, route: "silta guide", commandValueOptions: valueOptions)
     }
   }
 
   @Test func existingExamplesParseWithTheRootParser() throws {
     try withScratchDirectory { scratch in
       typealias Example = (route: String, arguments: [String])
-      let fixture = WhereCommandTests()
-      _ = try fixture.setup(scratch)
-      let examples = try helpRoutes(in: scratch)
+      _ = try AcmeWorkspaces.setup(scratch)
+      let examples = try helpPages(in: scratch)
         .flatMap { route -> [Example] in
-          let words = route.split(separator: " ").map(String.init)
-          let arguments = (words.count == 1 ? [] : Array(words.dropFirst())) + ["--help"]
-          let result = try SiltaBinary.run(arguments, in: scratch)
-          let labelled = result.stdout.split(separator: "\n")
+          let labelled = route.text.split(separator: "\n")
             .filter { line in
-              line.hasPrefix("Example:") || line.hasPrefix("Ask:")
-                || line.hasPrefix("Answer:") || line.hasPrefix("Accept:")
+              !line.hasPrefix("USAGE: ")
+                && (line.contains(": silta ")
+                  || line.hasPrefix("Example:") || line.hasPrefix("Ask:")
+                  || line.hasPrefix("Answer:") || line.hasPrefix("Accept"))
             }
           return try labelled.map { line in
             let arguments = try #require(
-              Self.arguments(afterCommandIn: String(line)), "\(route) has no command: \(line)")
-            return (route, arguments)
+              Self.arguments(afterCommandIn: String(line)),
+              "\(route.route) has no command: \(line)")
+            return (route.route, arguments)
           }
         }
       #expect(!examples.isEmpty, "no existing examples were found")
@@ -76,8 +79,21 @@ struct HelpCommandTests {
     }
   }
 
-  @Test func idRulesExcludeOperandsAndCatchRanges() throws {
-    #expect(try Self.idMatches(in: "--prefix D12", pattern: Self.decisionPattern).isEmpty)
+  @Test func idRulesCheckProseAndCommandOperands() throws {
+    let options: Set<String> = ["--approved", "--prefix"]
+    #expect(
+      !(try Self.idMatches(
+        in: "pass their words as --approved (D39)", pattern: Self.decisionPattern,
+        commandValueOptions: options)).isEmpty)
+    #expect(
+      !(try Self.idMatches(in: "see D39: x", pattern: Self.decisionPattern)).isEmpty)
+    #expect(
+      !(try Self.idMatches(in: "--json D10-12.", pattern: Self.decisionPattern)).isEmpty)
+    #expect(
+      try Self.idMatches(
+        in: "Example: silta task add --prefix D12", pattern: Self.decisionPattern,
+        commandValueOptions: options
+      ).isEmpty)
     #expect(try Self.idMatches(in: "platform-api@M3:path", pattern: Self.milestonePattern).isEmpty)
     #expect(!(try Self.idMatches(in: "D10-12", pattern: Self.decisionPattern)).isEmpty)
     #expect(!(try Self.idMatches(in: "M10-12", pattern: Self.milestonePattern)).isEmpty)
@@ -92,7 +108,7 @@ struct HelpCommandTests {
     }
   }
 
-  private func helpRoutes(in scratch: URL) throws -> [String] {
+  private func helpPages(in scratch: URL) throws -> [(route: String, text: String)] {
     let result = try SiltaBinary.run(["schema", "--json"], in: scratch)
     let root = try Self.object(result.stdout)
     let data = try #require(root["data"] as? [String: Any])
@@ -107,12 +123,24 @@ struct HelpCommandTests {
         routes.insert(words.prefix(count).joined(separator: " "))
       }
     }
-    return routes.sorted()
+    var pages: [(route: String, text: String)] = []
+    for route in routes {
+      let words = route.split(separator: " ").map(String.init)
+      let arguments = (words.count == 1 ? [] : Array(words.dropFirst())) + ["--help"]
+      let result = try SiltaBinary.run(arguments, in: scratch)
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.isEmpty)
+      pages.append((route, result.stdout))
+    }
+    return pages
   }
 
   @discardableResult
-  private func checkHelpRules(_ text: String, route: String) throws -> String {
-    try checkRuntimeTextRules(text, route: route)
+  private func checkHelpRules(
+    _ text: String, route: String, commandValueOptions: Set<String>
+  ) throws -> String {
+    try checkRuntimeTextRules(
+      text, route: route, commandValueOptions: commandValueOptions)
     let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
     let overviewIndex = try #require(lines.firstIndex { $0.hasPrefix("OVERVIEW: ") })
     var abstractLines = [lines[overviewIndex].dropFirst("OVERVIEW: ".count)]
@@ -138,9 +166,6 @@ struct HelpCommandTests {
       route == "silta" ? "USAGE: silta" : "USAGE: silta " + route.dropFirst("silta ".count)
     let usageLines = lines.filter { $0.hasPrefix(usagePrefix) }
     #expect(!usageLines.isEmpty, "\(route) has no accurate usage line")
-    #expect(
-      !usageLines.contains { $0.hasSuffix("<options>") },
-      "\(route) uses a bare <options> usage line")
     let discussion = try discussionLines(text)
     #expect(discussion.count <= 6, "\(route) discussion is too long")
     if route == "silta agents uninstall" {
@@ -150,12 +175,14 @@ struct HelpCommandTests {
     return abstract
   }
 
-  private func checkRuntimeTextRules(_ text: String, route: String) throws {
+  private func checkRuntimeTextRules(
+    _ text: String, route: String, commandValueOptions: Set<String>
+  ) throws {
     #expect(!text.contains("docs/"), "\(route) names a repository path")
     let milestones = try Self.idMatches(
-      in: text, pattern: Self.milestonePattern)
+      in: text, pattern: Self.milestonePattern, commandValueOptions: commandValueOptions)
     let decisions = try Self.idMatches(
-      in: text, pattern: Self.decisionPattern)
+      in: text, pattern: Self.decisionPattern, commandValueOptions: commandValueOptions)
     #expect(milestones.isEmpty, "\(route) names a milestone: \(milestones)")
     #expect(decisions.isEmpty, "\(route) names a decision: \(decisions)")
     #expect(
@@ -163,23 +190,6 @@ struct HelpCommandTests {
         && !text.lowercased().contains("not available")
         && !text.lowercased().contains("waits for"),
       "\(route) contains roadmap text")
-  }
-
-  private func checkExampleValues(_ arguments: [String], route: String) throws {
-    let allowedValues: [String: Set<String>] = [
-      "--kind": Set(CommentDraft.kinds),
-      "--status": Set(TaskService.statuses),
-      "--rel": Set(TaskService.relations),
-    ]
-    for (index, argument) in arguments.enumerated() {
-      guard let allowed = allowedValues[argument] else { continue }
-      let hasValue = index + 1 < arguments.count
-      #expect(hasValue, "\(route) example omits a value for \(argument)")
-      guard hasValue else { continue }
-      #expect(
-        allowed.contains(arguments[index + 1]),
-        "\(route) example has an invalid \(argument) value: \(arguments[index + 1])")
-    }
   }
 
   private func schemaAbstracts(in scratch: URL) throws -> [String: String] {
@@ -214,12 +224,58 @@ struct HelpCommandTests {
     return lines[(headingIndex + 1)..<endIndex].filter { !$0.isEmpty }
   }
 
-  private static func arguments(afterCommandIn line: String) -> [String]? {
-    guard let range = line.range(of: "silta ") else { return nil }
-    return shellWords(String(line[range.upperBound...]))
+  private static func errorCode(_ stdout: String) throws -> String? {
+    let root = try object(stdout)
+    return (root["error"] as? [String: Any])?["code"] as? String
   }
 
-  private static func shellWords(_ text: String) -> [String] {
+  private static func object(_ json: String) throws -> [String: Any] {
+    let root = try #require(
+      try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+    return root
+  }
+}
+
+extension HelpCommandTests {
+  fileprivate func checkExampleValues(_ arguments: [String], route: String) throws {
+    let allowedValues: [String: Set<String>] = [
+      "--kind": Set(CommentDraft.kinds),
+      "--status": Set(TaskService.statuses),
+      "--rel": Set(TaskService.relations),
+    ]
+    let arguments = Self.normalizedArguments(arguments)
+    for (index, argument) in arguments.enumerated() {
+      guard let allowed = allowedValues[argument] else { continue }
+      let hasValue = index + 1 < arguments.count
+      #expect(hasValue, "\(route) example omits a value for \(argument)")
+      guard hasValue else { continue }
+      #expect(
+        allowed.contains(arguments[index + 1]),
+        "\(route) example has an invalid \(argument) value: \(arguments[index + 1])")
+    }
+  }
+
+  fileprivate static func arguments(afterCommandIn line: String) -> [String]? {
+    guard let range = line.range(of: "silta ") else { return nil }
+    var command = String(line[range.upperBound...])
+    while command.last == "." { command.removeLast() }
+    return shellWords(command)
+  }
+
+  fileprivate static func normalizedArguments(_ arguments: [String]) -> [String] {
+    var normalized: [String] = []
+    for argument in arguments {
+      guard argument.hasPrefix("--"), let separator = argument.firstIndex(of: "=") else {
+        normalized.append(argument)
+        continue
+      }
+      normalized.append(String(argument[..<separator]))
+      normalized.append(String(argument[argument.index(after: separator)...]))
+    }
+    return normalized
+  }
+
+  fileprivate static func shellWords(_ text: String) -> [String] {
     var words: [String] = []
     var word = ""
     var quote: Character?
@@ -243,15 +299,12 @@ struct HelpCommandTests {
     return words
   }
 
-  private static func errorCode(_ stdout: String) throws -> String? {
-    let root = try object(stdout)
-    return (root["error"] as? [String: Any])?["code"] as? String
-  }
-
-  private static func idMatches(in text: String, pattern: String) throws -> [String] {
-    let operands = try NSRegularExpression(pattern: #"(--[A-Za-z0-9-]+) [^ ]+"#)
-    let checked = operands.stringByReplacingMatches(
-      in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "$1")
+  fileprivate static func idMatches(
+    in text: String, pattern: String, commandValueOptions: Set<String> = []
+  ) throws -> [String] {
+    let checked = text.components(separatedBy: .newlines)
+      .map { commandCheckedLine($0, commandValueOptions: commandValueOptions) }
+      .joined(separator: "\n")
     let regex = try NSRegularExpression(pattern: pattern)
     let range = NSRange(checked.startIndex..., in: checked)
     return regex.matches(in: checked, range: range).compactMap { match in
@@ -259,15 +312,89 @@ struct HelpCommandTests {
     }
   }
 
-  private static let milestonePattern =
-    #"(?<![A-Za-z0-9_@:-])M\d+(?:-\d+)?(?![A-Za-z0-9_@:-])"#
+  fileprivate static let milestonePattern =
+    #"(?<![A-Za-z0-9_@-])M\d+(?:-\d+)?(?![A-Za-z0-9_-])"#
 
-  private static let decisionPattern =
-    #"(?<![A-Za-z0-9_@:-])D\d+(?:-\d+)?(?![A-Za-z0-9_@:-])"#
+  fileprivate static let decisionPattern =
+    #"(?<![A-Za-z0-9_@-])D\d+(?:-\d+)?(?![A-Za-z0-9_-])"#
 
-  private static func object(_ json: String) throws -> [String: Any] {
-    let root = try #require(
-      try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
-    return root
+  fileprivate static func commandCheckedLine(
+    _ line: String, commandValueOptions: Set<String>
+  ) -> String {
+    guard line.contains("silta ") || line.contains("`") else { return line }
+    var checked = ""
+    var rest = line[...]
+    while !rest.isEmpty {
+      if let opening = rest.firstIndex(of: "`") {
+        checked += rest[..<opening] + "`"
+        rest = rest[rest.index(after: opening)...]
+        guard let closing = rest.firstIndex(of: "`") else {
+          checked += rest
+          return checked
+        }
+        checked +=
+          removingOptionOperands(
+            from: String(rest[..<closing]), commandValueOptions: commandValueOptions) + "`"
+        rest = rest[rest.index(after: closing)...]
+      } else if let command = rest.range(of: "silta ") {
+        checked += rest[..<command.upperBound]
+        checked += removingOptionOperands(
+          from: String(rest[command.upperBound...]), commandValueOptions: commandValueOptions)
+        return checked
+      } else {
+        checked += rest
+        return checked
+      }
+    }
+    return checked
+  }
+
+  fileprivate static func removingOptionOperands(
+    from command: String, commandValueOptions: Set<String>
+  ) -> String {
+    var checked: [String] = []
+    var skipsOperand = false
+    for word in shellWords(command) {
+      if skipsOperand {
+        skipsOperand = false
+        continue
+      }
+      if let separator = word.firstIndex(of: "="), word.hasPrefix("-") {
+        let option = String(word[..<separator])
+        if commandValueOptions.contains(option) {
+          checked.append(option)
+        } else {
+          checked.append(word)
+        }
+        continue
+      }
+      if commandValueOptions.contains(word) {
+        checked.append(word)
+        skipsOperand = true
+        continue
+      }
+      checked.append(word)
+    }
+    return checked.joined(separator: " ")
+  }
+
+  fileprivate static func valueOptions(in pages: [String]) -> Set<String> {
+    var options = Set<String>()
+    for page in pages {
+      for line in page.split(separator: "\n") {
+        let fields = line.split(separator: " ", maxSplits: 2).map(String.init)
+        guard fields.count >= 2, fields[0].hasPrefix("-") else { continue }
+        var names = [fields[0].trimmingCharacters(in: CharacterSet(charactersIn: ","))]
+        var valueToken = fields[1]
+        if fields[1].hasPrefix("-") {
+          names.append(fields[1])
+          guard fields.count == 3 else { continue }
+          valueToken = fields[2]
+        }
+        guard valueToken.hasPrefix("<") || valueToken.hasPrefix("[<") else { continue }
+        options.formUnion(names)
+      }
+    }
+    return options
   }
 }

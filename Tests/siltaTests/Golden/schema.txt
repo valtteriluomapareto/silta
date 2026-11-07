@@ -48,7 +48,7 @@ details: silta schema <command>
 global flags:
   --ws <ws>  optional: Use this workspace; default is inferred or saved.
   --approved <approved>  optional: The human's words approving this command in chat; default is none.
-  --json  optional: Print JSON; default is text.
+  --json  optional: Print the JSON envelope on stdout; default is text.
   --quiet  optional: Hide success text; warnings and errors still show.
   --verbose  optional: Mirror command diagnostics to stderr.
 

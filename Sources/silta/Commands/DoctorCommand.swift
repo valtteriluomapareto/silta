@@ -7,11 +7,11 @@ struct DoctorCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "doctor",
     abstract: "Diagnose database, git and data across all workspaces without repairs.",
-    discussion: "--ws does not filter this report; --install skips SQLite and git.\n"
-      + "Broad inspection can update SQLite coordination sidecars.\n"
-      + "Harness integrity and retained hook evidence are read without launches.\n"
-      + "Snapshot recovery is human-only: stop clients and preserve the home.\n"
-      + "Copy a chosen snapshot to a fresh home, then inspect it with doctor.\n"
+    discussion: "--ws does not filter; --install skips SQLite and git.\n"
+      + "Harness checks are read without launches; broad inspection can update SQLite "
+      + "sidecars.\n"
+      + "Snapshot recovery is human-only: stop clients; preserve home WAL/SHM sidecars.\n"
+      + "Copy the snapshot as silta.db to a fresh home without old sidecars; doctor it.\n"
       + "`silta restore` consumes an export directory, not a snapshot."
   )
   static let dataShape = Shape.object([

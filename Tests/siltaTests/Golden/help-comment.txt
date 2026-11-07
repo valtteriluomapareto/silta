@@ -15,7 +15,7 @@ GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
   --approved <approved>   The human's words approving this command in chat;
                           default is none.
-  --json                  Print JSON; default is text.
+  --json                  Print the JSON envelope on stdout; default is text.
   --quiet                 Hide success text; warnings and errors still show.
   --verbose               Mirror command diagnostics to stderr.
 
@@ -47,7 +47,7 @@ GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
   --approved <approved>   The human's words approving this command in chat;
                           default is none.
-  --json                  Print JSON; default is text.
+  --json                  Print the JSON envelope on stdout; default is text.
   --quiet                 Hide success text; warnings and errors still show.
   --verbose               Mirror command diagnostics to stderr.
 
@@ -68,7 +68,7 @@ GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
   --approved <approved>   The human's words approving this command in chat;
                           default is none.
-  --json                  Print JSON; default is text.
+  --json                  Print the JSON envelope on stdout; default is text.
   --quiet                 Hide success text; warnings and errors still show.
   --verbose               Mirror command diagnostics to stderr.
 
@@ -89,7 +89,7 @@ GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
   --approved <approved>   The human's words approving this command in chat;
                           default is none.
-  --json                  Print JSON; default is text.
+  --json                  Print the JSON envelope on stdout; default is text.
   --quiet                 Hide success text; warnings and errors still show.
   --verbose               Mirror command diagnostics to stderr.
 
@@ -125,7 +125,7 @@ GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
   --approved <approved>   The human's words approving this command in chat;
                           default is none.
-  --json                  Print JSON; default is text.
+  --json                  Print the JSON envelope on stdout; default is text.
   --quiet                 Hide success text; warnings and errors still show.
   --verbose               Mirror command diagnostics to stderr.
 
@@ -152,7 +152,7 @@ GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
   --approved <approved>   The human's words approving this command in chat;
                           default is none.
-  --json                  Print JSON; default is text.
+  --json                  Print the JSON envelope on stdout; default is text.
   --quiet                 Hide success text; warnings and errors still show.
   --verbose               Mirror command diagnostics to stderr.
 

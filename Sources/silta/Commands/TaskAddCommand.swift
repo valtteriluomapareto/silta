@@ -30,7 +30,7 @@ struct TaskAddCommand: OutputCommand {
   @Option(name: .customLong("topic"), help: "An existing topic slug; default is none. Repeatable.")
   var topics: [String] = []
 
-  @Option(help: "The source note reference; default is none.") var from: String?
+  @Option(help: "The source note: reference; default is none.") var from: String?
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     var draft = TaskDraft(title: title)
