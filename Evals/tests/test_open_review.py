@@ -71,6 +71,7 @@ class OpenReview(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             budget = codex_usage.TokenBudget(directory, 50)
             child = Mock(pid=1234, returncode=7, stdout=io.BytesIO(), stderr=io.BytesIO())
+            child.communicate.return_value = (b'', b'')
             child.poll.return_value = 7
             def observed(_):
                 budget.phase_tokens = 100
@@ -87,15 +88,17 @@ class OpenReview(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             budget = codex_usage.TokenBudget(directory, 50)
             child = Mock(pid=1234, returncode=7, stdout=io.BytesIO(), stderr=io.BytesIO())
+            child.communicate.return_value = (b'', b'')
             child.poll.side_effect = lambda: child.returncode if child.wait.called else None
             def observed(_):
                 budget.phase_tokens = 15
                 return 15
             with patch.object(codex_usage.subprocess, 'Popen', return_value=child):
-                with patch.object(budget, 'observe', side_effect=observed), patch.object(codex_usage.os, 'killpg') as kill, patch.object(codex_usage.selectors, 'DefaultSelector') as selector:
+                with patch.object(budget, 'observe', side_effect=observed), patch.object(codex_usage.os, 'killpg', side_effect=lambda *args: self.assertTrue(child.wait.called, 'Process killed before its exit')) as kill, patch.object(codex_usage.selectors, 'DefaultSelector') as selector:
                     selector.return_value.__enter__.return_value.get_map.return_value = {}
                     result = budget.execute(['fake-only'], {}, Path(directory), 1)
-            kill.assert_not_called()
+            self.assertTrue(child.wait.called)
+            kill.assert_called_once()
             self.assertEqual(result['exit'], 7)
 
     def test_malformed_optional_report_never_loses_model_exit_or_later_models(self):

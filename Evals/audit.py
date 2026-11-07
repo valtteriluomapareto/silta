@@ -56,6 +56,8 @@ def render_trial(directory, trial):
           'review=', trial['checks'].get('evidence_review', 'unavailable'), 'error=', trial.get('error'))
     if e.get('approval'):
         print('APPROVAL', trial['evidence'] + '#/approval', json.dumps(e['approval'], sort_keys=True))
+    if e.get('infrastructure_error'):
+        issue(trial['evidence'] + '#/infrastructure_error', e['infrastructure_error'])
     if not e.get('phases'):
         issue(trial['evidence'], 'no phase evidence; effects cannot be established')
     before = e.get('baseline', {})
@@ -67,6 +69,16 @@ def render_trial(directory, trial):
         source = str(raw_path.relative_to(directory))
         print('PHASE', prefix, phase['actor'], 'exit=' + str(phase['exit']),
               'process_exit=' + str(phase.get('process_exit', phase['exit'])))
+        for error in phase.get('errors', []):
+            issue(bound + '/errors', json.dumps(error))
+        if phase.get('schema_errors'):
+            issue(bound + '/schema_errors', json.dumps(phase['schema_errors']))
+        cleanup = phase.get('capture', {}).get('cleanup', {})
+        if cleanup.get('drain_cut_short') or cleanup.get('group_status') == 'unconfirmed' or cleanup.get('main_reaped') is False:
+            issue(bound + '/capture/cleanup', 'verify native writers stopped before logout/removal: ' + json.dumps(cleanup))
+        for stream, capture in phase.get('capture', {}).get('streams', {}).items():
+            if not capture.get('complete'):
+                issue(bound + '/capture/streams/' + stream, 'capture incomplete; full output is unavailable')
         try:
             raw = raw_path.read_bytes()
         except OSError:
@@ -94,8 +106,14 @@ def render_trial(directory, trial):
                 continue
             for kind, item in entries:
                 if kind == 'message':
-                    print(f'[{prefix}/message-{message_count} {locator} {bound}/messages/{message_count}] MESSAGE', item)
+                    retained_messages = phase.get('messages', [])
+                    retained = (bound + f'/messages/{message_count}' if message_count < len(retained_messages)
+                                and retained_messages[message_count] == item else '')
+                    print(f'[{prefix}/message-{message_count} {locator}' + (' ' + retained if retained else '') + '] MESSAGE', item)
                     message_count += 1
+                    continue
+                if not isinstance(item, dict):
+                    issue(locator, 'malformed native tool container: ' + excerpt(item, locator))
                     continue
                 identifier = item.get('id')
                 if not isinstance(identifier, str) or not identifier:
@@ -111,7 +129,10 @@ def render_trial(directory, trial):
                     pending.add(identifier)
                 index, start = tools[identifier]
                 result_index = next((i for i, result in enumerate(phase['tool_results']) if result['id'] == identifier), None)
-                command = start.get('command', start.get('input', {}).get('command'))
+                tool_input = start.get('input')
+                command = start.get('command', tool_input.get('command') if isinstance(tool_input, dict) else None)
+                if command is not None and not isinstance(command, str):
+                    issue(locator, 'malformed native command: ' + excerpt(command, locator))
                 if result_index is not None:
                     retained = bound + f'/tool_results/{result_index}'
                 elif command is not None and command in phase['commands']:
@@ -149,11 +170,16 @@ def render_trial(directory, trial):
                     print(citation, 'TRACE FILE reported/unverified', excerpt(item.get('input', {}), locator))
         for identifier in pending:
             issue(prefix + '/tool-' + str(tools[identifier][0]), 'missing completion/output for ' + str(identifier))
-        for index, log in enumerate(phase['all_logs']):
+        if phase.get('all_logs') is None:
+            issue(bound + '/all_logs', 'Silta command logs unavailable; call counts are unknown')
+        for index, log in enumerate(phase.get('all_logs') or []):
             print(bound + f'/all_logs/{index}', 'SILTA', log['command'], 'exit=' + str(log['exit_code']))
         boundary = f'SNAPSHOT after {prefix}/tool-{tool_count - 1}' if tool_count else f'SNAPSHOT {prefix}/no-tools'
         print(boundary, bound + '/state')
         state = phase['state']
+        if state is None:
+            issue(bound + '/state', 'snapshot unavailable; effects cannot be inferred from the baseline')
+            continue
         for table in TABLES:
             old = {row['id']: row for row in before.get(table, [])}
             new = {row['id']: row for row in state.get(table, [])}
@@ -164,7 +190,7 @@ def render_trial(directory, trial):
                 print(boundary, bound + '/state/' + table, 'STATE REMOVED', json.dumps(old[identifier], ensure_ascii=False))
         files(before.get('files', {}), state['files'], prefix + '/files ' + boundary + ' ' + bound + '/state/files', 'FILE')
         before = state
-    if e.get('phases'):
+    if e.get('phases') and e['phases'][-1].get('state') is not None:
         final = e['phases'][-1]['state']
         for table in TABLES:
             for index, row in enumerate(final.get(table, [])):
