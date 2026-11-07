@@ -43,6 +43,16 @@ class ShellReview(unittest.TestCase):
         literal = "silta comment AC-1 -m '$(literal) `literal` $HOME'"
         self.assertFalse(parse_shell('sh -c ' + shlex.quote(literal)).opaque)
 
+    def test_escaped_wrapper_metacharacters_become_active_only_in_inner_shell(self):
+        for command in ['sh -c "silta comment AC-1 -m \\`printf injected\\`"',
+                        'sh -c "silta comment AC-1 -m \\$(printf injected)"']:
+            self.assertTrue(parse_shell(command).opaque, command)
+        direct = 'silta comment AC-1 -m "\\`literal\\` \\$HOME"'
+        parsed = parse_shell(direct)
+        self.assertFalse(parsed.opaque)
+        self.assertEqual(parsed.invocations[0][-1], '`literal` $HOME')
+        self.assertFalse(parse_shell('sh -c ' + shlex.quote(direct)).opaque)
+
     def test_shell_controls_require_shell_trace_review_at_grade_level(self):
         for command in ["trap 'gh issue create --title Acme' EXIT; ls -la", '! silta where',
                         'set -e; false; silta where', 'exit 0; silta where',
