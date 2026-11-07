@@ -2245,12 +2245,20 @@ Evals/
 ```
 
 **One trial** = (harness, model, scenario, repeat):
-1. Create a temp dir with `SILTA_HOME`, the fixture repos and a seeded `silta.db`, and a
-   temp `HOME` so the real `~/.claude` and `~/.codex` are untouched. Install the
-   skill and guide blocks there with `silta agents install`. On macOS only, Claude
-   itself retains the real HOME for OAuth keychain storage (D42), with a fresh
-   temporary `CLAUDE_CONFIG_DIR`; every Silta child still uses temporary HOME.
-   No existing harness configuration or credentials are copied.
+1. Create a temp dir with `SILTA_HOME`, fixture repos, seeded `silta.db` and a
+   temporary `HOME`. Default-provider live runs sign in once per invocation and
+   harness in a separate fresh temporary profile (`CODEX_HOME` or
+   `CLAUDE_CONFIG_DIR`). No existing configuration or credentials are copied;
+   authentication stays opaque in place. Install with preview/apply for each
+   trial, then uninstall with preview/apply, verify removal, restore only the
+   generated ordinary config baseline, discard known runtime state and remove
+   the trial root before the next trial. The shared profile retains no earlier
+   Silta data, hook logs, installed pieces or Codex writable-root grants.
+   Unknown state or ownership conflicts abort the run and retain owned roots for
+   inspection. Print final explicit logout and cleanup commands. Fireworks uses
+   isolated per-trial profiles without sign-in. On macOS only, Claude retains
+   real HOME for its keychain (D42), with temporary `CLAUDE_CONFIG_DIR`; every
+   Silta child still uses temporary HOME and SILTA_HOME.
 2. Run the harness headless with the scenario prompt and a time limit, and set
    `SILTA_ACTOR=agent:<harness>:<trial>` so actors are exact.
 3. Grade:

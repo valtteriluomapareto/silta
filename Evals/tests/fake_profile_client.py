@@ -68,9 +68,15 @@ state = {'event': 'model', 'profile': str(profile), 'home': os.environ['HOME'], 
          'old_data_exists': bool(old and Path(old['data']).exists()),
          'old_hook_exists': bool(old and (Path(old['data']) / 'log/hook-sentinel').exists()),
          'old_runtime_exists': bool(old and (profile / 'projects/previous-trial').exists()),
+         'old_session_exists': bool(old and (profile / 'sessions' / (old['actor'].split(':')[-1] + '.jsonl')).exists()),
          'old_config': bool(old and 'PRIVATE_TRIAL_CONFIG' in config_text),
          'real_config': 'REAL_PROFILE_SENTINEL' in config_text}
 record(state)
+if mode == 'cancel':
+    with journal.with_suffix('.signal').open('w') as signal_file:
+        signal_file.write(str(os.getpid()) + '\n')
+    read_end, write_end = os.pipe()
+    os.read(read_end, 1)
 phase = int('resume' in args or '--resume' in args or actor.endswith('-b'))
 scenario_actor = actor.split(':', 2)[-1].removeprefix(harness + '-')
 scenario = next(s for s in evals.SCENARIOS if scenario_actor.startswith(s + '-'))
@@ -140,18 +146,27 @@ hook('Stop')
 (profile / 'projects/previous-trial').write_text('PRIVATE_TRIAL_HISTORY')
 (data / 'log/hook-sentinel').write_text('PRIVATE_HOOK_STATE')
 if harness == 'codex':
-    with config.open('a') as output:
-        output.write('\n[projects.' + json.dumps(str(Path.cwd())) + ']\ntrust_level="trusted"\n# PRIVATE_TRIAL_CONFIG\n')
+    if 'PRIVATE_TRIAL_CONFIG' not in config.read_text():
+        with config.open('a') as output:
+            output.write('\n[projects.' + json.dumps(str(Path.cwd())) + ']\ntrust_level="trusted"\n# PRIVATE_TRIAL_CONFIG\n')
 else:
     settings = json.loads(config.read_text())
     settings['privateTrialState'] = 'PRIVATE_TRIAL_CONFIG'
     config.write_text(json.dumps(settings))
 if mode == 'unknown':
     (profile / 'unknown-opaque').touch()
+if mode == 'runtime-link':
+    (profile / 'cache').symlink_to(journal.parent / 'real', target_is_directory=True)
 if mode == 'corrupt':
     target = profile / ('AGENTS.md' if harness == 'codex' else 'CLAUDE.md')
     target.write_text(target.read_text().replace('Read `silta brief`', 'Altered `silta brief`'))
 count = 2 if phase and ('resume' in args or '--resume' in args) else 1
+if harness == 'codex':
+    (profile / 'sessions').mkdir(exist_ok=True)
+    (profile / 'sessions' / (session + '.jsonl')).write_text('\n'.join(map(json.dumps, [
+        {'type': 'session_meta', 'payload': {'id': conversation}},
+        {'type': 'event_msg', 'payload': {'type': 'token_count', 'info': {
+            'total_token_usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}}}}])) + '\n')
 emit({'type': 'result', 'is_error': False, 'usage': {'input_tokens': 10, 'output_tokens': 5}} if harness == 'claude'
      else {'type': 'turn.completed', 'usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}})
 sys.exit(7 if mode == 'nonzero' else 0)

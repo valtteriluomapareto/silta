@@ -15,6 +15,7 @@ import sys
 import tempfile
 
 from codex_usage import TokenBudget, tokens
+from profiles import RunProfile
 
 ROOT = Path(__file__).resolve().parent
 SCENARIOS = sorted(p.parent.name for p in (ROOT / 'scenarios').glob('*/scenario.yaml'))
@@ -58,6 +59,14 @@ def execute(argv, env, cwd, timeout, stdin=None):
         os.killpg(child.pid, signal.SIGKILL)
         out, err = child.communicate()
         return {'exit': 'timeout', 'stdout': out, 'stderr': err}
+    except BaseException:
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        finally:
+            child.communicate()
+        raise
 
 
 def parse_stream(harness, stream):
@@ -214,8 +223,10 @@ def git(cwd, *args):
                                    env={k: v for k, v in os.environ.items() if k != 'FIREWORKS_API_KEY'}).strip()
 
 
-def prepare(root, binary, harness, scenario, variant):
+def prepare(root, binary, harness, scenario, variant, profile=None):
     env = isolated_env(root)
+    if profile:
+        env['CODEX_HOME' if harness == 'codex' else 'CLAUDE_CONFIG_DIR'] = str(profile.directory)
     wrapper = root / 'bin/silta'
     wrapper.write_text('#!/bin/sh\nexport HOME=' + shlex.quote(env['HOME'])
                        + '\nexport SILTA_HOME=' + shlex.quote(env['SILTA_HOME']) + '\nexec '
@@ -259,14 +270,17 @@ def prepare(root, binary, harness, scenario, variant):
         for name in ['AGENTS.md', 'CLAUDE.md']:
             (cwd / name).write_text('Ask the human for approval before adding any dependency.\n')
     (root / 'input.md').write_text('# Acme retry bug\n\n- [ ] Reproduce retry\n- [ ] Verify retry\n')
-    (Path(env['CODEX_HOME'])).mkdir(exist_ok=True)
-    (Path(env['CODEX_HOME']) / 'config.toml').write_text('cli_auth_credentials_store = "file"\n')
-    install_args = ['agents', 'install', '--' + harness]
-    if harness == 'claude':
-        install_args += ['--hook', '--stop-hook']
-    preview = silta(env, cwd, install_args + ['--json'])
-    token = json.loads(preview['stdout'])['data']['token']
-    silta(env, cwd, install_args + ['--apply', token])
+    if profile:
+        profile.install(binary, env, cwd)
+    else:
+        (Path(env['CODEX_HOME'])).mkdir(exist_ok=True)
+        (Path(env['CODEX_HOME']) / 'config.toml').write_text('cli_auth_credentials_store = "file"\n')
+        install_args = ['agents', 'install', '--' + harness]
+        if harness == 'claude':
+            install_args += ['--hook', '--stop-hook']
+        preview = silta(env, cwd, install_args + ['--json'])
+        token = json.loads(preview['stdout'])['data']['token']
+        silta(env, cwd, install_args + ['--apply', token])
     control_env = dict(env, SILTA_ACTOR='agent:control:acme')
     tiny = silta(control_env, cwd, ['brief', '--budget', '1', '--json'])
     guide = silta(control_env, cwd, ['guide'])['stdout']
@@ -320,7 +334,26 @@ def phase_prompt(spec, variant, root, phase):
 
 
 def run_trial(binary, harness, model, scenario, variant, repeat, client, output, stub=False,
-              recording='pass', provider='default', operator='interactive', max_trial_tokens=None):
+              recording='pass', provider='default', operator='interactive', max_trial_tokens=None, profile=None):
+    if not stub and provider == 'default' and profile is None:
+        raise ValueError('Default live trials require the CLI run-scoped profile')
+    if not profile:
+        return _run_trial(binary, harness, model, scenario, variant, repeat, client, output, stub,
+                          recording, provider, operator, max_trial_tokens)
+    root = Path(tempfile.mkdtemp(prefix='silta-eval-')).resolve()
+    destination = output / f'{harness}-{scenario}-{variant}-{repeat}'
+    try:
+        result = _run_trial(binary, harness, model, scenario, variant, repeat, client, output, stub,
+                            recording, provider, operator, max_trial_tokens, root, profile)
+    except BaseException:
+        profile.finish_trial(root, destination, retain=True)
+        raise
+    profile.finish_trial(root, destination)
+    return result
+
+
+def _run_trial(binary, harness, model, scenario, variant, repeat, client, output, stub=False,
+               recording='pass', provider='default', operator='interactive', max_trial_tokens=None, root=None, profile=None):
     key = os.environ.get('FIREWORKS_API_KEY', '') if provider == 'fireworks' else ''
     if provider == 'fireworks' and (harness != 'codex' or not key):
         raise ValueError('Fireworks requires Codex and FIREWORKS_API_KEY in the runner environment')
@@ -328,8 +361,8 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
     spec_path = ROOT / 'scenarios' / scenario / 'scenario.yaml'
     spec = json.loads(spec_path.read_text())
     trial_id = f'{harness}-{scenario}-{variant}-{repeat}'
-    root = Path(tempfile.mkdtemp(prefix='silta-eval-')).resolve()
-    env, cwd, sha, controls = prepare(root, binary, harness, scenario, variant)
+    root = root or Path(tempfile.mkdtemp(prefix='silta-eval-')).resolve()
+    env, cwd, sha, controls = prepare(root, binary, harness, scenario, variant, profile)
     if provider == 'fireworks':
         config = Path(env['CODEX_HOME']) / 'config.toml'
         config.write_text(FIREWORKS_CONFIG + config.read_text())
@@ -345,22 +378,6 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
         evidence.update(recording=recording,
                         recording_sha256=hashlib.sha256((ROOT / 'tests/recordings' / f'{scenario}-{recording}.json').read_bytes()).hexdigest(),
                         stub_sha256=hashlib.sha256(client.read_bytes()).hexdigest())
-    if not stub and provider != 'fireworks':
-        # Print only commands and temporary paths, never inspect authentication files.
-        login_env = dict(env)
-        if harness == 'claude' and sys.platform == 'darwin':
-            login_env['HOME'] = os.environ['HOME']
-            login_env['USER'] = os.environ.get('USER', 'unknown')
-        login_env.pop('SILTA_ACTOR', None)
-        launcher = root / 'profile-launcher.sh'
-        login_command = ['env', '-i', *[f'{k}={v}' for k, v in login_env.items()], str(client)]
-        launcher.write_text('#!/bin/sh\ncd ' + shlex.quote(str(cwd)) + ' || exit 1\nexec '
-                            + shlex.join(login_command) + ' "$@"\n')
-        launcher.chmod(0o700)
-        login = [str(launcher), *(['login'] if harness == 'codex' else [])]
-        print('Sign in afresh in another terminal:\n' + shlex.join(login), flush=True)
-        if input('Type signed-in after completing the temporary-profile login: ') != 'signed-in':
-            raise RuntimeError('login not confirmed; temporary profile retained at ' + str(root))
     count = 2 if scenario == 'handoff-resume' or variant.startswith('present-') else 1
     conversation = ''
     for phase in range(count):
@@ -444,7 +461,7 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
         import shutil
         shutil.rmtree(root)
     else:
-        (output / trial_id / 'profile-location.txt').write_text(str(root) + '\n')
+        (output / trial_id / ('trial-location.txt' if profile else 'profile-location.txt')).write_text(str(root) + '\n')
     write_json(output / trial_id / 'evidence.json', evidence)
     return {**grade(evidence), 'id': trial_id, 'harness': harness, 'model': model,
             'scenario': scenario, 'variant': variant, 'repeat': repeat,
@@ -888,7 +905,7 @@ def render_html(report):
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
             '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
-            + rows + '</table><ul>' + links + '</ul></html>')
+            + '<p>' + escape({k: report[k] for k in ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials') if k in report}) + '</p>' + rows + '</table><ul>' + links + '</ul></html>')
 
 
 def main():
@@ -925,39 +942,57 @@ def main():
     if args.max_trial_tokens is not None and (args.max_trial_tokens < 1 or args.harness != 'codex'):
         parser.error('--max-trial-tokens requires Codex and a positive integer')
     args.output.mkdir(parents=True)
-    trials = []
+    trials, aborted, profile = [], False, None
+    cases = []
     for harness in (['claude', 'codex'] if args.harness == 'both' else [args.harness]):
         for scenario in ([args.scenario] if args.scenario else [s for s in SCENARIOS if not args.core or s not in ('proposals-ask', 'ask-short')]):
             spec = json.loads((ROOT / 'scenarios' / scenario / 'scenario.yaml').read_text())
-            for repeat in range(1, args.repeats + 1):
-                for variant in spec['variants']:
-                    try:
-                        trial = run_trial(args.silta.resolve(), harness, args.model, scenario,
-                                          variant, repeat, (args.stub or args.client).resolve(),
-                                          args.output, bool(args.stub), args.recording, args.provider,
-                                          args.operator, args.max_trial_tokens)
-                    except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
-                        trial_id = f'{harness}-{scenario}-{variant}-{repeat}'
-                        failure = {'id': trial_id, 'scenario': scenario, 'variant': variant,
-                                   'harness': harness, 'model': args.model, 'repeat': repeat,
-                                   'passed': False, 'checks': {'infrastructure': False},
-                                   'error': redact(str(error), secret), 'violations': [],
-                                   'provider': args.provider, 'operator': args.operator,
-                                   'metrics': {'silta_calls': 0, 'ctx_calls': 0,
-                                               'usage_errors': 0, 'forbidden_attempts': 0},
-                                   'evidence': trial_id + '/failure.json'}
-                        failure = redact(failure, secret)
-                        write_json(args.output / failure['evidence'], failure)
-                        trial = failure
-                    trials.append(trial)
+            cases.extend((harness, scenario, variant, repeat) for repeat in range(1, args.repeats + 1) for variant in spec['variants'])
+    try:
+        if args.live and args.provider == 'default':
+            profile = RunProfile(args.harness, args.client.resolve(), args.output, isolated_env, execute)
+            profile.sign_in()
+        for harness, scenario, variant, repeat in cases:
+            try:
+                trial = run_trial(args.silta.resolve(), harness, args.model, scenario,
+                                  variant, repeat, (args.stub or args.client).resolve(),
+                                  args.output, bool(args.stub), args.recording, args.provider,
+                                  args.operator, args.max_trial_tokens, profile=profile)
+            except (OSError, RuntimeError, ValueError, KeyError, TypeError, KeyboardInterrupt) as error:
+                trial_id = f'{harness}-{scenario}-{variant}-{repeat}'
+                failure = {'id': trial_id, 'scenario': scenario, 'variant': variant,
+                           'harness': harness, 'model': args.model, 'repeat': repeat,
+                           'passed': False, 'checks': {'infrastructure': False},
+                           'error': redact(str(error) or type(error).__name__, secret), 'violations': [],
+                           'provider': args.provider, 'operator': args.operator,
+                           'metrics': {'silta_calls': 0, 'ctx_calls': 0,
+                                       'usage_errors': 0, 'forbidden_attempts': 0},
+                           'evidence': trial_id + '/failure.json'}
+                failure = redact(failure, secret)
+                write_json(args.output / failure['evidence'], failure)
+                trial = failure
+                if profile or isinstance(error, KeyboardInterrupt):
+                    aborted = True
+            trials.append(trial)
+            if aborted:
+                break
+    except (OSError, RuntimeError, ValueError, EOFError, KeyboardInterrupt) as error:
+        aborted = True
+        write_json(args.output / 'abort.json', {'error': redact(str(error) or type(error).__name__, secret)})
+    finally:
+        if profile:
+            profile.instructions()
     report = aggregate(trials, 'stub' if args.stub else 'live')
+    if profile:
+        report.update(aborted=aborted, planned_trials=len(cases), attempted_trials=len(trials),
+                      completed_trials=sum(t['checks'].get('infrastructure', False) for t in trials))
     report['commit'] = git(ROOT, 'rev-parse', 'HEAD')
     report['dirty'] = bool(git(ROOT, 'status', '--porcelain'))
     report['binary_sha256'] = hashlib.sha256(args.silta.read_bytes()).hexdigest()
     report = redact(report, secret)
     write_json(args.output / 'report.json', report)
     (args.output / 'report.html').write_text(render_html(report))
-    return 0 if all(t['passed'] for t in trials) else 1
+    return 0 if not aborted and all(t['passed'] for t in trials) else 1
 
 
 if __name__ == '__main__':
