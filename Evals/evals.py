@@ -233,7 +233,8 @@ def parse_stream(harness, stream):
     if len(accepted) != len(result['tool_results']):
         schema_errors.append('tool_results')
         result['tool_results'] = accepted
-    if result['usage'] is not None and (tokens(result['usage']) is None or not finite_json(result['usage'])):
+    usage = result['usage']
+    if usage is not None and (not isinstance(usage, dict) or (usage and tokens(usage) is None) or not finite_json(usage)):
         schema_errors.append('usage')
         result['usage'] = None
     cost = result['cost_usd']

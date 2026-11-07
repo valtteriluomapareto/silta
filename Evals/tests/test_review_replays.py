@@ -252,6 +252,7 @@ class NativeLifecycle(unittest.TestCase):
             base = self.events(harness)
             parsed = evals.parse_stream(harness, '\n'.join(map(json.dumps, base)))
             self.assertTrue(parsed['complete'])
+            self.assertIsNone(evals.tokens(parsed['usage']), 'Absent usage must stay unknown')
             cases = {'missing-result':base[:2]+base[3:], 'orphan-result':[base[0],*base[2:]],
                      'duplicate-result':base[:3]+base[2:], 'duplicate-start':base[:2]+base[1:],
                      'missing-terminal':base[:3], 'duplicate-terminal':base+[base[-1]],
