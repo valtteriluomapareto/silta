@@ -3,7 +3,9 @@
 | Audience | Where |
 |---|---|
 | Agents working in this repo | [`../AGENTS.md`](../AGENTS.md) |
-| What Silta is, install | [`../README.md`](../README.md) |
+| New users: what Silta is, install | [`../README.md`](../README.md) |
+| New users: install to first task in their workspace | [`getting-started.md`](getting-started.md) |
+| Annotated app, repo and edge configuration | [`examples/acme-workspace.yaml`](examples/acme-workspace.yaml) |
 | Contributors (commands, workflow) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | Product and technical design | [`spec.md`](spec.md) |
 | Why things are the way they are | [`decisions.md`](decisions.md) |
@@ -20,6 +22,8 @@
 | You changed… | Also update |
 |---|---|
 | A command, flag, JSON shape, error code or exit code | `spec.md` §16, the golden tests, and `silta guide` text |
+| A command, flag or user-visible behavior | Check `../README.md` and `getting-started.md` |
+| Workspace configuration fields or shape | `getting-started.md`, `examples/acme-workspace.yaml`, and its CLI test |
 | The data model or a migration | `spec.md` §6, and add a new migration (never edit a shipped one) |
 | A design choice or trade-off | `decisions.md`: a new D# entry, or a dated "↳ update" under the old one |
 | Scope or order of work | The active plan and the board below |

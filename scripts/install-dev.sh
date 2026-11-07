@@ -34,4 +34,4 @@ trap 'rm -f "$temporary"' EXIT
 install -m 755 "$binary" "$temporary"
 mv -f "$temporary" "$destination/silta"
 printf 'Installed %s from commit %s.\n' "$destination/silta" "$commit"
-printf 'Next: follow %s/docs/dogfood/README.md with the maintainer.\n' "$root"
+printf 'Next: follow %s/docs/getting-started.md.\n' "$root"
