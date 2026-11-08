@@ -14,6 +14,12 @@ struct ScenarioTests {
     .filter { $0.pathExtension == "yaml" }.sorted { $0.path < $1.path }
     try #require(!files.isEmpty)
     for file in files {
+      let steps = try Scenario.decode(String(contentsOf: file, encoding: .utf8)).steps
+      let loggedSteps = steps.enumerated().filter { step in
+        let arguments = step.element.args
+        return arguments.first != "help" && !arguments.contains("--help")
+          && !arguments.contains("-h") && !arguments.contains("--version")
+      }
       var transcripts: [Data] = []
       for _ in 0..<2 {
         try withScratchDirectory { scratch in
@@ -22,11 +28,12 @@ struct ScenarioTests {
           let log = try String(
             contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)
           let lines = log.split(separator: "\n")
-          #expect(lines.count == transcript.split(separator: 10).count)
+          #expect(lines.count == loggedSteps.count)
           for (index, line) in lines.enumerated() {
             let entry = try #require(
               JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
-            let expected = ScenarioRunner.environment(step: index, overrides: [:], scratch: scratch)
+            let expected = ScenarioRunner.environment(
+              step: loggedSteps[index].offset, overrides: [:], scratch: scratch)
             #expect(entry["timestamp"] as? String == expected["SILTA_NOW"])
           }
         }
