@@ -32,8 +32,6 @@ What other slices are doing now:
 - Shared files and their owners are listed in docs/plans/m1-daily-use.md; don't edit
   one you don't own without saying so first.
 
-Setup: follow CONTRIBUTING.md, "Toolchain", for the pinned lint tools.
-
 Steps:
 1. Record your plan where AGENTS.md's current dogfooding stage requires it,
    including the out-of-scope work, then get it reviewed before coding. Proceed

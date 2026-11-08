@@ -39,6 +39,27 @@ struct SpecParityTests {
       try #require(!published.isEmpty)
       #expect(published.subtracting(documented).sorted() == [], "Commands missing from §16")
       #expect(documented.subtracting(published).sorted() == [], "Unknown commands in §16")
+
+      let dump = try SiltaBinary.run(["--experimental-dump-help"], in: scratch)
+      try #require(dump.termination == .exit(0))
+      #expect(dump.stderr.isEmpty)
+      let tree = try #require(
+        JSONSerialization.jsonObject(with: Data(dump.stdout.utf8)) as? [String: Any])
+      try #require(tree["serializationVersion"] as? Int == 0)
+      let command = try #require(tree["command"] as? [String: Any])
+      let all = try commandPaths(command, prefix: "").subtracting(["silta"])
+      let exceptions = [
+        "silta agents session-start": "Claude SessionStart protocol documented in spec §12.",
+        "silta agents stop": "Claude Stop protocol documented in spec §12.",
+        "silta comment post": "Default spelling of comment; documented by silta comment --help.",
+        "silta help": "ArgumentParser's built-in help, documented with global flags in spec §16.",
+      ]
+      for (name, reason) in exceptions {
+        #expect(all.contains(name), "Stale exception: \(name); \(reason)")
+      }
+      let covered = documented.union(exceptions.keys)
+      #expect(all.subtracting(covered).sorted() == [], "Undocumented parser commands")
+      #expect(covered.subtracting(all).sorted() == [], "Unknown commands or exceptions")
     }
   }
 
@@ -78,6 +99,18 @@ struct SpecParityTests {
     let expected = Dictionary(
       uniqueKeysWithValues: ErrorCode.allCases.map { ($0.rawValue, $0.exitCode) })
     #expect(documented == expected, "§16 codes and exits must match ErrorCode in both directions")
+  }
+
+  private func commandPaths(_ command: [String: Any], prefix: String) throws -> Set<String> {
+    let word = try #require(command["commandName"] as? String)
+    let path = prefix.isEmpty ? word : prefix + " " + word
+    let children = command["subcommands"] as? [[String: Any]] ?? []
+    var paths: Set<String> = []
+    if children.isEmpty || command["defaultSubcommand"] != nil { paths.insert(path) }
+    for child in children {
+      paths.formUnion(try commandPaths(child, prefix: path))
+    }
+    return paths
   }
 
   private func cliSection() throws -> String {

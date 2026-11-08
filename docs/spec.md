@@ -1735,7 +1735,8 @@ arguments.
   ls`, `ws show`, `schema`, `guide`). Warnings and errors still show; with `--json` it changes
   nothing.
 - `--json` and `--quiet` may come before or after the subcommand.
-- `--help` and `--version` print plain text to stdout and exit 0, even with `--json`.
+- `--help` (`-h`, `help`) and `--version` print plain text to stdout and exit 0, even
+  with `--json` or a broken environment.
 - A parse error is `usage` (exit 1). Its message is one line of at most 200
   characters, and `next` is `silta <command> --help` for the command that was being
   parsed. A parsed but invalid value is `invalid`.
