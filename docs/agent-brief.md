@@ -5,7 +5,8 @@ subagent). The repo's rules already live in `AGENTS.md` and the coding guideline
 the brief only adds what they can't know: what "done" is, what other slices are doing
 right now, and where to stop.
 
-Copy the block, fill in the `<…>`, and delete lines that don't apply.
+Copy the block, fill in the `<…>`, and delete lines that don't apply. Setup is in
+[CONTRIBUTING, Toolchain](../CONTRIBUTING.md#toolchain).
 
 ```text
 Work slice <Sn> "<title>" (GitHub issue #<n>, Silta task <SI-n>) in this repo.
@@ -30,11 +31,6 @@ What other slices are doing now:
 - <e.g. S7 is in progress in another agent; don't touch Sources/SiltaCore/Location/>
 - Shared files and their owners are listed in docs/plans/m1-daily-use.md; don't edit
   one you don't own without saying so first.
-
-Setup: install the pinned lint tools (Homebrew's versions differ from CI's):
-  T=$(mktemp -d); : > "$T/path"
-  RUNNER_TEMP="$T" GITHUB_PATH="$T/path" bash scripts/ci/install-swift-tools.sh
-  export PATH="$(paste -sd: "$T/path"):$PATH"
 
 Steps:
 1. Record your plan where AGENTS.md's current dogfooding stage requires it,

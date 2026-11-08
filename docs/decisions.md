@@ -68,9 +68,12 @@ They're summarised here so every decision has one index.
   - macOS 15+.
   - Domain types don't import GRDB; record conformances live in the storage layer.
 - **D12: SQLite through GRDB**, using the system SQLite.
-  - PostgreSQL is the planned move if Silta is ever shared by several people.
-  - Turso is revisited when it reaches 1.0, or when a Swift binding appears.
-  - The comparison is in spec Appendix B.
+  - Need (2026-11-02): many short-lived Swift writer processes with full-text search.
+    PostgreSQL offers Finnish search and sharing but needs a server; it is the planned
+    move for multi-person use. Turso/libSQL lacked mature Swift/multi-process support;
+    revisit at 1.0 or a Swift binding. Other candidates lost on single-writer limits,
+    missing FTS, immature bindings, licensing or maintenance. SQLite sharing add-ons
+    remain options; CloudKit is a poor fit for work data.
   - **↳ update 2026-11-02:** a home-local advisory file lock covers database
     initialization: WAL setup, pending-migration discovery, backup and migration.
     GRDB discovers pending work before its migration transaction, and simultaneous

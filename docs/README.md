@@ -6,8 +6,8 @@
 | New users: what Silta is, install | [`../README.md`](../README.md) |
 | New users: install to first task in their workspace | [`getting-started.md`](getting-started.md) |
 | Annotated app, repo and edge configuration | [`examples/acme-workspace.yaml`](examples/acme-workspace.yaml) |
-| Contributors (commands, workflow) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
-| Product and technical design | [`spec.md`](spec.md) |
+| Contributors (toolchain, commands, workflow) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
+| Contributors (product contract and technical design) | [`spec.md`](spec.md) |
 | Why things are the way they are | [`decisions.md`](decisions.md) |
 | How Swift code is written, and what each target and folder holds | [`coding-guidelines.md`](coding-guidelines.md) |
 | Plans and their lifecycle | [`plans/README.md`](plans/README.md), [`plans/_template.md`](plans/_template.md) |
@@ -21,7 +21,7 @@
 
 | You changed… | Also update |
 |---|---|
-| A command, flag, JSON shape, error code or exit code | `spec.md` §16, the golden tests, and `silta guide` text |
+| A command, flag, JSON shape, error code or exit code | `spec.md` §16, the golden tests, and `silta guide` text; parity tests check the spec against code |
 | A command, flag or user-visible behavior | Check `../README.md` and `getting-started.md` |
 | Workspace configuration fields or shape | `getting-started.md`, `examples/acme-workspace.yaml`, and its CLI test |
 | The data model or a migration | `spec.md` §6, and add a new migration (never edit a shipped one) |

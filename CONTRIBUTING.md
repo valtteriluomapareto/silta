@@ -13,8 +13,15 @@ This covers setup, commands and the merge workflow. Agents should start with
 | Python | system `python3` | guard scripts and offline agent-eval tooling |
 
 CI selects exactly this Xcode (`scripts/ci/select-xcode.sh`) and installs the
-SHA-checked tools. Locally, `brew install swiftlint swift-format` is enough. If a
-lint result differs from CI, trust CI's pinned versions.
+SHA-checked tools. Use the same pinned tools locally; Homebrew's current versions
+can produce different lint results. On macOS 15+ arm64 with Command Line Tools:
+
+```sh
+silta_tools=$(mktemp -d)
+: > "$silta_tools/path"
+RUNNER_TEMP="$silta_tools" GITHUB_PATH="$silta_tools/path" bash scripts/ci/install-swift-tools.sh
+export PATH="$(paste -sd: "$silta_tools/path"):$PATH"
+```
 
 ## Commands
 
