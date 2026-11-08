@@ -31,6 +31,10 @@ class ShellProof(unittest.TestCase):
             nested = 'sh -c ' + shlex.quote(nested)
         self.assertTrue(parse_shell(nested).opaque)
 
+    def test_printf_allows_only_data_formats_without_arithmetic_effects(self):
+        self.assertTrue(parse_shell("printf '%d' 'SILTA_HOME=1'; silta brief").opaque)
+        self.assertFalse(parse_shell("printf '%s' Acme; silta brief").opaque)
+
     def test_10_opaque_background_effects_outlive_native_completion(self):
         p = phase({'A': "sh -c 'read value < /tmp/acme-fifo; silta where' &", 'B': 'silta brief'},
                   [('A', 'started'), ('A', 'completed'), ('B', 'started'), ('B', 'completed')],
