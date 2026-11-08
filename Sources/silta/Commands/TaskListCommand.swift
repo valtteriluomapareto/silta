@@ -4,7 +4,8 @@ import SiltaCore
 struct TaskListCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "ls",
-    abstract: "List workspace tasks, including your own proposals.")
+    abstract: "List workspace tasks, including your own proposals.",
+    discussion: "Work the backlog: silta task ls --status todo")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.summaryShape)])
 

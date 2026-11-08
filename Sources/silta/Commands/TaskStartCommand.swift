@@ -4,7 +4,8 @@ import SiltaCore
 
 struct TaskStartCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "start", abstract: "Claim a todo task for this exact actor and session.")
+    commandName: "start", abstract: "Claim a todo task for this exact actor and session.",
+    discussion: "Claim a task: silta task start AC-1")
 
   static let dataShape = TaskOutput.receiptShape
 

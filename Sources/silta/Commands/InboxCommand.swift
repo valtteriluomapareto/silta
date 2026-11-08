@@ -7,7 +7,8 @@ struct InboxCommand: OutputCommand {
     discussion: "Human inboxes include grouped blockers, proposals and promoted task pointers. "
       + "Tracker status is not refreshed. --for me means human:<USER>, independent of the caller. "
       + "ask human: is a confirmation instruction, not an executable command. "
-      + "See `silta guide questions` for relay and approval rules. Reads never clear attention.")
+      + "See `silta guide questions` for relay and approval rules. Reads never clear attention.\n"
+      + "Read pending attention: silta inbox")
   static let workspaceSource = WorkspaceSource.option
   static let dataShape = Shape.object([
     "scope": .string, "actor": .string, "remaining": .int, "more": .optional(.string),

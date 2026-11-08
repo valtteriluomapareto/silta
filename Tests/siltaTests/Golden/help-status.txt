@@ -4,7 +4,7 @@ OVERVIEW: Print a one-line status: workspace, app, inbox count and your claimed
 tasks.
 
 Bare silta runs this. It is a read: no fetch, no index write. inbox counts what
-silta inbox shows for you; claimed lists your exact session's claims.
+`silta inbox` shows for you; claimed lists your exact session's claims.
 
 USAGE: silta status [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
 
