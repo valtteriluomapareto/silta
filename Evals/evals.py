@@ -681,10 +681,7 @@ def shell_program(phase, command, call=None):
     """Only attested native call cwd can anchor relative filesystem inputs."""
     raw_scope = phase.get('scope')
     scope = dict(raw_scope) if isinstance(raw_scope, dict) else {}
-    calls = [call] if call is not None else [row for row in phase.get('tool_results', [])
-                                           if row.get('command') == command]
-    cwds = [row.get('cwd') for row in calls]
-    scope['cwd'] = cwds[0] if cwds and isinstance(cwds[0], str) and all(c == cwds[0] for c in cwds) else None
+    scope['cwd'] = call.get('cwd') if isinstance(call, dict) else None
     return parse_shell(command, scope=scope)
 
 

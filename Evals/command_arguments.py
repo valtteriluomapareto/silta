@@ -161,7 +161,7 @@ def read_paths(argv, *, stdin=False):
     if not positional and (name == 'ls' or name == 'rg' and (not stdin or '--files' in used)
                            or name == 'grep' and set(used) & {'-r', '--recursive'}):
         positional = ['.']
-    return files + [word for word in positional if word != '-']
+    return files + [word for word in positional if word != '-' or name == 'ls']
 
 
 def path_scope(paths, scope):
