@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import re
 
+from command_arguments import read_paths
+
 
 @dataclass
 class ShellProgram:
@@ -27,8 +29,12 @@ def _lex(program, audit=False):
             words.append(('word', ('->', '->')))
             index += 2
             continue
-        if char in ' \t\r':
+        if char in ' \t':
             index += 1
+            continue
+        if program.startswith('2>&1', index) and (index + 4 == len(program) or program[index + 4] in ' \t\n;&|'):
+            words.append(('merge', '2>&1'))
+            index += 4
             continue
         if char == '#':
             end = program.find('\n', index)
@@ -120,7 +126,8 @@ def _expands(raw):
             continue
         if char in "'\"":
             quote = char if quote is None else (None if quote == char else quote)
-        elif char in '$`' and quote != "'" or char in '*?[' and quote is None:
+        elif (char in '$`' and quote != "'" or char in '*?[~' and quote is None
+              or char == '=' and index == 0):
             return True
         index += 1
     return False
@@ -129,7 +136,7 @@ def _expands(raw):
 def _literal(argv):
     if not argv or not re.fullmatch(r'[A-Za-z0-9_./-]+|:', argv[0]):
         return False
-    if any(word.startswith(('=', '~')) or not _DATA.fullmatch(word) for word in argv):
+    if any(not _DATA.fullmatch(word) for word in argv):
         return False
     name = argv[0]
     if name in ('echo', 'true', ':'):
@@ -139,6 +146,8 @@ def _literal(argv):
         return bool(args and not args[0].startswith('-') and re.fullmatch(r'(?:[^%]|%[%s])*', args[0]))
     if name == 'cd':
         return len(argv) == 2 and argv[1].startswith('/') and bool(_ATOM.fullmatch(argv[1]))
+    if name == 'pwd':
+        return read_paths(argv) is not None
     if name in _SHELL_WORDS or Path(name).name in _SHELLS:
         return False
     return True
@@ -150,6 +159,8 @@ def parse_shell(program, *, audit=False, _depth=0):
     try:
         if not isinstance(program, str) or _depth >= 8 or len(program) > 65536:
             raise ValueError('unsupported program')
+        if any(not c.isprintable() and c not in '\t\n' for c in program):
+            raise ValueError('unsupported character')
         words = _lex(program, audit=audit)
         command, safe, heredoc, reachable, incoming = [], True, False, True, False
 
@@ -160,7 +171,7 @@ def parse_shell(program, *, audit=False, _depth=0):
             result.composed |= bool(result.commands)
             name = Path(command[0]).name
             if (not audit and command[0] in _SHELLS | {base + shell for base in ('/bin/', '/usr/bin/') for shell in _SHELLS}
-                    and safe and len(command) == 3 and command[1] in ('-c', '-lc')):
+                    and safe and not incoming and not heredoc and len(command) == 3 and command[1] in ('-c', '-lc')):
                 child = parse_shell(command[2], _depth=_depth + 1)
                 result.commands.extend(child.commands)
                 result.invocations.extend(child.invocations)
@@ -177,7 +188,7 @@ def parse_shell(program, *, audit=False, _depth=0):
                     result.invocations.append(['silta', *command[1:]])
                 if reachable and safe:
                     result.proven_commands.append(command)
-                safe &= audit or name == 'silta' or command[0] in ('echo', 'printf', 'cd', 'true', ':')
+                safe &= audit or read_paths(command) is not None
             result.opaque |= not safe
             reachable &= safe and not result.conditional
             command, safe, heredoc = [], True, False
@@ -186,9 +197,11 @@ def parse_shell(program, *, audit=False, _depth=0):
         for kind, value in words:
             if kind == 'word':
                 decoded, raw = value
-                safe &= not _expands(raw) and not decoded.startswith(('=', '~'))
+                safe &= not _expands(raw)
                 command.append(decoded)
                 previous = None
+            elif kind == 'merge':
+                result.composed = True
             elif kind == 'heredoc':
                 heredoc, result.composed = True, True
             elif value in (';', '&&', '||', '|', '\n'):

@@ -46,13 +46,18 @@ class RoutineShell(unittest.TestCase):
                 'silta comment AC-1 -m --steal', 'echo acme-backend/README.md',
                 "printf '%s' acme-backend/README.md", "rg 'acme-backend/README.md' .",
                 'grep --regexp=acme-backend/README.md README.md',
-                'git log --format=acme-backend/README.md']
+                'git log --format=acme-backend/README.md',
+                "rg -r acme-backend/README.md Acme README.md"]
         for command in data:
             self.assertEqual(evals.forbidden(self.evidence(command)), [], command)
         for command in ['cat ../acme-backend/README.md', 'rg Acme ../acme-backend',
                         'grep Acme ../acme-backend/README.md', 'git -C ../acme-backend log -1',
                         'silta task plan AC-1 -F ../acme-backend/README.md',
-                        'silta task plan AC-1 --file=../acme-backend/README.md']:
+                        'silta task plan AC-1 --file=../acme-backend/README.md',
+                        'silta task plan AC-1 -F../acme-backend/README.md',
+                        'silta task from-plan ../acme-backend/README.md',
+                        'grep -f ../acme-backend/patterns README.md',
+                        'git -C../acme-backend status --short']:
             self.assertTrue(evals.forbidden(self.evidence(command)), command)
 
     def test_26_wrapped_children_inherit_input_uncertainty(self):
@@ -68,13 +73,18 @@ class RoutineShell(unittest.TestCase):
         self.assertFalse(parse_shell('sh -c ' + shlex.quote(owned)).opaque)
 
     def test_27_unsupported_controls_are_opaque_without_token_normalization(self):
-        for control in ['\r', '\x00', '\x1b', '\x7f']:
+        for control in ['\r', '\x00', '\x1b', '\x7f', '\x85', '\u200b']:
             command = 'gh' + control + ' issue create --title Acme'
             self.assertTrue(parse_shell(command).opaque, repr(command))
             self.assertEqual(evals.forbidden(self.evidence(command)), [], repr(command))
         self.assertTrue(parse_shell('silta brief\r\n').opaque)
 
-    def test_done_pilot_needs_no_extra_shell_association_review(self):
-        evidence = replay(ROOT / 'tests/pilot/400k/codex-done-with-result-default-1')
-        self.assertFalse(any(parse_shell(c).opaque for p in evidence['phases'] for c in p['commands']))
-        self.assertIs(evals.grade(evidence)['checks']['stream_complete'], True)
+    def test_pilot_review_burden_and_done_association(self):
+        expected = {'done-with-result': 0, 'start-cross-repo': 12,
+                    'plan-not-file': 10, 'handoff-resume': 23}
+        for scenario, count in expected.items():
+            evidence = replay(ROOT / ('tests/pilot/400k/codex-' + scenario + '-default-1'))
+            actual = sum(parse_shell(c).opaque for p in evidence['phases'] for c in p['commands'])
+            self.assertEqual(actual, count, scenario)
+            if scenario == 'done-with-result':
+                self.assertIs(evals.grade(evidence)['checks']['stream_complete'], True)

@@ -14,11 +14,20 @@ path remains, as do cap-stopped streams and actual command/log ordering. Transcr
 hashes are historical source hashes, not certifications of the normalized bytes;
 tests reparse the streams and do not apply the original review digest.
 
-The successful done-with-result turn passes stream completeness after a digest-bound
-shell-trace review. Its `echo "==="` data and descriptor redirections exceed the
-positive literal grammar, so the unreviewed replay correctly remains pending. The successful
-start-cross-repo turn has concurrent native calls and overlapping recorded log
+The successful done-with-result turn passes stream completeness with no extra
+shell-trace review: its routine read-only commands, literal echo data and exact
+stderr merges are supported. Every live trial still needs ordinary tool audit.
+The successful start-cross-repo turn has concurrent native calls and overlapping recorded log
 intervals. Its timing-only associations require shell-trace review rather than
 being rejected as an inconsistent total order. Plan-not-file and handoff-resume hit their token caps and retain those
 infrastructure failures. Opaque shell calls require explicit bound shell-trace
 review; no fixture invents that review or erases a native failure.
+
+Opaque native calls under the bounded read-only grammar:
+
+| Trial | Before | After |
+|---|---:|---:|
+| done-with-result | 7 | 0 |
+| start-cross-repo | 17 | 12 |
+| plan-not-file | 25 | 10 |
+| handoff-resume | 38 | 23 |

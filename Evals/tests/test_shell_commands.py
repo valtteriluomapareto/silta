@@ -65,7 +65,7 @@ class ShellCommands(unittest.TestCase):
         phase['logs'] = phase['logs'][:1]
         self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
         phase = self.phase('silta where 2>&1 | head', [('silta where', 2)])
-        self.assertIsNone(evals.trace_matches_logs(phase, 'codex'))
+        self.assertIs(evals.trace_matches_logs(phase, 'codex'), True)
 
     def test_multiline_input_pipelines_remain_opaque(self):
         for command in ['cat input |\nsilta task plan AC-1 -F -',
@@ -74,7 +74,7 @@ class ShellCommands(unittest.TestCase):
             for rendered in [command, '/bin/zsh -lc ' + shlex.quote(command)]:
                 with self.subTest(command=rendered):
                     self.assertTrue(parse_shell(rendered).opaque)
-        self.assertTrue(parse_shell('echo data | cat\nsilta brief').opaque)
+        self.assertFalse(parse_shell('echo data | cat\nsilta brief').opaque)
 
     def test_trailing_newline_keeps_single_invocation_exit_proof(self):
         for command in ['silta brief\n', '\nsilta brief\n\n', 'silta brief;\n']:
@@ -133,7 +133,7 @@ class ShellCommands(unittest.TestCase):
         e['phases'][0]['tool_results'].pop(6)  # Missing the real task-start pair.
         e['review']['digest'] = evals.review_digest(e)
         e['review'] = None
-        self.assertIsNone(evals.grade(e)['checks']['stream_complete'])
+        self.assertFalse(evals.grade(e)['checks']['stream_complete'])
 
     def test_malformed_approval_audit_cannot_crash(self):
         self.assertEqual(parse_shell("silta task add 'broken -> AC-2").single(), [])
