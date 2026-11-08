@@ -138,7 +138,7 @@ Update this line when a stage starts.
 | Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
 | DF0 | One task per slice. Find it by the issue's `url:` link in `silta --ws silta task ls --proposed --promoted --archived --json`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F - <<'EOF'`, tick each step with `task plan <ref> --step N --done` as soon as it's done. Add subtasks before submitting. When the PR is open, end its description with a `## Draft result` section: the result as it should read once merged, ending with the `Friction:` line. Then `task submit <ref>`; never `done` before the merge. Back on a task in `review`, read the latest `Review:` comment (`gh pr view <n> --comments`), fix it on the same PR, update the draft result, and submit again | Comment on the slice issue | `silta --ws silta task show <ref>` |
 | DF1 | as DF0, but review rounds arrive as Silta threads (see **Reviews** below) | `silta --ws silta comment <ref> --kind question --to <actor> -F -` / `--kind handoff -F -`; answer with `--kind answer --reply-to <question ref>`; the asker accepts with `comment accept <answer ref>` | as DF0 |
-| DF2 | as DF0 | as DF1 | The hook runs `silta brief` |
+| DF2 | as DF0 | as DF1 | The hook runs `silta agents session-start` |
 
 From DF0 on, every command runs as `silta --ws silta …`:
 - **Find the slice's task; never add a second one.** Imported tasks stay `proposed`
