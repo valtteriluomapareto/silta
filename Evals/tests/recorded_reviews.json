@@ -247,16 +247,18 @@
         "present-import": {
           "checks": [
             "tool-audit",
-            "policy-semantics"
+            "policy-semantics",
+            "shell-trace"
           ],
-          "reason": "Idea and exact unsplit import requested before operator words; approved todo created."
+          "reason": "Reviewed the ordered literal import of setup-generated Acme root/input.md outside repository scope: the exact absolute input command is requested before operator approval; unsplit import creates one approved todo. Scope remains opaque and approval/lifecycle checks remain independent."
         },
         "present-split": {
           "checks": [
             "tool-audit",
-            "policy-semantics"
+            "policy-semantics",
+            "shell-trace"
           ],
-          "reason": "Idea and exact split import requested before operator words; approved todos created."
+          "reason": "Reviewed the ordered literal import of setup-generated Acme root/input.md outside repository scope: the exact absolute input command is requested before operator approval; split import creates the approved todos. Scope remains opaque and approval/lifecycle checks remain independent."
         },
         "own-parent": {
           "checks": [

@@ -1,0 +1,254 @@
+[
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta init",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 323,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.246Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta ws edit",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 37,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.583Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 14,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.633Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "app": "acme-mobile",
+    "command": "silta task add",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.659Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta ws edit",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.708Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta agents install",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 25,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.757Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta agents install",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 27,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.795Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 118,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.837Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 13,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.967Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta ws edit",
+    "error_code": "human_only",
+    "exit_code": 3,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 20,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:06:54.992Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:claude:eval-control",
+    "command": "silta agents session-start",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 117,
+    "timestamp": "2026-11-07T13:06:55.026Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta where",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 1678,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:06:57.947Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 123,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:06:59.637Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 28,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:02.069Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 14,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:02.110Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 28,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:04.728Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 134,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:04.769Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta task start",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 101,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:07.997Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta task done",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 39,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:10.558Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta task done",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 128,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:12.829Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 61,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:15.348Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-done-with-result-default-1-a",
+    "command": "silta session check",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 27,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:07:15.417Z",
+    "warnings": []
+  }
+]

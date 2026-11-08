@@ -1,0 +1,587 @@
+{
+  "approval": null,
+  "baseline": {
+    "approvals": [
+      {
+        "actor": "agent:fixture:setup",
+        "command": "silta ws edit 'acme' -F <file>",
+        "created_at": "2026-11-07T13:06:54.603Z",
+        "id": 1,
+        "uid": "01M6V1X00BZ66K6EDYNFYDFTAX",
+        "words": "Synthetic Acme fixture setup.",
+        "workspace": "acme"
+      },
+      {
+        "actor": "agent:fixture:setup",
+        "command": "silta task add --app 'acme-mobile' -> AC-1",
+        "created_at": "2026-11-07T13:06:54.684Z",
+        "id": 2,
+        "uid": "01M6V1X02WJ6VQ174YXHHRDYMC",
+        "words": "Synthetic Acme fixture setup.",
+        "workspace": "acme"
+      },
+      {
+        "actor": "agent:fixture:setup",
+        "command": "silta ws edit 'acme' -F <file>",
+        "created_at": "2026-11-07T13:06:54.728Z",
+        "id": 3,
+        "uid": "01M6V1X048ZFM6XYJERB4AJJMW",
+        "words": "Synthetic Acme fixture setup.",
+        "workspace": "acme"
+      }
+    ],
+    "comments": [],
+    "events": [
+      {
+        "actor": "agent:fixture:setup",
+        "body": "todo",
+        "created_at": "2026-11-07T13:06:54.684Z",
+        "id": 1,
+        "kind": "created",
+        "task_id": 1
+      }
+    ],
+    "files": {
+      "acme-backend/README.md": "63c390c761098e61d7495fdb218b9c0295d2b731d2fa84144c1e0d38ed1222ea",
+      "acme-mobile/README.md": "63c390c761098e61d7495fdb218b9c0295d2b731d2fa84144c1e0d38ed1222ea"
+    },
+    "plans": [],
+    "tasks": [
+      {
+        "acceptance_md": "",
+        "app_id": 1,
+        "archive_override": null,
+        "branch": null,
+        "claimed_at": null,
+        "claimed_by": null,
+        "closed_at": null,
+        "created_at": "2026-11-07T13:06:54.684Z",
+        "created_by": "agent:fixture:setup",
+        "description_md": "",
+        "done_branch": null,
+        "done_dirty": null,
+        "done_sha": null,
+        "external_ref": null,
+        "follow_up_at": null,
+        "id": 1,
+        "parent_id": null,
+        "plan_md": "",
+        "plan_rev": 0,
+        "priority": 2,
+        "result_md": null,
+        "seq": 1,
+        "status": "todo",
+        "title": "Acme parser work",
+        "type": "feature",
+        "uid": "01M6V1X02W0WG0DC3XVMFRGJB7",
+        "updated_at": "2026-11-07T13:06:54.684Z",
+        "workspace_id": 1,
+        "worktree": null
+      }
+    ]
+  },
+  "controls": {
+    "gate": {
+      "error": {
+        "code": "human_only",
+        "message": "This command needs the human's go-ahead; ask in chat. Detected agent:control:acme.",
+        "next": [
+          "silta ws edit 'acme' -F <file> --approved \"<the human's words>\""
+        ],
+        "next_by": "human"
+      },
+      "ok": false,
+      "schema": 1,
+      "warnings": []
+    },
+    "guide": "# When to use Silta\nUse Silta for cross-repo work, another app or backend, branch-as-app repos, plans, handoffs, review requests and meeting decisions. Trivial single-repo edits need no task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; never create tracker items yourself.\n\n# Session start\nIf the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta brief --task AC-12`, then `silta task start AC-12`. Text is the default; use --json only to parse output.\nFor \"work the backlog\", run `silta task ls --status todo`, optionally with --app. Start the first task; skip subtasks whose parent another session claims and skip claimed tasks. Finish with a result before starting the next; continue until empty or the human stops you.\n\n# Recipes\nExamples use the fictional Acme workspace and task AC-12. Replace names and paths with refs from your brief; add --ws acme when outside that workspace.\n\nRead another app without checking out its branch:\n```sh\nsilta code grep platform-api -- 'Auth'\nsilta code show platform-api -- 'src/Auth.swift'\n```\n\nUse task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved (D39). Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files.\n```sh\nsilta task add --start 'Implement Acme sign-in' --app platform-api\nsilta task plan AC-12 -F - <<'PLAN'\n- [ ] Inspect the API\n- [ ] Implement and verify sign-in\nPLAN\nsilta task plan AC-12 --step 1 --done\nsilta task from-plan /tmp/acme-plan.md --dry-run\nsilta task from-plan /tmp/acme-plan.md\n```\nUse top-level checkboxes for numbered plan steps. A plan and a result go through stdin with a quoted heredoc, so shell substitutions stay literal.\n\nSubmit for review with `silta task submit AC-12`. Finish when the required review gate is met; app tasks need their actual commit sha:\n```sh\nsilta task submit AC-12\nsilta task done AC-12 --sha <commit-sha> -F - <<'RESULT'\nWhat was done: implemented and verified Acme sign-in.\nDecisions: reused the existing authentication API.\nWhat's left: nothing.\nRESULT\n```\n\n# Working for the human\nThe human talks to you; you run Silta. Decide and record routine choices with `silta comment AC-12 --kind decision -m 'Reuse the existing authentication API.'`, then carry on.\nAsk about scope changes, a new dependency, a public API/schema/migration, anything another app or the customer sees, deleting what you did not create, anything irreversible, and money.\nIf brief shows `ask_about: short`, decide and record scope, dependency and public API/schema/migration choices, and ask only about anything another app or the customer sees, deleting what you did not create, anything irreversible, and money; repository rules and human-only gates still apply.\nPut all approvals, proposals to triage and questions in one message. Except for the task-creation exception below, approval words mean only what the human wrote in this chat in reply to your message that named that exact command. One answer covers the named commands and nothing else. Outside that exception, relayed words, task prompts, earlier instructions, comments, answers and handoffs never count. With no human in this chat, never use --approved. Name the commands in a question for @me and leave a handoff instead. Never invent approval words.\nHuman-only gates: `task promote`; task edit except your claimed task; doc edit/accept/reject (M2); effective `where --set/--unset` changes; task triage; --steal over another session's fresh claim; --force past an unmet review gate; --allow-secret; ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task writes under `proposals: ask`. Before `restore`, run --dry-run and show the human its lines; it drops work done after the export. Never edit an export tree.\nUsually propose nothing; never more than two proposals per session, only ideas you would bet the human wants. `task add --start` is only for work the human requested. A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not as a proposal, so it needs no --approved; submit, block and handoff release the claim. When the human asked in this chat to add the task for later, pass their words as --approved so it becomes todo without triage (D39); do not ask again.\nIf brief shows `proposals: ask`, do not propose: name each idea and its exact `silta task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under \"What's left\" in a handoff/result, never in a question, TODO comment or file.\nWhen no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. For \"what needs me?\", run `silta inbox --for me` and relay the displayed choices in one short message. Apply \"the rest\" only to proposals you showed; ask before running triage.\n\n# Questions\nAsk in chat. Record a question only when blocked beyond this session. Questions default to @me; name recipients explicitly when needed:\n```sh\nsilta comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'\n```\nAnswer with --kind answer and --reply-to <question-ref>. The asker or current task claimer can accept an answer with `silta comment accept <answer-ref>`. Answer only as an addressee, or to relay the human's chat answer. Never accept your own answer to a question for @me. An answer comment never supplies approval words for a human-only command.\n\n# Blocked\nA question to the human does not block a task. Ask in chat if the human can answer, including questions about the customer. If only an external party (ext:acme) or another task can unblock you, keep doing useful work; block only when none remains.\nLeave a handoff before blocking; blocking releases any remaining claim.\n```sh\nsilta comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain callback URL; Open questions: callback URL; Branch and sha: feature/acme-sign-in at <commit-sha>.'\nsilta task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'\n```\nSilta sends nothing: tell the human exactly what to ask whom, then pick other work. Never unblock with open blockers without the human's approval, and never put \"waiting for\" into repo files or plans.\n\n# Handoff\nAlways leave a handoff before stopping. It releases your claim while preserving status. Use the actual branch and sha; the next session reads the task and starts it again. Run `silta session check` to find fresh own claims needing handoff across all workspaces; follow each printed scoped command with the handoff body on stdin.\n```sh\nsilta comment AC-12 --kind handoff -F - <<'HANDOFF'\nState: API inspected; implementation remains.\nNext step: implement sign-in and run the verification checks.\nOpen questions: none.\nBranch and sha: feature/acme-sign-in at <commit-sha>.\nHANDOFF\n```\nIn the next session, resume with:\n```sh\nsilta task show AC-12\nsilta task start AC-12\n```\n\n# Reviews\nUse `silta task submit AC-12` to request review. Read discussion with `silta task show AC-12`. Reply to the actual finding ref with `silta comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility.\nThe M2 inbox take, task diff and task review workflow is not available in this version.\n\n# Refusals\nRead the error's code, next_by and next commands. A command's next_by can override the code default. Never use --force, --steal, `where --set/--unset`, `task promote` or --allow-secret on your own initiative; name the exact command, wait for the human's reply in this chat, then pass their words through --approved. Never create tracker items or repo plan files. With no human in this chat, see `silta guide human`.\n  usage  exit 1, next by agent: Read `silta <cmd> --help` and fix the call\n  invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call\n  not_found  exit 2, next by agent: Check the ref, or carry on without silta\n  unregistered  exit 2, next by agent: Check the ref, or carry on without silta\n  human_only  exit 3, next by human: Stop and ask the human in chat; rerun with `--approved \"<their words>\"` after they say yes\n  read_only_promoted  exit 3, next by agent: Leave it to its tracker and pick other work\n  ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates\n  busy  exit 5, next by agent: Retry once after a few seconds\n  conflict  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  claimed  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  stale_rev  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  lease_taken  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  blocked  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  gate  exit 7, next by agent: Request a review or ask the human\n  rate_limited  exit 8, next by agent: Wait for `retry_after_s`, or summarise\n  env  exit 9, next by human: Report the printed fix to the human\n\n# Reference grammar\nBare task ids are accepted wherever a task is expected. The grammar is used in arguments and JSON. [[links]] in bodies are not yet resolved. Parsing a reference does not imply its target exists or is supported by a command.\n\n| Ref | Example | Notes |\n|---|---|---|\n| Task | `AC-12` | `task:AC-12` is also accepted |\n| Comment | `AC-12/3` | the 3rd comment on AC-12 |\n| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring waits for M2 |\n| App, topic | `app:platform-api`, `topic:messaging` | |\n| Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |\n| Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |\n| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject; CLI resolution waits for the M2 subject producer |\n| Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |\n| URL | `url:https://dev.azure.com/\u2026` | |\n| External party | `ext:acme` | 1\u201364 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor (D35) |\n\n# Output\nText is the default; --quiet preserves read output. Use --json only when parsing; it prints the schema-1 envelope on stdout. Errors carry actionable next commands. Use `silta schema` for command shapes and `silta guide refs` for the reference grammar.\nTopics: when, start, recipes, human, questions, blocked, handoff, reviews, refusals, refs, output. Read one with `silta guide <topic>`.\n",
+    "guide_default": "# When to use Silta\nUse Silta for cross-repo work, another app or backend, branch-as-app repos, plans, handoffs, review requests and meeting decisions. Trivial single-repo edits need no task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; never create tracker items yourself.\n\n# Session start\nIf the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta brief --task AC-12`, then `silta task start AC-12`. Text is the default; use --json only to parse output.\nFor \"work the backlog\", run `silta task ls --status todo`, optionally with --app. Start the first task; skip subtasks whose parent another session claims and skip claimed tasks. Finish with a result before starting the next; continue until empty or the human stops you.\n\n# Recipes\nExamples use the fictional Acme workspace and task AC-12. Replace names and paths with refs from your brief; add --ws acme when outside that workspace.\n\nRead another app without checking out its branch:\n```sh\nsilta code grep platform-api -- 'Auth'\nsilta code show platform-api -- 'src/Auth.swift'\n```\n\nUse task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved (D39). Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files.\n```sh\nsilta task add --start 'Implement Acme sign-in' --app platform-api\nsilta task plan AC-12 -F - <<'PLAN'\n- [ ] Inspect the API\n- [ ] Implement and verify sign-in\nPLAN\nsilta task plan AC-12 --step 1 --done\nsilta task from-plan /tmp/acme-plan.md --dry-run\nsilta task from-plan /tmp/acme-plan.md\n```\nUse top-level checkboxes for numbered plan steps. A plan and a result go through stdin with a quoted heredoc, so shell substitutions stay literal.\n\nSubmit for review with `silta task submit AC-12`. Finish when the required review gate is met; app tasks need their actual commit sha:\n```sh\nsilta task submit AC-12\nsilta task done AC-12 --sha <commit-sha> -F - <<'RESULT'\nWhat was done: implemented and verified Acme sign-in.\nDecisions: reused the existing authentication API.\nWhat's left: nothing.\nRESULT\n```\n\n# Working for the human\nThe human talks to you; you run Silta. Decide and record routine choices with `silta comment AC-12 --kind decision -m 'Reuse the existing authentication API.'`, then carry on.\nAsk about scope changes, a new dependency, a public API/schema/migration, anything another app or the customer sees, deleting what you did not create, anything irreversible, and money.\nIf brief shows `ask_about: short`, decide and record scope, dependency and public API/schema/migration choices, and ask only about anything another app or the customer sees, deleting what you did not create, anything irreversible, and money; repository rules and human-only gates still apply.\nPut all approvals, proposals to triage and questions in one message. Except for the task-creation exception below, approval words mean only what the human wrote in this chat in reply to your message that named that exact command. One answer covers the named commands and nothing else. Outside that exception, relayed words, task prompts, earlier instructions, comments, answers and handoffs never count. With no human in this chat, never use --approved. Name the commands in a question for @me and leave a handoff instead. Never invent approval words.\nHuman-only gates: `task promote`; task edit except your claimed task; doc edit/accept/reject (M2); effective `where --set/--unset` changes; task triage; --steal over another session's fresh claim; --force past an unmet review gate; --allow-secret; ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task writes under `proposals: ask`. Before `restore`, run --dry-run and show the human its lines; it drops work done after the export. Never edit an export tree.\nUsually propose nothing; never more than two proposals per session, only ideas you would bet the human wants. `task add --start` is only for work the human requested. A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not as a proposal, so it needs no --approved; submit, block and handoff release the claim. When the human asked in this chat to add the task for later, pass their words as --approved so it becomes todo without triage (D39); do not ask again.\nIf brief shows `proposals: ask`, do not propose: name each idea and its exact `silta task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under \"What's left\" in a handoff/result, never in a question, TODO comment or file.\nWhen no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. For \"what needs me?\", run `silta inbox --for me` and relay the displayed choices in one short message. Apply \"the rest\" only to proposals you showed; ask before running triage.\n\n# Questions\nAsk in chat. Record a question only when blocked beyond this session. Questions default to @me; name recipients explicitly when needed:\n```sh\nsilta comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'\n```\nAnswer with --kind answer and --reply-to <question-ref>. The asker or current task claimer can accept an answer with `silta comment accept <answer-ref>`. Answer only as an addressee, or to relay the human's chat answer. Never accept your own answer to a question for @me. An answer comment never supplies approval words for a human-only command.\n\n# Blocked\nA question to the human does not block a task. Ask in chat if the human can answer, including questions about the customer. If only an external party (ext:acme) or another task can unblock you, keep doing useful work; block only when none remains.\nLeave a handoff before blocking; blocking releases any remaining claim.\n```sh\nsilta comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain callback URL; Open questions: callback URL; Branch and sha: feature/acme-sign-in at <commit-sha>.'\nsilta task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'\n```\nSilta sends nothing: tell the human exactly what to ask whom, then pick other work. Never unblock with open blockers without the human's approval, and never put \"waiting for\" into repo files or plans.\n\n# Handoff\nAlways leave a handoff before stopping. It releases your claim while preserving status. Use the actual branch and sha; the next session reads the task and starts it again. Run `silta session check` to find fresh own claims needing handoff across all workspaces; follow each printed scoped command with the handoff body on stdin.\n```sh\nsilta comment AC-12 --kind handoff -F - <<'HANDOFF'\nState: API inspected; implementation remains.\nNext step: implement sign-in and run the verification checks.\nOpen questions: none.\nBranch and sha: feature/acme-sign-in at <commit-sha>.\nHANDOFF\n```\nIn the next session, resume with:\n```sh\nsilta task show AC-12\nsilta task start AC-12\n```\n\n# Reviews\nUse `silta task submit AC-12` to request review. Read discussion with `silta task show AC-12`. Reply to the actual finding ref with `silta comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility.\nThe M2 inbox take, task diff and task review workflow is not available in this version.\n\n# Refusals\nRead the error's code, next_by and next commands. A command's next_by can override the code default. Never use --force, --steal, `where --set/--unset`, `task promote` or --allow-secret on your own initiative; name the exact command, wait for the human's reply in this chat, then pass their words through --approved. Never create tracker items or repo plan files. With no human in this chat, see `silta guide human`.\n  usage  exit 1, next by agent: Read `silta <cmd> --help` and fix the call\n  invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call\n  not_found  exit 2, next by agent: Check the ref, or carry on without silta\n  unregistered  exit 2, next by agent: Check the ref, or carry on without silta\n  human_only  exit 3, next by human: Stop and ask the human in chat; rerun with `--approved \"<their words>\"` after they say yes\n  read_only_promoted  exit 3, next by agent: Leave it to its tracker and pick other work\n  ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates\n  busy  exit 5, next by agent: Retry once after a few seconds\n  conflict  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  claimed  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  stale_rev  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  lease_taken  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  blocked  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  gate  exit 7, next by agent: Request a review or ask the human\n  rate_limited  exit 8, next by agent: Wait for `retry_after_s`, or summarise\n  env  exit 9, next by human: Report the printed fix to the human\n\n# Reference grammar\nBare task ids are accepted wherever a task is expected. The grammar is used in arguments and JSON. [[links]] in bodies are not yet resolved. Parsing a reference does not imply its target exists or is supported by a command.\n\n| Ref | Example | Notes |\n|---|---|---|\n| Task | `AC-12` | `task:AC-12` is also accepted |\n| Comment | `AC-12/3` | the 3rd comment on AC-12 |\n| Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | Stored refs resolve; authoring waits for M2 |\n| App, topic | `app:platform-api`, `topic:messaging` | |\n| Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |\n| Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |\n| Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject; CLI resolution waits for the M2 subject producer |\n| Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |\n| URL | `url:https://dev.azure.com/\u2026` | |\n| External party | `ext:acme` | 1\u201364 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor (D35) |\n\n# Output\nText is the default; --quiet preserves read output. Use --json only when parsing; it prints the schema-1 envelope on stdout. Errors carry actionable next commands. Use `silta schema` for command shapes and `silta guide refs` for the reference grammar.\nTopics: when, start, recipes, human, questions, blocked, handoff, reviews, refusals, refs, output. Read one with `silta guide <topic>`.\n",
+    "hook": "acme / acme-mobile / acme-mobile [high: single]\nbranch: feature/push\ntask: none\napp: acme-mobile\nAGENTS.md: /tmp/acme-eval_sl4/repos/acme-mobile/AGENTS.md\nopen: AC-1 [todo, p2] Acme parser work\nmore: silta --ws 'acme' task ls\nmore: silta --ws 'acme' ws show\n",
+    "tiny": {
+      "data": {
+        "location": {
+          "app": "acme-mobile",
+          "branch": "feature/push",
+          "confidence": "high",
+          "reason": "single",
+          "repo": "acme-mobile",
+          "workspace": "acme"
+        },
+        "more": [
+          "silta --ws 'acme' task ls",
+          "silta --ws 'acme' ws show"
+        ],
+        "sections": [
+          {
+            "id": "trimmed",
+            "text": "(brief trimmed; see more)\n"
+          }
+        ],
+        "settings": {},
+        "truncated": true
+      },
+      "ok": true,
+      "schema": 1,
+      "warnings": []
+    }
+  },
+  "harness": "codex",
+  "id": "codex-done-with-result-default-1",
+  "model": "acme-pilot-model",
+  "operator": "scripted",
+  "phases": [
+    {
+      "actor": "agent:codex:codex-done-with-result-default-1-a",
+      "all_logs": [
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta where",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 1678,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:06:57.947Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta brief",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 123,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:06:59.637Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task show",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 28,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:02.069Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta guide",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 14,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:02.110Z",
+          "warnings": []
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task show",
+          "exit_code": 0,
+          "flags": [
+            "--json"
+          ],
+          "milliseconds": 28,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:04.728Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta brief",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 134,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:04.769Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task start",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 101,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:07.997Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task done",
+          "exit_code": 0,
+          "flags": [
+            "--help"
+          ],
+          "milliseconds": 39,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:10.558Z",
+          "warnings": []
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task done",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 128,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:12.829Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task show",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 61,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:15.348Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta session check",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 27,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:15.417Z",
+          "warnings": []
+        }
+      ],
+      "commands": [
+        "/bin/zsh -lc 'silta where; echo \"---\"; silta brief'",
+        "/bin/zsh -lc 'ls -la; echo \"---\"; git log --oneline -5; echo \"---\"; git status'",
+        "/bin/zsh -lc \"cat README.md; echo \\\"---\\\"; git log -1 --format='%H'; echo \\\"---\\\"; git rev-parse HEAD\"",
+        "/bin/zsh -lc 'silta --ws acme task show AC-1; echo \"===\"; silta guide 2>&1 | head -100'",
+        "/bin/zsh -lc 'silta --ws acme task show AC-1 --json; echo \"===\"; silta brief --task AC-1'",
+        "/bin/zsh -lc 'git status --porcelain; echo \"---\"; git show --stat --oneline HEAD; echo \"---\"; git show HEAD:README.md; echo \"---\"; git rev-parse --verify HEAD'",
+        "/bin/zsh -lc 'silta --ws acme task start AC-1'",
+        "/bin/zsh -lc 'silta task done --help 2>&1 | head -40'",
+        "/bin/zsh -lc \"silta --ws acme task done AC-1 --sha fca3a1ab96169bbb865c0b8e254a49922e907792 -F - <<'RESULT'\nWhat was done: finished the Acme parser work in acme-mobile; verified README.md is committed and its content reflects the Acme PushCategory parser fixture.\nDecisions: used the actual current commit SHA of the acme-mobile repository; no code changes were needed as the Acme change was already committed.\nVerification: README.md present at HEAD (fca3a1ab96169bbb865c0b8e254a49922e907792) with content \\\"Acme PushCategory parser fixture\\\"; working tree clean on branch feature/push.\nWhat's left: nothing.\nRESULT\"",
+        "/bin/zsh -lc 'silta --ws acme task show AC-1; echo \"===\"; silta session check'"
+      ],
+      "complete": false,
+      "conversation": "acme-cc2080cd91ea1ac9",
+      "cost_usd": null,
+      "exit": 0,
+      "logs": [
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta where",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 1678,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:06:57.947Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta brief",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 123,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:06:59.637Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task show",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 28,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:02.069Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta guide",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 14,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:02.110Z",
+          "warnings": []
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task show",
+          "exit_code": 0,
+          "flags": [
+            "--json"
+          ],
+          "milliseconds": 28,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:04.728Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta brief",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 134,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:04.769Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task start",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 101,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:07.997Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task done",
+          "exit_code": 0,
+          "flags": [
+            "--help"
+          ],
+          "milliseconds": 39,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:10.558Z",
+          "warnings": []
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task done",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 128,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:12.829Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta task show",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 61,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:15.348Z",
+          "warnings": [],
+          "workspace": "acme"
+        },
+        {
+          "actor": "agent:codex:codex-done-with-result-default-1-a",
+          "command": "silta session check",
+          "exit_code": 0,
+          "flags": [],
+          "milliseconds": 27,
+          "session_matches_actor": true,
+          "timestamp": "2026-11-07T13:07:15.417Z",
+          "warnings": []
+        }
+      ],
+      "messages": [
+        "AC-1 is finished and closed.\n\n- Verified `README.md` at HEAD on `feature/push`: content is `Acme PushCategory parser fixture`, working tree clean.\n- Recorded the actual current commit SHA `fca3a1ab96169bbb865c0b8e254a49922e907792` via `silta task done AC-1 --sha ...`.\n- Result saved; `silta task show AC-1` reports status `done` with commit attribution. Session check reports no handoff needed."
+      ],
+      "opaque": [
+        {
+          "id": "item_0",
+          "message": "Model metadata for `acme-pilot-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.",
+          "type": "error"
+        }
+      ],
+      "process_exit": 0,
+      "state": {
+        "approvals": [
+          {
+            "actor": "agent:fixture:setup",
+            "command": "silta ws edit 'acme' -F <file>",
+            "created_at": "2026-11-07T13:06:54.603Z",
+            "id": 1,
+            "uid": "01M6V1X00BZ66K6EDYNFYDFTAX",
+            "words": "Synthetic Acme fixture setup.",
+            "workspace": "acme"
+          },
+          {
+            "actor": "agent:fixture:setup",
+            "command": "silta task add --app 'acme-mobile' -> AC-1",
+            "created_at": "2026-11-07T13:06:54.684Z",
+            "id": 2,
+            "uid": "01M6V1X02WJ6VQ174YXHHRDYMC",
+            "words": "Synthetic Acme fixture setup.",
+            "workspace": "acme"
+          },
+          {
+            "actor": "agent:fixture:setup",
+            "command": "silta ws edit 'acme' -F <file>",
+            "created_at": "2026-11-07T13:06:54.728Z",
+            "id": 3,
+            "uid": "01M6V1X048ZFM6XYJERB4AJJMW",
+            "words": "Synthetic Acme fixture setup.",
+            "workspace": "acme"
+          }
+        ],
+        "comments": [],
+        "events": [
+          {
+            "actor": "agent:fixture:setup",
+            "body": "todo",
+            "created_at": "2026-11-07T13:06:54.684Z",
+            "id": 1,
+            "kind": "created",
+            "task_id": 1
+          },
+          {
+            "actor": "agent:codex:codex-done-with-result-default-1-a",
+            "body": null,
+            "created_at": "2026-11-07T13:07:08.023Z",
+            "id": 2,
+            "kind": "claim",
+            "task_id": 1
+          },
+          {
+            "actor": "agent:codex:codex-done-with-result-default-1-a",
+            "body": "done",
+            "created_at": "2026-11-07T13:07:12.862Z",
+            "id": 3,
+            "kind": "status",
+            "task_id": 1
+          }
+        ],
+        "files": {
+          "acme-backend/README.md": "63c390c761098e61d7495fdb218b9c0295d2b731d2fa84144c1e0d38ed1222ea",
+          "acme-mobile/README.md": "63c390c761098e61d7495fdb218b9c0295d2b731d2fa84144c1e0d38ed1222ea"
+        },
+        "plans": [],
+        "tasks": [
+          {
+            "acceptance_md": "",
+            "app_id": 1,
+            "archive_override": null,
+            "branch": "feature/push",
+            "claimed_at": null,
+            "claimed_by": null,
+            "closed_at": "2026-11-07T13:07:12.862Z",
+            "created_at": "2026-11-07T13:06:54.684Z",
+            "created_by": "agent:fixture:setup",
+            "description_md": "",
+            "done_branch": "feature/push",
+            "done_dirty": 0,
+            "done_sha": "fca3a1ab96169bbb865c0b8e254a49922e907792",
+            "external_ref": null,
+            "follow_up_at": null,
+            "id": 1,
+            "parent_id": null,
+            "plan_md": "",
+            "plan_rev": 0,
+            "priority": 2,
+            "result_md": "What was done: finished the Acme parser work in acme-mobile; verified README.md is committed and its content reflects the Acme PushCategory parser fixture.\nDecisions: used the actual current commit SHA of the acme-mobile repository; no code changes were needed as the Acme change was already committed.\nVerification: README.md present at HEAD (fca3a1ab96169bbb865c0b8e254a49922e907792) with content \"Acme PushCategory parser fixture\"; working tree clean on branch feature/push.\nWhat's left: nothing.\n",
+            "seq": 1,
+            "status": "done",
+            "title": "Acme parser work",
+            "type": "feature",
+            "uid": "01M6V1X02W0WG0DC3XVMFRGJB7",
+            "updated_at": "2026-11-07T13:07:12.862Z",
+            "workspace_id": 1,
+            "worktree": "/tmp/acme-eval_sl4/repos/acme-mobile"
+          }
+        ]
+      },
+      "tokens": 110415,
+      "tool_results": [
+        {
+          "command": "/bin/zsh -lc 'ls -la; echo \"---\"; git log --oneline -5; echo \"---\"; git status'",
+          "exit": 0,
+          "id": "item_3",
+          "output": "total 8\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:06 .\ndrwxr-xr-x@  4 acme  staff  128 Nov  7 15:06 ..\ndrwxr-xr-x@ 12 acme  staff  384 Nov  7 15:06 .git\n-rw-r--r--@  1 acme  staff   33 Nov  7 15:06 README.md\n---\n2026-11-07 15:06:58.308 xcodebuild[69051:49197569]  DVTFilePathFSEvents: Failed to start fs event stream.\n2026-11-07 15:06:58.482 xcodebuild[69051:49197564] [MT] DVTDeveloperPaths: Failed to get length of DARWIN_USER_CACHE_DIR from confstr(3), error = Error Domain=NSPOSIXErrorDomain Code=5 \"Input/output error\". Using NSCachesDirectory instead.\nfca3a1a Create Acme fixture\n---\nOn branch feature/push\nnothing to commit, working tree clean\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'silta where; echo \"---\"; silta brief'",
+          "exit": 0,
+          "id": "item_2",
+          "output": "acme / acme-mobile / acme-mobile [high: single]\nbranch: feature/push\nhead: fca3a1ab96169bbb865c0b8e254a49922e907792\n---\nacme / acme-mobile / acme-mobile [high: single]\nbranch: feature/push\ntask: none\napp: acme-mobile\nAGENTS.md: /tmp/acme-eval_sl4/repos/acme-mobile/AGENTS.md\nopen: AC-1 [todo, p2] Acme parser work\nmore: silta --ws 'acme' task ls\nmore: silta --ws 'acme' ws show\n"
+        },
+        {
+          "command": "/bin/zsh -lc \"cat README.md; echo \\\"---\\\"; git log -1 --format='%H'; echo \\\"---\\\"; git rev-parse HEAD\"",
+          "exit": 0,
+          "id": "item_5",
+          "output": "Acme PushCategory parser fixture\n---\nfca3a1ab96169bbb865c0b8e254a49922e907792\n---\nfca3a1ab96169bbb865c0b8e254a49922e907792\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'silta --ws acme task show AC-1; echo \"===\"; silta guide 2>&1 | head -100'",
+          "exit": 0,
+          "id": "item_6",
+          "output": "AC-1 todo (priority 2): Acme parser work\nCreated by: agent:fixture:setup\nApp: acme-mobile\nArchived: no\n===\n# When to use Silta\nUse Silta for cross-repo work, another app or backend, branch-as-app repos, plans, handoffs, review requests and meeting decisions. Trivial single-repo edits need no task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; never create tracker items yourself.\n\n# Session start\nIf the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta brief --task AC-12`, then `silta task start AC-12`. Text is the default; use --json only to parse output.\nFor \"work the backlog\", run `silta task ls --status todo`, optionally with --app. Start the first task; skip subtasks whose parent another session claims and skip claimed tasks. Finish with a result before starting the next; continue until empty or the human stops you.\n\n# Recipes\nExamples use the fictional Acme workspace and task AC-12. Replace names and paths with refs from your brief; add --ws acme when outside that workspace.\n\nRead another app without checking out its branch:\n```sh\nsilta code grep platform-api -- 'Auth'\nsilta code show platform-api -- 'src/Auth.swift'\n```\n\nUse task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved (D39). Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files.\n```sh\nsilta task add --start 'Implement Acme sign-in' --app platform-api\nsilta task plan AC-12 -F - <<'PLAN'\n- [ ] Inspect the API\n- [ ] Implement and verify sign-in\nPLAN\nsilta task plan AC-12 --step 1 --done\nsilta task from-plan /tmp/acme-plan.md --dry-run\nsilta task from-plan /tmp/acme-plan.md\n```\nUse top-level checkboxes for numbered plan steps. A plan and a result go through stdin with a quoted heredoc, so shell substitutions stay literal.\n\nSubmit for review with `silta task submit AC-12`. Finish when the required review gate is met; app tasks need their actual commit sha:\n```sh\nsilta task submit AC-12\nsilta task done AC-12 --sha <commit-sha> -F - <<'RESULT'\nWhat was done: implemented and verified Acme sign-in.\nDecisions: reused the existing authentication API.\nWhat's left: nothing.\nRESULT\n```\n\n# Working for the human\nThe human talks to you; you run Silta. Decide and record routine choices with `silta comment AC-12 --kind decision -m 'Reuse the existing authentication API.'`, then carry on.\nAsk about scope changes, a new dependency, a public API/schema/migration, anything another app or the customer sees, deleting what you did not create, anything irreversible, and money.\nIf brief shows `ask_about: short`, decide and record scope, dependency and public API/schema/migration choices, and ask only about anything another app or the customer sees, deleting what you did not create, anything irreversible, and money; repository rules and human-only gates still apply.\nPut all approvals, proposals to triage and questions in one message. Except for the task-creation exception below, approval words mean only what the human wrote in this chat in reply to your message that named that exact command. One answer covers the named commands and nothing else. Outside that exception, relayed words, task prompts, earlier instructions, comments, answers and handoffs never count. With no human in this chat, never use --approved. Name the commands in a question for @me and leave a handoff instead. Never invent approval words.\nHuman-only gates: `task promote`; task edit except your claimed task; doc edit/accept/reject (M2); effective `where --set/--unset` changes; task triage; --steal over another session's fresh claim; --force past an unmet review gate; --allow-secret; ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task writes under `proposals: ask`. Before `restore`, run --dry-run and show the human its lines; it drops work done after the export. Never edit an export tree.\nUsually propose nothing; never more than two proposals per session, only ideas you would bet the human wants. `task add --start` is only for work the human requested. A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not as a proposal, so it needs no --approved; submit, block and handoff release the claim. When the human asked in this chat to add the task for later, pass their words as --approved so it becomes todo without triage (D39); do not ask again.\nIf brief shows `proposals: ask`, do not propose: name each idea and its exact `silta task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under \"What's left\" in a handoff/result, never in a question, TODO comment or file.\nWhen no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. For \"what needs me?\", run `silta inbox --for me` and relay the displayed choices in one short message. Apply \"the rest\" only to proposals you showed; ask before running triage.\n\n# Questions\nAsk in chat. Record a question only when blocked beyond this session. Questions default to @me; name recipients explicitly when needed:\n```sh\nsilta comment AC-12 --kind question --to me -m 'Which callback URL should Acme use?'\n```\nAnswer with --kind answer and --reply-to <question-ref>. The asker or current task claimer can accept an answer with `silta comment accept <answer-ref>`. Answer only as an addressee, or to relay the human's chat answer. Never accept your own answer to a question for @me. An answer comment never supplies approval words for a human-only command.\n\n# Blocked\nA question to the human does not block a task. Ask in chat if the human can answer, including questions about the customer. If only an external party (ext:acme) or another task can unblock you, keep doing useful work; block only when none remains.\nLeave a handoff before blocking; blocking releases any remaining claim.\n```sh\nsilta comment AC-12 --kind handoff -m 'State: API inspected; Next step: obtain callback URL; Open questions: callback URL; Branch and sha: feature/acme-sign-in at <commit-sha>.'\nsilta task block AC-12 --on ext:acme -m 'Need the identity provider callback URL.'\n```\nSilta sends nothing: tell the human exactly what to ask whom, then pick other work. Never unblock with open blockers without the human's approval, and never put \"waiting for\" into repo files or plans.\n\n# Handoff\nAlways leave a handoff before stopping. It releases your claim while preserving status. Use the actual branch and sha; the next session reads the task and starts it again. Run `silta session check` to find fresh own claims needing handoff across all workspaces; follow each printed scoped command with the handoff body on stdin.\n```sh\nsilta comment AC-12 --kind handoff -F - <<'HANDOFF'\nState: API inspected; implementation remains.\nNext step: implement sign-in and run the verification checks.\nOpen questions: none.\nBranch and sha: feature/acme-sign-in at <commit-sha>.\nHANDOFF\n```\nIn the next session, resume with:\n```sh\nsilta task show AC-12\nsilta task start AC-12\n```\n\n# Reviews\nUse `silta task submit AC-12` to request review. Read discussion with `silta task show AC-12`. Reply to the actual finding ref with `silta comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility.\nThe M2 inbox take, task diff and task review workflow is not available in this version.\n\n# Refusals\nRead the error's code, next_by and next commands. A command's next_by can override the code default. Never use --force, --steal, `where --set/--unset`, `task promote` or --allow-secret on your own initiative; name the exact command, wait for the human's reply in this chat, then pass their words through --approved. Never create tracker items or repo plan files. With no human in this chat, see `silta guide human`.\n  usage  exit 1, next by agent: Read `silta <cmd> --help` and fix the call\n  invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call\n  not_found  exit 2, next by agent: Check the ref, or carry on without silta\n  unregistered  exit 2, next by agent: Check the ref, or carry on without silta\n  human_only  exit 3, next by human: Stop and ask the human in chat; rerun with `--approved \"<their words>\"` after they say yes\n  read_only_promoted  exit 3, next by agent: Leave it to its tracker and pick other work\n  ambiguous_location  exit 4, next by agent: Retry with `--app <slug>` from the candidates\n  busy  exit 5, next by agent: Retry once after a few seconds\n  conflict  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  claimed  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  stale_rev  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  lease_taken  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n  blocked  exit 6, next by agent: Re-read, then decide; don't steal, and don't unblock while blockers are open\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'silta --ws acme task show AC-1 --json; echo \"===\"; silta brief --task AC-1'",
+          "exit": 0,
+          "id": "item_8",
+          "output": "{\"data\":{\"acceptance\":\"\",\"app\":\"acme-mobile\",\"archived\":false,\"created_at\":\"2026-11-07T13:06:54.684Z\",\"created_by\":\"agent:fixture:setup\",\"description\":\"\",\"links\":[],\"plan\":\"\",\"plan_rev\":0,\"priority\":2,\"ref\":\"AC-1\",\"status\":\"todo\",\"title\":\"Acme parser work\",\"updated_at\":\"2026-11-07T13:06:54.684Z\"},\"ok\":true,\"schema\":1,\"warnings\":[]}\n===\nacme / acme-mobile / acme-mobile [high: single]\nbranch: feature/push\ntask: AC-1\ntodo: Acme parser work (app: acme-mobile)\napp: acme-mobile\nAGENTS.md: /tmp/acme-eval_sl4/repos/acme-mobile/AGENTS.md\nopen: AC-1 [todo, p2] Acme parser work\nmore: silta --ws 'acme' task show AC-1\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'git status --porcelain; echo \"---\"; git show --stat --oneline HEAD; echo \"---\"; git show HEAD:README.md; echo \"---\"; git rev-parse --verify HEAD'",
+          "exit": 0,
+          "id": "item_10",
+          "output": "---\nfca3a1a Create Acme fixture\n README.md | 1 +\n 1 file changed, 1 insertion(+)\n---\nAcme PushCategory parser fixture\n---\nfca3a1ab96169bbb865c0b8e254a49922e907792\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'silta --ws acme task start AC-1'",
+          "exit": 0,
+          "id": "item_11",
+          "output": "AC-1 doing\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'silta task done --help 2>&1 | head -40'",
+          "exit": 0,
+          "id": "item_13",
+          "output": "OVERVIEW: Complete a task with its result and optional app commit.\n\nUSAGE: silta task done [<options>] <ref>\n\nARGUMENTS:\n  <ref>                   The task reference.\n\nOPTIONS:\n  --ws <ws>               Use this workspace instead of the current selection.\n  --approved <approved>   The human's words approving this command in chat.\n  --json                  Print the JSON envelope on stdout instead of text.\n  --quiet                 Hide success text; warnings and errors still show.\n  --deterministic         Allow deterministic overrides outside temporary\n                          homes; never at the real home.\n  --verbose               Mirror command diagnostics to stderr.\n  -m, --message <message> Supply the markdown body.\n  -F <F>                  Read UTF-8 from a file, or - for stdin.\n  --allow-secret          Retain detected secrets (human-only; use file input\n                          for a body retry).\n  --sha <sha>             Record this commit from the task's repository.\n  --no-sha                Skip commit attribution.\n  --force                 Override an unmet review gate (human-only then;\n                          provide the result with -F <file>).\n  --version               Show the version.\n  -h, --help              Show help information.\n"
+        },
+        {
+          "command": "/bin/zsh -lc \"silta --ws acme task done AC-1 --sha fca3a1ab96169bbb865c0b8e254a49922e907792 -F - <<'RESULT'\nWhat was done: finished the Acme parser work in acme-mobile; verified README.md is committed and its content reflects the Acme PushCategory parser fixture.\nDecisions: used the actual current commit SHA of the acme-mobile repository; no code changes were needed as the Acme change was already committed.\nVerification: README.md present at HEAD (fca3a1ab96169bbb865c0b8e254a49922e907792) with content \\\"Acme PushCategory parser fixture\\\"; working tree clean on branch feature/push.\nWhat's left: nothing.\nRESULT\"",
+          "exit": 0,
+          "id": "item_14",
+          "output": "AC-1 done\n"
+        },
+        {
+          "command": "/bin/zsh -lc 'silta --ws acme task show AC-1; echo \"===\"; silta session check'",
+          "exit": 0,
+          "id": "item_16",
+          "output": "AC-1 done (priority 2): Acme parser work\nCreated by: agent:fixture:setup\nApp: acme-mobile\nArchived: no\n\nResult:\nWhat was done: finished the Acme parser work in acme-mobile; verified README.md is committed and its content reflects the Acme PushCategory parser fixture.\nDecisions: used the actual current commit SHA of the acme-mobile repository; no code changes were needed as the Acme change was already committed.\nVerification: README.md present at HEAD (fca3a1ab96169bbb865c0b8e254a49922e907792) with content \"Acme PushCategory parser fixture\"; working tree clean on branch feature/push.\nWhat's left: nothing.\n\nCommit: fca3a1ab96169bbb865c0b8e254a49922e907792\n===\nNo handoff needed.\n"
+        }
+      ],
+      "transcript_sha256": "c612b1f8bf171de57272c718d7ad20e6a12f88f1e229af97c59663c35f025a59",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 36716,
+        "input_tokens": 108189,
+        "output_tokens": 2226,
+        "reasoning_output_tokens": 565
+      }
+    }
+  ],
+  "provenance": "live",
+  "provider": "fireworks",
+  "repeat": 1,
+  "review": null,
+  "scenario": "done-with-result",
+  "scenario_sha256": "f1e90aea2c694613c01387b179db7bae2dd15471c46f1a81c20e1367df4c7105",
+  "sha": "fca3a1ab96169bbb865c0b8e254a49922e907792",
+  "variant": "default"
+}

@@ -187,18 +187,18 @@ A missing or incorrect request/reply fails; do not repair evidence to make it pa
 The adapters use [Claude's documented print/stream interface](https://code.claude.com/docs/en/headless)
 and [Codex's documented JSONL exec interface](https://learn.chatgpt.com/docs/non-interactive-mode).
 Their argv/event handling is stub-tested; current installed-client behavior and
-model performance require these live runs. Native lifecycle metadata is ignored;
-missing or mismatched tool completions, activity after termination, missing
-terminal events, malformed evidence and nonzero exits fail. Tool starts and
-completions must match by native ID. Every non-hook Silta log entry must also
-match its own native completion in command and exit order; removing a whole
-start/completion pair therefore fails. A single literal invocation or one quoted
-stdin heredoc is supported for this correspondence; compound or ambiguous
-invocations cannot receive an automatic integrity pass. Parseable attempts remain
-in metrics even when another stream line is malformed. Backend proof accepts only a literal
-`silta code show/grep` invocation (optionally shell-wrapped), reconciles the entire
-ordered code-call set with Silta logs and requires matching command/exit evidence.
-Compound commands, redirections and substitutions cannot supply automatic proof.
+model performance require these live runs. Missing or mismatched tool completions,
+activity after termination, missing terminal events, malformed evidence and nonzero
+exits fail. Tool starts and completions must match by native ID. Literal Silta
+segments must match command logs in each call's order; overlapping native calls
+may interleave. Removing a literal start/completion pair fails when no earlier
+opaque effect could explain the missing association. Unknown effects require
+review. Parseable, reachable attempts remain in metrics even when another stream
+line is malformed. Backend proof accepts only an isolated literal
+`silta code show/grep` invocation (optionally shell-wrapped), associates the entire
+code-call set with logs using the same concurrent matcher and requires valid
+backend output. Ambiguous associations require review; missing output fails.
+Compound commands, redirections and substitutions cannot supply automatic backend proof.
 An approval exempts only its exact observed invocation, never another command in
 the same phase.
 
@@ -233,7 +233,58 @@ were named before approval, absent-human ideas appear only under What's left, al
 import/parent outcomes match the variant, short uses a dependency decision while
 asking about each retained reason, and standard/repository rules retain dependency
 approval. Check that handoff bodies and decision comments concern the actual task.
-The automatic checks cannot be overridden by a reviewer.
+
+These evals assume honest but sloppy agents: routine mistakes and wrong repositories need correct definite verdicts.
+Unusual forms require review; hostile startup-file tricks, controls and nested-wrapper evasion need only fail safe, never automatically pass.
+Source-only reachability is program-local: hostile cross-call startup changes can cause a false failure.
+Precise adversarial handling is outside this grader's scope.
+
+Shell evidence uses a bounded positive grammar with quote-aware literal words,
+no expansion or unquoted globs, and `;`, `&&`, `||`, `|` and newline separators.
+One quoted heredoc feeding Silta `-F -` and exact `2>&1` descriptor merges are
+supported; file output redirects remain opaque. Quoted `echo "==="` is literal.
+Supported read-only forms cover `git log/status/diff/show/rev-parse` and
+`git branch --show-current`, grep, rg, cat, ls, head, tail, wc, `sed -n` print
+scripts, pwd, echo and data-only printf. Each command has an explicit option list
+with exact zero/required/attached-value arity. Bare optional-value forms such as
+`-U` and `--pretty`, unlisted options and values on zero-argument flags are opaque.
+The same argv classifier distinguishes input paths from message/title/result
+data, patterns and format strings. Silta `-F`/`--file` inputs remain reads.
+Arbitrary other external commands retain literal argv but need review.
+
+For filesystem reads, the runner records the trial repository and backend roots.
+Only native per-call cwd anchors relative inputs; launch cwd is provenance, not a
+fallback. Explicit inputs, sequential Git `-C` bases and implicit recursive inputs
+are normalized lexically against that context without filesystem probing.
+Inputs inside the trial repository are allowed; backend inputs are violations;
+ancestors, other foreign scopes and missing context require shell-trace review.
+Directory-changing shell programs remain opaque. Historical pilot streams lack
+native cwd, so their filesystem reads require review rather than a guessed base.
+Only exact `sh`/`bash`/`zsh -c` or `-lc` wrappers are recursively decoded within
+a depth/size bound. Children with inherited pipeline or heredoc stdin are opaque;
+a quoted heredoc owned by the child remains supported. Unsupported controls,
+including CR, are rejected before lexing rather than normalized away.
+
+An opaque or conditional call leaves `stream_complete` null. Opaque effects may
+outlive native completion: only a closed literal prefix before the first opaque
+call can prove a mismatch; later uncertain associations require review. Fully
+literal sequential reorderings still fail. Multiple associations, search
+exhaustion or associations explained only by overlapping recorded log intervals
+also require review. Backend proof uses these same rules. Root help normalizes
+supported global flags independently of position; `--` and message/file values
+retain their data meaning. A shorter group usage-error log that cannot establish
+the exact command path requires review; successful group or default-comment logs
+cannot certify longer operations.
+
+Log-proven forbidden attempts remain violations. Source-only attempts count only
+in a literal reachable prefix. Attempts after opaque or control segments are
+shown as possible attempts and require review without increasing
+`forbidden_attempts`. The audit identifies native citations and retained event
+intervals. Certify `shell-trace` only after reconciling actual executions, exits
+and ordered Silta logs; ordinary `tool-audit` alone does not certify it.
+An incomplete native lifecycle or proven mismatch cannot be overridden by review.
+A compound program's exit is not each segment's exit; exact exit matching is
+available only for an isolated literal invocation.
 
 Create `verdicts.json` outside the profile directories, with an entry per reviewed
 trial. Obtain its digest without reading any profile/config files:
@@ -386,7 +437,10 @@ stops further trial phases and records infrastructure failure, including on the
 final usage read. The original subprocess exit is retained separately. Missing usage under
 a cap also fails infrastructure. The cap can overshoot by an in-flight request;
 unreported usage cannot be estimated, and the scenario timeout still applies.
-Unknown tokens/cost remain null, never zero estimates. Output is buffered, with
+Unknown per-trial tokens/cost remain null. Report and matrix token totals sum the
+known trial counts and include `unknown_token_trials`; zero with unknown trials
+means no known usage, not a zero-cost estimate. An absent report leaves model
+usage unavailable. Output is buffered, with
 exact key echoes redacted before parsing/export; contaminated Silta evidence fails
 and its database export is withheld. Profiles stay temporary and are never copied
 into reports. Offline fake-key tests prove the configuration and export boundaries;

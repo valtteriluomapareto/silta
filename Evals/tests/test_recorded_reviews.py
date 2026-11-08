@@ -50,6 +50,14 @@ class RecordedReviews(unittest.TestCase):
             self.assertNotIn('policy-semantics', outcome['checks'])
             self.assertTrue(outcome['reason'])
 
+    def test_only_reviewed_foreign_imports_have_shell_trace_certification(self):
+        catalog = json.loads((ROOT / 'tests/recorded_reviews.json').read_text())
+        certified = {(name, variant) for name, entry in catalog['recordings'].items()
+                     for variant, outcome in entry['variants'].items()
+                     if 'shell-trace' in outcome['checks']}
+        self.assertEqual(certified, {('proposals-ask-pass', 'present-import'),
+                                     ('proposals-ask-pass', 'present-split')})
+
     def test_unknown_or_changed_recorded_inputs_are_uncertified(self):
         import copy
         evidence = self.review_input()

@@ -16,6 +16,8 @@ def observations(harness, event):
         item = event['item']
         if item['type'] == 'agent_message' and kind == 'item.completed':
             yield 'message', item['text']
+        elif kind == 'item.completed' and evals.native_diagnostic(item):
+            yield 'diagnostic', item
         elif item['type'] != 'reasoning':
             yield kind.split('.')[1], item
     elif harness == 'claude' and kind in ('assistant', 'user'):
@@ -48,6 +50,8 @@ def render_trial(directory, trial):
     print('\nTRIAL', trial['id'], 'evidence=' + trial['evidence'])
     print('provider=', e.get('provider'), 'model=', trial['model'], 'operator=', e.get('operator'),
           'source=', (e.get('approval') or {}).get('source'), 'reviewer=', (e.get('review') or {}).get('reviewer'))
+    if e.get('phases') and 'baseline' in e:
+        print('POSSIBLE ATTEMPTS (review only)', evals.forbidden(e, possible=True))
     print('SCENARIO', e.get('scenario'), 'variant=', e.get('variant'), 'repeat=', e.get('repeat'), 'expected_sha=', e.get('sha'))
     settings = e.get('controls', {}).get('tiny', {}).get('data', {}).get('settings', {})
     print(trial['evidence'] + '#/controls/tiny/data/settings', 'POLICY SETTINGS', json.dumps(settings))
@@ -87,6 +91,11 @@ def render_trial(directory, trial):
         if not phase.get('transcript_sha256') or hashlib.sha256(raw).hexdigest() != phase['transcript_sha256']:
             issue(bound + '/transcript_sha256', 'unbound or changed transcript; raw order/content is unverified: ' + source)
         parsed = evals.parse_stream(e['harness'], raw.decode(errors='replace'))
+        if isinstance(phase.get('logs'), list):
+            print(bound, 'SHELL TRACE', evals.trace_matches_logs(parsed | {'logs': phase['logs'], 'scope': phase.get('scope', {})}, e['harness']))
+        for result in parsed['tool_results']:
+            print(bound, 'NATIVE CALL INTERVAL', result['id'],
+                  result.get('native_start'), result.get('native_end'))
         for field in ('commands', 'messages', 'tool_results', 'opaque'):
             if parsed[field] != phase.get(field, []):
                 issue(bound + '/' + field, 'raw/retained disagreement; both observations require investigation')
@@ -105,6 +114,9 @@ def render_trial(directory, trial):
                 issue(locator, 'unparsed native observation: ' + excerpt(line, locator))
                 continue
             for kind, item in entries:
+                if kind == 'diagnostic':
+                    print(locator, 'NATIVE DIAGNOSTIC', excerpt(item, locator))
+                    continue
                 if kind == 'message':
                     retained_messages = phase.get('messages', [])
                     retained = (bound + f'/messages/{message_count}' if message_count < len(retained_messages)
@@ -147,8 +159,11 @@ def render_trial(directory, trial):
                     if command is None:
                         issue(citation, 'opaque/native tool effects require investigation')
                     else:
-                        argv = evals.trace_argv(command)
-                        if not argv or Path(argv[0]).name != 'silta':
+                        parsed_shell = evals.shell_program(phase, command, phase['tool_results'][result_index]
+                                                          if result_index is not None else None)
+                        if parsed_shell.opaque or parsed_shell.conditional:
+                            issue(citation, 'opaque/conditional shell: reconcile ordered Silta logs and certify shell-trace review')
+                        if not parsed_shell.invocations or len(parsed_shell.commands) != len(parsed_shell.invocations):
                             issue(citation, 'shell/program effects beyond output and snapshots are unverified')
                 else:
                     if kind == 'completed':

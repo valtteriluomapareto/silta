@@ -1,0 +1,456 @@
+[
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta init",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 302,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:53.980Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta ws edit",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.298Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 13,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.347Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "app": "acme-mobile",
+    "command": "silta task add",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.373Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta ws edit",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 35,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.422Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta agents install",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 25,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.471Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta agents install",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 25,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.510Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 114,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.548Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 13,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.675Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta ws edit",
+    "error_code": "human_only",
+    "exit_code": 3,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 21,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:09:54.701Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:claude:eval-control",
+    "command": "silta agents session-start",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 118,
+    "timestamp": "2026-11-07T13:09:54.736Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta where",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 1625,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:57.172Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 124,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:58.808Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 18,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:01.833Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 29,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:01.833Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta ws show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 25,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:01.875Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta code grep",
+    "error_code": "not_found",
+    "exit_code": 2,
+    "flags": [],
+    "milliseconds": 28,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:05.278Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta ws ls",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 26,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:08.977Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta ws ls",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 23,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:09.016Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta code grep",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 66,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:08.977Z",
+    "warnings": [
+      "ref_stale"
+    ],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta code",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 22,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:23.447Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 28,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:23.447Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 20,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:23.483Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task ls",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 36,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:23.487Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task start",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 25,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:23.515Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task",
+    "error_code": "usage",
+    "exit_code": 1,
+    "flags": [],
+    "milliseconds": 44,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:23.538Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 18,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:28.819Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta comment",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 27,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:28.819Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 17,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:28.853Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 28,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:28.861Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 23,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:28.904Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 157,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:28.819Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task start",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 95,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:31.751Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task plan",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:36.666Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 17,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:36.716Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task plan",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 45,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:41.475Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta comment",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 44,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:41.534Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta comment",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 47,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:44.732Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 25,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:44.792Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-start-cross-repo-default-1-a",
+    "command": "silta session check",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 26,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:10:47.032Z",
+    "warnings": []
+  }
+]

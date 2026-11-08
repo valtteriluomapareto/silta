@@ -1,0 +1,535 @@
+[
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta init",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 293,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:40.754Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta ws edit",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.061Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 14,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.111Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "app": "acme-mobile",
+    "command": "silta task add",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.139Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta ws edit",
+    "exit_code": 0,
+    "flags": [
+      "--approved"
+    ],
+    "milliseconds": 36,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.189Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta agents install",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 25,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.238Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:fixture:setup",
+    "command": "silta agents install",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 25,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.275Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 114,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.313Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 13,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.441Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:control:acme",
+    "command": "silta ws edit",
+    "error_code": "human_only",
+    "exit_code": 3,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 21,
+    "session_matches_actor": false,
+    "timestamp": "2026-11-07T13:08:41.466Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:claude:eval-control",
+    "command": "silta agents session-start",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 119,
+    "timestamp": "2026-11-07T13:08:41.502Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta where",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 1506,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:44.366Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 122,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:45.883Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 29,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:48.772Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta guide",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 17,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:51.535Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task show",
+    "error_code": "not_found",
+    "exit_code": 2,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 28,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:55.860Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta ws show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 30,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:55.860Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task ls",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 26,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:55.904Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta",
+    "error_code": "usage",
+    "exit_code": 1,
+    "flags": [],
+    "milliseconds": 22,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:55.943Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta",
+    "error_code": "usage",
+    "exit_code": 1,
+    "flags": [],
+    "milliseconds": 22,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:55.978Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [
+      "--json"
+    ],
+    "milliseconds": 30,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:59.417Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 13,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:08:59.461Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 23,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:07.806Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task plan",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 33,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:07.844Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta brief",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 127,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:07.891Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta inbox",
+    "error_code": "not_found",
+    "exit_code": 2,
+    "flags": [],
+    "milliseconds": 18,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:15.807Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 30,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:21.438Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task start",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 30,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:21.438Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta comment",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 22,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:21.482Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task done",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 33,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:21.482Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta comment post",
+    "exit_code": 0,
+    "flags": [
+      "--help"
+    ],
+    "milliseconds": 38,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:21.518Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta code grep",
+    "error_code": "not_found",
+    "exit_code": 2,
+    "flags": [],
+    "milliseconds": 31,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:27.221Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta code grep",
+    "error_code": "not_found",
+    "exit_code": 2,
+    "flags": [],
+    "milliseconds": 26,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:27.266Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta code show",
+    "error_code": "not_found",
+    "exit_code": 2,
+    "flags": [],
+    "milliseconds": 25,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:27.304Z",
+    "warnings": []
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta code grep",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 67,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:29.399Z",
+    "warnings": [
+      "ref_stale"
+    ],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta code grep",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 59,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:29.478Z",
+    "warnings": [
+      "ref_stale"
+    ],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta code show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 71,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:29.547Z",
+    "warnings": [
+      "ref_stale"
+    ],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta code show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 73,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:29.630Z",
+    "warnings": [
+      "ref_stale"
+    ],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta status",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 131,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:37.854Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task start",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 89,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:37.996Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta status",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 116,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:38.099Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task plan",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 47,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:43.957Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta comment",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 46,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:47.639Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta task show",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 31,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:50.483Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta status",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 118,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:50.527Z",
+    "warnings": [],
+    "workspace": "acme"
+  },
+  {
+    "actor": "agent:codex:codex-plan-not-file-default-1-a",
+    "command": "silta session check",
+    "exit_code": 0,
+    "flags": [],
+    "milliseconds": 28,
+    "session_matches_actor": true,
+    "timestamp": "2026-11-07T13:09:53.410Z",
+    "warnings": []
+  }
+]
