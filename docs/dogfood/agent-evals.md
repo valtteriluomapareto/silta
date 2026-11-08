@@ -245,11 +245,21 @@ One quoted heredoc feeding Silta `-F -` and exact `2>&1` descriptor merges are
 supported; file output redirects remain opaque. Quoted `echo "==="` is literal.
 Supported read-only forms cover `git log/status/diff/show/rev-parse` and
 `git branch --show-current`, grep, rg, cat, ls, head, tail, wc, `sed -n` print
-scripts, pwd, echo and data-only printf. Their positive option grammar excludes
-writing/executing options; unfamiliar forms require review. The same argv
-classifier distinguishes input paths from message/title/result data, patterns
-and format strings. Silta `-F`/`--file` inputs remain reads. Arbitrary other
-external commands retain literal argv but their effects require review.
+scripts, pwd, echo and data-only printf. Each command has an explicit option list
+with exact zero/required/attached-value arity. Bare optional-value forms such as
+`-U` and `--pretty`, unlisted options and values on zero-argument flags are opaque.
+The same argv classifier distinguishes input paths from message/title/result
+data, patterns and format strings. Silta `-F`/`--file` inputs remain reads.
+Arbitrary other external commands retain literal argv but need review.
+
+For filesystem reads, the runner records the trial repository and backend roots.
+Only native per-call cwd anchors relative inputs; launch cwd is provenance, not a
+fallback. Explicit inputs, sequential Git `-C` bases and implicit recursive inputs
+are normalized lexically against that context without filesystem probing.
+Inputs inside the trial repository are allowed; backend inputs are violations;
+ancestors, other foreign scopes and missing context require shell-trace review.
+Directory-changing shell programs remain opaque. Historical pilot streams lack
+native cwd, so their filesystem reads require review rather than a guessed base.
 Only exact `sh`/`bash`/`zsh -c` or `-lc` wrappers are recursively decoded within
 a depth/size bound. Children with inherited pipeline or heredoc stdin are opaque;
 a quoted heredoc owned by the child remains supported. Unsupported controls,

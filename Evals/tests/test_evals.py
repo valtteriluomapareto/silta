@@ -269,6 +269,8 @@ class Acceptance(unittest.TestCase):
             with self.subTest(command=command):
                 bad = copy.deepcopy(evidence)
                 bad['phases'][0]['commands'].append(command)
+                bad['phases'][0]['tool_results'].append({'command': command,
+                    'cwd': bad['phases'][0]['scope']['launch_cwd'], 'exit': 0, 'output': '', 'id': 'injected'})
                 self.assertFalse(self.evals.grade(bad)['checks']['no_forbidden'])
         for exit_code in [1, 'timeout']:
             bad = copy.deepcopy(evidence)

@@ -1,5 +1,6 @@
 """Bounded argv forms: input paths are distinct from literal option data."""
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import posixpath
 import re
 
 
@@ -34,7 +35,8 @@ def silta_options(argv):
     return flags, files
 
 
-def _options(words, flags, values):
+def _options(words, flags, values, attached=None):
+    attached = attached or {}
     positional, files, used, index = [], [], [], 0
     while index < len(words):
         word = words[index]
@@ -45,21 +47,24 @@ def _options(words, flags, values):
             positional.append(word)
         else:
             flag, equals, value = word.partition('=')
-            parts = [flag] if flag.startswith('--') or flag in flags | values.keys() else ['-' + c for c in flag[1:]]
+            parts = [flag] if flag.startswith('--') else ['-' + c for c in word[1:]]
             for offset, part in enumerate(parts):
                 used.append(part)
-                if part in values:
+                if part in values or part in attached:
+                    if not part.startswith('--'):
+                        value = word[offset + 2:]
+                        equals = bool(value)
                     if not equals:
-                        value = ''.join(p[1:] for p in parts[offset + 1:])
-                        if not value:
-                            index += 1
-                            if index == len(words):
-                                return None
-                            value = words[index]
-                    if values[part] and value != '-':
+                        if part in attached:
+                            return None
+                        index += 1
+                        if index == len(words):
+                            return None
+                        value = words[index]
+                    if (values | attached)[part] and value != '-':
                         files.append(value)
                     break
-                if part not in flags:
+                if part not in flags or equals:
                     return None
         index += 1
     return positional, files, used
@@ -77,15 +82,20 @@ _READ = {
     'rg': ('nilqFwvsocHU', 'files hidden no-ignore line-number ignore-case files-with-matches quiet fixed-strings invert-match only-matching count',
            {'-r': False, '--replace': False, '-e': False, '--regexp': False, '-f': True, '--file': True, '-g': False, '--glob': False, '--iglob': False, '-t': False, '--type': False, '-m': False, '--max-count': False, '-A': False, '-B': False, '-C': False}),
 }
-_GIT_FLAGS = set('''--oneline --all --decorate --no-decorate --stat --name-only --name-status
---no-patch --no-color --no-ext-diff --no-textconv --short --porcelain --branch --verify
---abbrev-ref --show-toplevel --git-dir --show-prefix --is-inside-work-tree --reverse
---date-order --no-merges -p -s -b -w --help'''.split())
-_GIT_VALUES = dict.fromkeys('''-n --max-count --format --pretty --date --since --until
---author --grep -S -G -U'''.split(), False)
+_GIT = {
+    'log': ('--oneline --all --stat --name-only --name-status --no-decorate --reverse --no-merges -p',
+            {'-n': False, '--max-count': False},
+            dict.fromkeys(('--format', '--pretty', '--date', '--since', '--until', '--author', '--grep'), False)),
+    'status': ('--short --porcelain --branch -s -b', {}, {}),
+    'diff': ('--stat --name-only --name-status --no-patch --no-color --no-ext-diff --no-textconv -p -w -b',
+             {}, {'-U': False, '--unified': False}),
+    'show': ('--stat --oneline --name-only --name-status --no-patch --no-color --no-ext-diff --no-textconv -p',
+             {}, {'--format': False, '--pretty': False, '-U': False}),
+    'rev-parse': ('--verify --abbrev-ref --show-toplevel --git-dir --show-prefix --is-inside-work-tree', {}, {}),
+}
 
 
-def read_paths(argv):
+def read_paths(argv, *, stdin=False):
     """Return proven input paths, or None when argv effects/roles need review."""
     if not argv:
         return None
@@ -103,34 +113,38 @@ def read_paths(argv):
             return None
         parsed = _options(words[2:], set(), {})
     elif name == 'git':
-        paths = []
+        paths, base = [], '.'
         while words and (words[0].startswith('-C') or words[0] == '--no-pager'):
             option, words = words[0], words[1:]
             if option.startswith('-C'):
                 if len(option) > 2:
-                    paths.append(option[2:])
+                    base = posixpath.normpath(posixpath.join(base, option[2:]))
+                    paths.append(base)
                 else:
                     if not words:
                         return None
-                    paths.append(words[0])
+                    base = posixpath.normpath(posixpath.join(base, words[0]))
+                    paths.append(base)
                     words = words[1:]
         if not words:
             return None
         verb, words = words[0], words[1:]
         if verb == 'branch':
-            return paths if words == ['--show-current'] else None
-        if verb not in ('log', 'status', 'diff', 'show', 'rev-parse'):
+            return paths + [base] if words == ['--show-current'] else None
+        if verb not in _GIT:
             return None
         explicit = words.index('--') if '--' in words else len(words)
         tail, words = words[explicit + 1:], words[:explicit]
         words = ['-n' + w[1:] if re.fullmatch(r'-\d+', w) else w for w in words]
-        parsed = _options(words, _GIT_FLAGS, _GIT_VALUES)
+        flags, values, attached = _GIT[verb]
+        parsed = _options(words, set(flags.split()), values, attached)
         if parsed is None:
             return None
         positional = parsed[0]
         if verb != 'status' and any('/' in p and ':' not in p and not p.startswith(('/', './', '../')) for p in positional):
             return None
-        return paths + tail + [p for p in positional if verb == 'status' or p.startswith(('/', './', '../'))]
+        return paths + [base] + [posixpath.normpath(posixpath.join(base, p)) for p in
+                               tail + [p for p in positional if verb == 'status' or p.startswith(('/', './', '../'))]]
     elif name in _READ:
         short, long, values = _READ[name]
         flags = {'-' + c for c in short} | {'--' + w for w in long.split()} | {'--help', '--version'}
@@ -144,4 +158,40 @@ def read_paths(argv):
     positional, files, used = parsed
     if name in ('grep', 'rg') and not set(used) & {'-e', '--regexp', '-f', '--file', '--files'}:
         positional = positional[1:]
+    if not positional and (name == 'ls' or name == 'rg' and (not stdin or '--files' in used)
+                           or name == 'grep' and set(used) & {'-r', '--recursive'}):
+        positional = ['.']
     return files + [word for word in positional if word != '-']
+
+
+def path_scope(paths, scope):
+    """Lexical scope needs attested roots; never inspect the grader's filesystem."""
+    if scope is None:
+        return False, []
+    if paths is None:
+        return True, []
+    repository, backends = scope.get('repository'), scope.get('backends')
+    if not paths:
+        return False, []
+    if (not isinstance(repository, str) or not repository.startswith('/')
+            or not isinstance(backends, list)
+            or any(not isinstance(p, str) or not p.startswith('/') for p in backends)):
+        return True, []
+    repository = PurePosixPath(posixpath.normpath(repository))
+    roots = [PurePosixPath(posixpath.normpath(p)) for p in backends]
+    cwd, unknown, forbidden = scope.get('cwd'), False, []
+    for path in paths:
+        if not path:
+            unknown = True
+            continue
+        if not path.startswith('/'):
+            if not isinstance(cwd, str) or not cwd.startswith('/'):
+                unknown = True
+                continue
+            path = posixpath.join(cwd, path)
+        resolved = PurePosixPath(posixpath.normpath(path))
+        if any(resolved.is_relative_to(root) for root in roots):
+            forbidden.append(str(resolved))
+        elif not resolved.is_relative_to(repository):
+            unknown = True
+    return unknown, forbidden

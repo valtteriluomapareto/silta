@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import re
 
-from command_arguments import read_paths
+from command_arguments import read_paths, path_scope
 
 
 @dataclass
@@ -15,6 +15,8 @@ class ShellProgram:
     conditional: bool = False
     redirected: bool = False
     proven_commands: list = field(default_factory=list)
+    backend_reads: list = field(default_factory=list)
+    possible_backend_reads: list = field(default_factory=list)
 
     def isolated(self):
         """One command has the native exit even with supported stdin/stderr forms."""
@@ -158,7 +160,7 @@ def _literal(argv):
     return True
 
 
-def parse_shell(program, *, audit=False, _depth=0):
+def parse_shell(program, *, audit=False, scope=None, _depth=0):
     """Prove literal segments and their reachable prefix; otherwise require review."""
     result = ShellProgram()
     try:
@@ -170,18 +172,22 @@ def parse_shell(program, *, audit=False, _depth=0):
         command, safe, heredoc, reachable, incoming = [], True, False, True, False
 
         def finish():
-            nonlocal command, safe, heredoc, reachable
+            nonlocal command, safe, heredoc, reachable, scope
             if not command:
                 return
             result.composed |= bool(result.commands)
             name = Path(command[0]).name
             if (not audit and command[0] in _SHELLS | {base + shell for base in ('/bin/', '/usr/bin/') for shell in _SHELLS}
                     and safe and not incoming and not heredoc and len(command) == 3 and command[1] in ('-c', '-lc')):
-                child = parse_shell(command[2], _depth=_depth + 1)
+                child = parse_shell(command[2], scope=scope, _depth=_depth + 1)
                 result.commands.extend(child.commands)
                 result.invocations.extend(child.invocations)
                 if reachable:
                     result.proven_commands.extend(child.proven_commands)
+                    result.backend_reads.extend(child.backend_reads)
+                else:
+                    result.possible_backend_reads.extend(child.backend_reads)
+                result.possible_backend_reads.extend(child.possible_backend_reads)
                 safe = not child.opaque
                 result.composed |= child.composed
                 result.conditional |= child.conditional
@@ -194,7 +200,13 @@ def parse_shell(program, *, audit=False, _depth=0):
                     result.invocations.append(['silta', *command[1:]])
                 if reachable and safe:
                     result.proven_commands.append(command)
-                safe &= audit or read_paths(command) is not None
+                paths = read_paths(command, stdin=incoming)
+                unknown, backend = path_scope(paths, scope)
+                (result.backend_reads if reachable and safe else result.possible_backend_reads).extend(backend)
+                safe &= audit or paths is not None and not unknown
+                if scope is not None and command[0] == 'cd':
+                    safe = False
+                    scope = dict(scope, cwd=None)
             result.opaque |= not safe
             reachable &= safe and not result.conditional
             command, safe, heredoc = [], True, False
@@ -231,4 +243,6 @@ def parse_shell(program, *, audit=False, _depth=0):
     except (ValueError, TypeError, IndexError):
         result.opaque = True
         result.proven_commands = []
+        result.possible_backend_reads.extend(result.backend_reads)
+        result.backend_reads = []
     return result

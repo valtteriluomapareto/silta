@@ -36,7 +36,10 @@ class RoutineShell(unittest.TestCase):
     @staticmethod
     def evidence(command):
         return {'baseline': {'files': {}}, 'phases': [{'commands': [command], 'logs': [],
-                                                     'state': {'files': {}}}]}
+                'scope': {'repository': '/tmp/acme-eval/repos/acme-mobile',
+                          'backends': ['/tmp/acme-eval/repos/acme-backend']},
+                'tool_results': [{'command': command, 'cwd': '/tmp/acme-eval/repos/acme-mobile'}],
+                'state': {'files': {}}}]}
 
     def test_isolated_redirects_preserve_exit_proof_without_output_proof(self):
         for command, name in [('silta brief 2>&1', 'brief'),
@@ -91,11 +94,12 @@ class RoutineShell(unittest.TestCase):
         self.assertTrue(parse_shell('silta brief\r\n').opaque)
 
     def test_pilot_review_burden_and_done_association(self):
-        expected = {'done-with-result': 0, 'start-cross-repo': 12,
-                    'plan-not-file': 10, 'handoff-resume': 23}
+        expected = {'done-with-result': 3, 'start-cross-repo': 15,
+                    'plan-not-file': 12, 'handoff-resume': 27}
         for scenario, count in expected.items():
             evidence = replay(ROOT / ('tests/pilot/400k/codex-' + scenario + '-default-1'))
-            actual = sum(parse_shell(c).opaque for p in evidence['phases'] for c in p['commands'])
+            actual = sum(evals.shell_program(p, c, call).opaque for p in evidence['phases']
+                         for c, call in evals.command_calls(p))
             self.assertEqual(actual, count, scenario)
             if scenario == 'done-with-result':
-                self.assertIs(evals.grade(evidence)['checks']['stream_complete'], True)
+                self.assertIsNone(evals.grade(evidence)['checks']['stream_complete'])

@@ -1,6 +1,7 @@
 """Exact option arity and attested path scope constrain read-only proof."""
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -24,8 +25,29 @@ class ShellScope(unittest.TestCase):
                         'head --quiet=value README.md; silta brief']:
             self.assertTrue(parse_shell(command).opaque, command)
         for command in ['git diff -U3', 'git log --pretty=oneline', 'git log -n 5 --format=%H',
-                        'git status --porcelain', 'git show --stat --oneline HEAD']:
+                        'git status --porcelain', 'git show --stat --oneline HEAD', 'git log --format=']:
             self.assertFalse(parse_shell(command).opaque, command)
+
+        with tempfile.TemporaryDirectory(prefix='si66-git-arity-') as root:
+            root = Path(root)
+            env = dict(os.environ, HOME=str(root), SILTA_HOME=str(root / 'data'), ZDOTDIR=str(root))
+            def git(*args):
+                return subprocess.run(['git', '-c', 'user.name=Acme', '-c', 'user.email=acme@example.invalid',
+                                       '-c', 'commit.gpgsign=false', *args], cwd=root, env=env,
+                                      capture_output=True, text=True, check=True)
+            git('init', '-q')
+            (root / 'README.md').write_text('before\n')
+            git('add', 'README.md')
+            git('commit', '-qm', 'Seed')
+            (root / 'README.md').write_text('after\n')
+            git('diff', '-U', '--output=out')
+            self.assertIn('diff --git', (root / 'out').read_text())
+            helper = root / 'helper'
+            helper.write_text('#!/bin/sh\nprintf called > ' + shlex.quote(str(root / 'called')) + '\n')
+            helper.chmod(0o755)
+            env['GIT_EXTERNAL_DIFF'] = str(helper)
+            git('show', '--pretty', '--ext-diff')
+            self.assertTrue((root / 'called').exists())
 
     @staticmethod
     def scoped(command, cwd='/tmp/acme-eval/repos/acme-mobile'):
@@ -70,6 +92,19 @@ class ShellScope(unittest.TestCase):
                         'git -C .. -C acme-backend log -1; silta brief',
                         'grep -f ../acme-backend/patterns README.md; silta brief']:
             self.assertTrue(evals.forbidden(self.evidence(self.scoped(command))), command)
+        stdin = self.scoped("printf '%s' SENTINEL | rg SENTINEL; silta brief",
+                            '/tmp/acme-eval/repos/acme-backend')
+        self.assertEqual(evals.forbidden(self.evidence(stdin)), [])
+        self.assertIs(evals.trace_matches_logs(stdin, 'codex'), True)
+        absolute = self.scoped('cat /tmp/acme-eval/repos/acme-mobile/README.md; silta brief', None)
+        self.assertIs(evals.trace_matches_logs(absolute, 'codex'), True)
+        duplicate = phase({'A': 'grep -r SENTINEL .; silta brief', 'B': 'grep -r SENTINEL .; silta brief'},
+                          [('A', 'started'), ('A', 'completed'), ('B', 'started'), ('B', 'completed')],
+                          [log('brief'), log('brief')])
+        duplicate['scope'] = self.scoped('')['scope']
+        for row in duplicate['tool_results']:
+            row['cwd'] = '/tmp/acme-eval/repos/' + ('acme-mobile' if row['id'] == 'A' else 'acme-backend')
+        self.assertEqual(len(evals.forbidden(self.evidence(duplicate))), 1)
         normalized = self.scoped('cat ../acme-backend/../acme-mobile/README.md; silta brief')
         self.assertEqual(evals.forbidden(self.evidence(normalized)), [])
         self.assertIs(evals.trace_matches_logs(normalized, 'codex'), True)

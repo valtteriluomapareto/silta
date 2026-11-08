@@ -14,20 +14,24 @@ path remains, as do cap-stopped streams and actual command/log ordering. Transcr
 hashes are historical source hashes, not certifications of the normalized bytes;
 tests reparse the streams and do not apply the original review digest.
 
-The successful done-with-result turn passes stream completeness with no extra
-shell-trace review: its routine read-only commands, literal echo data and exact
-stderr merges are supported. Every live trial still needs ordinary tool audit.
+The successful done-with-result turn needs bound shell-trace review for three
+filesystem-read calls: the historical native stream does not attest their cwd.
+Its ordered Silta calls otherwise reconcile; no launch cwd is invented for it.
+Every live trial also needs ordinary tool audit.
 The successful start-cross-repo turn has concurrent native calls and overlapping recorded log
 intervals. Its timing-only associations require shell-trace review rather than
 being rejected as an inconsistent total order. Plan-not-file and handoff-resume hit their token caps and retain those
 infrastructure failures. Opaque shell calls require explicit bound shell-trace
 review; no fixture invents that review or erases a native failure.
 
-Opaque native calls under the bounded read-only grammar:
+Opaque native calls with exact option arity and attested path scope:
 
-| Trial | Before | After |
+| Trial | Before scope checks | After |
 |---|---:|---:|
-| done-with-result | 7 | 0 |
-| start-cross-repo | 17 | 12 |
-| plan-not-file | 25 | 10 |
-| handoff-resume | 38 | 23 |
+| done-with-result | 0 | 3 |
+| start-cross-repo | 12 | 15 |
+| plan-not-file | 10 | 12 |
+| handoff-resume | 23 | 27 |
+
+The counts use the grader's scoped parser, not syntax-only parsing. No historical
+native cwd or repository-scope field was fabricated in the recordings.

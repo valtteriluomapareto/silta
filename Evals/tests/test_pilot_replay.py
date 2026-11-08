@@ -40,7 +40,10 @@ class PilotReplay(unittest.TestCase):
                 result = evals.grade(evidence)
                 # Cap-stopped streams still fail; successful native turns do not.
                 if evidence['scenario'] == 'done-with-result':
-                    self.assertTrue(result['checks']['stream_complete'])
+                    self.assertIsNone(result['checks']['stream_complete'])
+                    evidence['review'] = {'reviewer': 'fixture-reviewer', 'checks': ['tool-audit', 'shell-trace'],
+                                          'digest': evals.review_digest(evidence)}
+                    self.assertTrue(evals.grade(evidence)['checks']['stream_complete'])
                     self.assertTrue(result['checks']['result_sha'])
                     self.assertTrue(result['checks']['result_template'])
                 elif evidence['scenario'] == 'start-cross-repo':
