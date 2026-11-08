@@ -80,7 +80,7 @@ class ShellScope(unittest.TestCase):
 
     def test_40_resolved_scope_includes_implicit_recursive_inputs(self):
         for command in ['grep -r SENTINEL .; silta brief', 'rg SENTINEL; silta brief',
-                        'rg --files; silta brief', 'ls; silta brief', 'git log -1; silta brief']:
+                        'rg --files; silta brief', 'ls; silta brief', 'ls -; silta brief', 'git log -1; silta brief']:
             for cwd, expected in [('/tmp/acme-eval/repos/acme-mobile', True),
                                   ('/tmp/acme-eval', None),
                                   ('/tmp/acme-eval/foreign', None)]:
@@ -117,6 +117,17 @@ class ShellScope(unittest.TestCase):
         for command in ['which silta; silta brief', 'find . -print; silta brief',
                         'sort README.md; silta brief', 'ls 2>/dev/null; silta brief']:
             self.assertIsNone(evals.trace_matches_logs(self.scoped(command), 'codex'))
+
+    def test_40_incomplete_duplicates_never_borrow_completed_cwd(self):
+        command = 'grep -r SENTINEL .; silta brief'
+        for completed_cwd, count in [('/tmp/acme-eval/repos/acme-mobile', 0),
+                                     ('/tmp/acme-eval/repos/acme-backend', 1)]:
+            p = phase({'A': command, 'B': command},
+                      [('A', 'started'), ('A', 'completed'), ('B', 'started')], [log('brief')])
+            p['scope'] = self.scoped('')['scope']
+            p['tool_results'][0]['cwd'] = completed_cwd
+            self.assertTrue(evals.shell_program(p, command, None).opaque)
+            self.assertEqual(len(evals.forbidden(self.evidence(p))), count)
 
     def test_40_native_cwd_is_retained_without_guessing(self):
         events = [{'type': 'thread.started', 'thread_id': 'acme'},
