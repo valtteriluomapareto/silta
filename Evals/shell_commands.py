@@ -107,7 +107,6 @@ ttyctl type typeset ulimit umask unalias unfunction unhash unlimit unset unsetop
 vared wait whence where which while zcompile zformat zle zmodload zparseopts zregexparse zstyle
 """.split())
 _SHELLS = {'sh', 'bash', 'zsh'}
-_ROLES = _SHELLS | {'silta', 'gh', 'az'}
 _ATOM = re.compile(r'[A-Za-z0-9_./:@%+=,-]+')
 _DATA = re.compile(r"[A-Za-z0-9_ \t\n@%+=:,./!?*\[\]\"';|&(){}<>\\-]*")
 
@@ -142,8 +141,7 @@ def _literal(argv):
         return len(argv) == 2 and argv[1].startswith('/') and bool(_ATOM.fullmatch(argv[1]))
     if name in _SHELL_WORDS or Path(name).name in _SHELLS:
         return False
-    return Path(name).name == 'silta' or all(
-        _ATOM.fullmatch(word) and Path(word).name not in _ROLES for word in argv[1:])
+    return True
 
 
 def parse_shell(program, *, audit=False, _depth=0):
@@ -179,6 +177,7 @@ def parse_shell(program, *, audit=False, _depth=0):
                     result.invocations.append(['silta', *command[1:]])
                 if reachable and safe:
                     result.proven_commands.append(command)
+                safe &= audit or name == 'silta' or command[0] in ('echo', 'printf', 'cd', 'true', ':')
             result.opaque |= not safe
             reachable &= safe and not result.conditional
             command, safe, heredoc = [], True, False

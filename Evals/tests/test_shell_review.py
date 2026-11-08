@@ -83,7 +83,7 @@ class ShellReview(unittest.TestCase):
                         'printf -v SILTA_HOME /tmp/acme; silta brief']:
             with self.subTest(command=command):
                 self.assertTrue(parse_shell(command).opaque)
-        self.assertFalse(parse_shell('printf literal; arbitrary-executable argument; silta brief').opaque)
+        self.assertTrue(parse_shell('printf literal; arbitrary-executable argument; silta brief').opaque)
         from test_pilot_replay import replay
         for hidden in ["trap 'gh issue create --title Acme' EXIT; ls -la",
                        "print -s 'gh issue create --title Acme'; print -s 'printf harmless'; fc -s 1; ls -la"]:

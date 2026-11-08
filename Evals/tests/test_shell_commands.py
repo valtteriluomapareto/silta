@@ -74,7 +74,7 @@ class ShellCommands(unittest.TestCase):
             for rendered in [command, '/bin/zsh -lc ' + shlex.quote(command)]:
                 with self.subTest(command=rendered):
                     self.assertTrue(parse_shell(rendered).opaque)
-        self.assertFalse(parse_shell('echo data | cat\nsilta brief').opaque)
+        self.assertTrue(parse_shell('echo data | cat\nsilta brief').opaque)
 
     def test_trailing_newline_keeps_single_invocation_exit_proof(self):
         for command in ['silta brief\n', '\nsilta brief\n\n', 'silta brief;\n']:
@@ -90,7 +90,7 @@ class ShellCommands(unittest.TestCase):
 
     def test_shell_continuations_cannot_hide_gate_flags_or_command_names(self):
         parsed = parse_shell('gh issue cr\\\neate --title Acme')
-        self.assertFalse(parsed.opaque)
+        self.assertTrue(parsed.opaque)
         self.assertEqual(parsed.commands, [['gh', 'issue', 'create', '--title', 'Acme']])
         parsed = parse_shell('silta task start AC-1 --st\\\neal')
         self.assertFalse(parsed.opaque)

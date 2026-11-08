@@ -32,10 +32,10 @@ def match_calls(calls, logs, harness):
 
     chains = [call['chain'] for call in calls]
     unknown = any(None in chain for chain in chains)
-    intervals = [native_interval(call) for call in calls]
     if unknown:
         if len(calls) * (len(calls) - 1) > _WORK_LIMIT:
             return None
+        intervals = [native_interval(call) for call in calls]
         starts = [span for call, span in zip(calls, intervals) if None in call['chain']]
         if any(span is None for span in starts):
             return None
@@ -57,6 +57,7 @@ def match_calls(calls, logs, harness):
         return False
     if len(calls) * (len(calls) - 1) > _WORK_LIMIT:
         return None
+    intervals = [native_interval(call) for call in calls]
     if any(intervals[a] and intervals[b] and intervals[b][1] < intervals[a][0]
            for a in range(len(calls)) for b in range(a + 1, len(calls))):
         return False
