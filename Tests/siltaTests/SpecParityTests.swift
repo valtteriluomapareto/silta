@@ -17,7 +17,7 @@ struct SpecParityTests {
     try #require(!lines.isEmpty)
     var documented: Set<String> = []
     for line in lines {
-      // Only a complete trailing milestone marker exempts a future command.
+      // Only these exact suffixes exempt future commands.
       let future = [" [M2]", " [M3]", " [M4]", " [M5]"].first { line.hasSuffix($0) }
       let name = future.map { String(line.dropLast($0.count)) } ?? line
       #expect(
@@ -48,9 +48,12 @@ struct SpecParityTests {
     try #require(errors.count == 2)
     let table = errors[1].components(separatedBy: "**Commands.**")
     try #require(table.count == 2)
-    let rows = table[0].split(separator: "\n").filter { $0.hasPrefix("|") }
+    let rows = table[0].split(separator: "\n").map {
+      $0.trimmingCharacters(in: .whitespaces)
+    }.filter { $0.hasPrefix("|") }
     try #require(rows.count > 2, "§16 must contain the error-code table")
     #expect(rows[0] == "| Exit | Codes | Agent should |")
+    #expect(rows[1] == "|---|---|---|")
     var documented: [String: Int32] = [:]
     var successExits: [Int32] = []
     for row in rows.dropFirst(2) {
