@@ -11,6 +11,7 @@ class ShellProgram:
     commands: list = field(default_factory=list)
     composed: bool = False
     conditional: bool = False
+    proven_commands: list = field(default_factory=list)
 
     def single(self):
         """Output/approval proof requires exactly one unmodified literal call."""
@@ -32,17 +33,6 @@ def _lex(program, audit=False):
         if char == '#':
             end = program.find('\n', index)
             index = len(program) if end < 0 else end
-            continue
-        # Only descriptor duplication is a supported non-word redirection.
-        duplicate = re.match(r'[12]?>&[12](?=$|[\s;|&])', program[index:])
-        if duplicate:
-            words.append(('redirect', duplicate[0]))
-            index += len(duplicate[0])
-            continue
-        descriptor = re.match(r'[12](>>?)', program[index:])
-        if descriptor:
-            words.append(('operator', descriptor[1]))
-            index += len(descriptor[0])
             continue
         if program.startswith('<<', index):
             header = re.match(r'''<<[ \t]*(['"])([A-Za-z_]\w*)\1[ \t]*\n''', program[index:])
@@ -102,6 +92,26 @@ def _lex(program, audit=False):
     return words
 
 
+# Language vocabulary, not behavioral exceptions: sh/bash/zsh keywords and
+# builtins. Only the small literal forms below are admitted from this vocabulary.
+_SHELL_WORDS = frozenset("""
+! - . : [ [[ ]] alias always autoload bg bind bindkey break builtin bye caller case
+cd chdir command compadd comparguments compcall compctl compdescribe compfiles compgen
+compgroups complete compopt compquote compset comptags comptry compvalues continue coproc
+declare dirs disable disown do done echo echotc echoti elif else emulate enable end
+esac eval exec exit export false fc fg fi float for foreach function functions getln
+getopts hash help history if in integer jobs kill let limit local log logout nocorrect
+mapfile noglob popd print printf private pushd pushln pwd r read readarray readonly rehash repeat return
+sched select set setopt shift shopt source suspend test then time times trap true
+ttyctl type typeset ulimit umask unalias unfunction unhash unlimit unset unsetopt until
+vared wait whence where which while zcompile zformat zle zmodload zparseopts zregexparse zstyle
+""".split())
+_SHELLS = {'sh', 'bash', 'zsh'}
+_ROLES = _SHELLS | {'silta', 'gh', 'az'}
+_ATOM = re.compile(r'[A-Za-z0-9_./:@%+=,-]+')
+_DATA = re.compile(r"[A-Za-z0-9_ \t\n@%+=:,./!?*\[\]\"';|&(){}<>\\-]*")
+
+
 def _expands(raw):
     quote, index = None, 0
     while index < len(raw):
@@ -110,108 +120,97 @@ def _expands(raw):
             index += 2
             continue
         if char in "'\"":
-            if quote is None:
-                quote = char
-            elif quote == char:
-                quote = None
-        elif quote != "'" and char in '$`*?[~':
+            quote = char if quote is None else (None if quote == char else quote)
+        elif char in '$`' and quote != "'" or char in '*?[' and quote is None:
             return True
         index += 1
     return False
 
 
-def parse_shell(program, *, audit=False):
-    """Return ordered literal Silta invocations and uncertainty without throwing.
+def _literal(argv):
+    if not argv or not re.fullmatch(r'[A-Za-z0-9_./-]+|:', argv[0]):
+        return False
+    if any(word.startswith(('=', '~')) or not _DATA.fullmatch(word) for word in argv):
+        return False
+    name = argv[0]
+    if name in ('echo', 'true', ':'):
+        return name == 'echo' or len(argv) == 1
+    if name == 'printf':
+        args = argv[1:] if argv[1:2] != ['--'] else argv[2:]
+        return bool(args and not args[0].startswith('-') and re.fullmatch(r'(?:[^%]|%[%sd])*', args[0]))
+    if name == 'cd':
+        return len(argv) == 2 and argv[1].startswith('/') and bool(_ATOM.fullmatch(argv[1]))
+    if name in _SHELL_WORDS or Path(name).name in _SHELLS:
+        return False
+    return Path(name).name == 'silta' or all(
+        _ATOM.fullmatch(word) and Path(word).name not in _ROLES for word in argv[1:])
 
-    Unknown syntax invalidates this call, not the trial. Heredoc bodies are
-    skipped as literal data and never scanned as shell commands or gate flags.
-    """
+
+def parse_shell(program, *, audit=False, _depth=0):
+    """Prove literal segments and their reachable prefix; otherwise require review."""
     result = ShellProgram()
-    if not isinstance(program, str):
-        result.opaque = True
-        return result
     try:
+        if not isinstance(program, str) or _depth >= 8 or len(program) > 65536:
+            raise ValueError('unsupported program')
         words = _lex(program, audit=audit)
-        if (not audit and len(words) == 3 and all(kind == 'word' for kind, _ in words)
-                and Path(words[0][1][0]).name in ('sh', 'bash', 'zsh')
-                and words[1][1][0] in ('-c', '-lc')):
-            result.opaque |= any(_expands(raw) for _, (_, raw) in words)
-            words = _lex(words[2][1][0])
-        command, heredoc, previous, incoming_pipe = [], False, None, False
+        command, safe, heredoc, reachable, incoming = [], True, False, True, False
 
         def finish():
-            nonlocal command, heredoc
-            if command:
-                result.composed |= bool(result.commands)
+            nonlocal command, safe, heredoc, reachable
+            if not command:
+                return
+            result.composed |= bool(result.commands)
+            name = Path(command[0]).name
+            if (not audit and command[0] in _SHELLS | {base + shell for base in ('/bin/', '/usr/bin/') for shell in _SHELLS}
+                    and safe and len(command) == 3 and command[1] in ('-c', '-lc')):
+                child = parse_shell(command[2], _depth=_depth + 1)
+                result.commands.extend(child.commands)
+                result.invocations.extend(child.invocations)
+                if reachable:
+                    result.proven_commands.extend(child.proven_commands)
+                safe = not child.opaque
+                result.composed |= child.composed
+                result.conditional |= child.conditional
+            else:
+                safe &= (audit or _literal(command)) and not (incoming and name == 'silta')
+                safe &= not heredoc or name == 'silta' and any(command[n:n + 2] == ['-F', '-'] for n in range(len(command)))
                 result.commands.append(command)
-                if Path(command[0]).name == 'silta':
-                    if incoming_pipe:
-                        result.opaque = True
-                    if heredoc and not any(command[n:n + 2] == ['-F', '-'] for n in range(len(command))):
-                        result.opaque = True
+                if name == 'silta':
                     result.invocations.append(['silta', *command[1:]])
-                elif heredoc:
-                    result.opaque = True
-                if (Path(command[0]).name in ('eval', 'alias', 'unalias', 'function', 'source', '.', 'exec',
-                                   'env', 'command', 'builtin', 'sudo', 'time', 'if', 'then',
-                                   'else', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac',
-                                   'trap', '!', 'set', 'unset', 'export', 'readonly', 'local',
-                                   'declare', 'typeset', 'shopt', 'setopt', 'unsetopt', 'enable',
-                                   'exit', 'return', 'break', 'continue', 'shift', 'getopts',
-                                   'read', 'cd', 'pushd', 'popd', 'umask', 'ulimit', 'wait',
-                                   'jobs', 'fg', 'bg', 'disown', 'kill', 'logout', 'hash',
-                                   'unhash', 'autoload', 'emulate', 'zmodload', 'disable',
-                                   'functions', 'unfunction', 'bind', 'let', 'coproc',
-                                   'noglob', 'nocorrect', 'limit', 'unlimit', 'suspend',
-                                   'fc', 'history', 'print', 'pushln', 'r', 'sched', '-',
-                                   'chdir', 'bye', 'dirs', 'bindkey', 'float', 'integer',
-                                   'private', 'rehash', 'getln', 'vared', 'ttyctl', 'zle',
-                                   'zcompile', 'zformat', 'zparseopts', 'zregexparse', 'zstyle',
-                                   'complete', 'compgen', 'compadd', 'compctl', 'compcall',
-                                   'comparguments', 'compdescribe', 'compfiles', 'compgroups',
-                                   'compquote', 'compset', 'comptags', 'comptry', 'compvalues')
-                        or Path(command[0]).name == 'printf' and '-v' in command[1:]
-                        or Path(command[0]).name in ('sh', 'bash', 'zsh')
-                        or re.match(r'[A-Za-z_]\w*=', command[0])):
-                    result.opaque = True
-            command, heredoc = [], False
+                if reachable and safe:
+                    result.proven_commands.append(command)
+            result.opaque |= not safe
+            reachable &= safe and not result.conditional
+            command, safe, heredoc = [], True, False
 
-        index = 0
-        while index < len(words):
-            kind, value = words[index]
+        previous = None
+        for kind, value in words:
             if kind == 'word':
                 decoded, raw = value
-                result.opaque |= _expands(raw)
+                safe &= not _expands(raw) and not decoded.startswith(('=', '~'))
                 command.append(decoded)
                 previous = None
             elif kind == 'heredoc':
-                heredoc = True
-                result.composed = True
-            elif kind == 'redirect':
-                result.composed = True
-            elif value in ('>', '>>'):
-                result.composed = True
-                if index + 1 >= len(words) or words[index + 1][0] != 'word':
-                    raise ValueError('missing output target')
-                result.opaque |= _expands(words[index + 1][1][1])
-                index += 1
+                heredoc, result.composed = True, True
             elif value in (';', '&&', '||', '|', '\n'):
                 if not command and value != '\n':
-                    raise ValueError('empty simple command')
+                    raise ValueError('empty command')
                 had_command = bool(command)
                 finish()
                 result.composed |= value in ('&&', '||', '|')
                 result.conditional |= value in ('&&', '||')
+                reachable &= value not in ('&&', '||', '|')
                 if value != '\n' or had_command:
-                    incoming_pipe = value == '|'
+                    incoming = value == '|'
                 previous = value if value != '\n' else previous
             else:
+                safe = False
+                finish()
                 raise ValueError('unsupported operator')
-            index += 1
         if not command and previous in ('&&', '||', '|'):
             raise ValueError('missing command')
         finish()
     except (ValueError, TypeError, IndexError):
-        # Partial argv must not certify a malformed call.
-        result.invocations, result.commands, result.opaque = [], [], True
+        result.opaque = True
+        result.proven_commands = []
     return result

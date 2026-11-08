@@ -41,7 +41,7 @@ class ShellReview(unittest.TestCase):
                         'sh -${OPTION} ' + shlex.quote('silta brief')]:
             self.assertTrue(parse_shell(command).opaque)
         literal = "silta comment AC-1 -m '$(literal) `literal` $HOME'"
-        self.assertFalse(parse_shell('sh -c ' + shlex.quote(literal)).opaque)
+        self.assertTrue(parse_shell('sh -c ' + shlex.quote(literal)).opaque)
 
     def test_escaped_wrapper_metacharacters_become_active_only_in_inner_shell(self):
         for command in ['sh -c "silta comment AC-1 -m \\`printf injected\\`"',
@@ -49,9 +49,9 @@ class ShellReview(unittest.TestCase):
             self.assertTrue(parse_shell(command).opaque, command)
         direct = 'silta comment AC-1 -m "\\`literal\\` \\$HOME"'
         parsed = parse_shell(direct)
-        self.assertFalse(parsed.opaque)
+        self.assertTrue(parsed.opaque)
         self.assertEqual(parsed.invocations[0][-1], '`literal` $HOME')
-        self.assertFalse(parse_shell('sh -c ' + shlex.quote(direct)).opaque)
+        self.assertTrue(parse_shell('sh -c ' + shlex.quote(direct)).opaque)
 
     def test_literal_word_decoding_agrees_with_an_isolated_shell(self):
         import os
@@ -67,10 +67,10 @@ class ShellReview(unittest.TestCase):
                          r'"slash \q and quote \""', "''", r"'single \ and \" double'"]:
                 command = 'silta comment AC-1 -m ' + word
                 parsed = parse_shell(command)
-                self.assertFalse(parsed.opaque)
                 actual = subprocess.run(['/bin/sh', '-c', command], env=env, text=True, capture_output=True)
                 self.assertEqual(actual.returncode, 0, actual.stderr)
                 self.assertEqual(parsed.invocations[0][1:], json.loads(actual.stdout))
+                self.assertEqual(parsed.opaque, any(char in parsed.invocations[0][-1] for char in '$`'))
 
     def test_shell_controls_require_shell_trace_review_at_grade_level(self):
         for command in ["trap 'gh issue create --title Acme' EXIT; ls -la", '! silta where',

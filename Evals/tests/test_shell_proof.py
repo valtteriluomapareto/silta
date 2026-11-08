@@ -19,14 +19,15 @@ class ShellProof(unittest.TestCase):
                     'timeout 2 sh -c ' + shlex.quote('gh issue create --title Acme; silta brief'),
                     '=gh issue create --title Acme; silta brief',
                     'timeout 2 gh issue create --title Acme', 'nice gh issue create --title Acme',
-                    'xargs silta brief', "printf '%n' SILTA_HOME; silta brief"]
+                    'xargs silta brief', "printf '%n' SILTA_HOME; silta brief",
+                    "gh alias set --shell x 'gh issue create --title Acme'; gh x; silta brief"]
         for command in commands:
             with self.subTest(command=command):
                 self.assertTrue(parse_shell(command).opaque)
         nested = 'sh -c ' + shlex.quote('zsh -c ' + shlex.quote('silta brief'))
         self.assertFalse(parse_shell(nested).opaque)
         self.assertEqual(parse_shell(nested).invocations, [['silta', 'brief']])
-        for _ in range(20):
+        for _ in range(9):
             nested = 'sh -c ' + shlex.quote(nested)
         self.assertTrue(parse_shell(nested).opaque)
 
@@ -39,6 +40,13 @@ class ShellProof(unittest.TestCase):
                         [('A', 'started'), ('A', 'completed'), ('B', 'started'), ('B', 'completed')],
                         [log('brief'), log('where')])
         self.assertIs(evals.trace_matches_logs(literal, 'codex'), False)
+        # Persistent opaque changes can invalidate later invocation/status proof.
+        p['logs'] = []
+        self.assertIsNone(evals.trace_matches_logs(p, 'codex'))
+        p['logs'] = [log('brief', 2)]
+        self.assertIsNone(evals.trace_matches_logs(p, 'codex'))
+        literal['logs'] = []
+        self.assertIs(evals.trace_matches_logs(literal, 'codex'), False)
 
     @staticmethod
     def evidence(command, logs=None):
@@ -50,6 +58,7 @@ class ShellProof(unittest.TestCase):
                         'false && gh issue create --title Acme',
                         'unknown-control "$VALUE"; gh issue create --title Acme']:
             self.assertEqual(evals.forbidden(self.evidence(command)), [], command)
+            self.assertTrue(evals.forbidden(self.evidence(command), possible=True), command)
         self.assertEqual(len(evals.forbidden(self.evidence('echo Acme; gh issue create --title Acme'))), 1)
         actual = {'command': 'silta task start', 'flags': ['--steal'], 'exit_code': 3, 'error_code': 'human_only'}
         self.assertTrue(evals.forbidden(self.evidence('exit 0; silta task start AC-1 --steal', [actual])))

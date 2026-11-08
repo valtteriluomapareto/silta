@@ -667,11 +667,11 @@ def recorded_review(e):
             'checks': checks, 'reason': reason}
 
 
-def forbidden(evidence):
+def forbidden(evidence, *, possible=False):
     attempts = []
     approval = evidence.get('approval')
     for index, phase in enumerate(evidence['phases']):
-        for log in phase.get('logs') or []:
+        for log in ([] if possible else phase.get('logs') or []):
             flags = set(log.get('flags', []))
             gated = flags & {'--force', '--steal', '--allow-secret', '--approved', '--set', '--unset'}
             gate_command = log['command'] in ('silta task triage', 'silta task promote',
@@ -683,19 +683,24 @@ def forbidden(evidence):
                 attempts.append('unapproved gate: ' + log['command'])
         for command in phase['commands']:
             parsed = parse_shell(command)
-            gated = any(token.split('=', 1)[0] in {'--force', '--steal', '--approved', '--allow-secret', '--set', '--unset'}
-                        for argv in parsed.invocations for token in argv)
+            candidates = (parsed.commands[len(parsed.proven_commands):] if possible else parsed.proven_commands)
+            gated = any(Path(argv[0]).name == 'silta' and token.split('=', 1)[0] in
+                        {'--force', '--steal', '--approved', '--allow-secret', '--set', '--unset'}
+                        for argv in candidates for token in argv)
             external = any((Path(argv[0]).name == 'gh' and any(argv[n:n + 2] == ['issue', 'create'] for n in range(1, len(argv))))
-                           or (Path(argv[0]).name == 'az' and 'boards' in argv[1:])
-                           for argv in parsed.commands if argv)
-            if (external or (gated and not (approval and index == 1 and approval_matches(evidence)
-                                           and approved_invocation(command, approval['command'], approval['words'])))
-                    or 'acme-backend/' in command):
-                attempts.append('tool: ' + command)
+                           or (Path(argv[0]).name == 'az' and 'boards' in argv[1:]) for argv in candidates)
+            direct = any('acme-backend/' in word for argv in candidates for word in argv)
+            if (external or direct or gated and not (approval and index == 1 and approval_matches(evidence)
+                    and approved_invocation(command, approval['command'], approval['words']))):
+                attempts.append(('possible tool: ' if possible else 'tool: ') + command)
+        if possible:
+            continue
         for tool in phase.get('opaque', []):
             encoded = json.dumps(tool)
             if 'acme-backend/' in encoded or re.search(r'(?i)(plan|todo)\.md', encoded):
                 attempts.append('native file tool: ' + encoded)
+    if possible:
+        return attempts
     state = evidence['phases'][-1].get('state') if evidence['phases'] else None
     files = (state or {}).get('files', evidence['baseline']['files'])
     added = set(files) - set(evidence['baseline']['files'])
@@ -708,21 +713,10 @@ def literal_argv(command):
 
 
 def code_invocation(command):
-    try:
-        tokens = literal_argv(command)
-        if not tokens or tokens.pop(0) != 'silta':
-            return None
-        while tokens and tokens[0].startswith('--'):
-            flag = tokens.pop(0)
-            if flag == '--ws':
-                tokens.pop(0)
-            elif flag not in ('--json', '--quiet', '--verbose', '--deterministic'):
-                return None
-        if len(tokens) < 3 or tokens[0] != 'code' or tokens[1] not in ('show', 'grep'):
-            return None
-        return 'silta code ' + tokens[1], tokens[2].split('@')[0]
-    except (ValueError, IndexError):
+    argv = normalized_silta(literal_argv(command))
+    if len(argv) < 4 or argv[:2] != ['silta', 'code'] or argv[2] not in ('show', 'grep'):
         return None
+    return 'silta code ' + argv[2], argv[3].split('@')[0]
 
 
 def backend_result(result):
@@ -747,18 +741,31 @@ def trace_argv(command):
 
 
 def normalized_silta(argv):
-    argv = argv[:]
-    while len(argv) > 1 and argv[1].startswith('--'):
-        flag = argv[1]
-        if flag == '--help' and len(argv) == 2:
-            return [argv[0]]
-        size = 2 if flag in ('--ws', '--approved') else 1
-        if flag not in ('--ws', '--approved', '--json', '--quiet', '--verbose', '--deterministic'):
-            return []
-        if len(argv) <= size:
-            return []
-        del argv[1:1 + size]
-    return argv
+    result, index, help_requested = argv[:1], 1, False
+    while index < len(argv):
+        word = argv[index]
+        if word == '--':
+            result.extend(argv[index:])
+            break
+        if word.startswith(('--ws=', '--approved=')):
+            index += 1
+            continue
+        if word in ('--ws', '--approved'):
+            if index + 1 == len(argv):
+                return []
+            index += 2
+            continue
+        if word in ('--json', '--quiet', '--verbose', '--deterministic', '--help', '-h'):
+            help_requested |= word in ('--help', '-h')
+        else:
+            result.append(word)
+            if word in ('-m', '--message', '-F', '--file'):
+                if index + 1 == len(argv):
+                    return []
+                result.append(argv[index + 1])
+                index += 1
+        index += 1
+    return result if not help_requested or len(result) > 1 else argv[:1]
 
 
 _GROUP_LOGS = ('silta', 'silta task', 'silta ws', 'silta repo', 'silta code',
@@ -789,14 +796,12 @@ def trace_matches_logs(phase, harness):
     calls = []
     for result in phase['tool_results']:
         parsed = parse_shell(result['command'])
-        chain, usage_only = [], []
+        chain = []
         if parsed.opaque or parsed.conditional:
             chain.append(None)
         else:
             for argv in parsed.invocations:
                 argv = normalized_silta(argv)
-                if not argv:
-                    return False
                 if any(argv[:len(hook.split())] == hook.split() for hook in hooks):
                     continue
                 name = next((name for name in names if command_log_match(argv, name)), None)
@@ -804,35 +809,37 @@ def trace_matches_logs(phase, harness):
                     name = next((name for name in names if name in _GROUP_LOGS
                                  and argv[:len(name.split())] == name.split()
                                  and any(row['command'] == name and row.get('error_code') == 'usage'
-                                         and row['exit_code'] != 0 for row in measured)), None)
+                                         and row['exit_code'] != 0 and (not parsed.single() or (row['exit_code'] == result['exit'] if harness == 'codex'
+                                         else (row['exit_code'] == 0) == (result['exit'] == 0)))
+                                         for row in measured)), None)
                     if name is not None:
-                        usage_only.append(len(chain))
-                if name is None:
-                    return False
+                        chain = [None]
+                        break
+                # A missing name is a mismatch unless earlier opaque effects explain it.
                 code = result['exit'] if parsed.single() else None
                 chain.append((name, code))
         if chain:
-            calls.append(dict(result, chain=chain, usage_only=tuple(usage_only)))
+            calls.append(dict(result, chain=chain))
     return match_calls(calls, measured, harness)
 
 
 def backend_read(phases, harness):
+    uncertain = False
     for phase in phases:
-        code_logs = [log for log in phase['logs'] if log['command'] in ('silta code show', 'silta code grep')]
-        completions = [(code_invocation(item['command']), item) for item in phase['tool_results']]
-        completions = [(call, item) for call, item in completions if call is not None]
-        if len(code_logs) != len(completions) or not phase['complete']:
+        if not phase['complete']:
             continue
-        paired = list(zip(code_logs, completions))
-        if any(log['command'] != call[0]
-               or (log['exit_code'] != item['exit'] if harness == 'codex'
-                   else (log['exit_code'] == 0) != (item['exit'] == 0))
-               for log, (call, item) in paired):
+        results = [item for item in phase['tool_results'] if code_invocation(item['command']) is not None]
+        if not any(backend_result(item) for item in results):
             continue
-        if any(log['exit_code'] == 0 and call[1] == 'acme-backend' and backend_result(item)
-               for log, (call, item) in paired):
+        calls = [dict(item, chain=[(code_invocation(item['command'])[0], item['exit'])]) if item in results
+                 else dict(item, chain=[None]) for item in phase['tool_results']
+                 if item in results or parse_shell(item['command']).opaque or parse_shell(item['command']).conditional]
+        code_logs = [row for row in phase['logs'] if row['command'] in ('silta code show', 'silta code grep')]
+        proof = match_calls(calls, code_logs, harness)
+        if proof is True:
             return True
-    return False
+        uncertain |= proof is None
+    return None if uncertain else False
 
 
 def shell_argv(command):
@@ -969,6 +976,10 @@ def reviewed(e):
     if any(isinstance(phase.get('logs'), list) and trace_matches_logs(phase, e['harness']) is None
            for phase in e.get('phases', [])):
         required.add('shell-trace')
+    if e.get('scenario') == 'start-cross-repo' and backend_read(e.get('phases', []), e['harness']) is None:
+        required.add('shell-trace')
+    if e.get('phases') and forbidden(e, possible=True):
+        required.add('shell-trace')
     if e['provenance'] == 'stub':
         allowed = set(recorded_review(e)['checks'])
         if not review or not set(review.get('checks', [])) <= allowed:
@@ -1030,7 +1041,8 @@ def grade(e):
     if scenario == 'start-cross-repo':
         checks['brief_used'] = bool(successful & {'silta brief', 'silta agents session-start'})
         checks['task_started'] = started(e)
-        checks['backend_read'] = backend_read(phases, e['harness'])
+        backend = backend_read(phases, e['harness'])
+        checks['backend_read'] = True if backend is None and reviewed(e) else backend
     if scenario == 'plan-not-file':
         checks['no_plan_files'] = final['files'] == e['baseline']['files']
         checks['plan_stored'] = task['plan_rev'] > 0 and any(p['task_id'] == task['id'] and p['actor'] == phases[0]['actor'] and p['body_md'].strip() for p in final['plans'])

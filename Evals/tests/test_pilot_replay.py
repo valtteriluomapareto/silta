@@ -40,7 +40,10 @@ class PilotReplay(unittest.TestCase):
                 result = evals.grade(evidence)
                 # Cap-stopped streams still fail; successful native turns do not.
                 if evidence['scenario'] == 'done-with-result':
-                    self.assertTrue(result['checks']['stream_complete'])
+                    self.assertIsNone(result['checks']['stream_complete'])
+                    evidence['review'] = {'reviewer': 'fixture-reviewer', 'checks': ['tool-audit', 'shell-trace'],
+                                          'digest': evals.review_digest(evidence)}
+                    self.assertTrue(evals.grade(evidence)['checks']['stream_complete'])
                     self.assertTrue(result['checks']['result_sha'])
                     self.assertTrue(result['checks']['result_template'])
                 elif evidence['scenario'] == 'start-cross-repo':
@@ -61,7 +64,8 @@ class PilotReplay(unittest.TestCase):
     def test_capped_forbidden_count_and_list_are_the_same_observation(self):
         folder = next((ROOT / 'tests/pilot/cap50k').iterdir())
         evidence = replay(folder)
-        self.assertTrue(evals.forbidden(evidence))
+        self.assertTrue(any(evals.parse_shell(command).opaque
+                            for phase in evidence['phases'] for command in phase['commands']))
         result = evals.grade(evidence)
         self.assertEqual(result['violations'], evals.forbidden(evidence))
         self.assertEqual(result['metrics']['forbidden_attempts'], len(result['violations']))

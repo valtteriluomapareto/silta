@@ -14,7 +14,9 @@ path remains, as do cap-stopped streams and actual command/log ordering. Transcr
 hashes are historical source hashes, not certifications of the normalized bytes;
 tests reparse the streams and do not apply the original review digest.
 
-The successful done-with-result turn passes stream completeness. The successful
+The successful done-with-result turn passes stream completeness after a digest-bound
+shell-trace review. Its `echo "==="` data and descriptor redirections exceed the
+positive literal grammar, so the unreviewed replay correctly remains pending. The successful
 start-cross-repo turn has concurrent native calls and overlapping recorded log
 intervals. Its timing-only associations require shell-trace review rather than
 being rejected as an inconsistent total order. Plan-not-file and handoff-resume hit their token caps and retain those

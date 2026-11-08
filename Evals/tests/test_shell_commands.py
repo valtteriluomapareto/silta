@@ -22,7 +22,7 @@ class ShellCommands(unittest.TestCase):
                     self.assertFalse(parsed.opaque)
                     self.assertEqual(parsed.invocations, [['silta', 'where'], ['silta', 'brief']])
         parsed = parse_shell("silta comment AC-1 -m '$(literal) `text`; |'\nsilta brief # ignored\n")
-        self.assertFalse(parsed.opaque)
+        self.assertTrue(parsed.opaque)
         self.assertEqual(parsed.invocations[0][-1], '$(literal) `text`; |')
         self.assertEqual(parsed.invocations[-1], ['silta', 'brief'])
 
@@ -55,7 +55,7 @@ class ShellCommands(unittest.TestCase):
 
     @staticmethod
     def phase(command, logs, code=0):
-        return {'tool_results': [{'command': command, 'exit': code}],
+        return {'tool_results': [{'command': command, 'exit': code, 'native_start': 1, 'native_end': 2}],
                 'logs': [{'command': name, 'exit_code': status} for name, status in logs]}
 
     def test_compound_exit_does_not_claim_each_segment_status(self):
@@ -65,7 +65,7 @@ class ShellCommands(unittest.TestCase):
         phase['logs'] = phase['logs'][:1]
         self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
         phase = self.phase('silta where 2>&1 | head', [('silta where', 2)])
-        self.assertIs(evals.trace_matches_logs(phase, 'codex'), True)
+        self.assertIsNone(evals.trace_matches_logs(phase, 'codex'))
 
     def test_multiline_input_pipelines_remain_opaque(self):
         for command in ['cat input |\nsilta task plan AC-1 -F -',
@@ -111,17 +111,19 @@ class ShellCommands(unittest.TestCase):
 
     def test_opaque_call_does_not_erase_known_mismatches_or_reordering(self):
         phase = self.phase('silta where; silta brief', [('silta brief', 0), ('silta where', 0)])
-        phase['tool_results'].append({'command': "echo 'unbalanced", 'exit': 1})
+        phase['tool_results'].append({'command': "echo 'unbalanced", 'exit': 1, 'native_start': 3, 'native_end': 4})
         self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
         phase = self.phase('silta brief', [('silta brief', 2)])
-        phase['tool_results'].append({'command': 'eval unknown', 'exit': 0})
+        phase['tool_results'].append({'command': 'eval unknown', 'exit': 0, 'native_start': 3, 'native_end': 4})
         self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
 
     def test_bound_general_review_cannot_certify_unknown_shell_effects(self):
         folder = ROOT / 'tests/pilot/400k/codex-done-with-result-default-1'
         e = json.loads((folder / 'evidence.json').read_text())
         e['phases'][0].update(evals.parse_stream('codex', (folder / 'phase-0.jsonl').read_text()))
-        e['phases'][0]['tool_results'].append({'command': "find '/bad", 'exit': 1})
+        end = max(row['native_end'] for row in e['phases'][0]['tool_results'])
+        e['phases'][0]['tool_results'].append({'command': "find '/bad", 'exit': 1,
+                                              'native_start': end + 1, 'native_end': end + 2})
         e['phases'][0]['commands'].append("find '/bad")
         self.assertIsNone(evals.grade(e)['checks']['stream_complete'])
         e['review'] = {'reviewer': 'fixture-reviewer', 'checks': ['tool-audit'], 'digest': evals.review_digest(e)}
@@ -130,7 +132,8 @@ class ShellCommands(unittest.TestCase):
         self.assertTrue(evals.grade(e)['checks']['stream_complete'])
         e['phases'][0]['tool_results'].pop(6)  # Missing the real task-start pair.
         e['review']['digest'] = evals.review_digest(e)
-        self.assertFalse(evals.grade(e)['checks']['stream_complete'])
+        e['review'] = None
+        self.assertIsNone(evals.grade(e)['checks']['stream_complete'])
 
     def test_malformed_approval_audit_cannot_crash(self):
         self.assertEqual(parse_shell("silta task add 'broken -> AC-2").single(), [])

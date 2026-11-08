@@ -50,6 +50,8 @@ def render_trial(directory, trial):
     print('\nTRIAL', trial['id'], 'evidence=' + trial['evidence'])
     print('provider=', e.get('provider'), 'model=', trial['model'], 'operator=', e.get('operator'),
           'source=', (e.get('approval') or {}).get('source'), 'reviewer=', (e.get('review') or {}).get('reviewer'))
+    if e.get('phases') and 'baseline' in e:
+        print('POSSIBLE ATTEMPTS (review only)', evals.forbidden(e, possible=True))
     print('SCENARIO', e.get('scenario'), 'variant=', e.get('variant'), 'repeat=', e.get('repeat'), 'expected_sha=', e.get('sha'))
     settings = e.get('controls', {}).get('tiny', {}).get('data', {}).get('settings', {})
     print(trial['evidence'] + '#/controls/tiny/data/settings', 'POLICY SETTINGS', json.dumps(settings))

@@ -26,28 +26,40 @@ def log_span(rows):
 
 
 def match_calls(calls, logs, harness):
-    """True proves a unique association; None requires bound shell-trace review.
-
-    Each call carries its ordered chain and native event interval. Log timing can
-    explain conflicting emission order only as uncertainty, never as proof.
-    """
+    """Prove a unique literal association; unknown effects and timing need review."""
     def status(code):
         return code if harness == 'codex' else code == 0
 
     chains = [call['chain'] for call in calls]
     unknown = any(None in chain for chain in chains)
-    uncertain = any(call.get('usage_only') for call in calls)
-    required = Counter(name for chain in chains for entry in chain if entry is not None for name in [entry[0]])
+    intervals = [native_interval(call) for call in calls]
+    if unknown:
+        if len(calls) * (len(calls) - 1) > _WORK_LIMIT:
+            return None
+        starts = [span for call, span in zip(calls, intervals) if None in call['chain']]
+        if any(span is None for span in starts):
+            return None
+        # Unknown effects may replace executables or startup files for later calls.
+        cutoff = min(span[0] for span in starts)
+        prefix = [call for call, span in zip(calls, intervals) if span and span[1] < cutoff]
+        end = max((span[1] for span in intervals if span and span[1] < cutoff), default=-1)
+        if any(call not in prefix and (not span or span[0] < end) for call, span in zip(calls, intervals)):
+            return None
+        length = sum(len(call['chain']) for call in prefix)
+        return False if match_calls(prefix, logs[:length], harness) is False else None
+    known = [entry for chain in chains for entry in chain if entry is not None]
+    required = Counter(entry[0] for entry in known)
     available = Counter(row['command'] for row in logs)
-    exits = Counter((entry[0], status(entry[1])) for chain in chains for entry in chain
-                    if entry is not None and entry[1] is not None)
+    exits = Counter((entry[0], status(entry[1])) for entry in known if entry[1] is not None)
     observed_exits = Counter((row['command'], status(row['exit_code'])) for row in logs)
     if (required - available or exits - observed_exits
-            or (not unknown and sum(required.values()) != len(logs))):
+            or sum(required.values()) != len(logs)):
         return False
     if len(calls) * (len(calls) - 1) > _WORK_LIMIT:
         return None
-    intervals = [native_interval(call) for call in calls]
+    if any(intervals[a] and intervals[b] and intervals[b][1] < intervals[a][0]
+           for a in range(len(calls)) for b in range(a + 1, len(calls))):
+        return False
     before, predecessors = [], [set() for _ in calls]
     for a in range(len(calls)):
         for b in range(len(calls)):
@@ -70,20 +82,13 @@ def match_calls(calls, logs, harness):
                 return None
             if index == len(logs) and cursors == lengths:
                 if relax:
-                    valid = True
-                    for a, b in before:
-                        if not assigned[a] or not assigned[b] or assigned[a][-1] < assigned[b][0]:
-                            continue
-                        left = log_span([logs[n] for n in assigned[a]])
-                        right = log_span([logs[n] for n in assigned[b]])
-                        if (not intervals[a] or not intervals[b] or not left or not right
-                                or max(left[0], right[0]) >= min(left[1], right[1])):
-                            valid = False
-                            break
-                    if not valid:
+                    spans = [log_span([logs[n] for n in indices]) for indices in assigned]
+                    if any(not intervals[a] or not intervals[b] or not spans[a] or not spans[b]
+                           or max(spans[a][0], spans[b][0]) >= min(spans[a][1], spans[b][1])
+                           for a, b in before if assigned[a][-1] > assigned[b][0]):
                         continue
                 solutions += 1
-                if unknown or uncertain or relax or solutions == 2:
+                if relax or solutions == 2:
                     return solutions
                 continue
             for call, cursor in enumerate(cursors):
@@ -94,20 +99,14 @@ def match_calls(calls, logs, harness):
                        for p in predecessors[call]):
                     continue
                 entry = chains[call][cursor]
-                if entry is None:
-                    advanced = list(cursors)
-                    advanced[call] += 1
-                    stack.append((index, tuple(advanced), assigned))
                 if index == len(logs):
                     continue
                 row = logs[index]
-                if cursor in calls[call].get('usage_only', ()) and (row.get('error_code') != 'usage' or row['exit_code'] == 0):
-                    continue
-                if entry is not None and (row['command'] != entry[0]
+                if (row['command'] != entry[0]
                         or entry[1] is not None and status(row['exit_code']) != status(entry[1])):
                     continue
                 advanced, association = list(cursors), list(assigned)
-                advanced[call] += entry is not None
+                advanced[call] += 1
                 association[call] += (index,)
                 stack.append((index + 1, tuple(advanced), tuple(association)))
         return solutions
@@ -116,7 +115,7 @@ def match_calls(calls, logs, harness):
     if strict is None:
         return None
     if strict:
-        return None if unknown or uncertain or strict > 1 else True
+        return None if strict > 1 else True
     # Native order remains the default. Only overlapping measured call spans may
     # explain a conflicting association, and that explanation needs review.
     relaxed = search(True)
