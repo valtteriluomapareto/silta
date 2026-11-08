@@ -49,35 +49,39 @@ struct HelpCommandTests {
     }
   }
 
-  @Test func existingExamplesParseWithTheRootParser() throws {
+  @Test func everyExampleRunsAsPrinted() throws {
+    try withScratchDirectory { scratch in try runExamples(in: scratch) }
+  }
+
+  @Test func examplesNeverOpenShellInput() throws {
     try withScratchDirectory { scratch in
-      typealias Example = (route: String, arguments: [String])
-      _ = try AcmeWorkspaces.setup(scratch)
-      let examples = try helpPages(in: scratch)
-        .flatMap { route -> [Example] in
-          let labelled = route.text.split(separator: "\n")
-            .filter { Self.isExampleLine(String($0)) }
-          return try labelled.map { line in
-            let arguments = try #require(
-              Self.arguments(afterCommandIn: String(line)),
-              "\(route.route) has no command: \(line)")
-            return (route.route, arguments)
-          }
+      for page in try helpPages(in: scratch) {
+        for line in page.text.split(separator: "\n") where Self.isExampleLine(String(line)) {
+          #expect(!line.contains("<<"), "\(page.route) opens a heredoc: \(line)")
+          #expect(!line.contains("-F -"), "\(page.route) reads stdin: \(line)")
         }
-      #expect(!examples.isEmpty, "no existing examples were found")
-      for example in examples {
-        try checkExampleValues(example.arguments, route: example.route)
-        let result = try SiltaBinary.run(example.arguments + ["--json"], in: scratch)
-        let error = try Self.errorCode(result.stdout)
-        #expect(error != "usage", "\(example.route) example does not parse: \(example.arguments)")
       }
     }
   }
 
-  @Test func unknownCommandWithHelpIsAUsageError() throws {
+  @Test func discussionCommandsRequireLabels() {
+    #expect(Self.isExampleLine("silta task ls"))
+    #expect(!Self.hasExampleLabel("silta task ls"))
+    #expect(Self.hasExampleLabel("Work the backlog: silta task ls"))
+  }
+
+  @Test(arguments: [
+    ["frobnicate", "--help", "--json"],
+    ["--ws", "acme", "frobnicate", "--help", "--json"],
+    ["--json", "frobnicate", "--help"],
+    ["--approved", "Human words", "frobnicate", "--help", "--json"],
+    ["frobnicate", "-h", "--json"],
+  ])
+  func unknownCommandWithHelpIsAUsageError(arguments: [String]) throws {
     try withScratchDirectory { scratch in
-      let direct = try SiltaBinary.run(["frobnicate", "--json"], in: scratch)
-      let help = try SiltaBinary.run(["frobnicate", "--help", "--json"], in: scratch)
+      let directArguments = arguments.filter { $0 != "--help" && $0 != "-h" }
+      let direct = try SiltaBinary.run(directArguments, in: scratch)
+      let help = try SiltaBinary.run(arguments, in: scratch)
       let helpError = try? Self.errorCode(help.stdout)
       #expect(try Self.errorCode(direct.stdout) == "usage")
       #expect(helpError == "usage")
@@ -257,15 +261,16 @@ struct HelpCommandTests {
 }
 
 extension HelpCommandTests {
-  private static let routesRequiringExamples: Set<String> = [
-    "silta init", "silta ws edit", "silta agents install", "silta brief",
-    "silta task add", "silta task ls", "silta task start", "silta task plan",
-    "silta task submit", "silta task done", "silta task block", "silta comment",
-    "silta inbox", "silta code grep", "silta code show", "silta export", "silta restore",
+  private static let routesRequiringExamples = [
+    "silta agents install", "silta brief", "silta code grep", "silta code show",
+    "silta comment", "silta export", "silta inbox", "silta init", "silta restore",
+    "silta task add", "silta task ls", "silta task start", "silta task block",
+    "silta task plan", "silta task submit", "silta task done", "silta ws edit",
   ]
 
   private static func isExampleLine(_ line: String) -> Bool {
-    !line.hasPrefix("USAGE: ") && line.contains(": silta ")
+    let bare = line.trimmingCharacters(in: .whitespaces).hasPrefix("silta ")
+    return !line.hasPrefix("USAGE: ") && (line.contains(": silta ") || bare)
   }
 
   private static func hasExampleLabel(_ line: String) -> Bool {
@@ -297,9 +302,7 @@ extension HelpCommandTests {
 
   fileprivate static func arguments(afterCommandIn line: String) -> [String]? {
     guard let range = line.range(of: "silta ") else { return nil }
-    let words = shellWords(String(line[range.upperBound...]))
-    let heredoc = words.firstIndex { $0.hasPrefix("<<") } ?? words.endIndex
-    return Array(words[..<heredoc])
+    return shellWords(String(line[range.upperBound...]))
   }
 
   fileprivate static func normalizedArguments(_ arguments: [String]) -> [String] {
@@ -444,5 +447,98 @@ extension HelpCommandTests {
       }
     }
     return options
+  }
+}
+
+extension HelpCommandTests {
+  private struct Example {
+    let route: String
+    let line: String
+    let arguments: [String]
+  }
+
+  private func exampleFixture(_ scratch: URL) throws -> (repo: URL, commitSHA: String) {
+    let repo = try AcmeWorkspaces.setup(scratch)
+    for title in ["Seed Acme one", "Seed Acme two"] {
+      let seed = try SiltaBinary.run(
+        ["task", "add", title, "--app", "portal", "--start", "--json"],
+        in: scratch, cwd: repo, environment: TaskCommandTests.actor)
+      try #require(seed.termination == .exit(0), "\(seed.stdout)")
+    }
+    let commit = try SiltaBinary.runProcess(
+      URL(filePath: "/usr/bin/git"), ["rev-parse", "HEAD"], in: scratch, cwd: repo)
+    try #require(commit.termination == .exit(0), "\(commit.stderr)")
+    return (repo, commit.stdout.trimmingCharacters(in: .newlines))
+  }
+
+  private func examples(in scratch: URL) throws -> [Example] {
+    let pages = try Dictionary(
+      uniqueKeysWithValues: helpPages(in: scratch).map { ($0.route, $0.text) })
+    return try Self.routesRequiringExamples.flatMap { route in
+      let lines = try #require(pages[route], "missing help for \(route)")
+        .split(separator: "\n").filter { Self.isExampleLine(String($0)) }
+      return try lines.map { line in
+        let arguments = try #require(
+          Self.arguments(afterCommandIn: String(line)), "\(route) has no command: \(line)")
+        return Example(route: route, line: String(line), arguments: arguments)
+      }
+    }
+  }
+
+  private func resolvedArguments(
+    _ example: Example, placeholders: [String: String], scratch: URL
+  ) -> [String] {
+    example.arguments.map { argument in
+      let resolved = placeholders.reduce(argument) {
+        $0.replacingOccurrences(of: $1.key, with: $1.value)
+      }
+      guard resolved == "~" || resolved.hasPrefix("~/") else { return resolved }
+      return scratch.appending(path: "home").path + resolved.dropFirst()
+    }
+  }
+
+  private func recordPlaceholders(
+    from result: CLIResult,
+    example: Example,
+    arguments: [String],
+    placeholders: inout [String: String]
+  ) throws {
+    let data = try #require(Self.object(result.stdout)["data"] as? [String: Any])
+    if example.route == "silta agents install", !example.line.contains("PREVIEW_TOKEN") {
+      placeholders["PREVIEW_TOKEN"] = try #require(data["token"] as? String)
+    }
+    if example.route == "silta restore", arguments.contains("--dry-run") {
+      placeholders["MANIFEST"] = try #require(data["manifest_sha256"] as? String)
+    }
+  }
+
+  private func runExamples(in scratch: URL) throws {
+    let (repo, commitSHA) = try exampleFixture(scratch)
+    let examples = try examples(in: scratch)
+    var placeholders = ["COMMIT_SHA": commitSHA]
+    let expectedErrors = [
+      "silta init": (code: "env", reason: "The example scan paths are outside the Acme fixture.")
+    ]
+    #expect(!examples.isEmpty, "no existing examples were found")
+    for example in examples {
+      let arguments = resolvedArguments(example, placeholders: placeholders, scratch: scratch)
+      try checkExampleValues(arguments, route: example.route)
+      let result = try SiltaBinary.run(
+        arguments + ["--json"], in: scratch, cwd: repo, environment: TaskCommandTests.actor)
+      let error = try Self.errorCode(result.stdout)
+      if example.line.contains("(human):") {
+        #expect(error == "human_only", "\(example.line): \(result.stdout)")
+        continue
+      }
+      if let expected = expectedErrors[example.route] {
+        #expect(error == expected.code, "\(expected.reason): \(example.line): \(result.stdout)")
+        continue
+      }
+      #expect(error == nil, "\(example.line): \(result.stdout)")
+      #expect(result.termination == .exit(0), "\(example.line): \(result.stdout)")
+      guard result.termination == .exit(0) else { continue }
+      try recordPlaceholders(
+        from: result, example: example, arguments: arguments, placeholders: &placeholders)
+    }
   }
 }

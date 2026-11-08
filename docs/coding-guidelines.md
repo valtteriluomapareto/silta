@@ -241,8 +241,9 @@ Every command's help has an abstract of one sentence, at most 80 characters,
 ending in a period and saying `(human-only)` when it is. The usage line is accurate;
 each argument and option gets one line, with enumerated values and defaults. The
 discussion has at most six prose lines plus at most three example lines, and covers only
-effects a caller must know. Every write gets an example. Each example is `Label: silta …`,
-uses Acme refs (`acme`, `AC-1`, fixture apps), and runs as printed.
+effects a caller must know. The workflow commands listed in the rules test have 1–3
+examples; other commands may have them. Each example is `Label: silta …`, uses Acme refs
+(`acme`, `AC-1`, fixture apps), and runs as printed.
 Global options appear in their own titled group; test knobs stay hidden. Help
 contains no repository paths, milestone or decision ids, roadmap language, or a
 paragraph copied from another command. It points to `silta guide <topic>` for

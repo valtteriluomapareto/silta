@@ -10,8 +10,8 @@ struct RestoreCommand: OutputCommand {
       "<dir> is the <root>/<workspace> directory that holds manifest.json. The workspace's rows "
       + "are replaced in one transaction, approvals are kept, and nothing is written on failure. "
       + "Run --dry-run first and show the human what it reports.\n"
-      + "Preview Acme restore: silta restore acme-exports/acme --dry-run\n"
-      + "Restore manifest (human): silta restore acme-exports/acme --manifest SHA")
+      + "Preview Acme restore: silta restore ~/acme-exports/acme --dry-run\n"
+      + "Restore manifest (human): silta restore ~/acme-exports/acme --manifest MANIFEST")
 
   static let dataShape = Shape.object([
     "workspace": .string, "dry_run": .bool, "created": .bool, "same_uid": .bool,

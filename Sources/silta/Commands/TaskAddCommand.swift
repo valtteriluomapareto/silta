@@ -5,7 +5,7 @@ import SiltaCore
 struct TaskAddCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "add", abstract: "Add a proposal; --start claims work requested by the human.",
-    discussion: "Propose portal work: silta task add \"Fix portal errors\" --app portal")
+    discussion: "Start requested work: silta task add \"Fix portal errors\" --app portal --start")
 
   static let dataShape = TaskOutput.receiptShape
 

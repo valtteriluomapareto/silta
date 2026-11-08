@@ -3,10 +3,20 @@ import SiltaCore
 
 struct SiltaCommand: ParsableCommand {
   static func parseRoot(_ arguments: [String]) throws -> any ParsableCommand {
-    if let first = arguments.first, arguments.contains("--help"), !first.hasPrefix("-"),
-      first != "help", !configuration.subcommands.contains(where: { $0._commandName == first })
-    {
-      throw ValidationError("Unexpected argument '\(first)'")
+    var rest = arguments[...]
+    while let argument = rest.first {
+      rest = rest.dropFirst()
+      if argument == "--ws" || argument == "--approved" {
+        rest = rest.dropFirst()
+        continue
+      }
+      if argument.hasPrefix("-") { continue }
+      if arguments.contains("--help") || arguments.contains("-h"), argument != "help",
+        !configuration.subcommands.contains(where: { $0.configuration.commandName == argument })
+      {
+        throw ValidationError("Unexpected argument '\(argument)'")
+      }
+      break
     }
     return try parseAsRoot(arguments)
   }

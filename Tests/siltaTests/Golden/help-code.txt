@@ -30,7 +30,7 @@ SUBCOMMANDS:
 
 OVERVIEW: Search committed text, returning app-relative paths and line numbers.
 
-Find API references: silta code grep api "TaskService"
+Find Acme references: silta code grep api "Acme API"
 
 USAGE: silta code grep [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--prod] [--fetch] <target> <pattern> [<pathspec>]
 

@@ -5,7 +5,7 @@ struct TaskListCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "ls",
     abstract: "List workspace tasks, including your own proposals.",
-    discussion: "Find a slice task: silta task ls --proposed --promoted --archived")
+    discussion: "Work the backlog: silta task ls --status todo")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.summaryShape)])
 

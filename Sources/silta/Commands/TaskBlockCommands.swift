@@ -4,7 +4,7 @@ import SiltaCore
 struct TaskBlockCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "block", abstract: "Record blockers; Silta sends nothing.",
-    discussion: "Wait on another task: silta task block AC-1 --on AC-2 -m \"Waiting for API.\"")
+    discussion: "After a handoff: silta task block AC-2 --on AC-1 -m \"Waiting for API.\"")
 
   static let dataShape = Shape.object([
     "ref": .string, "status": .string, "follow_up_at": .optional(.string),

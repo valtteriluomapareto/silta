@@ -5,7 +5,8 @@ import SiltaCore
 struct TaskDoneCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "done", abstract: "Complete a task with its result and optional app commit.",
-    discussion: "Finish with a commit: silta task done AC-1 --sha 1234567 -F - <<'EOF'")
+    discussion: "Record merged commit: silta task done AC-1 --sha COMMIT_SHA "
+      + "-m 'Fixed portal.'")
 
   static let dataShape = TaskOutput.receiptShape
 

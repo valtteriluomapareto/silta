@@ -4,7 +4,7 @@ import SiltaCore
 struct TaskPlanCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "plan", abstract: "Store a plan revision or tick a top-level checkbox.",
-    discussion: "Plan from stdin: silta task plan AC-1 -F - <<'EOF'\n"
+    discussion: "Plan the work: silta task plan AC-1 -m '- [ ] Inspect API'\n"
       + "Tick a step: silta task plan AC-1 --step 1 --done")
 
   static let dataShape = Shape.object([
