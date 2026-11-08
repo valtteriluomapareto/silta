@@ -1735,11 +1735,10 @@ arguments.
   ls`, `ws show`, `schema`, `guide`). Warnings and errors still show; with `--json` it changes
   nothing.
 - `--json` and `--quiet` may come before or after the subcommand.
-- `--help` (`-h`, `help`) and `--version` print plain text to stdout and exit 0, even
-  with `--json` or a broken environment.
-- A parse error is `usage` (exit 1). Its message is one line of at most 200
-  characters, and `next` is `silta <command> --help` for the command that was being
-  parsed. A parsed but invalid value is `invalid`.
+- `--help` (`-h`, `help [<command>]`) and `--version`, on any route before `--`, print plain text and exit 0 without reading the environment; `--json` may precede or follow them.
+  Parse errors are `usage` (exit 1) even with a broken environment; with `--json`, stdout carries
+  the envelope and stderr is empty. `env` comes only after argv parses; usage messages are capped at
+  200 characters, `next` is `silta <command> --help`, and invalid values are `invalid`.
 - An unexpected error (a bug) is `env` (exit 9), with the message
   `internal error (bug): <description>`, `next_by: human` and `next: silta doctor`.
   The arguments are never echoed, because they can carry bodies (§18).

@@ -37,24 +37,21 @@ enum SiltaMain {
     let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     let timer = ContinuousClock()
     let started = timer.now
+    let parseResult = parseCommand(arguments)
+    if let rendered = informationalResult(parseResult, arguments: arguments, mode: mode) {
+      return rendered
+    }
     do {
       guard let snapshot = try environmentSnapshot(arguments, hook: hookDeadline != nil) else {
         return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
       }
-      let environment: SiltaEnvironment
-      if let hookDeadline {
-        environment = try await BriefHook.environment(
-          snapshot, deterministic: flags.contains("--deterministic"), deadline: hookDeadline,
-          watchdog: watchdog)
-      } else {
-        environment = try await SiltaEnvironment.system(
-          environment: snapshot, deterministic: flags.contains("--deterministic"),
-          verbose: flags.contains("--verbose") ? .standardError : nil)
-      }
+      let environment = try await makeEnvironment(
+        snapshot, flags: flags, hookDeadline: hookDeadline, watchdog: watchdog)
       watchdog?.prepare(environment: environment)
       let timestamp = environment.clock.now()
       let execution = await execute(
-        arguments, context: CommandContext(mode: mode, environment: environment))
+        arguments, parseResult: parseResult,
+        context: CommandContext(mode: mode, environment: environment))
       let rendered = execution.rendered
       let milliseconds = elapsedMilliseconds(started.duration(to: timer.now))
       var entry = LogEntry(
@@ -77,7 +74,9 @@ enum SiltaMain {
         watchdog?.failed(milliseconds: elapsedMilliseconds(started.duration(to: timer.now)))
         return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
       }
-      if let informational = informationalResult(arguments, mode: mode) { return informational }
+      if case .failure(let error) = parseResult {
+        return parseFailure(error, arguments: arguments, mode: mode)
+      }
       return OutputRouter.render(.failure(error), mode: mode)
     }
   }
@@ -94,6 +93,20 @@ enum SiltaMain {
   private static func suppliedSession(_ actor: ActorID, hook: Bool) -> Bool? {
     guard !hook, case .agent(_, let session) = actor else { return nil }
     return ProcessInfo.processInfo.environment["SILTA_SESSION"] == session
+  }
+
+  private static func makeEnvironment(
+    _ snapshot: [String: String], flags: Set<String>, hookDeadline: BriefHookDeadline?,
+    watchdog: HookWatchdog?
+  ) async throws -> SiltaEnvironment {
+    if let hookDeadline {
+      return try await BriefHook.environment(
+        snapshot, deterministic: flags.contains("--deterministic"), deadline: hookDeadline,
+        watchdog: watchdog)
+    }
+    return try await SiltaEnvironment.system(
+      environment: snapshot, deterministic: flags.contains("--deterministic"),
+      verbose: flags.contains("--verbose") ? .standardError : nil)
   }
 
   private static func environmentSnapshot(_ arguments: [String], hook: Bool) throws -> [String:
@@ -119,27 +132,18 @@ enum SiltaMain {
     .filter { flags.contains($0) }
   }
 
-  /// Configuration failures must not obstruct help or version discovery.
-  static func informationalResult(_ arguments: [String], mode: OutputMode) -> Rendered? {
-    do {
-      var command = try SiltaCommand.parseRoot(arguments)
-      guard !(command is any OutputCommand) else { return nil }
-      try command.run()
-      return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
-    } catch {
-      guard SiltaCommand.exitCode(for: error) == .success else { return nil }
-      return parseFailure(error, arguments: arguments, mode: mode)
-    }
-  }
-
   /// Parses and executes using the environment already assembled by the command boundary.
-  static func execute(_ arguments: [String], context: CommandContext) async -> CommandExecution {
+  static func execute(
+    _ arguments: [String], parseResult: Result<any ParsableCommand, any Error>,
+    context: CommandContext
+  ) async -> CommandExecution {
     var context = context
     let mode = context.mode
     var command: any ParsableCommand
-    do {
-      command = try SiltaCommand.parseRoot(arguments)
-    } catch {
+    switch parseResult {
+    case .success(let parsedCommand):
+      command = parsedCommand
+    case .failure(let error):
       let store = context.environment.db
       let scope =
         SiltaCommand.exitCode(for: error) == .success
