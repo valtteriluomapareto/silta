@@ -9,6 +9,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / 'tests')]
 import evals
 from shell_commands import parse_shell
 from test_pilot_replay import replay
+from test_shell_review import phase, log
 
 
 class RoutineShell(unittest.TestCase):
@@ -36,6 +37,16 @@ class RoutineShell(unittest.TestCase):
     def evidence(command):
         return {'baseline': {'files': {}}, 'phases': [{'commands': [command], 'logs': [],
                                                      'state': {'files': {}}}]}
+
+    def test_isolated_redirects_preserve_exit_proof_without_output_proof(self):
+        for command, name in [('silta brief 2>&1', 'brief'),
+                              ("silta task plan AC-1 -F - <<'DATA'\nbody\nDATA", 'task plan')]:
+            for rendered in [command, 'sh -c ' + shlex.quote(command)]:
+                p = phase({'A': rendered}, [('A', 'started'), ('A', 'completed')], [log(name, 2)])
+                self.assertIs(evals.trace_matches_logs(p, 'codex'), False, rendered)
+                p['tool_results'][0]['exit'] = 2
+                self.assertIs(evals.trace_matches_logs(p, 'codex'), True, rendered)
+                self.assertEqual(parse_shell(rendered).single(), [])
 
     def test_25_value_operands_are_data_and_file_operands_remain_reads(self):
         data = ["silta comment AC-1 -m 'Inspect acme-backend/README.md'",
