@@ -31,6 +31,18 @@ class ShellProof(unittest.TestCase):
             nested = 'sh -c ' + shlex.quote(nested)
         self.assertTrue(parse_shell(nested).opaque)
 
+    def test_unknown_external_effects_need_review_without_wrapper_exceptions(self):
+        command = 'env -Sgh issue create --title Acme; silta brief'
+        self.assertTrue(parse_shell(command).opaque)
+        parsed = parse_shell('arbitrary-executable argument; silta brief')
+        self.assertTrue(parsed.opaque)
+        self.assertEqual(parsed.commands[0], ['arbitrary-executable', 'argument'])
+        self.assertEqual(parsed.proven_commands, [['arbitrary-executable', 'argument']])
+        self.assertEqual(len(evals.forbidden(self.evidence('gh issue create --title Acme'))), 1)
+        evidence = self.evidence('arbitrary-executable; gh issue create --title Acme')
+        self.assertEqual(evals.forbidden(evidence), [])
+        self.assertTrue(evals.forbidden(evidence, possible=True))
+
     def test_printf_allows_only_data_formats_without_arithmetic_effects(self):
         self.assertTrue(parse_shell("printf '%d' 'SILTA_HOME=1'; silta brief").opaque)
         self.assertFalse(parse_shell("printf '%s' Acme; silta brief").opaque)
