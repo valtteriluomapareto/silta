@@ -237,7 +237,7 @@ Shell evidence uses a positive literal grammar: a plain command name/path,
 a bounded safe character set after quote decoding, no leading `=`/`~`, no
 expansion or unquoted globs, and only `;`, `&&`, `||`, `|` and newline separators.
 One quoted heredoc feeding Silta `-F -` is supported. Shell-language words require
-review except explicit forms of `echo`, `printf`, `cd`, `true` and `:`. External
+review except explicit forms of `echo`, `printf` (data-only `%s`/`%%`), `cd`, `true` and `:`. External
 commands accept atomic arguments; Silta also accepts literal message data.
 Only fully decoded `sh`/`bash`/`zsh -c` or `-lc` wrappers are recursively unwrapped,
 with a depth/size bound. Every other wrapper, redirection, shell control, expansion

@@ -137,7 +137,7 @@ def _literal(argv):
         return name == 'echo' or len(argv) == 1
     if name == 'printf':
         args = argv[1:] if argv[1:2] != ['--'] else argv[2:]
-        return bool(args and not args[0].startswith('-') and re.fullmatch(r'(?:[^%]|%[%sd])*', args[0]))
+        return bool(args and not args[0].startswith('-') and re.fullmatch(r'(?:[^%]|%[%s])*', args[0]))
     if name == 'cd':
         return len(argv) == 2 and argv[1].startswith('/') and bool(_ATOM.fullmatch(argv[1]))
     if name in _SHELL_WORDS or Path(name).name in _SHELLS:
