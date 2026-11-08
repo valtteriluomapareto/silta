@@ -3,7 +3,8 @@ import SiltaCore
 
 struct CodeShowCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "show", abstract: "Read a committed file, optionally selecting lines.")
+    commandName: "show", abstract: "Read a committed file, optionally selecting lines.",
+    discussion: "Read focused lines: silta code show platform README.md --lines 1-80")
   static let dataShape = CodeOptions.dataShape
   static let workspaceSource = WorkspaceSource.option
 

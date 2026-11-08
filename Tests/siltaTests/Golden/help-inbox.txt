@@ -7,6 +7,7 @@ Tracker status is not refreshed. --for me means human:<USER>, independent of
 the caller. ask human: is a confirmation instruction, not an executable
 command. See `silta guide questions` for relay and approval rules. Reads never
 clear attention.
+Read pending attention: silta inbox
 
 USAGE: silta inbox [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--for <for>] [--all]
 

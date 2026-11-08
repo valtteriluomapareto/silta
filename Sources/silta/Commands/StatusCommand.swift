@@ -8,7 +8,7 @@ struct StatusCommand: OutputCommand {
     commandName: "status",
     abstract: "Print a one-line status: workspace, app, inbox count and your claimed tasks.",
     discussion: "Bare silta runs this. It is a read: no fetch, no index write. "
-      + "inbox counts what silta inbox shows for you; claimed lists your exact session's claims.")
+      + "inbox counts what `silta inbox` shows for you; claimed lists your exact session's claims.")
   static let workspaceSource = WorkspaceSource.location
   static let dataShape = Shape.object([
     "location": .string, "workspace": .optional(.string), "app": .optional(.string),

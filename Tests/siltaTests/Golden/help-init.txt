@@ -7,7 +7,7 @@ A new workspace derives its slug and task prefix from the first directory.
 Values keep case, use letters, digits, _ or -, and start/end alphanumeric.
 A --ws scan refreshes that workspace, matching slug without regard to case.
 It takes no slug or prefix; a none-named clone is refused with its path.
-Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC
+Scan Acme repos: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC
 
 USAGE: silta init [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--scan <scan> ...] [--slug <slug>] [--prefix <prefix>]
 

@@ -4,7 +4,8 @@ import SiltaCore
 struct CodeGrepCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "grep",
-    abstract: "Search committed text, returning app-relative paths and line numbers.")
+    abstract: "Search committed text, returning app-relative paths and line numbers.",
+    discussion: "Find Acme references: silta code grep api \"Acme API\"")
   static let dataShape = CodeOptions.dataShape
   static let workspaceSource = WorkspaceSource.option
 

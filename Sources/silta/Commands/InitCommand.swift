@@ -11,7 +11,7 @@ struct InitCommand: OutputCommand {
       + "Values keep case, use letters, digits, _ or -, and start/end alphanumeric.\n"
       + "A --ws scan refreshes that workspace, matching slug without regard to case.\n"
       + "It takes no slug or prefix; a none-named clone is refused with its path.\n"
-      + "Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC")
+      + "Scan Acme repos: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC")
 
   static let dataShape = Shape.object([
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,

@@ -109,7 +109,9 @@ struct AgentsInstallCommand: OutputCommand {
       + "Replacements are atomic per file, not across files; failures list paths.\n"
       + "--hook opts into SessionStart; no hook leaves settings unread.\n"
       + "Hook JSON needs exact safe integers; other forms need manual work.\n"
-      + "Real harness acceptance is separate from installation.")
+      + "Real harness acceptance is separate from installation.\n"
+      + "Preview harness changes: silta agents install\n"
+      + "Apply reviewed preview: silta agents install --apply PREVIEW_TOKEN")
   static let workspaceSource = WorkspaceSource.none
   static let dataShape = AgentInstallResult.shape
   @OptionGroup(title: "Global Options") var global: GlobalOptions
