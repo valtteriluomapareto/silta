@@ -3,6 +3,28 @@ import Foundation
 import SiltaCore
 
 extension SiltaMain {
+  static func parseCommand(_ arguments: [String]) -> Result<any ParsableCommand, any Error> {
+    Result { try SiltaCommand.parseRoot(arguments) }
+  }
+
+  static func informationalResult(
+    _ parseResult: Result<any ParsableCommand, any Error>, arguments: [String], mode: OutputMode
+  ) -> Rendered? {
+    switch parseResult {
+    case .failure(let error) where SiltaCommand.exitCode(for: error) == .success:
+      return parseFailure(error, arguments: arguments, mode: mode)
+    case .success(var command) where !(command is any OutputCommand):
+      do {
+        try command.run()
+        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+      } catch {
+        return parseFailure(error, arguments: arguments, mode: mode)
+      }
+    default:
+      return nil
+    }
+  }
+
   /// The output mode, read from the raw arguments so a parse error can still answer in
   /// JSON. ArgumentParser itself accepts the flags before or after the subcommand.
   /// Nothing after `--` counts.

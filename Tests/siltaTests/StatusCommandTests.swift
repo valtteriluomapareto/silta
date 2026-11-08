@@ -271,6 +271,53 @@ struct StatusCommandTests {
 }
 
 extension StatusCommandTests {
+  @Test(arguments: [
+    (["--help"], "OVERVIEW: A local context hub"),
+    (["-h"], "OVERVIEW: A local context hub"),
+    (["help"], "OVERVIEW: A local context hub"),
+    (["--version"], SiltaVersion.current),
+    (["task", "--help"], "OVERVIEW: Keep task work, plans and results"),
+    (["task", "-h"], "OVERVIEW: Keep task work, plans and results"),
+    (["help", "task"], "OVERVIEW: Keep task work, plans and results"),
+    (["task", "ls", "--help"], "OVERVIEW: List workspace tasks"),
+    (["help", "task", "ls"], "OVERVIEW: List workspace tasks"),
+    (["--bogus"], nil),
+    (["stauts"], nil),
+    (["task", "ls", "--bogus"], nil),
+  ])
+  func parseResultsSurviveBrokenEnvironment(
+    arguments: [String], expectedPrefix: String?
+  ) throws {
+    try withScratchDirectory { scratch in
+      for broken in [false, true] {
+        let environment =
+          broken ? Self.caller.merging(["SILTA_NOW": "bad"]) { $1 } : Self.caller
+        for invocation in [arguments, ["--json"] + arguments, arguments + ["--json"]] {
+          let result = try Self.silta(invocation, scratch, environment: environment)
+          let json = invocation.contains("--json")
+          if let expectedPrefix {
+            #expect(result.termination == .exit(0), "\(invocation), broken: \(broken)")
+            #expect(result.stdout.hasPrefix(expectedPrefix), "\(invocation), broken: \(broken)")
+            #expect(result.stderr.isEmpty, "\(invocation), broken: \(broken)")
+            #expect(
+              !FileManager.default.fileExists(
+                atPath: scratch.appending(path: "silta-home").path))
+          } else {
+            #expect(result.termination == .exit(1), "\(invocation), broken: \(broken)")
+            if json {
+              #expect(result.stdout.contains("\"code\":\"usage\""))
+              #expect(result.stdout.contains("\"ok\":false"))
+              #expect(result.stderr.isEmpty, "\(invocation), broken: \(broken)")
+            } else {
+              #expect(result.stdout.isEmpty)
+              #expect(result.stderr.contains("[usage]"))
+            }
+          }
+        }
+      }
+    }
+  }
+
   /// Every storage file but the command log, by content, with truth rows read
   /// logically: a read connection may checkpoint the WAL, which changes bytes but not
   /// rows.

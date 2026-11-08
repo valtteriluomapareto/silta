@@ -6,8 +6,8 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct ControlPlaneTests {
-  @Test(arguments: [["--version"], ["--help"], ["schema", "--json"], ["schema", "--nope"]])
-  func everyCommandLogsOnce(arguments: [String]) throws {
+  @Test(arguments: [["schema", "--json"], ["schema", "--nope"]])
+  func commandsWithAnEnvironmentLogOnce(arguments: [String]) throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
         arguments, in: scratch,
@@ -31,7 +31,7 @@ struct ControlPlaneTests {
       let cwd = scratch.appending(path: "acme")
       try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
       let result = try SiltaBinary.run(
-        ["--version"], in: scratch, cwd: cwd,
+        ["schema"], in: scratch, cwd: cwd,
         environment: ["SILTA_NOW": "2023-11-14T22:13:20.000Z"])
       #expect(result.termination == .exit(0))
       let data = try Data(contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"))
