@@ -43,7 +43,7 @@ let package = Package(
     ),
     .target(
       name: "SiltaTestSupport",
-      dependencies: ["SiltaCore"],
+      dependencies: ["SiltaCore", .product(name: "GRDB", package: "GRDB.swift")],
       swiftSettings: swiftSettings
     ),
     .testTarget(

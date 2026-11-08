@@ -1,0 +1,49 @@
+### silta
+
+OVERVIEW: A local context hub and backlog for coding agents.
+
+USAGE: silta [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  schema                  Describe the commands, their flags, their --json data
+                          and the error codes.
+  ws                      List, select and edit workspaces.
+  init                    Initialize or scan repos; select with ws use; ws edit
+                          is human-only.
+  repo                    Operate on registered repositories.
+  task                    Keep task work, plans and results in the local
+                          backlog.
+  code                    Read another app's committed code without checking
+                          out a branch.
+  where                   Resolve the workspace, repository and app for a local
+                          path.
+  doctor                  Diagnose database, git and data across all workspaces
+                          without repairs.
+  comment                 Post task discussion; a claimer's handoff releases
+                          its claim.
+  brief                   Read budgeted local context for the current task.
+  inbox                   Read current local attention without marking it read.
+  guide                   Read the agent manual, or one topic.
+  agents                  Preview and safely apply harness integration.
+  session                 Read current-actor handoff needs.
+  status (default)        Print a one-line status: workspace, app, inbox count
+                          and your claimed tasks.
+  export                  Write one workspace as a deterministic text tree for
+                          backup and diff.
+  restore                 Replace a workspace from an export tree (human-only,
+                          except --dry-run).
+  backup                  Create a whole-database SQLite snapshot.
+
+  See 'silta help <subcommand>' for detailed help.

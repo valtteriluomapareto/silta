@@ -116,7 +116,8 @@ through. Fix the change, or propose a decision first.
    - **A bug fix starts with a reproduction.** Write a test that fails for the
      reported reason and commit it first, wrapped in `withKnownIssue`. Then fix it.
    - **A feature starts from its acceptance tests**, in red → green → refactor steps.
-   - **Goldens are written from the spec**, not generated from the code.
+   - **Goldens are written from the spec**, not generated from the code. Help goldens are
+     reviewed against the help standard in [coding guidelines](docs/coding-guidelines.md).
 4. **Implement, verify, then get a review again** with the same reviewers.
 5. **Commit** in imperative sentence case, under ~72 characters, ending with the
    `Co-Authored-By` trailer the harness gives you.

@@ -9,7 +9,7 @@ struct WsShowCommand: WorkspaceArgumentCommand {
 
   static let workspaceSource = WorkspaceSource.argument
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The workspace slug; defaults to repository location, then the saved default.")
   var workspace: String?

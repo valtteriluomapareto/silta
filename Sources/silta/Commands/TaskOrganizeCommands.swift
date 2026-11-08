@@ -10,7 +10,7 @@ struct TaskArchiveCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The task reference.")
   var ref: String
@@ -31,7 +31,7 @@ struct TaskKeepCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The task reference.")
   var ref: String
@@ -52,7 +52,7 @@ struct TaskLinkCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The source task reference.")
   var ref: String
@@ -60,7 +60,10 @@ struct TaskLinkCommand: OutputCommand {
   @Argument(help: "The target reference (task, doc, app, topic, code, plan, note or url).")
   var target: String
 
-  @Option(help: "The relation; defaults to cites. blocked_by belongs to block.")
+  @Option(
+    help: .init(
+      "Relation: \(TaskService.relations.joined(separator: ", ")); "
+        + "blocked_by belongs to block."))
   var rel = "cites"
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let linked = try TaskService(environment: context.environment, workspace: global.ws)
@@ -80,7 +83,7 @@ struct TaskPromoteCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The task reference.")
   var ref: String

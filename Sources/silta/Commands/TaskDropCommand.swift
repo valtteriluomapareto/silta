@@ -10,7 +10,7 @@ struct TaskDropCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
 

@@ -10,11 +10,12 @@ struct TaskStartCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Flag(help: "Override another session's fresh claim (human-only then).") var steal = false
+  @Flag(help: "Override another session's fresh claim; human-only then.")
+  var steal = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let started = try await TaskService(

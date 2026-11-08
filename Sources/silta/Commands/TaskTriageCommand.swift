@@ -4,13 +4,13 @@ import SiltaCore
 struct TaskTriageCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "triage",
-    abstract: "Accept or drop proposals in one approved batch.")
+    abstract: "Accept or drop proposals in one approved batch (human-only).")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
 
@@ -20,7 +20,7 @@ struct TaskTriageCommand: OutputCommand {
   @Option(parsing: .upToNextOption, help: "Proposal refs to drop; repeat or list several.")
   var drop: [String] = []
 
-  @Option(help: "Priority for accepted proposals: 1, 2 or 3; without it they keep their own.")
+  @Option(help: "Priority for accepted proposals: 1, 2 or 3; default keeps each own.")
   var priority: Int?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {

@@ -9,7 +9,7 @@ struct WsUseCommand: WorkspaceArgumentCommand {
 
   static let workspaceSource = WorkspaceSource.argument
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The workspace slug to use outside registered repositories.")
   var workspace: String

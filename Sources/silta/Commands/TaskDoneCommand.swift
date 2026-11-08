@@ -10,18 +10,21 @@ struct TaskDoneCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
 
   @Argument(help: "The task reference.") var ref: String
 
-  @Option(help: "Record this commit from the task's repository.") var sha: String?
+  @Option(
+    help: .init(
+      "Record this commit from the task's repository; "
+        + "default is attribution from the repository."))
+  var sha: String?
 
   @Flag(help: "Skip commit attribution.") var noSha = false
 
-  @Flag(
-    help: "Override an unmet review gate (human-only then; provide the result with -F <file>).")
+  @Flag(help: "Override an unmet review gate; human-only then; a result is optional.")
   var force = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

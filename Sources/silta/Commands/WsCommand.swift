@@ -5,5 +5,5 @@ struct WsCommand: ParsableCommand {
     commandName: "ws", abstract: "List, select and edit workspaces.",
     subcommands: [WsListCommand.self, WsUseCommand.self, WsEditCommand.self, WsShowCommand.self])
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 }

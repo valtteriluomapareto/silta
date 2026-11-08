@@ -12,14 +12,15 @@ struct TaskBlockCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
 
   @Argument(help: "The task reference.") var ref: String
 
   @Option(
-    parsing: .upToNextOption, help: "Task, ext:party or url:http(s) blockers; Silta sends nothing.")
+    parsing: .upToNextOption,
+    help: "Task, ext:party or url:http(s) blockers; default is none. Silta sends nothing.")
   var on: [String] = []
 
   @Option(help: "UTC YYYY-MM-DD or Nd, default 7d; today/0d is allowed.")
@@ -62,7 +63,7 @@ struct TaskUnblockCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @OptionGroup var body: TaskBody
 

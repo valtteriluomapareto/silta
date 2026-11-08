@@ -1,0 +1,26 @@
+### silta inbox
+
+OVERVIEW: Read current local attention without marking it read.
+
+Human inboxes include grouped blockers, proposals and promoted task pointers.
+Tracker status is not refreshed. --for me means human:<USER>, independent of
+the caller. ask human: is a confirmation instruction, not an executable
+command. See `silta guide questions` for relay and approval rules. Reads never
+clear attention.
+
+USAGE: silta inbox [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--for <for>] [--all]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --for <for>             Complete actor or me; defaults to the caller.
+  --all                   Show every item, including proposals older than 14
+                          days.
+  --version               Show the version.
+  -h, --help              Show help information.

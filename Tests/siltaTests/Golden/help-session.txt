@@ -1,0 +1,45 @@
+### silta session
+
+OVERVIEW: Read current-actor handoff needs.
+
+USAGE: silta session [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  check                   Read fresh own claims needing handoff across all
+                          workspaces.
+
+  See 'silta help session <subcommand>' for detailed help.
+
+### silta session check
+
+OVERVIEW: Read fresh own claims needing handoff across all workspaces.
+
+Read-only; never initializes or migrates. Creation or claim alone does not need
+handoff. Own plan, step, discussion and other task writes after handoff do.
+Refreshes do not erase earlier writes; expired or foreign claims are omitted.
+
+USAGE: silta session check [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.

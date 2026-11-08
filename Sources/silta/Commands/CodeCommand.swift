@@ -8,5 +8,5 @@ struct CodeCommand: ParsableCommand {
       CodeShowCommand.self, CodeGrepCommand.self, CodeLogCommand.self, CodeListCommand.self,
     ])
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 }

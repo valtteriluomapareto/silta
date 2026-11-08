@@ -8,7 +8,7 @@ struct CommentAcceptCommand: OutputCommand {
   static let dataShape = CommentOutput.mutationShape
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @Argument(help: "The live answer ref to accept.") var ref: String
 
   func execute(_ context: CommandContext) throws -> CommandOutput {

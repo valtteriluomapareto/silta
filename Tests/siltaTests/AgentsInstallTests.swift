@@ -259,6 +259,21 @@ struct AgentsInstallTests {
 }
 
 extension AgentsInstallTests {
+  @Test func uninstallHookFlagsExplainTheirRefusal() throws {
+    try withScratchDirectory { scratch in
+      for flag in ["--hook", "--stop-hook"] {
+        let result = try Self.run(["uninstall", flag, "--json"], in: scratch)
+        #expect(result.termination == .exit(1))
+        let error = try #require(
+          try GuideContractTests.object(result.stdout)["error"] as? [String: Any])
+        #expect(error["code"] as? String == "invalid")
+        #expect(
+          (error["message"] as? String)?.contains(
+            "uninstall removes all selected owned hooks without hook flags") == true)
+      }
+    }
+  }
+
   @Test func editedMarkdownOwnershipRefuses() throws {
     try withScratchDirectory { scratch in
       #expect(try Self.apply(["install", "--codex"], in: scratch).termination == .exit(0))

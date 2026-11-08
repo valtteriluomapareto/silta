@@ -6,15 +6,12 @@ struct TaskEditCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit",
     abstract: "Edit task fields; approval is needed unless you hold its claim.",
-    discussion: """
-      --print prints the current document; change it and pass it back with -F.
-      It has five ordered sections: ## Title, ## Description, ## Acceptance, ## Plan,
-      ## Result. Each heading is followed by a tilde fence (at least ~~~), the literal
-      value, then a matching fence on its own line. Choose fences longer than any tilde
-      run in the values. Empty fields contain one empty line between fences.
-      The editor receives this same document. A changed plan creates a revision.
-      Agents can't clear a stored Result or Plan.
-      """)
+    discussion: "`--print` outputs the document; edit it and return it with `-F`.\n"
+      + "Order: ## Title, ## Description, ## Acceptance, ## Plan, ## Result.\n"
+      + "Each heading is followed by a tilde fence (~~~ or longer) around the value.\n"
+      + "Choose a fence longer than any tilde run in the values.\n"
+      + "Empty fields hold one blank line; changed plans make revisions.\n"
+      + "Agents can't clear a stored Plan or Result.")
 
   static let dataShape = Shape.object([
     "ref": .string, "status": .string, "document": .optional(.string),
@@ -22,15 +19,18 @@ struct TaskEditCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Argument(help: "The task reference.")
   var ref: String
 
-  @Option(name: .customShort("F"), help: "Read UTF-8 Markdown from a file, or - for stdin.")
+  @Option(
+    name: .customShort("F"),
+    help: "Read UTF-8 Markdown from a file, or - for stdin; default is none."
+  )
   var file: String?
 
-  @Flag(help: "Print the current edit document without editing; needs no approval.")
+  @Flag(help: "Print the current document without editing; needs no approval.")
   var print = false
 
   @Flag(help: "Retain secrets with human approval.")

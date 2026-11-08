@@ -13,7 +13,7 @@ struct SessionCheckCommand: OutputCommand {
   static let dataShape = Shape.object([
     "tasks": .array(.object(["workspace": .string, "ref": .string]))
   ])
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let result = SessionCheckData(

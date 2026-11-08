@@ -7,7 +7,7 @@ struct InboxCommand: OutputCommand {
     discussion: "Human inboxes include grouped blockers, proposals and promoted task pointers. "
       + "Tracker status is not refreshed. --for me means human:<USER>, independent of the caller. "
       + "ask human: is a confirmation instruction, not an executable command. "
-      + "See docs/spec.md §8.1 for relay and approval rules. Reads never clear attention.")
+      + "See `silta guide questions` for relay and approval rules. Reads never clear attention.")
   static let workspaceSource = WorkspaceSource.option
   static let dataShape = Shape.object([
     "scope": .string, "actor": .string, "remaining": .int, "more": .optional(.string),
@@ -28,10 +28,11 @@ struct InboxCommand: OutputCommand {
       ])),
   ])
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @Option(name: .customLong("for"), help: "Complete actor or me; defaults to the caller.")
   var target: String?
-  @Flag(help: "Show every item, including proposals older than 14 days.") var all = false
+  @Flag(help: "Show every item, including proposals older than 14 days.")
+  var all = false
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let workspace = try context.workspace(global.ws)

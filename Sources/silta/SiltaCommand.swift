@@ -17,5 +17,5 @@ struct SiltaCommand: ParsableCommand {
     defaultSubcommand: StatusCommand.self
   )
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 }

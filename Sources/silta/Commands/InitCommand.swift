@@ -5,21 +5,13 @@ import SiltaCore
 struct InitCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "init",
-    abstract: "Initialize or scan repos; select with ws use; configuration editing is human-only.",
-    discussion: """
-      `init --scan` discovers repos at the scan roots and at most two child levels, without \
-      fetching. A new workspace's slug is the first directory's lowercased name unless --slug \
-      names another; its task prefix is the slug's first two letters uppercased unless --prefix \
-      names another. Chosen values keep their case, and task refs read <prefix>-<n> (AC-1). Both \
-      use letters, digits, _ or -, starting and ending with a letter or digit, and the same \
-      validation as `ws edit`. --prefix works without --slug, and --slug also names the \
-      workspace. On a scan, --ws rescans an existing workspace, matching its slug without \
-      regard to case, instead of naming a new one, so it accepts neither option. A clone \
-      whose directory name normalizes to none is refused, because none means non-code \
-      work, and the conflict names its path.
-
-      Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC
-      """)
+    abstract: "Initialize or scan repos; select with ws use; ws edit is human-only.",
+    discussion: "`init --scan` scans roots and two child levels without fetching.\n"
+      + "A new workspace derives its slug and task prefix from the first directory.\n"
+      + "Values keep case, use letters, digits, _ or -, and start/end alphanumeric.\n"
+      + "A --ws scan refreshes that workspace, matching slug without regard to case.\n"
+      + "It takes no slug or prefix; a none-named clone is refused with its path.\n"
+      + "Example: silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC")
 
   static let dataShape = Shape.object([
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,
@@ -27,24 +19,24 @@ struct InitCommand: OutputCommand {
 
   static let workspaceSource = WorkspaceSource.none
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 
   @Option(
     parsing: .upToNextOption,
     help: ArgumentHelp(
-      "Scan directories to two child levels; an existing workspace only refreshes the "
-        + "repo paths already registered."))
+      "Scan directories to two child levels; default is none. An existing workspace only "
+        + "refreshes registered repo paths."))
   var scan: [String] = []
 
   @Option(
     help: ArgumentHelp(
-      "Slug for a new workspace, kept as typed; defaults to the first directory's "
-        + "lowercased name."))
+      "Slug for a new workspace; defaults to the first directory's lowercased name."))
   var slug: String?
 
   @Option(
     help: ArgumentHelp(
-      "Task prefix for a new workspace, kept as typed; task refs read <prefix>-<n>, e.g. AC-1."))
+      "Task prefix; task refs read <prefix>-<n>, e.g. AC-1; defaults to the slug's first "
+        + "two letters, uppercased."))
   var prefix: String?
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

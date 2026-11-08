@@ -5,5 +5,5 @@ struct RepoCommand: ParsableCommand {
     commandName: "repo", abstract: "Operate on registered repositories.",
     subcommands: [RepoFetchCommand.self])
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
 }

@@ -8,7 +8,7 @@ struct CodeGrepCommand: OutputCommand {
   static let dataShape = CodeOptions.dataShape
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @OptionGroup var options: CodeOptions
   @Argument(help: "App slug, optionally followed by @ref.") var target: String
   @Argument(help: "Extended regular expression (git grep -E); put option-like ones after --.")

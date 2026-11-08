@@ -9,19 +9,25 @@ struct CommentPostCommand: OutputCommand {
   static let dataShape = CommentOutput.receiptShape
   static let workspaceSource = WorkspaceSource.option
 
-  @OptionGroup var global: GlobalOptions
+  @OptionGroup(title: "Global Options") var global: GlobalOptions
   @OptionGroup var body: TaskBody
   @Argument(help: "The task reference.") var target: String
   @Option(
     help: .init(
-      "comment, question, answer, decision or handoff. "
+      "One of \(CommentDraft.kinds.joined(separator: ", ")); default is comment. "
         + "A handoff names state, next step, open questions and branch/sha.")
   )
   var kind: String?
-  @Option(help: "Join this post's thread; replies normalize to its root.") var replyTo: String?
-  @Option(name: .customLong("to"), help: "Recipient: complete actor or me (repeatable).")
+  @Option(help: "Join this post's thread; replies normalize to its root; default is none.")
+  var replyTo: String?
+  @Option(
+    name: .customLong("to"),
+    help: .init(
+      "Recipient: complete actor or me; repeatable, default none. "
+        + "Questions default to the human; @me means human:<USER>."))
   var recipients: [String] = []
-  @Option(name: .customLong("from"), help: "Cite a note: reference.") var source: String?
+  @Option(name: .customLong("from"), help: "Cite a note: reference; default is none.")
+  var source: String?
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let workspace = try context.workspace(global.ws)
