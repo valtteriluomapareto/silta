@@ -5,6 +5,13 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct SpecParityTests {
+  private let exceptions = [
+    "silta agents session-start": "Claude SessionStart protocol documented in spec §12.",
+    "silta agents stop": "Claude Stop protocol documented in spec §12.",
+    "silta comment post": "Default spelling of comment; documented by silta comment --help.",
+    "silta help": "ArgumentParser's built-in help, documented with global flags in spec §16.",
+  ]
+
   @Test func commandsMatchPublishedSchema() throws {
     let section = try cliSection()
     let commands = section.components(separatedBy: "**Commands.**")
@@ -48,12 +55,6 @@ struct SpecParityTests {
       try #require(tree["serializationVersion"] as? Int == 0)
       let command = try #require(tree["command"] as? [String: Any])
       let all = try commandPaths(command, prefix: "").subtracting(["silta"])
-      let exceptions = [
-        "silta agents session-start": "Claude SessionStart protocol documented in spec §12.",
-        "silta agents stop": "Claude Stop protocol documented in spec §12.",
-        "silta comment post": "Default spelling of comment; documented by silta comment --help.",
-        "silta help": "ArgumentParser's built-in help, documented with global flags in spec §16.",
-      ]
       for (name, reason) in exceptions {
         #expect(all.contains(name), "Stale exception: \(name); \(reason)")
       }
