@@ -127,7 +127,7 @@ enum SiltaMain {
 
   private static func logFlags(_ flags: Set<String>) -> [String] {
     return [
-      "--approved", "--json", "--quiet", "--deterministic", "--verbose", "--help", "--version",
+      "--approved", "--json", "--quiet", "--deterministic", "--verbose",
     ]
     .filter { flags.contains($0) }
   }
