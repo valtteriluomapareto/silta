@@ -132,7 +132,7 @@ enum SiltaMain {
     .filter { flags.contains($0) }
   }
 
-  /// Parses and executes using the environment already assembled by the command boundary.
+  /// Executes the parse result using the environment assembled by the command boundary.
   static func execute(
     _ arguments: [String], parseResult: Result<any ParsableCommand, any Error>,
     context: CommandContext

@@ -299,6 +299,9 @@ extension StatusCommandTests {
             #expect(result.termination == .exit(0), "\(invocation), broken: \(broken)")
             #expect(result.stdout.hasPrefix(expectedPrefix), "\(invocation), broken: \(broken)")
             #expect(result.stderr.isEmpty, "\(invocation), broken: \(broken)")
+            #expect(
+              !FileManager.default.fileExists(
+                atPath: scratch.appending(path: "silta-home").path))
           } else {
             #expect(result.termination == .exit(1), "\(invocation), broken: \(broken)")
             if json {
