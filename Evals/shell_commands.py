@@ -13,12 +13,17 @@ class ShellProgram:
     commands: list = field(default_factory=list)
     composed: bool = False
     conditional: bool = False
+    redirected: bool = False
     proven_commands: list = field(default_factory=list)
 
-    def single(self):
-        """Output/approval proof requires exactly one unmodified literal call."""
+    def isolated(self):
+        """One command has the native exit even with supported stdin/stderr forms."""
         return self.commands[0][:] if (not self.opaque and not self.composed
                                       and len(self.commands) == 1) else []
+
+    def single(self):
+        """Output/approval proof also requires unmodified input and output."""
+        return self.isolated() if not self.redirected else []
 
 
 def _lex(program, audit=False):
@@ -180,6 +185,7 @@ def parse_shell(program, *, audit=False, _depth=0):
                 safe = not child.opaque
                 result.composed |= child.composed
                 result.conditional |= child.conditional
+                result.redirected |= child.redirected
             else:
                 safe &= (audit or _literal(command)) and not (incoming and name == 'silta')
                 safe &= not heredoc or name == 'silta' and any(command[n:n + 2] == ['-F', '-'] for n in range(len(command)))
@@ -201,9 +207,9 @@ def parse_shell(program, *, audit=False, _depth=0):
                 command.append(decoded)
                 previous = None
             elif kind == 'merge':
-                result.composed = True
+                result.redirected = True
             elif kind == 'heredoc':
-                heredoc, result.composed = True, True
+                heredoc, result.redirected = True, True
             elif value in (';', '&&', '||', '|', '\n'):
                 if not command and value != '\n':
                     raise ValueError('empty command')

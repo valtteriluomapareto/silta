@@ -809,18 +809,18 @@ def trace_matches_logs(phase, harness):
                 if any(argv[:len(hook.split())] == hook.split() for hook in hooks):
                     continue
                 name = next((name for name in names if command_log_match(argv, name)), None)
-                if name is None and (not parsed.single() or result['exit'] != 0):
+                if name is None and (not parsed.isolated() or result['exit'] != 0):
                     name = next((name for name in names if name in _GROUP_LOGS
                                  and argv[:len(name.split())] == name.split()
                                  and any(row['command'] == name and row.get('error_code') == 'usage'
-                                         and row['exit_code'] != 0 and (not parsed.single() or (row['exit_code'] == result['exit'] if harness == 'codex'
+                                         and row['exit_code'] != 0 and (not parsed.isolated() or (row['exit_code'] == result['exit'] if harness == 'codex'
                                          else (row['exit_code'] == 0) == (result['exit'] == 0)))
                                          for row in measured)), None)
                     if name is not None:
                         chain = [None]
                         break
                 # A missing name is a mismatch unless earlier opaque effects explain it.
-                code = result['exit'] if parsed.single() else None
+                code = result['exit'] if parsed.isolated() else None
                 chain.append((name, code))
         if chain:
             calls.append(dict(result, chain=chain))
