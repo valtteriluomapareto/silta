@@ -56,12 +56,7 @@ struct HelpCommandTests {
       let examples = try helpPages(in: scratch)
         .flatMap { route -> [Example] in
           let labelled = route.text.split(separator: "\n")
-            .filter { line in
-              !line.hasPrefix("USAGE: ")
-                && (line.contains(": silta ")
-                  || line.hasPrefix("Example:") || line.hasPrefix("Ask:")
-                  || line.hasPrefix("Answer:") || line.hasPrefix("Accept"))
-            }
+            .filter { Self.isExampleLine(String($0)) }
           return try labelled.map { line in
             let arguments = try #require(
               Self.arguments(afterCommandIn: String(line)),
@@ -75,6 +70,19 @@ struct HelpCommandTests {
         let result = try SiltaBinary.run(example.arguments + ["--json"], in: scratch)
         let error = try Self.errorCode(result.stdout)
         #expect(error != "usage", "\(example.route) example does not parse: \(example.arguments)")
+      }
+    }
+  }
+
+  @Test func unknownCommandWithHelpIsAUsageError() throws {
+    try withScratchDirectory { scratch in
+      let direct = try SiltaBinary.run(["frobnicate", "--json"], in: scratch)
+      let help = try SiltaBinary.run(["frobnicate", "--help", "--json"], in: scratch)
+      let helpError = try? Self.errorCode(help.stdout)
+      #expect(try Self.errorCode(direct.stdout) == "usage")
+      withKnownIssue("Unknown-command help follows the default subcommand") {
+        #expect(helpError == "usage")
+        #expect(help.stdout == direct.stdout)
       }
     }
   }
@@ -172,12 +180,43 @@ struct HelpCommandTests {
     let usageLines = lines.filter { $0.hasPrefix(usagePrefix) }
     #expect(!usageLines.isEmpty, "\(route) has no accurate usage line")
     let discussion = try discussionLines(text)
-    #expect(discussion.count <= 6, "\(route) discussion is too long")
+    let examples = discussion.filter { Self.isExampleLine($0) }
+    let prose = discussion.filter { !Self.isExampleLine($0) }
+    #expect(prose.count <= 6, "\(route) discussion has too much prose")
+    #expect(examples.count <= 3, "\(route) has more than 3 example lines")
+    for example in examples {
+      #expect(Self.hasExampleLabel(example), "\(route) has an invalid example label: \(example)")
+    }
+    if Self.routesRequiringExamples.contains(route), examples.isEmpty {
+      withKnownIssue("Runnable examples are added with the command changes") {
+        #expect(!examples.isEmpty, "\(route) has no runnable example")
+      }
+    }
     if route == "silta agents uninstall" {
       #expect(!text.contains("--hook"), "\(route) advertises install-only hooks")
       #expect(!text.contains("--stop-hook"), "\(route) advertises install-only hooks")
     }
     return abstract
+  }
+
+  private static let routesRequiringExamples: Set<String> = [
+    "silta init", "silta ws edit", "silta agents install", "silta brief",
+    "silta task add", "silta task ls", "silta task start", "silta task plan",
+    "silta task submit", "silta task done", "silta task block", "silta comment",
+    "silta inbox", "silta code grep", "silta code show", "silta export", "silta restore",
+  ]
+
+  private static func isExampleLine(_ line: String) -> Bool {
+    !line.hasPrefix("USAGE: ") && line.contains(": silta ")
+  }
+
+  private static func hasExampleLabel(_ line: String) -> Bool {
+    guard let colon = line.firstIndex(of: ":"), colon != line.startIndex,
+      line[line.index(after: colon)...].hasPrefix(" silta ")
+    else { return false }
+    let label = line[..<colon]
+    return label.first?.isLetter == true
+      && label.allSatisfy { $0.isLetter || $0.isNumber || " /'()-".contains($0) }
   }
 
   private func checkRuntimeTextRules(
