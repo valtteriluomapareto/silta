@@ -8,6 +8,7 @@ Hook mode has a 1.5 s process deadline and silently succeeds on errors; it
 never fetches, indexes or migrates. The current task shows its newest handoff,
 your inbox items on it and an open-question count; your other inbox items
 follow it. Decisions are absent from the brief.
+Read task context: silta brief --task AC-1
 
 USAGE: silta brief [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--app <app>] [--task <task>] [--topic <topic> ...] [--budget <budget>] [--short] [--hook]
 

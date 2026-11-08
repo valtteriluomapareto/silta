@@ -80,10 +80,8 @@ struct HelpCommandTests {
       let help = try SiltaBinary.run(["frobnicate", "--help", "--json"], in: scratch)
       let helpError = try? Self.errorCode(help.stdout)
       #expect(try Self.errorCode(direct.stdout) == "usage")
-      withKnownIssue("Unknown-command help follows the default subcommand") {
-        #expect(helpError == "usage")
-        #expect(help.stdout == direct.stdout)
-      }
+      #expect(helpError == "usage")
+      #expect(help.stdout == direct.stdout)
     }
   }
 
@@ -187,36 +185,14 @@ struct HelpCommandTests {
     for example in examples {
       #expect(Self.hasExampleLabel(example), "\(route) has an invalid example label: \(example)")
     }
-    if Self.routesRequiringExamples.contains(route), examples.isEmpty {
-      withKnownIssue("Runnable examples are added with the command changes") {
-        #expect(!examples.isEmpty, "\(route) has no runnable example")
-      }
+    if Self.routesRequiringExamples.contains(route) {
+      #expect(!examples.isEmpty, "\(route) has no runnable example")
     }
     if route == "silta agents uninstall" {
       #expect(!text.contains("--hook"), "\(route) advertises install-only hooks")
       #expect(!text.contains("--stop-hook"), "\(route) advertises install-only hooks")
     }
     return abstract
-  }
-
-  private static let routesRequiringExamples: Set<String> = [
-    "silta init", "silta ws edit", "silta agents install", "silta brief",
-    "silta task add", "silta task ls", "silta task start", "silta task plan",
-    "silta task submit", "silta task done", "silta task block", "silta comment",
-    "silta inbox", "silta code grep", "silta code show", "silta export", "silta restore",
-  ]
-
-  private static func isExampleLine(_ line: String) -> Bool {
-    !line.hasPrefix("USAGE: ") && line.contains(": silta ")
-  }
-
-  private static func hasExampleLabel(_ line: String) -> Bool {
-    guard let colon = line.firstIndex(of: ":"), colon != line.startIndex,
-      line[line.index(after: colon)...].hasPrefix(" silta ")
-    else { return false }
-    let label = line[..<colon]
-    return label.first?.isLetter == true
-      && label.allSatisfy { $0.isLetter || $0.isNumber || " /'()-".contains($0) }
   }
 
   private func checkRuntimeTextRules(
@@ -281,6 +257,26 @@ struct HelpCommandTests {
 }
 
 extension HelpCommandTests {
+  private static let routesRequiringExamples: Set<String> = [
+    "silta init", "silta ws edit", "silta agents install", "silta brief",
+    "silta task add", "silta task ls", "silta task start", "silta task plan",
+    "silta task submit", "silta task done", "silta task block", "silta comment",
+    "silta inbox", "silta code grep", "silta code show", "silta export", "silta restore",
+  ]
+
+  private static func isExampleLine(_ line: String) -> Bool {
+    !line.hasPrefix("USAGE: ") && line.contains(": silta ")
+  }
+
+  private static func hasExampleLabel(_ line: String) -> Bool {
+    guard let colon = line.firstIndex(of: ":"), colon != line.startIndex,
+      line[line.index(after: colon)...].hasPrefix(" silta ")
+    else { return false }
+    let label = line[..<colon]
+    return label.first?.isLetter == true
+      && label.allSatisfy { $0.isLetter || $0.isNumber || " /'()-".contains($0) }
+  }
+
   fileprivate func checkExampleValues(_ arguments: [String], route: String) throws {
     let allowedValues: [String: Set<String>] = [
       "--kind": Set(CommentDraft.kinds),
@@ -301,8 +297,9 @@ extension HelpCommandTests {
 
   fileprivate static func arguments(afterCommandIn line: String) -> [String]? {
     guard let range = line.range(of: "silta ") else { return nil }
-    let command = String(line[range.upperBound...])
-    return shellWords(command)
+    let words = shellWords(String(line[range.upperBound...]))
+    let heredoc = words.firstIndex { $0.hasPrefix("<<") } ?? words.endIndex
+    return Array(words[..<heredoc])
   }
 
   fileprivate static func normalizedArguments(_ arguments: [String]) -> [String] {

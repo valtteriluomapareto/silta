@@ -7,6 +7,8 @@ OVERVIEW: Replace a workspace from an export tree (human-only, except
 workspace's rows are replaced in one transaction, approvals are kept, and
 nothing is written on failure. Run --dry-run first and show the human what it
 reports.
+Preview Acme restore: silta restore acme-exports/acme --dry-run
+Restore manifest (human): silta restore acme-exports/acme --manifest SHA
 
 USAGE: silta restore [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <dir> [--dry-run] [--manifest <sha>]
 

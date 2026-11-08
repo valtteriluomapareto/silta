@@ -2,6 +2,15 @@ import ArgumentParser
 import SiltaCore
 
 struct SiltaCommand: ParsableCommand {
+  static func parseRoot(_ arguments: [String]) throws -> any ParsableCommand {
+    if let first = arguments.first, arguments.contains("--help"), !first.hasPrefix("-"),
+      first != "help", !configuration.subcommands.contains(where: { $0._commandName == first })
+    {
+      throw ValidationError("Unexpected argument '\(first)'")
+    }
+    return try parseAsRoot(arguments)
+  }
+
   static let configuration = CommandConfiguration(
     commandName: "silta",
     abstract: "A local context hub and backlog for coding agents.",

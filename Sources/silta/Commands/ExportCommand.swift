@@ -11,7 +11,8 @@ struct ExportCommand: OutputCommand {
       + "exported directory, never one inside a registered repo. Repo paths and worktrees are "
       + "not written; configured values are written as stored. It stages in a hidden "
       + ".<workspace>.export-XXXXXX next to the tree; one it can't remove, or a crash left, is "
-      + "an export_leftover warning for the human. Unreadable entries refuse the target.")
+      + "an export_leftover warning for the human. Unreadable entries refuse the target.\n"
+      + "Export Acme: silta export --ws acme --to acme-exports")
 
   static let dataShape = Shape.object([
     "workspace": .string, "path": .string, "files": .int, "sha": .optional(.string),

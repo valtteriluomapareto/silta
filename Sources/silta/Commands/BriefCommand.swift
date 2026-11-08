@@ -10,7 +10,8 @@ struct BriefCommand: OutputCommand {
       + "Hook mode has a 1.5 s process deadline and silently succeeds on errors; it never "
       + "fetches, indexes or migrates. The current task shows its newest handoff, your inbox "
       + "items on it and an open-question count; your other inbox items follow it. "
-      + "Decisions are absent from the brief.")
+      + "Decisions are absent from the brief.\n"
+      + "Read task context: silta brief --task AC-1")
   static let workspaceSource = WorkspaceSource.location
   static let dataShape = Shape.object([
     "location": .object([

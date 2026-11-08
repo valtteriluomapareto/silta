@@ -8,6 +8,7 @@ and worktrees are not written; configured values are written as stored. It
 stages in a hidden .<workspace>.export-XXXXXX next to the tree; one it can't
 remove, or a crash left, is an export_leftover warning for the human.
 Unreadable entries refuse the target.
+Export Acme: silta export --ws acme --to acme-exports
 
 USAGE: silta export [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--to <root>] [--commit]
 

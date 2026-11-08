@@ -33,6 +33,8 @@ Replacements are atomic per file, not across files; failures list paths.
 --hook opts into SessionStart; no hook leaves settings unread.
 Hook JSON needs exact safe integers; other forms need manual work.
 Real harness acceptance is separate from installation.
+Preview harness changes: silta agents install
+Apply reviewed preview: silta agents install --apply PREVIEW_TOKEN
 
 USAGE: silta agents install [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--claude] [--codex] [--dry-run] [--apply <apply>] [--hook] [--stop-hook]
 

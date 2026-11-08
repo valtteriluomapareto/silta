@@ -50,6 +50,8 @@ SUBCOMMANDS:
 
 OVERVIEW: Add a proposal; --start claims work requested by the human.
 
+Propose portal work: silta task add "Fix portal errors" --app portal
+
 USAGE: silta task add [<options>] <title>
 
 ARGUMENTS:
@@ -104,6 +106,8 @@ OPTIONS:
 
 OVERVIEW: Record blockers; Silta sends nothing.
 
+Wait on another task: silta task block AC-1 --on AC-2 -m "Waiting for API."
+
 USAGE: silta task block [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <ref> [--on <on> ...] [--follow-up <follow-up>]
 
 ARGUMENTS:
@@ -132,6 +136,8 @@ OPTIONS:
 ### silta task done
 
 OVERVIEW: Complete a task with its result and optional app commit.
+
+Finish with a commit: silta task done AC-1 --sha 1234567 -F - <<'EOF'
 
 USAGE: silta task done [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <ref> [--sha <sha>] [--no-sha] [--force]
 
@@ -297,6 +303,8 @@ OPTIONS:
 
 OVERVIEW: List workspace tasks, including your own proposals.
 
+Find a slice task: silta task ls --proposed --promoted --archived
+
 USAGE: silta task ls <options>
 
 GLOBAL OPTIONS:
@@ -325,6 +333,9 @@ OPTIONS:
 ### silta task plan
 
 OVERVIEW: Store a plan revision or tick a top-level checkbox.
+
+Plan from stdin: silta task plan AC-1 -F - <<'EOF'
+Tick a step: silta task plan AC-1 --step 1 --done
 
 USAGE: silta task plan [<options>] <ref>
 
@@ -401,6 +412,8 @@ OPTIONS:
 
 OVERVIEW: Claim a todo task for this exact actor and session.
 
+Claim a task: silta task start AC-1
+
 USAGE: silta task start [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> [--steal]
 
 ARGUMENTS:
@@ -423,6 +436,8 @@ OPTIONS:
 ### silta task submit
 
 OVERVIEW: Submit doing work for review and release its claim.
+
+Request review: silta task submit AC-1
 
 USAGE: silta task submit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref>
 

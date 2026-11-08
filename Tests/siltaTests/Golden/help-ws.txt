@@ -30,6 +30,8 @@ SUBCOMMANDS:
 
 OVERVIEW: Edit workspace YAML (human-only).
 
+Update Acme YAML (human): silta ws edit acme -F - <<'EOF'
+
 USAGE: silta ws edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<workspace>] [-F <F>]
 
 ARGUMENTS:
