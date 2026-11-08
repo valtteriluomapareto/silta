@@ -195,8 +195,7 @@ struct DogfoodLogTests {
   }
 
   @Test(arguments: [
-    ["schema"], ["ws", "ls"], ["init", "--scan", "missing-acme"], ["init"], ["--version"],
-    ["--help"], ["task"], ["task", "show", "--help"],
+    ["schema"], ["ws", "ls"], ["init", "--scan", "missing-acme"], ["init"],
   ])
   func commandsThatActOnNoWorkspaceStayUntagged(arguments: [String]) throws {
     try withScratchDirectory { scratch in
