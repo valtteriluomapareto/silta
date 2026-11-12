@@ -1,9 +1,10 @@
 import CryptoKit
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 /// Hex SHA-256, computed here so manifest checks don't trust the exporter's own hashing.
 enum SHA256Hex {
@@ -112,6 +113,13 @@ struct ExportCoverageTests {
       "id": .excluded, "uid": .excluded, "doc_id": .excluded, "rev": .excluded,
       "base_rev": .excluded, "body_md": .excluded, "state": .excluded, "actor": .excluded,
       "message": .excluded, "created_at": .excluded,
+      "title": .excluded, "kind": .excluded, "about_refs": .excluded,
+      "source_task_id": .excluded,
+    ],
+    "doc_verification": [
+      "id": .excluded, "uid": .excluded, "doc_rev_id": .excluded,
+      "actor": .excluded, "message": .excluded, "app_shas": .excluded,
+      "created_at": .excluded,
     ],
     "link": [
       "id": .excluded, "uid": .plain, "workspace_id": .excluded, "from_kind": .plain,

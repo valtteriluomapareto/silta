@@ -685,3 +685,14 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     routine retries and safe reconstruction of stdin writes; recipes alone cannot
     enforce scope because agents do not reliably propagate `--ws`. Guide recipes still
     carry an explicit workspace to support intentional cross-workspace/outside work.
+
+## Docs compatibility (2026-11-12)
+
+- **D45: Preserve legacy map identities and encode their refs.** Existing service
+  slugs and edge kinds remain byte-for-byte, with their ids and attachments.
+  New service slugs and edge kinds must be identifiers. Refs percent-encode unsafe
+  UTF-8 bytes with uppercase hex; ASCII letters, digits, `_` and `-` stay literal.
+  A literal percent sign is encoded too. Decoding requires the canonical spelling.
+  The maintainer chose this after the shipped writer refused to change an attached
+  legacy edge kind. Retaining an executable for repair would leave fresh installs
+  and attached identities without a reliable upgrade path.

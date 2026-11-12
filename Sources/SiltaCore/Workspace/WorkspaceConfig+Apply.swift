@@ -253,6 +253,14 @@ private struct WorkspaceWriter {
       )
       return id
     }
+    if table == "service" || table == "edge" {
+      let field = table == "service" ? "slug" : "kind"
+      guard let value = identity[field].flatMap(String.fromDatabaseValue),
+        WorkspaceConfig.isValidIdentifier(value)
+      else {
+        throw WorkspaceError.invalid(["New \(table) \(field) must be an identifier."])
+      }
+    }
     var inserted = identity.merging(values) { _, value in value }
     inserted["uid"] = try ids.next(at: date).databaseValue
     let columns = inserted.keys.sorted()

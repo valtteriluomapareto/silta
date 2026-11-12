@@ -353,8 +353,18 @@ CREATE TABLE doc_rev (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   doc_id INTEGER NOT NULL REFERENCES doc(id), rev INTEGER NOT NULL,
   base_rev INTEGER,                           -- the revision this proposal was written against
   body_md TEXT NOT NULL,
+  title TEXT, kind TEXT, about_refs TEXT,      -- revision metadata; NULL when legacy history is unknown
+  source_task_id INTEGER REFERENCES task(id),
   state TEXT NOT NULL,                        -- proposed | accepted | rejected | superseded
   actor TEXT NOT NULL, message TEXT, created_at TEXT NOT NULL, UNIQUE (doc_id, rev));
+
+CREATE TABLE doc_verification (
+  id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
+  doc_rev_id INTEGER NOT NULL REFERENCES doc_rev(id),
+  actor TEXT NOT NULL, message TEXT,
+  app_shas TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL);
+-- app_shas is an array of {app,ref,sha} snapshots, retaining multiple refs and deleted apps.
+-- Migration fills metadata only for the current accepted revision; it invents no verification.
 
 -- Typed links. Owned targets by id; external targets as strings.
 CREATE TABLE link (

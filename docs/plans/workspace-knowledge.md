@@ -50,18 +50,16 @@ to at least one map item**, and it appears wherever that item does.
 | Service | `service:push` | Setup, quirks, limits, where credentials live |
 | Topic | `topic:messaging` | Cross-cutting domain knowledge |
 
-**Refs are shell-safe and printed by Silta.** Slugs can't contain `/`, so
-`edge:<from>/<to>/<kind>` parses unambiguously and needs no quoting. A service target
-retains its YAML discriminator: `edge:mobile/service:push/sdk`; an app and a service
-may share a slug without sharing a ref. Edge kinds become identifiers like slugs.
-A migration check refuses stored kinds that don't fit without changing the schema
-or writer floor. The upgrade retains the pre-docs executable beside the installed
-binary as `silta-before-docs`, preserving it across repeated installs. The new
-binary's read-only `ws show` supplies the repair YAML; the refusal names the retained
-executable's `--ws <ws> ws edit -F <file>` command, with the normal approval gate,
-then retrying the upgrade. It never offers the new binary's migrating write as the
-repair. K1 tests refusal, approved repair with the prior writer and successful
-upgrade, including reinstalling before repair. The brief prints each edge's exact ref, so an
+**Refs are shell-safe and printed by Silta.**
+`edge:<from>/<to>/<kind>` retains the service target discriminator, as in
+`edge:mobile/service:push/sdk`; an app and service may share a slug. Newly created
+service slugs and edge kinds must be identifiers. Existing identities retain their
+bytes and attachments. Service slugs and edge kinds in refs encode unsafe UTF-8
+bytes as uppercase `%HH`, leaving ASCII letters, digits, `_` and `-` literal:
+`service:push%20service`, `edge:mobile/api/HTTP%20API`. Parsing accepts only that
+canonical spelling, so literal `%2F` is printed as `%252F`. No retained executable
+or repair step is needed to upgrade legacy identities.
+The brief prints each edge's exact ref, so an
 agent copies it instead of composing it. New apps cannot use `edge`, `service` or
 `doc` as their slug. Existing apps keep those names and their identities, including
 through export and restore; their code refs use the explicit `code:` prefix. Typed
@@ -323,10 +321,17 @@ Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A
 - **Agent verify:** yes, with SHAs recorded.
 - **Default mode:** `propose`; `direct` deferred.
 - **§22:** changes when this ships.
-- **R1 ships alone first.** The maintainer chose it: R1 is smaller and its
-  `doc-context` eval tests the core claim. R2 starts only if that eval shows docs
-  change agent outcomes; otherwise the proposal machinery isn't built.
+- **Implement all releases, in order.** On 2026-11-12 the maintainer authorized all
+  K tasks, extending the initial R1-only scope. R1 lands first; proposals and
+  freshness follow. Live evals and sign-ins remain separate work; the implementation
+  task covers their offline fixtures and stub tests.
 - **Reserved app names preserve existing identities.** The maintainer chose to
   preserve existing names and reserve them for new apps. Existing tasks and links
   must survive upgrades and faithful restore; no rename is required. Code in these
   apps uses explicit `code:` refs.
+
+- **Legacy kinds keep their identities.** On 2026-11-12 the maintainer chose to
+  preserve legacy kinds and encode refs. Existing service slugs follow the same
+  compatibility rule. Only newly created identities require identifiers. The
+  schema migration raises the writer floor; enabling reserved app creation rules
+  and typed map targets requires another floor raise within K1 before K2–K4 start.

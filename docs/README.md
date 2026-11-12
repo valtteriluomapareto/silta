@@ -44,7 +44,7 @@ a plan ships:
 |---|---|---|
 | [`plans/df3-real-workspace.md`](plans/df3-real-workspace.md) | proposed | Onboarding a real multi-repo workspace and measuring whether Silta helps |
 | [`plans/m1-daily-use.md`](plans/m1-daily-use.md) | active | M1 broken into slices with dependencies, for parallel agents |
-| [`plans/workspace-knowledge.md`](plans/workspace-knowledge.md) | active | R1: docs attached to workspace map items; proposals and freshness follow only after their release gates |
+| [`plans/workspace-knowledge.md`](plans/workspace-knowledge.md) | active | Docs attached to workspace map items; reads, proposals, freshness and offline evals |
 <!-- plans-board:end -->
 
 ## Dogfooding
