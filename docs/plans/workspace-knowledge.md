@@ -1,4 +1,4 @@
-# Workspace knowledge: docs and the workspace map, kept by agents
+# Workspace knowledge: docs on the workspace map, kept by agents
 
 Status: proposed
 
@@ -6,9 +6,9 @@ Status: proposed
 
 An agent in any repo of a workspace starts with the knowledge that matters for its
 app and task: the workspace map (apps, edges, services, topics) and the docs
-attached to it. When it learns something lasting, it proposes a doc change or a map
-change. The human coordinates and reviews both in one batch; they never write,
-search or maintain docs or configuration themselves.
+attached to it. When it learns something lasting, it proposes a doc change. The
+human coordinates and reviews proposals in one batch; they never write, search or
+maintain docs themselves.
 
 ## Operating model
 
@@ -16,8 +16,8 @@ This plan is designed around who does what. Every slice must keep this split.
 
 | Role | Does | Never has to |
 |---|---|---|
-| **Agent** | Reads the docs the brief shows next to the map; proposes doc and map changes after learning something lasting; checks a stale doc against the code before relying on it; prepares one review batch for the human, merging overlapping proposals first | Ask the human what a doc says, or wait on a review to keep working |
-| **Human** | Says "review the proposals" to an agent; answers one batched message; decides contested or cross-team knowledge | Run the CLI, write markdown or YAML, find duplicates, chase stale docs |
+| **Agent** | Reads the docs the brief shows next to the map; proposes doc changes after learning something lasting; notes map gaps for the human; checks a stale doc against the code before relying on it; prepares one review batch for the human, merging overlapping proposals first | Ask the human what a doc says, or wait on a review to keep working |
+| **Human** | Says "review the doc proposals" to an agent; answers one batched message; approves map changes in chat (D38); decides contested or cross-team knowledge | Run the CLI, write markdown or YAML, find duplicates, chase stale docs |
 | **Silta** | Attaches every doc to a map item; shows docs where the item appears in the brief; gates and records writes (D5, D38); flags stale docs; keeps every revision | — |
 
 Reading costs the human nothing. Writing costs them one batched answer (D37).
@@ -30,7 +30,8 @@ Reading costs the human nothing. Writing costs them one batched answer (D37).
   export, §20 test tiers, §21 evals, §22 M2, Appendix A (`ws edit` YAML).
 - D2, D5, D8, D30 (simplicity), D32 (`min_writer_version`), D37 (attention budget),
   D38 (human works through agents), D39 (settings), D44.
-- [DF3 plan](df3-real-workspace.md): the real multi-repo trial where this is judged.
+- [DF3 plan](df3-real-workspace.md): the real multi-repo trial where this is judged,
+  and whose question E5 decides whether map proposals are needed.
 - Spec §23 Q8 (code access): docs and edges point at code through `silta code`.
 
 ## Design
@@ -135,44 +136,38 @@ propose.
 - **Few:** one rule for every proposal type (tasks, docs, map): usually none, at most
   two per session. It stays guide text, as for tasks today.
 
-**Map proposals.** Agents discover the map: that mobile also calls the pdf-service,
-that an edge summary is wrong. When the human is present, D38 already covers this:
-the agent shows a `ws edit -F` change and runs it with `--approved`. Map proposals
-cover the rest, so the change waits in the same batch as docs.
-- `silta ws propose -F - -m "<why>" [--dry-run]` takes a **YAML fragment**: only the
-  sections it changes. Omitted sections and rows are unchanged; removals are
-  explicit. The output summarises the diff ("adds 1 edge, removes 0").
-- A proposal is stored as **per-item operations** (add, update or remove by
-  identity), each with the item's prior values as its base.
-- Agents may propose edges, services, topics and aliases, and app summaries. Repos,
-  app identity and refs, environments and settings stay human-only through `ws edit`;
-  an attempt is refused, and `next` names the `ws edit` change to ask the human for.
-- A doc proposal may name an item added by a pending map proposal from the same
-  session; they must be accepted together.
-- `ws edit` gains the same base check: it refuses a save whose items changed since
-  it read them, closing today's lost-update window.
+**Map gaps.** Agents discover the map: that `sales` also calls `pdf-service`, or
+that an edge summary is wrong. The map changes rarely, so this plan adds no new
+mechanism for it:
+- **Human present:** the agent shows the `ws edit -F` change in chat and, after a
+  yes, runs it with `--approved` (D38).
+- **Human absent:** the agent writes the gap under "What's left" in its handoff or
+  result, as a line starting `Map gap:`, never a task or a file (D39).
+- DF3 counts these lines and the chat changes for E5. Map proposals, an agent
+  write that waits in the review batch, are built only if E5 shows gaps that
+  waited on an absent human.
 
 ### Reviewing: one batch, one answer
 
-- **Refs:** a doc proposal is `doc:<slug>@<rev>`; a map proposal is `map:<n>` (§5.1).
-  `doc show --rev <n> --diff` and `ws show map:<n>` show the change.
-- **The inbox** lists pending proposals grouped per item, with the why, the source
+- **Refs:** a proposal is `doc:<slug>@<rev>` (§5.1). `doc show --rev <n> --diff`
+  shows the change.
+- **The inbox** lists pending doc proposals grouped per doc, with the why, the source
   task and a diff summary. They leave the inbox 14 days after creation (D37).
 - **The review loop, through an agent:**
-  1. The human says "review the proposals".
+  1. The human says "review the doc proposals".
   2. The agent reads each diff and checks it against the code. It merges overlapping
      proposals first by proposing a combined revision, so every recommendation names
      a proposal that exists.
   3. It sends one message: per proposal, accept or reject with one line of
      reasoning, plus the exact commands.
-  4. The human answers once. The agent runs `silta proposals --accept <refs> --reject
-     <refs> --approved "<words>"`, one transactional command for docs and map
-     together, like `task triage --accept/--drop`.
+  4. The human answers once. The agent runs `silta doc triage --accept <refs>
+     --reject <refs> --approved "<words>"`, one transactional command, like
+     `task triage --accept/--drop`.
 - **Batch semantics:** every proposal's base is checked against the state before the
-  batch. Two proposals in one batch that change the same doc or map item are refused
-  with the overlap named; nothing is written. Then the batch applies all or nothing.
-- **Stale base:** `stale_rev` names the proposal, and `next` is `doc show` (or `ws
-  show`) and a rebased propose with `-F`. No `$EDITOR` step.
+  batch. Two proposals in one batch that change the same doc are refused with the
+  overlap named; nothing is written. Then the batch applies all or nothing.
+- **Stale base:** `stale_rev` names the proposal, and `next` is `doc show` and a
+  rebased propose with `-F`. No `$EDITOR` step.
 
 ### Staying true
 
@@ -188,9 +183,9 @@ cover the rest, so the change waits in the same batch as docs.
 
 ### Export and restore
 
-Docs, their revisions and verifications, and pending map proposals join the export
-tree (§15). Restore no longer refuses a workspace with docs; a tampered tree or a
-dangling about ref writes nothing.
+Docs, their revisions and verifications join the export tree (§15). Restore no
+longer refuses a workspace with docs; a tampered tree or a dangling about ref writes
+nothing.
 
 ### Error contract
 
@@ -202,33 +197,29 @@ Every new refusal has a code and a `next`. Goldens cover each.
 | About ref doesn't resolve | `not_found` | `silta ws show` or `silta doc ls --about <app ref>` |
 | Stale base | `stale_rev` | `silta doc show <slug>`, then `doc propose … --base <current>` |
 | Overlap in one batch | `conflict` | the overlapping refs; merge and re-propose |
-| Human-only map field in `ws propose` | `human_only` | the `ws edit` change to ask the human for |
 | Removing an item with docs | `conflict` | add-attach-remove commands naming each doc |
 
 ## Releases and slices
 
-Each release is usable on its own. Map proposals come third because docs prove the
-core claim without them. All migrations land in K1, because `StorageSchema.swift` is
-shared.
+Each release is usable on its own. All migrations land in K1, because
+`StorageSchema.swift` is shared.
 
 | Release | Proves |
 |---|---|
 | **R1 Read** | Docs on the map change agent outcomes. Agents write docs with `doc edit -F --approved` while the human is in chat (D38). |
 | **R2 Propose and review** | Agents capture knowledge without the human present, and one answer reviews it. |
-| **R3 Map proposals** | The map stays current through the same loop. |
-| **R4 Freshness** | Stale docs are flagged, and agents check the code. |
+| **R3 Freshness** | Stale docs are flagged, and agents check the code. |
 
 | Slice | Release | Scope | Depends on | Verify with |
 |---|---|---|---|---|
-| K1 Store, refs, attachments | R1 | All migrations; `edge:` and `service:` refs, reserved slugs, identifier kinds; revision metadata; about links and removal conflicts for every map table; `doc_verification`; `map_rev` per item; `min_writer_version` | — | Ref resolver tests; migration tests from the checked-in prior-schema DBs; `ws edit` conflict goldens |
+| K1 Store, refs, attachments | R1 | All migrations; `edge:` and `service:` refs, reserved slugs, identifier kinds; revision metadata; about links and removal conflicts for every map table; `doc_verification`; `min_writer_version` | — | Ref resolver tests; migration tests from the checked-in prior-schema DBs; `ws edit` conflict goldens |
 | K2 Reads and human writes | R1 | `doc show [--rev] [--diff]`, `doc ls --about`; `doc edit -F` creating a doc when missing (human-only, `--approved`) | K1 | CLI goldens; bounds |
 | K3 Brief placement | R1 | Doc lines in sections 4, 5 and 9; hook and short counts; budget share | K1 | Brief goldens, including the backlog-survives fixture; determinism |
-| K4 Export and restore | R1 | Docs, revisions, verifications, map proposals in the tree | K1 | Round trip; tampered and dangling-ref restores write nothing |
-| K5 Doc proposals and batch review | R2 | `doc propose`, `--task` default, `proposals --accept/--reject`, batch semantics, inbox group, D37 age-out | K2 | Gate truth table; accept race; overlap and stale-base batches; `SILTA_NOW` age-out at 13/14/15 days; a §20.1 scenario YAML |
-| K6 Map proposals | R3 | `ws propose` fragments and `--dry-run`; per-item operations; allowed sections; joint doc+map accept; `ws edit` base check | K5 | Scope refusals; per-item conflicts; a batch of two map proposals on different items succeeds |
-| K7 Freshness | R4 | Stale flags (age and moved app ref); per-ref checks in `doc show`/`verify`; index cache for the hook | K3 | `SILTA_NOW` at 89/90/91 days; fixtures with a moved file, a missing ref and a broken edge ref; a §20.1 scenario |
-| K8 Guidance | R1–R4 | `silta guide docs` and the installed skill, extended per release | per release | Guide goldens; `GuideContractTests` |
-| K9 Evals | R1–R4 | The scenarios below, stub-tested first, per release | per release | Stub matrix; live runs |
+| K4 Export and restore | R1 | Docs, revisions and verifications in the tree | K1 | Round trip; tampered and dangling-ref restores write nothing |
+| K5 Doc proposals and batch review | R2 | `doc propose`, `--task` default, `doc triage --accept/--reject`, batch semantics, inbox group, D37 age-out; the `Map gap:` guide rule | K2 | Gate truth table; accept race; overlap and stale-base batches; `SILTA_NOW` age-out at 13/14/15 days; a §20.1 scenario YAML |
+| K6 Freshness | R3 | Stale flags (age and moved app ref); per-ref checks in `doc show`/`verify`; index cache for the hook | K3 | `SILTA_NOW` at 89/90/91 days; fixtures with a moved file, a missing ref and a broken edge ref; a §20.1 scenario |
+| K7 Guidance | R1–R3 | `silta guide docs` and the installed skill, extended per release | per release | Guide goldens; `GuideContractTests` |
+| K8 Evals | R1–R3 | The scenarios below, stub-tested first, per release | per release | Stub matrix; live runs |
 
 K2, K3 and K4 run in parallel after K1. Each slice must fit one reviewable PR (about
 800 lines); a slice that grows splits before review.
@@ -244,7 +235,7 @@ self-checks that each grading token appears only where the scenario puts it.
   `doc show` is needed. Pass: the recorded plan or result names the token. **Control:**
   the same task without the doc must fail in the stub; the live control pass rate is
   reported as a diagnostic.
-- **`doc-context` stale variant (R4):** the code at the backend's ref contradicts the
+- **`doc-context` stale variant (R3):** the code at the backend's ref contradicts the
   doc. Pass: the recorded value is the code's, with a proven `silta code` read and no
   `doc verify` stamping the wrong doc.
 - **`doc-capture` (R2):** the backend task reveals a fact the mobile app depends on,
@@ -253,12 +244,9 @@ self-checks that each grading token appears only where the scenario puts it.
   existing doc on the edge, where a pass is a revision of that doc rather than a new
   slug; and a task-local fact, where a pass is zero proposals. A new repo markdown file
   holding the token fails.
-- **`map-capture` (R3):** the map has the pdf-service app but no edge from mobile.
-  Pass: one map proposal whose only operation adds an edge from `acme-mobile` to
-  `pdf-service`, any kind. **Negative:** an incidental CDN call; pass is no edge.
 - **`doc-review` (R2):** three pending proposals, one contradicting the code, in a
   varying position. The scripted operator replies "do what you recommend". Pass: the
-  final state has the wrong one rejected, the other two accepted, in one `proposals`
+  final state has the wrong one rejected, the other two accepted, in one `doc triage`
   command whose approval row carries those words. Whether the message reasoned well is
   a human `policy-semantics` check. The runner learns to bind an approval to a batch
   command.
@@ -266,12 +254,12 @@ self-checks that each grading token appears only where the scenario puts it.
 Each new predicate enters `guarantees.json` with a planted fault, a failing recording
 and a recorded review entry per variant.
 
-**Human load (D37):** the dogfood report adds proposals per type, acceptance rate,
-time to decision and approvals per batch.
+**Human load (D37):** the dogfood report adds doc proposals, acceptance rate, time
+to decision and approvals per batch.
 
-**Unverified until DF3:** whether agents in a real workspace propose docs and map
-changes worth keeping, and whether the human keeps reviewing them. DF3's decision
-rules gain one for this.
+**Unverified until DF3:** whether agents in a real workspace propose docs worth
+keeping, and whether the human keeps reviewing them. DF3's decision rules gain one
+for this, and E5 counts `Map gap:` lines to decide on map proposals.
 
 ## Risks
 
@@ -282,8 +270,6 @@ rules gain one for this.
   until DF3 shows the need.
 - **Attachment friction.** Agents may attach to the wrong item. Reviews and DF3 would
   show it; `doc ls --about` before proposing and kind inference help.
-- **Map churn.** Agents propose edges for incidental calls. `map-capture`'s negative
-  variant checks it.
 - **Brief bloat.** The budget share and the backlog-survives golden catch it.
 - **Agents ignore docs.** `doc-context` measures the outcome; metrics count `doc show`
   calls.
@@ -295,7 +281,7 @@ rules gain one for this.
   listed above.
 - Every new command and refusal has goldens; `silta schema` matches §16; export
   round-trips docs and proposals.
-- The dogfood report shows proposals and decisions per type.
+- The dogfood report shows doc proposals and decisions.
 
 Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A and into
 `decisions.md`, split §22 M2 into this and a reviews milestone, and delete this file.
@@ -308,25 +294,22 @@ Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A
 - `agent_doc_writes: direct`, a changes digest and `doc revert`: until DF3 shows
   review fatigue. The setting stays at `propose`.
 - Docs attached to environments; environment runbooks attach to their app.
-- Agent proposals for repos, apps, refs, environments and settings.
+- Map proposals (`ws propose`): deferred until DF3's E5 shows map gaps waiting on
+  an absent human. The map changes through `ws edit` as today.
 - The Mac app (M5), and importing existing repo docs.
 
 ## Decided in review
 
-The maintainer asked for map proposals, so they stay, as R3. The Pragmatism reviewer
-recommended deferring them, because D38's `ws edit --approved` covers the
-human-present case; the plan now says so and builds them after docs prove themselves.
-
-Answers to the earlier open questions, from the reviewers:
+- **Map proposals deferred.** The Pragmatism reviewer recommended it: D38's `ws edit
+  --approved` covers the human-present case, and the map changes rarely. The
+  maintainer agreed after weighing concrete cases. Agents record gaps as `Map gap:`
+  lines, and DF3's E5 decides.
 - **Kinds:** keep four, optional and inferred.
 - **Agent verify:** yes, with SHAs recorded.
 - **Default mode:** `propose`; `direct` deferred.
-- **App proposals:** no.
 - **§22:** changes when this ships.
 
 ## Open questions for the human
 
 1. **Release order:** R1 lets agents write docs only with your words in chat. Is that
    enough for a first release, or should R2 (proposals) ship with it?
-2. **Map proposals as R3:** keep them in this plan, or defer them until DF3 shows how
-   often the map changes?
