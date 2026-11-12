@@ -73,7 +73,8 @@ class RunProfile:
         # may be removed; an unfamiliar entry stops reuse for human inspection.
         runtime = ({'sessions', 'archived_sessions', 'history.jsonl', 'session_index.jsonl', 'log', 'logs',
                     'tmp', 'shell_snapshots', 'models_cache.json', 'version.json', 'sqlite', 'skills',
-                    '.codex-global-state.json', 'capabilities.json'} if self.harness == 'codex' else
+                    '.codex-global-state.json', 'capabilities.json', 'cache', 'plugins', 'thread-writer-locks',
+                    '.sandbox_migration'} if self.harness == 'codex' else
                    {'projects', 'debug', 'todos', 'tasks', 'plans', 'session-env', 'paste-cache', 'file-history',
                     'backups', 'shell-snapshots', 'cache', 'statsig', 'telemetry', '.cache', 'stats-cache.json',
                     'history.jsonl', 'skills', 'sessions', 'plugins', '.last-cleanup',
@@ -82,12 +83,13 @@ class RunProfile:
                     'remote-settings.json', 'remote-settings.json.signature.json',
                     'remote-settings.json.synced-at'})
         auth = 'auth.json' if self.harness == 'codex' else '.credentials.json'
-        # Credential state is opaque and kept: Codex 0.166 locks auth.json with auth.lock.
+        # Credential state is opaque and kept: Codex 0.166 locks auth.json with auth.lock
+        # and keeps a per-install id; neither carries trial history.
         allowed = ({p.name for p in self.configs if p.parent == self.directory} | {auth}
-                   | ({'auth.lock'} if self.harness == 'codex' else set()))
+                   | ({'auth.lock', 'installation_id'} if self.harness == 'codex' else set()))
         disposable = []
         for path in self.directory.iterdir():
-            if path.name in runtime or (self.harness == 'codex' and re.fullmatch(r'state_\d+\.sqlite(?:-wal|-shm)?', path.name)):
+            if path.name in runtime or (self.harness == 'codex' and re.fullmatch(r'(?:state|thread_history|goals|logs|memories|queue)_\d+\.sqlite(?:-wal|-shm)?', path.name)):
                 disposable.append(path)
             elif path.name not in allowed:
                 raise RuntimeError('Unknown profile entry retained: ' + str(path))

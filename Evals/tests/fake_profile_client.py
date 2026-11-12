@@ -35,6 +35,7 @@ if login:
     if harness == 'codex':
         # Codex 0.166 keeps a credential lock beside auth.json.
         (profile / 'auth.lock').touch()
+        (profile / 'installation_id').write_text('acme-install\n')
     config = profile / ('config.toml' if harness == 'codex' else '.claude.json')
     if mode in ('symlink-auth', 'hardlink-auth'):
         config.unlink(missing_ok=True)
