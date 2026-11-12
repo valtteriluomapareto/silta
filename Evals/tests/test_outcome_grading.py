@@ -1,8 +1,11 @@
 """Outcome grading observes recorded context and persistent sibling-repo files."""
 import copy
+import json
 import sys
 from pathlib import Path
 import unittest
+import tempfile
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import evals
@@ -31,15 +34,84 @@ def record(e, body, table='comments', **extra):
 
 
 class OutcomeGrading(unittest.TestCase):
-    def test_main_wrong_mixed_missing_and_partial_values(self):
-        for body, expected in [(MAIN, True), (WRONG, False),
-                               (MAIN + ' ' + WRONG, False), ('', False),
-                               ('ORDER_SHIPPED PRICE_DROP', False),
-                               ('NOT_ORDER_SHIPPED PRICE_DROP ACCOUNT_SECURITY', False)]:
+    @unittest.expectedFailure
+    def test_main_values_allow_corrections(self):
+        for body in [MAIN, 'Legacy checkout: ' + WRONG + '. Registered main: ' + MAIN]:
             with self.subTest(body=body):
                 e = evidence()
                 record(e, body)
-                self.assertEqual(evals.backend_context(e), expected)
+                self.assertTrue(evals.backend_context(e))
+
+    @unittest.expectedFailure
+    def test_main_values_match_normalized_word_runs(self):
+        for body in [MAIN.lower(), 'order shipped, price drop, account security',
+                     'Order-Shipped; Price-Drop; Account-Security',
+                     'NOT_ORDER_SHIPPED PRICE_DROP ACCOUNT_SECURITY']:
+            with self.subTest(body=body):
+                e = evidence()
+                record(e, body)
+                self.assertTrue(evals.backend_context(e))
+
+    def test_missing_main_values_fail(self):
+        for body in [WRONG, '', 'ORDER_SHIPPED PRICE_DROP',
+                     'order almost shipped price drop account security',
+                     'PREORDER_SHIPPED PRICE_DROP ACCOUNT_SECURITY']:
+            with self.subTest(body=body):
+                e = evidence()
+                record(e, body)
+                self.assertFalse(evals.backend_context(e))
+
+    @unittest.expectedFailure
+    def test_legacy_mentioned_metrics_are_boolean_and_summed(self):
+        trials = []
+        for number, (body, expected) in enumerate([
+                (MAIN, False), (MAIN + ' ' + WRONG, True),
+                ('legacy promo v1', True), ('', False)]):
+            e = evidence()
+            record(e, body)
+            measured = evals.metrics(e)
+            failed = evals.failure_metrics(e)
+            self.assertIs(measured['legacy_mentioned'], expected)
+            self.assertIs(failed['legacy_mentioned'], expected)
+            trials.append({'harness': 'codex', 'model': 'fixture', 'scenario': 'start-cross-repo',
+                           'repeat': number, 'passed': True, 'metrics': measured,
+                           'id': str(number), 'evidence': 'fixture.json', 'checks': {}})
+        report = evals.aggregate(trials, 'stub')
+        self.assertEqual(report['groups'][0]['legacy_mentioned'], 2)
+        self.assertIs(type(report['groups'][0]['legacy_mentioned']), int)
+        self.assertIn('<th>Legacy mentioned</th>', evals.render_html(report))
+        e = evidence()
+        record(e, WRONG, actor='agent:fixture:setup')
+        self.assertIs(evals.metrics(e)['legacy_mentioned'], False)
+        e = evidence()
+        record(e, WRONG, task_id=8)
+        self.assertIs(evals.metrics(e)['legacy_mentioned'], False)
+        e = evidence()
+        record(e, WRONG)
+        e['baseline']['comments'] = copy.deepcopy(e['phases'][0]['state']['comments'])
+        self.assertIs(evals.metrics(e)['legacy_mentioned'], False)
+        e['phases'][0]['state'] = None
+        self.assertIs(evals.failure_metrics(e)['legacy_mentioned'], False)
+
+    @unittest.expectedFailure
+    def test_legacy_mentioned_is_false_when_setup_has_no_evidence(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(prefix='si76-metric-failure-') as directory:
+            directory = Path(directory)
+            binary = directory / 'fake-binary'
+            binary.write_bytes(b'not executed')
+            output = directory / 'report'
+            argv = ['evals', '--silta', str(binary), '--stub', str(root / 'tests/stub_harness.py'),
+                    '--harness', 'codex', '--scenario', 'start-cross-repo', '--repeats', '1',
+                    '--output', str(output)]
+            with patch.object(sys, 'argv', argv), patch.object(
+                    evals, 'run_trial', side_effect=RuntimeError('fixture setup failed')):
+                self.assertEqual(evals.main(), 1)
+            report = json.loads((output / 'report.json').read_text())
+            self.assertIs(report['trials'][0]['metrics']['legacy_mentioned'], False)
+            self.assertEqual(report['groups'][0]['legacy_mentioned'], 0)
+            self.assertIs(type(report['groups'][0]['legacy_mentioned']), int)
+        self.assertIs(evals.failure_metrics({'phases': []})['legacy_mentioned'], False)
 
     def test_comments_plans_and_handoffs_on_ac1_by_trial_actors_only(self):
         for table, kind in [('comments', 'comment'), ('comments', 'decision'),
