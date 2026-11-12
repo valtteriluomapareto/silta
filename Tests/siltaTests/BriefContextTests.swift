@@ -5,6 +5,24 @@ import SiltaTestSupport
 import Testing
 
 extension BriefCommandTests {
+  @Test func agentsPointerRequiresExistingFile() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try fixture.git(["checkout", "-q", "api"], repo, scratch)
+      for mode in [[], ["--short"], ["--json"], ["--hook"]] {
+        let result = try run(mode, repo, scratch)
+        withKnownIssue("SI-76: brief advertises a missing AGENTS.md") {
+          #expect(!result.stdout.contains("AGENTS.md"))
+        }
+      }
+      try "Acme instructions\n".write(
+        to: repo.appending(path: "AGENTS.md"), atomically: true, encoding: .utf8)
+      for mode in [[], ["--short"], ["--json"], ["--hook"]] {
+        #expect(try run(mode, repo, scratch).stdout.contains("AGENTS.md: " + repo.path + "/AGENTS.md"))
+      }
+    }
+  }
+
   @Test func appContextFollowsLocationAndTopicsExpandOnce() throws {
     try withScratchDirectory { scratch in
       let repo = try contextFixture(scratch)
