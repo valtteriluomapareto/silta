@@ -32,6 +32,9 @@ if login:
         (profile / '.claude.json').write_text('{"hasCompletedOnboarding":true}\n')
     auth.touch()
     auth.chmod(0)
+    if harness == 'codex':
+        # Codex 0.166 keeps a credential lock beside auth.json.
+        (profile / 'auth.lock').touch()
     config = profile / ('config.toml' if harness == 'codex' else '.claude.json')
     if mode in ('symlink-auth', 'hardlink-auth'):
         config.unlink(missing_ok=True)

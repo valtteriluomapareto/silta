@@ -82,7 +82,9 @@ class RunProfile:
                     'remote-settings.json', 'remote-settings.json.signature.json',
                     'remote-settings.json.synced-at'})
         auth = 'auth.json' if self.harness == 'codex' else '.credentials.json'
-        allowed = {p.name for p in self.configs if p.parent == self.directory} | {auth}
+        # Credential state is opaque and kept: Codex 0.166 locks auth.json with auth.lock.
+        allowed = ({p.name for p in self.configs if p.parent == self.directory} | {auth}
+                   | ({'auth.lock'} if self.harness == 'codex' else set()))
         disposable = []
         for path in self.directory.iterdir():
             if path.name in runtime or (self.harness == 'codex' and re.fullmatch(r'state_\d+\.sqlite(?:-wal|-shm)?', path.name)):
