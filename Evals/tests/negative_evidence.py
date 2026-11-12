@@ -31,7 +31,9 @@ def invalidate(e, key):
     elif key == 'resume_task':
         phases[1]['actor'] = phases[0]['actor']
     elif key == 'resume_no_replan':
-        final['plans'].append({'task_id': 1, 'rev': 2, 'body_md': 'Replanned'})
+        previous = final['plans'][-1]
+        final['plans'].append(dict(previous, id=previous['id'] + 1, rev=previous['rev'] + 1,
+                                   actor=phases[-1]['actor'], body_md='Replanned'))
     elif key == 'result_template':
         final['tasks'][0]['result_md'] = 'Done!'
     elif key == 'result_sha':
