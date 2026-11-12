@@ -308,8 +308,6 @@ Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A
 - **Agent verify:** yes, with SHAs recorded.
 - **Default mode:** `propose`; `direct` deferred.
 - **§22:** changes when this ships.
-
-## Open questions for the human
-
-1. **Release order:** R1 lets agents write docs only with your words in chat. Is that
-   enough for a first release, or should R2 (proposals) ship with it?
+- **R1 ships alone first.** The maintainer chose it: R1 is smaller and its
+  `doc-context` eval tests the core claim. R2 starts only if that eval shows docs
+  change agent outcomes; otherwise the proposal machinery isn't built.
