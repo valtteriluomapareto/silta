@@ -89,7 +89,9 @@ class RunProfile:
                    | ({'auth.lock', 'installation_id'} if self.harness == 'codex' else set()))
         disposable = []
         for path in self.directory.iterdir():
-            if path.name in runtime or (self.harness == 'codex' and re.fullmatch(r'(?:state|thread_history|goals|logs|memories|queue)_\d+\.sqlite(?:-wal|-shm)?', path.name)):
+            # Codex SQLite stores and lock files are runtime state, whatever their name;
+            # only credentials (auth.json, auth.lock) and installation_id are kept.
+            if path.name in runtime or (self.harness == 'codex' and re.fullmatch(r'(?!auth\.lock$)(?:[\w-]+\.sqlite(?:-wal|-shm)?|\.?[\w.-]*\.lock)', path.name)):
                 disposable.append(path)
             elif path.name not in allowed:
                 raise RuntimeError('Unknown profile entry retained: ' + str(path))
