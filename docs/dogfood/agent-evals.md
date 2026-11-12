@@ -197,9 +197,13 @@ review. Parseable, reachable attempts remain in metrics even when another stream
 line is malformed. Cross-repo success comes from final AC-1 comments, decisions,
 plan revisions or handoffs written by trial actors, excluding baseline rows.
 Every main token (`ORDER_SHIPPED`, `PRICE_DROP`, `ACCOUNT_SECURITY`) must appear
-as a whole token and neither legacy token (`LEGACY_PROMO_V1`, `LEGACY_NEWS_V1`)
-may appear, even in a correction. The backend's registered ref is main, while its
-working tree is on `legacy/push-v1`; both define `api/push_category.md` differently.
+as consecutive word parts after uppercasing text and splitting on
+non-alphanumeric runs. `ORDER_SHIPPED`, `order shipped`, `Order-Shipped` and
+`NOT_ORDER_SHIPPED` all match; camelCase splitting is not performed. Legacy names
+(`LEGACY_PROMO_V1`, `LEGACY_NEWS_V1`) alongside main names are allowed, so recording
+a mismatch as a correction passes. Legacy-only, partial-main and absent context
+fail. The backend's registered ref is main, while its working tree is on
+`legacy/push-v1`; both define `api/push_category.md` differently.
 Setup fetches main from a local bare origin through `silta repo fetch`, so code
 reads have recorded fetch freshness.
 
@@ -212,7 +216,11 @@ observed lower bounds: native file tools, opaque programs require transcript
 review. Explicit backend path operands without attested cwd count as possible
 reads, while other unresolved paths are not inferred as reads. Metrics are also
 retained for failed infrastructure trials, summed by group and shown in HTML.
-Read method does not determine success.
+Read method does not determine success. `legacy_mentioned` is a per-trial boolean
+for normalized legacy names in the same attributed AC-1 text, including failed
+trials; no captured context means no observed mentions. Groups sum those booleans
+as counts, shown beside read metrics in JSON and HTML. Mentioning legacy names
+does not change the success criterion.
 An approval exempts only its exact observed invocation, never another command in
 the same phase.
 

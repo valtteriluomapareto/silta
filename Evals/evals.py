@@ -1021,19 +1021,28 @@ def resumed_same_task(e):
             and any(c['actor'] == b['actor'] and c['task_id'] == task_id for c in b['state']['comments']))
 
 
-def backend_context(e):
-    """Only trial-authored AC-1 comments and plan revisions establish the outcome."""
-    final = e['phases'][-1]['state']
-    task = next(t for t in final['tasks'] if t['seq'] == 1)
+def backend_categories(e):
+    """Recognize category word runs only in captured, trial-authored AC-1 context."""
+    phases = e.get('phases', [])
+    final = phases[-1].get('state') if phases else None
+    task = next((t for t in (final or {}).get('tasks', []) if t['seq'] == 1), None)
+    if task is None:
+        return set()
     actors = {phase['actor'] for phase in e['phases']}
     bodies = []
     for table in ('comments', 'plans'):
-        baseline_ids = {row['id'] for row in e['baseline'][table]}
+        baseline_ids = {row['id'] for row in e['baseline'].get(table, [])}
         bodies.extend(row['body_md'] for row in final[table]
                       if row['task_id'] == task['id'] and row['actor'] in actors
                       and row['id'] not in baseline_ids)
-    words = set(re.findall(r'\b[A-Z][A-Z0-9_]*\b', '\n'.join(bodies)))
-    return set(MAIN_CATEGORIES) <= words and not set(LEGACY_CATEGORIES) & words
+    words = ' ' + ' '.join(re.findall(r'[^\W_]+', '\n'.join(bodies).upper())) + ' '
+    return {category for category in MAIN_CATEGORIES + LEGACY_CATEGORIES
+            if ' ' + category.replace('_', ' ') + ' ' in words}
+
+
+def backend_context(e):
+    """Main-category completeness establishes correctness, including corrections."""
+    return set(MAIN_CATEGORIES) <= backend_categories(e)
 
 
 def backend_unchanged(e):
@@ -1142,7 +1151,9 @@ def failure_metrics(e):
     phases = e.get('phases', [])
     logs_known = bool(phases) and all(isinstance(p.get('logs'), list) for p in phases)
     calls = [row for p in phases for row in (p.get('logs') or [])]
-    return {**backend_read_metrics(e), 'silta_calls': len(calls) if logs_known else None,
+    return {**backend_read_metrics(e),
+            'legacy_mentioned': bool(set(LEGACY_CATEGORIES) & backend_categories(e)),
+            'silta_calls': len(calls) if logs_known else None,
             'ctx_calls': sum(row.get('command') in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for row in calls) if logs_known else None,
             'usage_errors': None, 'forbidden_attempts': None,
             'usage': [p.get('usage') for p in phases],
@@ -1154,7 +1165,9 @@ def metrics(e):
     phases = e['phases']
     calls = [log for phase in phases for log in phase['logs']]
     counts = [p.get('tokens', tokens(p['usage'])) for p in phases]
-    return {**backend_read_metrics(e), 'silta_calls': len(calls),
+    return {**backend_read_metrics(e),
+            'legacy_mentioned': bool(set(LEGACY_CATEGORIES) & backend_categories(e)),
+            'silta_calls': len(calls),
             'ctx_calls': sum(log['command'] in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for log in calls),
             'usage_errors': usage_errors(phases), 'forbidden_attempts': len(forbidden(e)),
             'usage': [p['usage'] for p in phases],
@@ -1179,6 +1192,10 @@ def aggregate(trials, provenance):
                        'silta_calls': known_sum(t['metrics']['silta_calls'] for t in selected),
                        **{key: known_sum(t['metrics'].get(key) for t in selected)
                           for key in ('silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads')},
+                       'legacy_mentioned': known_sum(
+                           int(t['metrics']['legacy_mentioned'])
+                           if type(t['metrics'].get('legacy_mentioned')) is bool else None
+                           for t in selected),
                        'ctx_calls': known_sum(t['metrics']['ctx_calls'] for t in selected),
                        'usage_errors': known_sum(t['metrics']['usage_errors'] for t in selected),
                        'forbidden_attempts': known_sum(t['metrics']['forbidden_attempts'] for t in selected),
@@ -1194,7 +1211,7 @@ def render_html(report):
     status = ('<p>' + escape({k: report[k] for k in RUN_FIELDS if k in report}) + '</p>'
               if 'aborted' in report else '')
     rows = ''.join('<tr>' + ''.join('<td>' + escape(g[key]) + '</td>' for key in
-                   ('harness', 'model', 'scenario', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
+                   ('harness', 'model', 'scenario', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads', 'legacy_mentioned', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
     links = ''.join('<li><a href="' + escape(t['evidence']) + '">' + escape(t['id']) + '</a>: '
                     + escape({k: t.get(k) for k in ('provider', 'operator', 'operator_source', 'reviewer')})
                     + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks'])
@@ -1202,7 +1219,7 @@ def render_html(report):
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
             + status
-            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Backend via Silta</th><th>Direct backend</th><th>Possible direct backend</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
+            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Backend via Silta</th><th>Direct backend</th><th>Possible direct backend</th><th>Legacy mentioned</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
             + rows + '</table><ul>' + links + '</ul></html>')
 
 
@@ -1263,7 +1280,7 @@ def main():
                            'passed': False, 'checks': {'infrastructure': False},
                            'error': redact(str(error) or type(error).__name__, secret), 'violations': [],
                            'provider': args.provider, 'operator': args.operator,
-                           'metrics': {'silta_calls': 0, 'ctx_calls': 0,
+                           'metrics': {'silta_calls': 0, 'ctx_calls': 0, 'legacy_mentioned': False,
                                        'usage_errors': 0, 'forbidden_attempts': 0},
                            'evidence': trial_id + '/failure.json'}
                 failure = redact(failure, secret)

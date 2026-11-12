@@ -34,7 +34,6 @@ def record(e, body, table='comments', **extra):
 
 
 class OutcomeGrading(unittest.TestCase):
-    @unittest.expectedFailure
     def test_main_values_allow_corrections(self):
         for body in [MAIN, 'Legacy checkout: ' + WRONG + '. Registered main: ' + MAIN]:
             with self.subTest(body=body):
@@ -42,7 +41,6 @@ class OutcomeGrading(unittest.TestCase):
                 record(e, body)
                 self.assertTrue(evals.backend_context(e))
 
-    @unittest.expectedFailure
     def test_main_values_match_normalized_word_runs(self):
         for body in [MAIN.lower(), 'order shipped, price drop, account security',
                      'Order-Shipped; Price-Drop; Account-Security',
@@ -61,7 +59,6 @@ class OutcomeGrading(unittest.TestCase):
                 record(e, body)
                 self.assertFalse(evals.backend_context(e))
 
-    @unittest.expectedFailure
     def test_legacy_mentioned_metrics_are_boolean_and_summed(self):
         trials = []
         for number, (body, expected) in enumerate([
@@ -93,7 +90,6 @@ class OutcomeGrading(unittest.TestCase):
         e['phases'][0]['state'] = None
         self.assertIs(evals.failure_metrics(e)['legacy_mentioned'], False)
 
-    @unittest.expectedFailure
     def test_legacy_mentioned_is_false_when_setup_has_no_evidence(self):
         root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory(prefix='si76-metric-failure-') as directory:

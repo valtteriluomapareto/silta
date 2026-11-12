@@ -2358,7 +2358,7 @@ synthetic fixtures are ever sent to third-party providers.
 
 | Id | Prompt (summary) | Checks |
 |---|---|---|
-| `start-cross-repo` | In `acme-mobile` on a feature branch: "add push categories; the backend is in another app" | Agent ran `brief` or used the hook output; recorded AC-1 context names every PushCategory value at the registered main ref and none from the checked-out legacy branch; task created with `--start` or the existing one started |
+| `start-cross-repo` | In `acme-mobile` on a feature branch: "add push categories; the backend is in another app" | Agent ran `brief` or used the hook output; recorded AC-1 context names every PushCategory value at the registered main ref as normalized consecutive word parts; legacy names in corrections are allowed and measured; task created with `--start` or the existing one started |
 | `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo |
 | `handoff-resume` | Session A works and is stopped. Session B: "continue" | A wrote a `handoff`; B's first silta call is `brief`; B continues the same task without re-planning |
 | `question-flow` | Ambiguous requirement, human not reachable | A `question` comment with `@me`; the task isn't marked done |
