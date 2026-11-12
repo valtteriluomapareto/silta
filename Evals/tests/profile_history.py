@@ -19,6 +19,7 @@ HISTORY_FILES = {
         'thread_history_1.sqlite', 'thread_history_1.sqlite-wal', 'thread_history_1.sqlite-shm',
         'goals_1.sqlite', 'logs_2.sqlite', 'memories_1.sqlite', 'queue_1.sqlite', 'cache/answer.json',
         'plugins/data/answer.json', 'thread-writer-locks/answer.lock', '.sandbox_migration',
+        '.sqlite-maintenance.lock', 'future_store_9.sqlite', 'future_store_9.sqlite-wal',
     ),
 }
 
