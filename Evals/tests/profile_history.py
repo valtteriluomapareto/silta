@@ -16,6 +16,9 @@ HISTORY_FILES = {
         'log/session.log', 'logs/session.log', 'tmp/session.txt', 'shell_snapshots/shell.sh',
         'models_cache.json', 'version.json', 'sqlite/memories.sqlite', 'skills/remember/SKILL.md',
         '.codex-global-state.json', 'capabilities.json', 'state_5.sqlite', 'state_5.sqlite-wal', 'state_5.sqlite-shm',
+        'thread_history_1.sqlite', 'thread_history_1.sqlite-wal', 'thread_history_1.sqlite-shm',
+        'goals_1.sqlite', 'logs_2.sqlite', 'memories_1.sqlite', 'queue_1.sqlite', 'cache/answer.json',
+        'plugins/data/answer.json', 'thread-writer-locks/answer.lock', '.sandbox_migration',
     ),
 }
 
