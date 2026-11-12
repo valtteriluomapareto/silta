@@ -76,7 +76,11 @@ class RunProfile:
                     '.codex-global-state.json', 'capabilities.json'} if self.harness == 'codex' else
                    {'projects', 'debug', 'todos', 'tasks', 'plans', 'session-env', 'paste-cache', 'file-history',
                     'backups', 'shell-snapshots', 'cache', 'statsig', 'telemetry', '.cache', 'stats-cache.json',
-                    'history.jsonl', 'skills'})
+                    'history.jsonl', 'skills', 'sessions', 'plugins', '.last-cleanup',
+                    # Server-fetched policy and settings caches; the client refetches them.
+                    'policy-limits.json', 'policy-limits.json.signature.json', 'policy-limits.json.stamp.json',
+                    'remote-settings.json', 'remote-settings.json.signature.json',
+                    'remote-settings.json.synced-at'})
         auth = 'auth.json' if self.harness == 'codex' else '.credentials.json'
         allowed = {p.name for p in self.configs if p.parent == self.directory} | {auth}
         disposable = []
