@@ -44,6 +44,7 @@ a plan ships:
 |---|---|---|
 | [`plans/df3-real-workspace.md`](plans/df3-real-workspace.md) | proposed | Onboarding a real multi-repo workspace and measuring whether Silta helps |
 | [`plans/m1-daily-use.md`](plans/m1-daily-use.md) | active | M1 broken into slices with dependencies, for parallel agents |
+| [`plans/workspace-knowledge.md`](plans/workspace-knowledge.md) | proposed | Docs agents read from the brief and propose after work; the human reviews in batches |
 <!-- plans-board:end -->
 
 ## Dogfooding
