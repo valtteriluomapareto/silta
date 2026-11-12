@@ -51,9 +51,17 @@ to at least one map item**, and it appears wherever that item does.
 | Topic | `topic:messaging` | Cross-cutting domain knowledge |
 
 **Refs are shell-safe and printed by Silta.** Slugs can't contain `/`, so
-`edge:<from>/<to>/<kind>` parses unambiguously and needs no quoting. Edge kinds
-become identifiers like slugs; a migration check refuses stored kinds that don't
-fit and names them for `ws edit`. The brief prints each edge's exact ref, so an
+`edge:<from>/<to>/<kind>` parses unambiguously and needs no quoting. A service target
+retains its YAML discriminator: `edge:mobile/service:push/sdk`; an app and a service
+may share a slug without sharing a ref. Edge kinds become identifiers like slugs.
+A migration check refuses stored kinds that don't fit without changing the schema
+or writer floor. The upgrade retains the pre-docs executable beside the installed
+binary as `silta-before-docs`, preserving it across repeated installs. The new
+binary's read-only `ws show` supplies the repair YAML; the refusal names the retained
+executable's `--ws <ws> ws edit -F <file>` command, with the normal approval gate,
+then retrying the upgrade. It never offers the new binary's migrating write as the
+repair. K1 tests refusal, approved repair with the prior writer and successful
+upgrade, including reinstalling before repair. The brief prints each edge's exact ref, so an
 agent copies it instead of composing it. `edge`, `service` and `doc` become
 reserved app slugs, like `none`. `service:` joins §5.1.
 
@@ -69,6 +77,8 @@ reserved app slugs, like `none`. `service:` joins §5.1.
 
 - A short markdown document. Each revision stores its body **and its metadata**:
   title, kind and about refs. Accepting a revision applies them to the doc.
+  Historical about refs are immutable snapshots and may outlive their map items;
+  current accepted attachments are the resolving `about` links.
 - A doc with no accepted revision is invisible to the brief and to removal checks,
   so a pending proposal never pins a map item or reaches an agent.
 - **Kinds:** `contract`, `flow`, `runbook`, `reference`. Optional: inferred from the
@@ -104,7 +114,7 @@ neighbours, one line per edge (section 5). Docs join those lines:
 - under a service edge: docs about the service;
 - in section 9: docs about the task's topics.
 
-A doc line is the slug, kind, summary line and a stale flag.
+A doc line is the slug, kind and summary line; R3 adds the stale flag.
 
 **Budget:** the brief trims later sections first, so doc lines in sections 4 and 5
 could push out open tasks.
@@ -117,8 +127,8 @@ could push out open tasks.
 `silta doc show <slug> [--rev <n>]` prints a doc, bounded like `code show`. `silta
 doc ls --about <ref>` lists the docs on an item, including pending proposals and
 their comments, so any agent working there sees them and doesn't duplicate them.
-`silta guide docs` teaches when to read, how to treat a stale doc, and when to
-propose.
+`silta guide docs` teaches when to read. R2 adds proposals and R3 adds stale-doc
+handling. R1 guidance and recovery commands name only commands shipped in R1.
 
 ### Writing: agents propose docs and map changes
 
@@ -184,8 +194,10 @@ mechanism for it:
 ### Export and restore
 
 Docs, their revisions and verifications join the export tree (§15). Restore no
-longer refuses a workspace with docs; a tampered tree or a dangling about ref writes
-nothing.
+longer refuses a workspace with docs; a tampered tree or a dangling current
+attachment writes nothing. Historical revision snapshots retain their original
+about refs even when those targets were later removed. K4 tests edit, reattach,
+remove, export and restore together.
 
 ### Error contract
 
@@ -213,7 +225,7 @@ Each release is usable on its own. All migrations land in K1, because
 | Slice | Release | Scope | Depends on | Verify with |
 |---|---|---|---|---|
 | K1 Store, refs, attachments | R1 | All migrations; `edge:` and `service:` refs, reserved slugs, identifier kinds; revision metadata; about links and removal conflicts for every map table; `doc_verification`; `min_writer_version` | — | Ref resolver tests; migration tests from the checked-in prior-schema DBs; `ws edit` conflict goldens |
-| K2 Reads and human writes | R1 | `doc show [--rev] [--diff]`, `doc ls --about`; `doc edit -F` creating a doc when missing (human-only, `--approved`) | K1 | CLI goldens; bounds |
+| K2 Reads and human writes | R1 | `doc show [--rev] [--diff]`, `doc ls --about`; `doc edit -F` creating a doc when missing (human-only, `--approved`), with `--title`, optional `--kind`, repeatable `--about`; a new doc needs title and about, omitted metadata stays on an existing doc, supplied about refs replace its attachment set | K1 | CLI goldens; bounds |
 | K3 Brief placement | R1 | Doc lines in sections 4, 5 and 9; hook and short counts; budget share | K1 | Brief goldens, including the backlog-survives fixture; determinism |
 | K4 Export and restore | R1 | Docs, revisions and verifications in the tree | K1 | Round trip; tampered and dangling-ref restores write nothing |
 | K5 Doc proposals and batch review | R2 | `doc propose`, `--task` default, `doc triage --accept/--reject`, batch semantics, inbox group, D37 age-out; the `Map gap:` guide rule | K2 | Gate truth table; accept race; overlap and stale-base batches; `SILTA_NOW` age-out at 13/14/15 days; a §20.1 scenario YAML |
@@ -279,9 +291,9 @@ for this, and E5 counts `Map gap:` lines to decide on map proposals.
 - Per release, its evals pass live for Claude Code and Codex: `all_repeats_pass` over
   three repeats plus human `evidence_review`, with the controls and negative variants
   listed above.
-- Every new command and refusal has goldens; `silta schema` matches §16; export
-  round-trips docs and proposals.
-- The dogfood report shows doc proposals and decisions.
+- Every command and refusal shipped in the release has goldens; `silta schema`
+  matches §16; export round-trips docs in R1 and proposals from R2.
+- From R2, the dogfood report shows doc proposals and decisions.
 
 Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A and into
 `decisions.md`, split §22 M2 into this and a reviews milestone, and delete this file.
