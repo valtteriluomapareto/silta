@@ -87,11 +87,12 @@ class ShellScope(unittest.TestCase):
                 p = self.scoped(command, cwd)
                 self.assertIs(evals.trace_matches_logs(p, 'codex'), expected, (command, cwd))
             backend = self.scoped(command, '/tmp/acme-eval/repos/acme-backend')
-            self.assertTrue(evals.forbidden(self.evidence(backend)), command)
+            self.assertEqual(evals.forbidden(self.evidence(backend)), [], command)
+            self.assertTrue(evals.shell_program(backend, command, backend["tool_results"][0]).backend_reads)
         for command in ['cat ../acme-backend/README.md; silta brief',
                         'git -C .. -C acme-backend log -1; silta brief',
                         'grep -f ../acme-backend/patterns README.md; silta brief']:
-            self.assertTrue(evals.forbidden(self.evidence(self.scoped(command))), command)
+            self.assertEqual(evals.forbidden(self.evidence(self.scoped(command))), [], command)
         stdin = self.scoped("printf '%s' SENTINEL | rg SENTINEL; silta brief",
                             '/tmp/acme-eval/repos/acme-backend')
         self.assertEqual(evals.forbidden(self.evidence(stdin)), [])
@@ -104,7 +105,7 @@ class ShellScope(unittest.TestCase):
         duplicate['scope'] = self.scoped('')['scope']
         for row in duplicate['tool_results']:
             row['cwd'] = '/tmp/acme-eval/repos/' + ('acme-mobile' if row['id'] == 'A' else 'acme-backend')
-        self.assertEqual(len(evals.forbidden(self.evidence(duplicate))), 1)
+        self.assertEqual(evals.forbidden(self.evidence(duplicate)), [])
         normalized = self.scoped('cat ../acme-backend/../acme-mobile/README.md; silta brief')
         self.assertEqual(evals.forbidden(self.evidence(normalized)), [])
         self.assertIs(evals.trace_matches_logs(normalized, 'codex'), True)
@@ -127,7 +128,8 @@ class ShellScope(unittest.TestCase):
             p['scope'] = self.scoped('')['scope']
             p['tool_results'][0]['cwd'] = completed_cwd
             self.assertTrue(evals.shell_program(p, command, None).opaque)
-            self.assertEqual(len(evals.forbidden(self.evidence(p))), count)
+            self.assertEqual(evals.forbidden(self.evidence(p)), [])
+            self.assertEqual(evals.backend_read_metrics(self.evidence(p))["direct_backend_reads"], count)
 
     def test_40_native_cwd_is_retained_without_guessing(self):
         events = [{'type': 'thread.started', 'thread_id': 'acme'},

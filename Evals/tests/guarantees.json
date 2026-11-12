@@ -15,10 +15,6 @@
     "scenario": "start-cross-repo",
     "variant": "default"
   },
-  "backend_read": {
-    "scenario": "start-cross-repo",
-    "variant": "default"
-  },
   "no_forbidden": {
     "scenario": "start-cross-repo",
     "variant": "default"
@@ -94,5 +90,13 @@
   "policy_guide": {
     "scenario": "ask-short",
     "variant": "short"
+  },
+  "backend_context": {
+    "scenario": "start-cross-repo",
+    "variant": "default"
+  },
+  "backend_unchanged": {
+    "scenario": "start-cross-repo",
+    "variant": "default"
   }
 }

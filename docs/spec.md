@@ -1344,8 +1344,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    an earlier item printed is not repeated. When the caller has any item, `more:`
    adds `silta --ws acme inbox`, which no trim removes.
 4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
-   the resolved worktree's repo root with its on-disk casing, including for subpath apps. The pointer does not
-   claim the file exists.
+   the resolved worktree's repo root with its on-disk casing, including for subpath apps,
+   only when that file exists.
 5. **Neighbours**: edges in and out, ordered by source app, target app, target
    service, kind and edge id. Configured code references produce complete, quoted
    `silta code show …` commands, including ref and line selection. With no usable
@@ -2358,7 +2358,7 @@ synthetic fixtures are ever sent to third-party providers.
 
 | Id | Prompt (summary) | Checks |
 |---|---|---|
-| `start-cross-repo` | In `acme-mobile` on a feature branch: "add push categories; the backend is in another app" | Agent ran `brief` or used the hook output; at least one `code show/grep` on the backend app; no file reads outside the worktree by other means; task created with `--start` or the existing one started |
+| `start-cross-repo` | In `acme-mobile` on a feature branch: "add push categories; the backend is in another app" | Agent ran `brief` or used the hook output; recorded AC-1 context names every PushCategory value at the registered main ref and none from the checked-out legacy branch; task created with `--start` or the existing one started |
 | `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo |
 | `handoff-resume` | Session A works and is stopped. Session B: "continue" | A wrote a `handoff`; B's first silta call is `brief`; B continues the same task without re-planning |
 | `question-flow` | Ambiguous requirement, human not reachable | A `question` comment with `@me`; the task isn't marked done |
@@ -2542,9 +2542,9 @@ notes indexing (M3).
      default branch, a feature branch and the prod ref. Measure task success,
      reads of the wrong version (another clone's working tree on the wrong
      branch), tool calls, tokens and time.
-   - **Check the eval itself.** `start-cross-repo` (§21) passes only when the agent
-     used `code show/grep`, which assumes the answer. Its criterion should be the
-     outcome: the agent read the right version of the backend.
+   - **Check the eval itself.** `start-cross-repo` (§21) grades recorded context
+     against the registered ref, with a wrong-branch fixture trap. Direct reads
+     are allowed; `code` and direct backend reads are adoption metrics.
    - **Watch real use.** In DF3's multi-repo workspace, compare `code` calls in the
      logs with direct reads of other clones, and record the friction.
    - **Decide.** Keep `code` as it is, cut it down (for example to `show` and

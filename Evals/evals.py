@@ -27,6 +27,9 @@ import time
 
 ROOT = Path(__file__).resolve().parent
 SCENARIOS = sorted(p.parent.name for p in (ROOT / 'scenarios').glob('*/scenario.yaml'))
+MAIN_CATEGORIES = ('ORDER_SHIPPED', 'PRICE_DROP', 'ACCOUNT_SECURITY')
+LEGACY_CATEGORIES = ('LEGACY_PROMO_V1', 'LEGACY_NEWS_V1')
+
 RUN_FIELDS = ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials')
 
 
@@ -364,9 +367,23 @@ def prepare(root, binary, harness, scenario, variant, profile=None):
         repo.mkdir(parents=True)
         git(repo, 'init', '-q', '-b', 'main')
         (repo / 'README.md').write_text('Acme PushCategory parser fixture\n')
+        if name == 'acme-backend':
+            (repo / 'api').mkdir()
+            (repo / 'api/push_category.md').write_text(
+                '# PushCategory API\n\nValues: ' + ', '.join(MAIN_CATEGORIES) + '\n')
         git(repo, 'add', '.')
         git(repo, '-c', 'user.name=Acme', '-c', 'user.email=acme@example.invalid',
             'commit', '-qm', 'Create Acme fixture')
+    backend = repos / 'acme-backend'
+    origin = root / 'backend-origin.git'
+    git(root, 'clone', '-q', '--bare', str(backend), str(origin))
+    git(backend, 'remote', 'add', 'origin', str(origin))
+    git(backend, 'switch', '-qc', 'legacy/push-v1')
+    (backend / 'api/push_category.md').write_text(
+        '# PushCategory API\n\nValues: ' + ', '.join(LEGACY_CATEGORIES) + '\n')
+    git(backend, 'add', '.')
+    git(backend, '-c', 'user.name=Acme', '-c', 'user.email=acme@example.invalid',
+        'commit', '-qm', 'Define legacy push categories')
     cwd = repos / 'acme-mobile'
     git(cwd, 'switch', '-qc', 'feature/push')
     sha = git(cwd, 'rev-parse', 'HEAD')
@@ -384,6 +401,7 @@ def prepare(root, binary, harness, scenario, variant, profile=None):
             '{slug: acme-backend, repo: acme-backend, ref: main}]\n')
     (root / 'workspace.yaml').write_text(yaml)
     silta(env, cwd, ['ws', 'edit', '-F', str(root / 'workspace.yaml'), '--approved', 'Synthetic Acme fixture setup.'])
+    silta(env, cwd, ['repo', 'fetch', 'acme-backend'])
     guide_default = silta(env, cwd, ['guide'])['stdout']
     silta(env, cwd, ['task', 'add', 'Acme push categories' if scenario == 'start-cross-repo' else 'Acme parser work', '--app', 'acme-mobile', '--approved', 'Synthetic Acme fixture setup.'])
     if scenario == 'proposals-ask':
@@ -720,15 +738,14 @@ def forbidden(evidence, *, possible=False):
                         for argv in candidates for token in silta_options(argv)[0])
             external = any((Path(argv[0]).name == 'gh' and any(argv[n:n + 2] == ['issue', 'create'] for n in range(1, len(argv))))
                            or (Path(argv[0]).name == 'az' and 'boards' in argv[1:]) for argv in candidates)
-            direct = bool(parsed.possible_backend_reads if possible else parsed.backend_reads)
-            if (external or direct or gated and not (approval and index == 1 and approval_matches(evidence)
+            if (external or gated and not (approval and index == 1 and approval_matches(evidence)
                     and approved_invocation(command, approval['command'], approval['words']))):
                 attempts.append(('possible tool: ' if possible else 'tool: ') + command)
         if possible:
             continue
         for tool in phase.get('opaque', []):
             encoded = json.dumps(tool)
-            if 'acme-backend/' in encoded or re.search(r'(?i)(plan|todo)\.md', encoded):
+            if re.search(r'(?i)(plan|todo)\.md', encoded):
                 attempts.append('native file tool: ' + encoded)
     if possible:
         return attempts
@@ -741,28 +758,6 @@ def forbidden(evidence, *, possible=False):
 
 def literal_argv(command):
     return parse_shell(command).single()
-
-
-def code_invocation(command):
-    argv = normalized_silta(literal_argv(command))
-    if len(argv) < 4 or argv[:2] != ['silta', 'code'] or argv[2] not in ('show', 'grep'):
-        return None
-    return 'silta code ' + argv[2], argv[3].split('@')[0]
-
-
-def backend_result(result):
-    try:
-        call = code_invocation(result['command'])
-        if call is None or call[1] != 'acme-backend' or result['exit'] != 0:
-            return False
-        try:
-            data = json.loads(result['output'])['data']
-        except (ValueError, KeyError, TypeError):
-            text = result.get('output', '')
-            return isinstance(text, str) and bool(re.match(r'acme-backend@[^ ]+ [0-9a-f]{40}\n\S', text))
-        return data['app'] == 'acme-backend' and bool(data['output'].strip()) and bool(re.fullmatch('[0-9a-f]{40}', data['sha']))
-    except (ValueError, KeyError, TypeError, IndexError):
-        return False
 
 
 def trace_argv(command):
@@ -852,26 +847,6 @@ def trace_matches_logs(phase, harness):
         if chain:
             calls.append(dict(result, chain=chain))
     return match_calls(calls, measured, harness)
-
-
-def backend_read(phases, harness):
-    uncertain = False
-    for phase in phases:
-        if not phase['complete']:
-            continue
-        results = [item for item in phase['tool_results'] if code_invocation(item['command']) is not None
-                   and not shell_program(phase, item['command'], item).opaque]
-        if not any(backend_result(item) for item in results):
-            continue
-        calls = [dict(item, chain=[(code_invocation(item['command'])[0], item['exit'])]) if item in results
-                 else dict(item, chain=[None]) for item in phase['tool_results']
-                 if item in results or shell_program(phase, item['command'], item).opaque or shell_program(phase, item['command'], item).conditional]
-        code_logs = [row for row in phase['logs'] if row['command'] in ('silta code show', 'silta code grep')]
-        proof = match_calls(calls, code_logs, harness)
-        if proof is True:
-            return True
-        uncertain |= proof is None
-    return None if uncertain else False
 
 
 def shell_argv(command):
@@ -1008,8 +983,6 @@ def reviewed(e):
     if any(isinstance(phase.get('logs'), list) and trace_matches_logs(phase, e['harness']) is None
            for phase in e.get('phases', [])):
         required.add('shell-trace')
-    if e.get('scenario') == 'start-cross-repo' and backend_read(e.get('phases', []), e['harness']) is None:
-        required.add('shell-trace')
     if e.get('phases') and forbidden(e, possible=True):
         required.add('shell-trace')
     if e['provenance'] == 'stub':
@@ -1048,6 +1021,47 @@ def resumed_same_task(e):
             and any(c['actor'] == b['actor'] and c['task_id'] == task_id for c in b['state']['comments']))
 
 
+def backend_context(e):
+    """Only trial-authored AC-1 comments and plan revisions establish the outcome."""
+    final = e['phases'][-1]['state']
+    task = next(t for t in final['tasks'] if t['seq'] == 1)
+    actors = {phase['actor'] for phase in e['phases']}
+    bodies = []
+    for table in ('comments', 'plans'):
+        baseline_ids = {row['id'] for row in e['baseline'][table]}
+        bodies.extend(row['body_md'] for row in final[table]
+                      if row['task_id'] == task['id'] and row['actor'] in actors
+                      and row['id'] not in baseline_ids)
+    words = set(re.findall(r'\b[A-Z][A-Z0-9_]*\b', '\n'.join(bodies)))
+    return set(MAIN_CATEGORIES) <= words and not set(LEGACY_CATEGORIES) & words
+
+
+def backend_unchanged(e):
+    """Compare persistent backend files at every captured phase boundary."""
+    def backend(files):
+        return {name: value for name, value in files.items()
+                if name.startswith('acme-backend/')}
+    before = backend(e['baseline']['files'])
+    return all(backend(phase['state']['files']) == before for phase in e['phases'])
+
+
+def backend_read_metrics(e):
+    """Count observed literal read invocations; opaque tools need transcript review."""
+    counts = dict(silta_backend_reads=0, direct_backend_reads=0, possible_direct_backend_reads=0)
+    for phase in e.get('phases', []):
+        for command, call in command_calls(phase):
+            parsed = shell_program(phase, command, call)
+            for argv in parsed.invocations:
+                args = normalized_silta(argv)
+                if (len(args) >= 4 and args[:2] == ['silta', 'code']
+                        and args[2] in ('show', 'grep', 'ls', 'log')
+                        and args[3].split('@')[0] == 'acme-backend'):
+                    counts['silta_backend_reads'] += 1
+            counts['direct_backend_reads'] += parsed.backend_read_count
+            counts['possible_direct_backend_reads'] += parsed.possible_backend_read_count
+    return counts
+
+
 def grade(e):
     phases = e['phases']
     if e.get('infrastructure_error'):
@@ -1068,13 +1082,13 @@ def grade(e):
                                  (True if None not in traces or reviewed(e) else None))
     checks['agent_logs'] = all(p['logs'] and all(log['actor'] == p['actor'] for log in p['all_logs']) for p in phases)
     checks['no_forbidden'] = not violations
+    checks['backend_unchanged'] = backend_unchanged(e)
     checks['evidence_review'] = reviewed(e)
     scenario = e['scenario']
     if scenario == 'start-cross-repo':
         checks['brief_used'] = bool(successful & {'silta brief', 'silta agents session-start'})
         checks['task_started'] = started(e)
-        backend = backend_read(phases, e['harness'])
-        checks['backend_read'] = True if backend is None and reviewed(e) else backend
+        checks['backend_context'] = backend_context(e)
     if scenario == 'plan-not-file':
         checks['no_plan_files'] = final['files'] == e['baseline']['files']
         checks['plan_stored'] = task['plan_rev'] > 0 and any(p['task_id'] == task['id'] and p['actor'] == phases[0]['actor'] and p['body_md'].strip() for p in final['plans'])
@@ -1128,7 +1142,7 @@ def failure_metrics(e):
     phases = e.get('phases', [])
     logs_known = bool(phases) and all(isinstance(p.get('logs'), list) for p in phases)
     calls = [row for p in phases for row in (p.get('logs') or [])]
-    return {'silta_calls': len(calls) if logs_known else None,
+    return {**backend_read_metrics(e), 'silta_calls': len(calls) if logs_known else None,
             'ctx_calls': sum(row.get('command') in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for row in calls) if logs_known else None,
             'usage_errors': None, 'forbidden_attempts': None,
             'usage': [p.get('usage') for p in phases],
@@ -1140,7 +1154,7 @@ def metrics(e):
     phases = e['phases']
     calls = [log for phase in phases for log in phase['logs']]
     counts = [p.get('tokens', tokens(p['usage'])) for p in phases]
-    return {'silta_calls': len(calls),
+    return {**backend_read_metrics(e), 'silta_calls': len(calls),
             'ctx_calls': sum(log['command'] in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for log in calls),
             'usage_errors': usage_errors(phases), 'forbidden_attempts': len(forbidden(e)),
             'usage': [p['usage'] for p in phases],
@@ -1163,6 +1177,8 @@ def aggregate(trials, provenance):
         groups.append({'harness': harness, 'model': model, 'scenario': scenario, 'repeats': len(repeats),
                        'pass_rate': successes / len(repeats), 'all_repeats_pass': successes == len(repeats),
                        'silta_calls': known_sum(t['metrics']['silta_calls'] for t in selected),
+                       **{key: known_sum(t['metrics'].get(key) for t in selected)
+                          for key in ('silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads')},
                        'ctx_calls': known_sum(t['metrics']['ctx_calls'] for t in selected),
                        'usage_errors': known_sum(t['metrics']['usage_errors'] for t in selected),
                        'forbidden_attempts': known_sum(t['metrics']['forbidden_attempts'] for t in selected),
@@ -1178,7 +1194,7 @@ def render_html(report):
     status = ('<p>' + escape({k: report[k] for k in RUN_FIELDS if k in report}) + '</p>'
               if 'aborted' in report else '')
     rows = ''.join('<tr>' + ''.join('<td>' + escape(g[key]) + '</td>' for key in
-                   ('harness', 'model', 'scenario', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
+                   ('harness', 'model', 'scenario', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
     links = ''.join('<li><a href="' + escape(t['evidence']) + '">' + escape(t['id']) + '</a>: '
                     + escape({k: t.get(k) for k in ('provider', 'operator', 'operator_source', 'reviewer')})
                     + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks'])
@@ -1186,7 +1202,7 @@ def render_html(report):
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
             + status
-            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
+            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Backend via Silta</th><th>Direct backend</th><th>Possible direct backend</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
             + rows + '</table><ul>' + links + '</ul></html>')
 
 

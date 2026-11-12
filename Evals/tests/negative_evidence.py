@@ -13,8 +13,11 @@ def invalidate(e, key):
     elif key == 'task_started':
         for phase in phases:
             phase['logs'] = [l for l in phase['logs'] if l['command'] != 'silta task start']
-    elif key == 'backend_read':
-        phases[0]['tool_results'] = []
+    elif key == 'backend_context':
+        final['comments'] = []
+        final['plans'] = []
+    elif key == 'backend_unchanged':
+        final['files']['acme-backend/README.md'] = 'changed'
     elif key == 'no_forbidden':
         phases[0]['commands'].append('gh issue create --title Acme')
     elif key == 'no_plan_files':

@@ -31,7 +31,6 @@ def record(e, body, table='comments', **extra):
 
 
 class OutcomeGrading(unittest.TestCase):
-    @unittest.expectedFailure
     def test_main_wrong_mixed_missing_and_partial_values(self):
         for body, expected in [(MAIN, True), (WRONG, False),
                                (MAIN + ' ' + WRONG, False), ('', False),
@@ -42,7 +41,6 @@ class OutcomeGrading(unittest.TestCase):
                 record(e, body)
                 self.assertEqual(evals.backend_context(e), expected)
 
-    @unittest.expectedFailure
     def test_comments_plans_and_handoffs_on_ac1_by_trial_actors_only(self):
         for table, kind in [('comments', 'comment'), ('comments', 'decision'),
                             ('comments', 'handoff'), ('plans', None)]:
@@ -62,7 +60,6 @@ class OutcomeGrading(unittest.TestCase):
         e['phases'][0]['messages'] = [MAIN]
         self.assertFalse(evals.backend_context(e))
 
-    @unittest.expectedFailure
     def test_backend_unchanged_detects_write_add_delete_in_every_phase(self):
         e = evidence()
         self.assertTrue(evals.backend_unchanged(e))
@@ -79,7 +76,6 @@ class OutcomeGrading(unittest.TestCase):
             changed['phases'].append(copy.deepcopy(e['phases'][0]))
             self.assertFalse(evals.backend_unchanged(changed), 'earlier phase ' + change)
 
-    @unittest.expectedFailure
     def test_direct_and_opaque_backend_reads_are_allowed(self):
         e = evidence()
         command = 'cat ../acme-backend/api/push_category.md'
@@ -88,7 +84,6 @@ class OutcomeGrading(unittest.TestCase):
         e['phases'][0]['opaque'] = [{'name': 'Read', 'input': {'file_path': '/tmp/acme/repos/acme-backend/api/push_category.md'}}]
         self.assertEqual(evals.forbidden(e), [])
 
-    @unittest.expectedFailure
     def test_metrics_count_read_invocations_not_paths_and_keep_uncertainty(self):
         e = evidence()
         command = ('silta code show acme-backend -- api/push_category.md; '
@@ -104,6 +99,10 @@ class OutcomeGrading(unittest.TestCase):
         counts = evals.backend_read_metrics(e)
         self.assertEqual(counts['direct_backend_reads'], 0)
         self.assertEqual(counts['possible_direct_backend_reads'], 2)
+        # Relative paths without attested cwd are possible reads, never proven.
+        e['phases'][0]['commands'] = ['silta brief && cat /tmp/acme/repos/acme-backend/README.md']
+        counts = evals.backend_read_metrics(e)
+        self.assertEqual(counts['possible_direct_backend_reads'], 1)
         measured = evals.metrics(e)
         failed = evals.failure_metrics(e)
         for key in counts:

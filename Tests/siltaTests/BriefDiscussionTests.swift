@@ -116,7 +116,7 @@ extension BriefCommandTests {
       #expect(
         ids == [
           "task", "handoff", "task_inbox", "questions", "plan", "inbox", "inbox", "inbox",
-          "app", "agents", "open_tasks", "open_tasks", "recently_done",
+          "app", "open_tasks", "open_tasks", "recently_done",
         ])
       #expect(
         data["more"] as? [String]

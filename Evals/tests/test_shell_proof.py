@@ -91,17 +91,13 @@ class ShellProof(unittest.TestCase):
             row['output'] = json.dumps({'data': {'app': 'acme-backend', 'sha': 'a' * 40, 'output': 'actual'}})
         return p
 
-    def test_12_backend_read_reuses_concurrent_association(self):
+    def test_12_backend_chains_keep_native_trace_association(self):
         p = self.backend_phase()
         self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
-        self.assertIs(evals.backend_read([p], 'codex'), True)
         p['tool_results'].reverse()
-        self.assertIs(evals.backend_read([p], 'codex'), True)
+        self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
         ambiguous = self.backend_phase(True)
-        self.assertIsNone(evals.backend_read([ambiguous], 'codex'))
-        for row in ambiguous['tool_results']:
-            row['output'] = '{}'
-        self.assertIs(evals.backend_read([ambiguous], 'codex'), False)
+        self.assertIsNone(evals.trace_matches_logs(ambiguous, 'codex'))
 
     def test_13_global_help_options_are_independent_of_position(self):
         for command in ['silta --help --json', 'silta --help --verbose', 'silta --json --help',

@@ -72,7 +72,9 @@ class RoutineShell(unittest.TestCase):
                         'silta task from-plan ../acme-backend/README.md',
                         'grep -f ../acme-backend/patterns README.md',
                         'git -C../acme-backend status --short']:
-            self.assertTrue(evals.forbidden(self.evidence(command)), command)
+            self.assertEqual(evals.forbidden(self.evidence(command)), [], command)
+            self.assertTrue(evals.shell_program(self.evidence(command)["phases"][0], command,
+                            {"cwd": "/tmp/acme-eval/repos/acme-mobile"}).backend_reads)
 
     def test_26_wrapped_children_inherit_input_uncertainty(self):
         child = 'silta task plan AC-1 -F -'

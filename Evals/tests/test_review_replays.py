@@ -42,7 +42,7 @@ class ReviewReplays(unittest.TestCase):
                 self.assertEqual(evidence['phases'][0]['exit'], 0)
                 self.assertTrue(evidence['phases'][0]['complete'])
                 self.assertTrue(any(log['exit_code'] == 2 for log in evidence['phases'][0]['logs']))
-                self.assertFalse(result['checks']['backend_read'])
+                self.assertFalse(result['checks']['backend_context'])
                 self.assertFalse(result['passed'])
 
     def test_approval_does_not_hide_unrelated_steal_replay(self):
@@ -91,7 +91,7 @@ class ReviewReplays(unittest.TestCase):
                 self.assertFalse(result['checks']['stream_complete'])
                 self.assertFalse(result['passed'])
 
-    def test_backend_proof_pairs_the_entire_ordered_code_log(self):
+    def test_native_trace_pairs_the_entire_ordered_code_log(self):
         import copy
         for harness in ['claude', 'codex']:
             result, evidence = self.trial(harness, 'start-cross-repo', 'pass')
@@ -109,7 +109,7 @@ class ReviewReplays(unittest.TestCase):
                         changed[0]['tool_results'].append(completion)
                     else:
                         changed[0]['tool_results'].remove(completion)
-                    self.assertFalse(evals.backend_read(changed, harness))
+                    self.assertFalse(evals.trace_matches_logs(changed[0], harness))
 
     def test_interleaved_code_reads_require_the_same_completion_order(self):
         import copy
@@ -119,11 +119,11 @@ class ReviewReplays(unittest.TestCase):
                 self.assertTrue(result['passed'])
                 phase = copy.deepcopy(evidence['phases'][0])
                 positions = [index for index, item in enumerate(phase['tool_results'])
-                             if evals.code_invocation(item['command']) is not None]
+                             if 'silta --ws acme code ' in item['command']]
                 self.assertEqual(len(positions), 3)
                 first, second = positions[:2]
                 phase['tool_results'][first], phase['tool_results'][second] = phase['tool_results'][second], phase['tool_results'][first]
-                self.assertFalse(evals.backend_read([phase], harness))
+                self.assertFalse(evals.trace_matches_logs(phase, harness))
 
     def test_quoted_stdin_is_one_traced_call_and_body_flags_are_not_attempts(self):
         for harness in ['claude', 'codex']:

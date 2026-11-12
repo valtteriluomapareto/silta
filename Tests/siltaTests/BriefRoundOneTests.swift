@@ -20,7 +20,7 @@ extension BriefCommandTests {
       for mode in [[], ["--short"]] {
         let result = try run(["--task", "AC-2", "--app", "api"] + mode, repo, scratch)
         #expect(result.stdout.contains("app: api\n"))
-        #expect(result.stdout.contains("AGENTS.md:"))
+        #expect(!result.stdout.contains("AGENTS.md:"))
         #expect(result.stdout.contains("neighbour:"))
         #expect(result.stdout.contains("open: AC-1"))
         #expect(result.stdout.contains("description trimmed; silta --ws 'acme' task show AC-2"))
@@ -85,7 +85,7 @@ extension BriefCommandTests {
       #expect(!result.stdout.contains("code ls 'api'"))
       #expect(result.stdout.contains("open: AC-2 [doing, p2] Acme task (app: portal)"))
       #expect(result.stdout.contains("done: AC-4\n"))
-      #expect(result.stdout.contains("AGENTS.md: " + repo.path + "/AGENTS.md"))
+      #expect(!result.stdout.contains("AGENTS.md:"))
     }
   }
 }

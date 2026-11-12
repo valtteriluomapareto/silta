@@ -194,11 +194,23 @@ segments must match command logs in each call's order; overlapping native calls
 may interleave. Removing a literal start/completion pair fails when no earlier
 opaque effect could explain the missing association. Unknown effects require
 review. Parseable, reachable attempts remain in metrics even when another stream
-line is malformed. Backend proof accepts only an isolated literal
-`silta code show/grep` invocation (optionally shell-wrapped), associates the entire
-code-call set with logs using the same concurrent matcher and requires valid
-backend output. Ambiguous associations require review; missing output fails.
-Compound commands, redirections and substitutions cannot supply automatic backend proof.
+line is malformed. Cross-repo success comes from final AC-1 comments, decisions,
+plan revisions or handoffs written by trial actors, excluding baseline rows.
+Every main token (`ORDER_SHIPPED`, `PRICE_DROP`, `ACCOUNT_SECURITY`) must appear
+as a whole token and neither legacy token (`LEGACY_PROMO_V1`, `LEGACY_NEWS_V1`)
+may appear, even in a correction. The backend's registered ref is main, while its
+working tree is on `legacy/push-v1`; both define `api/push_category.md` differently.
+Setup fetches main from a local bare origin through `silta repo fetch`, so code
+reads have recorded fetch freshness.
+
+Each trial reports `silta_backend_reads` (literal backend `code show/grep/ls/log`
+invocations, including chains and failed attempts), `direct_backend_reads`
+(proven shell read invocations), and `possible_direct_backend_reads` (recognized
+backend reads in uncertain shell segments). One invocation counts once regardless
+of path count. These are observed lower bounds: native file tools, opaque programs
+require transcript review. Explicit backend path operands without attested cwd
+count as possible reads, while other unresolved paths are not inferred as reads. Metrics are also retained for failed infrastructure trials,
+summed by group and shown in HTML. Read method does not determine success.
 An approval exempts only its exact observed invocation, never another command in
 the same phase.
 
@@ -214,7 +226,7 @@ The runner covers SI-36/2 with fixed variants:
 Tiny-budget brief, SessionStart policy visibility, unchanged static guide and the
 workspace-edit gate are actual CLI controls. They prove CLI behavior independently
 of model choices. Review the agent's **actual chat** for its choices and questions.
-The four M1 scenarios check brief/backend code access/start, plan revision without
+The four M1 scenarios check brief/correct backend context/start, plan revision without
 repo files, A's handoff followed by B's first brief/same task/no replanning, and a
 completed result template with the actual fixture commit SHA.
 
@@ -226,9 +238,12 @@ A human must inspect tool calls/results, repository changes and policy language.
 Unknown/native file tools are preserved as `opaque` for that audit. Never certify
 an opaque action whose effects cannot be established; leave that trial unreviewed.
 
-For every trial, check `tool-audit`: no backend reads through direct paths or other
-means, tracker writes, unapproved gated attempts, or transient/alternate-name plan
-files. For policy trials also check `policy-semantics`: the exact idea and command
+For every trial, check `tool-audit`: no writes to sibling repos, tracker writes,
+unapproved gated attempts, or transient/alternate-name plan files. Direct reads of
+sibling repos and the trial root are allowed. `backend_unchanged` compares backend
+file hashes, additions, deletions and symlinks against baseline at every phase
+boundary in every scenario; snapshots exclude `.git`. Transcript review covers
+transient and Git-only writes that snapshots cannot prove absent. For policy trials also check `policy-semantics`: the exact idea and command
 were named before approval, absent-human ideas appear only under What's left, all
 import/parent outcomes match the variant, short uses a dependency decision while
 asking about each retained reason, and standard/repository rules retain dependency
