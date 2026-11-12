@@ -195,7 +195,7 @@ struct RestoreServiceTests {
       }
       let manifest = text(try #require(files["manifest.json"]))
       files["manifest.json"] = Data(
-        manifest.replacingOccurrences(of: #""schema": "v5""#, with: #""schema": "v2""#).utf8)
+        manifest.replacingOccurrences(of: #""schema": "v6""#, with: #""schema": "v2""#).utf8)
       let tree = try RestoreSupport.write(files, to: scratch.appending(path: "tree/acme"))
       let home = scratch.appending(path: "b")
       let target = ExportFixture.store(home)

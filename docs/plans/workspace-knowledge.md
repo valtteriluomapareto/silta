@@ -95,7 +95,9 @@ reservation is unchanged. `service:` joins §5.1.
 
 - An `about` link is the attachment. Links parsed from a body later (M3) use
   `rel=cites` and never pin anything.
-- `link.to_kind` gains `edge` and `service`. A map change that would remove an item
+- Doc `link.to_kind` gains `edge` and `service`. Task-link writes to these targets
+  remain unavailable until tasks have an unlink recovery path; typed prefixes
+  refuse rather than falling back to legacy app code. A map change that would remove an item
   with attached docs is a `conflict` that names the docs, for every map table, not
   only apps and topics as today.
 - Archiving a doc deletes its about links, so no link keeps the id of a deleted row.
@@ -226,7 +228,7 @@ Each release is usable on its own. All migrations land in K1, because
 | Slice | Release | Scope | Depends on | Verify with |
 |---|---|---|---|---|
 | K1 Store, refs, attachments | R1 | All migrations; `edge:` and `service:` refs, reserved slugs, identifier kinds; revision metadata; about links and removal conflicts for every map table; `doc_verification`; `min_writer_version` | — | Ref resolver tests; migration tests from the checked-in prior-schema DBs; `ws edit` conflict goldens |
-| K2 Reads and human writes | R1 | `doc show [--rev] [--diff]`, `doc ls --about`; `doc edit -F` creating a doc when missing (human-only, `--approved`), with `--title`, optional `--kind`, repeatable `--about`; a new doc needs title and about, omitted metadata stays on an existing doc, supplied about refs replace its attachment set | K1 | CLI goldens; bounds |
+| K2 Reads and human writes | R1 | `doc show [--rev] [--diff]`, `doc ls --about`; `doc edit -F` creating a doc when missing, `doc archive` hiding it and removing attachments (human-only, `--approved`), with `--title`, optional `--kind`, repeatable `--about`; a new doc needs title and about, omitted metadata stays on an existing doc, supplied about refs replace its attachment set | K1 | CLI goldens; bounds |
 | K3 Brief placement | R1 | Doc lines in sections 4, 5 and 9; hook and short counts; budget share | K1 | Brief goldens, including the backlog-survives fixture; determinism |
 | K4 Export and restore | R1 | Docs, revisions and verifications in the tree | K1 | Round trip; tampered and dangling-ref restores write nothing |
 | K5 Doc proposals and batch review | R2 | `doc propose`, `--task` default, `doc triage --accept/--reject`, batch semantics, inbox group, D37 age-out; the `Map gap:` guide rule | K2 | Gate truth table; accept race; overlap and stale-base batches; `SILTA_NOW` age-out at 13/14/15 days; a §20.1 scenario YAML |

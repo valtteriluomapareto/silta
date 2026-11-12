@@ -1,6 +1,6 @@
 {
   "format": "1",
-  "schema": "v5",
+  "schema": "v6",
   "workspace": "beta",
   "counts": {"alias_decision": "0", "app": "0", "approval": "0", "comment": "0", "edge": "0", "environment": "0", "link": "0", "repo": "0", "review_request": "0", "service": "0", "source": "0", "task": "0", "task_event": "0", "task_plan_rev": "0", "topic": "0", "topic_alias": "0", "workspace": "1"},
   "files": [

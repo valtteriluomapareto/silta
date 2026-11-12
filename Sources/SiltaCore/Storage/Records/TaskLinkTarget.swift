@@ -22,6 +22,10 @@ struct TaskLinkTarget {
     if raw.hasPrefix("doc:") {
       return try doc(String(raw.dropFirst(4)), workspace: source.workspaceID, in: db)
     }
+    let prefix = raw.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+    if ["edge", "service"].contains(prefix) {
+      return try map(raw, workspace: source.workspaceID, in: db)
+    }
     for kind in ["app", "topic"] where raw.hasPrefix(kind + ":") {
       return Self(
         kind: kind,
@@ -123,6 +127,11 @@ struct TaskLinkTarget {
     }
     let owner = value[..<colon].split(
       separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+    if !raw.hasPrefix("code:"), ["doc", "edge", "service"].contains(String(owner[0])) {
+      throw CommandFailure(
+        error: TaskError.invalid("Use code: for code in apps named doc, edge or service."),
+        next: ["silta task link --help"])
+    }
     _ = try TaskService.entity("app", slug: String(owner[0]), workspace: workspace, in: db)
     if owner.count == 2 && owner[1].isEmpty {
       throw TaskError.invalid("A code branch cannot be empty.")

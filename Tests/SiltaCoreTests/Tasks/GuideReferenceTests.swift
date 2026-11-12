@@ -20,6 +20,10 @@ struct GuideReferenceTests {
             UPDATE topic SET slug='messaging' WHERE slug='release';
             UPDATE doc SET slug='mobile-auth-flow' WHERE slug='guide';
             UPDATE comment SET task_id=12 WHERE task_id=1;
+            INSERT INTO service(uid,workspace_id,slug,name)
+              VALUES('push',1,'push','Push');
+            INSERT INTO edge(uid,workspace_id,from_app_id,to_service_id,kind,summary)
+              VALUES('push-edge',1,1,1,'sdk','Push delivery');
             """)
       }
       for revision in 1...3 {
@@ -49,7 +53,8 @@ struct GuideReferenceTests {
   private static let kinds = [
     "Task": ["task"], "Comment": ["comment"],
     "Doc / revision / comment": ["doc", "doc_rev", "comment"],
-    "App, topic": ["app", "topic"], "Code": ["code"],
+    "App, topic": ["app", "topic"], "Edge": ["edge"], "Service": ["service"],
+    "Code": ["code"],
     "Plan lines": ["task_plan_rev", "task"], "Diff lines": ["diff", "diff"],
     "Note": ["note"], "URL": ["url"], "External party": ["ext"],
   ]

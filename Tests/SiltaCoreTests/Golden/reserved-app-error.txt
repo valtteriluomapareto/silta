@@ -1,0 +1,3 @@
+error: New apps cannot use reserved slug doc; choose a different slug. [invalid]
+next: silta ws edit
+{"error":{"code":"invalid","message":"New apps cannot use reserved slug doc; choose a different slug.","next":["silta ws edit"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
