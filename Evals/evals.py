@@ -1106,7 +1106,9 @@ def grade(e):
         checks['handoff_written'] = any(c['kind'] == 'handoff' and c['actor'] == a['actor'] and c['task_id'] == task['id'] for c in a['state']['comments']) and a['state']['tasks'][0]['claimed_by'] is None
         checks['resume_brief_first'] = bool(b['logs']) and b['logs'][0]['command'] in ('silta brief', 'silta agents session-start') and b['logs'][0]['exit_code'] == 0
         checks['resume_task'] = resumed_same_task(e)
-        checks['resume_no_replan'] = a['state']['plans'] == final['plans'] and not any(log['command'] == 'silta task plan' for log in b['logs'])
+        # Ticking steps (`task plan --step N --done`) is resuming, not replanning: only a
+        # new or changed plan revision counts.
+        checks['resume_no_replan'] = a['state']['plans'] == final['plans']
     if scenario == 'done-with-result':
         body = task['result_md'] or ''
         checks['result_template'] = task['status'] == 'done' and result_sections(body)
