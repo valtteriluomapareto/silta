@@ -84,7 +84,8 @@ struct ReservedAppIdentityTests {
           sql: """
             INSERT INTO task(id,uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
               VALUES(1,'task',1,1,'Work','todo','human:acme','','');
-            INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+            INSERT INTO link(
+            uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
               VALUES('task-link',1,'task',1,'cites',?,1,'human:acme','');
             """, arguments: [kind])
       }

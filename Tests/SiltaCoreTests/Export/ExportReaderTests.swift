@@ -74,10 +74,10 @@ struct ExportReaderTests {
       var files = try ExportTreeTests.render(store)
       let manifest = text(try #require(files["manifest.json"]))
       files["manifest.json"] = Data(
-        manifest.replacingOccurrences(of: #""schema": "v5""#, with: #""schema": "v3""#).utf8)
+        manifest.replacingOccurrences(of: #""schema": "v6""#, with: #""schema": "v3""#).utf8)
       #expect(try ExportTree.parse(files).schema == "v3")
       files["manifest.json"] = Data(
-        manifest.replacingOccurrences(of: #""schema": "v5""#, with: #""schema": "v99""#).utf8)
+        manifest.replacingOccurrences(of: #""schema": "v6""#, with: #""schema": "v99""#).utf8)
       #expect(throws: StorageError.schemaTooNew) { try ExportTree.parse(files) }
     }
   }

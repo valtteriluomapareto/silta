@@ -19,12 +19,14 @@ struct MapReferenceTests {
       try store.write { tx in
         try tx.database.execute(
           sql: """
-            INSERT INTO service(uid,workspace_id,slug,name) VALUES('same-slug',1,'api','API service');
+            INSERT INTO service(uid,workspace_id,slug,name)
+              VALUES('same-slug',1,'api','API service');
             INSERT INTO edge(uid,workspace_id,from_app_id,to_service_id,kind,summary)
               VALUES('service-edge',1,1,2,'http-api','Different target');
             UPDATE service SET slug='push/legacy %2F 雪' WHERE id=1;
             UPDATE edge SET kind='HTTP/API %2F 雪' WHERE id=2;
-            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
+            INSERT INTO workspace(uid,slug,name,task_prefix)
+            VALUES('beta','beta','Beta','BE');
             INSERT INTO service(uid,workspace_id,slug,name) VALUES('foreign',2,'foreign','Foreign');
             """)
       }

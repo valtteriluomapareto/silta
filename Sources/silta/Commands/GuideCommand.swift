@@ -255,8 +255,12 @@ extension GuideCommand {
         | Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, \
         `doc:mobile-auth-flow@4/2` | Stored refs resolve |
         | App, topic | `app:platform-api`, `topic:messaging` | |
+        | Edge | `edge:platform-api/service:push/sdk` | Map attachment target; \
+        task links do not accept edges |
+        | Service | `service:push` | Map attachment target; task links do not accept services |
         | Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix \
-        optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
+        optional except for apps named doc, edge or service; \
+        `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
         | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
         | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | \
         relative to the task's review subject |

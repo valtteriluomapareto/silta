@@ -696,3 +696,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   The maintainer chose this after the shipped writer refused to change an attached
   legacy edge kind. Retaining an executable for repair would leave fresh installs
   and attached identities without a reliable upgrade path.
+
+  Task-link input does not yet accept edge/service targets: its add-only surface
+  has no unlink recovery. The internal resolver serves doc attachments, whose
+  accepted set can be replaced. Typed task prefixes refuse instead of falling
+  back to code; explicit `code:` retains legacy app access.

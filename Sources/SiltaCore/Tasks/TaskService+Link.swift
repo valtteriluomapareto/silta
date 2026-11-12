@@ -9,11 +9,7 @@ extension TaskService {
   package func link(_ ref: String, target raw: String, relation: String = "cites") throws
     -> TaskResult
   {
-    guard Self.relations.contains(relation) else {
-      let values = Self.relations.dropLast().joined(separator: ", ")
-      throw TaskError.invalid(
-        "Use \(values) or \(Self.relations.last ?? ""); blocked_by is reserved.")
-    }
+    try validateLink(raw, relation: relation)
     let command = "silta task link " + shellWord(ref) + " '<target>' --rel " + shellWord(relation)
     let content = try linkContent(raw, command: command)
     let slug = try selected()
@@ -58,6 +54,22 @@ extension TaskService {
         arguments: [Self.timestamp(at), environment.actor.description, Self.timestamp(at), task.id])
       try changed(task.id, kind: "link", body: relation, redacted: content.1, at: at, in: tx)
       return result
+    }
+  }
+
+  private func validateLink(_ raw: String, relation: String) throws {
+    guard Self.relations.contains(relation) else {
+      let values = Self.relations.dropLast().joined(separator: ", ")
+      throw TaskError.invalid(
+        "Use \(values) or \(Self.relations.last ?? ""); blocked_by is reserved.")
+    }
+    if raw.hasPrefix("edge:") || raw.hasPrefix("service:") {
+      throw CommandFailure(
+        error: TaskError.invalid(
+          "Edge and service targets are unavailable for task links; "
+            + "use code: for code in a legacy app."
+        ),
+        next: ["silta task link --help"])
     }
   }
 

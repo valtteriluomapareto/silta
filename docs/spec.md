@@ -192,12 +192,20 @@ its target exists or is supported by a command.
 | Comment | `AC-12/3` | the 3rd comment on AC-12 |
 | Doc / revision / comment | `doc:mobile-auth-flow`, `doc:mobile-auth-flow@4`, `doc:mobile-auth-flow@4/2` | Stored refs resolve |
 | App, topic | `app:platform-api`, `topic:messaging` | |
-| Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
+| Edge | `edge:platform-api/service:push/sdk` | Map attachment target; task links do not accept edges |
+| Service | `service:push` | Map attachment target; task links do not accept services |
+| Code | `platform-api:src/Api/Controllers/AuthController.cs#L40-52` | `code:` prefix optional except for apps named doc, edge or service; `@<ref>` after the app picks another branch: `platform-api@feature/x:path` |
 | Plan lines | `plan@3#L12-18`, `plan#L12` | latest revision when `@n` is omitted |
 | Diff lines | `diff:lib/push/categories.dart#L88`, `#-L88` for the old side | relative to the task's review subject |
 | Note | `note:notes/projects/acme/2026-10-26-weekly-status.md` | |
 | URL | `url:https://dev.azure.com/…` | |
 | External party | `ext:acme` | 1–64 lowercase letters, digits and `-`, starting and ending with a letter or digit; something a task waits on, never an actor |
+
+Map refs encode service slugs and edge kinds with uppercase UTF-8 `%HH`, leaving
+ASCII letters, digits, `_` and `-` literal. Input must match its decoded value's
+canonical encoding exactly. A literal percent sign is encoded too; service edge
+targets retain their `service:` discriminator. Typed prefixes never fall back to
+code refs when missing or unsupported by a command.
 
 `silta guide refs` prints this table. Reference examples are checked against the core resolver.
 
@@ -2574,6 +2582,11 @@ Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
 item and its docs. Proposal-only or archived docs and `cites` links do not pin map
 items; removing an item cleans its non-pinning doc links in the same transaction.
+New app identities cannot use `doc`, `edge` or `service`; retained identities and
+faithful restore preserve those names. Their generic code refs require `code:`.
+New service slugs and edge kinds must be identifiers (letters/digits with internal
+`_` or `-`). Existing service slugs and kinds retain their bytes and identities.
+Existing non-doc links also protect app, edge, service and topic targets from removal.
 Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-local
 repo paths are excluded from this view. A `workspace` change-log event invalidates
 that workspace's complete configuration, including omitted children.

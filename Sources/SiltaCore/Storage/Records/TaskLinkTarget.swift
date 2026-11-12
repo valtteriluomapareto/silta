@@ -22,6 +22,10 @@ struct TaskLinkTarget {
     if raw.hasPrefix("doc:") {
       return try doc(String(raw.dropFirst(4)), workspace: source.workspaceID, in: db)
     }
+    let prefix = raw.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+    if ["edge", "service"].contains(prefix) {
+      return try map(raw, workspace: source.workspaceID, in: db)
+    }
     for kind in ["app", "topic"] where raw.hasPrefix(kind + ":") {
       return Self(
         kind: kind,

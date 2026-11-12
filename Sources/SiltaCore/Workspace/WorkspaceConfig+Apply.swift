@@ -204,7 +204,7 @@ private struct WorkspaceWriter {
         if ["app", "edge", "service", "topic"].contains(table) {
           try config.prepareDocRemoval(of: table, id: id, workspace: workspace, in: db)
         }
-        if ["app", "topic"].contains(table),
+        if ["app", "edge", "service", "topic"].contains(table),
           try Bool.fetchOne(
             db,
             sql: """
@@ -252,6 +252,13 @@ private struct WorkspaceWriter {
           """, arguments: StatementArguments(columns.compactMap { values[$0] } + [id.databaseValue])
       )
       return id
+    }
+    if table == "app", let slug = identity["slug"].flatMap(String.fromDatabaseValue),
+      ["doc", "edge", "service"].contains(slug)
+    {
+      throw WorkspaceError.invalid([
+        "New apps cannot use reserved slug \(slug); choose a different slug."
+      ])
     }
     if table == "service" || table == "edge" {
       let field = table == "service" ? "slug" : "kind"
