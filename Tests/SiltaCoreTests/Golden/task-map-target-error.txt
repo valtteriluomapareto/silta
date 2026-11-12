@@ -1,0 +1,3 @@
+error: Edge and service targets are unavailable for task links; use code: for code in a legacy app. [invalid]
+next: silta task link --help
+{"error":{"code":"invalid","message":"Edge and service targets are unavailable for task links; use code: for code in a legacy app.","next":["silta task link --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
