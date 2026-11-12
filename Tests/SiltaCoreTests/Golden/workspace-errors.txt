@@ -6,5 +6,7 @@ error: No workspace is named acme-two. [not_found]
 next: silta ws ls
 error: Configuration conflicts with an existing reference or unique value. [conflict]
 next: silta ws edit
+error: Cannot remove service:push; attached docs: doc:push-rules. Reattach the docs before removing this item. [conflict]
+next: silta --ws 'acme' ws show
 error: The editor could not be started; check EDITOR. [env]
 ask human: silta ws edit

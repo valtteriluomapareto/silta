@@ -2560,6 +2560,10 @@ same shape. Slugs identify workspace, repo, app, service and topic rows. Environ
 match by app and name; edges by from, to and kind; sources by kind and root. Duplicate
 identities are invalid. Saving updates retained rows and removes omitted rows in one
 transaction; removing a referenced app or repo is a conflict. Renaming is not supported.
+Current accepted doc `about` attachments also protect apps, edges, services and
+topics, including items removed through an omitted parent. The conflict names the
+item and its docs. Proposal-only or archived docs and `cites` links do not pin map
+items; removing an item cleans its non-pinning doc links in the same transaction.
 Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-local
 repo paths are excluded from this view. A `workspace` change-log event invalidates
 that workspace's complete configuration, including omitted children.

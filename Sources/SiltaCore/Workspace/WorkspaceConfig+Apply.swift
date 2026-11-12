@@ -199,13 +199,16 @@ private struct WorkspaceWriter {
         table == "environment"
         ? "app_id IN (SELECT id FROM app WHERE workspace_id=?)" : "workspace_id=?"
       let existing = try Int64.fetchAll(
-        db, sql: "SELECT id FROM \(table) WHERE \(filter)", arguments: [workspace])
+        db, sql: "SELECT id FROM \(table) WHERE \(filter) ORDER BY id", arguments: [workspace])
       for id in existing where !(kept[table] ?? []).contains(id) {
+        if ["app", "edge", "service", "topic"].contains(table) {
+          try config.prepareDocRemoval(of: table, id: id, workspace: workspace, in: db)
+        }
         if ["app", "topic"].contains(table),
           try Bool.fetchOne(
             db,
             sql: """
-              SELECT EXISTS(SELECT 1 FROM link WHERE to_kind=? AND to_id=?)
+              SELECT EXISTS(SELECT 1 FROM link WHERE to_kind=? AND to_id=? AND from_kind<>'doc')
               """, arguments: [table, id]) == true
         {
           throw WorkspaceError.conflict

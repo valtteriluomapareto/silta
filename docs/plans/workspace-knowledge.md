@@ -1,6 +1,6 @@
 # Workspace knowledge: docs on the workspace map, kept by agents
 
-Status: proposed
+Status: active
 
 ## Goal
 
@@ -62,8 +62,11 @@ executable's `--ws <ws> ws edit -F <file>` command, with the normal approval gat
 then retrying the upgrade. It never offers the new binary's migrating write as the
 repair. K1 tests refusal, approved repair with the prior writer and successful
 upgrade, including reinstalling before repair. The brief prints each edge's exact ref, so an
-agent copies it instead of composing it. `edge`, `service` and `doc` become
-reserved app slugs, like `none`. `service:` joins §5.1.
+agent copies it instead of composing it. New apps cannot use `edge`, `service` or
+`doc` as their slug. Existing apps keep those names and their identities, including
+through export and restore; their code refs use the explicit `code:` prefix. Typed
+ref prefixes never fall back to code when a target is missing. The existing `none`
+reservation is unchanged. `service:` joins §5.1.
 
 **What goes where:**
 - **The map** holds what Silta needs to route and resolve: identity, location,
@@ -323,3 +326,7 @@ Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A
 - **R1 ships alone first.** The maintainer chose it: R1 is smaller and its
   `doc-context` eval tests the core claim. R2 starts only if that eval shows docs
   change agent outcomes; otherwise the proposal machinery isn't built.
+- **Reserved app names preserve existing identities.** The maintainer chose to
+  preserve existing names and reserve them for new apps. Existing tasks and links
+  must survive upgrades and faithful restore; no rename is required. Code in these
+  apps uses explicit `code:` refs.

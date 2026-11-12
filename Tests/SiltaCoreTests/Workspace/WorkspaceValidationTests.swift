@@ -74,6 +74,7 @@ struct WorkspaceValidationTests {
   @Test func workspaceErrorsHaveGoldenRecoveryCommands() {
     let errors: [WorkspaceError] = [
       .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"), .conflict,
+      .docAttachments(workspace: "acme", item: "service:push", docs: ["doc:push-rules"]),
       .editor,
     ]
     let rendered = errors.map { OutputRouter.render(.failure($0), mode: .init(json: false)).stderr }

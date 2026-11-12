@@ -1,0 +1,2 @@
+error: Cannot remove topic:messaging; attached docs: doc:push-rules. Reattach the docs before removing this item. [conflict]
+next: silta --ws 'acme' ws show

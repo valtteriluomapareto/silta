@@ -72,6 +72,7 @@ extension WorkspaceError: ErrorExamples {
     [
       .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"),
       .ambiguous(["acme", "beta"]), .conflict,
+      .docAttachments(workspace: "acme", item: "service:push", docs: ["doc:push-rules"]),
       .editor, .input, .setting("acme", key: "review_gate", value: "\"robot\""),
       .unknownSetting("acme", key: "review_gate", value: "\"future\""),
     ]
