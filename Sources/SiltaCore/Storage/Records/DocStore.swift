@@ -16,7 +16,7 @@ struct DocStore {
     let metadata = try metadata(draft, old: old)
     let stamp = utcTimestamp(at)
     let id = try docID(draft, metadata: metadata, old: old, stamp: stamp)
-    let number = try nextRevision(id)
+    let number = try nextRevision(id, slug: draft.slug)
     let base: Int? = old?["current_rev"]
     try db.execute(
       sql: """
@@ -70,14 +70,24 @@ struct DocStore {
       arguments: [workspace, slug])
   }
 
-  private func nextRevision(_ doc: Int64) throws -> Int {
+  private func nextRevision(_ doc: Int64, slug: String) throws -> Int {
     let previous =
-      try Int.fetchOne(
-        db, sql: "SELECT MAX(rev) FROM doc_rev WHERE doc_id=?",
-        arguments: [doc]) ?? 0
-    let (number, overflow) = previous.addingReportingOverflow(1)
+      try Int64.fetchOne(
+        db, sql: "SELECT MAX(rev) FROM doc_rev WHERE doc_id=?", arguments: [doc]) ?? 0
+    let (floor, overflow) = previous.addingReportingOverflow(1)
     guard !overflow else { throw StorageError.resourceExhausted }
-    return number
+    let scope = "doc_rev:\(workspace):\(slug)"
+    try db.execute(
+      sql: """
+        INSERT INTO seq_counter(scope,next) VALUES(?,?)
+        ON CONFLICT(scope) DO UPDATE SET next=MAX(next,excluded.next)
+        """, arguments: [scope, floor])
+    guard
+      let next = try Int64.fetchOne(
+        db, sql: "SELECT next FROM seq_counter WHERE scope=?", arguments: [scope]),
+      next > 0, next < Int64.max
+    else { throw StorageError.resourceExhausted }
+    return Int(try transaction.nextSequence(scope: scope))
   }
 
   private func docID(_ draft: DocDraft, metadata: Metadata, old: Row?, stamp: String) throws

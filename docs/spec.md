@@ -282,7 +282,7 @@ CREATE TABLE topic_alias (
   PRIMARY KEY (workspace_id, alias));
 
 CREATE TABLE seq_counter (scope TEXT PRIMARY KEY, next INTEGER NOT NULL);
-  -- 'task:<workspace_id>', 'comment:doc_rev:<id>'; task-comment high-water marks: §17
+  -- 'task:<workspace_id>', 'doc_rev:<workspace_id>:<slug>', 'comment:doc_rev:<id>'; see §17
 
 CREATE TABLE task (
   id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -1883,7 +1883,10 @@ Every CLI call is its own short-lived process, and several agents run at once.
 - **Writes:** every write is one `BEGIN IMMEDIATE` transaction, with
   `busy_timeout = 5 s` and up to 3 retries with jitter. After that, exit 5 `busy`.
 - **Sequence numbers** are allocated inside the same transaction as the row. Tasks
-  use `seq_counter`. Task comments use `max(seq)+1` across all retained rows under
+  use `seq_counter`. Doc revisions use `doc_rev:<workspace_id>:<slug>`, honoring its
+  stored reservation and bootstrapping above all retained accepted/proposed revisions.
+  This scope follows the public name rather than replaceable doc row ids. Task
+  comments use `max(seq)+1` across all retained rows under
   `BEGIN IMMEDIATE`: the append-only table supplies its own high-water mark, including
   soft-deleted and imported/older comments without counter rows, so refs are never
   reused and no counter bootstrap state is needed. Doc-revision comments (M2) use
