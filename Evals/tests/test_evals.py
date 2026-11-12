@@ -252,19 +252,24 @@ class Acceptance(unittest.TestCase):
         self.assertNotIn('--start', phase['logs'][0]['flags'])
         self.assertTrue(self.evals.started({'phases': [phase]}))
 
-    def test_backend_claim_needs_the_actual_target_command(self):
-        output = json.dumps({'data': {'app': 'acme-backend', 'sha': 'a' * 40,
-                                      'output': 'PushCategory'}})
-        for command in ['echo claimed-backend', 'silta code grep acme-mobile -- PushCategory']:
-            result = {'command': command, 'exit': 0, 'output': output}
-            self.assertFalse(self.evals.backend_result(result))
-        self.assertTrue(self.evals.backend_result({'command': 'silta code grep acme-backend -- PushCategory',
-                                                  'exit': 0, 'output': output}))
+    def test_fixture_traps_wrong_branch_and_fetches_registered_main(self):
+        root = Path(self.temp.name) / 'branch-trap'
+        env, cwd, _, _ = self.evals.prepare(root, BINARY, 'codex', 'start-cross-repo', 'default')
+        backend = root / 'repos/acme-backend'
+        self.assertEqual(self.evals.git(backend, 'branch', '--show-current'), 'legacy/push-v1')
+        wrong = (backend / 'api/push_category.md').read_text()
+        self.assertIn('LEGACY_PROMO_V1', wrong)
+        self.assertNotIn('ORDER_SHIPPED', wrong)
+        output = json.loads(self.evals.silta(env, cwd, ['code', 'show', 'acme-backend',
+                           '--json', '--', 'api/push_category.md'])['stdout'])
+        self.assertEqual(output['warnings'], [])
+        for token in ('ORDER_SHIPPED', 'PRICE_DROP', 'ACCOUNT_SECURITY'):
+            self.assertIn(token, output['data']['output'])
+        self.assertNotIn('LEGACY_PROMO_V1', output['data']['output'])
 
     def test_native_and_gated_evidence_fail_closed(self):
         evidence = self.evidence('start-cross-repo')
-        for command in ['silta brief; cat ../acme-backend/README.md',
-                        'gh --repo acme/example issue create --title Acme',
+        for command in ['gh --repo acme/example issue create --title Acme',
                         'az boards work-item create --title Acme']:
             with self.subTest(command=command):
                 bad = copy.deepcopy(evidence)

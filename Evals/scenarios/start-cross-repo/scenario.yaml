@@ -1,6 +1,6 @@
 {
   "id": "start-cross-repo",
-  "prompt": "Add push categories to Acme mobile. The backend is in the acme-backend app; inspect its PushCategory API. Begin the task, record context, then leave a handoff before implementing code.",
+  "prompt": "Add push categories to Acme mobile. The backend is in the acme-backend app; inspect its PushCategory API at the app's registered ref (main). Begin the task, record context, then leave a handoff before implementing code.",
   "timeout_s": 180,
   "variants": [
     "default"

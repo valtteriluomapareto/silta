@@ -2,7 +2,7 @@
   "stub_sha256": "3b223e20cc1091ae921689c3c4d47536d085f6311df45c5ab850a78a3cc119b4",
   "recordings": {
     "start-cross-repo-pass": {
-      "sha256": "efd61bb6a08f28d406674bcc40987087105e97859324c6925026c1547b0cd24b",
+      "sha256": "f0fea00a9402b4597416e33719bc04952f67e633778dd7ac377e0e96dfb2a4ee",
       "variants": {
         "default": {
           "checks": [
@@ -360,7 +360,7 @@
       }
     },
     "start-cross-repo-interleaved": {
-      "sha256": "7709320d7f255804dfcdc98b0409f24f990b3e4d16c398ee68b4481083a822f8",
+      "sha256": "bc53267d55065b795ab03602e04fe806ec6c420533bcdce02d3ce665bf144f5f",
       "variants": {
         "default": {
           "checks": [

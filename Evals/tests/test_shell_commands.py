@@ -82,9 +82,9 @@ class ShellCommands(unittest.TestCase):
                 phase = self.phase(command, [('silta brief', 2)], code=0)
                 self.assertIs(evals.trace_matches_logs(phase, 'codex'), False)
                 self.assertEqual(parse_shell(command).single(), ['silta', 'brief'])
-        output = json.dumps({'data': {'app': 'acme-backend', 'sha': 'a' * 40, 'output': 'actual'}})
-        self.assertTrue(evals.backend_result({'command': 'silta code grep acme-backend -- X\n',
-                                              'exit': 0, 'output': output}))
+        command = 'silta code grep acme-backend -- X\n'
+        counts = evals.backend_read_metrics({'phases': [{'commands': [command]}]})
+        self.assertEqual(counts['silta_backend_reads'], 1)
         self.assertTrue(evals.approved_invocation("silta task add --app none --approved 'Acme words'\n",
                                                  'silta task add --app none\n', 'Acme words'))
 

@@ -18,6 +18,9 @@ class ShellProgram:
     backend_reads: list = field(default_factory=list)
     possible_backend_reads: list = field(default_factory=list)
 
+    backend_read_count: int = 0
+    possible_backend_read_count: int = 0
+
     def isolated(self):
         """One command has the native exit even with supported stdin/stderr forms."""
         return self.commands[0][:] if (not self.opaque and not self.composed
@@ -185,9 +188,12 @@ def parse_shell(program, *, audit=False, scope=None, _depth=0):
                 if reachable:
                     result.proven_commands.extend(child.proven_commands)
                     result.backend_reads.extend(child.backend_reads)
+                    result.backend_read_count += child.backend_read_count
                 else:
                     result.possible_backend_reads.extend(child.backend_reads)
+                    result.possible_backend_read_count += child.backend_read_count
                 result.possible_backend_reads.extend(child.possible_backend_reads)
+                result.possible_backend_read_count += child.possible_backend_read_count
                 safe = not child.opaque
                 result.composed |= child.composed
                 result.conditional |= child.conditional
@@ -203,6 +209,16 @@ def parse_shell(program, *, audit=False, scope=None, _depth=0):
                 paths = read_paths(command, stdin=incoming)
                 unknown, backend = path_scope(paths, scope)
                 (result.backend_reads if reachable and safe else result.possible_backend_reads).extend(backend)
+                if backend:
+                    if reachable and safe:
+                        result.backend_read_count += 1
+                    else:
+                        result.possible_backend_read_count += 1
+                elif paths and scope and any(
+                        Path(root).name in Path(path).parts
+                        for root in scope.get('backends', []) for path in paths):
+                    # Explicit sibling names are potential reads without an attested cwd.
+                    result.possible_backend_read_count += 1
                 safe &= audit or paths is not None and not unknown
                 if scope is not None and command[0] == 'cd':
                     safe = False
@@ -245,4 +261,6 @@ def parse_shell(program, *, audit=False, scope=None, _depth=0):
         result.proven_commands = []
         result.possible_backend_reads.extend(result.backend_reads)
         result.backend_reads = []
+        result.possible_backend_read_count += result.backend_read_count
+        result.backend_read_count = 0
     return result

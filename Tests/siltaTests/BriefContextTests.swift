@@ -5,6 +5,23 @@ import SiltaTestSupport
 import Testing
 
 extension BriefCommandTests {
+  @Test func agentsPointerRequiresExistingFile() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try fixture.git(["checkout", "-q", "api"], repo, scratch)
+      for mode in [[], ["--short"], ["--json"], ["--hook"]] {
+        let result = try run(mode, repo, scratch)
+        #expect(!result.stdout.contains("AGENTS.md"))
+      }
+      try "Acme instructions\n".write(
+        to: repo.appending(path: "AGENTS.md"), atomically: true, encoding: .utf8)
+      for mode in [[], ["--short"], ["--json"], ["--hook"]] {
+        #expect(
+          try run(mode, repo, scratch).stdout.contains("AGENTS.md: " + repo.path + "/AGENTS.md"))
+      }
+    }
+  }
+
   @Test func appContextFollowsLocationAndTopicsExpandOnce() throws {
     try withScratchDirectory { scratch in
       let repo = try contextFixture(scratch)
@@ -14,14 +31,14 @@ extension BriefCommandTests {
       #expect(result.stdout.contains("summary: Acme API"))
       #expect(!result.stdout.contains("summary: Acme portal"))
       #expect(result.stdout.contains("environment: prod https://api.acme.example"))
-      #expect(result.stdout.contains("AGENTS.md: " + repo.path + "/AGENTS.md"))
+      #expect(!result.stdout.contains("AGENTS.md:"))
       #expect(result.stdout.contains("description:\nAcme task body"))
       let data = try fixture.data(run(["--task", "AC-2", "--app", "api", "--json"], repo, scratch))
       let sections = try #require(data["sections"] as? [[String: String]])
       let ids = sections.compactMap { $0["id"] }
       #expect(
         ids == [
-          "task", "plan", "description", "app", "app", "environments", "agents",
+          "task", "plan", "description", "app", "app", "environments",
           "neighbours", "neighbours", "neighbours", "open_tasks", "open_tasks", "glossary",
         ])
       Golden.forTests().check(normalizeBrief(result.stdout, repo), "brief-context.txt")
