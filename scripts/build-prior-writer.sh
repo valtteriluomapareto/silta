@@ -3,7 +3,7 @@
 # Usage: scripts/build-prior-writer.sh <scratch-directory>
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-prior_commit=b13f6062bf43ff2d79680a324a5288a90d0aed83
+prior_commit=dc868192e3877a29d79dc54681f0f57b72c3f56f
 prior_root="$1"
 mkdir -p "$prior_root/source"
 git archive "$prior_commit" | tar -x -C "$prior_root/source"

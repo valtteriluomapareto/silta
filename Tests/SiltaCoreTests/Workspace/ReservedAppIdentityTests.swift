@@ -54,21 +54,7 @@ struct ReservedAppIdentityTests {
       _ = try service.link("AC-1", target: "code:\(slug)@feature/x:src/Branch.swift")
       let linked = try service.show("AC-1").links
       #expect(linked.contains { $0.target == "code:\(slug):src/Acme.swift" })
-      do {
-        _ = try service.link("AC-1", target: "\(slug):src/Implicit.swift")
-        Issue.record("Reserved typed prefix fell back to code")
-      } catch let error as any CodedError {
-        #expect(error.code == (slug == "doc" ? .notFound : .invalid))
-        if slug == "edge" { Self.check(error, golden: "task-map-target-error.txt") }
-      }
-      do {
-        _ = try service.link("AC-1", target: "\(slug)@feature/x:src/Implicit.swift")
-        Issue.record("Reserved app at an explicit branch accepted implicit code")
-      } catch let error as any CodedError {
-        #expect(error.code == .invalid)
-        #expect(error.next == ["silta task link --help"])
-        if slug == "doc" { Self.check(error, golden: "reserved-code-prefix-error.txt") }
-      }
+      try Self.requireExplicitCode(service, slug: slug)
       #expect(try service.show("AC-1").links == linked)
       let files = try ExportTreeTests.render(store)
       let tree = try RestoreSupport.write(files, to: scratch.appending(path: "tree/acme"))
@@ -134,12 +120,44 @@ struct ReservedAppIdentityTests {
           try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
         } == 5)
       try store.initialize()
-      let count = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") }
+      let yaml = try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") }
+      let links = try store.read {
+        try String.fetchAll($0, sql: "SELECT id || ':' || uid FROM link ORDER BY id")
+      }
+      let edit = home.appending(path: "workspace-edit.yaml")
+      try yaml.replacingOccurrences(of: "\"Acme\"", with: "\"Changed\"").write(
+        to: edit, atomically: true, encoding: .utf8)
       let after = try SiltaBinary.runProcess(
-        URL(filePath: binary), ["--json"] + args, in: home, environment: environment)
+        URL(filePath: binary),
+        [
+          "--json", "--ws", "acme", "ws", "edit", "-F", edit.path,
+          "--approved", "Change synthetic Acme map",
+        ], in: home, environment: environment)
       #expect(after.termination == .exit(9))
       #expect(after.stdout.contains("Database requires a newer version of silta."))
-      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == count)
+      #expect(try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") } == yaml)
+      #expect(
+        try store.read {
+          try String.fetchAll($0, sql: "SELECT id || ':' || uid FROM link ORDER BY id")
+        } == links)
+    }
+  }
+
+  private static func requireExplicitCode(_ service: TaskService, slug: String) throws {
+    do {
+      _ = try service.link("AC-1", target: "\(slug):src/Implicit.swift")
+      Issue.record("Reserved typed prefix fell back to code")
+    } catch let error as any CodedError {
+      #expect(error.code == (slug == "doc" ? .notFound : .invalid))
+      if slug == "edge" { Self.check(error, golden: "task-map-target-error.txt") }
+    }
+    do {
+      _ = try service.link("AC-1", target: "\(slug)@feature/x:src/Implicit.swift")
+      Issue.record("Reserved app at an explicit branch accepted implicit code")
+    } catch let error as any CodedError {
+      #expect(error.code == .invalid)
+      #expect(error.next == ["silta task link --help"])
+      if slug == "doc" { Self.check(error, golden: "reserved-code-prefix-error.txt") }
     }
   }
 
