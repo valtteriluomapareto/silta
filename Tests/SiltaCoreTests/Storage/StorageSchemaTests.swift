@@ -41,7 +41,8 @@ struct StorageSchemaTests {
       let expected: Set<String> = [
         "meta", "workspace", "repo", "repo_path", "app", "environment", "service", "edge",
         "topic", "topic_alias", "seq_counter", "task", "task_plan_rev", "task_event", "comment",
-        "review_request", "doc", "doc_rev", "link", "alias_decision", "source", "worktree_override",
+        "review_request", "doc", "doc_rev", "doc_verification", "link", "alias_decision", "source",
+        "worktree_override",
         "change_log", "approval", "grdb_migrations",
       ]
       try store.read { db in

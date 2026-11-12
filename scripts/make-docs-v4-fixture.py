@@ -11,9 +11,13 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-root=Path(tempfile.mkdtemp(prefix='silta-v4-fixture-',dir='/private/tmp'))
-(root/'home').mkdir()
-yaml='''workspace: {slug: acme, name: Acme, task_prefix: AC}
+if len(sys.argv) != 3:
+    sys.exit(__doc__.splitlines()[0])
+
+scratch = tempfile.TemporaryDirectory(prefix="silta-v4-fixture-")
+root = Path(scratch.name)
+(root / "home").mkdir()
+yaml = '''workspace: {slug: acme, name: Acme, task_prefix: AC}
 repos: [{slug: platform}]
 apps:
   - {slug: mobile, repo: platform, ref: origin/mobile}
@@ -24,14 +28,24 @@ edges:
   - {from: api, to: service:push, kind: sdk, summary: Push delivery}
 topics: [{slug: messaging}]
 '''
-(root/'workspace.yaml').write_text(yaml)
-env={'PATH':'/usr/bin:/bin','HOME':str(root/'home'),'SILTA_HOME':str(root/'state'),'SILTA_ACTOR':'agent:codex:acme','SILTA_NOW':'2023-11-14T22:13:20.000Z','SILTA_ID_SEED':'1'}
-writer=str(Path(sys.argv[1]).resolve())
-result=subprocess.run([writer,'ws','edit','-F',str(root/'workspace.yaml'),'--approved','Create synthetic Acme fixture'],cwd=root,env=env,text=True,capture_output=True)
-assert result.returncode==0,result.stderr
-fixture=Path(sys.argv[2]).resolve()
-fixture.parent.mkdir(parents=True,exist_ok=True)
-with sqlite3.connect(root/'state/silta.db') as db:
+(root / "workspace.yaml").write_text(yaml)
+env = {
+    "PATH": "/usr/bin:/bin",
+    "HOME": str(root / "home"),
+    "SILTA_HOME": str(root / "state"),
+    "SILTA_ACTOR": "agent:codex:acme",
+    "SILTA_NOW": "2023-11-14T22:13:20.000Z",
+    "SILTA_ID_SEED": "1",
+}
+writer = str(Path(sys.argv[1]).resolve())
+subprocess.run(
+    [writer, "ws", "edit", "-F", str(root / "workspace.yaml"),
+     "--approved", "Create synthetic Acme fixture"],
+    cwd=root, env=env, text=True, capture_output=True, check=True,
+)
+fixture = Path(sys.argv[2]).resolve()
+fixture.parent.mkdir(parents=True, exist_ok=True)
+with sqlite3.connect(root / 'state/silta.db') as db:
     assert db.execute("SELECT value FROM meta WHERE key='min_writer_version'").fetchone()==('4',), 'requires a v4 writer'
     assert db.execute('SELECT identifier FROM grdb_migrations ORDER BY rowid').fetchall()==[(f'v{i}',) for i in range(1,5)]
     db.executescript('''

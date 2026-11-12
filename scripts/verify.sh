@@ -37,6 +37,12 @@ if [[ -n "${CODEX_SANDBOX:-}" ]]; then
   swiftpm=(--disable-sandbox)
 fi
 
+if [[ "$mode" == full ]]; then
+  step "build prior writer (isolated compatibility test)"
+  export SILTA_PRIOR_BINARY="$SILTA_HOME/prior/silta"
+  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior"
+fi
+
 step "build (warnings as errors)"
 # Dependencies come only from Package.resolved (D18): fail instead of re-resolving.
 swift build ${swiftpm[@]+"${swiftpm[@]}"} --build-tests --only-use-versions-from-resolved-file \

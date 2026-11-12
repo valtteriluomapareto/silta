@@ -1,6 +1,6 @@
 import GRDB
 
-// This schema may be corrected until first dogfood shipping (D20).
+// Shipped migrations are immutable; additions preserve existing identities (D20).
 enum StorageSchema {
   static var migrator: DatabaseMigrator {
     var migrator = DatabaseMigrator()
@@ -23,6 +23,9 @@ enum StorageSchema {
     }
     migrator.registerMigration("v4") { db in
       try db.execute(sql: "UPDATE meta SET value='4' WHERE key='min_writer_version'")
+    }
+    migrator.registerMigration("v5") { db in
+      try migrateDocMetadata(in: db)
     }
     return migrator
   }
