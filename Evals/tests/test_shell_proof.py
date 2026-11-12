@@ -91,28 +91,22 @@ class ShellProof(unittest.TestCase):
             row['output'] = json.dumps({'data': {'app': 'acme-backend', 'sha': 'a' * 40, 'output': 'actual'}})
         return p
 
-    def test_12_backend_read_reuses_concurrent_association(self):
+    def test_12_backend_chains_keep_native_trace_association(self):
         p = self.backend_phase()
         self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
-        self.assertIs(evals.backend_read([p], 'codex'), True)
         p['tool_results'].reverse()
-        self.assertIs(evals.backend_read([p], 'codex'), True)
+        self.assertIs(evals.trace_matches_logs(p, 'codex'), True)
         ambiguous = self.backend_phase(True)
-        self.assertIsNone(evals.backend_read([ambiguous], 'codex'))
-        for row in ambiguous['tool_results']:
-            row['output'] = '{}'
-        self.assertIs(evals.backend_read([ambiguous], 'codex'), False)
+        self.assertIsNone(evals.trace_matches_logs(ambiguous, 'codex'))
 
-    def test_12b_chained_backend_read_goes_to_review(self):
-        command = "silta --ws acme task start AC-1; silta --ws acme code grep acme-backend -- 'PushCategory'"
+    def test_12b_chained_backend_read_is_an_adoption_metric(self):
+        command = "silta --ws acme task start AC-1; silta --ws acme code grep acme-backend -- PushCategory"
         p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log('task start'), log('code grep')])
-        p['tool_results'][0]['output'] = 'AC-1 doing\nacme-backend@main ' + 'a' * 40 + '\nREADME.md:1:x'
-        self.assertIsNone(evals.backend_read([p], 'codex'))
+        self.assertEqual(evals.backend_read_metrics({'phases': [p]})['silta_backend_reads'], 1)
         p['logs'][1]['exit_code'] = 2
-        self.assertIs(evals.backend_read([p], 'codex'), False)
-        other = phase({'A': 'silta task start AC-1; silta code grep acme-mobile -- X'},
-                      [('A', 'started'), ('A', 'completed')], [log('task start'), log('code grep')])
-        self.assertIs(evals.backend_read([other], 'codex'), False)
+        self.assertEqual(evals.backend_read_metrics({'phases': [p]})['silta_backend_reads'], 1)
+        p['commands'] = [command.replace('acme-backend', 'acme-mobile')]
+        self.assertEqual(evals.backend_read_metrics({'phases': [p]})['silta_backend_reads'], 0)
 
     def test_13_global_help_options_are_independent_of_position(self):
         for command in ['silta --help --json', 'silta --help --verbose', 'silta --json --help',

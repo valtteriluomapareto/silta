@@ -46,12 +46,18 @@ struct BriefContext {
             "environment: \(TaskError.shown(environment["name"]))\(url.isEmpty ? "" : " " + TaskError.shown(url))\n"
         ))
     }
-    sections.append(
-      BriefSection(
-        id: "agents",
-        text:
-          "AGENTS.md: \(TaskError.shown((location.displayWorktree ?? location.worktree) + "/AGENTS.md"))\n"
-      ))
+    var isDirectory: ObjCBool = false
+    if FileManager.default.fileExists(
+      atPath: location.worktree + "/AGENTS.md", isDirectory: &isDirectory),
+      !isDirectory.boolValue
+    {
+      sections.append(
+        BriefSection(
+          id: "agents",
+          text:
+            "AGENTS.md: \(TaskError.shown((location.displayWorktree ?? location.worktree) + "/AGENTS.md"))\n"
+        ))
+    }
     return sections + (try neighbours(id: id, app: app))
   }
 
