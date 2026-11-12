@@ -750,6 +750,22 @@ def code_invocation(command):
     return 'silta code ' + argv[2], argv[3].split('@')[0]
 
 
+def chained_backend_call(command):
+    """A `silta code show|grep acme-backend` segment of a compound shell command."""
+    if code_invocation(command) is not None:
+        return False
+    try:
+        segments = parse_shell(command).invocations
+    except ValueError:
+        return False
+    for segment in segments:
+        argv = normalized_silta(list(segment))
+        if (len(argv) >= 4 and argv[:2] == ['silta', 'code'] and argv[2] in ('show', 'grep')
+                and argv[3].split('@')[0] == 'acme-backend'):
+            return True
+    return False
+
+
 def backend_result(result):
     try:
         call = code_invocation(result['command'])
@@ -862,6 +878,11 @@ def backend_read(phases, harness):
         results = [item for item in phase['tool_results'] if code_invocation(item['command']) is not None
                    and not shell_program(phase, item['command'], item).opaque]
         if not any(backend_result(item) for item in results):
+            # A backend code call inside a compound command shares its output with the
+            # other segments, so it cannot be certified automatically: bound review decides.
+            uncertain |= (any(chained_backend_call(item['command']) for item in phase['tool_results'])
+                          and any(row['command'] in ('silta code show', 'silta code grep')
+                                  and row['exit_code'] == 0 for row in phase['logs']))
             continue
         calls = [dict(item, chain=[(code_invocation(item['command'])[0], item['exit'])]) if item in results
                  else dict(item, chain=[None]) for item in phase['tool_results']

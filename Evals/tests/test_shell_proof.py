@@ -103,6 +103,17 @@ class ShellProof(unittest.TestCase):
             row['output'] = '{}'
         self.assertIs(evals.backend_read([ambiguous], 'codex'), False)
 
+    def test_12b_chained_backend_read_goes_to_review(self):
+        command = "silta --ws acme task start AC-1; silta --ws acme code grep acme-backend -- 'PushCategory'"
+        p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log('task start'), log('code grep')])
+        p['tool_results'][0]['output'] = 'AC-1 doing\nacme-backend@main ' + 'a' * 40 + '\nREADME.md:1:x'
+        self.assertIsNone(evals.backend_read([p], 'codex'))
+        p['logs'][1]['exit_code'] = 2
+        self.assertIs(evals.backend_read([p], 'codex'), False)
+        other = phase({'A': 'silta task start AC-1; silta code grep acme-mobile -- X'},
+                      [('A', 'started'), ('A', 'completed')], [log('task start'), log('code grep')])
+        self.assertIs(evals.backend_read([other], 'codex'), False)
+
     def test_13_global_help_options_are_independent_of_position(self):
         for command in ['silta --help --json', 'silta --help --verbose', 'silta --json --help',
                         'silta --help --ws acme --json', 'silta --help --quiet --verbose']:
