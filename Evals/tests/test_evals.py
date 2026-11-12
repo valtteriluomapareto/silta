@@ -104,6 +104,12 @@ class Acceptance(unittest.TestCase):
         evidence['approval'] = None
         self.assertFalse(self.evals.grade(evidence)['checks']['approval_provenance'])
 
+    def test_resume_may_tick_plan_steps(self):
+        evidence = copy.deepcopy(self.evidence('handoff-resume'))
+        b = evidence['phases'][1]
+        b['logs'].append({'actor': b['actor'], 'command': 'silta task plan', 'exit_code': 0, 'flags': []})
+        self.assertTrue(self.evals.grade(evidence)['checks']['resume_no_replan'])
+
     def test_resume_wrong_task_actor_and_replan(self):
         original = self.evidence('handoff-resume')
         for key in ['resume_task', 'resume_no_replan', 'resume_brief_first', 'handoff_written']:
