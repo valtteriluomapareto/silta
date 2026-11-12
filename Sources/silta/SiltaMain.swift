@@ -252,6 +252,7 @@ enum SiltaMain {
   static func workspaceRecovery(
     _ error: any CodedError, edit: WsEditCommand, context: CommandContext
   ) -> [String] {
+    if case .docAttachments = error as? WorkspaceError { return error.next }
     var target = edit.workspace ?? edit.global.ws
     if target == nil {
       do {

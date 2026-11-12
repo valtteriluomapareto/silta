@@ -39,7 +39,8 @@ package enum AcmeDocAttachments {
       let db = tx.database
       try db.execute(
         sql: """
-          INSERT INTO doc(uid,workspace_id,slug,title,kind,current_rev,archived,created_at,updated_at)
+          INSERT INTO doc(
+            uid,workspace_id,slug,title,kind,current_rev,archived,created_at,updated_at)
           SELECT ?,id,?,'Private Acme title','reference',?,?,?,? FROM workspace
           WHERE slug='acme' ON CONFLICT(workspace_id,slug) DO NOTHING
           """,
@@ -55,7 +56,8 @@ package enum AcmeDocAttachments {
           """, arguments: ["rev-" + slug, state, "2023-11-14T22:13:20.000Z", slug])
       try db.execute(
         sql: """
-          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+          INSERT INTO link(
+            uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
           SELECT ?,doc.workspace_id,'doc',doc.id,?,?,target.id,'human:acme',?
           FROM doc CROSS JOIN \(kind) target WHERE doc.slug=?
           """,
