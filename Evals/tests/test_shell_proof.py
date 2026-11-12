@@ -99,6 +99,15 @@ class ShellProof(unittest.TestCase):
         ambiguous = self.backend_phase(True)
         self.assertIsNone(evals.trace_matches_logs(ambiguous, 'codex'))
 
+    def test_12b_chained_backend_read_is_an_adoption_metric(self):
+        command = "silta --ws acme task start AC-1; silta --ws acme code grep acme-backend -- PushCategory"
+        p = phase({'A': command}, [('A', 'started'), ('A', 'completed')], [log('task start'), log('code grep')])
+        self.assertEqual(evals.backend_read_metrics({'phases': [p]})['silta_backend_reads'], 1)
+        p['logs'][1]['exit_code'] = 2
+        self.assertEqual(evals.backend_read_metrics({'phases': [p]})['silta_backend_reads'], 1)
+        p['commands'] = [command.replace('acme-backend', 'acme-mobile')]
+        self.assertEqual(evals.backend_read_metrics({'phases': [p]})['silta_backend_reads'], 0)
+
     def test_13_global_help_options_are_independent_of_position(self):
         for command in ['silta --help --json', 'silta --help --verbose', 'silta --json --help',
                         'silta --help --ws acme --json', 'silta --help --quiet --verbose']:
