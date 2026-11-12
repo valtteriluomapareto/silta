@@ -1,0 +1,1 @@
+{"error":{"code":"conflict","message":"Cannot remove service:push; attached docs: doc:push-rules. Reattach the docs before removing this item.","next":["silta --ws 'acme' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
