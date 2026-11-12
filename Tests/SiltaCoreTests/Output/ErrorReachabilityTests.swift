@@ -79,6 +79,15 @@ extension WorkspaceError: ErrorExamples {
   }
 }
 
+extension DocError: ErrorExamples {
+  static var examples: [DocError] {
+    [
+      .missing(["--title", "--about"]),
+      .invalid("A doc needs at least one --about map item."), .notFound("missing"),
+    ]
+  }
+}
+
 extension LocationError: ErrorExamples {
   static var examples: [LocationError] {
     [
@@ -258,7 +267,7 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
-    ScanError.self, CommentError.self,
+    ScanError.self, CommentError.self, DocError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,
     ExportError.self, ExportFailure.self, ExportGitFailure.self,
