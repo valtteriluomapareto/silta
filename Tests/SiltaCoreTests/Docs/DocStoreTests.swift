@@ -176,6 +176,42 @@ struct DocStoreTests {
     }
   }
 
+  @Test func inputFailuresHaveStableCodesAndBodyFreeRecovery() throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      let ids = SeededIDGenerator(seed: 71)
+      var empty = DocDraft(slug: "rules", body: "Private body")
+      empty.title = "Rules"
+      empty.about = []
+      let attempts: [(String, () throws -> Void)] = [
+        (
+          "missing metadata",
+          {
+            _ = try Self.accept(DocDraft(slug: "rules", body: "Private body"), in: store, ids: ids)
+          }
+        ),
+        ("empty attachments", { _ = try Self.accept(empty, in: store, ids: ids) }),
+        (
+          "missing doc",
+          { _ = try store.write { try Self.writer($0, ids: ids).archive("missing") } }
+        ),
+      ]
+      var blocks: [String] = []
+      for (label, attempt) in attempts {
+        do {
+          try attempt()
+          Issue.record("Invalid doc input was accepted")
+        } catch let error as any CodedError {
+          let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
+          let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
+          blocks.append("## " + label + "\n" + text.stderr + json.stdout)
+          #expect(!error.message.contains("Private body"))
+        }
+      }
+      Golden.forTests().check(blocks.joined(separator: "\n"), "doc-store-errors.txt")
+    }
+  }
+
   static func snapshot(_ store: DatabaseStore) throws -> [[String]] {
     try store.read { (db: Database) throws in
       try ["doc", "doc_rev", "doc_verification", "link", "change_log", "meta"].map {

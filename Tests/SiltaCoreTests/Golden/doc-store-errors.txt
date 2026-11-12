@@ -1,0 +1,14 @@
+## missing metadata
+error: A doc with no accepted revision requires: --title, --about. [usage]
+next: silta ws show
+{"error":{"code":"usage","message":"A doc with no accepted revision requires: --title, --about.","next":["silta ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## empty attachments
+error: A doc needs at least one --about map item. [invalid]
+next: silta ws show
+{"error":{"code":"invalid","message":"A doc needs at least one --about map item.","next":["silta ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+
+## missing doc
+error: Doc missing not found. [not_found]
+next: silta ws show
+{"error":{"code":"not_found","message":"Doc missing not found.","next":["silta ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
