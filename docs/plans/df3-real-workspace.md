@@ -55,7 +55,7 @@ the numbers; the maintainer decides them.
 | E2 | Does the maintainer explain less? | Check-in tally, compared with the week without the hook | Keep the hook only if the tally is lower with it than without |
 | E3 | Do agents use Silta correctly without reminders? | Logs: calls per session, `usage` error rate, retry loops | Fix guide text if `usage` errors exceed 10% of calls |
 | E4 | What does it cost? | Logs (hook ms, approvals per week); check-in question 3 | Change whatever the maintainer names twice as nearly making them stop |
-| E5 | Does the workspace data stay current? | Gap list at weeks 0, 2 and 6 | Rethink upkeep if gaps grow between reviews |
+| E5 | Does the workspace data stay current? | Gap list at weeks 0, 2 and 6; `Map gap:` lines agents left while the maintainer was away | Rethink upkeep if gaps grow between reviews; build map proposals ([workspace knowledge](workspace-knowledge.md)) if `Map gap:` lines wait on the maintainer most weeks |
 
 `code` calls per cross-repo task are counted for §23 Q8, which owns that decision.
 Counts are normalised per agent session and per active day.
