@@ -29,9 +29,7 @@ struct StoredEdgeCodeContextTests {
       let text = context.sections.map(\.text).joined()
       let expected =
         "next: silta --ws 'acme' code show '\(owner)' --lines 2-4 -- 'src/Push.swift'\n"
-      withKnownIssue {
-        #expect(text.contains(expected))
-      }
+      #expect(text.contains(expected))
       #expect(try store.read { try String.fetchOne($0, sql: "SELECT code_refs FROM edge") } == refs)
     }
   }

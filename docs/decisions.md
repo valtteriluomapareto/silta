@@ -701,3 +701,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   has no unlink recovery. The internal resolver serves doc attachments, whose
   accepted set can be replaced. Typed task prefixes refuse instead of falling
   back to code; explicit `code:` retains legacy app access.
+
+  Stored `edge.code_refs` already identify code. Their read boundary preserves
+  existing implicit values, including reserved app names and explicit branches,
+  without rewriting storage. The explicit-prefix requirement applies to generic
+  reference input.

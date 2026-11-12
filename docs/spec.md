@@ -205,7 +205,8 @@ Map refs encode service slugs and edge kinds with uppercase UTF-8 `%HH`, leaving
 ASCII letters, digits, `_` and `-` literal. Input must match its decoded value's
 canonical encoding exactly. A literal percent sign is encoded too; service edge
 targets retain their `service:` discriminator. Typed prefixes never fall back to
-code refs when missing or unsupported by a command.
+code refs when missing or unsupported by a command. Stored code fields are
+already typed as code and keep interpreting retained implicit values.
 
 `silta guide refs` prints this table. Reference examples are checked against the core resolver.
 

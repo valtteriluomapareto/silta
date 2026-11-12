@@ -106,9 +106,11 @@ struct BriefContext {
   }
 
   private func codeCommand(_ raw: String, workspace: Int64) throws -> String {
+    // The configured field already identifies code; retain its stored spelling.
+    let reference = raw.hasPrefix("code:") ? raw : "code:" + raw
     let value =
       try TaskLinkTarget.code(
-        raw, workspace: workspace, in: db
+        reference, workspace: workspace, in: db
       ).external ?? ""
     let parts = value.split(separator: ":", maxSplits: 1)
     let file = parts[1].split(separator: "#", maxSplits: 1)
