@@ -1,0 +1,3 @@
+error: Use code: for code in apps named doc, edge or service. [invalid]
+next: silta task link --help
+{"error":{"code":"invalid","message":"Use code: for code in apps named doc, edge or service.","next":["silta task link --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

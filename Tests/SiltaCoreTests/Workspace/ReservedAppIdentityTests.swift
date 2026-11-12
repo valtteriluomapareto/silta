@@ -51,6 +51,7 @@ struct ReservedAppIdentityTests {
       let service = TaskService(
         environment: try TaskServiceTests.environment(home), workspace: "acme")
       _ = try service.link("AC-1", target: "code:\(slug):src/Acme.swift")
+      _ = try service.link("AC-1", target: "code:\(slug)@feature/x:src/Branch.swift")
       let linked = try service.show("AC-1").links
       #expect(linked.contains { $0.target == "code:\(slug):src/Acme.swift" })
       do {
@@ -59,6 +60,14 @@ struct ReservedAppIdentityTests {
       } catch let error as any CodedError {
         #expect(error.code == (slug == "doc" ? .notFound : .invalid))
         if slug == "edge" { Self.check(error, golden: "task-map-target-error.txt") }
+      }
+      do {
+        _ = try service.link("AC-1", target: "\(slug)@feature/x:src/Implicit.swift")
+        Issue.record("Reserved app at an explicit branch accepted implicit code")
+      } catch let error as any CodedError {
+        #expect(error.code == .invalid)
+        #expect(error.next == ["silta task link --help"])
+        if slug == "doc" { Self.check(error, golden: "reserved-code-prefix-error.txt") }
       }
       #expect(try service.show("AC-1").links == linked)
       let files = try ExportTreeTests.render(store)
