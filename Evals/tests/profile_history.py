@@ -6,7 +6,10 @@ HISTORY_FILES = {
         'backups/.claude.json', 'debug/session.log', 'todos/tasks.json', 'tasks/session/tasks.json',
         'plans/plan.md', 'session-env/session.env', 'paste-cache/paste.txt', 'file-history/session/file.txt',
         'shell-snapshots/shell.sh', 'cache/changelog.md', 'statsig/cache.json', 'telemetry/events.json',
-        '.cache/data.json', 'stats-cache.json', 'skills/remember/SKILL.md',
+        '.cache/data.json', 'stats-cache.json', 'skills/remember/SKILL.md', 'sessions/answer.jsonl',
+        'plugins/data/answer.json', '.last-cleanup', 'policy-limits.json', 'policy-limits.json.signature.json',
+        'policy-limits.json.stamp.json', 'remote-settings.json', 'remote-settings.json.signature.json',
+        'remote-settings.json.synced-at',
     ),
     'codex': (
         'history.jsonl', 'sessions/answer.jsonl', 'archived_sessions/answer.jsonl', 'session_index.jsonl',
