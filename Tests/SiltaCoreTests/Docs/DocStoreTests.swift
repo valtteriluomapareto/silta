@@ -52,7 +52,7 @@ struct DocStoreTests {
         try store.read {
           try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='change_seq'")
         } == (sequence ?? 0) + 1)
-      try store.read { db in
+      try store.read { (db: Database) throws in
         let old = try DocStore.revision("push-rules", revision: 1, workspace: 1, in: db)
         #expect(old.body == "Keep unknown categories visible." && old.about == first.about)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_verification") == 2)
@@ -163,7 +163,7 @@ struct DocStoreTests {
           sql: "ALTER TABLE doc ADD COLUMN future TEXT; UPDATE doc SET owner='acme',future='keep';")
       }
       _ = try Self.accept(DocDraft(slug: "push-rules", body: "A newer rule"), in: store, ids: ids)
-      try store.read { db in
+      try store.read { (db: Database) throws in
         let old = try DocStore.revision("push-rules", revision: 1, workspace: 1, in: db)
         #expect(old.title == nil && old.kind == nil && old.about == nil)
         #expect(old.body == "Original rule.")
@@ -177,7 +177,7 @@ struct DocStoreTests {
   }
 
   static func snapshot(_ store: DatabaseStore) throws -> [[String]] {
-    try store.read { db in
+    try store.read { (db: Database) throws in
       try ["doc", "doc_rev", "doc_verification", "link", "change_log", "meta"].map {
         try Row.fetchAll(db, sql: "SELECT * FROM \($0) ORDER BY rowid").map(\.description)
       }

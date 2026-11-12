@@ -24,7 +24,7 @@ struct DocAttachmentRecoveryTests {
       try AcmeDocAttachments.apply(
         AcmeDocAttachments.yaml().replacingOccurrences(of: "kind: sdk", with: "kind: http-api"),
         to: store)
-      try store.read { db in
+      try store.read { (db: Database) throws in
         #expect(try String.fetchAll(db, sql: "SELECT kind FROM edge") == ["http-api"])
         #expect(
           try DocStore.revision("rules", revision: 1, workspace: 1, in: db).about == [
