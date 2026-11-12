@@ -1051,7 +1051,7 @@ def backend_read_metrics(e):
     for phase in e.get('phases', []):
         for command, call in command_calls(phase):
             parsed = shell_program(phase, command, call)
-            for argv in parsed.invocations:
+            for argv in parsed.proven_commands:
                 args = normalized_silta(argv)
                 if (len(args) >= 4 and args[:2] == ['silta', 'code']
                         and args[2] in ('show', 'grep', 'ls', 'log')

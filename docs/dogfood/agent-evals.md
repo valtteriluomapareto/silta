@@ -203,8 +203,8 @@ working tree is on `legacy/push-v1`; both define `api/push_category.md` differen
 Setup fetches main from a local bare origin through `silta repo fetch`, so code
 reads have recorded fetch freshness.
 
-Each trial reports `silta_backend_reads` (literal backend `code show/grep/ls/log`
-invocations, including chains and failed attempts), `direct_backend_reads`
+Each trial reports `silta_backend_reads` (proven literal backend `code show/grep/ls/log`
+invocations, including reachable chains and failed attempts), `direct_backend_reads`
 (proven shell read invocations), and `possible_direct_backend_reads` (recognized
 backend reads in uncertain shell segments). One invocation counts once regardless
 of path count. These are observed lower bounds: native file tools, opaque programs

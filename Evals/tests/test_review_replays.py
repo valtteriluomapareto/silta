@@ -235,16 +235,24 @@ class NativeLifecycle(unittest.TestCase):
                     phase = dict(parsed, logs=[], state={'files':{}})
                     self.assertTrue(evals.forbidden({'approval':None, 'phases':[phase], 'baseline':{'files':{}}}))
 
-    def test_backend_proof_rejects_shell_composition_and_substitution(self):
-        output = json.dumps({'data':{'app':'acme-backend','sha':'a'*40,'output':'invented'}})
+    def test_backend_metrics_reject_unattributed_shell_effects_and_output_claims(self):
+        from test_outcome_grading import evidence, record, MAIN
         base = 'silta --ws acme code grep acme-backend --json -- PushCategory'
-        for command in [base + '; printf invented', base + ' && printf invented',
-                        base + ' >/tmp/result', base + ' $(printf invented)',
-                        base + ' `printf invented`']:
+        for command, expected in [
+                (base, 1), (base + '; printf invented', 1),
+                (base + ' && printf invented', 1),
+                (base + ' >/tmp/result', 0), (base + ' $(printf invented)', 0),
+                (base + ' `printf invented`', 0),
+                ('/bin/zsh -lc ' + shlex.quote(base), 1)]:
             with self.subTest(command=command):
-                self.assertFalse(evals.backend_result({'command':command, 'exit':0, 'output':output}))
-        self.assertTrue(evals.backend_result({'command':'/bin/zsh -lc ' + shlex.quote(base),
-                                             'exit':0, 'output':output}))
+                e = evidence()
+                phase = e['phases'][0]
+                phase['commands'] = [command]
+                phase['tool_results'] = [{'command': command, 'exit': 0, 'output': MAIN}]
+                self.assertEqual(evals.backend_read_metrics(e)['silta_backend_reads'], expected)
+                self.assertFalse(evals.backend_context(e), 'Tool output cannot replace recorded context')
+                record(e, MAIN)
+                self.assertTrue(evals.backend_context(e), 'Outcome is independent of read method')
 
     def test_tool_lifecycle_rejects_missing_or_mismatched_native_evidence(self):
         import copy
