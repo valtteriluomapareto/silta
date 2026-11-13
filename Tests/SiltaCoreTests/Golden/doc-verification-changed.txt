@@ -1,3 +1,3 @@
-error: Document attachments or app configuration changed; prepare the write again. [conflict]
+error: Document metadata or app configuration changed; prepare the write again. [conflict]
 next: silta --ws 'acme' ws show
-{"error":{"code":"conflict","message":"Document attachments or app configuration changed; prepare the write again.","next":["silta --ws 'acme' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"conflict","message":"Document metadata or app configuration changed; prepare the write again.","next":["silta --ws 'acme' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -11,9 +11,19 @@ struct DocStore {
 
   var db: Database { transaction.database }
 
+  /// Requires pre-write evidence; changed bindings refuse before any row mutation.
   func accept(_ draft: DocDraft, verification: DocVerification) throws -> DocRevision {
     let old = try find(draft.slug)
-    let metadata = try DocMetadata.resolve(draft, workspace: workspace, in: db)
+    let metadata: DocMetadata
+    do {
+      metadata = try DocMetadata.resolve(draft, workspace: workspace, in: db)
+    } catch let error as any CodedError where [.usage, .invalid, .notFound].contains(error.code) {
+      throw DocError.changed(workspace: verification.binding.workspace)
+    }
+    let current = try DocVerification.binding(metadata, workspace: workspace, in: db)
+    guard verification.matches(current) else {
+      throw DocError.changed(workspace: verification.binding.workspace)
+    }
     let stamp = utcTimestamp(at)
     let id = try docID(draft, metadata: metadata, old: old, stamp: stamp)
     let number = try nextRevision(id, slug: draft.slug)

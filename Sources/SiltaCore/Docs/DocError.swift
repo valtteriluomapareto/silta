@@ -3,12 +3,14 @@ enum DocError: CodedError {
   case missing([String])
   case invalid(String)
   case notFound(String)
+  case changed(workspace: String)
 
   var code: ErrorCode {
     switch self {
     case .missing: .usage
     case .invalid: .invalid
     case .notFound: .notFound
+    case .changed: .conflict
     }
   }
 
@@ -18,8 +20,14 @@ enum DocError: CodedError {
       "A doc with no accepted revision requires: " + fields.joined(separator: ", ") + "."
     case .invalid(let reason): reason
     case .notFound(let ref): "Doc " + TaskError.shown(ref) + " not found."
+    case .changed: "Document metadata or app configuration changed; prepare the write again."
     }
   }
 
-  var next: [String] { ["silta ws show"] }
+  var next: [String] {
+    if case .changed(let workspace) = self {
+      return [workspaceCommand("silta ws show", workspace: workspace)]
+    }
+    return ["silta ws show"]
+  }
 }
