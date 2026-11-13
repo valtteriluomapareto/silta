@@ -133,6 +133,29 @@ struct RestoreDocumentCommandTests {
     }
   }
 
+  @Test func committedSnapshotPathIsMaskedInJSON() throws {
+    try withScratchDirectory { scratch in
+      try Self.seed(scratch)
+      let directory = try Self.export(scratch)
+      let secret = "ghp_" + String(repeating: "x", count: 36)
+      let home = scratch.appending(path: secret)
+      try FileManager.default.moveItem(at: scratch.appending(path: "silta-home"), to: home)
+      let result = try SiltaBinary.run(
+        ["restore", directory.path, "--approved", "Restore these rules", "--json"], in: scratch,
+        environment: RestoreCommandTests.agent.merging(["SILTA_HOME": home.path]) { _, new in new })
+      #expect(result.termination == .exit(0), "\(result.stderr)\(result.stdout)")
+      #expect(!result.stdout.contains(secret))
+      let object = try #require(
+        try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+      let data = try #require(object["data"] as? [String: Any])
+      let snapshot = try #require(data["snapshot"] as? String)
+      #expect(snapshot.contains("[REDACTED:github_pat]"))
+      #expect(
+        !(try FileManager.default.contentsOfDirectory(atPath: home.appending(path: "backups").path))
+          .isEmpty)
+    }
+  }
+
   private static func digest(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
