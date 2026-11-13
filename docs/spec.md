@@ -1513,8 +1513,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     includes `doc_revision_allocations.jsonl` and `doc_comment_sequences.jsonl`,
     even when empty. Their record counts and the doc/revision/verification counts
     are present in the manifest; format 1 does not add these files or count keys.
-    Document data and reserved revision history remain refused until their complete
-    codecs and transactional restore are available.
+    Exports and restores refuse document data and reserved revision history.
   - **Values.** Every value is a double-quoted string, integers in decimal; a NULL
     column is left out. Only `"`, `\`, controls (U+0000–U+001F, U+007F–U+009F),
     U+2028, U+2029, U+FEFF, U+FFFE and U+FFFF are escaped: `\"`, `\\`, `\n`, `\r`,
