@@ -2,7 +2,7 @@ import Foundation
 
 extension RestoreDocumentGraph {
   func links() throws {
-    var identities: Set<[String]> = []
+    var identities: Set<[Data]> = []
     for link in tree.links {
       guard ["task", "doc", "comment"].contains(link.value("from_kind") ?? ""),
         let kind = link.value("to_kind"), link.value("uid") != nil,
@@ -30,7 +30,7 @@ extension RestoreDocumentGraph {
       let identity =
         ["from_kind", "from", "rel", "to_kind"].map { link.value($0) ?? "" }
         + [link.value("to") ?? link.value("to_ext") ?? "", revision, link.value("anchor") ?? ""]
-      guard identities.insert(identity).inserted else {
+      guard identities.insert(identity.map { Data($0.utf8) }).inserted else {
         throw invalid("a typed link identity appears twice")
       }
     }

@@ -1,0 +1,3 @@
+error: Not an unchanged silta export tree: current document metadata differs from its accepted revision. Nothing was restored. [invalid]
+ask human: silta --ws 'acme' export  # again, on the machine the tree came from
+{"error":{"code":"invalid","message":"Not an unchanged silta export tree: current document metadata differs from its accepted revision. Nothing was restored.","next":["silta --ws 'acme' export  # again, on the machine the tree came from"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
