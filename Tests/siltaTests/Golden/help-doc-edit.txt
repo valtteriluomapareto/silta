@@ -4,8 +4,8 @@ Supply UTF-8 Markdown with -F, or preserve the accepted body with --keep-body.
 New docs require --title and --about; supplied about refs replace the whole set.
 Input is at most 65536 bytes. Kind stays fixed unless --kind is explicit.
 Use silta guide recipes for editing rules.
-Create: silta --ws acme doc edit rules --title Rules --about service:push -F rules.md
-Preserve: silta --ws acme doc edit rules --keep-body --about topic:messaging
+Create (human): silta --ws acme doc edit rules --title Rules --about service:push -F rules.md
+Preserve (human): silta --ws acme doc edit rules --keep-body --about topic:messaging
 
 USAGE: silta doc edit [<options>] <slug>
 
