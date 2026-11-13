@@ -177,7 +177,7 @@ struct DocWritePolicyTests {
       do {
         _ = try await Self.service(home, store).edit(DocEditRequest(slug: "rules")) { "New" }
         Issue.record("Late approval failure did not roll back")
-      } catch { #expect(error is DatabaseError) }
+      } catch { #expect((error as? StorageError) == .constraintViolation) }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
@@ -232,7 +232,10 @@ extension DocWritePolicyTests {
         beforeRequest: { _ in
           if keep {
             try store.write {
-              try $0.database.execute(sql: "UPDATE doc_rev SET uid='new-baseline'")
+              try $0.database.execute(
+                sql:
+                  "UPDATE doc_rev SET uid='new-baseline' WHERE doc_id=(SELECT id FROM doc WHERE slug='rules')"
+              )
             }
           } else {
             try store.write { _ in }
