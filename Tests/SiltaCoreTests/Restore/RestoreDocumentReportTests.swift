@@ -78,6 +78,22 @@ struct RestoreDocumentReportTests {
     #expect(Self.report(before, after).removedDocs.isEmpty)
   }
 
+  @Test(arguments: ["title", "kind", "owner"])
+  func documentProjectionChangesCompareLiteralBytes(_ key: String) throws {
+    var before = try RestoreDocumentGraphFixture.graph().tree
+    if key != "owner" {
+      RestoreDocumentGraphFixture.record(&before.documents, 1, key, nil)
+    }
+    before.documents.documents[0].row = before.documents.documents[0].row.replacing(
+      key, with: "caf\u{e9}", keys: ExportFormat.docKeys)
+    var after = before
+    after.documents.documents[0].row = after.documents.documents[0].row.replacing(
+      key, with: "cafe\u{301}", keys: ExportFormat.docKeys)
+    #expect(
+      before.documents.documents[0].row.value(key) == after.documents.documents[0].row.value(key))
+    #expect(Self.report(before, after).changedDocs == ["doc:push-rules"])
+  }
+
   @Test func canonicallyEquivalentUIDsRemainDifferentIdentities() throws {
     var before = try RestoreDocumentGraphFixture.graph().tree
     before.documents.documents[0].row = before.documents.documents[0].row.replacing(
