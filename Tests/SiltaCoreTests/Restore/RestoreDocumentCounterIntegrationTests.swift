@@ -10,7 +10,7 @@ struct RestoreDocumentCounterIntegrationTests {
   @Test func counterOnlyPublicRoundtripKeepsAbsentNamesAndOldReservations() throws {
     try withScratchDirectory { scratch in
       let sourceHome = scratch.appending(path: "source")
-      let source = try RestoreDocumentIntegrationTests.source(sourceHome)
+      let source = try RestoreDocumentFixture.source(sourceHome)
       try source.write {
         try $0.database.execute(
           sql: """
@@ -57,7 +57,7 @@ struct RestoreDocumentCounterIntegrationTests {
   @Test func exhaustedDestinationHistorySurvivesPublicOlderRestore() throws {
     try withScratchDirectory { scratch in
       let sourceHome = scratch.appending(path: "source")
-      let source = try RestoreDocumentIntegrationTests.source(sourceHome)
+      let source = try RestoreDocumentFixture.source(sourceHome)
       let directory = try RestoreDocumentIntegrationTests.publish(
         source, home: sourceHome, to: scratch.appending(path: "out"))
       let home = scratch.appending(path: "target")

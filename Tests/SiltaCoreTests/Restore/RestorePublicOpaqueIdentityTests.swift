@@ -71,7 +71,7 @@ struct RestorePublicOpaqueIdentityTests {
         try $0.database.execute(sql: "UPDATE doc SET uid=? WHERE id=92", arguments: [uid])
       }
       var tree = try RestoreDocumentGraphFixture.graph().tree
-      RestoreDocumentTamperTests.renameUID(&tree, from: ExportDocumentTests.uid("001"), to: uid)
+      RestoreOpaqueIdentityFixture.rename(&tree, from: ExportDocumentTests.uid("001"), to: uid)
       try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
       let files = try tree.files()
       #expect(try #require(files["docs/push-rules.md"]).range(of: Data(uid.utf8)) != nil)

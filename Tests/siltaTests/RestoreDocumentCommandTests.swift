@@ -6,32 +6,6 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreDocumentCommandTests {
-  static func seed(_ scratch: URL, workspace: String = "acme", slug: String = "rules") throws {
-    try ExportCommandTests.seed(scratch)
-    try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path).write { db in
-      try db.execute(sql: "UPDATE workspace SET slug=?", arguments: [workspace])
-      try db.execute(
-        sql: """
-          INSERT INTO service(id,uid,workspace_id,slug,name)
-          VALUES(400,'delivery-service',1,'delivery','Delivery');
-          INSERT INTO doc(id,uid,workspace_id,slug,title,kind,current_rev,created_at,updated_at)
-          VALUES(100,'policy-doc',1,:slug,'Policy','contract',1,'','');
-          INSERT INTO doc_rev(id,uid,doc_id,rev,body_md,state,actor,created_at,title,kind,
-            about_refs,source_task_id)
-          VALUES(200,'policy-rev',100,1,'Original rule.','accepted','human:acme','','Policy',
-            'contract','["service:delivery"]',(SELECT id FROM task WHERE seq=1));
-          INSERT INTO doc_verification(uid,doc_rev_id,actor,app_shas,created_at)
-          VALUES('policy-verification',200,'human:acme','[]','');
-          INSERT INTO comment(uid,doc_rev_id,seq,kind,body_md,actor,created_at)
-          VALUES('policy-comment',200,1,'comment','Keep this.','human:acme','');
-          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
-            created_by,created_at)
-          VALUES('policy-about',1,'doc',100,'about','service',400,'human:acme','');
-          INSERT INTO seq_counter(scope,next)
-          VALUES('doc_rev:1:'||:slug,2),('comment:doc_rev:200',2);
-          """, arguments: ["slug": slug])
-    }
-  }
 
   static func export(_ scratch: URL, workspace: String = "acme") throws -> URL {
     let result = try SiltaBinary.run(["--ws", workspace, "export", "--to", "out"], in: scratch)
@@ -41,7 +15,7 @@ struct RestoreDocumentCommandTests {
 
   @Test func nonzeroDocumentDryRunMatchesTextAndJSONContract() throws {
     try withScratchDirectory { scratch in
-      try Self.seed(scratch)
+      try RestoreDocumentCommandFixture.seed(scratch)
       _ = try Self.export(scratch)
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
       try queue.write {
@@ -56,7 +30,7 @@ struct RestoreDocumentCommandTests {
             INSERT INTO seq_counter(scope,next) VALUES('doc_rev:1:removed-rules',8);
             """)
       }
-      let before = try Self.dump(queue)
+      let before = try RestoreDocumentCommandFixture.dump(queue)
       for json in [false, true] {
         let result = try SiltaBinary.run(
           ["restore", "out/acme", "--dry-run"] + (json ? ["--json"] : []), in: scratch)
@@ -64,7 +38,7 @@ struct RestoreDocumentCommandTests {
         Golden.forTests().check(
           RestoreCommandTests.masked(result.stdout, scratch),
           json ? "restore-docs-dry-run.json" : "restore-docs-dry-run.txt")
-        #expect(try Self.dump(queue) == before)
+        #expect(try RestoreDocumentCommandFixture.dump(queue) == before)
       }
       let restored = try SiltaBinary.run(
         ["restore", "out/acme", "--approved", "yes, restore the docs"], in: scratch,
@@ -86,7 +60,7 @@ struct RestoreDocumentCommandTests {
     try withScratchDirectory { scratch in
       let workspace = target == "workspace" ? name : "acme"
       let slug = target == "doc" ? name : "rules"
-      try Self.seed(scratch, workspace: workspace, slug: slug)
+      try RestoreDocumentCommandFixture.seed(scratch, workspace: workspace, slug: slug)
       let directory = try Self.export(scratch, workspace: workspace)
       let path = directory.appending(path: "docs/" + slug + ".jsonl")
       let original = try Data(contentsOf: path)
@@ -104,7 +78,7 @@ struct RestoreDocumentCommandTests {
           .utf8
       ).write(to: manifest)
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
-      let before = try Self.dump(queue)
+      let before = try RestoreDocumentCommandFixture.dump(queue)
       var output = ""
       for json in [false, true] {
         let result = try SiltaBinary.run(
@@ -125,7 +99,7 @@ struct RestoreDocumentCommandTests {
           }
         }
         output += result.stderr + result.stdout
-        #expect(try Self.dump(queue) == before)
+        #expect(try RestoreDocumentCommandFixture.dump(queue) == before)
       }
       if target == "workspace", name.hasPrefix("ghp_") {
         Golden.forTests().check(output, "restore-docs-unsafe-scope.txt")
@@ -135,7 +109,7 @@ struct RestoreDocumentCommandTests {
 
   @Test func committedSnapshotPathIsMaskedInJSON() throws {
     try withScratchDirectory { scratch in
-      try Self.seed(scratch)
+      try RestoreDocumentCommandFixture.seed(scratch)
       let directory = try Self.export(scratch)
       let secret = "ghp_" + String(repeating: "x", count: 36)
       let home = scratch.appending(path: secret)
@@ -160,16 +134,4 @@ struct RestoreDocumentCommandTests {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
-  private static func dump(_ queue: DatabaseQueue) throws -> [String: [String]] {
-    try queue.read { db in
-      var result: [String: [String]] = [:]
-      for table in try String.fetchAll(
-        db, sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-      {
-        result[table] = try Row.fetchAll(db, sql: "SELECT * FROM \(table)").map(\.description)
-          .sorted()
-      }
-      return result
-    }
-  }
 }

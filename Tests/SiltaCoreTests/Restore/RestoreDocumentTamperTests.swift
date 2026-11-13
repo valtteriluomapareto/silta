@@ -85,7 +85,7 @@ struct RestoreDocumentTamperTests {
         old = ExportDocumentTests.uid("040")
         new = "foreign-task-comment"
       }
-      Self.renameUID(&tree, from: old, to: new)
+      RestoreOpaqueIdentityFixture.rename(&tree, from: old, to: new)
       try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
       let directory = try RestoreSupport.write(
         tree.files(), to: scratch.appending(path: "tree/acme"))
@@ -147,28 +147,4 @@ struct RestoreDocumentTamperTests {
     }
   }
 
-  static func renameUID(_ tree: inout ExportSnapshot, from old: String, to new: String) {
-    func row(_ original: ExportRow) -> ExportRow {
-      var result = original
-      for index in result.fields.indices
-      where ["uid", "doc_rev", "thread", "from", "to", "source_task"].contains(
-        result.fields[index].key)
-      {
-        if result.fields[index].value.utf8.elementsEqual(old.utf8) {
-          result.fields[index].value = new
-        }
-      }
-      return result
-    }
-    for index in tree.tasks.indices {
-      tree.tasks[index].row = row(tree.tasks[index].row)
-      tree.tasks[index].records = tree.tasks[index].records.map(row)
-    }
-    for index in tree.documents.documents.indices {
-      tree.documents.documents[index].row = row(tree.documents.documents[index].row)
-      tree.documents.documents[index].records = tree.documents.documents[index].records.map(row)
-    }
-    tree.documents.commentSequences = tree.documents.commentSequences.map(row)
-    tree.links = tree.links.map(row)
-  }
 }
