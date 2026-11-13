@@ -13,6 +13,7 @@ package struct BriefSection: Encodable, Equatable, Sendable {
 
   var beforeTask = false
   var truncated = false
+  var documents: [BriefDocGroup] = []
 
   enum CodingKeys: String, CodingKey { case id, text }
 }
