@@ -105,6 +105,10 @@ package struct ExportSnapshot: Equatable, Sendable {
       ExportFormat.aliasDecisionsFile: ExportFormat.jsonl(aliasDecisions),
       ExportFormat.approvalsFile: ExportFormat.jsonl(approvals),
     ]
+    if format == "2" {
+      files[ExportFormat.docAllocationsFile] = ""
+      files[ExportFormat.docCommentSequencesFile] = ""
+    }
     for task in tasks {
       files["tasks/\(task.ref).md"] = Self.markdown(task.row)
       files["tasks/\(task.ref).jsonl"] = ExportFormat.jsonl(task.records)

@@ -39,7 +39,7 @@ struct BriefCommand: OutputCommand {
       "Positive token budget, estimated as rendered characters / 4; "
         + "default is 2500, or 800 with --short/--hook."))
   var budget: Int?
-  @Flag(help: "Use an 800-token brief.") var short = false
+  @Flag(help: "Show doc counts; default budget is 800 tokens.") var short = false
   @Flag(help: "Read bounded session-start context, silently ignoring errors.") var hook = false
   var appSlug: String? { app }
 
@@ -50,7 +50,7 @@ struct BriefCommand: OutputCommand {
     let report = try await BriefService(environment: context.environment).resolve(
       path: URL(filePath: FileManager.default.currentDirectoryPath), workspace: global.ws,
       app: app, task: task, topics: topic, budget: budget ?? (short || hook ? 800 : 2500),
-      hook: hook)
+      short: short, hook: hook)
     return CommandOutput(
       text: report.text, quiet: report.text, data: report, warnings: report.warnings
     )

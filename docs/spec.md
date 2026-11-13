@@ -950,7 +950,40 @@ It lists:
   resolved threads, strictly newer than the holder's own last write (`claimed_at`);
   foreign writes and reads do not advance this attention boundary
 
-## 9. Docs (M2)
+## 9. Docs
+
+`doc show <slug|doc:slug|doc:slug@N> [--rev N] [--lines N|A-B]` reads
+stored revision metadata and markdown. The default is the current accepted revision;
+without one it lists up to 20 pending revision refs and points to `doc ls` for more.
+An explicit revision can be proposed, rejected, superseded or archived. Historical
+NULL metadata is shown as unknown, without resolving historical map targets or
+substituting current metadata. A conflicting reference revision and `--rev` is usage.
+
+`doc ls [--about <canonical-map-ref>] [--archived] [--offset N] [--limit N]`
+lists current accepted and individual pending revisions, ordered by slug then revision.
+The default page has 20 entries, with a maximum of 100. Accepted entries match current
+live attachments; pending entries match either the current attachment or their stored
+proposal snapshot. Archived documents require `--archived` in lists, but explicit reads
+remain available. Unknown snapshot attachments stay unknown.
+
+Reads mask secrets before rendering, clipping or line selection. Show defaults to at
+most 400 rendered lines including its continuation. List title and metadata previews
+are at most 120 characters each, with omitted-character counts and a pinned show
+command. Complete continuation commands preserve the workspace, selected revision and
+list filters. JSON show data is `{ref,output}`; list data is
+`{entries:[{ref,state,output}],total,offset,limit,next?}`. JSON carries the same bounded
+masked view as text, without hidden body or metadata fields.
+Document identities are masked in both text and JSON. Safe canonical refs remain
+copyable, including identifier exemptions from the secret scanner. Unsafe refs use a
+scoped `doc ls` recovery, without show-only flags or redacted nonfunctional commands.
+Pending-only reads follow the same rendered-line selection as accepted revisions.
+A sensitive workspace name recovers through `silta ws ls`, selecting scope explicitly
+before a document query and omitting document-specific filters and flags.
+Percent-encoded attachment refs are inspected as decoded text for secrets; safe refs
+retain their canonical spelling. A credential-bearing list filter is omitted from
+recovery: its continuation restarts the broader scoped list without a filter or offset.
+
+The following document write and review design is planned:
 
 - Bodies are markdown with `[[ref]]` links (§5.1), parsed into `link` rows when a
   revision is accepted.
@@ -1366,8 +1399,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
    the resolved worktree's repo root with its on-disk casing, including for subpath apps,
    only when that file exists.
-5. **Neighbours**: edges in and out, ordered by source app, target app, target
-   service, kind and edge id. Configured code references produce complete, quoted
+5. **Neighbours**: edges in and out, printed with their canonical `edge:` refs and
+   ordered by source app, target app, target service, kind and edge id. Configured code references produce complete, quoted
    `silta code show …` commands, including ref and line selection. With no usable
    code references, offer `silta code ls` on the other app. Service edges omit a
    redundant directory command for the current app. Repeated code commands appear
@@ -1391,7 +1424,19 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    when an archive override keeps it, and a
    body-free `closed_at_unreadable` warning counts such tasks; it never fails the brief.
 8. **Decisions** (not yet shown): `decision` comments, plus decisions from meeting notes from M3.
-9. **Docs** (M2): titles, plus stale flags.
+9. **Docs**: current accepted, nonarchived docs appear beside their app, edge or
+   service. Docs about the selected task's topics and explicit `--topic` selections
+   appear before the glossary. Full mode shows at most two slug/kind/summary rows
+   per item, ranking matching task/selected topics then slug. The summary is the
+   first nonempty nonheading line, at most 120 characters; masking precedes selection
+   and clipping. Remaining docs have a count and scoped `doc ls --about` command.
+   Short/hook mode shows counts only and does not read revision bodies. Explicit
+   `--short` keeps these semantics even with a larger `--budget`.
+   Document annotations use spare space after the ordinary brief is fitted and at
+   most 20% of its character budget, including headers and complete recovery commands.
+   Whole annotations degrade to counts or are omitted; they never displace retained
+   baseline content or open tasks. Omitted rows/annotations keep `truncated` truthful.
+   Secret-bearing map refs are masked and use an unfiltered scoped `doc ls` recovery.
 10. **Glossary**: aliases of the topics shown.
 
 Output ends with one `more:` line per complete command, e.g. `more: silta brief --task AC-15`
@@ -1853,8 +1898,8 @@ silta inbox take [M2]
 
 # docs
 silta doc new [M2]
-silta doc ls [M2]
-silta doc show [M2]
+silta doc ls
+silta doc show
 silta doc edit [M2]
 silta doc propose [M2]
 silta doc accept [M2]
