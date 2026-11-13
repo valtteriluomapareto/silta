@@ -35,7 +35,7 @@ struct RestoreRefusalTests {
   static let damages: [Damage] = [
     .init("flipped byte", .invalid, "tasks/AC-2.md", "Waiting.", "Waiting!", rehash: false),
     .init(
-      "future format", .invalid, "manifest.json", #""format": "2""#, #""format": "3""#,
+      "future format", .env, "manifest.json", #""format": "2""#, #""format": "3""#,
       rehash: false),
     .init(
       "newer schema", .env, "manifest.json", #""schema": "v7""#, #""schema": "v99""#,

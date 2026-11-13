@@ -23,16 +23,14 @@ struct ExportFormatRecoveryTests {
       _ = try ExportTree.parse(Self.files(format: format))
       Issue.record("Restored an unsupported future format")
     } catch let error as ExportError {
-      withKnownIssue("Future formats ask for another incompatible export") {
-        #expect(error.code == .env)
-        #expect(error.nextBy == .human)
-        #expect(error.next == ["update silta"])
-        if format == "3" {
-          let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
-          let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
-          #expect(text.exitCode == 9 && json.exitCode == 9)
-          Golden.forTests().check(text.stderr + json.stdout, "export-newer-format-error.txt")
-        }
+      #expect(error.code == .env)
+      #expect(error.nextBy == .human)
+      #expect(error.next == ["update silta"])
+      if format == "3" {
+        let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
+        let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
+        #expect(text.exitCode == 9 && json.exitCode == 9)
+        Golden.forTests().check(text.stderr + json.stdout, "export-newer-format-error.txt")
       }
     }
   }
@@ -66,10 +64,8 @@ struct ExportFormatRecoveryTests {
         _ = try RestoreSupport.restore(tree, into: store, home: home, dryRun: dryRun)
         Issue.record("Restored an unsupported future format")
       } catch let error as ExportError {
-        withKnownIssue("Future formats ask for another incompatible export") {
-          #expect(error.code == .env)
-          #expect(error.next == ["update silta"])
-        }
+        #expect(error.code == .env)
+        #expect(error.next == ["update silta"])
       }
       #expect(try RestoreSupport.backups(home) == backups)
       if initialized {

@@ -10,6 +10,8 @@ package enum ExportError: CodedError, Equatable {
   case insideRepo(path: String, repo: String, workspace: String)
   /// The workspace holds data this binary can't export yet.
   case unsupported(String)
+  /// The tree uses a canonical format version newer than this reader supports.
+  case newerFormat
   /// The tree could not be written under the root.
   case unwritable(path: String, workspace: String)
   /// The new tree could not be put in place and the previous one could not be moved
@@ -39,7 +41,9 @@ package enum ExportError: CodedError, Equatable {
     case .busy: .busy
     case .notAnExport, .restoreConflict, .manifestChanged: .conflict
     case .insideRepo, .invalidTree, .notATree, .otherWorkspace, .notWorkTree: .invalid
-    case .unsupported, .unwritable, .previousKept, .gitFailed, .publicationUnconfirmed: .env
+    case .unsupported, .newerFormat, .unwritable, .previousKept, .gitFailed,
+      .publicationUnconfirmed:
+      .env
     }
   }
 
@@ -76,6 +80,8 @@ package enum ExportError: CodedError, Equatable {
         + "so export changed nothing."
     case .unsupported(let what):
       "This workspace has \(what), which this version of silta can't export; nothing was written."
+    case .newerFormat:
+      "This export uses a newer format than this version of silta can read; nothing was changed."
     case .unwritable(let path, _):
       "The export could not be written under \(path); the previous export, if any, is unchanged."
     case .previousKept(let path, let target, _):
@@ -120,7 +126,7 @@ package enum ExportError: CodedError, Equatable {
       [workspaceCommand("silta export --to <writable directory>", workspace: workspace)]
     case .previousKept(let path, let target, _):
       ["[ ! -e \(shellWord(target)) ] && mv \(shellWord(path)) \(shellWord(target))"]
-    case .unsupported: ["update silta"]
+    case .unsupported, .newerFormat: ["update silta"]
     case .invalidTree(_, let workspace):
       [
         workspace.map {

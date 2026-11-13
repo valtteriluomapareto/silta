@@ -74,6 +74,12 @@ struct ExportManifest {
       let object = parsed as? [String: Any],
       let format = object["format"] as? String
     else { throw ExportTree.invalid("manifest.json is not a format manifest") }
+    if !format.isEmpty, !format.hasPrefix("0"),
+      format.utf8.allSatisfy({ (0x30...0x39).contains($0) }),
+      format.utf8.count > ExportFormat.version.utf8.count || format > ExportFormat.version
+    {
+      throw ExportError.newerFormat
+    }
     guard ["1", "2"].contains(format) else {
       throw ExportTree.invalid("format \(format) is not a supported format (1 or 2)")
     }
