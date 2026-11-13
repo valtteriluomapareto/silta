@@ -59,6 +59,9 @@ struct DocEditPreparationCommandTests {
         }
         if variant != "path" && variant != "ref" { #expect(!report.contains(configured)) }
         #expect(!report.contains("doc edit") && !report.contains("--approved"))
+        if variant == "pat-ref" {
+          Golden.forTests().check(report, "doc-edit-preparation-secret." + (json ? "json" : "txt"))
+        }
       }
     }
   }
