@@ -9,7 +9,7 @@ struct BriefContext {
   let date: Date
   let archiveDays: Int
 
-  func sections(topics requested: [String]) throws
+  func sections(topics requested: [String], compact: Bool = false) throws
     -> (sections: [BriefSection], warnings: [OutputWarning])
   {
     let backlog = try BriefBacklog(
