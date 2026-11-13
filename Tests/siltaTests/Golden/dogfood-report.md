@@ -49,6 +49,8 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 - `silta comment delete`
 - `silta comment reopen`
 - `silta comment resolve`
+- `silta doc ls`
+- `silta doc show`
 - `silta doctor`
 - `silta export`
 - `silta guide`

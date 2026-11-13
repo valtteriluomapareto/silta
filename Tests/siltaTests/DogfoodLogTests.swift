@@ -318,6 +318,22 @@ extension DogfoodLogTests {
     ] + integrationCatalog() + exportCatalog()
   }
 
+  static func documentCatalog(_ store: DatabaseStore) throws
+    -> [(args: [String], workspace: String?)]
+  {
+    try AcmeDocAttachments.attach("rules", to: "app", in: store)
+    try store.write {
+      try $0.database.execute(
+        sql: """
+          UPDATE doc_rev SET title='API rules',kind='reference',about_refs='["app:api"]';
+          """)
+    }
+    return [
+      (["--ws", "acme", "doc", "ls"], "acme"),
+      (["--ws", "acme", "doc", "show", "rules"], "acme"),
+    ]
+  }
+
   static func integrationCatalog() -> [(args: [String], workspace: String?)] {
     [
       (["guide"], nil), (["agents", "install"], nil), (["agents", "uninstall"], nil),
@@ -376,6 +392,13 @@ extension DogfoodLogTests {
         let command = try #require(entry["command"] as? String)
         covered.insert(command)
         #expect(entry["workspace"] as? String == workspace, "\(command)")
+      }
+      for (args, workspace) in try Self.documentCatalog(store) {
+        let result = try Self.run(args, scratch: scratch)
+        #expect(result.termination == .exit(0), "\(args) \(result.stdout)")
+        let entry = try Self.last(scratch)
+        covered.insert(try #require(entry["command"] as? String))
+        #expect(entry["workspace"] as? String == workspace)
       }
       #expect(covered == names)
     }
