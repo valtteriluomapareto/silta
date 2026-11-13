@@ -1,0 +1,16 @@
+doc:rules@3 [proposed] diff against doc:rules@1
+actor: agent:codex:acme
+created_at: 2023-11-15
+--- doc:rules@1
++++ doc:rules@3
+@@ -1,5 +1,5 @@
+-title: Base rules
+-kind: contract
+-about: app:api
+-
+-Base body
++title: Proposed rules
++kind: contract
++about: service:push
++
++Proposed body
