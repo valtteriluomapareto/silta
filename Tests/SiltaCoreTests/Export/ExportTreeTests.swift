@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct ExportTreeTests {
@@ -267,7 +268,7 @@ struct TreeDamage: Sendable, CustomTestStringConvertible {
     edit("crlf", "tasks/AC-10.jsonl", "\n", "\r\n"),
     edit("wrong ref", "tasks/AC-2.md", #"ref: "AC-2""#, #"ref: "AC-3""#),
     edit("unquoted frontmatter", "tasks/AC-10.md", #"type: "chore""#, "type: chore"),
-    edit("future format", "manifest.json", #""format": "1""#, #""format": "2""#, rehash: false),
+    edit("future format", "manifest.json", #""format": "2""#, #""format": "3""#, rehash: false),
     edit("escaped slash", "workspace.yaml", "src/Portal", #"src\/Portal"#),
     edit("wider fence", "tasks/AC-2.md", "~~~\nWaiting.\n~~~", "~~~~\nWaiting.\n~~~~"),
     Self(testDescription: "record groups out of order") { files in

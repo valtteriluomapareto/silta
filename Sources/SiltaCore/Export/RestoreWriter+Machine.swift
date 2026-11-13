@@ -92,6 +92,7 @@ extension RestoreWriter {
   func check() throws {
     let after = try ExportSnapshot.read(db, workspace: slug)
     var expected = tree
+    expected.format = after.format
     expected.schema = after.schema
     expected.workspace = tree.workspace.replacing(
       "next_task_seq", with: after.workspace.value("next_task_seq"),
