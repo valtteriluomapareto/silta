@@ -40,13 +40,11 @@ struct RestoreDocumentRowTests {
       #expect(after.documents[0].records[0].value("title") == nil)
       #expect(after.documents[0].records[1].value("triaged_by") == "human:acme")
       #expect(after.documents[0].records[5].value("app_shas") == ExportDocumentTests.shas)
-      #expect(throws: ExportError.unsupported("docs")) {
-        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
+      #expect(try store.read { try ExportSnapshot.read($0, workspace: "acme").documents } == after)
     }
   }
 
-  @Test func counterOnlyReplacementKeepsIndependentNamesAndPublicRefusal() throws {
+  @Test func counterOnlyReplacementKeepsIndependentNamesInPublicExports() throws {
     try withScratchDirectory { home in
       let store = try RestoreDocumentRowSupport.make(home)
       var graph = try RestoreDocumentGraphFixture.graph()
@@ -66,9 +64,7 @@ struct RestoreDocumentRowTests {
         after.revisionAllocations.map { $0.value("slug") } == [
           "future-only", "gone-rules", "incoming-only", "push-rules", "removed-rules",
         ])
-      #expect(throws: ExportError.unsupported("reserved doc revision history")) {
-        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
+      #expect(try store.read { try ExportSnapshot.read($0, workspace: "acme").documents } == after)
     }
   }
 

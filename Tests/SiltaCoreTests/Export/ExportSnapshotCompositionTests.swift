@@ -38,10 +38,8 @@ struct ExportSnapshotCompositionTests {
       let selected = ExportRow(keys: keys, values: counts)
       Golden.forTests().check(ExportFormat.line(selected) + "\n", "export-doc-counts.json")
       #expect(try RestoreSupport.dump(store) == before)
-      #expect(throws: ExportError.unsupported("docs")) {
-        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
-      #expect(throws: ExportError.self) { try ExportTree.parse(files) }
+      #expect(try store.read { try ExportSnapshot.read($0, workspace: "acme") } == snapshot)
+      #expect(try ExportTree.parse(files) == snapshot)
     }
   }
 

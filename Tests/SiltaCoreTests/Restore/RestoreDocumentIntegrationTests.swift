@@ -15,7 +15,18 @@ struct RestoreDocumentIntegrationTests {
           UPDATE task SET claimed_by='agent:codex:acme',claimed_at='2023-11-14T22:13:00.000Z',
             branch='feature/docs' WHERE id=700;
           INSERT INTO seq_counter(scope,next) VALUES('task:17',2);
-          """)
+          UPDATE task SET plan_rev=2,plan_md='v2' WHERE id=700;
+          INSERT INTO task_plan_rev(id,task_id,rev,body_md,actor,created_at)
+          VALUES(1601,700,1,'v1','human:acme',''),(1602,700,2,'v2','human:acme','');
+          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,
+            created_by,created_at)
+          VALUES('note-nfc',17,'task',700,'cites','note',:nfc,'human:acme',''),
+            ('note-nfd',17,'task',700,'cites','note',:nfd,'human:acme','');
+          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
+            created_by,created_at)
+          VALUES('plan-one',17,'task',700,'cites','task_plan_rev',1601,'human:acme',''),
+            ('plan-two',17,'task',700,'cites','task_plan_rev',1602,'human:acme','');
+          """, arguments: ["nfc": "caf\u{e9}", "nfd": "cafe\u{301}"])
     }
     return store
   }
@@ -36,7 +47,14 @@ struct RestoreDocumentIntegrationTests {
       #expect(parsed.documents.documents.count == 1)
       ExportTreeTests.expectSame(
         try parsed.documents.files(), try ExportDocumentSnapshotTests.golden())
-      #expect(parsed.links == (try RestoreDocumentGraphFixture.links()))
+      #expect(Array(parsed.links.prefix(10)) == (try RestoreDocumentGraphFixture.links()))
+      let notes = parsed.links.filter { $0.value("to_kind") == "note" }
+      #expect(
+        notes.compactMap { $0.value("to_ext").map { Data($0.utf8) } }
+          == [Data("caf\u{e9}".utf8), Data("cafe\u{301}".utf8)])
+      #expect(
+        parsed.links.filter { $0.value("to_kind") == "task_plan_rev" }
+          .compactMap { $0.value("to_rev") } == ["1", "2"])
       #expect(try RestoreSupport.dump(source) == before)
       let home = scratch.appending(path: "target")
       let target = ExportFixture.store(home)
@@ -103,6 +121,7 @@ struct RestoreDocumentIntegrationTests {
       #expect(
         try RestoreDocumentRowSupport.accept("removed-rules", store: target, ids: ids).revision
           == 236)
+      #expect(try Self.commentSequence(target) == 9)
     }
   }
 
@@ -135,6 +154,16 @@ struct RestoreDocumentIntegrationTests {
         #expect(try RestoreSupport.dump(store) == before)
       }
     }
+  }
+
+  private static func commentSequence(_ store: DatabaseStore) throws -> Int64 {
+    let owner = try #require(
+      try store.read {
+        try Int64.fetchOne(
+          $0, sql: "SELECT id FROM doc_rev WHERE uid=?",
+          arguments: [ExportDocumentTests.uid("003")])
+      })
+    return try store.write { try $0.nextSequence(scope: "comment:doc_rev:\(owner)") }
   }
 
   private static func retained(_ store: DatabaseStore) throws -> [[String]] {
