@@ -1,3 +1,4 @@
+import Foundation
 import GRDB
 
 extension ExportDocumentSnapshot {
@@ -31,11 +32,13 @@ extension ExportDocumentSnapshot {
     for found in try Row.fetchAll(db, sql: DocumentQuery.commentFloors, arguments: [workspace]) {
       let row = try ExportRow(keys: ["doc_rev", "next"], row: found)
       let owner = row.value("doc_rev") ?? ""
-      floors.comments[owner] = max(
-        floors.comments[owner] ?? 1, try Self.positive(row.value("next")))
+      floors.comments[Data(owner.utf8)] = (
+        owner,
+        max(floors.comments[Data(owner.utf8)]?.next ?? 1, try Self.positive(row.value("next")))
+      )
     }
     snapshot.revisionAllocations = Self.floorRows(floors.revisions, key: "slug")
-    snapshot.commentSequences = Self.floorRows(floors.comments, key: "doc_rev")
+    snapshot.commentSequences = Self.commentFloorRows(floors.comments)
     return snapshot
   }
 }

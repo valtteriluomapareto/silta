@@ -130,13 +130,7 @@ struct RestoreDocumentRowTests {
       #expect(
         try RestoreDocumentRowSupport.accept("removed-rules", store: store, ids: ids).revision
           == 236)
-      let revision = try store.read {
-        try Int64.fetchOne(
-          $0, sql: "SELECT id FROM doc_rev WHERE uid=?",
-          arguments: [ExportDocumentTests.uid("003")])
-      }
-      let owner = try #require(revision)
-      #expect(try store.write { try $0.nextSequence(scope: "comment:doc_rev:\(owner)") } == 9)
+      #expect(try RestoreDocumentFixture.commentSequence(store) == 9)
     }
   }
 

@@ -1,0 +1,1 @@
+{"data":{"output":"doc:rules@3/2 [answer, accepted]\nactor: agent:codex:acme\ncreated_at: 2023-11-15\nreply_to: doc:rules@3/1\n\nKeep unknown statuses.\n","ref":"doc:rules@3/2"},"ok":true,"schema":1,"warnings":[]}

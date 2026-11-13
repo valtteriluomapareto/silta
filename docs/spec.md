@@ -983,19 +983,52 @@ Percent-encoded attachment refs are inspected as decoded text for secrets; safe 
 retain their canonical spelling. A credential-bearing list filter is omitted from
 recovery: its continuation restarts the broader scoped list without a filter or offset.
 
+`doc show <ref> --diff` compares stored title, kind, attachments and body with the
+revision's recorded `base_rev`, using one replacement hunk with unchanged leading
+and trailing lines removed. A missing recorded base refuses with plain-show recovery;
+a nil base is empty. Masking precedes comparison; identical masked views say
+"no visible changes". Actor and time are shown separately from the compared content.
+
+`doc show <ref> --comments [--offset N] [--limit N]` pages comments in sequence order,
+20 by default and at most 20 per page. `doc show doc:slug@revision/comment` reads one
+copied comment ref, including a tombstone for a deleted post. Thread, attribution,
+resolution and accepted-answer metadata remain visible. Diff and comment-page flags
+are mutually exclusive; pagination options require the comment-page view. The same
+`--lines` bound applies, with continuations pinned to the revision, view and page.
+Lists preview at most two comments per revision, each at most 120 masked characters,
+with character/record omission counts and a complete comment-page continuation.
+
+`doc edit <slug|doc:slug> -F <file|->` accepts complete UTF-8 Markdown. It is
+human-only: an agent supplies the human's exact approval words with `--approved`.
+There is no editor or message-body option. New documents require `--title` and at
+least one `--about`; omitted metadata on an accepted document stays unchanged.
+Supplied about refs replace the complete live set. Title is one line of at most
+120 characters; kind is inferred initially and stays fixed unless `--kind` is
+explicit (`contract`, `flow`, `runbook`, `reference`). Supplied input is at most
+65536 UTF-8 bytes before and after secret redaction. Humans refuse new secret
+text; approved agents redact it unless explicitly using `--allow-secret`.
+New or changed identities refuse detected secrets without rewriting identifier
+bytes; explicit `--allow-secret` retains them. Typed doc identifier exemptions
+remain valid. Unchanged accepted fields are preserved after an exact state recheck.
+
+`doc edit <ref> --keep-body` explicitly copies the accepted owned body instead
+of reading input; it is exclusive with `-F`. An archived accepted body is eligible,
+but reactivation needs replacement about refs after its live links are removed.
+Retained bodies are not rescanned or retroactively capped. Each save creates one
+accepted revision. Concurrent changes to the owned baseline or prepared target
+bindings refuse atomically. Used agent approval is recorded in the same transaction.
+JSON success data is `{ref,archived,changed}`; text says accepted and quiet prints
+the immutable revision ref. Missing creation fields recover together in a body-free
+edit retry. Unsafe identities/scopes use the protected read hubs described above.
+
 The following document write and review design is planned:
 
 - Bodies are markdown with `[[ref]]` links (§5.1), parsed into `link` rows when a
   revision is accepted.
-- **Humans:** `silta doc edit <slug> [-F <file>]` saves an accepted revision, from
-  `$EDITOR` or a file. It is human-only (§11): without `--approved`, an agent gets
-  `human_only`, whose `next` also offers `doc propose`. With `agent_doc_writes:
-  direct`, `doc edit` needs no approval.
 - **Agents:** `doc propose <slug> -F - -m "why" [--base <rev>]`.
 - **Accept:** `silta doc accept <slug> <rev>` refuses (exit 6) if `base_rev` isn't the
   current revision; `--rebase` opens a 3-way merge in `$EDITOR`, or takes the merged
   text with `-F <file>`. Reject with `doc reject`.
-- Setting `agent_doc_writes: propose | direct`.
 - `silta doc verify <slug>` stamps `verified_at`. `doc archive` hides a doc.
 - Writing rule (shown in `doc new` templates): point at code, don't copy it.
 - Renaming a slug adds the old one to `previous_slugs`, so old `[[doc:…]]` links keep
@@ -1927,7 +1960,7 @@ silta inbox take [M2]
 silta doc new [M2]
 silta doc ls
 silta doc show
-silta doc edit [M2]
+silta doc edit
 silta doc propose [M2]
 silta doc accept [M2]
 silta doc reject [M2]

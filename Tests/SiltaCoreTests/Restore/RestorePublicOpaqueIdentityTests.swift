@@ -18,41 +18,39 @@ struct RestorePublicOpaqueIdentityTests {
       }
       #expect(Set(docUIDs.map { Data($0.utf8) }).count == 2)
       let before = try RestoreSupport.dump(source)
-      withKnownIssue("Public export and restore alias SQLite-distinct opaque document owners.") {
-        let directory = try RestoreDocumentIntegrationTests.publish(
-          source, home: sourceHome, to: scratch.appending(path: "out"))
-        let files = try RestoreService.readTree(directory)
-        let tree = try ExportTree.parse(files)
-        #expect(tree.documents.documents.count == 2)
-        let floors = tree.documents.commentSequences.filter {
-          ($0.value("doc_rev") ?? "").hasPrefix("rev-caf")
-        }
-        #expect(
-          Data(ExportFormat.jsonl(floors).utf8)
-            == Data(
-              ("{\"doc_rev\": \"rev-cafe\u{301}\", \"next\": \"27\"}\n"
-                + "{\"doc_rev\": \"rev-caf\u{e9}\", \"next\": \"13\"}\n").utf8))
-        #expect(try RestoreSupport.dump(source) == before)
-        let home = scratch.appending(path: "target")
-        let target: DatabaseStore
-        if inPlace {
-          target = try RestoreOpaqueIdentityFixture.documents(home)
-        } else {
-          target = ExportFixture.store(home)
-          try target.initialize()
-        }
-        let original = try RestoreSupport.dump(target)
-        let preview = try RestoreSupport.restore(directory, into: target, home: home, dryRun: true)
-        #expect(preview.docs == RestoreReport.Counts(before: inPlace ? 2 : 0, after: 2))
-        #expect(try RestoreSupport.dump(target) == original)
-        let report = try RestoreSupport.restore(directory, into: target, home: home)
-        #expect(report.created == !inPlace && report.docs.after == 2)
-        ExportTreeTests.expectSame(try ExportTreeTests.render(target), files)
-        #expect(try Self.identities(target) == identities)
-        try target.read { (db: Database) throws in
-          #expect(try String.fetchOne(db, sql: "PRAGMA foreign_key_check") == nil)
-          #expect(try Int64.fetchOne(db, sql: "SELECT id FROM doc WHERE slug='push-rules'") != 91)
-        }
+      let directory = try RestoreDocumentIntegrationTests.publish(
+        source, home: sourceHome, to: scratch.appending(path: "out"))
+      let files = try RestoreService.readTree(directory)
+      let tree = try ExportTree.parse(files)
+      #expect(tree.documents.documents.count == 2)
+      let floors = tree.documents.commentSequences.filter {
+        ($0.value("doc_rev") ?? "").hasPrefix("rev-caf")
+      }
+      #expect(
+        Data(ExportFormat.jsonl(floors).utf8)
+          == Data(
+            ("{\"doc_rev\": \"rev-cafe\u{301}\", \"next\": \"27\"}\n"
+              + "{\"doc_rev\": \"rev-caf\u{e9}\", \"next\": \"13\"}\n").utf8))
+      #expect(try RestoreSupport.dump(source) == before)
+      let home = scratch.appending(path: "target")
+      let target: DatabaseStore
+      if inPlace {
+        target = try RestoreOpaqueIdentityFixture.documents(home)
+      } else {
+        target = ExportFixture.store(home)
+        try target.initialize()
+      }
+      let original = try RestoreSupport.dump(target)
+      let preview = try RestoreSupport.restore(directory, into: target, home: home, dryRun: true)
+      #expect(preview.docs == RestoreReport.Counts(before: inPlace ? 2 : 0, after: 2))
+      #expect(try RestoreSupport.dump(target) == original)
+      let report = try RestoreSupport.restore(directory, into: target, home: home)
+      #expect(report.created == !inPlace && report.docs.after == 2)
+      ExportTreeTests.expectSame(try ExportTreeTests.render(target), files)
+      #expect(try Self.identities(target) == identities)
+      try target.read { (db: Database) throws in
+        #expect(try String.fetchOne(db, sql: "PRAGMA foreign_key_check") == nil)
+        #expect(try Int64.fetchOne(db, sql: "SELECT id FROM doc WHERE slug='push-rules'") != 91)
       }
     }
   }
@@ -89,11 +87,7 @@ struct RestorePublicOpaqueIdentityTests {
           if uid == "opaque-ordinary" {
             #expect((output.stdout + output.stderr).contains(uid))
           } else {
-            withKnownIssue(
-              "Public foreign UID conflicts disclose credential-shaped raw identities."
-            ) {
-              #expect(!(output.stdout + output.stderr).contains(uid))
-            }
+            #expect(!(output.stdout + output.stderr).contains(uid))
           }
         }
       }

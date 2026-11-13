@@ -140,15 +140,15 @@ extension RestoreReport {
     _ current: ExportSnapshot?, _ tree: ExportSnapshot, workspace: String, digest: String,
     dryRun: Bool
   ) -> RestoreReport {
-    let incoming = Dictionary(tree.tasks.map { ($0.row.value("uid") ?? "", $0) }) { first, _ in
-      first
-    }
+    let incoming = Dictionary(
+      tree.tasks.map { (Data(($0.row.value("uid") ?? "").utf8), $0) },
+      uniquingKeysWith: { first, _ in first })
     let existing = current?.tasks ?? []
     var removed: [String] = []
     var changed: [String] = []
     var claims: [Claim] = []
     for task in existing {
-      let replacement = incoming[task.row.value("uid") ?? ""]
+      let replacement = incoming[Data((task.row.value("uid") ?? "").utf8)]
       if replacement == nil {
         removed.append(task.ref)
       } else if replacement != task {
@@ -161,7 +161,10 @@ extension RestoreReport {
     let documents = documentChanges(current, tree)
     return RestoreReport(
       workspace: workspace, dryRun: dryRun, created: current == nil,
-      sameUID: current.map { $0.workspace.value("uid") == tree.workspace.value("uid") } ?? true,
+      sameUID: current.map {
+        $0.workspace.value("uid").map { Data($0.utf8) }
+          == tree.workspace.value("uid").map { Data($0.utf8) }
+      } ?? true,
       manifestSHA256: digest, tasks: Counts(before: existing.count, after: tree.tasks.count),
       docs: Counts(
         before: current?.documents.documents.count ?? 0, after: tree.documents.documents.count),

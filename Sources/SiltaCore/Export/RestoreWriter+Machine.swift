@@ -1,3 +1,4 @@
+import Foundation
 import GRDB
 
 extension RestoreWriter {
@@ -17,9 +18,9 @@ extension RestoreWriter {
   }
 
   struct MachineRows {
-    var repoPaths: [String: (path: String, fetched: String?)] = [:]
+    var repoPaths: [Data: (path: String, fetched: String?)] = [:]
     var overrides: [MachineOverride] = []
-    var worktrees: [String: MachineWorktree] = [:]
+    var worktrees: [Data: MachineWorktree] = [:]
   }
 
   func machineRows() throws -> MachineRows {
@@ -33,7 +34,7 @@ extension RestoreWriter {
         """,
       arguments: [workspace])
     {
-      kept.repoPaths[row["uid"]] = (row["path"], row["fetched_at"])
+      kept.repoPaths[Data((row["uid"] as String).utf8)] = (row["path"], row["fetched_at"])
     }
     for row in try Row.fetchAll(
       db,
@@ -53,7 +54,7 @@ extension RestoreWriter {
         """,
       arguments: [workspace])
     {
-      kept.worktrees[row["uid"]] = .init(
+      kept.worktrees[Data((row["uid"] as String).utf8)] = .init(
         path: row["worktree"], claimedBy: row["claimed_by"], branch: row["branch"])
     }
     return kept
@@ -69,21 +70,21 @@ extension RestoreWriter {
         arguments: [repo, path.path, path.fetched])
     }
     for override in kept.overrides {
-      guard let app = ids["app"]?[override.app] else { continue }
+      guard let app = ids["app"]?[Data(override.app.utf8)] else { continue }
       try db.execute(
         sql: "INSERT INTO worktree_override(path,app_id,set_by) VALUES(?,?,?)",
         arguments: [override.path, app, override.setBy])
     }
     for task in tree.tasks {
-      guard let uid = task.row.value("uid"), let kept = kept.worktrees[uid],
+      guard let uid = task.row.value("uid"), let kept = kept.worktrees[Data(uid.utf8)],
         kept.claimedBy == task.row.value("claimed_by"), kept.branch == task.row.value("branch"),
-        let id = ids["task"]?[uid]
+        let id = ids["task"]?[Data(uid.utf8)]
       else { continue }
       try db.execute(sql: "UPDATE task SET worktree=? WHERE id=?", arguments: [kept.path, id])
     }
     let section = zip(tree.sections, ExportFormat.sections).first { $0.1.table == "repo" }?.0
     reposWithoutPath = (section?.rows ?? []).compactMap { row in
-      kept.repoPaths[row.value("uid") ?? ""] == nil ? row.value("slug") : nil
+      kept.repoPaths[Data((row.value("uid") ?? "").utf8)] == nil ? row.value("slug") : nil
     }
   }
 

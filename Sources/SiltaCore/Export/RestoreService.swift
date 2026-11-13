@@ -133,7 +133,7 @@ struct RestoreValidation {
   }
 
   /// Base rows and their owned identities, independently of polymorphic link ends.
-  func rows() throws -> [String: Set<String>] {
+  func rows() throws -> [String: Set<Data>] {
     let uids = try index()
     try references(uids)
     try parents()
@@ -141,13 +141,13 @@ struct RestoreValidation {
     return uids
   }
 
-  private func index() throws -> [String: Set<String>] {
+  private func index() throws -> [String: Set<Data>] {
     try settings()
-    var uids: [String: Set<String>] = [:]
+    var uids: [String: Set<Data>] = [:]
     func add(_ table: String, _ row: ExportRow) throws {
       try integers(row, in: table)
       guard let uid = row.value("uid") else { return }
-      guard uids[table, default: []].insert(uid).inserted else {
+      guard uids[table, default: []].insert(Data(uid.utf8)).inserted else {
         throw invalid("\(table) uid \(uid) appears twice")
       }
     }
@@ -195,9 +195,9 @@ struct RestoreValidation {
     }
   }
 
-  private func references(_ uids: [String: Set<String>]) throws {
+  private func references(_ uids: [String: Set<Data>]) throws {
     func resolve(_ uid: String?, _ table: String, from: String) throws {
-      guard let uid, !uids[table, default: []].contains(uid) else { return }
+      guard let uid, !uids[table, default: []].contains(Data(uid.utf8)) else { return }
       throw invalid("\(from) names \(table) \(uid), which the tree doesn't hold")
     }
     var rows: [(String, ExportRow)] = zip(tree.sections, ExportFormat.sections).flatMap { pair in
@@ -211,9 +211,11 @@ struct RestoreValidation {
     }
     for task in tree.tasks {
       let comments = Set(
-        task.records.compactMap { $0.value("table") == "comment" ? $0.value("uid") : nil })
+        task.records.compactMap {
+          $0.value("table") == "comment" ? $0.value("uid").map { Data($0.utf8) } : nil
+        })
       for record in task.records {
-        if let thread = record.value("thread"), !comments.contains(thread) {
+        if let thread = record.value("thread"), !comments.contains(Data(thread.utf8)) {
           throw invalid(
             "a comment of \(task.ref) threads under \(thread), not on that task")
         }
@@ -222,17 +224,17 @@ struct RestoreValidation {
   }
 
   func links(
-    _ uids: [String: Set<String>], tables: [String: String] = ExportFormat.linkTables
+    _ uids: [String: Set<Data>], tables: [String: String] = ExportFormat.linkTables
   ) throws {
     func resolve(_ uid: String?, _ table: String, from: String) throws {
-      guard let uid, !uids[table, default: []].contains(uid) else { return }
+      guard let uid, !uids[table, default: []].contains(Data(uid.utf8)) else { return }
       throw invalid("\(from) names \(table) \(uid), which the tree doesn't hold")
     }
     let revisions = Set(
       tree.tasks.flatMap { task in
         task.records.compactMap {
           $0.value("table") == "task_plan_rev"
-            ? "\(task.row.value("uid") ?? "")@\($0.value("rev") ?? "")" : nil
+            ? Data("\(task.row.value("uid") ?? "")@\($0.value("rev") ?? "")".utf8) : nil
         }
       })
     for link in tree.links {
@@ -243,7 +245,7 @@ struct RestoreValidation {
         from: "link")
       guard let to = link.value("to") else { continue }
       if link.value("to_kind") == "task_plan_rev" {
-        guard revisions.contains("\(to)@\(link.value("to_rev") ?? "")") else {
+        guard revisions.contains(Data("\(to)@\(link.value("to_rev") ?? "")".utf8)) else {
           let revision = link.value("to_rev") ?? ""
           throw invalid(
             "a link names plan revision \(revision) of \(to), which the tree doesn't hold")
@@ -278,16 +280,16 @@ struct RestoreValidation {
 
   private func parents() throws {
     let parent = Dictionary(
-      tree.tasks.map { ($0.row.value("uid") ?? "", $0.row.value("parent")) }
+      tree.tasks.map { (Data(($0.row.value("uid") ?? "").utf8), $0.row.value("parent")) }
     ) { first, _ in first }
     for task in tree.tasks {
-      var seen: Set<String> = []
+      var seen: Set<Data> = []
       var next = task.row.value("uid")
       while let uid = next {
-        guard seen.insert(uid).inserted else {
+        guard seen.insert(Data(uid.utf8)).inserted else {
           throw invalid("\(task.ref) is its own ancestor")
         }
-        next = parent[uid] ?? nil
+        next = parent[Data(uid.utf8)] ?? nil
       }
     }
   }

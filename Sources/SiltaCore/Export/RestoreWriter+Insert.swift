@@ -1,3 +1,4 @@
+import Foundation
 import GRDB
 
 extension RestoreWriter {
@@ -28,12 +29,12 @@ extension RestoreWriter {
         "INSERT INTO \(table)(\(columns.joined(separator: ","))) VALUES(\(placeholders))",
       arguments: StatementArguments(values))
     let rowID = db.lastInsertedRowID
-    if let uid = row.value("uid") { ids[table, default: [:]][uid] = rowID }
+    if let uid = row.value("uid") { ids[table, default: [:]][Data(uid.utf8)] = rowID }
     return rowID
   }
 
   func id(_ uid: String, in table: String) throws -> Int64 {
-    guard let id = ids[table]?[uid] else {
+    guard let id = ids[table]?[Data(uid.utf8)] else {
       throw ExportError.invalidTree(reason: "\(uid) names no \(table) of the tree", workspace: slug)
     }
     return id
@@ -55,7 +56,9 @@ extension RestoreWriter {
       for record in task.records {
         let table = record.value("table") ?? ""
         let rowID = try insert(table, record, extra: ["task_id": taskID], deferred: ["thread"])
-        if table == "task_plan_rev" { revisions["\(taskUID)@\(record.value("rev") ?? "")"] = rowID }
+        if table == "task_plan_rev" {
+          revisions[Data("\(taskUID)@\(record.value("rev") ?? "")".utf8)] = rowID
+        }
       }
       for record in task.records {
         guard let uid = record.value("uid"), let thread = record.value("thread") else { continue }
@@ -74,7 +77,8 @@ extension RestoreWriter {
       var to: Int64?
       if let target = link.value("to") {
         if toKind == "task_plan_rev" {
-          guard let revision = revisions["\(target)@\(link.value("to_rev") ?? "")"] else {
+          guard let revision = revisions[Data("\(target)@\(link.value("to_rev") ?? "")".utf8)]
+          else {
             throw ExportError.invalidTree(
               reason: "a link names a plan revision the tree doesn't hold", workspace: slug)
           }

@@ -2,8 +2,8 @@ import Foundation
 import GRDB
 
 extension DocService {
-  func read(_ slug: String, revision: Int?) throws
-    -> DocReadSelection
+  func read(_ slug: String, revision: Int?, view: DocReadView) throws
+    -> DocReadResult
   {
     try store.read { db in
       let workspaceID = try TaskService.workspaceID(workspace, in: db)
@@ -14,9 +14,9 @@ extension DocService {
       else { throw DocError.notFound(slug) }
       let archived: Bool = doc["archived"]
       if let selected = revision ?? (doc["current_rev"] as Int?) {
-        return DocReadSelection(
-          revision: try DocStore.revision(slug, revision: selected, workspace: workspaceID, in: db),
-          archived: archived, pending: [], pendingCount: 0)
+        let snapshot = try DocStore.revision(
+          slug, revision: selected, workspace: workspaceID, in: db)
+        return try render(snapshot, archived: archived, view: view, workspace: workspaceID, in: db)
       }
       let id: Int64 = doc["id"]
       let total =
@@ -27,8 +27,12 @@ extension DocService {
         db,
         sql: "SELECT rev FROM doc_rev WHERE doc_id=? AND state='proposed' ORDER BY rev LIMIT 20",
         arguments: [id])
-      return DocReadSelection(
-        revision: nil, archived: archived, pending: pending, pendingCount: total)
+      return DocReadResult(
+        ref: "doc:" + slug,
+        output: "No accepted revision for doc:\(slug).\nPending revisions (\(total)):\n"
+          + pending.map { "doc:\(slug)@\($0)\n" }.joined()
+          + (total > pending.count && scopeIsSafe && Self.safeReference("doc:" + slug)
+            ? "next: " + listCommand + "\n" : ""))
     }
   }
 
@@ -62,10 +66,11 @@ extension DocService {
       let rows = try Row.fetchAll(
         db,
         sql:
-          "SELECT doc.slug,doc_rev.rev,doc_rev.state,doc_rev.title,doc_rev.kind,doc_rev.about_refs"
+          "SELECT doc.slug,doc_rev.id,doc_rev.rev,doc_rev.state,doc_rev.title,doc_rev.kind,"
+          + "doc_rev.about_refs"
           + join + " ORDER BY doc.slug,doc_rev.rev LIMIT ? OFFSET ?",
         arguments: arguments + [limit, offset])
-      let entries = try rows.map(entry)
+      let entries = try rows.map { try entry($0, in: db) }
       let next =
         offset < total && entries.count < total - offset
         ? listPageCommand(
@@ -91,7 +96,7 @@ extension DocService {
     }
   }
 
-  private func entry(_ row: Row) throws -> DocListResult.Entry {
+  private func entry(_ row: Row, in db: Database) throws -> DocListResult.Entry {
     let ref = "doc:\(row["slug"] as String)@\(row["rev"] as Int)"
     let state: String = row["state"]
     let raw: String? = row["about_refs"]
@@ -105,7 +110,8 @@ extension DocService {
       masking: ref,
       output: "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
         + "  kind: \(Self.preview(kind ?? "(unknown)")); about: \(Self.preview(Self.about(refs)))\n"
-        + "  show: " + showCommand(ref) + "\n")
+        + "  show: " + showCommand(ref) + "\n"
+        + (try commentPreviews(row["id"], ref: ref, in: db)))
     return DocListResult.Entry(ref: rendered.ref, state: state, output: rendered.output)
   }
 
