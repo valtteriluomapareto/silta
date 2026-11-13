@@ -66,7 +66,7 @@ struct RestoreDocumentIntegrationTests {
       let report = try RestoreSupport.restore(directory, into: target, home: home)
       #expect(report.created && report.docs.after == 1)
       ExportTreeTests.expectSame(try ExportTreeTests.render(target), files)
-      try target.read { db in
+      try target.read { (db: Database) throws in
         #expect(try Int64.fetchOne(db, sql: "SELECT id FROM doc") != 91)
         #expect(try Int64.fetchOne(db, sql: "SELECT id FROM task") != 700)
         #expect(try String.fetchOne(db, sql: "PRAGMA foreign_key_check") == nil)
