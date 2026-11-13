@@ -423,8 +423,10 @@
       "sha256": "d888dfed36c781def9c881b0042dc78d2a387ce8e7b1cfeab38eb2dc78717026",
       "variants": {
         "default": {
-          "checks": [],
-          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters execute scoped brief/start/read/plan commands with complete matching native pairs and successful actor logs. The printed edge-attached document leads to its actual body; its fallback value is recorded in a new trial-owned AC-1 plan. No forbidden activity observed."
         }
       }
     },
@@ -432,8 +434,10 @@
       "sha256": "6327c56536cdeb31cac299c2a0380b7725b9cbcfc3632b3df08135f68d586301",
       "variants": {
         "default": {
-          "checks": [],
-          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters read the actual attached document through scoped commands with complete native/log evidence, then deliberately record an unresolved AC-1 plan. Tool behavior is certifiable; the missing recorded fallback remains an independent outcome failure."
         }
       }
     },
@@ -441,8 +445,10 @@
       "sha256": "d888dfed36c781def9c881b0042dc78d2a387ce8e7b1cfeab38eb2dc78717026",
       "variants": {
         "default": {
-          "checks": [],
-          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters complete scoped brief/start/plan operations normally. No document exists or is shown; the new trial-owned plan remains unresolved. The pass filename describes normal replay, not a passing outcome."
         }
       }
     },
@@ -450,8 +456,10 @@
       "sha256": "6327c56536cdeb31cac299c2a0380b7725b9cbcfc3632b3df08135f68d586301",
       "variants": {
         "default": {
-          "checks": [],
-          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters complete scoped brief/start/plan operations normally without a document or doc-show invocation, recording an unresolved trial-owned plan. No forbidden activity observed; no positive outcome is certified."
         }
       }
     }
