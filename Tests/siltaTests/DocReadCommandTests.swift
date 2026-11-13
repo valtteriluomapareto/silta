@@ -125,7 +125,11 @@ struct DocReadCommandTests {
             INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at,title,kind,about_refs)
             SELECT 'pending-'||n,doc.id,n,'Hidden body','proposed','human:acme','',?,
               'reference',NULL FROM doc CROSS JOIN numbers;
-            """, arguments: ["Password=hidden-acme\n" + String(repeating: "z", count: 130)])
+            """,
+          arguments: [
+            "-----BEGIN PRIVATE KEY-----\nhidden-acme" + String(repeating: "z", count: 140)
+              + "\n-----END PRIVATE KEY-----\n" + String(repeating: "z", count: 140)
+          ])
       }
       let page = try run(["ls"], scratch, json: true)
       #expect(page.termination == .exit(0))
