@@ -32,7 +32,7 @@ package enum ExportTree {
         throw refuse("\(path) does not match its sha256")
       }
     }
-    var reader = Reader(files: files, slug: manifest.workspace)
+    var reader = ExportFileReader(files: files, slug: manifest.workspace)
     let (workspace, sections) = try reader.workspace()
     let prefix = workspace.value("task_prefix") ?? ""
     let tasks = try present.filter { $0.hasPrefix("tasks/") && $0.hasSuffix(".md") }
@@ -96,7 +96,7 @@ struct ExportManifest {
 
 /// Parses the line grammar of each file; values go through `JSONSerialization`, and
 /// whatever it accepts beyond the grammar is caught by the byte comparison afterwards.
-private struct Reader {
+struct ExportFileReader {
   let files: [String: Data]
   /// The manifest's workspace, so a refusal can name the tree to export again.
   let slug: String
