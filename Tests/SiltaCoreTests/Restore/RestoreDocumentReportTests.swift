@@ -20,8 +20,8 @@ struct RestoreDocumentReportTests {
     #expect(counts["doc_rev"]?.0 == 0 && counts["doc_rev"]?.1 == 5)
     #expect(counts["doc_verification"]?.0 == 0 && counts["doc_verification"]?.1 == 1)
     #expect(counts["comment"]?.0 == 0 && counts["comment"]?.1 == 4)
-    #expect(counts["doc"] == nil && counts["doc_comment"] == nil)
-    #expect(counts["doc_revision_allocation"] == nil && counts["doc_comment_sequence"] == nil)
+    #expect(counts["doc"]?.0 == nil && counts["doc_comment"]?.0 == nil)
+    #expect(counts["doc_revision_allocation"]?.0 == nil && counts["doc_comment_sequence"]?.0 == nil)
     let rendered = OutputRouter.render(
       .success(CommandOutput(text: "", data: result.presented)), mode: OutputMode(json: true))
     Golden.forTests().check(rendered.stdout, "restore-doc-report.json")
@@ -60,9 +60,17 @@ struct RestoreDocumentReportTests {
     var before = try RestoreDocumentGraphFixture.graph().tree
     let index = key == "app_shas" ? 5 : (key == "comment" ? 6 : 1)
     let field = key == "comment" ? "body_md" : key
-    RestoreDocumentGraphFixture.record(&before.documents, index, field, "caf\u{e9}")
+    func value(_ ref: String) -> String {
+      if key == "about_refs" { return "[\"service:" + ref + "\"]" }
+      if key == "app_shas" {
+        return "[{\"app\":\"legacy-app\",\"ref\":\"" + ref
+          + "\",\"sha\":\"" + String(repeating: "a", count: 40) + "\"}]"
+      }
+      return ref
+    }
+    RestoreDocumentGraphFixture.record(&before.documents, index, field, value("caf\u{e9}"))
     var after = before
-    RestoreDocumentGraphFixture.record(&after.documents, index, field, "cafe\u{301}")
+    RestoreDocumentGraphFixture.record(&after.documents, index, field, value("cafe\u{301}"))
     #expect(
       before.documents.documents[0].records[index].value(field)
         == after.documents.documents[0].records[index].value(field))

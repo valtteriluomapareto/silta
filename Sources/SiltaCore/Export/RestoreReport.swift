@@ -85,6 +85,14 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
   package var manifestSHA256: String
   /// Tasks before and after.
   package var tasks: Counts
+  /// Documents before and after.
+  package var docs: Counts
+  /// Current document refs absent from the incoming stable identities.
+  package var removedDocs: [String]
+  /// Incoming refs of retained documents whose literal content differs.
+  package var changedDocs: [String]
+  /// A presentation value with safe document and workspace identities.
+  package var presented: Self { self }
   /// Refs of tasks that exist now and not in the tree.
   package var removed: [String]
   /// Refs of tasks whose row or records differ from the tree.
@@ -106,6 +114,9 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case workspace, created, tasks, removed, changed, rows, settings, snapshot
+    case docs
+    case removedDocs = "removed_docs"
+    case changedDocs = "changed_docs"
     case dryRun = "dry_run"
     case nextTaskRef = "next_task_ref"
     case sameUID = "same_uid"
@@ -144,6 +155,7 @@ extension RestoreReport {
       workspace: workspace, dryRun: dryRun, created: current == nil,
       sameUID: current.map { $0.workspace.value("uid") == tree.workspace.value("uid") } ?? true,
       manifestSHA256: digest, tasks: Counts(before: existing.count, after: tree.tasks.count),
+      docs: Counts(before: 0, after: 0), removedDocs: [], changedDocs: [],
       removed: removed, changed: changed, rows: rowCounts(current, tree),
       settings: settingChanges(
         current?.workspace.value("settings"), tree.workspace.value("settings")),
