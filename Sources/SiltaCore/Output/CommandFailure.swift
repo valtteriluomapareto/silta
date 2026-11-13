@@ -3,7 +3,7 @@ package struct CommandFailure: WarnedFailure {
   /// Preserves the original error's scripting category.
   package let code: ErrorCode
 
-  /// Preserves the original explanation without retaining its error object.
+  /// The original or caller-protected explanation, without retaining its error object.
   package let message: String
 
   /// Contains actual command paths and any safe workspace context.
@@ -18,10 +18,11 @@ package struct CommandFailure: WarnedFailure {
   /// Preserves the original failure's warnings.
   package let warnings: [OutputWarning]
 
-  /// Captures only public diagnostics and the corrected recovery commands.
-  package init(error: any CodedError, next: [String], nextBy: NextBy? = nil) {
+  /// Captures public diagnostics and recovery; an omitted message preserves the original.
+  package init(error: any CodedError, next: [String], nextBy: NextBy? = nil, message: String? = nil)
+  {
     code = error.code
-    message = error.message
+    self.message = message ?? error.message
     retryAfter = error.retryAfter
     self.nextBy = nextBy ?? error.nextBy
     warnings = (error as? any WarnedFailure)?.warnings ?? []
