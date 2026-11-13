@@ -2,6 +2,10 @@ import GRDB
 
 extension DocStore {
   func attachments(_ doc: Int64) throws -> [Row] {
+    try Self.attachments(doc, workspace: workspace, in: db)
+  }
+
+  static func attachments(_ doc: Int64, workspace: Int64, in db: Database) throws -> [Row] {
     try Row.fetchAll(
       db,
       sql: """

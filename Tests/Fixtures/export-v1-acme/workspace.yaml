@@ -1,0 +1,18 @@
+workspace: {"uid": "01HF7YAT01R5E052FC5M592SZC", "slug": "acme", "name": "Acme", "task_prefix": "AC", "settings": "{}", "next_task_seq": "2"}
+repos:
+  - {"uid": "01HF7YAT01BSAK5YZEMA9ZG2Y9", "slug": "platform"}
+apps:
+  - {"uid": "01HF7YAT01Q6TG3MERAJXQ3002", "slug": "mobile", "previous_slugs": "[]", "name": "mobile", "repo": "01HF7YAT01BSAK5YZEMA9ZG2Y9", "ref": "origin/mobile", "is_primary": "1", "lifecycle": "active"}
+  - {"uid": "01HF7YAT01MMY3DNVCXJCY0XC5", "slug": "doc", "previous_slugs": "[]", "name": "doc", "repo": "01HF7YAT01BSAK5YZEMA9ZG2Y9", "ref": "origin/api", "is_primary": "1", "lifecycle": "active"}
+  - {"uid": "01HF7YAT01N0YQWDEY30BMK5K7", "slug": "edge", "previous_slugs": "[]", "name": "edge", "repo": "01HF7YAT01BSAK5YZEMA9ZG2Y9", "ref": "origin/edge", "is_primary": "1", "lifecycle": "active"}
+  - {"uid": "01HF7YAT01C57NC0BQVHTPFZMB", "slug": "service", "previous_slugs": "[]", "name": "service", "repo": "01HF7YAT01BSAK5YZEMA9ZG2Y9", "ref": "origin/service", "is_primary": "1", "lifecycle": "active"}
+environments: []
+services:
+  - {"uid": "01HF7YAT01R1ETMJWASXV792N2", "slug": "push service", "name": "push service"}
+edges:
+  - {"uid": "01HF7YAT01N1BMRVXEDPDPYETA", "from_app": "01HF7YAT01Q6TG3MERAJXQ3002", "to_app": "01HF7YAT01MMY3DNVCXJCY0XC5", "kind": "HTTP API", "summary": "Push categories", "code_refs": "[\"doc:Sources/Rules.swift\"]"}
+  - {"uid": "01HF7YAT01CC5ZVDX6MRTABWDA", "from_app": "01HF7YAT01Q6TG3MERAJXQ3002", "to_service": "01HF7YAT01R1ETMJWASXV792N2", "kind": "SDK / v1", "summary": "Push delivery", "code_refs": "[\"service@release:Sources/Push.swift\"]"}
+topics:
+  - {"uid": "01HF7YAT01XT4TYC4P6Y2AW235", "slug": "messaging", "previous_slugs": "[]", "name": "messaging", "status": "active"}
+topic_aliases: []
+sources: []

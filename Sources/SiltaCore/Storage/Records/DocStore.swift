@@ -11,9 +11,19 @@ struct DocStore {
 
   var db: Database { transaction.database }
 
-  func accept(_ draft: DocDraft) throws -> DocRevision {
+  /// Requires pre-write evidence; changed bindings refuse before any row mutation.
+  func accept(_ draft: DocDraft, verification: DocVerification) throws -> DocRevision {
     let old = try find(draft.slug)
-    let metadata = try metadata(draft, old: old)
+    let metadata: DocMetadata
+    do {
+      metadata = try DocMetadata.resolve(draft, workspace: workspace, in: db)
+    } catch let error as any CodedError where [.usage, .invalid, .notFound].contains(error.code) {
+      throw DocError.changed(workspace: verification.binding.workspace)
+    }
+    let current = try DocVerification.binding(metadata, workspace: workspace, in: db)
+    guard verification.matches(current) else {
+      throw DocError.changed(workspace: verification.binding.workspace)
+    }
     let stamp = utcTimestamp(at)
     let id = try docID(draft, metadata: metadata, old: old, stamp: stamp)
     let number = try nextRevision(id, slug: draft.slug)
@@ -38,11 +48,11 @@ struct DocStore {
     try db.execute(
       sql: """
         INSERT INTO doc_verification(uid,doc_rev_id,actor,message,app_shas,created_at)
-        VALUES(?,?,?,?,'[]',?)
+        VALUES(?,?,?,?,?,?)
         """,
       arguments: [
         try ids.next(at: at), revisionID, actor.description,
-        draft.message ?? "Accepted revision.", stamp,
+        draft.message ?? "Accepted revision.", try verification.encodedSnapshots(), stamp,
       ])
     try transaction.recordChange(kind: "doc", rowID: id)
     return try Self.revision(draft.slug, revision: number, workspace: workspace, in: db)
@@ -90,7 +100,7 @@ struct DocStore {
     return Int(try transaction.nextSequence(scope: scope))
   }
 
-  private func docID(_ draft: DocDraft, metadata: Metadata, old: Row?, stamp: String) throws
+  private func docID(_ draft: DocDraft, metadata: DocMetadata, old: Row?, stamp: String) throws
     -> Int64
   {
     if let old { return old["id"] }

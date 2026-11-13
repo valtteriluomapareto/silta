@@ -1,0 +1,14 @@
+{
+  "format": "1",
+  "schema": "v4",
+  "workspace": "acme",
+  "counts": {"alias_decision": "0", "app": "4", "approval": "1", "comment": "1", "edge": "2", "environment": "0", "link": "0", "repo": "1", "review_request": "0", "service": "1", "source": "0", "task": "1", "task_event": "1", "task_plan_rev": "0", "topic": "1", "topic_alias": "0", "workspace": "1"},
+  "files": [
+    {"path": "alias_decisions.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "approvals.jsonl", "sha256": "296fe09a61827de96c8b790191e37f5f770f1c57a67e415a718e65c420a47771"},
+    {"path": "links.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "tasks/AC-1.jsonl", "sha256": "dcdcbadbc77b71e1d6c6754c69f82d2f6335ef4ab86fb00190c36e8e2fa96417"},
+    {"path": "tasks/AC-1.md", "sha256": "5589238bfb5438be27278ffb6cb9e816ee4c8d86331b0d04ef21946e5ee49f7f"},
+    {"path": "workspace.yaml", "sha256": "c00bb1c7da47b71c6c776916b8df2d6b6434fe5796a34397e4f66f1c917ad359"}
+  ]
+}

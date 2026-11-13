@@ -62,8 +62,10 @@ package struct ExportTask: Equatable, Sendable {
   package var records: [ExportRow]
 }
 
-/// A workspace as format 1 holds it, independent of integer ids.
+/// One exported workspace, independent of integer ids.
 package struct ExportSnapshot: Equatable, Sendable {
+  /// The canonical format rendered by this snapshot.
+  package var format: String = ExportFormat.version
   /// The last applied migration.
   package var schema: String
   /// The workspace row.
@@ -95,6 +97,10 @@ package struct ExportSnapshot: Equatable, Sendable {
       ExportFormat.aliasDecisionsFile: ExportFormat.jsonl(aliasDecisions),
       ExportFormat.approvalsFile: ExportFormat.jsonl(approvals),
     ]
+    if format == "2" {
+      files[ExportFormat.docAllocationsFile] = ""
+      files[ExportFormat.docCommentSequencesFile] = ""
+    }
     for task in tasks {
       files["tasks/\(task.ref).md"] = Self.markdown(task.row)
       files["tasks/\(task.ref).jsonl"] = ExportFormat.jsonl(task.records)
@@ -140,6 +146,13 @@ package struct ExportSnapshot: Equatable, Sendable {
       counts[record.table] =
         tasks.map { $0.records.filter { $0.value("table") == record.table }.count }.reduce(0, +)
     }
+    if format == "2" {
+      for kind in [
+        "doc", "doc_rev", "doc_verification", "doc_revision_allocation", "doc_comment_sequence",
+      ] {
+        counts[kind] = 0
+      }
+    }
     counts["link"] = links.count
     counts["alias_decision"] = aliasDecisions.count
     counts["approval"] = approvals.count
@@ -152,7 +165,7 @@ package struct ExportSnapshot: Equatable, Sendable {
     }
     return """
       {
-        "format": \(ExportFormat.quote(ExportFormat.version)),
+        "format": \(ExportFormat.quote(format)),
         "schema": \(ExportFormat.quote(schema)),
         "workspace": \(ExportFormat.quote(workspace.value("slug") ?? "")),
         "counts": {\(countLine)},

@@ -264,7 +264,7 @@ package enum ExportService {
   private struct SwapFailure: Error {}  // guard:allow-error mapped to unwritable by export
 
   /// Refuses a target that isn't absent, empty or this workspace's previous export:
-  /// a format 1 manifest for `workspace`, no file it doesn't list (`.DS_Store` aside)
+  /// a supported format manifest for `workspace`, no file it doesn't list (`.DS_Store` aside)
   /// and nothing unreadable. Listed files may be missing; they are rewritten.
   private static func checkTarget(_ target: URL, workspace: String) throws {
     let refused = { (entry: String) in

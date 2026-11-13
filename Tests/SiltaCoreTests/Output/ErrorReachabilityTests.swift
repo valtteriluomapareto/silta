@@ -84,6 +84,7 @@ extension DocError: ErrorExamples {
     [
       .missing(["--title", "--about"]),
       .invalid("A doc needs at least one --about map item."), .notFound("missing"),
+      .changed(workspace: "acme"),
     ]
   }
 }
@@ -216,7 +217,7 @@ extension ExportError: ErrorExamples {
     [
       .notAnExport(path: "/tmp/acme-notes/acme", entry: "it holds README.md", workspace: "acme"),
       .insideRepo(path: "/tmp/acme/platform/exports/acme", repo: "platform", workspace: "acme"),
-      .unsupported("docs"), .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
+      .unsupported("docs"), .newerFormat, .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
       .invalidTree(reason: "links.jsonl does not match its sha256", workspace: "acme"),
       .notATree(path: "/tmp/acme-notes", reason: "it has no manifest.json", child: "acme"),
       .notATree(path: "/tmp/silta-2023-11-14.db", reason: "it is a file", child: nil),

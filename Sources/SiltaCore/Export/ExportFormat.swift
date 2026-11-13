@@ -1,9 +1,9 @@
 import CryptoKit
 import Foundation
 
-/// Format 1 keys and layout (spec §15), shared by rendering and the reader.
+/// Canonical keys and layout (spec §15), shared by rendering and the reader.
 enum ExportFormat {
-  static let version = "1"
+  static let version = "2"
 
   static let workspaceKeys = ["uid", "slug", "name", "task_prefix", "settings", "next_task_seq"]
 
@@ -121,6 +121,9 @@ enum ExportFormat {
     "task": "task", "comment": "comment", "app": "app", "topic": "topic",
     "task_plan_rev": "task_plan_rev",
   ]
+
+  static let docAllocationsFile = "doc_revision_allocations.jsonl"
+  static let docCommentSequencesFile = "doc_comment_sequences.jsonl"
 
   static let workspaceFile = "workspace.yaml"
   static let linksFile = "links.jsonl"
