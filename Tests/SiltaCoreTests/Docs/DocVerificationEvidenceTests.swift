@@ -20,13 +20,11 @@ struct DocVerificationEvidenceTests {
             $0, sql: "SELECT app_shas FROM doc_verification ORDER BY id DESC LIMIT 1")
         })
       let snapshots = try JSONDecoder().decode([[String: String]].self, from: Data(raw.utf8))
-      withKnownIssue("SI-79/12: accepting an edge stores no referenced-app evidence") {
-        #expect(
-          snapshots == [
-            ["app": "api", "ref": "origin/api", "sha": String(repeating: "f", count: 40)],
-            ["app": "mobile", "ref": "origin/mobile", "sha": String(repeating: "f", count: 40)],
-          ])
-      }
+      #expect(
+        snapshots == [
+          ["app": "api", "ref": "origin/api", "sha": String(repeating: "f", count: 40)],
+          ["app": "mobile", "ref": "origin/mobile", "sha": String(repeating: "f", count: 40)],
+        ])
     }
   }
 

@@ -18,7 +18,13 @@ struct DocStoreTests {
   static func accept(_ draft: DocDraft, in store: DatabaseStore, ids: any IDGenerator) throws
     -> DocRevision
   {
-    try store.write { try writer($0, ids: ids).accept(draft) }
+    let binding = try DocVerification.readBinding(draft, workspace: 1, store: store)
+    let verification = DocVerification(
+      binding: binding,
+      snapshots: binding.apps.map {
+        .init(app: $0.app, ref: $0.ref, sha: String(repeating: "f", count: 40))
+      })
+    return try store.write { try writer($0, ids: ids).accept(draft, verification: verification) }
   }
 
   @Test func acceptedRevisionsPreserveMetadataAndStableAttachments() throws {
@@ -57,7 +63,9 @@ struct DocStoreTests {
         #expect(old.body == "Keep unknown categories visible." && old.about == first.about)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_verification") == 2)
         #expect(
-          try String.fetchAll(db, sql: "SELECT app_shas FROM doc_verification") == ["[]", "[]"])
+          try String.fetchAll(db, sql: "SELECT app_shas FROM doc_verification").allSatisfy {
+            $0.contains("\"app\":\"api\"") && $0.contains(String(repeating: "f", count: 40))
+          })
         #expect(
           try String.fetchOne(db, sql: "SELECT verified_at FROM doc") == "2023-11-14T22:13:20.000Z")
         #expect(

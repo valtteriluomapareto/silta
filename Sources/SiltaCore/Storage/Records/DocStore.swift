@@ -11,7 +11,7 @@ struct DocStore {
 
   var db: Database { transaction.database }
 
-  func accept(_ draft: DocDraft) throws -> DocRevision {
+  func accept(_ draft: DocDraft, verification: DocVerification) throws -> DocRevision {
     let old = try find(draft.slug)
     let metadata = try DocMetadata.resolve(draft, workspace: workspace, in: db)
     let stamp = utcTimestamp(at)
@@ -38,11 +38,11 @@ struct DocStore {
     try db.execute(
       sql: """
         INSERT INTO doc_verification(uid,doc_rev_id,actor,message,app_shas,created_at)
-        VALUES(?,?,?,?,'[]',?)
+        VALUES(?,?,?,?,?,?)
         """,
       arguments: [
         try ids.next(at: at), revisionID, actor.description,
-        draft.message ?? "Accepted revision.", stamp,
+        draft.message ?? "Accepted revision.", try verification.encodedSnapshots(), stamp,
       ])
     try transaction.recordChange(kind: "doc", rowID: id)
     return try Self.revision(draft.slug, revision: number, workspace: workspace, in: db)
