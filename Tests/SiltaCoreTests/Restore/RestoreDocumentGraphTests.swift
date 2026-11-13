@@ -132,7 +132,8 @@ struct RestoreDocumentGraphTests {
       let store = try RestoreDocumentGraphFixture.source(home)
       let before = try RestoreSupport.dump(store)
       let links = try store.read { try ExportLinks.read($0, workspace: 17) }
-      #expect(links == RestoreDocumentGraphFixture.links())
+      let expected = try RestoreDocumentGraphFixture.links()
+      #expect(links == expected)
       Golden.forTests().check(ExportFormat.jsonl(links), "export/typed-doc-links/links.jsonl")
       #expect(try RestoreSupport.dump(store) == before)
       #expect(throws: ExportError.unsupported("docs")) {
