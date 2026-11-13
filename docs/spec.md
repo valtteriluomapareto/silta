@@ -382,7 +382,7 @@ CREATE TABLE link (
   workspace_id INTEGER NOT NULL REFERENCES workspace(id),
   from_kind TEXT NOT NULL, from_id INTEGER NOT NULL,          -- task | doc | comment
   rel TEXT NOT NULL,                                          -- about | source | blocked_by | relates | cites
-  to_kind TEXT NOT NULL,                                      -- task | task_plan_rev | comment | doc | doc_rev | app | topic | note | code | url | ext
+  to_kind TEXT NOT NULL,                                      -- known owned row kind, or note | code | url | ext
   to_id INTEGER, to_ext TEXT,
   anchor TEXT,                                -- owned target line anchor, separate from identity
   created_by TEXT NOT NULL, created_at TEXT NOT NULL,
