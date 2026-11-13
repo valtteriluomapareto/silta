@@ -1,0 +1,6 @@
+doc:rules@3/2 [answer, accepted]
+actor: agent:codex:acme
+created_at: 2023-11-15
+reply_to: doc:rules@3/1
+
+Keep unknown statuses.
