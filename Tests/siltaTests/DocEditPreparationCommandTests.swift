@@ -49,19 +49,16 @@ struct DocEditPreparationCommandTests {
             : ["silta --ws 'acme' repo fetch 'platform'", "silta --ws 'acme' ws show"]
       let owner = scope == "acme" && missingPath ? "human" : "agent"
       let report = result.stdout + result.stderr
-      withKnownIssue("SI-105/5,/6: preparation recovery is replaced and configured identities leak")
-      {
-        if json {
-          #expect(error["next"] as? [String] == next && error["next_by"] as? String == owner)
-        } else {
-          #expect(next.allSatisfy(report.contains))
-          #expect(report.contains(owner == "human" ? "ask human:" : "next:"))
-        }
-        if variant != "path" && variant != "ref" { #expect(!report.contains(configured)) }
-        #expect(!report.contains("doc edit") && !report.contains("--approved"))
-        if variant == "pat-ref" {
-          Golden.forTests().check(report, "doc-edit-preparation-secret." + (json ? "json" : "txt"))
-        }
+      if json {
+        #expect(error["next"] as? [String] == next && error["next_by"] as? String == owner)
+      } else {
+        #expect(next.allSatisfy(report.contains))
+        #expect(report.contains(owner == "human" ? "ask human:" : "next:"))
+      }
+      if variant != "path" && variant != "ref" { #expect(!report.contains(configured)) }
+      #expect(!report.contains("doc edit") && !report.contains("--approved"))
+      if variant == "pat-ref" {
+        Golden.forTests().check(report, "doc-edit-preparation-secret." + (json ? "json" : "txt"))
       }
     }
   }
