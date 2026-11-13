@@ -117,7 +117,7 @@ struct BriefBacklog {
       """
   }
 
-  private func topicID(_ word: String, workspace: Int64) throws -> Int64 {
+  func topicID(_ word: String, workspace: Int64) throws -> Int64 {
     guard
       let id = try Int64.fetchOne(
         db,
