@@ -1,0 +1,20 @@
+acme / platform / api [high: single]
+branch: main
+task: AC-1
+app: api
+docs about app:api:
+  doc:rule-01 [reference] AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.AcmeRule.Acm
+  docs: 29 more (silta --ws 'acme' doc ls --about 'app:api')
+neighbour: edge:api/service:push/sdk Push
+open: AC-1 [doing, p2] Handle push
+open: AC-2 [todo, p2] Acme backlog
+open: AC-3 [todo, p2] Acme backlog
+open: AC-4 [todo, p2] Acme backlog
+open: AC-5 [todo, p2] Acme backlog
+open: AC-6 [todo, p2] Acme backlog
+open: AC-7 [todo, p2] Acme backlog
+open: AC-8 [todo, p2] Acme backlog
+4 more open:
+next: silta --ws 'acme' task ls --app 'api'
+next: silta --ws 'acme' task ls --topic 'messaging'
+more: silta --ws 'acme' task show AC-1

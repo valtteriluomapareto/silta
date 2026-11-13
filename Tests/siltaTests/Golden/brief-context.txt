@@ -10,10 +10,10 @@ Acme task body
 app: api
 summary: Acme API
 environment: prod https://api.acme.example
-neighbour: api -> service:push [uses] Acme push
-neighbour: api -> portal [calls] Acme integration
+neighbour: edge:api/service:push/uses Acme push
+neighbour: edge:api/portal/calls Acme integration
 next: silta --ws 'acme' code show 'api' --lines 1 -- 'README.md'
-neighbour: portal -> api [calls] Acme caller
+neighbour: edge:portal/api/calls Acme caller
 next: silta --ws 'acme' code ls 'portal'
 open: AC-1 [doing, p2] Acme task
 open: AC-2 [doing, p2] Acme task (app: portal)
