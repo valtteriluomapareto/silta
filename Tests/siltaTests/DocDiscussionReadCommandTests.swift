@@ -214,3 +214,74 @@ struct DocDiscussionReadCommandTests {
     return store
   }
 }
+
+extension DocDiscussionReadCommandTests {
+  @Test(arguments: [false, true])
+  func unsafeDiscussionIdentitiesHaveSafeRecovery(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let secret = "AKIA" + String(repeating: "A", count: 16)
+      try renameDiscussion(store, slug: secret)
+      let ref = "doc:\(secret)@3"
+      for args in [
+        ["show", ref, "--diff"], ["show", ref, "--comments"], ["show", ref + "/1"],
+        ["show", ref, "--diff", "--lines", "9999"],
+        ["show", ref, "--comments", "--lines", "9999"],
+        ["show", ref + "/1", "--lines", "9999"],
+        ["show", ref, "--comments", "--offset", "1", "--limit", "1"],
+        ["ls", "--offset", "1", "--limit", "1"], ["show", ref + "/99"],
+      ] {
+        let result = try run(args, scratch, json: json)
+        #expect(result.termination == .exit(args[1].hasSuffix("/99") ? 2 : 0))
+        let report = result.stdout + result.stderr
+        withKnownIssue("Discussion identity or recovery bypasses basic document masking") {
+          #expect(!report.contains(secret))
+          #expect(report.contains("silta --ws 'acme' doc ls"))
+          #expect(!report.contains("doc ls --") && !report.contains("doc show 'doc:[REDACTED:"))
+        }
+      }
+      try store.write { try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE rev=3") }
+      let missing = try run(["show", ref, "--diff"], scratch, json: json)
+      #expect(missing.termination == .exit(2))
+      withKnownIssue("Missing recorded-base recovery exposes an unsafe document identity") {
+        #expect(!(missing.stdout + missing.stderr).contains(secret))
+        #expect((missing.stdout + missing.stderr).contains("silta --ws 'acme' doc ls"))
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func typedDiscussionRefsPreservePinnedViews(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let slug = String(repeating: "a", count: 52)
+      try renameDiscussion(store, slug: slug)
+      let ref = "doc:\(slug)@3"
+      for (args, suffix) in [
+        (["show", ref, "--diff"], "'\(ref)' --diff --lines"),
+        (
+          ["show", ref, "--comments", "--limit", "1"],
+          "'\(ref)' --comments --offset 0 --limit 1 --lines"
+        ),
+        (["show", ref + "/1"], "'\(ref)/1' --lines"),
+        (
+          ["show", ref, "--comments", "--offset", "1", "--limit", "1"],
+          "'\(ref)' --comments --offset 2 --limit 1"
+        ),
+      ] {
+        let result = try run(args, scratch, json: json)
+        #expect(result.termination == .exit(0))
+        #expect(result.stdout.contains("silta --ws 'acme' doc show " + suffix))
+      }
+    }
+  }
+
+  private func renameDiscussion(_ store: DatabaseStore, slug: String) throws {
+    let body = (1...450).map { "line \($0)" }.joined(separator: "\n")
+    try store.write {
+      try $0.database.execute(sql: "UPDATE doc SET slug=?", arguments: [slug])
+      try $0.database.execute(sql: "UPDATE doc_rev SET body_md=? WHERE rev=3", arguments: [body])
+      try $0.database.execute(sql: "UPDATE comment SET body_md=? WHERE seq=1", arguments: [body])
+    }
+  }
+}
