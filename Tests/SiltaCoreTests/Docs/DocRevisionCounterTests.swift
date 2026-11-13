@@ -25,11 +25,13 @@ struct DocRevisionCounterTests {
       draft.slug = "other"
       #expect(try DocStoreTests.accept(draft, in: store, ids: ids).revision == 1)
       draft.slug = "rules"
+      let binding = try DocVerification.readBinding(draft, workspace: 2, store: store)
+      let verification = DocVerification(binding: binding, snapshots: [])
       let beta = try store.write {
         try DocStore(
           workspace: 2, transaction: $0, actor: DocStoreTests.actor,
           ids: ids, at: DocStoreTests.instant
-        ).accept(draft)
+        ).accept(draft, verification: verification)
       }
       #expect(beta.revision == 1)
       #expect(

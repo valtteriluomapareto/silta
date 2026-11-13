@@ -1,0 +1,3 @@
+error: --title must be one line of at most 120 characters. [invalid]
+next: silta ws show
+{"error":{"code":"invalid","message":"--title must be one line of at most 120 characters.","next":["silta ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

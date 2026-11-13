@@ -57,6 +57,16 @@ package struct CodeService {
       warnings: (fetch || immutable ? [] : stale(selection)) + warnings)
   }
 
+  /// Resolves a captured app selection without selecting it again or reading content.
+  func resolveCommit(app: String, ref: String, repo: String, path: String) async throws -> String {
+    guard FileManager.default.fileExists(atPath: path + "/.git") else {
+      throw RepoError.localPath(repo: repo, workspace: workspace)
+    }
+    let selection = Selection(
+      ref: ref, prod: nil, subpath: "", repo: repo, path: path, fetched: nil)
+    return try await resolve(ref, app: app, selection: selection, operation: .list(nil))
+  }
+
   /// Resolves `ref` to a commit. A ref git rejects or can't find is `not_found`; when its
   /// `origin/` counterpart resolves, the error suggests repeating the read with that ref.
   private func resolve(
