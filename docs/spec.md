@@ -1594,8 +1594,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     **`docs/<slug>.jsonl`** holds revision metadata without the body, followed by
     verification and revision-owned comment rows. Nullable historical metadata
     stays absent; original about refs and verification evidence stay literal even
-    when their map targets have been removed. Current title and kind must match
-    their accepted revision, and an unarchived accepted doc needs live attachments.
+    when their map targets have been removed. Restore requires current title and kind
+    to match their accepted revision, and an unarchived accepted doc needs live attachments.
   - **Document allocation streams:** `doc_revision_allocations.jsonl` holds each
     reserved `slug` and its next revision number, including names without a doc.
     `doc_comment_sequences.jsonl` holds each revision UID (`doc_rev`) and its next
@@ -1619,7 +1619,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq` and the
     two document allocation streams.
   - **Refusals, with nothing written:** a database with migrations this binary
-    doesn't know; unknown link kinds or malformed document graphs.
+    doesn't know; unknown link kinds.
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
     from the working directory, and an unexpanded `~` is refused. Export replaces
     `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous
