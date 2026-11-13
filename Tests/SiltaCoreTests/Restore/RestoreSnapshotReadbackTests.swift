@@ -6,6 +6,20 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreSnapshotReadbackTests {
+  @Test func genuineOldFormatNormalizesOnlyTheCurrentEnvelope() throws {
+    try withScratchDirectory { home in
+      let store = try ExportFixture.make(home)
+      let incoming = try ExportTree.parse(ExportVersionTests.frozen())
+      var after = incoming
+      after.format = "2"
+      after.schema = "v7"
+      try store.write(rollingBack: true) { tx in
+        let writer = RestoreWriter(tx: tx, tree: incoming, slug: "acme")
+        try writer.check(after, revisionAllocations: [])
+      }
+    }
+  }
+
   @Test func readbackAllowsOnlyExplicitRestoreNormalizations() throws {
     try withScratchDirectory { home in
       let store = try ExportFixture.make(home)
@@ -16,7 +30,10 @@ struct RestoreSnapshotReadbackTests {
       after.workspace = after.workspace.replacing(
         "next_task_seq", with: "900", keys: ExportFormat.workspaceKeys)
       after.approvals.append(
-        ExportDocumentTests.row([("uid", "retained-approval"), ("actor", "human:acme")]))
+        ExportDocumentTests.row([
+          ("uid", "retained-approval"), ("actor", "human:acme"),
+          ("command", "silta ws edit"), ("words", "Approved"), ("created_at", ""),
+        ]))
       var floors = after.documents.revisionAllocations
       floors[1] = floors[1].replacing("next", with: "151", keys: ["slug", "next"])
       floors.append(ExportDocumentTests.row([("slug", "absent-name"), ("next", "333")]))
