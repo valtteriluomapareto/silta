@@ -12,14 +12,25 @@ struct BriefContext {
   func sections(topics requested: [String], compact: Bool = false) throws
     -> (sections: [BriefSection], warnings: [OutputWarning])
   {
-    let backlog = try BriefBacklog(
-      db: db, location: location, actor: actor,
-      date: date, archiveDays: archiveDays
-    ).sections(topics: requested)
-    return (try appSections() + backlog.sections, backlog.warnings)
+    let reader = BriefBacklog(
+      db: db, location: location, actor: actor, date: date, archiveDays: archiveDays)
+    let backlog = try reader.sections(topics: requested)
+    let workspace = try TaskService.workspaceID(location.workspace, in: db)
+    let explicit = try Set(requested.map { try reader.topicID($0, workspace: workspace) })
+    let docs = try BriefDocs(db: db, location: location, topics: explicit, compact: compact)
+    let app = try appSections(documents: docs)
+    var sections = app + backlog.sections
+    let topics = try docs.topicGroups()
+    if !topics.isEmpty {
+      let beforeGlossary =
+        backlog.sections.firstIndex { $0.id == "glossary" } ?? backlog.sections.count
+      sections.insert(
+        BriefSection(id: "docs", text: "", documents: topics), at: app.count + beforeGlossary)
+    }
+    return (sections, backlog.warnings)
   }
 
-  private func appSections() throws -> [BriefSection] {
+  private func appSections(documents: BriefDocs) throws -> [BriefSection] {
     guard let app = location.app,
       let row = try Row.fetchOne(
         db,
@@ -58,10 +69,13 @@ struct BriefContext {
             "AGENTS.md: \(TaskError.shown((location.displayWorktree ?? location.worktree) + "/AGENTS.md"))\n"
         ))
     }
-    return sections + (try neighbours(id: id, app: app))
+    if let group = try documents.group(kind: "app", id: id) {
+      sections[sections.count - 1].documents = [group]
+    }
+    return sections + (try neighbours(id: id, app: app, documents: documents))
   }
 
-  private func neighbours(id: Int64, app: String) throws -> [BriefSection] {
+  private func neighbours(id: Int64, app: String, documents: BriefDocs) throws -> [BriefSection] {
     var sections: [BriefSection] = []
     var emitted: Set<String> = []
     let workspace = try TaskService.workspaceID(location.workspace, in: db)
@@ -77,7 +91,6 @@ struct BriefContext {
         """, arguments: [id, id])
     {
       let source: String = edge["source"]
-      let target: String = edge["target"] ?? "service:" + (edge["service"] as String? ?? "")
       let fallback = source == app ? (edge["target"] as String? ?? source) : source
       var commands: [String] = []
       do {
@@ -97,10 +110,18 @@ struct BriefContext {
         ]
       }
       commands = commands.filter { emitted.insert($0).inserted }
+      let edgeID: Int64 = edge["id"]
+      let ref = try TaskLinkTarget(kind: "edge", id: edgeID).rendered(in: db)
       let text =
-        "neighbour: \(TaskError.shown(source)) -> \(TaskError.shown(target)) [\(TaskError.shown(edge["kind"]))] \(TaskError.shown(edge["summary"]))\n"
+        "neighbour: \(BriefDocGroup.shown(ref)) \(TaskError.shown(edge["summary"]))\n"
         + commands.map { "next: " + $0 + "\n" }.joined()
-      sections.append(BriefSection(id: "neighbours", text: text))
+      var groups = try documents.group(kind: "edge", id: edgeID).map { [$0] } ?? []
+      if let service: Int64 = edge["to_service_id"],
+        let group = try documents.group(kind: "service", id: service)
+      {
+        groups.append(group)
+      }
+      sections.append(BriefSection(id: "neighbours", text: text, documents: groups))
     }
     return sections
   }

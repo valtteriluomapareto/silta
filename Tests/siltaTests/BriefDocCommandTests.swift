@@ -18,7 +18,8 @@ extension BriefCommandTests {
 
             Use the fallback.
             Another paragraph.','accepted','human:acme','' FROM doc WHERE slug='read-first';
-            INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+            INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
+              created_by,created_at)
             SELECT 'brief-link',1,'doc',doc.id,'about','app',app.id,'human:acme',''
             FROM doc JOIN app ON app.slug='api' WHERE doc.slug='read-first';
             """)

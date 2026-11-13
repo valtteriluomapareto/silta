@@ -1366,8 +1366,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
    the resolved worktree's repo root with its on-disk casing, including for subpath apps,
    only when that file exists.
-5. **Neighbours**: edges in and out, ordered by source app, target app, target
-   service, kind and edge id. Configured code references produce complete, quoted
+5. **Neighbours**: edges in and out, printed with their canonical `edge:` refs and
+   ordered by source app, target app, target service, kind and edge id. Configured code references produce complete, quoted
    `silta code show …` commands, including ref and line selection. With no usable
    code references, offer `silta code ls` on the other app. Service edges omit a
    redundant directory command for the current app. Repeated code commands appear
@@ -1391,7 +1391,19 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    when an archive override keeps it, and a
    body-free `closed_at_unreadable` warning counts such tasks; it never fails the brief.
 8. **Decisions** (not yet shown): `decision` comments, plus decisions from meeting notes from M3.
-9. **Docs** (M2): titles, plus stale flags.
+9. **Docs**: current accepted, nonarchived docs appear beside their app, edge or
+   service. Docs about the selected task's topics and explicit `--topic` selections
+   appear before the glossary. Full mode shows at most two slug/kind/summary rows
+   per item, ranking matching task/selected topics then slug. The summary is the
+   first nonempty nonheading line, at most 120 characters; masking precedes selection
+   and clipping. Remaining docs have a count and scoped `doc ls --about` command.
+   Short/hook mode shows counts only and does not read revision bodies. Explicit
+   `--short` keeps these semantics even with a larger `--budget`.
+   Document annotations use spare space after the ordinary brief is fitted and at
+   most 20% of its character budget, including headers and complete recovery commands.
+   Whole annotations degrade to counts or are omitted; they never displace retained
+   baseline content or open tasks. Omitted rows/annotations keep `truncated` truthful.
+   Secret-bearing map refs are masked and use an unfiltered scoped `doc ls` recovery.
 10. **Glossary**: aliases of the topics shown.
 
 Output ends with one `more:` line per complete command, e.g. `more: silta brief --task AC-15`

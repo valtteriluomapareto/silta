@@ -12,7 +12,7 @@ package struct BriefService {
   /// Hook reads may reuse a fresh location cache but never populate it.
   package func resolve(
     path: URL, workspace: String? = nil, app: String? = nil, task: String? = nil,
-    topics: [String] = [], budget: Int = 2500, hook: Bool = false
+    topics: [String] = [], budget: Int = 2500, short: Bool = false, hook: Bool = false
   ) async throws -> BriefReport {
     let location = try await LocationService(environment: environment).resolve(
       path: path, workspace: workspace, app: app, task: task, cacheWrites: !hook)
@@ -39,7 +39,7 @@ package struct BriefService {
         try BriefContext(
           db: db, location: location, actor: environment.actor, date: now,
           archiveDays: settings.archiveAfterDays ?? WorkspaceSettings.defaultArchiveAfterDays
-        ).sections(topics: topics)
+        ).sections(topics: topics, compact: short || hook)
       )
     }
     let selection =
@@ -47,7 +47,7 @@ package struct BriefService {
       + topics.map { " --topic " + shellWord($0) }.joined()
     let more =
       (current.map {
-        (budget < 2500 ? [command + " brief --task " + $0.ref + selection] : [])
+        (short || hook || budget < 2500 ? [command + " brief --task " + $0.ref + selection] : [])
           + [command + " task show " + $0.ref]
       }
         ?? [command + " task ls", command + " ws show"])
@@ -61,6 +61,7 @@ package struct BriefService {
         + discussion.inbox + context.sections,
       more: more, warnings: location.warnings + settings.warnings + context.warnings)
     report.trim(tokens: budget)
+    report.insertDocuments(tokens: budget)
     return report
   }
 
