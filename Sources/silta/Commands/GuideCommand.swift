@@ -102,7 +102,9 @@ extension GuideCommand {
 
         Submit for review with `silta --ws acme task submit AC-12`. Finish when the required \
         review gate \
-        is met; app tasks need their actual commit sha:
+        is met; app tasks need their actual commit sha. A result always has exactly these three \
+        labelled parts, in order: `What was done:`, `Decisions:` (write `none` if there were none) \
+        and `What's left:`.
         ```sh
         silta --ws acme task submit AC-12
         silta --ws acme task done AC-12 --sha <commit-sha> -F - <<'RESULT'
