@@ -17,7 +17,7 @@ enum DocError: CodedError {
   var message: String {
     switch self {
     case .missing(let fields):
-      "A doc with no accepted revision requires: " + fields.joined(separator: ", ") + "."
+      "Missing required doc fields: " + fields.joined(separator: ", ") + "."
     case .invalid(let reason): reason
     case .notFound(let ref): "Doc " + TaskError.shown(ref) + " not found."
     case .changed: "Document metadata or app configuration changed; prepare the write again."

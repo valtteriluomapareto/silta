@@ -1,0 +1,1 @@
+{"error":{"code":"usage","message":"Missing required doc fields: --about.","next":["silta --ws 'acme' doc edit 'doc:rules' --keep-body --about <ref> --approved \"<the human's words>\""],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

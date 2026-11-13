@@ -1,0 +1,2 @@
+error: Doc missing not found. [not_found]
+next: silta --ws 'acme' doc ls

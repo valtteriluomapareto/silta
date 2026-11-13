@@ -263,7 +263,8 @@ struct HelpCommandTests {
 extension HelpCommandTests {
   private static let routesRequiringExamples = [
     "silta agents install", "silta brief", "silta code grep", "silta code show",
-    "silta comment", "silta doc edit", "silta export", "silta inbox", "silta init", "silta restore",
+    "silta comment", "silta doc archive", "silta doc edit", "silta export", "silta inbox",
+    "silta init", "silta restore",
     "silta task add", "silta task ls", "silta task start", "silta task block",
     "silta task plan", "silta task submit", "silta task done", "silta ws edit",
   ]
