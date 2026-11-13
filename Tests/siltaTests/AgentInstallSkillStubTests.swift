@@ -44,7 +44,7 @@ struct AgentInstallSkillStubTests {
       let change = try #require(changes.first { $0["path"] == ".claude/skills/silta/SKILL.md" })
       let diff = try #require(change["diff"])
       #expect(diff.contains("+Read workspace docs shown in the brief"))
-      #expect(diff.contains("+For document workflows, run `silta guide docs`."))
+      #expect(diff.contains("+For document workflows, run `silta guide docs`"))
       let untouched = try AgentsInstallTests.read(".claude/skills/silta/SKILL.md", in: scratch)
       #expect(untouched == installed)
       let applied = try AgentsInstallTests.apply(["install", "--claude"], in: scratch)

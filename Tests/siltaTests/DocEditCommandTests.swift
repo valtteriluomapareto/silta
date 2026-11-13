@@ -205,8 +205,10 @@ struct DocEditCommandTests {
       Golden.forTests().check(help.stdout, "help-doc-edit.txt")
       let schema = try SiltaBinary.run(["schema"], in: scratch)
       #expect(schema.termination == .exit(0) && schema.stdout.contains("silta doc edit"))
-      let guide = try SiltaBinary.run(["guide", "recipes"], in: scratch)
+      let guide = try SiltaBinary.run(["guide", "docs"], in: scratch)
       #expect(guide.stdout.contains("--keep-body") && guide.stdout.contains("--kind"))
+      let recipes = try SiltaBinary.run(["guide", "recipes"], in: scratch)
+      #expect(recipes.stdout.contains("silta guide docs"))
     }
   }
   @Test(arguments: ["edit", "archive"])
