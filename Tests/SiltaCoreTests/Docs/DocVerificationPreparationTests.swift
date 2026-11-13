@@ -155,7 +155,8 @@ struct DocVerificationPreparationTests {
           Self.draft(["app:api"]), workspace: 1,
           environment: Self.environment(home, store: store, git: idle))
       }
-      #expect(idle.requests.isEmpty && (try Self.truth(store)) == absent)
+      #expect(idle.requests.isEmpty)
+      #expect(try Self.truth(store) == absent)
     }
   }
 }
