@@ -1,5 +1,6 @@
 Would restore acme from <scratch>/work/out/acme (manifest <sha>): would replace the workspace.
 Tasks: 2 -> 1.
+Docs: 0 -> 0.
 Removed since the export: AC-2.
 Dry run: the workspace was not changed.
 ask human: silta restore '<scratch>/work/out/acme' --manifest <sha> --approved "<the human's words>"

@@ -1,5 +1,6 @@
 Would restore acme from <scratch>/work/out/acme (manifest <sha>): would replace the workspace.
 Tasks: 2 -> 1.
+Docs: 0 -> 0.
 Removed since the export: AC-2.
 Changed since the export: AC-1.
 Other rows: service 1 -> 0.

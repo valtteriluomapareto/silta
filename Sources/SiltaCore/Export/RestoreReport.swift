@@ -85,6 +85,21 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
   package var manifestSHA256: String
   /// Tasks before and after.
   package var tasks: Counts
+  /// Documents before and after.
+  package var docs: Counts
+  /// Current document refs absent from the incoming stable identities.
+  package var removedDocs: [String]
+  /// Incoming refs of retained documents whose literal content differs.
+  package var changedDocs: [String]
+  /// A presentation value with safe document and workspace identities.
+  package var presented: Self {
+    var report = self
+    report.workspace = SecretGuard.redacted(workspace)
+    report.snapshot = snapshot.map(SecretGuard.redacted)
+    report.removedDocs = removedDocs.map(SecretGuard.redacted)
+    report.changedDocs = changedDocs.map(SecretGuard.redacted)
+    return report
+  }
   /// Refs of tasks that exist now and not in the tree.
   package var removed: [String]
   /// Refs of tasks whose row or records differ from the tree.
@@ -106,6 +121,9 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case workspace, created, tasks, removed, changed, rows, settings, snapshot
+    case docs
+    case removedDocs = "removed_docs"
+    case changedDocs = "changed_docs"
     case dryRun = "dry_run"
     case nextTaskRef = "next_task_ref"
     case sameUID = "same_uid"
@@ -140,15 +158,62 @@ extension RestoreReport {
         claims.append(Claim(task: task.ref, actor: actor))
       }
     }
+    let documents = documentChanges(current, tree)
     return RestoreReport(
       workspace: workspace, dryRun: dryRun, created: current == nil,
       sameUID: current.map { $0.workspace.value("uid") == tree.workspace.value("uid") } ?? true,
       manifestSHA256: digest, tasks: Counts(before: existing.count, after: tree.tasks.count),
+      docs: Counts(
+        before: current?.documents.documents.count ?? 0, after: tree.documents.documents.count),
+      removedDocs: documents.removed, changedDocs: documents.changed,
       removed: removed, changed: changed, rows: rowCounts(current, tree),
       settings: settingChanges(
         current?.workspace.value("settings"), tree.workspace.value("settings")),
       nextTaskRef: taskRefs(current, tree),
       approvalsAdded: 0, claimsReplaced: claims, reposWithoutPath: [], snapshot: nil)
+  }
+
+  private static func documentChanges(_ current: ExportSnapshot?, _ tree: ExportSnapshot)
+    -> (removed: [String], changed: [String])
+  {
+    guard let current else { return ([], []) }
+    let incoming = Dictionary(
+      tree.documents.documents.map { (Data(($0.row.value("uid") ?? "").utf8), $0) }
+    ) { first, _ in first }
+    var removed: [String] = []
+    var changed: [String] = []
+    for document in current.documents.documents {
+      guard let replacement = incoming[Data((document.row.value("uid") ?? "").utf8)] else {
+        removed.append("doc:" + document.slug)
+        continue
+      }
+      if replacement.row != document.row || replacement.records != document.records
+        || !replacement.slug.utf8.elementsEqual(document.slug.utf8)
+        || documentLinks(document, in: current) != documentLinks(replacement, in: tree)
+      {
+        changed.append("doc:" + replacement.slug)
+      }
+    }
+    return (
+      removed.sorted(by: ExportSnapshot.byteOrder), changed.sorted(by: ExportSnapshot.byteOrder)
+    )
+  }
+
+  private static func documentLinks(_ document: ExportDocument, in tree: ExportSnapshot)
+    -> [ExportRow]
+  {
+    let uid = Data((document.row.value("uid") ?? "").utf8)
+    let comments = Set(
+      document.records.compactMap { row -> Data? in
+        guard row.value("table") == "comment", let uid = row.value("uid") else { return nil }
+        return Data(uid.utf8)
+      })
+    return tree.links.filter { link in
+      guard let owner = link.value("from") else { return false }
+      let source = Data(owner.utf8)
+      return (link.value("from_kind") == "doc" && source == uid)
+        || (link.value("from_kind") == "comment" && comments.contains(source))
+    }
   }
 
   /// The task refs before and after, each with its own workspace's prefix: the counter
@@ -169,7 +234,12 @@ extension RestoreReport {
   /// Row counts of the tables outside the tasks that differ.
   private static func rowCounts(_ current: ExportSnapshot?, _ tree: ExportSnapshot) -> [RowCount] {
     func counts(_ snapshot: ExportSnapshot?) -> [(String, Int)] {
-      zip(
+      let documents = snapshot?.documents.documents.flatMap(\.records) ?? []
+      let taskComments =
+        snapshot?.tasks.flatMap(\.records).filter {
+          $0.value("table") == "comment"
+        }.count ?? 0
+      return zip(
         ExportFormat.sections,
         snapshot?.sections ?? tree.sections.map { .init(name: $0.name, rows: []) }
       )
@@ -177,6 +247,9 @@ extension RestoreReport {
         + [
           ("link", snapshot?.links.count ?? 0),
           ("alias_decision", snapshot?.aliasDecisions.count ?? 0),
+          ("doc_rev", documents.filter { $0.value("table") == "doc_rev" }.count),
+          ("doc_verification", documents.filter { $0.value("table") == "doc_verification" }.count),
+          ("comment", taskComments + documents.filter { $0.value("table") == "comment" }.count),
         ]
     }
     return zip(counts(current), counts(tree)).compactMap { before, after in
