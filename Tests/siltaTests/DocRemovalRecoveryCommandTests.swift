@@ -36,7 +36,9 @@ struct DocRemovalRecoveryCommandTests {
       ]
       let blocked = try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.fixed)
       #expect(blocked.termination == .exit(6))
-      let next = try #require(try DocEditCommandTests.error(blocked)["next"] as? [String])
+      let error = try DocEditCommandTests.error(blocked)
+      #expect(error["next_by"] as? String == "human")
+      let next = try #require(error["next"] as? [String])
       #expect(next.count == 3)
       #expect(next.last == "silta --ws 'acme' ws show")
       for (index, command) in next.dropLast().enumerated() {
@@ -94,6 +96,44 @@ struct DocRemovalRecoveryCommandTests {
       withKnownIssue("SI-107: encoded legacy removal refs bypass display secret masking") {
         #expect(!(result.stdout + result.stderr).contains("private123"))
       }
+    }
+  }
+
+  @Test(arguments: ["workspace", "workspace52", "doc", "retained-ref"])
+  func unsafeRecoveryStopsBeforeWriteFlags(variant: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      let sensitive = "AKIA" + String(repeating: "A", count: 16)
+      let scope =
+        variant == "workspace"
+        ? sensitive : variant == "workspace52" ? String(repeating: "a", count: 52) : "acme"
+      let name = variant == "doc" ? sensitive : "rules"
+      try AcmeDocAttachments.attach(name, to: "service", in: store)
+      try AcmeDocAttachments.attach(name, to: "topic", in: store)
+      try store.write { tx in
+        try tx.database.execute(sql: "UPDATE workspace SET slug=?", arguments: [scope])
+        if variant == "retained-ref" {
+          try tx.database.execute(sql: "UPDATE topic SET slug='Password=private123'")
+        }
+      }
+      let file = scratch.appending(path: "map.yml")
+      try AcmeDocAttachments.yaml(removing: "service").replacingOccurrences(
+        of: "slug: acme", with: "slug: " + scope
+      )
+      .write(to: file, atomically: true, encoding: .utf8)
+      let result = try SiltaBinary.run(
+        ["ws", "edit", scope, "-F", file.path, "--approved", "Remove the service", "--json"],
+        in: scratch, environment: TaskCommandTests.fixed)
+      #expect(result.termination == .exit(6))
+      let error = try DocEditCommandTests.error(result)
+      #expect(error["next_by"] as? String == "agent")
+      let next = try #require(error["next"] as? [String])
+      #expect(next.first == (scope == "acme" ? "silta --ws 'acme' doc ls" : "silta ws ls"))
+      #expect(
+        !next.contains {
+          $0.contains("--keep-body") || $0.contains("--about") || $0.contains("--approved")
+        })
+      #expect(!result.stdout.contains(sensitive) && !result.stdout.contains("private123"))
     }
   }
 
