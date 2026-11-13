@@ -209,4 +209,28 @@ struct DocEditCommandTests {
       #expect(guide.stdout.contains("--keep-body") && guide.stdout.contains("--kind"))
     }
   }
+  @Test func implicitEditGatePrecedesRealLocationGit() throws {
+    try withScratchDirectory { scratch in
+      let repo = try CodeCommandTests().setup(scratch)
+      let trace = scratch.appending(path: "git-trace.jsonl")
+      let configured = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/git"),
+        ["config", "--global", "trace2.eventTarget", trace.path], in: scratch,
+        environment: TaskCommandTests.fixed)
+      try #require(configured.termination == .exit(0))
+      let allowed = try SiltaBinary.run(
+        ["doc", "ls", "--json"], in: scratch, cwd: repo,
+        environment: TaskCommandTests.fixed)
+      try #require(allowed.termination == .exit(0))
+      try #require(!(try Data(contentsOf: trace)).isEmpty)
+      try Data().write(to: trace)
+      let refused = try SiltaBinary.run(
+        ["doc", "edit", "rules", "-F", "absent.md", "--json"],
+        in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
+      #expect(refused.termination == .exit(3))
+      #expect(try Self.error(refused)["code"] as? String == "human_only")
+      #expect(try Data(contentsOf: trace).isEmpty)
+    }
+  }
+
 }
