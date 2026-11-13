@@ -307,6 +307,22 @@ extension DocWritePolicyTests {
     }
   }
 
+  @Test func proposalTitleIsNotAnAcceptedSecretExemption() async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      try AcmeDocAttachments.attach("pending", to: "service", in: store, state: "proposed")
+      try store.write {
+        try $0.database.execute(sql: "UPDATE doc SET title=?", arguments: [Self.secret])
+      }
+      var request = Self.request("pending")
+      request.title = Self.secret
+      _ = try await Self.service(home, store).edit(request) { "Safe body" }
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT title FROM doc") }
+          == "[REDACTED:password]")
+    }
+  }
+
   @Test func postRedactionExpansionIsBoundedBeforeStore() async throws {
     try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
