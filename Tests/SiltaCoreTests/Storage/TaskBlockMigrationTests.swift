@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 struct TaskBlockMigrationTests {
   @Test func upgradesV2WithoutReplacingIdentityOrUnknownColumns() throws {
@@ -29,7 +30,7 @@ struct TaskBlockMigrationTests {
         let version = try String.fetchOne(
           db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
         let settings = try String.fetchOne(db, sql: "SELECT settings FROM workspace")
-        #expect(version == String(DatabaseStore.writerVersion) && settings == "{\"future\":42}")
+        #expect(version == "6" && settings == "{\"future\":42}")
       }
       let backups = try FileManager.default.contentsOfDirectory(
         atPath: home.appending(path: "backups").path)

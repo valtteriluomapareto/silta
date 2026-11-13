@@ -364,6 +364,7 @@ CREATE TABLE doc_rev (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   body_md TEXT NOT NULL,
   title TEXT, kind TEXT, about_refs TEXT,      -- revision metadata; NULL when legacy history is unknown
   source_task_id INTEGER REFERENCES task(id),
+  triaged_at TEXT, triaged_by TEXT,            -- both NULL: direct edit or unknown decision
   state TEXT NOT NULL,                        -- proposed | accepted | rejected | superseded
   actor TEXT NOT NULL, message TEXT, created_at TEXT NOT NULL, UNIQUE (doc_id, rev));
 
@@ -1553,7 +1554,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq`.
   - **Refusals, with nothing written:** a database with migrations this binary
-    doesn't know; a workspace with docs, until docs export ships with docs (M2).
+    doesn't know; a workspace with docs or reserved doc revision numbers, until docs export ships
+    with docs (M2).
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
     from the working directory, and an unexpanded `~` is refused. Export replaces
     `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous

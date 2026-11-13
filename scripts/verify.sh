@@ -41,6 +41,8 @@ if [[ "$mode" == full ]]; then
   step "build prior writer (isolated compatibility test)"
   export SILTA_PRIOR_BINARY="$SILTA_HOME/prior/silta"
   bash scripts/build-prior-writer.sh "$SILTA_HOME/prior"
+  export SILTA_V6_BINARY="$SILTA_HOME/prior-v6/silta"
+  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v6" b65eab8994b7ada9f54495f9c050ebe5a3090d74
 fi
 
 step "build (warnings as errors)"
