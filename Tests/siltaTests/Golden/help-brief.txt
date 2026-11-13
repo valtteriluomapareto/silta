@@ -29,7 +29,7 @@ OPTIONS:
   --budget <budget>       Positive token budget, estimated as rendered
                           characters / 4; default is 2500, or 800 with
                           --short/--hook.
-  --short                 Use an 800-token brief.
+  --short                 Show doc counts; default budget is 800 tokens.
   --hook                  Read bounded session-start context, silently ignoring
                           errors.
   --version               Show the version.

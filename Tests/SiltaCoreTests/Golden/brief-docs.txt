@@ -1,0 +1,15 @@
+acme / platform / api [high: single]
+branch: main
+task: AC-1
+app: api
+docs about app:api:
+  doc:app-guide [reference] Use app conventions.
+neighbour: edge:api/service:push/sdk Push
+docs about edge:api/service:push/sdk:
+  doc:interface [contract] Keep unknown categories visible.
+docs about service:push:
+  doc:interface [contract] Keep unknown categories visible.
+open: AC-1 [doing, p2] Handle push
+docs about topic:messaging:
+  doc:topic-rule [reference] Coordinate messaging.
+more: silta --ws 'acme' task show AC-1
