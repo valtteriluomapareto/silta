@@ -19,11 +19,11 @@ package struct CommandFailure: WarnedFailure {
   package let warnings: [OutputWarning]
 
   /// Captures only public diagnostics and the corrected recovery commands.
-  package init(error: any CodedError, next: [String]) {
+  package init(error: any CodedError, next: [String], nextBy: NextBy? = nil) {
     code = error.code
     message = error.message
     retryAfter = error.retryAfter
-    nextBy = error.nextBy
+    self.nextBy = nextBy ?? error.nextBy
     warnings = (error as? any WarnedFailure)?.warnings ?? []
     self.next = next
   }
