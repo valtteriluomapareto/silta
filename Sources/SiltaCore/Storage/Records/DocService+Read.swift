@@ -69,9 +69,10 @@ extension DocService {
       var command = listCommand
       if let about { command += " --about " + shellWord(about) }
       if archived { command += " --archived" }
-      let next =
-        offset < total && entries.count < total - offset
-        ? command + " --offset \(offset + entries.count) --limit \(limit)" : nil
+      let continuation =
+        about.map { !Self.safeReference($0) } == true
+        ? listCommand : command + " --offset \(offset + entries.count) --limit \(limit)"
+      let next = offset < total && entries.count < total - offset ? continuation : nil
       return DocListResult(entries: entries, total: total, offset: offset, limit: limit, next: next)
     }
   }

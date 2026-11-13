@@ -161,10 +161,8 @@ struct DocReadCommandTests {
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
         #expect(result.stdout.contains(safe))
-        withKnownIssue("Encoded legacy attachment credentials bypass document read masking") {
-          #expect(!result.stdout.contains("private123"))
-          #expect(result.stdout.contains("[REDACTED:password]"))
-        }
+        #expect(!result.stdout.contains("private123"))
+        #expect(result.stdout.contains("[REDACTED:password]"))
       }
     }
   }
@@ -184,13 +182,10 @@ struct DocReadCommandTests {
       }
       let result = try run(["ls", "--about", unsafe, "--limit", "1"], scratch, json: json)
       #expect(result.termination == .exit(0))
-      withKnownIssue("Encoded attachment filter credentials are echoed in list continuation") {
-        #expect(!result.stdout.contains("private123"))
-        #expect(
-          result.stdout.contains(
-            json
-              ? "\"next\":\"silta --ws 'acme' doc ls\"" : "next: silta --ws 'acme' doc ls\n"))
-      }
+      #expect(!result.stdout.contains("private123"))
+      #expect(
+        result.stdout.contains(
+          json ? "\"next\":\"silta --ws 'acme' doc ls\"" : "next: silta --ws 'acme' doc ls\n"))
       try store.write {
         try $0.database.execute(sql: "UPDATE edge SET kind='HTTP API'")
       }
