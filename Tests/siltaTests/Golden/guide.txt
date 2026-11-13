@@ -59,8 +59,9 @@ leave the commands in your handoff; never invent approval words. These examples 
 new Acme rules doc; use the returned revision refs in your workspace.
 Title is one line of at most 120 characters.
 A new doc needs a title and at least one about ref. Kind is inferred from its first
-attachments (one edge: contract; several edges: flow; service: runbook; otherwise: reference)
-and stays fixed unless --kind is explicit. Omitted accepted metadata stays unchanged.
+attachments (one edge: contract; several edges: flow; service: runbook;
+otherwise: reference) and stays fixed unless --kind is explicit.
+Omitted accepted metadata stays unchanged.
 Supplied about refs replace the complete live set; repeat --about for every attachment.
 Save complete UTF-8 Markdown with -F, at most 65536 bytes before and after redaction:
 ```sh

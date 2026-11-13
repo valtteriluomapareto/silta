@@ -28,12 +28,15 @@ struct AgentInstallTarget {
 
     Run `silta guide` for the current rules, or `silta guide <topic>` for one section.
     Run `silta brief` at session start unless the hook already printed it.
+    Read workspace docs shown in the brief before cross-app work.
+    For document workflows, run `silta guide docs`.
     """ + "\n"
 
   static func selected(claude: Bool, codex: Bool, root: String) throws -> [Self] {
     let instructions = """
       If `silta where` resolves this repo, use Silta for cross-repo work and backlog.
       Read `silta brief` at session start unless the hook already printed it.
+      Read docs shown in the brief before cross-app work; details: `silta guide docs`.
       Keep plans and results in Silta; never create repo plan files or tracker items.
       Leave a handoff before stopping; read errors and their next commands.
       Details: `silta guide`.

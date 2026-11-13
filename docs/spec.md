@@ -952,6 +952,8 @@ It lists:
 
 ## 9. Docs
 
+`silta guide docs` gives the scoped read, approved edit and archive workflows.
+
 `doc show <slug|doc:slug|doc:slug@N> [--rev N] [--lines N|A-B]` reads
 stored revision metadata and markdown. The default is the current accepted revision;
 without one it lists up to 20 pending revision refs and points to `doc ls` for more.
@@ -1305,7 +1307,7 @@ attribution. Live continuation behavior remains unverified; follow the
 The full agent manual, printed by the binary and versioned with it. The installed
 skill points at it instead of copying it, and Codex's block does the same, so every
 harness reads the rules the binary ships. `silta guide <topic>` prints one
-section. Topics are `when`, `start`, `recipes`, `human`, `questions`, `blocked`,
+section. Topics are `when`, `start`, `recipes`, `docs`, `human`, `questions`, `blocked`,
 `handoff`, `reviews`, `refusals`, `refs` and `output`, also listed in `guide --help`.
 Topic names match exactly (case-sensitive). An unknown topic returns `invalid`,
 naming the rejected topic and valid topics, with `next: silta guide --help`.
