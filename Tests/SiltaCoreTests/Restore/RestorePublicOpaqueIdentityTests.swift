@@ -46,7 +46,11 @@ struct RestorePublicOpaqueIdentityTests {
       #expect(try RestoreSupport.dump(target) == original)
       let report = try RestoreSupport.restore(directory, into: target, home: home)
       #expect(report.created == !inPlace && report.docs.after == 2)
-      ExportTreeTests.expectSame(try ExportTreeTests.render(target), files)
+      #expect(report.nextTaskRef.after == "AC-3")
+      var expected = tree
+      expected.workspace = tree.workspace.replacing(
+        "next_task_seq", with: "3", keys: ExportFormat.workspaceKeys)
+      ExportTreeTests.expectSame(try ExportTreeTests.render(target), try expected.files())
       #expect(try Self.identities(target) == identities)
       try target.read { (db: Database) throws in
         #expect(try String.fetchOne(db, sql: "PRAGMA foreign_key_check") == nil)
