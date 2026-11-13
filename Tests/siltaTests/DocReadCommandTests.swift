@@ -196,6 +196,26 @@ struct DocReadCommandTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func missingEncodedAttachmentFiltersDoNotEchoCredentials(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      _ = try fixture(scratch)
+      let result = try run(
+        ["ls", "--about", "edge:api/service:push/Password%3Dprivate123"], scratch, json: json)
+      #expect(result.termination == .exit(2))
+      let report = result.stdout + result.stderr
+      #expect(report.contains("silta --ws 'acme' ws show"))
+      withKnownIssue("Missing encoded edge filter echoes credential in document list error") {
+        #expect(!report.contains("private123"))
+        #expect(report.contains("[REDACTED:password]"))
+      }
+      let safe = try run(
+        ["ls", "--about", "edge:api/service:push/HTTP%20API"], scratch, json: json)
+      #expect(safe.termination == .exit(2))
+      #expect((safe.stdout + safe.stderr).contains("HTTP%20API"))
+    }
+  }
+
   private func run(_ args: [String], _ scratch: URL, json: Bool = false) throws -> CLIResult {
     try SiltaBinary.run(["--ws", "acme", "doc"] + args + (json ? ["--json"] : []), in: scratch)
   }
