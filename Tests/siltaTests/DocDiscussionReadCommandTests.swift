@@ -156,6 +156,29 @@ struct DocDiscussionReadCommandTests {
     }
   }
 
+  @Test func copiedCommentsStayWithTheirOwningRevision() throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO comment(uid,doc_rev_id,seq,kind,body_md,actor,created_at)
+            SELECT 'current-thread',id,1,'comment','Current revision thread','human:acme',''
+            FROM doc_rev WHERE rev=2;
+            """)
+      }
+      for args in [["show", "doc:rules@3/1"], ["show", "doc:rules@3", "--comments"]] {
+        let result = try run(args, scratch)
+        #expect(result.termination == .exit(0))
+        #expect(result.stdout.contains("What happens on timeout?"))
+        #expect(!result.stdout.contains("Current revision thread"))
+      }
+      let current = try run(["show", "doc:rules@2/1"], scratch)
+      #expect(current.termination == .exit(0))
+      #expect(current.stdout.contains("Current revision thread"))
+    }
+  }
+
   private func run(_ args: [String], _ scratch: URL, json: Bool = false) throws -> CLIResult {
     try SiltaBinary.run(["--ws", "acme", "doc"] + args + (json ? ["--json"] : []), in: scratch)
   }
