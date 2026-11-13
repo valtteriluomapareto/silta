@@ -96,6 +96,9 @@ struct DocWritePolicyTests {
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT slug FROM doc") }
           == Self.credential)
+      var preserve = DocEditRequest(slug: Self.credential)
+      preserve.keepBody = true
+      _ = try await service.edit(preserve, input: nil)
       _ = try await service.edit(Self.request(String(repeating: "a", count: 52))) { "Safe" }
       try store.write {
         try $0.database.execute(
@@ -112,9 +115,12 @@ struct DocWritePolicyTests {
       let store = try AcmeDocAttachments.make(in: home)
       let body = Self.secret + String(repeating: "é", count: 40_000)
       try Self.seed(store, body: body)
-      try store.write { try $0.database.execute(sql: "UPDATE doc SET archived=1") }
+      try store.write {
+        _ = try DocStoreTests.writer($0, ids: SeededIDGenerator(seed: 89)).archive("rules")
+      }
       var request = DocEditRequest(slug: "rules")
       request.keepBody = true
+      request.about = ["service:push"]
       let service = try Self.service(home, store)
       let result = try await service.edit(request, input: nil)
       #expect(result.ref == "doc:rules@2")
@@ -273,6 +279,31 @@ extension DocWritePolicyTests {
         }
       }
       await Self.refusal(.usage) { _ = try await service.edit(Self.request(), input: nil) }
+    }
+  }
+
+  @Test func pendingOnlyCannotKeepBodyAndProtectedRecoveryIsAgentOwned() async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      try AcmeDocAttachments.attach("pending", to: "service", in: store, state: "proposed")
+      var request = DocEditRequest(slug: "pending")
+      request.keepBody = true
+      let before = try DocVerificationPreparationTests.truth(store)
+      await Self.refusal(.usage) {
+        _ = try await Self.service(home, store).edit(request, input: nil)
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+      for scope in ["acme", Self.credential] {
+        var service = try Self.service(home, store, approved: nil)
+        service.workspace = scope
+        do {
+          _ = try service.authorizeEdit(DocEditRequest(slug: Self.credential))
+          Issue.record("Ungated identity write")
+        } catch let error as any CodedError {
+          #expect(error.code == .humanOnly && error.nextBy == .agent)
+          #expect(error.next == [scope == "acme" ? "silta --ws 'acme' doc ls" : "silta ws ls"])
+        }
+      }
     }
   }
 
