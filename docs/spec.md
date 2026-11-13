@@ -977,6 +977,8 @@ Document identities are masked in both text and JSON. Safe canonical refs remain
 copyable, including identifier exemptions from the secret scanner. Unsafe refs use a
 scoped `doc ls` recovery, without show-only flags or redacted nonfunctional commands.
 Pending-only reads follow the same rendered-line selection as accepted revisions.
+A sensitive workspace name recovers through `silta ws ls`, selecting scope explicitly
+before a document query and omitting document-specific filters and flags.
 Percent-encoded attachment refs are inspected as decoded text for secrets; safe refs
 retain their canonical spelling. A credential-bearing list filter is omitted from
 recovery: its continuation restarts the broader scoped list without a filter or offset.

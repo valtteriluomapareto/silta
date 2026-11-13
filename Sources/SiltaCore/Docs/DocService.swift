@@ -34,7 +34,7 @@ package struct DocService {
         text =
           "No accepted revision for \(ref).\nPending revisions (\(stored.pendingCount)):\n"
           + stored.pending.map { "\(ref)@\($0)\n" }.joined()
-          + (stored.pendingCount > stored.pending.count && Self.safeReference(ref)
+          + (stored.pendingCount > stored.pending.count && scopeIsSafe && Self.safeReference(ref)
             ? "next: " + listCommand + "\n" : "")
       }
       return DocReadResult(
@@ -44,10 +44,26 @@ package struct DocService {
     }
   }
 
-  var listCommand: String { workspaceCommand("silta doc ls", workspace: workspace) }
+  var scopeIsSafe: Bool { SecretGuard.matches(in: workspace).isEmpty }
+
+  var listCommand: String {
+    scopeIsSafe ? workspaceCommand("silta doc ls", workspace: workspace) : "silta ws ls"
+  }
+
+  var configurationCommand: String {
+    scopeIsSafe ? workspaceCommand("silta ws show", workspace: workspace) : "silta ws ls"
+  }
+
+  func listPageCommand(about: String?, archived: Bool, offset: Int, limit: Int) -> String {
+    guard scopeIsSafe, about.map(Self.safeReference) ?? true else { return listCommand }
+    var command = listCommand
+    if let about { command += " --about " + shellWord(about) }
+    if archived { command += " --archived" }
+    return command + " --offset \(offset) --limit \(limit)"
+  }
 
   func showCommand(_ ref: String, lines: String? = nil) -> String {
-    guard Self.safeReference(ref) else { return listCommand }
+    guard scopeIsSafe, Self.safeReference(ref) else { return listCommand }
     return workspaceCommand("silta doc show " + shellWord(ref), workspace: workspace)
       + (lines.map { " --lines " + $0 } ?? "")
   }
@@ -82,7 +98,7 @@ package struct DocService {
         + "next: " + showCommand(ref) + "\n"
     }
     let count = last - first + 1
-    let unsafe = !Self.safeReference(ref)
+    let unsafe = !scopeIsSafe || !Self.safeReference(ref)
     let shown = min(count, count > 400 || unsafe ? 399 : 400)
     let output = lines.dropFirst(first - 1).prefix(shown).joined(separator: "\n") + "\n"
     guard shown < count else {

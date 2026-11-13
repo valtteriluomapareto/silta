@@ -354,11 +354,9 @@ extension DocReadCommandTests {
         if scope == "acme" {
           #expect(report.contains("silta --ws 'acme'"))
         } else {
-          withKnownIssue("Sensitive workspace bypasses document command-scope safety") {
-            #expect(!report.contains(scope))
-            #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))
-            #expect(!report.contains("silta doc ls") && !report.contains("--ws '[REDACTED:"))
-          }
+          #expect(!report.contains(scope))
+          #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))
+          #expect(!report.contains("silta doc ls") && !report.contains("--ws '[REDACTED:"))
         }
       }
       let unknown = try SiltaBinary.run(
