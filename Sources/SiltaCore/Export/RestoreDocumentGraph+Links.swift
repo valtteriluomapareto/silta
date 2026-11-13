@@ -26,9 +26,10 @@ extension RestoreDocumentGraph {
       {
         throw invalid("a live document about link must name a map identity")
       }
+      let revision = kind == "task_plan_rev" ? link.value("to_rev") ?? "" : ""
       let identity =
         ["from_kind", "from", "rel", "to_kind"].map { link.value($0) ?? "" }
-        + [link.value("to") ?? link.value("to_ext") ?? "", link.value("anchor") ?? ""]
+        + [link.value("to") ?? link.value("to_ext") ?? "", revision, link.value("anchor") ?? ""]
       guard identities.insert(identity).inserted else {
         throw invalid("a typed link identity appears twice")
       }

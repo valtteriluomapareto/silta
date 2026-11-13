@@ -41,13 +41,7 @@ struct RestorePlanRevisionLinkTests {
         links.compactMap { $0.value("to") }
           == Array(repeating: ExportDocumentTests.uid("010"), count: 2))
       #expect(links.compactMap { $0.value("to_rev") } == ["1", "2"])
-      var refusal: ExportError?
-      do {
-        try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
-      } catch let error as ExportError { refusal = error }
-      withKnownIssue("Different stored plan revisions collapse to one link identity") {
-        #expect(refusal == nil)
-      }
+      try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
       #expect(try RestoreSupport.dump(store) == before)
     }
   }
