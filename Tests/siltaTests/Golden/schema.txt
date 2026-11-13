@@ -26,7 +26,7 @@ silta code show  Read a committed file, optionally selecting lines.
 silta code grep  Search committed text, returning app-relative paths and line numbers.
 silta code log  List commit SHA and subject at the selected ref.
 silta code ls  List immediate committed names in an app-relative directory.
-silta doc show  Read a stored document revision, optionally selecting lines.
+silta doc show  Read stored revisions, diffs or paged comments.
 silta doc ls  List current documents and pending revisions.
 silta where  Resolve the workspace, repository and app for a local path.
 silta doctor  Diagnose database, git and data across all workspaces without repairs.

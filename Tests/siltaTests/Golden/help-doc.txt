@@ -17,8 +17,7 @@ OPTIONS:
   -h, --help              Show help information.
 
 SUBCOMMANDS:
-  show                    Read a stored document revision, optionally selecting
-                          lines.
+  show                    Read stored revisions, diffs or paged comments.
   ls                      List current documents and pending revisions.
 
   See 'silta help doc <subcommand>' for detailed help.
@@ -47,12 +46,12 @@ OPTIONS:
 
 ### silta doc show
 
-OVERVIEW: Read a stored document revision, optionally selecting lines.
+OVERVIEW: Read stored revisions, diffs or paged comments.
 
-USAGE: silta doc show [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> [--rev <rev>] [--lines <lines>]
+USAGE: silta doc show [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> [--rev <rev>] [--lines <lines>] [--diff] [--comments] [--offset <offset>] [--limit <limit>]
 
 ARGUMENTS:
-  <ref>                   Doc slug, doc:slug or doc:slug@revision.
+  <ref>                   Doc slug, doc:slug or doc:slug@revision[/comment].
 
 GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
@@ -67,5 +66,11 @@ OPTIONS:
                           ref.
   --lines <lines>         Positive rendered line N or inclusive range A-B;
                           default is at most 400 lines.
+  --diff                  Compare against the recorded base revision.
+  --comments              Read revision comments.
+  --offset <offset>       Comment entries to skip; requires --comments; default
+                          is 0.
+  --limit <limit>         Comment entries, from 1 to 20; requires --comments;
+                          default is 20.
   --version               Show the version.
   -h, --help              Show help information.
