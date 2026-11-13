@@ -145,6 +145,62 @@ struct DocReadCommandTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func encodedLegacyAttachmentsAreMaskedBeforeRendering(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let unsafe = "edge:api/service:push/Password%3Dprivate123"
+      let safe = "edge:api/service:push/HTTP%20API"
+      let refs = "[\"\(unsafe)\",\"\(safe)\"]"
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET about_refs=? WHERE rev IN (2,3)", arguments: [refs])
+      }
+      for args in [["show", "rules"], ["show", "doc:rules@2", "--lines", "4"], ["ls"]] {
+        let result = try run(args, scratch, json: json)
+        #expect(result.termination == .exit(0))
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.contains(safe))
+        withKnownIssue("Encoded legacy attachment credentials bypass document read masking") {
+          #expect(!result.stdout.contains("private123"))
+          #expect(result.stdout.contains("[REDACTED:password]"))
+        }
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func encodedAttachmentFiltersHaveSafeContinuations(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let unsafe = "edge:api/service:push/Password%3Dprivate123"
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            UPDATE edge SET kind='Password=private123';
+            UPDATE link SET to_kind='edge',to_id=(SELECT id FROM edge LIMIT 1);
+            UPDATE doc_rev SET about_refs=? WHERE rev IN (2,3);
+            """, arguments: ["[\"\(unsafe)\"]"])
+      }
+      let result = try run(["ls", "--about", unsafe, "--limit", "1"], scratch, json: json)
+      #expect(result.termination == .exit(0))
+      withKnownIssue("Encoded attachment filter credentials are echoed in list continuation") {
+        #expect(!result.stdout.contains("private123"))
+        #expect(
+          result.stdout.contains(
+            json
+              ? "\"next\":\"silta --ws 'acme' doc ls\"" : "next: silta --ws 'acme' doc ls\n"))
+      }
+      try store.write {
+        try $0.database.execute(sql: "UPDATE edge SET kind='HTTP API'")
+      }
+      let safe = "edge:api/service:push/HTTP%20API"
+      let safePage = try run(["ls", "--about", safe, "--limit", "1"], scratch, json: json)
+      #expect(safePage.termination == .exit(0))
+      #expect(safePage.stdout.contains("--about '\(safe)' --offset 1 --limit 1"))
+    }
+  }
+
   private func run(_ args: [String], _ scratch: URL, json: Bool = false) throws -> CLIResult {
     try SiltaBinary.run(["--ws", "acme", "doc"] + args + (json ? ["--json"] : []), in: scratch)
   }
