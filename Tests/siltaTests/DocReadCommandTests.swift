@@ -111,6 +111,36 @@ struct DocReadCommandTests {
     }
   }
 
+  @Test func defaultAndMaximumPagesHaveBoundedSummaryFields() throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            WITH RECURSIVE numbers(n) AS (SELECT 4 UNION ALL SELECT n+1 FROM numbers WHERE n<104)
+            INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at,title,kind,about_refs)
+            SELECT 'pending-'||n,doc.id,n,'Hidden body','proposed','human:acme','',?,
+              'reference',NULL FROM doc CROSS JOIN numbers;
+            """, arguments: ["Password=hidden-acme\n" + String(repeating: "z", count: 130)])
+      }
+      let page = try run(["ls"], scratch, json: true)
+      #expect(page.termination == .exit(0))
+      #expect(page.stdout.contains("\"total\":103") && page.stdout.contains("\"limit\":20"))
+      #expect(page.stdout.contains("--offset 20 --limit 20"))
+      #expect(!page.stdout.contains("hidden-acme") && !page.stdout.contains("Hidden body"))
+      #expect(!page.stdout.contains(String(repeating: "z", count: 121)))
+      #expect(page.stdout.contains("characters omitted"))
+      let maximum = try run(["ls", "--limit", "100"], scratch)
+      #expect(maximum.termination == .exit(0))
+      #expect(
+        maximum.stdout.contains("100 entries")
+          && maximum.stdout.contains("--offset 100 --limit 100"))
+      let second = try run(["ls", "--offset", "100", "--limit", "100"], scratch)
+      #expect(second.termination == .exit(0))
+      #expect(second.stdout.contains("3 entries") && !second.stdout.contains("next:"))
+    }
+  }
+
   private func run(_ args: [String], _ scratch: URL, json: Bool = false) throws -> CLIResult {
     try SiltaBinary.run(["--ws", "acme", "doc"] + args + (json ? ["--json"] : []), in: scratch)
   }
