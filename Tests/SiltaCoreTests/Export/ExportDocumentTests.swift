@@ -13,7 +13,8 @@ struct ExportDocumentTests {
   }
 
   static let about = "[\n  \"edge:mobile/api/HTTP%20API\", \"service:retired%20push\"\n]"
-  static let shas = "[ { \"app\": \"retired-app\", \"ref\": \"release/old\", \"sha\": \""
+  static let shas =
+    "[ { \"app\": \"retired-app\", \"ref\": \"release/old\", \"sha\": \""
     + String(repeating: "a", count: 40)
     + "\" }, {\"app\":\"api\",\"ref\":\"origin/api\",\"sha\":\""
     + String(repeating: "b", count: 40) + "\"} ]"
@@ -52,11 +53,13 @@ struct ExportDocumentTests {
   }
 
   static var verification: [ExportRow] {
-    [row([
-      ("table", "doc_verification"), ("uid", uid("030")), ("doc_rev", uid("003")),
-      ("actor", "human:acme"), ("message", ""), ("app_shas", shas),
-      ("created_at", "2023-11-14T22:13:20.000Z"),
-    ])]
+    [
+      row([
+        ("table", "doc_verification"), ("uid", uid("030")), ("doc_rev", uid("003")),
+        ("actor", "human:acme"), ("message", ""), ("app_shas", shas),
+        ("created_at", "2023-11-14T22:13:20.000Z"),
+      ])
+    ]
   }
 
   static var comments: [ExportRow] {
@@ -108,8 +111,10 @@ struct ExportDocumentTests {
     #expect(parsed == doc)
   }
 
-  @Test(arguments: ["missing markdown", "missing jsonl", "wrong slug", "missing body", "body in jsonl",
-    "unknown field", "record order", "wider fence"])
+  @Test(arguments: [
+    "missing markdown", "missing jsonl", "wrong slug", "missing body", "body in jsonl",
+    "unknown field", "record order", "wider fence",
+  ])
   func refusesNoncanonicalPairs(_ damage: String) throws {
     var files = try ExportTreeTests.golden("doc-pair")
     let md = "docs/push-rules.md"
@@ -118,24 +123,33 @@ struct ExportDocumentTests {
     case "missing markdown": files[md] = nil
     case "missing jsonl": files[jsonl] = nil
     case "wrong slug":
-      files[md] = Data(text(files[md] ?? Data()).replacingOccurrences(
-        of: #"slug: "push-rules""#, with: #"slug: "other""#).utf8)
+      files[md] = Data(
+        text(files[md] ?? Data()).replacingOccurrences(
+          of: #"slug: "push-rules""#, with: #"slug: "other""#
+        ).utf8)
     case "missing body":
-      files[md] = Data(text(files[md] ?? Data()).replacingOccurrences(
-        of: "## Revision 2\n~~~~~\nUse", with: "~~~~~\nUse").utf8)
+      files[md] = Data(
+        text(files[md] ?? Data()).replacingOccurrences(
+          of: "## Revision 2\n~~~~~\nUse", with: "~~~~~\nUse"
+        ).utf8)
     case "body in jsonl":
-      files[jsonl] = Data(text(files[jsonl] ?? Data()).replacingOccurrences(
-        of: #""rev": "1""#, with: #""rev": "1", "body_md": "duplicate""#).utf8)
+      files[jsonl] = Data(
+        text(files[jsonl] ?? Data()).replacingOccurrences(
+          of: #""rev": "1""#, with: #""rev": "1", "body_md": "duplicate""#
+        ).utf8)
     case "unknown field":
-      files[jsonl] = Data(text(files[jsonl] ?? Data()).replacingOccurrences(
-        of: #""message": "Clarify fallback""#,
-        with: #""message": "Clarify fallback", "future": "ignored""#).utf8)
+      files[jsonl] = Data(
+        text(files[jsonl] ?? Data()).replacingOccurrences(
+          of: #""message": "Clarify fallback""#,
+          with: #""message": "Clarify fallback", "future": "ignored""#
+        ).utf8)
     case "record order":
       var lines = text(files[jsonl] ?? Data()).split(separator: "\n").map(String.init)
       lines.swapAt(1, 2)
       files[jsonl] = Data((lines.joined(separator: "\n") + "\n").utf8)
     default:
-      files[md] = Data(text(files[md] ?? Data()).replacingOccurrences(of: "~~~~~", with: "~~~~~~").utf8)
+      files[md] = Data(
+        text(files[md] ?? Data()).replacingOccurrences(of: "~~~~~", with: "~~~~~~").utf8)
     }
     #expect(throws: ExportError.self) {
       try ExportTree.parseDocument(files, slug: "push-rules", workspace: "acme")
