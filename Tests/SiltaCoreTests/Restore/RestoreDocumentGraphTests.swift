@@ -29,6 +29,9 @@ struct RestoreDocumentGraphTests {
     .init(testDescription: "missing base") { _, d in
       RestoreDocumentGraphFixture.record(&d, 1, "base_rev", "99")
     },
+    .init(testDescription: "earlier missing owned base") { _, d in
+      RestoreDocumentGraphFixture.record(&d, 3, "base_rev", "4")
+    },
     .init(testDescription: "self base") { _, d in
       RestoreDocumentGraphFixture.record(&d, 1, "base_rev", "2")
     },
