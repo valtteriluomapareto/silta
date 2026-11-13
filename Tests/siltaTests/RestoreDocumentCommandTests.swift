@@ -1,6 +1,6 @@
+import CryptoKit
 import Foundation
 import GRDB
-import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -66,6 +66,15 @@ struct RestoreDocumentCommandTests {
           json ? "restore-docs-dry-run.json" : "restore-docs-dry-run.txt")
         #expect(try Self.dump(queue) == before)
       }
+      let restored = try SiltaBinary.run(
+        ["restore", "out/acme", "--approved", "yes, restore the docs"], in: scratch,
+        environment: RestoreCommandTests.agent)
+      #expect(restored.termination == .exit(0), "\(restored.stderr)")
+      #expect(restored.stdout.contains("Docs: 2 -> 1."))
+      try queue.read { db in
+        #expect(try String.fetchOne(db, sql: "SELECT title FROM doc") == "Policy")
+        #expect(try String.fetchOne(db, sql: "SELECT body_md FROM doc_rev") == "Original rule.")
+      }
     }
   }
 
@@ -91,7 +100,7 @@ struct RestoreDocumentCommandTests {
       let manifest = directory.appending(path: "manifest.json")
       let manifestText = try String(contentsOf: manifest, encoding: .utf8)
       try Data(
-        manifestText.replacingOccurrences(of: SHA256Hex.of(original), with: SHA256Hex.of(changed))
+        manifestText.replacingOccurrences(of: Self.digest(original), with: Self.digest(changed))
           .utf8
       ).write(to: manifest)
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
@@ -122,6 +131,10 @@ struct RestoreDocumentCommandTests {
         Golden.forTests().check(output, "restore-docs-unsafe-scope.txt")
       }
     }
+  }
+
+  private static func digest(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
   private static func dump(_ queue: DatabaseQueue) throws -> [String: [String]] {
