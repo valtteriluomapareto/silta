@@ -19,14 +19,7 @@ struct BriefDocsEmptyTopicsTests {
       var location = try BriefDocsTests.location(home, store: store)
       if !selectedTask { location.currentTask = nil }
       for compact in [false, true] {
-        if compact {
-          try Self.check(store, location: location, compact: compact)
-        } else {
-          withKnownIssue("SI-116: Empty topic rank is interpreted as an ORDER BY column position.")
-          {
-            try Self.check(store, location: location, compact: compact)
-          }
-        }
+        try Self.check(store, location: location, compact: compact)
       }
     }
   }

@@ -37,13 +37,7 @@ struct BriefEmptyTopicDocumentTests {
         in: scratch, cwd: repo, environment: TaskCommandTests.actor)
       try #require(edit.termination == .exit(0), "\(edit.stdout)\(edit.stderr)")
       for flags in [[], ["--budget", "1"], ["--short"], ["--hook"]] {
-        if flags.isEmpty || flags == ["--budget", "1"] {
-          withKnownIssue("SI-116: Full no-topic document briefs fail before budget insertion.") {
-            try Self.check(flags, json: json, repo: repo, scratch: scratch)
-          }
-        } else {
-          try Self.check(flags, json: json, repo: repo, scratch: scratch)
-        }
+        try Self.check(flags, json: json, repo: repo, scratch: scratch)
       }
     }
   }
