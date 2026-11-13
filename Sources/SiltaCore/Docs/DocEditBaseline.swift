@@ -31,6 +31,7 @@ struct DocEditBaseline {
     let revision: Int? = row["rev"]
     let archived: Bool = row["archived"]
     let body: String? = row["body"]
+    let state: String? = row["state"]
     let title: String = row["title"]
     var fields: [String?] = [
       workspaceUID, row["uid"], pointer.map(String.init),
@@ -48,7 +49,7 @@ struct DocEditBaseline {
       refs.append(ref)
     }
     return Self(
-      fields: fields, documentExists: true, accepted: row["state"] == "accepted",
+      fields: fields, documentExists: true, accepted: state == "accepted",
       body: body, title: title, refs: refs)
   }
 
