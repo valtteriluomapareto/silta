@@ -23,6 +23,8 @@ struct DocArchiveCommandTests {
       #expect((again.stdout + again.stderr).contains("approval_unused"))
       let missing = try DocEditCommandTests.run(["rules", "--keep-body"], scratch)
       #expect(missing.termination == .exit(1) && missing.stdout.contains("--about <ref>"))
+      #expect(try DocEditCommandTests.error(missing)["code"] as? String == "usage")
+      Golden.forTests().check(missing.stdout, "doc-edit-reactivation-missing.json")
       let restored = try DocEditCommandTests.run(
         ["rules", "--keep-body", "--about", "topic:messaging"], scratch)
       #expect(restored.termination == .exit(0) && restored.stdout.contains("doc:rules@2"))

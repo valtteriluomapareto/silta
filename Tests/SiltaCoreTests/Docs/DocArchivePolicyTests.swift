@@ -100,4 +100,21 @@ struct DocArchivePolicyTests {
           == 0)
     }
   }
+  @Test func reactivationDistinguishesOmittedAndExplicitEmptyAbouts() async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      try DocWritePolicyTests.seed(store)
+      let service = try DocWritePolicyTests.service(home, store)
+      _ = try service.archive("rules")
+      let before = try DocVerificationPreparationTests.truth(store)
+      var request = DocEditRequest(slug: "rules", keepBody: true)
+      await DocWritePolicyTests.refusal(.usage) { _ = try await service.edit(request, input: nil) }
+      request.about = []
+      await DocWritePolicyTests.refusal(.invalid) {
+        _ = try await service.edit(request, input: nil)
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
 }
