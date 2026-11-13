@@ -71,7 +71,7 @@ struct RestoreDocumentCommandTests {
         environment: RestoreCommandTests.agent)
       #expect(restored.termination == .exit(0), "\(restored.stderr)")
       #expect(restored.stdout.contains("Docs: 2 -> 1."))
-      try queue.read { db in
+      try queue.read { (db: Database) throws in
         #expect(try String.fetchOne(db, sql: "SELECT title FROM doc") == "Policy")
         #expect(try String.fetchOne(db, sql: "SELECT body_md FROM doc_rev") == "Original rule.")
       }
