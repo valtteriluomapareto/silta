@@ -8,9 +8,14 @@ struct BriefDocGroup: Equatable, Sendable {
   let rows: [String]
 
   var choices: [(text: String, truncated: Bool)] {
-    let command =
-      "silta --ws " + shellWord(workspace) + " doc ls"
-      + (Self.safe(ref) ? " --about " + shellWord(ref) : "")
+    let command: String
+    if SecretGuard.matches(in: workspace).isEmpty {
+      command =
+        "silta --ws " + shellWord(workspace) + " doc ls"
+        + (Self.safe(ref) ? " --about " + shellWord(ref) : "")
+    } else {
+      command = "silta ws ls"
+    }
     let count = "docs: \(total) (\(command))\n"
     guard !rows.isEmpty else { return [(count, false)] }
     return stride(from: rows.count, through: 1, by: -1).map { shown in

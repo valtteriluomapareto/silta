@@ -10,17 +10,14 @@ struct BriefDocWorkspaceRecoveryTests {
       "AKIA" + String(repeating: "A", count: 16), String(repeating: "a", count: 52),
     ])
   func sensitiveWorkspaceRecoveryUsesTheWorkspaceList(json: Bool, workspace: String) throws {
-    withKnownIssue(
-      "Document continuations expose a sensitive workspace instead of listing workspaces."
-    ) {
-      for compact in [false, true] {
-        let group = Self.group(workspace: workspace, compact: compact)
-        for choice in group.choices {
-          let text = try Self.view(choice.text, json: json)
-          #expect(!text.contains(workspace))
-          #expect(text.contains("silta ws ls"))
-          #expect(!text.contains("--ws") && !text.contains("[REDACTED:"))
-        }
+    for compact in [false, true] {
+      let group = Self.group(workspace: workspace, compact: compact)
+      for choice in group.choices {
+        let text = try Self.view(choice.text, json: json)
+        #expect(!text.contains(workspace))
+        #expect(text.contains("silta ws ls"))
+        #expect(!text.contains("--ws") && !text.contains("[REDACTED:"))
+        #expect(choice.text.hasSuffix("(silta ws ls)\n"))
       }
     }
   }
