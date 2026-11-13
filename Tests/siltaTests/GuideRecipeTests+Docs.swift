@@ -24,17 +24,22 @@ extension GuideRecipeTests {
       let refused = try fixture.run(removal)
       #expect(refused.termination == .exit(6), "\(refused.stderr)")
       #expect(try RestoreDocumentCommandFixture.dump(queue) == before)
+      try FileManager.default.removeItem(at: scratch.appending(path: "rules.md"))
       try fixture.shell(split + first[1], task: "AC-1")
       try Self.expectReattached(queue)
       #expect(try fixture.run(removal).termination == .exit(0))
       #expect(try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM service") } == 0)
-      try fixture.shell(blocks[1], task: "AC-1")
+      let reads = try fixture.execute(blocks[1], task: "AC-1")
+      #expect(reads.termination == .exit(0), "\(reads.stderr)")
+      #expect(reads.stdout.contains("doc:rules@3 [accepted] diff against doc:rules@2"))
       let body =
         "# Delivery fallback\n"
         + "Keep $DELIVERY_MODE unchanged when retrying an unconfirmed delivery.\n"
         + "Implementation: [[console:README.md]].\n"
       try Self.expectUpdated(queue, body: body)
-      try fixture.shell(blocks[2], task: "AC-1")
+      let archived = try fixture.execute(blocks[2], task: "AC-1")
+      #expect(archived.termination == .exit(0), "\(archived.stderr)")
+      #expect(archived.stdout.contains("doc:rules@3 [accepted, archived]"))
       try Self.expectArchived(queue, body: body)
       try Self.expectApprovals(queue)
     }
