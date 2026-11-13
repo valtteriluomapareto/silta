@@ -150,7 +150,7 @@ struct ExportCommandTests {
         #expect(result.termination == .exit(0), "\(result.stderr)")
       }
       let first = try ExportServiceFiles.all(scratch.appending(path: "work/a/acme"))
-      #expect(first.count == 7)
+      #expect(first.count == 9)
       #expect(first == (try ExportServiceFiles.all(scratch.appending(path: "work/b/acme"))))
     }
   }

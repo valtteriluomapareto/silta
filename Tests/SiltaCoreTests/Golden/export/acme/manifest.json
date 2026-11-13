@@ -1,11 +1,13 @@
 {
-  "format": "1",
+  "format": "2",
   "schema": "v7",
   "workspace": "acme",
-  "counts": {"alias_decision": "1", "app": "2", "approval": "2", "comment": "2", "edge": "2", "environment": "1", "link": "3", "repo": "2", "review_request": "1", "service": "1", "source": "1", "task": "2", "task_event": "3", "task_plan_rev": "2", "topic": "1", "topic_alias": "2", "workspace": "1"},
+  "counts": {"alias_decision": "1", "app": "2", "approval": "2", "comment": "2", "doc": "0", "doc_comment_sequence": "0", "doc_rev": "0", "doc_revision_allocation": "0", "doc_verification": "0", "edge": "2", "environment": "1", "link": "3", "repo": "2", "review_request": "1", "service": "1", "source": "1", "task": "2", "task_event": "3", "task_plan_rev": "2", "topic": "1", "topic_alias": "2", "workspace": "1"},
   "files": [
     {"path": "alias_decisions.jsonl", "sha256": "ca263d8961e9d342c0c528b455637bac2aaddc95b629b7cce3737803a49fdea4"},
     {"path": "approvals.jsonl", "sha256": "d550968fe1e42297c1fa41d6979b6801b5b37ed668a7440e3fdac9989ce9e73e"},
+    {"path": "doc_comment_sequences.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "doc_revision_allocations.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
     {"path": "links.jsonl", "sha256": "43281ed12e3803e75ae9832039364bf9f0e43c41ee5c33ed47cedad97028ac02"},
     {"path": "tasks/AC-10.jsonl", "sha256": "5cb9c7ecc1008cd4a428261684ff8423287026e3a9a48181755d79d5e844374b"},
     {"path": "tasks/AC-10.md", "sha256": "af17c801371dd745f96472cf0eee8a8eedb5aa822e2bac1518c8ba6cd7fed0c6"},
