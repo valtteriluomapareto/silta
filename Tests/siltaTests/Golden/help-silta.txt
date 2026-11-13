@@ -27,6 +27,7 @@ SUBCOMMANDS:
                           backlog.
   code                    Read another app's committed code without checking
                           out a branch.
+  doc                     Read stored documents and their revisions.
   where                   Resolve the workspace, repository and app for a local
                           path.
   doctor                  Diagnose database, git and data across all workspaces

@@ -1,0 +1,7 @@
+doc:rules@2 [accepted] Push rules
+  kind: contract; about: app:api
+  show: silta --ws 'acme' doc show 'doc:rules@2'
+doc:rules@3 [proposed] Proposed rules
+  kind: contract; about: service:push
+  show: silta --ws 'acme' doc show 'doc:rules@3'
+2 entries (offset 0, limit 20, total 2)
