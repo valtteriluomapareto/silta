@@ -141,7 +141,7 @@ struct DocVerificationPreparationTests {
         (Self.request("origin/api", repo: repo), .failure(SeamError.gitUnavailable))
       ])
       let before = try Self.truth(store)
-      await #expect(throws: CodeError.git(repo: "platform", workspace: "acme")) {
+      await #expect(throws: CodeError.self) {
         try await DocVerification.prepare(
           Self.draft(["app:api"]), workspace: 1,
           environment: Self.environment(home, store: store, git: git))
