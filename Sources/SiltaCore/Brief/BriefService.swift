@@ -47,7 +47,7 @@ package struct BriefService {
       + topics.map { " --topic " + shellWord($0) }.joined()
     let more =
       (current.map {
-        (short || hook || budget < 2500 ? [command + " brief --task " + $0.ref + selection] : [])
+        (budget < 2500 ? [command + " brief --task " + $0.ref + selection] : [])
           + [command + " task show " + $0.ref]
       }
         ?? [command + " task ls", command + " ws show"])
