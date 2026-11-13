@@ -89,6 +89,36 @@ struct ExportTreeTests {
     }
   }
 
+  static let scopedCounts: [String: String] = [
+    "workspace": "SELECT count(*) FROM workspace WHERE id=1",
+    "repo": "SELECT count(*) FROM repo WHERE workspace_id=1",
+    "app": "SELECT count(*) FROM app WHERE workspace_id=1",
+    "environment":
+      "SELECT count(*) FROM environment JOIN app ON app.id=app_id WHERE workspace_id=1",
+    "service": "SELECT count(*) FROM service WHERE workspace_id=1",
+    "edge": "SELECT count(*) FROM edge WHERE workspace_id=1",
+    "topic": "SELECT count(*) FROM topic WHERE workspace_id=1",
+    "topic_alias": "SELECT count(*) FROM topic_alias WHERE workspace_id=1",
+    "source": "SELECT count(*) FROM source WHERE workspace_id=1",
+    "task": "SELECT count(*) FROM task WHERE workspace_id=1",
+    "task_plan_rev": Self.perTask("task_plan_rev"),
+    "task_event": Self.perTask("task_event"),
+    "comment": Self.perTask("comment"),
+    "review_request": Self.perTask("review_request"),
+    "link": "SELECT count(*) FROM link WHERE workspace_id=1",
+    "alias_decision": "SELECT count(*) FROM alias_decision WHERE workspace_id=1",
+    "approval": "SELECT count(*) FROM approval WHERE workspace='acme'",
+    "doc": "SELECT count(*) FROM doc WHERE workspace_id=1",
+    "doc_rev":
+      "SELECT count(*) FROM doc_rev WHERE doc_id IN (SELECT id FROM doc WHERE workspace_id=1)",
+    "doc_verification":
+      "SELECT count(*) FROM doc_verification WHERE doc_rev_id IN (SELECT id FROM doc_rev WHERE doc_id IN (SELECT id FROM doc WHERE workspace_id=1))",
+    "doc_revision_allocation":
+      "SELECT count(*) FROM (SELECT slug FROM doc WHERE workspace_id=1 UNION SELECT substr(scope,length('doc_rev:1:')+1) FROM seq_counter WHERE scope GLOB 'doc_rev:1:*')",
+    "doc_comment_sequence":
+      "SELECT count(*) FROM seq_counter c JOIN doc_rev r ON c.scope='comment:doc_rev:'||r.id JOIN doc d ON d.id=r.doc_id WHERE d.workspace_id=1",
+  ]
+
   @Test func manifestListsEveryFileWithItsHashAndCountsMatchTheDatabase() throws {
     try withScratchDirectory { scratch in
       let store = try ExportFixture.make(scratch)
@@ -105,35 +135,7 @@ struct ExportTreeTests {
         #expect(entry["sha256"] == digest, "\(path)")
       }
       let counts = try #require(manifest["counts"] as? [String: String])
-      let scoped: [String: String] = [
-        "workspace": "SELECT count(*) FROM workspace WHERE id=1",
-        "repo": "SELECT count(*) FROM repo WHERE workspace_id=1",
-        "app": "SELECT count(*) FROM app WHERE workspace_id=1",
-        "environment":
-          "SELECT count(*) FROM environment JOIN app ON app.id=app_id WHERE workspace_id=1",
-        "service": "SELECT count(*) FROM service WHERE workspace_id=1",
-        "edge": "SELECT count(*) FROM edge WHERE workspace_id=1",
-        "topic": "SELECT count(*) FROM topic WHERE workspace_id=1",
-        "topic_alias": "SELECT count(*) FROM topic_alias WHERE workspace_id=1",
-        "source": "SELECT count(*) FROM source WHERE workspace_id=1",
-        "task": "SELECT count(*) FROM task WHERE workspace_id=1",
-        "task_plan_rev": Self.perTask("task_plan_rev"),
-        "task_event": Self.perTask("task_event"),
-        "comment": Self.perTask("comment"),
-        "review_request": Self.perTask("review_request"),
-        "link": "SELECT count(*) FROM link WHERE workspace_id=1",
-        "alias_decision": "SELECT count(*) FROM alias_decision WHERE workspace_id=1",
-        "approval": "SELECT count(*) FROM approval WHERE workspace='acme'",
-        "doc": "SELECT count(*) FROM doc WHERE workspace_id=1",
-        "doc_rev":
-          "SELECT count(*) FROM doc_rev WHERE doc_id IN (SELECT id FROM doc WHERE workspace_id=1)",
-        "doc_verification":
-          "SELECT count(*) FROM doc_verification WHERE doc_rev_id IN (SELECT id FROM doc_rev WHERE doc_id IN (SELECT id FROM doc WHERE workspace_id=1))",
-        "doc_revision_allocation":
-          "SELECT count(*) FROM (SELECT slug FROM doc WHERE workspace_id=1 UNION SELECT substr(scope,length('doc_rev:1:')+1) FROM seq_counter WHERE scope GLOB 'doc_rev:1:*')",
-        "doc_comment_sequence":
-          "SELECT count(*) FROM seq_counter c JOIN doc_rev r ON c.scope='comment:doc_rev:'||r.id JOIN doc d ON d.id=r.doc_id WHERE d.workspace_id=1",
-      ]
+      let scoped = Self.scopedCounts
       #expect(Set(counts.keys) == Set(scoped.keys))
       try store.read { db in
         for (table, sql) in scoped {
