@@ -1,0 +1,8 @@
+doc:rules@2 [accepted]
+title: Push rules
+kind: contract
+about: app:api
+actor: human:acme
+created_at: 2023-11-14
+
+Accepted body

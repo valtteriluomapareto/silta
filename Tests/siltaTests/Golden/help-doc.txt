@@ -1,0 +1,71 @@
+### silta doc
+
+OVERVIEW: Read stored documents and their revisions.
+
+USAGE: silta doc [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.
+
+SUBCOMMANDS:
+  show                    Read a stored document revision, optionally selecting
+                          lines.
+  ls                      List current documents and pending revisions.
+
+  See 'silta help doc <subcommand>' for detailed help.
+
+### silta doc ls
+
+OVERVIEW: List current documents and pending revisions.
+
+USAGE: silta doc ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--about <about>] [--archived] [--offset <offset>] [--limit <limit>]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --about <about>         Filter by a canonical app, edge, service or topic ref.
+  --archived              Include archived documents.
+  --offset <offset>       Number of entries to skip. (default: 0)
+  --limit <limit>         Number of entries, from 1 to 100. (default: 20)
+  --version               Show the version.
+  -h, --help              Show help information.
+
+### silta doc show
+
+OVERVIEW: Read a stored document revision, optionally selecting lines.
+
+USAGE: silta doc show [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> [--rev <rev>] [--lines <lines>]
+
+ARGUMENTS:
+  <ref>                   Doc slug, doc:slug or doc:slug@revision.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --rev <rev>             Positive revision; must agree with a revision in the
+                          ref.
+  --lines <lines>         Positive rendered line N or inclusive range A-B;
+                          default is at most 400 lines.
+  --version               Show the version.
+  -h, --help              Show help information.
