@@ -35,12 +35,16 @@ struct DocArchiveCommandTests {
   ])
   func gateBeforeSelectionAndProtectedFallbackOwnership(scope: String) throws {
     try withScratchDirectory { scratch in
+      let ref = String(repeating: "b", count: 52)
       let result = try SiltaBinary.run(
-        ["--ws", scope, "doc", "archive", "rules", "--json"],
+        ["--ws", scope, "doc", "archive", ref, "--json"],
         in: scratch, environment: TaskCommandTests.actor)
       #expect(result.termination == .exit(3))
       let error = try DocEditCommandTests.error(result)
       #expect(error["next_by"] as? String == (scope == "acme" ? "human" : "agent"))
+      if scope == "acme" {
+        #expect(result.stdout.contains("doc:" + ref) && !result.stdout.contains("[REDACTED:"))
+      }
       if scope != "acme" {
         #expect(!result.stdout.contains(scope))
         #expect(error["next"] as? [String] == ["silta ws ls"])

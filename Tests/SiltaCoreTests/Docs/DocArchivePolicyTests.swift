@@ -37,6 +37,8 @@ struct DocArchivePolicyTests {
       let history = try store.read {
         try Row.fetchAll($0, sql: "SELECT * FROM doc_rev").map(\.description)
       }
+      let sequence =
+        try store.read { try Int.fetchOne($0, sql: "SELECT MAX(seq) FROM change_log") } ?? 0
       let first = try service.archive("doc:rules")
       #expect(first.archived && first.changed && first.ref == "doc:rules")
       #expect(
@@ -48,6 +50,13 @@ struct DocArchivePolicyTests {
       #expect(
         try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") }
           == (human ? 0 : 1))
+      #expect(
+        try store.read {
+          try String.fetchAll(
+            $0,
+            sql: "SELECT kind FROM change_log WHERE seq>? ORDER BY seq", arguments: [sequence])
+        }
+          == (human ? ["doc"] : ["doc", "approval"]))
       let before = try DocVerificationPreparationTests.truth(store)
       let second = try service.archive("rules")
       #expect(second.archived && !second.changed && !second.approvalUsed)
