@@ -4,7 +4,7 @@ extension ExportSnapshot {
   /// Reads the workspace named `slug` inside the caller's read transaction, so the
   /// tree is one consistent state. Throws `StorageError.schemaTooNew` for a database
   /// with migrations this binary doesn't know, `WorkspaceError.unknown` for a missing
-  /// workspace and `ExportError.unsupported` for data format 1 can't hold.
+  /// workspace and `ExportError.unsupported` for data this exporter cannot represent.
   package static func read(_ db: Database, workspace slug: String) throws -> Self {
     let migrator = StorageSchema.migrator
     if try migrator.hasBeenSuperseded(db) { throw StorageError.schemaTooNew }

@@ -1,11 +1,13 @@
 {
-  "format": "1",
+  "format": "2",
   "schema": "v7",
   "workspace": "beta",
-  "counts": {"alias_decision": "0", "app": "0", "approval": "0", "comment": "0", "edge": "0", "environment": "0", "link": "0", "repo": "0", "review_request": "0", "service": "0", "source": "0", "task": "0", "task_event": "0", "task_plan_rev": "0", "topic": "0", "topic_alias": "0", "workspace": "1"},
+  "counts": {"alias_decision": "0", "app": "0", "approval": "0", "comment": "0", "doc": "0", "doc_comment_sequence": "0", "doc_rev": "0", "doc_revision_allocation": "0", "doc_verification": "0", "edge": "0", "environment": "0", "link": "0", "repo": "0", "review_request": "0", "service": "0", "source": "0", "task": "0", "task_event": "0", "task_plan_rev": "0", "topic": "0", "topic_alias": "0", "workspace": "1"},
   "files": [
     {"path": "alias_decisions.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
     {"path": "approvals.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "doc_comment_sequences.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "doc_revision_allocations.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
     {"path": "links.jsonl", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
     {"path": "workspace.yaml", "sha256": "6e7edafbf06ddc87c405227f5ef382b1b91f18511b4eb5b9f4d043d4d4fcd0d8"}
   ]

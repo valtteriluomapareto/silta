@@ -125,7 +125,11 @@ struct DocReadCommandTests {
             INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at,title,kind,about_refs)
             SELECT 'pending-'||n,doc.id,n,'Hidden body','proposed','human:acme','',?,
               'reference',NULL FROM doc CROSS JOIN numbers;
-            """, arguments: ["Password=hidden-acme\n" + String(repeating: "z", count: 130)])
+            """,
+          arguments: [
+            "-----BEGIN PRIVATE KEY-----\nhidden-acme" + String(repeating: "z", count: 140)
+              + "\n-----END PRIVATE KEY-----\n" + String(repeating: "z", count: 140)
+          ])
       }
       let page = try run(["ls"], scratch, json: true)
       #expect(page.termination == .exit(0))
@@ -242,4 +246,77 @@ struct DocReadCommandTests {
     }
     return store
   }
+}
+
+extension DocReadCommandTests {
+  @Test(arguments: [false, true], [false, true])
+  func documentIdentitiesAreMaskedEverywhere(json: Bool, pending: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let secret = "AKIA" + String(repeating: "A", count: 16)
+      try rename(store, slug: secret, pending: pending)
+      let reads =
+        pending
+        ? [["show", secret], ["show", secret, "--lines", "1"], ["ls", "--limit", "1"]]
+        : [
+          ["show", secret], ["show", "doc:\(secret)@1"],
+          ["show", secret, "--lines", "9999"], ["ls", "--limit", "1"],
+          ["ls", "--offset", "1", "--limit", "1"],
+        ]
+      for args in reads {
+        let result = try run(args, scratch, json: json)
+        #expect(result.termination == .exit(0))
+        let report = result.stdout + result.stderr
+        #expect(!report.contains(secret))
+        #expect(report.contains("silta --ws 'acme' doc ls"))
+        #expect(
+          !report.contains("doc ls --lines") && !report.contains("doc show 'doc:[REDACTED:"))
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func typedIdentifierExemptionPreservesCopyableRefs(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let slug = String(repeating: "a", count: 52)
+      try rename(store, slug: slug, pending: false)
+      for args in [["show", slug, "--lines", "9999"], ["ls", "--limit", "1"]] {
+        let result = try run(args, scratch, json: json)
+        #expect(result.termination == .exit(0))
+        #expect(result.stdout.contains("silta --ws 'acme' doc show 'doc:\(slug)@2'"))
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func pendingOnlyReadsHonorRenderedLineSelection(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      try store.write { try $0.database.execute(sql: "UPDATE doc SET current_rev=NULL") }
+      for (lines, expected) in [
+        ("1", "No accepted revision for doc:rules.\n"),
+        ("3", "doc:rules@3\n"),
+        ("9999", "Document has 3 rendered lines; selection is past the end."),
+      ] {
+        let result = try run(["show", "rules", "--lines", lines], scratch, json: json)
+        #expect(result.termination == .exit(0))
+        let object = json ? try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) : nil
+        let data = (object as? [String: Any])?["data"] as? [String: Any]
+        let output = json ? try #require(data?["output"] as? String) : result.stdout
+        #expect(lines == "9999" ? output.hasPrefix(expected) : output == expected)
+      }
+    }
+  }
+
+  private func rename(_ store: DatabaseStore, slug: String, pending: Bool) throws {
+    try store.write {
+      try $0.database.execute(
+        sql: "UPDATE doc SET slug=?,current_rev=?", arguments: [slug, pending ? nil : 2])
+      try $0.database.execute(
+        sql: "UPDATE doc_rev SET body_md=?",
+        arguments: [(1...450).map { "line \($0)" }.joined(separator: "\n")])
+    }
+  }
+
 }

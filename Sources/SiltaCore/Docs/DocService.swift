@@ -23,10 +23,10 @@ package struct DocService {
     do {
       let result = try read(selection.slug, revision: selection.revision, view: request.view)
       return DocReadResult(
-        ref: result.ref,
+        masking: result.ref,
         output: bounded(
           SecretGuard.redacted(result.output),
-          command: showCommand(result.ref) + request.view.flags,
+          ref: result.ref, flags: request.view.flags,
           range: range))
     } catch let error as DocError {
       throw CommandFailure(error: error, next: [listCommand])
@@ -44,8 +44,10 @@ package struct DocService {
 
   var listCommand: String { workspaceCommand("silta doc ls", workspace: workspace) }
 
-  func showCommand(_ ref: String) -> String {
-    workspaceCommand("silta doc show " + shellWord(ref), workspace: workspace)
+  func showCommand(_ ref: String, flags: String = "", lines: String? = nil) -> String {
+    guard Self.safeReference(ref) else { return listCommand }
+    return workspaceCommand("silta doc show " + shellWord(ref), workspace: workspace) + flags
+      + (lines.map { " --lines " + $0 } ?? "")
   }
 
   static func about(_ refs: [String]?) -> String {
@@ -68,21 +70,26 @@ package struct DocService {
     return String(text.prefix(120)) + " [\(text.count - 120) characters omitted]"
   }
 
-  private func bounded(_ text: String, command: String, range: ClosedRange<Int>?) -> String {
+  private func bounded(
+    _ text: String, ref: String, flags: String, range: ClosedRange<Int>?
+  ) -> String {
     var lines = text.components(separatedBy: "\n")
     if lines.last == "" { lines.removeLast() }
     let first = range?.lowerBound ?? 1
     let last = min(range?.upperBound ?? lines.count, lines.count)
     guard first <= last else {
       return "Document has \(lines.count) rendered lines; selection is past the end.\n"
-        + "next: " + command + "\n"
+        + "next: " + showCommand(ref, flags: flags) + "\n"
     }
     let count = last - first + 1
-    let shown = min(count, count > 400 ? 399 : 400)
+    let unsafe = !Self.safeReference(ref)
+    let shown = min(count, count > 400 || unsafe ? 399 : 400)
     let output = lines.dropFirst(first - 1).prefix(shown).joined(separator: "\n") + "\n"
-    guard shown < count else { return output }
-    return output + "\(count - shown) lines omitted; next: " + command
-      + " --lines \(first + shown)-\(last)\n"
+    guard shown < count else {
+      return output + (unsafe ? "next: " + listCommand + "\n" : "")
+    }
+    return output + "\(count - shown) lines omitted; next: "
+      + showCommand(ref, flags: flags, lines: "\(first + shown)-\(last)") + "\n"
   }
 
   private static func lineRange(_ raw: String?) throws -> ClosedRange<Int>? {

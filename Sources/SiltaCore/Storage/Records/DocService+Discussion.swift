@@ -49,7 +49,7 @@ extension DocService {
       guard let row = try Row.fetchOne(db, sql: query + " AND c.seq=?", arguments: [id, seq]) else {
         throw CommandFailure(
           error: TaskError.notFound("comment \(ref)/\(seq)"),
-          next: [showCommand(ref) + " --comments"])
+          next: [showCommand(ref, flags: " --comments")])
       }
       let post = CommentDetails(row: row, task: ref)
       return DocReadResult(ref: post.ref, output: DocComments.render(post))
@@ -61,10 +61,11 @@ extension DocService {
     var output =
       "\(ref) comments (offset \(offset), limit \(limit), total \(total))\n"
       + rows.map { DocComments.render(CommentDetails(row: $0, task: ref)) }.joined(separator: "\n")
-    if offset < total && rows.count < total - offset {
+    if offset < total && rows.count < total - offset && Self.safeReference(ref) {
       output +=
-        "next: " + showCommand(ref)
-        + " --comments --offset \(offset + rows.count) --limit \(limit)\n"
+        "next: "
+        + showCommand(
+          ref, flags: " --comments --offset \(offset + rows.count) --limit \(limit)") + "\n"
     }
     return DocReadResult(ref: ref, output: output)
   }
@@ -77,8 +78,8 @@ extension DocService {
     return rows.map {
       let post = CommentDetails(row: $0, task: ref)
       return "  \(post.ref): \(Self.preview(post.body))\n"
-    }.joined() + "  \(total) comments; \(total - rows.count) omitted; show: " + showCommand(ref)
-      + " --comments --offset 0 --limit 20\n"
+    }.joined() + "  \(total) comments; \(total - rows.count) omitted; show: "
+      + showCommand(ref, flags: " --comments --offset 0 --limit 20") + "\n"
   }
 
   private func commentCount(_ id: Int64, in db: Database) throws -> Int {

@@ -234,19 +234,15 @@ extension DocDiscussionReadCommandTests {
         let result = try run(args, scratch, json: json)
         #expect(result.termination == .exit(args[1].hasSuffix("/99") ? 2 : 0))
         let report = result.stdout + result.stderr
-        withKnownIssue("Discussion identity or recovery bypasses basic document masking") {
-          #expect(!report.contains(secret))
-          #expect(report.contains("silta --ws 'acme' doc ls"))
-          #expect(!report.contains("doc ls --") && !report.contains("doc show 'doc:[REDACTED:"))
-        }
+        #expect(!report.contains(secret))
+        #expect(report.contains("silta --ws 'acme' doc ls"))
+        #expect(!report.contains("doc ls --") && !report.contains("doc show 'doc:[REDACTED:"))
       }
       try store.write { try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE rev=3") }
       let missing = try run(["show", ref, "--diff"], scratch, json: json)
       #expect(missing.termination == .exit(2))
-      withKnownIssue("Missing recorded-base recovery exposes an unsafe document identity") {
-        #expect(!(missing.stdout + missing.stderr).contains(secret))
-        #expect((missing.stdout + missing.stderr).contains("silta --ws 'acme' doc ls"))
-      }
+      #expect(!(missing.stdout + missing.stderr).contains(secret))
+      #expect((missing.stdout + missing.stderr).contains("silta --ws 'acme' doc ls"))
     }
   }
 

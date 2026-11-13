@@ -1,10 +1,11 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
 
-/// The strict reader of format 1 (spec §15).
+@testable import SiltaCore
+
+/// The strict reader of canonical export formats (spec §15).
 @Suite(.timeLimit(.minutes(1)))
 struct ExportReaderTests {
   @Test func readerRoundTripsTheTree() throws {

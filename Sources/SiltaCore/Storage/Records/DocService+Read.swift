@@ -31,7 +31,8 @@ extension DocService {
         ref: "doc:" + slug,
         output: "No accepted revision for doc:\(slug).\nPending revisions (\(total)):\n"
           + pending.map { "doc:\(slug)@\($0)\n" }.joined()
-          + (total > pending.count ? "next: " + listCommand + "\n" : ""))
+          + (total > pending.count && Self.safeReference("doc:" + slug)
+            ? "next: " + listCommand + "\n" : ""))
     }
   }
 
@@ -103,12 +104,13 @@ extension DocService {
     } catch { throw StorageError.corrupt }
     let title: String? = row["title"]
     let kind: String? = row["kind"]
-    return DocListResult.Entry(
-      ref: ref, state: state,
+    let rendered = DocReadResult(
+      masking: ref,
       output: "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
         + "  kind: \(Self.preview(kind ?? "(unknown)")); about: \(Self.preview(Self.about(refs)))\n"
         + "  show: " + showCommand(ref) + "\n"
         + (try commentPreviews(row["id"], ref: ref, in: db)))
+    return DocListResult.Entry(ref: rendered.ref, state: state, output: rendered.output)
   }
 
 }
