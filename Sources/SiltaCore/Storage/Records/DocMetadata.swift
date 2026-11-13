@@ -41,6 +41,7 @@ struct DocMetadata {
       } ?? []
     let refs = Array(Set(draft.about ?? previous)).sorted()
     guard !refs.isEmpty else {
+      if draft.about == nil { throw DocError.missing(["--about"]) }
       throw DocError.invalid("A doc needs at least one --about map item.")
     }
     let targets = try refs.map { try TaskLinkTarget.map($0, workspace: workspace, in: db) }

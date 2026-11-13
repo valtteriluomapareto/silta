@@ -112,6 +112,11 @@ extension GuideCommand {
         --approved "<the human's words>"
         ```
 
+        Archiving with `silta --ws acme doc archive doc:rules` needs chat approval and
+        --approved with the actual words. It removes live attachments and keeps history.
+        For a map removal conflict, add the replacement first, replay every printed
+        --keep-body edit with all surviving about refs, inspect ws show, then retry removal.
+
         Submit for review with `silta --ws acme task submit AC-12`. Finish when the required \
         review gate \
         is met; app tasks need their actual commit sha. A result always has exactly these three \
