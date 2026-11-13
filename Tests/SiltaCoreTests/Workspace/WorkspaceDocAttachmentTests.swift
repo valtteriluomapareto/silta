@@ -1,7 +1,8 @@
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkspaceDocAttachmentTests {
@@ -27,7 +28,14 @@ struct WorkspaceDocAttachmentTests {
         #expect(error.message.contains(item))
         #expect(error.message.contains("doc:alpha, doc:zeta"))
         #expect(!error.message.contains("Private Acme"))
-        #expect(error.next == ["silta --ws 'acme' ws show"])
+        #expect(
+          error.next == [
+            "silta --ws 'acme' doc edit 'doc:alpha' --keep-body --about <replacement-ref>"
+              + " --approved \"<the human's words>\"",
+            "silta --ws 'acme' doc edit 'doc:zeta' --keep-body --about <replacement-ref>"
+              + " --approved \"<the human's words>\"",
+            "silta --ws 'acme' ws show",
+          ])
       }
       #expect(try identities(in: store) == before)
       #expect(try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") } == yaml)

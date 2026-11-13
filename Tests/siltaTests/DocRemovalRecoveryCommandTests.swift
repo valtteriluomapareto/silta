@@ -93,9 +93,7 @@ struct DocRemovalRecoveryCommandTests {
         ] + (json ? ["--json"] : []),
         in: scratch, environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(6))
-      withKnownIssue("SI-107: encoded legacy removal refs bypass display secret masking") {
-        #expect(!(result.stdout + result.stderr).contains("private123"))
-      }
+      #expect(!(result.stdout + result.stderr).contains("private123"))
     }
   }
 
