@@ -14,7 +14,8 @@ struct DocVerification: Sendable {
     let serviceUID: String?
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-      same(lhs.kind, rhs.kind) && same(lhs.uid, rhs.uid) && same(lhs.serviceUID, rhs.serviceUID)
+      DocVerification.same(lhs.kind, rhs.kind) && DocVerification.same(lhs.uid, rhs.uid)
+        && DocVerification.same(lhs.serviceUID, rhs.serviceUID)
     }
   }
 
@@ -28,9 +29,12 @@ struct DocVerification: Sendable {
     let subpath: String?
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-      same(lhs.app, rhs.app) && same(lhs.uid, rhs.uid) && same(lhs.ref, rhs.ref)
-        && same(lhs.repo, rhs.repo) && same(lhs.repoUID, rhs.repoUID)
-        && same(lhs.path, rhs.path) && same(lhs.subpath, rhs.subpath)
+      DocVerification.same(lhs.app, rhs.app) && DocVerification.same(lhs.uid, rhs.uid)
+        && DocVerification.same(lhs.ref, rhs.ref)
+        && DocVerification.same(lhs.repo, rhs.repo)
+        && DocVerification.same(lhs.repoUID, rhs.repoUID)
+        && DocVerification.same(lhs.path, rhs.path)
+        && DocVerification.same(lhs.subpath, rhs.subpath)
     }
   }
 
@@ -44,9 +48,10 @@ struct DocVerification: Sendable {
     let apps: [AppBinding]
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-      same(lhs.workspace, rhs.workspace) && same(lhs.workspaceUID, rhs.workspaceUID)
-        && same(lhs.title, rhs.title) && same(lhs.kind, rhs.kind)
-        && lhs.about.elementsEqual(rhs.about, by: { same($0, $1) })
+      DocVerification.same(lhs.workspace, rhs.workspace)
+        && DocVerification.same(lhs.workspaceUID, rhs.workspaceUID)
+        && DocVerification.same(lhs.title, rhs.title) && DocVerification.same(lhs.kind, rhs.kind)
+        && lhs.about.elementsEqual(rhs.about, by: { DocVerification.same($0, $1) })
         && lhs.targets == rhs.targets && lhs.apps == rhs.apps
     }
   }
@@ -74,7 +79,9 @@ struct DocVerification: Sendable {
 
   func matches(_ current: Binding) -> Bool {
     binding == current && snapshots.count == current.apps.count
-      && zip(snapshots, current.apps).allSatisfy { same($0.app, $1.app) && same($0.ref, $1.ref) }
+      && zip(snapshots, current.apps).allSatisfy {
+        DocVerification.same($0.app, $1.app) && DocVerification.same($0.ref, $1.ref)
+      }
       && snapshots.allSatisfy {
         [40, 64].contains($0.sha.count) && $0.sha.allSatisfy(\.isHexDigit)
       }
