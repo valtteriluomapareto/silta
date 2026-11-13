@@ -54,11 +54,45 @@ struct RestoreWriter {
     uids["comment"] = tree.tasks.flatMap {
       $0.records.compactMap { $0.value("table") == "comment" ? $0.value("uid") : nil }
     }
+    uids["doc"] = tree.documents.documents.compactMap { $0.row.value("uid") }
+    for record in tree.documents.documents.flatMap(\.records) {
+      if let table = record.value("table"), let uid = record.value("uid") {
+        uids[table, default: []].append(uid)
+      }
+    }
     uids["link"] = tree.links.compactMap { $0.value("uid") }
     let ownership = [
-      "environment": "app_id IN (SELECT id FROM app WHERE workspace_id IS ?)",
-      "comment": "task_id IN (SELECT id FROM task WHERE workspace_id IS ?)",
+      "environment": "app_id IN (SELECT id FROM app WHERE workspace_id IS :ws)",
+      "doc_rev": "doc_id IN (SELECT id FROM doc WHERE workspace_id IS :ws)",
+      "doc_verification": """
+      doc_rev_id IN (SELECT r.id FROM doc_rev r JOIN doc d ON d.id=r.doc_id
+      WHERE d.workspace_id IS :ws)
+      """,
+      "comment": """
+      task_id IN (SELECT id FROM task WHERE workspace_id IS :ws)
+      OR doc_rev_id IN (SELECT r.id FROM doc_rev r JOIN doc d ON d.id=r.doc_id
+      WHERE d.workspace_id IS :ws)
+      """,
     ]
+    try checkApprovalUIDs()
+    for (table, list) in uids.sorted(by: { $0.key < $1.key }) where !list.isEmpty {
+      let mine = ownership[table] ?? "workspace_id IS :ws"
+      let json = "[" + list.map(ExportFormat.quote).joined(separator: ",") + "]"
+      if let uid = try String.fetchOne(
+        db,
+        sql:
+          """
+          SELECT uid FROM \(table) WHERE uid COLLATE BINARY IN (SELECT value FROM json_each(:uids))
+          AND (\(mine)) IS NOT TRUE
+          """,
+        arguments: ["uids": json, "ws": workspace])
+      {
+        throw ExportError.restoreConflict("\(table) uid \(uid) belongs to another workspace")
+      }
+    }
+  }
+
+  private func checkApprovalUIDs() throws {
     let approvals =
       "["
       + tree.approvals.compactMap { $0.value("uid") }.map(ExportFormat.quote)
@@ -71,21 +105,6 @@ struct RestoreWriter {
         """, arguments: [approvals, slug])
     {
       throw ExportError.restoreConflict("approval uid \(uid) belongs to another workspace")
-    }
-    for (table, list) in uids.sorted(by: { $0.key < $1.key }) where !list.isEmpty {
-      let mine = ownership[table] ?? "workspace_id IS ?"
-      let json = "[" + list.map(ExportFormat.quote).joined(separator: ",") + "]"
-      if let uid = try String.fetchOne(
-        db,
-        sql:
-          """
-          SELECT uid FROM \(table) WHERE uid IN (SELECT value FROM json_each(?))
-          AND NOT (\(mine))
-          """,
-        arguments: [json, workspace])
-      {
-        throw ExportError.restoreConflict("\(table) uid \(uid) belongs to another workspace")
-      }
     }
   }
 
@@ -140,6 +159,9 @@ struct RestoreWriter {
     try tx.recordChange(kind: "workspace", rowID: id)
     let new = (ids["task"]?.values.sorted() ?? [], ids["comment"]?.values.sorted() ?? [])
     for task in old.tasks + new.0 { try tx.recordChange(kind: "task", rowID: task) }
+    for doc in old.docs + (ids["doc"]?.values.sorted() ?? []) {
+      try tx.recordChange(kind: "doc", rowID: doc)
+    }
     for comment in old.comments + new.1 { try tx.recordChange(kind: "comment", rowID: comment) }
   }
 
@@ -154,12 +176,19 @@ struct RestoreWriter {
     RowIDs(
       tasks: try Int64.fetchAll(
         db, sql: "SELECT id FROM task WHERE workspace_id IS ?", arguments: [workspace]),
-      docs: [],
+      docs: try Int64.fetchAll(
+        db, sql: "SELECT id FROM doc WHERE workspace_id IS ? ORDER BY id", arguments: [workspace]),
       comments: try Int64.fetchAll(
         db,
         sql:
-          "SELECT id FROM comment WHERE task_id IN (SELECT id FROM task WHERE workspace_id IS ?)",
-        arguments: [workspace])
+          """
+          SELECT id FROM comment
+          WHERE task_id IN (SELECT id FROM task WHERE workspace_id IS :ws)
+            OR doc_rev_id IN (SELECT r.id FROM doc_rev r JOIN doc d ON d.id=r.doc_id
+              WHERE d.workspace_id IS :ws)
+          ORDER BY id
+          """,
+        arguments: ["ws": workspace])
     )
   }
 

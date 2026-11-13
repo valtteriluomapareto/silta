@@ -87,14 +87,8 @@ extension RestoreWriter {
     }
   }
 
+  /// Compares literal incoming truth with only the explicit restore normalizations.
   func check(_ after: ExportSnapshot, revisionAllocations: [ExportRow]) throws {
-    throw ExportError.unsupported("document readback composition")
-  }
-
-  /// The workspace read back must render as the tree does, with the current schema, the
-  /// counter that never rewinds, and the merged approvals.
-  func check() throws {
-    let after = try ExportSnapshot.read(db, workspace: slug)
     var expected = tree
     expected.format = after.format
     expected.schema = after.schema
@@ -102,6 +96,7 @@ extension RestoreWriter {
       "next_task_seq", with: after.workspace.value("next_task_seq"),
       keys: ExportFormat.workspaceKeys)
     expected.approvals = after.approvals
+    expected.documents.revisionAllocations = revisionAllocations
     let want = try expected.files()
     let got = try after.files()
     if let path = Set(want.keys).union(got.keys).filter({ want[$0] != got[$0] }).min(
@@ -110,5 +105,12 @@ extension RestoreWriter {
       throw ExportError.invalidTree(
         reason: "\(path) does not come back the same after restoring", workspace: slug)
     }
+  }
+
+  /// Public readback uses the public source admission guard.
+  func check() throws {
+    try check(
+      ExportSnapshot.read(db, workspace: slug),
+      revisionAllocations: tree.documents.revisionAllocations)
   }
 }

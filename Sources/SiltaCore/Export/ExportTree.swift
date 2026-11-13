@@ -15,6 +15,18 @@ package enum ExportTree {
   /// `ExportError.invalidTree` and one of a newer schema `StorageError.schemaTooNew`.
   /// This checks the form; whether rows reference each other is left to the caller.
   package static func parse(_ files: [String: Data]) throws -> ExportSnapshot {
+    let snapshot = try parseSnapshot(files)
+    for (path, data) in try snapshot.documents.files().sorted(by: {
+      ExportSnapshot.byteOrder($0.key, $1.key)
+    }) where !data.isEmpty {
+      throw invalid(
+        "\(path) is not in the form export writes", workspace: snapshot.workspace.value("slug"))
+    }
+    return snapshot
+  }
+
+  /// Parses all represented groups and checks their canonical bytes.
+  static func parseSnapshot(_ files: [String: Data]) throws -> ExportSnapshot {
     let manifest = try ExportManifest(files[ExportFormat.manifestFile])
     guard StorageSchema.migrator.migrations.contains(manifest.schema) else {
       throw StorageError.schemaTooNew
@@ -23,15 +35,7 @@ package enum ExportTree {
     func refuse(_ reason: String) -> ExportError {
       .invalidTree(reason: reason, workspace: manifest.workspace)
     }
-    if let extra = present.subtracting(manifest.files.keys).min(by: ExportSnapshot.byteOrder) {
-      throw refuse("\(extra) is not in the manifest")
-    }
-    for (path, digest) in manifest.files.sorted(by: { ExportSnapshot.byteOrder($0.key, $1.key) }) {
-      guard let data = files[path] else { throw refuse("\(path) is missing") }
-      guard ExportFormat.sha256(data) == digest else {
-        throw refuse("\(path) does not match its sha256")
-      }
-    }
+    try manifest.check(files)
     var reader = ExportFileReader(files: files, slug: manifest.workspace)
     let (workspace, sections) = try reader.workspace()
     let prefix = workspace.value("task_prefix") ?? ""
@@ -40,11 +44,21 @@ package enum ExportTree {
         try reader.task(String($0.dropFirst("tasks/".count).dropLast(".md".count)), prefix: prefix)
       }
       .sorted { Int($0.row.value("seq") ?? "") ?? 0 < Int($1.row.value("seq") ?? "") ?? 0 }
+    let documentFiles = files.filter {
+      $0.key.hasPrefix("docs/") || $0.key == ExportFormat.docAllocationsFile
+        || $0.key == ExportFormat.docCommentSequencesFile
+    }
+    if manifest.format == "1", !documentFiles.isEmpty {
+      throw refuse("format 1 cannot hold document files or allocation streams")
+    }
+    let documents =
+      manifest.format == "2"
+      ? try ExportDocumentSnapshot.parse(documentFiles, workspace: manifest.workspace)
+      : ExportDocumentSnapshot(documents: [], revisionAllocations: [], commentSequences: [])
     let snapshot = ExportSnapshot(
       format: manifest.format, schema: manifest.schema, workspace: workspace, sections: sections,
       tasks: tasks,
-      documents: ExportDocumentSnapshot(
-        documents: [], revisionAllocations: [], commentSequences: []),
+      documents: documents,
       links: try reader.jsonl(ExportFormat.linksFile, keys: ExportFormat.linkKeys),
       aliasDecisions: try reader.jsonl(
         ExportFormat.aliasDecisionsFile, keys: ExportFormat.aliasDecisionKeys),
@@ -93,6 +107,23 @@ struct ExportManifest {
     self.schema = schema
     self.workspace = workspace
     files = Dictionary(list.map { ($0["path"] ?? "", $0["sha256"] ?? "") }) { first, _ in first }
+  }
+
+  /// Checks listed files and digests before any row parsing.
+  func check(_ present: [String: Data]) throws {
+    func refuse(_ reason: String) -> ExportError {
+      .invalidTree(reason: reason, workspace: workspace)
+    }
+    let paths = Set(present.keys).subtracting([ExportFormat.manifestFile])
+    if let extra = paths.subtracting(files.keys).min(by: ExportSnapshot.byteOrder) {
+      throw refuse("\(extra) is not in the manifest")
+    }
+    for (path, digest) in files.sorted(by: { ExportSnapshot.byteOrder($0.key, $1.key) }) {
+      guard let data = present[path] else { throw refuse("\(path) is missing") }
+      guard ExportFormat.sha256(data) == digest else {
+        throw refuse("\(path) does not match its sha256")
+      }
+    }
   }
 }
 
