@@ -47,7 +47,7 @@ struct DocRemovalRecoveryCommandTests {
       #expect(
         try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.fixed).termination
           == .exit(0))
-      try store.read { db in
+      try store.read { (db: Database) throws in
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev WHERE rev=2") == 2)
         #expect(
           try String.fetchAll(db, sql: "SELECT body_md FROM doc_rev WHERE rev=2")
