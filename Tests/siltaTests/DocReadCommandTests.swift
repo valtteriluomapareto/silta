@@ -26,7 +26,7 @@ struct DocReadCommandTests {
       #expect(result.termination == .exit(0))
       Golden.forTests().check(result.stdout, "doc-show-legacy.txt")
       let conflict = try run(["show", "doc:rules@1", "--rev", "2"], scratch, json: true)
-      #expect(conflict.termination == .exit(2))
+      #expect(conflict.termination == .exit(1))
       #expect(conflict.stdout.contains("usage"))
       #expect(conflict.stdout.contains("--rev conflicts"))
     }
@@ -43,7 +43,7 @@ struct DocReadCommandTests {
       #expect(!proposed.stdout.contains("doc:rules@2"))
       #expect(proposed.stdout.contains("doc:rules@3"))
       let unknown = try run(["ls", "--about", "topic:missing"], scratch, json: true)
-      #expect(unknown.termination == .exit(4))
+      #expect(unknown.termination == .exit(2))
       #expect(unknown.stdout.contains("silta --ws 'acme' ws show"))
     }
   }
@@ -62,7 +62,7 @@ struct DocReadCommandTests {
       #expect(try run(["ls", "--archived"], scratch).stdout.contains("doc:rules@2"))
       #expect(try run(["show", "rules"], scratch).stdout.contains("[accepted, archived]"))
       let missing = try run(["show", "missing"], scratch, json: true)
-      #expect(missing.termination == .exit(4))
+      #expect(missing.termination == .exit(2))
       #expect(missing.stdout.contains("silta --ws 'acme' doc ls"))
       #expect(!missing.stdout.contains("--about"))
     }
@@ -104,7 +104,7 @@ struct DocReadCommandTests {
         ["ls", "--limit", "101"], ["ls", "--offset", "-1"],
         ["show", "rules", "--lines", "0"], ["show", "doc:rules@0"],
       ] {
-        #expect(try run(args, scratch).termination == .exit(2))
+        #expect(try run(args, scratch).termination == .exit(1))
       }
       #expect(
         try store.read { try String.fetchAll($0, sql: "SELECT key||value FROM meta") } == before)
