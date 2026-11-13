@@ -65,6 +65,9 @@ struct DocReadCommandTests {
       #expect(missing.termination == .exit(2))
       #expect(missing.stdout.contains("silta --ws 'acme' doc ls"))
       #expect(!missing.stdout.contains("--about"))
+      Golden.forTests().check(missing.stdout, "doc-show-missing.json")
+      let text = try run(["show", "missing"], scratch)
+      Golden.forTests().check(text.stderr, "doc-show-missing.txt")
     }
   }
 
