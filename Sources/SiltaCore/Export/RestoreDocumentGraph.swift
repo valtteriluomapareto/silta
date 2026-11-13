@@ -44,18 +44,18 @@ struct RestoreDocumentGraph {
   ]
 
   private func add(
-    _ row: ExportRow, table: String, required: [String], uids: inout [String: Set<String>]
+    _ row: ExportRow, table: String, required: [String], uids: inout [String: Set<Data>]
   ) throws {
     guard required.allSatisfy({ row.value($0) != nil }), let uid = row.value("uid"), !uid.isEmpty
     else {
       throw invalid("\(table) is missing required metadata or its UID")
     }
-    guard uids[table, default: []].insert(uid).inserted else {
+    guard uids[table, default: []].insert(Data(uid.utf8)).inserted else {
       throw invalid("\(table) uid \(uid) appears twice")
     }
   }
 
-  private func validate(_ document: ExportDocument, tasks: Set<String>) throws {
+  private func validate(_ document: ExportDocument, tasks: Set<Data>) throws {
     guard ["0", "1"].contains(document.row.value("archived") ?? "") else {
       throw invalid("a document archived flag is not 0 or 1")
     }
@@ -71,9 +71,9 @@ struct RestoreDocumentGraph {
     for revision in revisions {
       try validate(revision, of: document, numbers: numbers, tasks: tasks)
     }
-    let owned = Set(revisions.compactMap { $0.value("uid") })
+    let owned = Set(revisions.compactMap { $0.value("uid").map({ Data($0.utf8) }) })
     for record in document.records where record.value("table") != "doc_rev" {
-      guard let owner = record.value("doc_rev"), owned.contains(owner) else {
+      guard let owner = record.value("doc_rev"), owned.contains(Data(owner.utf8)) else {
         throw invalid("a document record names a revision outside its document")
       }
       if record.value("table") == "doc_verification" {
@@ -92,7 +92,7 @@ struct RestoreDocumentGraph {
 
   private func validate(
     _ revision: ExportRow, of document: ExportDocument, numbers: [Int64: ExportRow],
-    tasks: Set<String>
+    tasks: Set<Data>
   ) throws {
     let number = try ExportDocumentSnapshot.positive(revision.value("rev"), workspace: slug)
     guard
@@ -106,7 +106,7 @@ struct RestoreDocumentGraph {
         throw invalid("a document revision has no earlier owned base")
       }
     }
-    if let source = revision.value("source_task"), !tasks.contains(source) {
+    if let source = revision.value("source_task"), !tasks.contains(Data(source.utf8)) {
       throw invalid("a document revision names a source task outside the workspace")
     }
     guard (revision.value("triaged_at") == nil) == (revision.value("triaged_by") == nil) else {
@@ -117,7 +117,9 @@ struct RestoreDocumentGraph {
 
   private func current(_ document: ExportDocument, revisions: [Int64: ExportRow]) throws {
     let about = tree.links.filter {
-      $0.value("from_kind") == "doc" && $0.value("from") == document.row.value("uid")
+      $0.value("from_kind") == "doc"
+        && $0.value("from").map({ Data($0.utf8) })
+          == document.row.value("uid").map({ Data($0.utf8) })
         && $0.value("rel") == "about"
     }
     guard let value = document.row.value("current_rev") else {
@@ -145,18 +147,24 @@ struct RestoreDocumentGraph {
   }
 
   private func threads(_ comments: [ExportRow]) throws {
-    let indexed = Dictionary(comments.map { ($0.value("uid") ?? "", $0) }) { first, _ in first }
-    var sequences: Set<[String]> = []
+    let indexed = Dictionary(
+      comments.map { (Data(($0.value("uid") ?? "").utf8), $0) },
+      uniquingKeysWith: { first, _ in first })
+    var sequences: Set<[Data]> = []
     for comment in comments {
-      guard sequences.insert([comment.value("doc_rev") ?? "", comment.value("seq") ?? ""]).inserted
+      guard
+        sequences.insert(
+          [comment.value("doc_rev") ?? "", comment.value("seq") ?? ""].map({ Data($0.utf8) })
+        ).inserted
       else {
         throw invalid("comment sequence numbers repeat under one owner")
       }
-      var seen: Set<String> = []
+      var seen: Set<Data> = []
       var next = comment.value("uid")
       while let uid = next {
-        guard seen.insert(uid).inserted, let current = indexed[uid],
-          current.value("doc_rev") == comment.value("doc_rev")
+        guard seen.insert(Data(uid.utf8)).inserted, let current = indexed[Data(uid.utf8)],
+          current.value("doc_rev").map({ Data($0.utf8) })
+            == comment.value("doc_rev").map({ Data($0.utf8) })
         else { throw invalid("a comment thread is cyclic or belongs to another owner") }
         next = current.value("thread")
       }
