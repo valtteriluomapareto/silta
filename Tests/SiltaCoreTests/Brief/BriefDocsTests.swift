@@ -293,7 +293,8 @@ extension BriefDocsTests {
       try store.write { tx in
         try tx.database.execute(
           sql: """
-            INSERT INTO topic(id,uid,workspace_id,slug,name) VALUES(2,'billing',1,'billing','Billing');
+            INSERT INTO topic(id,uid,workspace_id,slug,name)
+            VALUES(2,'billing',1,'billing','Billing');
             INSERT INTO topic_alias VALUES(1,2,'payments');
             UPDATE link SET to_id=2 WHERE uid='link-billing-guide-topic';
             """)
