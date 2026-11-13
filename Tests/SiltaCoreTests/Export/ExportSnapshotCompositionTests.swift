@@ -73,7 +73,8 @@ struct ExportSnapshotCompositionTests {
       }
       let before = try RestoreSupport.dump(store)
       let snapshot = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
-      #expect(snapshot.documents.documents[0].row.value("title") == "Broken projection")
+      let document = try #require(snapshot.documents.documents.first)
+      #expect(document.row.value("title") == "Broken projection")
       #expect(throws: ExportError.self) {
         try RestoreDocumentGraph(tree: snapshot, documents: snapshot.documents, slug: "acme").run()
       }
