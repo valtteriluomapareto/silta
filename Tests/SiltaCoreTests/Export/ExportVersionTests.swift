@@ -78,7 +78,8 @@ struct ExportVersionTests {
 
   @Test func unsupportedVersionsStillRefuse() throws {
     var files = try Self.frozen()
-    let manifest = try #require(String(data: try #require(files["manifest.json"]), encoding: .utf8))
+    let data = try #require(files["manifest.json"])
+    let manifest = try #require(String(data: data, encoding: .utf8))
     files["manifest.json"] = Data(
       manifest.replacingOccurrences(
         of: #""format": "1""#, with: #""format": "3""#
