@@ -14,6 +14,15 @@ struct RestoreDocumentGraphTests {
   }
 
   static let damages: [Damage] = [
+    .init(testDescription: "duplicate document UID") { _, d in
+      RestoreDocumentGraphFixture.otherDocument(&d)
+      d.documents[1].row = d.documents[1].row.replacing(
+        "uid", with: ExportDocumentTests.uid("001"), keys: ExportFormat.docKeys)
+    },
+    .init(testDescription: "cross document verification") { _, d in
+      RestoreDocumentGraphFixture.otherDocument(&d)
+      RestoreDocumentGraphFixture.record(&d, 5, "doc_rev", "other-revision")
+    },
     .init(testDescription: "missing source task") { _, d in
       RestoreDocumentGraphFixture.record(&d, 1, "source_task", "gone")
     },
@@ -43,6 +52,8 @@ struct RestoreDocumentGraphTests {
     },
     .init(testDescription: "cross revision thread") { _, d in
       RestoreDocumentGraphFixture.record(&d, 6, "doc_rev", ExportDocumentTests.uid("053"))
+      d.commentSequences[2] = d.commentSequences[2].replacing(
+        "next", with: "2", keys: ["doc_rev", "next"])
     },
     .init(testDescription: "missing thread") { _, d in
       RestoreDocumentGraphFixture.record(&d, 7, "thread", "gone")
@@ -52,7 +63,10 @@ struct RestoreDocumentGraphTests {
     },
     .init(testDescription: "duplicate task/doc comment UID") { t, d in
       let uid = t.tasks[0].records.first { $0.value("table") == "comment" }?.value("uid")
-      RestoreDocumentGraphFixture.record(&d, 6, "uid", uid)
+      let keys = ExportFormat.docRecords[2].keys
+      d.documents[0].records.append(
+        d.documents[0].records[6]
+          .replacing("uid", with: uid, keys: keys).replacing("seq", with: "8", keys: keys))
     },
     .init(testDescription: "no current about") { t, d in
       RestoreDocumentGraphFixture.document(&d, "archived", "0")
@@ -95,6 +109,14 @@ struct RestoreDocumentGraphTests {
     #expect(graph.documents.documents[0].records[0].value("about_refs") == nil)
     #expect(
       graph.documents.documents[0].records[1].value("about_refs") == ExportDocumentTests.about)
+  }
+
+  @Test func legacyTitlesAndKindsDoNotAcquireNewWriteRestrictions() throws {
+    var graph = try RestoreDocumentGraphFixture.graph()
+    RestoreDocumentGraphFixture.otherDocument(&graph.documents)
+    let before = graph.documents
+    try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
+    #expect(graph.documents == before)
   }
 
   @Test func storedCodePointersCanOutliveTheirMapApp() throws {

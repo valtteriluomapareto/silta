@@ -83,6 +83,23 @@ enum RestoreDocumentGraphFixture {
         """)
   }
 
+  static func otherDocument(_ docs: inout ExportDocumentSnapshot) {
+    let row = ExportDocumentTests.row([
+      ("uid", "other-document"), ("slug", "other-rules"), ("previous_slugs", "[]"),
+      ("title", "Legacy\n" + String(repeating: "x", count: 121)), ("kind", "design"),
+      ("current_rev", "1"), ("archived", "1"), ("created_at", ""), ("updated_at", ""),
+    ])
+    let revision = ExportDocumentTests.row([
+      ("table", "doc_rev"), ("uid", "other-revision"), ("rev", "1"), ("body_md", "Old"),
+      ("state", "accepted"), ("actor", "human:acme"), ("created_at", ""),
+    ])
+    docs.documents.append(ExportDocument(slug: "other-rules", row: row, records: [revision]))
+    docs.revisionAllocations.append(
+      ExportDocumentTests.row([("slug", "other-rules"), ("next", "2")]))
+    docs.commentSequences.append(
+      ExportDocumentTests.row([("doc_rev", "other-revision"), ("next", "1")]))
+  }
+
   static func record(
     _ docs: inout ExportDocumentSnapshot, _ index: Int, _ key: String, _ value: String?
   ) {
