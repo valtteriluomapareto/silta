@@ -1948,7 +1948,7 @@ silta inbox take [M2]
 silta doc new [M2]
 silta doc ls
 silta doc show
-silta doc edit [M2]
+silta doc edit
 silta doc propose [M2]
 silta doc accept [M2]
 silta doc reject [M2]

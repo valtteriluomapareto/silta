@@ -11,15 +11,15 @@ struct GuideRecipeTests {
       let fixture = try GuideRecipeFixture(scratch)
       let guide = try fixture.run(["guide"]).stdout
       let blocks = Self.blocks(guide)
-      try #require(blocks.count == 7)
-      #expect(blocks[2].contains("silta --ws acme task submit AC-12"))
-      for index in [0, 1, 3, 4, 5, 6, 2] {
-        if index == 4 {
+      try #require(blocks.count == 8)
+      #expect(blocks[3].contains("silta --ws acme task submit AC-12"))
+      for index in [0, 1, 2, 4, 5, 6, 7, 3] {
+        if index == 5 {
           _ = try fixture.run([
             "task", "add", "Acme external dependency", "--start", "--app", "none",
           ])
         }
-        let target = index == 4 ? "AC-3" : "AC-1"
+        let target = index == 5 ? "AC-3" : "AC-1"
         if index == 1 {
           let dry = try #require(
             blocks[index].components(separatedBy: "\n").first {
@@ -35,7 +35,7 @@ struct GuideRecipeTests {
         } else {
           try fixture.shell(blocks[index], task: target)
         }
-        if index == 5 {
+        if index == 6 {
           let task = try GuideContractTests.data(fixture.run(["task", "show", target, "--json"]))
           #expect(task["claimed_by"] == nil)
           #expect(task["status"] as? String == "doing")
@@ -89,6 +89,20 @@ private struct GuideRecipeFixture {
     let fixture = CodeCommandTests()
     repo = try fixture.setup(scratch)
     sha = try fixture.git(["rev-parse", "HEAD"], repo, scratch).trimmingCharacters(in: .newlines)
+    let store = DatabaseStore(
+      home: scratch.appending(path: "silta-home"),
+      clock: FakeClock(now: Date(timeIntervalSince1970: 1_700_000_000)), jitter: { 0 })
+    try store.write { tx in
+      try tx.database.execute(
+        sql: """
+          INSERT INTO service(uid,workspace_id,slug,name) VALUES('acme-push',1,'push','Push');
+          INSERT INTO topic(uid,workspace_id,slug,name)
+          VALUES('acme-messaging',1,'messaging','Messaging');
+          """)
+    }
+    try "Keep the Acme fallback.\n".write(
+      to: scratch.appending(path: "rules.md"),
+      atomically: true, encoding: .utf8)
     plan = scratch.appending(path: "acme-plan.md")
     try "# Acme follow-up\n- [ ] Inspect API\n".write(to: plan, atomically: true, encoding: .utf8)
   }
@@ -110,6 +124,10 @@ private struct GuideRecipeFixture {
       .replacingOccurrences(of: "'Auth'", with: "'Acme'")
       .replacingOccurrences(of: "/tmp/acme-plan.md", with: shellWord(plan.path))
       .replacingOccurrences(of: "<commit-sha>", with: sha)
+      .replacingOccurrences(
+        of: "rules.md", with: shellWord(scratch.appending(path: "rules.md").path)
+      )
+      .replacingOccurrences(of: "<the human's words>", with: "Keep these Acme rules")
     return try SiltaBinary.runProcess(
       URL(filePath: "/bin/sh"), ["-ec", script], in: scratch, cwd: repo,
       environment: TaskCommandTests.actor.merging([
