@@ -51,8 +51,6 @@ package enum ExportError: CodedError, Equatable {
   /// is the agent's.
   package var nextBy: NextBy {
     switch self {
-    case .invalidTree(_, .some(let workspace))
-    where !SecretGuard.matches(in: workspace).isEmpty: .agent
     case .notATree(_, _, .some), .otherWorkspace, .manifestChanged, .notWorkTree, .busy: .agent
     case .invalidTree(_, let workspace)
     where workspace.map({ !SecretGuard.matches(in: $0).isEmpty }) == true:
