@@ -159,10 +159,11 @@ private enum Query {
 
   /// A link end the public exporter cannot represent.
   static let unsupportedLink = """
-    SELECT from_kind FROM link WHERE workspace_id=? AND from_kind NOT IN ('task','comment')
+    SELECT from_kind FROM link WHERE workspace_id=? AND from_kind NOT IN ('task','comment','doc')
     UNION ALL
-    SELECT to_kind FROM link WHERE workspace_id=? AND to_id IS NOT NULL
-      AND to_kind NOT IN ('task','task_plan_rev','comment','app','topic')
+    SELECT to_kind FROM link WHERE workspace_id=?
+      AND to_kind NOT IN ('task','task_plan_rev','comment','app','topic','doc','doc_rev',
+        'edge','service','note','url','code','ext')
     LIMIT 1
     """
 

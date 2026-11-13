@@ -30,9 +30,7 @@ struct ExportRestoreIdentityGuardTests {
           #expect(error.code == .conflict && error.next == ["silta ws ls"])
           for json in [false, true] {
             let output = OutputRouter.render(.failure(error), mode: OutputMode(json: json))
-            withKnownIssue("Foreign opaque UIDs are printed without credential masking.") {
-              #expect(!(output.stdout + output.stderr).contains(uid))
-            }
+            #expect(!(output.stdout + output.stderr).contains(uid))
           }
         }
       }
@@ -53,15 +51,11 @@ struct ExportRestoreIdentityGuardTests {
     #expect(plain.next[0].contains("--ws 'acme' export"))
     let typed = "doc:" + String(repeating: "a", count: 52)
     #expect(ExportError.invalidTree(reason: typed, workspace: "acme").message.contains(typed))
-    withKnownIssue(
-      "Invalid-tree messages and unsafe workspace recovery expose credential-shaped identities."
-    ) {
-      #expect(!unsafe.message.contains(credential))
-      #expect(unsafe.next == ["silta ws ls"] && unsafe.nextBy == .agent)
-      for json in [false, true] {
-        let output = OutputRouter.render(.failure(unsafe), mode: OutputMode(json: json))
-        #expect(!(output.stdout + output.stderr).contains(String(repeating: "a", count: 52)))
-      }
+    #expect(!unsafe.message.contains(credential))
+    #expect(unsafe.next == ["silta ws ls"] && unsafe.nextBy == .agent)
+    for json in [false, true] {
+      let output = OutputRouter.render(.failure(unsafe), mode: OutputMode(json: json))
+      #expect(!(output.stdout + output.stderr).contains(String(repeating: "a", count: 52)))
     }
   }
 
@@ -84,10 +78,8 @@ struct ExportRestoreIdentityGuardTests {
         try $0.database.execute(sql: "UPDATE link SET to_kind='future' WHERE id=3")
       }
       let before = try RestoreSupport.dump(store)
-      withKnownIssue("An unknown external link kind bypasses the source supported-kind guard.") {
-        #expect(throws: ExportError.unsupported("future links")) {
-          try ExportTreeTests.render(store)
-        }
+      #expect(throws: ExportError.unsupported("future links")) {
+        try ExportTreeTests.render(store)
       }
       #expect(try RestoreSupport.dump(store) == before)
     }

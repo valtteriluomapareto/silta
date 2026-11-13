@@ -52,6 +52,9 @@ package enum ExportError: CodedError, Equatable {
   package var nextBy: NextBy {
     switch self {
     case .notATree(_, _, .some), .otherWorkspace, .manifestChanged, .notWorkTree, .busy: .agent
+    case .invalidTree(_, let workspace)
+    where workspace.map({ !SecretGuard.matches(in: $0).isEmpty }) == true:
+      .agent
     default: .human
     }
   }
@@ -89,13 +92,13 @@ package enum ExportError: CodedError, Equatable {
         + "moved back; it is kept at \(path), next to the new tree. Move it back only while "
         + "\(target) is absent; if another export has put a tree there since, keep that one."
     case .invalidTree(let reason, _):
-      "Not an unchanged silta export tree: \(reason). Nothing was restored."
+      "Not an unchanged silta export tree: \(SecretGuard.redacted(reason)). Nothing was restored."
     case .notATree(let path, let reason, _):
       "\(path) is not an export tree: \(reason)."
     case .otherWorkspace(let tree, let given, _):
       "The tree holds workspace \(tree), not \(given); nothing was restored."
     case .restoreConflict(let reason):
-      "The tree clashes with this database: \(reason). Nothing was restored."
+      "The tree clashes with this database: \(SecretGuard.redacted(reason)). Nothing was restored."
     case .manifestChanged(let approved, _):
       "The tree is not the one approved (manifest \(approved)); it changed since the dry run. "
         + "Nothing was restored."
@@ -127,6 +130,9 @@ package enum ExportError: CodedError, Equatable {
     case .previousKept(let path, let target, _):
       ["[ ! -e \(shellWord(target)) ] && mv \(shellWord(path)) \(shellWord(target))"]
     case .unsupported, .newerFormat: ["update silta"]
+    case .invalidTree(_, let workspace)
+    where workspace.map({ !SecretGuard.matches(in: $0).isEmpty }) == true:
+      ["silta ws ls"]
     case .invalidTree(_, let workspace):
       [
         workspace.map {

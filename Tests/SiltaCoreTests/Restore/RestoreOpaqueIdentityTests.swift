@@ -19,21 +19,19 @@ struct RestoreOpaqueIdentityTests {
         #expect(rows[0] == rows[1])
         #expect(try String.fetchOne(db, sql: "PRAGMA foreign_key_check") == nil)
       }
-      withKnownIssue("Source and remapping conflate SQLite-distinct opaque document identities.") {
-        let tree = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
-        try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
-        let rows = tree.documents.commentSequences.filter {
-          ($0.value("doc_rev") ?? "").hasPrefix("rev-caf")
-        }
-        Golden.forTests().check(ExportFormat.jsonl(rows), "restore-opaque-comment-floors.jsonl")
-        let files = try tree.documents.files()
-        #expect(try ExportDocumentSnapshot.parse(files, workspace: "acme") == tree.documents)
-        #expect(try RestoreSupport.dump(store) == before)
-        let expected = try RestoreDocumentRowSupport.replace(
-          store, tree: tree, incoming: tree.documents)
-        let after = try ExportDocumentSnapshotTests.read(store)
-        ExportTreeTests.expectSame(try after.files(), try expected.files())
+      let tree = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
+      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+      let rows = tree.documents.commentSequences.filter {
+        ($0.value("doc_rev") ?? "").hasPrefix("rev-caf")
       }
+      Golden.forTests().check(ExportFormat.jsonl(rows), "restore-opaque-comment-floors.jsonl")
+      let files = try tree.documents.files()
+      #expect(try ExportDocumentSnapshot.parse(files, workspace: "acme") == tree.documents)
+      #expect(try RestoreSupport.dump(store) == before)
+      let expected = try RestoreDocumentRowSupport.replace(
+        store, tree: tree, incoming: tree.documents)
+      let after = try ExportDocumentSnapshotTests.read(store)
+      ExportTreeTests.expectSame(try after.files(), try expected.files())
       #expect(throws: ExportError.unsupported("docs")) {
         try store.read { try ExportSnapshot.read($0, workspace: "acme") }
       }
@@ -58,15 +56,11 @@ struct RestoreOpaqueIdentityTests {
       let files = try ExportTreeTests.render(source)
       let tree = try RestoreSupport.write(files, to: scratch.appending(path: "tree/acme"))
       let machine = try RestoreOpaqueIdentityFixture.machineRows(target)
-      withKnownIssue(
-        "Base validation and UID maps alias byte-distinct task/app/repo/comment owners."
-      ) {
-        let report = try RestoreSupport.restore(tree, into: target, home: home)
-        #expect(report.changed.isEmpty && report.removed.isEmpty)
-        #expect(!report.sameUID)
-        ExportTreeTests.expectSame(try ExportTreeTests.render(target), files)
-        #expect(try RestoreOpaqueIdentityFixture.machineRows(target) == machine)
-      }
+      let report = try RestoreSupport.restore(tree, into: target, home: home)
+      #expect(report.changed.isEmpty && report.removed.isEmpty)
+      #expect(!report.sameUID)
+      ExportTreeTests.expectSame(try ExportTreeTests.render(target), files)
+      #expect(try RestoreOpaqueIdentityFixture.machineRows(target) == machine)
     }
   }
 
@@ -87,11 +81,7 @@ struct RestoreOpaqueIdentityTests {
       }
       let tree = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
       #expect(tree.documents.documents.count == 2)
-      withKnownIssue(
-        "A canonically-equal UID falsely gives a pending-only doc another doc's about links."
-      ) {
-        try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
-      }
+      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
     }
   }
 
@@ -102,15 +92,12 @@ struct RestoreOpaqueIdentityTests {
         try $0.database.execute(sql: "UPDATE comment SET thread_id=44 WHERE uid='comment-child'")
       }
       let before = try RestoreSupport.dump(store)
-      withKnownIssue("Byte-distinct revision ownership is lost when checking comment thread roots.")
-      {
-        let tree = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
-        #expect(
-          throws: ExportError.invalidTree(
-            reason: "a comment thread is cyclic or belongs to another owner", workspace: "acme")
-        ) {
-          try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
-        }
+      let tree = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
+      #expect(
+        throws: ExportError.invalidTree(
+          reason: "a comment thread is cyclic or belongs to another owner", workspace: "acme")
+      ) {
+        try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
       }
       #expect(try RestoreSupport.dump(store) == before)
     }
@@ -122,13 +109,11 @@ struct RestoreOpaqueIdentityTests {
     let nfd = RestoreOpaqueIdentityFixture.nfd("rev")
     RestoreOpaqueIdentityFixture.rename(&tree, from: ExportDocumentTests.uid("003"), to: nfc)
     RestoreDocumentGraphFixture.record(&tree.documents, 5, "doc_rev", nfd)
-    withKnownIssue("A record may borrow a canonically-equivalent revision UID it does not own.") {
-      #expect(
-        throws: ExportError.invalidTree(
-          reason: "a document record names a revision outside its document", workspace: "acme")
-      ) {
-        try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
-      }
+    #expect(
+      throws: ExportError.invalidTree(
+        reason: "a document record names a revision outside its document", workspace: "acme")
+    ) {
+      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
     }
     tree = try RestoreDocumentGraphFixture.graph().tree
     RestoreOpaqueIdentityFixture.rename(
@@ -136,14 +121,12 @@ struct RestoreOpaqueIdentityTests {
       to: RestoreOpaqueIdentityFixture.nfc("task"))
     RestoreDocumentGraphFixture.record(
       &tree.documents, 1, "source_task", RestoreOpaqueIdentityFixture.nfd("task"))
-    withKnownIssue("A source reference resolves to a byte-distinct canonical lookalike.") {
-      #expect(
-        throws: ExportError.invalidTree(
-          reason: "a document revision names a source task outside the workspace", workspace: "acme"
-        )
-      ) {
-        try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
-      }
+    #expect(
+      throws: ExportError.invalidTree(
+        reason: "a document revision names a source task outside the workspace", workspace: "acme"
+      )
+    ) {
+      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
     }
   }
 }

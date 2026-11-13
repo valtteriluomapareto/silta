@@ -50,7 +50,7 @@ enum RestoreDocumentRowSupport {
         for row in try Row.fetchAll(
           tx.database, sql: "SELECT id,uid FROM \(table) WHERE workspace_id=17")
         {
-          writer.ids[table, default: [:]][row["uid"]] = row["id"]
+          writer.ids[table, default: [:]][Data((row["uid"] as String).utf8)] = row["id"]
         }
       }
       try writer.insertDocuments(incoming, workspace: 17)
