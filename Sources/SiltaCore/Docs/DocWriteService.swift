@@ -102,11 +102,13 @@ struct DocWriteService {
       if request.keepBody && (!baseline.accepted || baseline.body == nil) {
         throw DocError.missing(["-F", "--title", "--about"])
       }
-      if !baseline.documentExists {
+      if !baseline.accepted {
         try checkIdentity("doc:" + request.slug, request: request, workspace: slug)
       }
       for ref in request.about ?? []
-      where !baseline.refs.contains(where: { $0.utf8.elementsEqual(ref.utf8) }) {
+      where !baseline.accepted
+        || !baseline.refs.contains(where: { $0.utf8.elementsEqual(ref.utf8) })
+      {
         try checkIdentity(ref.removingPercentEncoding ?? ref, request: request, workspace: slug)
       }
       var draft = DocDraft(slug: request.slug, body: "")
@@ -115,7 +117,9 @@ struct DocWriteService {
       draft.about = request.about
       _ = try DocMetadata.resolve(draft, workspace: id, in: db)
       var redacted = false
-      if let title = draft.title, !title.utf8.elementsEqual((baseline.title ?? "").utf8) {
+      if let title = draft.title,
+        !baseline.accepted || !title.utf8.elementsEqual((baseline.title ?? "").utf8)
+      {
         let checked = try checked(title, request: request, workspace: slug)
         draft.title = checked.0
         redacted = checked.1
