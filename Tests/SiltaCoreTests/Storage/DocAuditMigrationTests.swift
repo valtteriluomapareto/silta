@@ -103,7 +103,10 @@ struct DocAuditMigrationTests {
           try Int.fetchOne(
             $0,
             sql:
-              "SELECT count(*) FROM doc_rev WHERE rev=10 AND triaged_at IS NULL AND triaged_by IS NULL"
+              """
+              SELECT count(*) FROM doc_rev WHERE rev=10
+              AND triaged_at IS NULL AND triaged_by IS NULL
+              """
           )
         } == 1)
     }
@@ -142,7 +145,8 @@ struct DocAuditMigrationTests {
     try store.write {
       try $0.database.execute(
         sql:
-          "UPDATE doc_rev SET triaged_at='2023-11-14T22:14:00.000Z',triaged_by='human:acme' WHERE id=14"
+          "UPDATE doc_rev SET triaged_at=?,triaged_by=? WHERE id=14",
+        arguments: ["2023-11-14T22:14:00.000Z", "human:acme"]
       )
     }
   }

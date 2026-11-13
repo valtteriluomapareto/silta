@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct StorageSchemaTests {
@@ -54,7 +55,7 @@ struct StorageSchemaTests {
         #expect(try Int.fetchOne(db, sql: "PRAGMA busy_timeout") == 5000)
         #expect(
           try String.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-            == String(DatabaseStore.writerVersion))
+            == "6")
         let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(task)").map {
           $0["name"] as String
         }
@@ -207,15 +208,15 @@ struct StorageSchemaTests {
     }
   }
 
-  // The writer version a fresh database records is the one this binary writes with.
-  @Test func freshSchemaRecordsThisWriterVersion() throws {
+  // Additive nullable data does not raise the required writer floor.
+  @Test func freshSchemaKeepsRequiredWriterFloor() throws {
     try withScratchDirectory { scratch in
       let store = Self.store(scratch)
       try store.initialize()
       let version = try store.read {
         try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
       }
-      #expect(version == DatabaseStore.writerVersion)
+      #expect(version == 6)
     }
   }
 

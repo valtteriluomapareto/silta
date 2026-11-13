@@ -114,7 +114,7 @@ struct ExportCoverageTests {
       "base_rev": .excluded, "body_md": .excluded, "state": .excluded, "actor": .excluded,
       "message": .excluded, "created_at": .excluded,
       "title": .excluded, "kind": .excluded, "about_refs": .excluded,
-      "source_task_id": .excluded,
+      "source_task_id": .excluded, "triaged_at": .excluded, "triaged_by": .excluded,
     ],
     "doc_verification": [
       "id": .excluded, "uid": .excluded, "doc_rev_id": .excluded,

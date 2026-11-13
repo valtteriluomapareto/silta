@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 struct TaskLinkMigrationTests {
   @Test func upgradesV1WithoutReplacingRowsOrUnknownFields() throws {
@@ -36,7 +37,7 @@ struct TaskLinkMigrationTests {
         let version = try Int.fetchOne(
           db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
         #expect(settings == "{\"future\":42}")
-        #expect(version == DatabaseStore.writerVersion)
+        #expect(version == 6)
       }
       let backups = try FileManager.default.contentsOfDirectory(
         atPath: scratch.appending(path: "backups").path)

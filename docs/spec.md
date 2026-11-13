@@ -364,6 +364,7 @@ CREATE TABLE doc_rev (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   body_md TEXT NOT NULL,
   title TEXT, kind TEXT, about_refs TEXT,      -- revision metadata; NULL when legacy history is unknown
   source_task_id INTEGER REFERENCES task(id),
+  triaged_at TEXT, triaged_by TEXT,            -- both NULL: direct edit or unknown decision
   state TEXT NOT NULL,                        -- proposed | accepted | rejected | superseded
   actor TEXT NOT NULL, message TEXT, created_at TEXT NOT NULL, UNIQUE (doc_id, rev));
 
