@@ -983,6 +983,21 @@ Percent-encoded attachment refs are inspected as decoded text for secrets; safe 
 retain their canonical spelling. A credential-bearing list filter is omitted from
 recovery: its continuation restarts the broader scoped list without a filter or offset.
 
+`doc show <ref> --diff` compares stored title, kind, attachments and body with the
+revision's recorded `base_rev`, using one replacement hunk with unchanged leading
+and trailing lines removed. A missing recorded base refuses with plain-show recovery;
+a nil base is empty. Masking precedes comparison; identical masked views say
+"no visible changes". Actor and time are shown separately from the compared content.
+
+`doc show <ref> --comments [--offset N] [--limit N]` pages comments in sequence order,
+20 by default and at most 20 per page. `doc show doc:slug@revision/comment` reads one
+copied comment ref, including a tombstone for a deleted post. Thread, attribution,
+resolution and accepted-answer metadata remain visible. Diff and comment-page flags
+are mutually exclusive; pagination options require the comment-page view. The same
+`--lines` bound applies, with continuations pinned to the revision, view and page.
+Lists preview at most two comments per revision, each at most 120 masked characters,
+with character/record omission counts and a complete comment-page continuation.
+
 The following document write and review design is planned:
 
 - Bodies are markdown with `[[ref]]` links (§5.1), parsed into `link` rows when a

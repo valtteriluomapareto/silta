@@ -1,0 +1,10 @@
+doc:rules@2 [accepted] Current rules
+  kind: runbook; about: topic:messaging
+  show: silta --ws 'acme' doc show 'doc:rules@2'
+doc:rules@3 [proposed] Proposed rules
+  kind: contract; about: service:push
+  show: silta --ws 'acme' doc show 'doc:rules@3'
+  doc:rules@3/1: What happens on timeout?
+  doc:rules@3/2: Keep unknown statuses.
+  3 comments; 1 omitted; show: silta --ws 'acme' doc show 'doc:rules@3' --comments --offset 0 --limit 20
+2 entries (offset 0, limit 20, total 2)

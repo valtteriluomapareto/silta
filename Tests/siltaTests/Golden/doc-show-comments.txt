@@ -1,0 +1,19 @@
+doc:rules@3 comments (offset 0, limit 20, total 3)
+doc:rules@3/1 [question]
+actor: human:acme
+created_at: 2023-11-15
+
+What happens on timeout?
+
+doc:rules@3/2 [answer, accepted]
+actor: agent:codex:acme
+created_at: 2023-11-15
+reply_to: doc:rules@3/1
+
+Keep unknown statuses.
+
+doc:rules@3/3 [comment, deleted]
+actor: human:acme
+created_at: 2023-11-15
+
+[deleted]
