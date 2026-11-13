@@ -230,3 +230,20 @@ class DocContext(unittest.TestCase):
             self.assertTrue(e['phases'][0]['complete'])
             self.assertFalse(trial['passed'])
             self.assertEqual(report['groups'][0]['pass_rate'], 0)
+
+    def test_default_core_and_explicit_control_selection(self):
+        for selection, expected in [([], set(evals.SCENARIOS) - {'doc-context-no-doc'}),
+                                    (['--core'], {'start-cross-repo', 'plan-not-file',
+                                                  'handoff-resume', 'done-with-result'}),
+                                    (['--scenario', 'doc-context-no-doc'], {'doc-context-no-doc'})]:
+            calls = []
+            def observe(*args, **kwargs):
+                calls.append((args[1], args[3]))
+                raise RuntimeError('Selection-only unit test; no trial executed')
+            output = self.root / ('selection-' + str(len(selection)) + '-' + str(len(expected)))
+            argv = ['evals', '--silta', str(BINARY), '--stub', str(STUB),
+                    '--output', str(output), '--repeats', '1', *selection]
+            with patch.object(sys, 'argv', argv), patch.object(evals, 'run_trial', side_effect=observe):
+                self.assertEqual(evals.main(), 1)
+            self.assertEqual(set(calls), {(adapter, scenario) for adapter in ['claude', 'codex']
+                                         for scenario in expected})

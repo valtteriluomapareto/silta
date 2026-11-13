@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 BINARY = ROOT.parent / '.build/debug/silta'
 STUB = Path(__file__).with_name('stub_harness.py')
 SCENARIOS = ['start-cross-repo', 'plan-not-file', 'handoff-resume',
-             'done-with-result', 'proposals-ask', 'ask-short']
+             'done-with-result', 'proposals-ask', 'ask-short', 'doc-context']
 
 
 class Acceptance(unittest.TestCase):
@@ -26,7 +26,7 @@ class Acceptance(unittest.TestCase):
         cls.command = [str(ROOT / 'run.sh'), '--silta', str(BINARY),
                        '--stub', str(STUB), '--output', str(cls.output)]
         if not (ROOT / 'run.sh').exists():
-            raise AssertionError('Missing eval matrix runner: six real-CLI replay scenarios cannot run')
+            raise AssertionError('Missing eval matrix runner: seven positive real-CLI replay scenarios cannot run')
         if os.environ.get('SI_EVAL_TEST_REPORT'):
             cls.output = Path(os.environ['SI_EVAL_TEST_REPORT'])
         else:
@@ -43,7 +43,7 @@ class Acceptance(unittest.TestCase):
     def test_both_adapters_all_scenarios_three_repeats(self):
         self.assertEqual(self.report['provenance'], 'stub')
         groups = self.report['groups']
-        self.assertEqual(len(groups), 12)
+        self.assertEqual(len(groups), 14)
         for group in groups:
             self.assertEqual(group['repeats'], 3)
             self.assertEqual(group['pass_rate'], 1)
@@ -56,7 +56,7 @@ class Acceptance(unittest.TestCase):
                                 '--recording', 'fail'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stderr)
         report = json.loads((output / 'report.json').read_text())
-        self.assertEqual(len(report['groups']), 12)
+        self.assertEqual(len(report['groups']), 14)
         self.assertTrue(all(g['pass_rate'] == 0 for g in report['groups']))
         expected = {(harness, scenario, variant) for harness in ['claude', 'codex']
                     for scenario in SCENARIOS

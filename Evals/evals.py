@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parent
 SCENARIOS = sorted(p.parent.name for p in (ROOT / 'scenarios').glob('*/scenario.yaml'))
 MAIN_CATEGORIES = ('ORDER_SHIPPED', 'PRICE_DROP', 'ACCOUNT_SECURITY')
 LEGACY_CATEGORIES = ('LEGACY_PROMO_V1', 'LEGACY_NEWS_V1')
+CORE_SCENARIOS = ('start-cross-repo', 'plan-not-file', 'handoff-resume', 'done-with-result')
 
 RUN_FIELDS = ('aborted', 'planned_trials', 'attempted_trials', 'completed_trials')
 
@@ -399,8 +400,15 @@ def prepare(root, binary, harness, scenario, variant, profile=None):
             + '{}' + '\nrepos: [{slug: acme-mobile}, {slug: acme-backend}]\n'
             'apps: [{slug: acme-mobile, repo: acme-mobile, ref: main}, '
             '{slug: acme-backend, repo: acme-backend, ref: main}]\n')
+    if scenario in ('doc-context', 'doc-context-no-doc'):
+        yaml += 'edges: [{from: acme-mobile, to: acme-backend, kind: http-api, summary: Push API}]\n'
     (root / 'workspace.yaml').write_text(yaml)
     silta(env, cwd, ['ws', 'edit', '-F', str(root / 'workspace.yaml'), '--approved', 'Synthetic Acme fixture setup.'])
+    if scenario == 'doc-context':
+        silta(env, cwd, ['doc', 'edit', 'acme-push-rules', '--title', 'Acme push handling',
+                         '--about', 'edge:acme-mobile/acme-backend/http-api', '-F', '-',
+                         '--approved', 'Synthetic Acme fixture setup.'],
+              '# Acme push handling\n\nPush parsing compatibility rules.\n\nFallback category: UNSORTED_Q7\n')
     silta(env, cwd, ['repo', 'fetch', 'acme-backend'])
     guide_default = silta(env, cwd, ['guide'])['stdout']
     silta(env, cwd, ['task', 'add', 'Acme push categories' if scenario == 'start-cross-repo' else 'Acme parser work', '--app', 'acme-mobile', '--approved', 'Synthetic Acme fixture setup.'])
@@ -1040,6 +1048,76 @@ def backend_categories(e):
             if ' ' + category.replace('_', ' ') + ' ' in words}
 
 
+def result_calls(phase, ref, candidates, harness):
+    """Match captured writer receipts, without claiming per-field JSON provenance."""
+    if not phase.get('complete') or phase.get('exit') != 0 or trace_matches_logs(phase, harness) is not True:
+        return False
+    operations = Counter()
+    for command, call in command_calls(phase):
+        args = normalized_silta(trace_argv(command))
+        if not call or call.get('exit') != 0 or args[:2] != ['silta', 'task'] or len(args) < 3:
+            continue
+        operation = args[2]
+        if operation not in ('done', 'drop', 'edit', 'triage') or '--print' in args:
+            continue
+        output = call.get('output', '')
+        try:
+            data = json.loads(output).get('data', {})
+            refs = [data.get('ref')] + [t.get('ref') for t in data.get('tasks', [])]
+            matches = ref in refs
+        except (ValueError, AttributeError, TypeError):
+            matches = any(line.startswith(ref + ' ') for line in output.splitlines())
+        if matches:
+            operations['drop' if operation == 'triage' else operation] += 1
+    required = Counter('edit' if row['kind'] == 'field' else
+                       'done' if row['body'] == 'done' else 'drop' for row in candidates)
+    return not (required - operations)
+
+
+def doc_context(e):
+    """Attribute an outcome to a plan row or an exclusively owned result interval."""
+    baseline, phases = e.get('baseline', {}), e.get('phases', [])
+    original = next((t for t in baseline.get('tasks', []) if t['seq'] == 1), None)
+    if not original or not phases:
+        return False
+    def task(state):
+        return next((t for t in (state or {}).get('tasks', [])
+                     if t['id'] == original['id'] and t['uid'] == original['uid']), None)
+    def names_token(body):
+        return bool(re.search(r'(?<![A-Za-z0-9_])UNSORTED_Q7(?![A-Za-z0-9_])', body or ''))
+    final = phases[-1].get('state')
+    if any(task(p.get('state')) is None for p in phases):
+        return False
+    actors = {p['actor'] for p in phases}
+    old_plans = {row['id'] for row in baseline.get('plans', [])}
+    if any(row['id'] not in old_plans and row['task_id'] == original['id']
+           and row['actor'] in actors and names_token(row['body_md'])
+           for row in final.get('plans', [])):
+        return True
+    before, owned = baseline, False
+    for phase in phases:
+        state = phase['state']
+        previous, current = task(before), task(state)
+        old_events, events = before.get('events'), state.get('events')
+        if previous is None or not isinstance(old_events, list) or not isinstance(events, list):
+            return False
+        if events[:len(old_events)] != old_events or [r['id'] for r in events] != sorted({r['id'] for r in events}):
+            return False
+        candidates = [row for row in events[len(old_events):] if row['task_id'] == original['id']
+                      and ((row['kind'] == 'status' and row['body'] in ('done', 'dropped'))
+                           or (row['kind'] == 'field' and row['body'] == 'edited'))]
+        exclusive = bool(candidates) and all(row['actor'] == phase['actor'] for row in candidates)
+        if any(row['actor'] != phase['actor'] for row in candidates):
+            owned = False
+        if current.get('result_md') != previous.get('result_md'):
+            owned = exclusive and result_calls(phase, 'AC-1', candidates, e['harness'])
+        elif candidates and not (exclusive and result_calls(phase, 'AC-1', candidates, e['harness'])):
+            owned = False
+        before = state
+    return (owned and task(final).get('result_md') != original.get('result_md')
+            and names_token(task(final).get('result_md')))
+
+
 def backend_context(e):
     """Main-category completeness establishes correctness, including corrections."""
     return set(MAIN_CATEGORIES) <= backend_categories(e)
@@ -1094,6 +1172,8 @@ def grade(e):
     checks['backend_unchanged'] = backend_unchanged(e)
     checks['evidence_review'] = reviewed(e)
     scenario = e['scenario']
+    if scenario in ('doc-context', 'doc-context-no-doc'):
+        checks['doc_context'] = doc_context(e)
     if scenario == 'start-cross-repo':
         checks['brief_used'] = bool(successful & {'silta brief', 'silta agents session-start'})
         checks['task_started'] = started(e)
@@ -1262,7 +1342,7 @@ def main():
     trials, aborted, profile = [], False, None
     cases = []
     for harness in (['claude', 'codex'] if args.harness == 'both' else [args.harness]):
-        for scenario in ([args.scenario] if args.scenario else [s for s in SCENARIOS if not args.core or s not in ('proposals-ask', 'ask-short')]):
+        for scenario in ([args.scenario] if args.scenario else [s for s in SCENARIOS if (s in CORE_SCENARIOS if args.core else s != 'doc-context-no-doc')]):
             spec = json.loads((ROOT / 'scenarios' / scenario / 'scenario.yaml').read_text())
             cases.extend((harness, scenario, variant, repeat) for repeat in range(1, args.repeats + 1) for variant in spec['variants'])
     try:

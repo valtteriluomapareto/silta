@@ -13,6 +13,9 @@ def invalidate(e, key):
     elif key == 'task_started':
         for phase in phases:
             phase['logs'] = [l for l in phase['logs'] if l['command'] != 'silta task start']
+    elif key == 'doc_context':
+        final['plans'] = []
+        final['tasks'][0]['result_md'] = None
     elif key == 'backend_context':
         final['comments'] = []
         final['plans'] = []

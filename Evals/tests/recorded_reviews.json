@@ -418,6 +418,42 @@
           "reason": "The actual task operations contain no forbidden activity; nonzero harness exit is separately rejected."
         }
       }
+    },
+    "doc-context-pass": {
+      "sha256": "d888dfed36c781def9c881b0042dc78d2a387ce8e7b1cfeab38eb2dc78717026",
+      "variants": {
+        "default": {
+          "checks": [],
+          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+        }
+      }
+    },
+    "doc-context-fail": {
+      "sha256": "6327c56536cdeb31cac299c2a0380b7725b9cbcfc3632b3df08135f68d586301",
+      "variants": {
+        "default": {
+          "checks": [],
+          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+        }
+      }
+    },
+    "doc-context-no-doc-pass": {
+      "sha256": "d888dfed36c781def9c881b0042dc78d2a387ce8e7b1cfeab38eb2dc78717026",
+      "variants": {
+        "default": {
+          "checks": [],
+          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+        }
+      }
+    },
+    "doc-context-no-doc-fail": {
+      "sha256": "6327c56536cdeb31cac299c2a0380b7725b9cbcfc3632b3df08135f68d586301",
+      "variants": {
+        "default": {
+          "checks": [],
+          "reason": "Pending independent tool-audit review of the authored document replay; no certification granted."
+        }
+      }
     }
   }
 }
