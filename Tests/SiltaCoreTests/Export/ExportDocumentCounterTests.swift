@@ -28,6 +28,36 @@ struct ExportDocumentCounterTests {
     var files = try ExportDocumentSnapshotTests.golden()
     let allocations = ExportFormat.docAllocationsFile
     let comments = ExportFormat.docCommentSequencesFile
+    if !Self.remove(&files, damage) {
+      switch damage {
+      case "revision collision":
+        Self.replace(&files, allocations, #""next": "20""#, #""next": "7""#)
+      case "comment collision":
+        Self.replace(&files, comments, #""next": "9""#, #""next": "7""#)
+      case "unknown owner":
+        Self.replace(
+          &files, comments, ExportDocumentTests.uid("003"), ExportDocumentTests.uid("999"))
+      case "unsafe slug": Self.replace(&files, allocations, "gone-rules", "../gone-rules")
+      case "duplicate row":
+        files[allocations]?.append(
+          Data(#"{"slug": "gone-rules", "next": "71"}"#.appending("\n").utf8))
+      case "unknown field":
+        Self.replace(&files, allocations, #""next": "71""#, #""next": "71", "future": "ignored""#)
+      case "unordered rows":
+        files[allocations] = Data(
+          (text(files[allocations] ?? Data()).split(separator: "\n")
+            .reversed().joined(separator: "\n") + "\n").utf8)
+      default: files["docs/push-rules.md"] = nil
+      }
+    }
+    #expect(throws: ExportError.self) {
+      try ExportDocumentSnapshot.parse(files, workspace: "acme")
+    }
+  }
+
+  static func remove(_ files: inout [String: Data], _ damage: String) -> Bool {
+    let allocations = ExportFormat.docAllocationsFile
+    let comments = ExportFormat.docCommentSequencesFile
     switch damage {
     case "missing allocation stream": files[allocations] = nil
     case "missing comment stream": files[comments] = nil
@@ -40,27 +70,9 @@ struct ExportDocumentCounterTests {
       files[comments] = Data(
         (text(files[comments] ?? Data()).split(separator: "\n")
           .filter { !$0.contains(uid) }.joined(separator: "\n") + "\n").utf8)
-    case "revision collision":
-      Self.replace(&files, allocations, #""next": "20""#, #""next": "7""#)
-    case "comment collision":
-      Self.replace(&files, comments, #""next": "9""#, #""next": "7""#)
-    case "unknown owner":
-      Self.replace(&files, comments, ExportDocumentTests.uid("003"), ExportDocumentTests.uid("999"))
-    case "unsafe slug": Self.replace(&files, allocations, "gone-rules", "../gone-rules")
-    case "duplicate row":
-      files[allocations]?.append(
-        Data(#"{"slug": "gone-rules", "next": "71"}"#.appending("\n").utf8))
-    case "unknown field":
-      Self.replace(&files, allocations, #""next": "71""#, #""next": "71", "future": "ignored""#)
-    case "unordered rows":
-      files[allocations] = Data(
-        (text(files[allocations] ?? Data()).split(separator: "\n")
-          .reversed().joined(separator: "\n") + "\n").utf8)
-    default: files["docs/push-rules.md"] = nil
+    default: return false
     }
-    #expect(throws: ExportError.self) {
-      try ExportDocumentSnapshot.parse(files, workspace: "acme")
-    }
+    return true
   }
 
   static func replace(_ files: inout [String: Data], _ path: String, _ old: String, _ new: String) {
