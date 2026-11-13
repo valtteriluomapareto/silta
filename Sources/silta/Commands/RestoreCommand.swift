@@ -17,6 +17,8 @@ struct RestoreCommand: OutputCommand {
     "workspace": .string, "dry_run": .bool, "created": .bool, "same_uid": .bool,
     "manifest_sha256": .string, "tasks": .object(["before": .int, "after": .int]),
     "removed": .array(.string), "changed": .array(.string),
+    "docs": .object(["before": .int, "after": .int]),
+    "removed_docs": .array(.string), "changed_docs": .array(.string),
     "settings": .array(
       .object(["key": .string, "before": .optional(.string), "after": .optional(.string)])),
     "next_task_ref": .object(["before": .optional(.string), "after": .optional(.string)]),
@@ -65,7 +67,7 @@ struct RestoreCommand: OutputCommand {
       store: environment.db, home: environment.home.url,
       identity: (environment.ids, environment.clock.now()))
     return CommandOutput(
-      text: Self.text(report, directory: directory.path), data: report,
+      text: Self.text(report, directory: directory.path), data: report.presented,
       approvalUsed: approval != nil
     ).reporting(report.workspace)
   }
@@ -76,14 +78,16 @@ struct RestoreCommand: OutputCommand {
     return "Next task ref: \(ref.before ?? "unset") -> \(ref.after ?? "unset")."
   }
 
-  static func text(_ report: RestoreReport, directory: String) -> String {
+  static func text(_ raw: RestoreReport, directory: String) -> String {
+    let report = raw.presented
     let dry = report.dryRun
     let verb = report.created ? "create" : "replace"
     var lines = [
-      "\(dry ? "Would restore" : "Restored") \(report.workspace) from \(directory) "
+      "\(dry ? "Would restore" : "Restored") \(report.workspace) from \(SecretGuard.redacted(directory)) "
         + "(manifest \(report.manifestSHA256.prefix(12))): "
         + "\(dry ? "would \(verb)" : "\(verb)d") the workspace.",
       "Tasks: \(report.tasks.before) -> \(report.tasks.after).",
+      "Docs: \(report.docs.before) -> \(report.docs.after).",
     ]
     if !report.sameUID { lines.append("The replaced workspace has another uid than the tree's.") }
     func refs(_ label: String, _ list: [String]) {
@@ -93,6 +97,8 @@ struct RestoreCommand: OutputCommand {
     }
     refs("Removed since the export", report.removed)
     refs("Changed since the export", report.changed)
+    refs("Removed docs since the export", report.removedDocs)
+    refs("Changed docs since the export", report.changedDocs)
     if !report.rows.isEmpty {
       lines.append(
         "Other rows: "
@@ -108,22 +114,39 @@ struct RestoreCommand: OutputCommand {
     if let ref = counterLine(report.nextTaskRef) { lines.append(ref) }
     if report.approvalsAdded > 0 { lines.append("Approvals added: \(report.approvalsAdded).") }
     refs("Claims replaced", report.claimsReplaced.map { "\($0.task) (\($0.actor))" })
+    lines += recoveryLines(raw, directory: directory)
+    return lines.joined(separator: "\n")
+  }
+
+  private static func recoveryLines(_ raw: RestoreReport, directory: String) -> [String] {
+    let report = raw.presented
+    let scopeIsSafe = SecretGuard.matches(in: raw.workspace).isEmpty
+    let pathIsSafe = SecretGuard.matches(in: directory).isEmpty
+    var lines: [String] = []
     if let snapshot = report.snapshot {
-      lines.append(
-        "Before-restore snapshot: \(snapshot); to go back, open it as silta.db in an empty "
-          + "SILTA_HOME, export \(report.workspace) there and restore that export.")
+      let recovery =
+        scopeIsSafe
+        ? "to go back, open it as silta.db in an empty SILTA_HOME, export "
+          + raw.workspace + " there and restore that export."
+        : "run silta ws ls to select the workspace before restoring it."
+      lines.append("Before-restore snapshot: \(SecretGuard.redacted(snapshot)); " + recovery)
     }
     if !report.reposWithoutPath.isEmpty {
       lines.append(
         "Repos without a local path: \(report.reposWithoutPath.joined(separator: ", ")); run "
-          + workspaceCommand("silta init --scan <clone dir>…", workspace: report.workspace) + ".")
+          + (scopeIsSafe
+            ? workspaceCommand("silta init --scan <clone dir>…", workspace: raw.workspace)
+            : "silta ws ls") + ".")
     }
-    if dry {
+    if report.dryRun {
       lines.append("Dry run: the workspace was not changed.")
       lines.append(
-        "ask human: silta restore " + shellWord(directory) + " --manifest "
-          + report.manifestSHA256.prefix(12) + " --approved \"<the human's words>\"")
+        scopeIsSafe && pathIsSafe
+          ? "ask human: silta restore " + shellWord(directory) + " --manifest "
+            + report.manifestSHA256.prefix(12) + " --approved \"<the human's words>\""
+          : "next: silta ws ls")
     }
-    return lines.joined(separator: "\n")
+    return lines
   }
+
 }
