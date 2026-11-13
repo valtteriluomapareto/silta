@@ -87,6 +87,10 @@ struct DocReadCommandTests {
       let selected = try run(["show", "doc:rules@2", "--lines", "8-10"], scratch, json: true)
       #expect(!selected.stdout.contains("private Acme") && !selected.stdout.contains("PRIVATE KEY"))
       #expect(!selected.stdout.contains("body_md"))
+      let inside = try run(["show", "doc:rules@2", "--lines", "9"], scratch, json: true)
+      #expect(inside.termination == .exit(0))
+      #expect(inside.stdout.contains("line 1"))
+      #expect(!inside.stdout.contains("private Acme token"))
     }
   }
 
