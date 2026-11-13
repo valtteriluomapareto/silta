@@ -2,7 +2,7 @@
 
 OVERVIEW: Read the agent manual, or one topic.
 
-Topic names are exact (case-sensitive). Topics: when, start, recipes, human,
+Topic names are exact (case-sensitive). Topics: when, start, recipes, docs, human,
 questions, blocked, handoff, reviews, refusals, refs, output
 
 USAGE: silta guide [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<topic>]
