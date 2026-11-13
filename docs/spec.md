@@ -1682,12 +1682,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     tasks removed or changed since the export, row counts of the other tables,
     settings, the ref the next task would get, approvals added and claims replaced.
     JSON includes `docs: {before, after}`, `changed_docs` and `removed_docs`.
-    Document identity and complete row/record changes use literal UTF-8 bytes;
+    Document identity and complete rows, records and outgoing document/comment
+    links use literal UTF-8 bytes;
     allocation-only changes do not mark a document changed. Document counts have
     their own field; other row counts include `doc_rev`, `doc_verification` and
     combined task/document `comment` rows, while allocation counts stay in the manifest.
-    Displayed document references and workspace identities mask credential-shaped
-    values. When a workspace or restore path cannot be printed safely, recovery is
+    Displayed document references, workspace identities and before-restore snapshot
+    paths mask credential-shaped values. When a workspace or restore path cannot be printed safely, recovery is
     the agent command `silta ws ls`, without manifest or approval suffixes.
   - A tree of an older schema restores the columns later migrations added at their
     defaults.

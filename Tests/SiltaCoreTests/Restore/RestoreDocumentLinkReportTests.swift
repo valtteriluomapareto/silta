@@ -45,9 +45,7 @@ struct RestoreDocumentLinkReportTests {
     #expect(before.links.count == after.links.count)
     let result = Self.report(before, after)
     #expect(result.removedDocs.isEmpty && result.rows.isEmpty)
-    withKnownIssue("Retained document-owned link changes are absent from the approval report.") {
-      #expect(result.changedDocs == ["doc:push-rules"])
-    }
+    #expect(result.changedDocs == ["doc:push-rules"])
   }
 
   @Test func taskAndTaskCommentLinksDoNotBelongToTheDocument() throws {
@@ -89,11 +87,8 @@ struct RestoreDocumentLinkReportTests {
     #expect(raw.snapshot == path)
     let json = OutputRouter.render(
       .success(CommandOutput(text: "", data: presented)), mode: OutputMode(json: true))
-    withKnownIssue("The presented snapshot path exposes credential-shaped home components in JSON.")
-    {
-      #expect(presented.snapshot == "/private/acme/[REDACTED:github_pat]/backups/before-restore.db")
-      #expect(!json.stdout.contains(credential))
-    }
+    #expect(presented.snapshot == "/private/acme/[REDACTED:github_pat]/backups/before-restore.db")
+    #expect(!json.stdout.contains(credential))
     #expect(raw.snapshot == path)
   }
 }
