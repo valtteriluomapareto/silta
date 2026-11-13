@@ -31,14 +31,14 @@ struct GuideCommandTests {
 
   @Test func outputModesAndSchema() throws {
     try withScratchDirectory { scratch in
-      for args in [["guide"], ["guide", "human"], ["guide", "refs"]] {
+      for args in [["guide"], ["guide", "human"], ["guide", "refs"], ["guide", "docs"]] {
         let text = try SiltaBinary.run(args, in: scratch)
         #expect(try SiltaBinary.run(["--quiet"] + args, in: scratch) == text)
         for flags in [["--json"], ["--quiet", "--json"]] {
           let result = try SiltaBinary.run(args + flags, in: scratch)
           #expect(result.termination == .exit(0))
           #expect(result.stderr.isEmpty)
-          if let topic = args.dropFirst().first, topic == "human" {
+          if let topic = args.dropFirst().first, ["human", "docs"].contains(topic) {
             Golden.forTests().check(result.stdout, "guide-\(topic).json")
           }
           let root = try GuideContractTests.object(result.stdout)

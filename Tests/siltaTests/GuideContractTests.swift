@@ -21,7 +21,7 @@ struct GuideContractTests {
 
   @Test func jsonIdentifiesSelectedTopic() throws {
     try withScratchDirectory { scratch in
-      for topic in [nil, "human", "refs"] as [String?] {
+      for topic in [nil, "human", "refs", "docs"] as [String?] {
         let result = try SiltaBinary.run(
           ["guide"] + (topic.map { [$0] } ?? []) + ["--json"], in: scratch)
         let data = try Self.data(result)
@@ -112,7 +112,10 @@ struct GuideContractTests {
       }
       let home = try Self.snapshot(scratch.appending(path: "home"))
       let siltaHome = try Self.snapshot(scratch.appending(path: "silta-home"), excludingLog: true)
-      for args in [["guide"], ["guide", "refs"], ["--ws", "missing", "guide", "human", "--json"]] {
+      for args in [
+        ["guide"], ["guide", "refs"], ["--ws", "missing", "guide", "human", "--json"],
+        ["guide", "docs"], ["--ws", "missing", "guide", "docs", "--json"],
+      ] {
         #expect(try SiltaBinary.run(args, in: scratch).termination == .exit(0))
         #expect(try Self.snapshot(scratch.appending(path: "home")) == home)
         #expect(
@@ -134,7 +137,9 @@ struct GuideContractTests {
       for (args, exit) in [
         (["guide"], Int32(0)), (["guide", "refs"], 0),
         (["--ws", "acme", "guide", "human", "--json"], 0),
-        (["guide", "refs", "--json"], 0), (["guide", "nope"], 1),
+        (["guide", "refs", "--json"], 0),
+        (["guide", "docs"], 0), (["--ws", "missing", "guide", "docs", "--json"], 0),
+        (["guide", "nope"], 1),
       ] {
         let result = try Self.observeReader(fifo) { try SiltaBinary.run(args, in: scratch) }
         #expect(!result.opened)

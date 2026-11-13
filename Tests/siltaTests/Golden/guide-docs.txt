@@ -1,0 +1,59 @@
+# Workspace docs
+Read the docs shown beside the app, edge, service or topic in your brief before cross-app
+work. Follow the printed doc ls command, then doc show; copy refs rather than composing
+them. Printed edge/service refs retain their typed target and encoded legacy names.
+Full briefs show at most two doc rows per item; short/hook briefs show counts. Follow
+complete continuations for bounded reads. Historical unknown metadata stays unknown;
+do not replace it with today's map or treat it as a verification claim.
+
+A workspace doc holds lasting cross-app knowledge. Repo instructions and repo docs stay
+in their repositories: point to code refs instead of copying code or repo documentation.
+The summary is the first nonempty nonheading line, at most 120 characters. Write the
+rule there, not a heading or a description of the document.
+
+Editing and archiving need the human's approval. Name the exact commands in chat first;
+only then replace <the human's words> with their actual reply. Without a human here,
+leave the commands in your handoff; never invent approval words. These examples start a
+new Acme rules doc; use the returned revision refs in your workspace.
+Title is one line of at most 120 characters.
+A new doc needs a title and at least one about ref. Kind is inferred from its first
+attachments (one edge: contract; several edges: flow; service: runbook;
+otherwise: reference) and stays fixed unless --kind is explicit.
+Omitted accepted metadata stays unchanged.
+Supplied about refs replace the complete live set; repeat --about for every attachment.
+Save complete UTF-8 Markdown with -F, at most 65536 bytes before and after redaction:
+```sh
+silta --ws acme doc edit rules -F rules.md --title Rules --about service:push \
+--approved "<the human's words>"
+silta --ws acme doc edit doc:rules --keep-body --about topic:messaging \
+--approved "<the human's words>"
+```
+--keep-body is exclusive with -F and copies an accepted owned body literally, including
+an archived one, even when its source file is gone. It does not rescan or cap retained
+body text. Reactivation needs replacement about refs after archive removed them.
+
+A quoted heredoc keeps shell substitutions literal. Read the stored revision and its
+recorded-base diff after the approved edit:
+```sh
+silta --ws acme doc edit rules -F - --approved "<the human's words>" <<'DOC'
+# Delivery fallback
+Keep $DELIVERY_MODE unchanged when retrying an unconfirmed delivery.
+Implementation: [[platform-api:src/Auth.swift]].
+DOC
+silta --ws acme doc ls --about topic:messaging
+silta --ws acme doc show doc:rules@3 --lines 1-80
+silta --ws acme doc show doc:rules@3 --diff
+```
+For a map removal conflict, add the replacement first, replay every printed --keep-body
+edit with all surviving about refs, inspect ws show, then retry the original map change.
+The first example reattaches rules from service:push to the existing topic:messaging.
+Archive is another approved way to remove all live attachments while keeping history:
+```sh
+silta --ws acme doc archive doc:rules --approved "<the human's words>"
+silta --ws acme doc ls --archived
+silta --ws acme doc show doc:rules@3
+```
+Archive creates no revision. Repeating an already clean archive changes nothing and
+leaves an unused approval unused. Explicit archived/history reads remain available;
+--archived includes archived docs in lists. For unsafe refs/scopes, follow the protected
+read command Silta prints instead of adding write flags to it.

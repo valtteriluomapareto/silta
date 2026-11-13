@@ -8,7 +8,7 @@ struct DocEditCommand: OutputCommand {
     discussion: "Use -F for complete UTF-8 Markdown, or --keep-body to retain it.\n"
       + "New docs need --title and --about. About refs replace the whole set.\n"
       + "Input: at most 65536 bytes. Kind stays fixed unless --kind is explicit.\n"
-      + "Read editing rules with silta guide recipes.\n"
+      + "Read editing rules with silta guide docs.\n"
       + "Create (human): silta doc edit api -F api.md --title API --about app:api\n"
       + "Preserve (human): silta doc edit api --keep-body --about app:api")
   static let dataShape = Shape.object(["ref": .string, "archived": .bool, "changed": .bool])
