@@ -1,4 +1,5 @@
 """Document outcomes use real CLI state and authored native evidence, never a model."""
+from contextlib import closing
 import copy
 import json
 from pathlib import Path
@@ -98,10 +99,11 @@ class DocContext(unittest.TestCase):
         self.assertFalse(self.outcome(e))
 
     def test_result_done_drop_edit_and_triage_drop(self):
+        original = self.root
         for method in ['done', 'drop', 'edit', 'triage']:
-            with self.subTest(method=method), tempfile.TemporaryDirectory(dir=self.root) as directory:
-                original = self.root
-                self.root = Path(directory)
+            with self.subTest(method=method):
+                self.root = original / method
+                self.root.mkdir()
                 self.prepare(proposed=method == 'triage')
                 def write():
                     if method == 'edit':
@@ -161,7 +163,7 @@ class DocContext(unittest.TestCase):
 
     def test_fixture_token_only_in_body_below_summary_on_edge(self):
         self.prepare()
-        with sqlite3.connect(self.root / 'data/silta.db') as db:
+        with closing(sqlite3.connect(self.root / 'data/silta.db')) as db:
             rows = db.execute('SELECT d.slug,r.body_md FROM doc d JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev').fetchall()
         self.assertEqual(len(rows), 1, 'the primary fixture must seed an accepted edge doc')
         self.assertIn(TOKEN, rows[0][1])
