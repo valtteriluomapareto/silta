@@ -99,7 +99,7 @@ struct DocWriteService {
       let id = try TaskService.workspaceID(slug, in: db)
       let baseline = try DocEditBaseline.read(
         request.slug, workspace: id, keepBody: request.keepBody, in: db)
-      if request.keepBody && baseline.body == nil {
+      if request.keepBody && (!baseline.accepted || baseline.body == nil) {
         throw DocError.missing(["-F", "--title", "--about"])
       }
       if !baseline.documentExists {

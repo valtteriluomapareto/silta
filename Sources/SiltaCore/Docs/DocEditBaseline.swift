@@ -4,6 +4,7 @@ import GRDB
 struct DocEditBaseline {
   let fields: [String?]
   let documentExists: Bool
+  let accepted: Bool
   let body: String?
   let title: String?
   let refs: [String]
@@ -22,7 +23,9 @@ struct DocEditBaseline {
         WHERE d.workspace_id=? AND d.slug=?
         """, arguments: [keepBody, DocInput.maximumBytes, workspace, slug])
     guard let row else {
-      return Self(fields: [workspaceUID], documentExists: false, body: nil, title: nil, refs: [])
+      return Self(
+        fields: [workspaceUID], documentExists: false, accepted: false, body: nil, title: nil,
+        refs: [])
     }
     let pointer: Int? = row["current_rev"]
     let revision: Int? = row["rev"]
@@ -44,7 +47,9 @@ struct DocEditBaseline {
       fields += [ref, uid]
       refs.append(ref)
     }
-    return Self(fields: fields, documentExists: true, body: body, title: title, refs: refs)
+    return Self(
+      fields: fields, documentExists: true, accepted: row["state"] == "accepted",
+      body: body, title: title, refs: refs)
   }
 
   func matches(_ other: Self) -> Bool {
