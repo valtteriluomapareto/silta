@@ -3,23 +3,37 @@ extension DocWriteService {
     -> any CodedError
   {
     if error is StorageError { return error }
+    let message = SecretGuard.redacted(error.message)
     guard safeScopeAndIdentity(request, workspace: workspace) else {
-      return CommandFailure(error: error, next: [readCommand(workspace: workspace)], nextBy: .agent)
+      return CommandFailure(
+        error: error, next: [readCommand(workspace: workspace)], nextBy: .agent, message: message)
+    }
+    if error is RepoError || error is CodeError {
+      let safe = error.next.allSatisfy(DocService.safeReference)
+      return CommandFailure(
+        error: error,
+        next: safe
+          ? error.next
+          : [DocService(workspace: workspace, store: environment.db).configurationCommand],
+        nextBy: safe ? nil : .agent, message: message)
     }
     if case .missing(let fields) = error as? DocError {
       return CommandFailure(
-        error: error, next: [retry(request, fields: fields, workspace: workspace)])
+        error: error, next: [retry(request, fields: fields, workspace: workspace)], message: message
+      )
     }
     if error is SecretError {
       return CommandFailure(
         error: error, next: [retry(request, allowSecret: true, workspace: workspace)],
-        nextBy: .human)
+        nextBy: .human, message: message)
     }
     if error.code == .notFound || error.code == .conflict {
       let read = DocService(workspace: workspace, store: environment.db)
-      return CommandFailure(error: error, next: [read.configurationCommand], nextBy: .agent)
+      return CommandFailure(
+        error: error, next: [read.configurationCommand], nextBy: .agent, message: message)
     }
-    return CommandFailure(error: error, next: [retry(request, workspace: workspace)])
+    return CommandFailure(
+      error: error, next: [retry(request, workspace: workspace)], message: message)
   }
 
   func retry(
