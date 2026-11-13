@@ -1,0 +1,22 @@
+OVERVIEW: Archive a document and remove its live attachments (human-only).
+
+Keeps revision history, comments and verification evidence.
+An already archived doc without live attachments changes nothing.
+Archive (human): silta doc archive rules
+
+USAGE: silta doc archive [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <slug>
+
+ARGUMENTS:
+  <slug>                  Doc slug or doc:slug, without a revision.
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --version               Show the version.
+  -h, --help              Show help information.

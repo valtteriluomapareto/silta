@@ -50,4 +50,12 @@ struct DocArchiveCommandTests {
       )
     }
   }
+  @Test func helpDeclaresHistoryAndNoopSemantics() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(["doc", "archive", "--help"], in: scratch)
+      #expect(result.termination == .exit(0))
+      Golden.forTests().check(result.stdout, "help-doc-archive.txt")
+    }
+  }
+
 }
