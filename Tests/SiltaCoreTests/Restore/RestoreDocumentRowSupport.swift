@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import SiltaTestSupport
 
 @testable import SiltaCore
 
@@ -66,7 +67,10 @@ enum RestoreDocumentRowSupport {
       "SELECT * FROM workspace WHERE id=23", "SELECT * FROM doc WHERE workspace_id=23",
       "SELECT * FROM doc_rev WHERE doc_id=92", "SELECT * FROM link WHERE workspace_id=23",
       "SELECT * FROM seq_counter WHERE scope GLOB 'doc_rev:23:*'",
-      "SELECT * FROM seq_counter WHERE scope IN ('comment:doc_rev:950','comment:doc_rev:4040404','task:17')",
+      """
+      SELECT * FROM seq_counter
+      WHERE scope IN ('comment:doc_rev:950','comment:doc_rev:4040404','task:17')
+      """,
       "SELECT * FROM repo_path", "SELECT * FROM worktree_override",
       "SELECT uid,worktree,claimed_by,claimed_at,branch FROM task WHERE workspace_id=17",
     ]
@@ -75,7 +79,9 @@ enum RestoreDocumentRowSupport {
     }
   }
 
-  static func accept(_ slug: String, store: DatabaseStore) throws -> DocRevision {
+  static func accept(_ slug: String, store: DatabaseStore, ids: any IDGenerator) throws
+    -> DocRevision
+  {
     var draft = DocDraft(slug: slug, body: "A rule after restoring history.")
     draft.title = "Restored policy"
     draft.about = ["service:push%20service"]
@@ -83,7 +89,7 @@ enum RestoreDocumentRowSupport {
     return try store.write { tx in
       try DocStore(
         workspace: 17, transaction: tx, actor: DocStoreTests.actor,
-        ids: SeededIDGenerator(seed: 501), at: ExportFixture.instant
+        ids: ids, at: ExportFixture.instant
       ).accept(draft, verification: DocVerification(binding: binding, snapshots: []))
     }
   }

@@ -51,6 +51,11 @@ struct RestoreDocumentRowTests {
       let store = try RestoreDocumentRowSupport.make(home)
       var graph = try RestoreDocumentGraphFixture.graph()
       RestoreDocumentGraphFixture.otherDocument(&graph.documents)
+      graph.documents.documents[1].records[0] = graph.documents.documents[1].records[0]
+        .replacing("uid", with: "owned-legacy-revision", keys: ExportFormat.docRecords[0].keys)
+      let last = graph.documents.commentSequences.count - 1
+      graph.documents.commentSequences[last] = graph.documents.commentSequences[last]
+        .replacing("doc_rev", with: "owned-legacy-revision", keys: ["doc_rev", "next"])
       let expected = try RestoreDocumentRowSupport.replace(
         store, tree: graph.tree, incoming: graph.documents)
       let after = try store.read { try ExportDocumentSnapshot.read($0, workspace: 17) }
@@ -85,7 +90,7 @@ struct RestoreDocumentRowTests {
             + "UPDATE link SET uid='typed-010' WHERE workspace_id=23")
       }
       let before = try RestoreSupport.dump(store)
-      #expect(throws: DatabaseError.self) {
+      #expect(throws: StorageError.constraintViolation) {
         try RestoreDocumentRowSupport.replace(store, tree: graph.tree, incoming: graph.documents)
       }
       #expect(try RestoreSupport.dump(store) == before)
@@ -97,8 +102,12 @@ struct RestoreDocumentRowTests {
       let store = try RestoreDocumentRowSupport.make(home)
       let graph = try RestoreDocumentGraphFixture.graph()
       _ = try RestoreDocumentRowSupport.replace(store, tree: graph.tree, incoming: graph.documents)
-      #expect(try RestoreDocumentRowSupport.accept("push-rules", store: store).revision == 151)
-      #expect(try RestoreDocumentRowSupport.accept("removed-rules", store: store).revision == 236)
+      let ids = SeededIDGenerator(seed: 501)
+      #expect(
+        try RestoreDocumentRowSupport.accept("push-rules", store: store, ids: ids).revision == 151)
+      #expect(
+        try RestoreDocumentRowSupport.accept("removed-rules", store: store, ids: ids).revision
+          == 236)
       let revision = try store.read {
         try Int64.fetchOne(
           $0, sql: "SELECT id FROM doc_rev WHERE uid=?",
@@ -120,7 +129,8 @@ struct RestoreDocumentRowTests {
       _ = try RestoreDocumentRowSupport.replace(store, tree: graph.tree, incoming: graph.documents)
       let before = try RestoreSupport.dump(store)
       #expect(throws: StorageError.resourceExhausted) {
-        try RestoreDocumentRowSupport.accept("push-rules", store: store)
+        try RestoreDocumentRowSupport.accept(
+          "push-rules", store: store, ids: SeededIDGenerator(seed: 501))
       }
       #expect(try RestoreSupport.dump(store) == before)
     }
