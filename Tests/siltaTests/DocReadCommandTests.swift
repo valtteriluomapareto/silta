@@ -205,14 +205,17 @@ struct DocReadCommandTests {
       #expect(result.termination == .exit(2))
       let report = result.stdout + result.stderr
       #expect(report.contains("silta --ws 'acme' ws show"))
-      withKnownIssue("Missing encoded edge filter echoes credential in document list error") {
-        #expect(!report.contains("private123"))
-        #expect(report.contains("[REDACTED:password]"))
-      }
+      #expect(!report.contains("private123"))
+      #expect(report.contains("[REDACTED:password]"))
       let safe = try run(
         ["ls", "--about", "edge:api/service:push/HTTP%20API"], scratch, json: json)
       #expect(safe.termination == .exit(2))
       #expect((safe.stdout + safe.stderr).contains("HTTP%20API"))
+      let invalid = try run(
+        ["ls", "--about", "edge:api/service:push/Password%3Dprivate123/extra"], scratch, json: json)
+      #expect(invalid.termination == .exit(1))
+      #expect(!(invalid.stdout + invalid.stderr).contains("private123"))
+      #expect((invalid.stdout + invalid.stderr).contains("Use edge:<from>/<to>/<kind>"))
     }
   }
 

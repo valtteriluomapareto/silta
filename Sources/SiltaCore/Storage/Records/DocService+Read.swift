@@ -48,7 +48,7 @@ extension DocService {
         + " OR doc_rev.state='proposed')"
       var arguments: StatementArguments = [workspaceID, archived]
       if let about {
-        let target = try TaskLinkTarget.map(about, workspace: workspaceID, in: db)
+        let target = try attachment(about, workspace: workspaceID, in: db)
         predicate += """
            AND (EXISTS(SELECT 1 FROM link WHERE link.workspace_id=doc.workspace_id
              AND from_kind='doc' AND from_id=doc.id AND rel='about' AND to_kind=? AND to_id=?)
@@ -74,6 +74,18 @@ extension DocService {
         ? listCommand : command + " --offset \(offset + entries.count) --limit \(limit)"
       let next = offset < total && entries.count < total - offset ? continuation : nil
       return DocListResult(entries: entries, total: total, offset: offset, limit: limit, next: next)
+    }
+  }
+
+  private func attachment(_ ref: String, workspace workspaceID: Int64, in db: Database) throws
+    -> TaskLinkTarget
+  {
+    do {
+      return try TaskLinkTarget.map(ref, workspace: workspaceID, in: db)
+    } catch let error as any CodedError where error.code == .notFound && !Self.safeReference(ref) {
+      throw CommandFailure(
+        error: TaskError.notFound("attachment " + (ref.removingPercentEncoding ?? ref)),
+        next: [workspaceCommand("silta ws show", workspace: workspace)])
     }
   }
 
