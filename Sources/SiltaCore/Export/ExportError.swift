@@ -134,17 +134,13 @@ package enum ExportError: CodedError, Equatable {
     where workspace.map({ !SecretGuard.matches(in: $0).isEmpty }) == true:
       ["silta ws ls"]
     case .invalidTree(_, let workspace):
-      if let workspace, !SecretGuard.matches(in: workspace).isEmpty {
-        ["silta ws ls"]
-      } else {
-        [
-          workspace.map {
-            workspaceCommand(
-              "silta export  # again, on the machine the tree came from", workspace: $0)
-          } ?? "silta --ws <the tree's workspace> export"
-            + "  # again, on the machine the tree came from"
-        ]
-      }
+      [
+        workspace.map {
+          workspaceCommand(
+            "silta export  # again, on the machine the tree came from", workspace: $0)
+        } ?? "silta --ws <the tree's workspace> export"
+          + "  # again, on the machine the tree came from"
+      ]
     case .notATree(let path, _, let child):
       child.map { ["silta restore " + shellWord(path + "/" + $0) + " --dry-run"] }
         ?? [
