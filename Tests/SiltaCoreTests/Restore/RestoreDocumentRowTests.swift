@@ -46,6 +46,32 @@ struct RestoreDocumentRowTests {
     }
   }
 
+  @Test func counterOnlyReplacementKeepsIndependentNamesAndPublicRefusal() throws {
+    try withScratchDirectory { home in
+      let store = try RestoreDocumentRowSupport.make(home)
+      var graph = try RestoreDocumentGraphFixture.graph()
+      graph.tree.links = []
+      let incoming = ExportDocumentSnapshot(
+        documents: [],
+        revisionAllocations: [
+          ExportDocumentTests.row([("slug", "incoming-only"), ("next", "400")])
+        ],
+        commentSequences: [])
+      let expected = try RestoreDocumentRowSupport.replace(
+        store, tree: graph.tree, incoming: incoming)
+      let after = try store.read { try ExportDocumentSnapshot.read($0, workspace: 17) }
+      #expect(after.documents.isEmpty && after.commentSequences.isEmpty)
+      ExportTreeTests.expectSame(try after.files(), try expected.files())
+      #expect(
+        after.revisionAllocations.map { $0.value("slug") } == [
+          "future-only", "gone-rules", "incoming-only", "push-rules", "removed-rules",
+        ])
+      #expect(throws: ExportError.unsupported("reserved doc revision history")) {
+        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
+      }
+    }
+  }
+
   @Test func legacyTitleKindAndUnknownSnapshotsSurviveInsertion() throws {
     try withScratchDirectory { home in
       let store = try RestoreDocumentRowSupport.make(home)
