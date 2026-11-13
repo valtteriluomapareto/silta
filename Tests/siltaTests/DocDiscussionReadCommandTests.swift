@@ -281,3 +281,55 @@ extension DocDiscussionReadCommandTests {
     }
   }
 }
+
+extension DocDiscussionReadCommandTests {
+  @Test(
+    arguments: [false, true],
+    ["acme", "AKIA" + String(repeating: "A", count: 16), String(repeating: "a", count: 52)])
+  func discussionRecoveryChecksWorkspaceBeforeViewFlags(json: Bool, scope: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      try renameDiscussion(store, slug: "rules")
+      try store.write {
+        try $0.database.execute(sql: "UPDATE workspace SET slug=?", arguments: [scope])
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Acme Beta','BE');
+            UPDATE meta SET value='beta' WHERE key='current_workspace';
+            """)
+      }
+      let ref = "doc:rules@3"
+      for args in [
+        ["show", ref, "--diff"], ["show", ref, "--diff", "--lines", "9999"],
+        ["show", ref, "--comments"], ["show", ref, "--comments", "--offset", "1", "--limit", "1"],
+        ["show", ref + "/1"], ["show", ref + "/1", "--lines", "9999"],
+        ["ls", "--about", "app:api", "--archived", "--limit", "1"],
+        ["ls", "--offset", "1", "--limit", "1"], ["show", ref + "/99"],
+      ] {
+        let result = try SiltaBinary.run(
+          ["--ws", scope, "doc"] + args + (json ? ["--json"] : []), in: scratch)
+        #expect(result.termination == .exit(args[1].hasSuffix("/99") ? 2 : 0))
+        let report = result.stdout + result.stderr
+        if scope == "acme" {
+          #expect(report.contains("silta --ws 'acme'"))
+        } else {
+          withKnownIssue("Discussion recovery constructs flags before checking workspace scope") {
+            #expect(!report.contains(scope))
+            #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))
+            #expect(!report.contains("silta doc ls") && !report.contains("--ws '[REDACTED:"))
+          }
+        }
+      }
+      try store.write { try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE rev=3") }
+      let missing = try SiltaBinary.run(
+        ["--ws", scope, "doc", "show", ref, "--diff"] + (json ? ["--json"] : []), in: scratch)
+      #expect(missing.termination == .exit(2))
+      if scope != "acme" {
+        withKnownIssue("Recorded-base recovery embeds sensitive workspace scope") {
+          #expect(!(missing.stdout + missing.stderr).contains(scope))
+          #expect((missing.stdout + missing.stderr).contains("silta ws ls"))
+        }
+      }
+    }
+  }
+}
