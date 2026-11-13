@@ -20,7 +20,7 @@ import Testing
 
   @Test func readsOnlyLimitPlusOneAndRefusesInvalidUtf8OrReadFailure() throws {
     var consumed = 0
-    #expect(throws: (any CodedError).self) {
+    #expect(throws: DocError.self) {
       _ = try DocInput.read { maximum in
         consumed += maximum
         return Data(repeating: 97, count: maximum)
@@ -28,7 +28,7 @@ import Testing
     }
     #expect(consumed == 65_537)
     var invalid = true
-    #expect(throws: (any CodedError).self) {
+    #expect(throws: DocError.self) {
       _ = try DocInput.read { _ in
         defer { invalid = false }
         return invalid ? Data([0xc3]) : nil

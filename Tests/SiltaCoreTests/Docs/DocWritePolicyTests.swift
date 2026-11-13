@@ -43,7 +43,8 @@ struct DocWritePolicyTests {
 
   @Test func gateBeforeInputOrStorageAndMissingMetadataBeforeInput() async throws {
     try await withScratchDirectory { home in
-      let store = DatabaseStore(home: home, clock: FakeClock(now: DocStoreTests.instant))
+      let store = DatabaseStore(
+        home: home, clock: FakeClock(now: DocStoreTests.instant), jitter: { 0 })
       let service = try Self.service(home, store, approved: nil)
       await Self.refusal(.humanOnly) {
         _ = try await service.edit(Self.request()) {
