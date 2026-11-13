@@ -115,7 +115,7 @@ package enum RestoreService {
 /// What the form check leaves to restore: integer values, settings as `ws edit` would
 /// accept them, unique uids, references that resolve inside the tree, and no parent
 /// cycles. Runs before the write, so a refusal here writes nothing at all.
-private struct RestoreValidation {
+struct RestoreValidation {
   let tree: ExportSnapshot
   let slug: String
 
@@ -125,6 +125,23 @@ private struct RestoreValidation {
   }
 
   func run() throws {
+    let uids = try index()
+    try references(uids)
+    try links(uids)
+    try parents()
+    try naturalKeys()
+  }
+
+  /// Base rows and their owned identities, independently of polymorphic link ends.
+  func rows() throws -> [String: Set<String>] {
+    let uids = try index()
+    try references(uids)
+    try parents()
+    try naturalKeys()
+    return uids
+  }
+
+  private func index() throws -> [String: Set<String>] {
     try settings()
     var uids: [String: Set<String>] = [:]
     func add(_ table: String, _ row: ExportRow) throws {
@@ -145,9 +162,7 @@ private struct RestoreValidation {
     for row in tree.links { try add("link", row) }
     for row in tree.aliasDecisions { try add("alias_decision", row) }
     for row in tree.approvals { try add("approval", row) }
-    try references(uids)
-    try parents()
-    try naturalKeys()
+    return uids
   }
 
   private func settings() throws {
@@ -204,6 +219,15 @@ private struct RestoreValidation {
         }
       }
     }
+  }
+
+  func links(
+    _ uids: [String: Set<String>], tables: [String: String] = ExportFormat.linkTables
+  ) throws {
+    func resolve(_ uid: String?, _ table: String, from: String) throws {
+      guard let uid, !uids[table, default: []].contains(uid) else { return }
+      throw invalid("\(from) names \(table) \(uid), which the tree doesn't hold")
+    }
     let revisions = Set(
       tree.tasks.flatMap { task in
         task.records.compactMap {
@@ -215,7 +239,7 @@ private struct RestoreValidation {
       guard link.value("from") != nil, (link.value("to") == nil) != (link.value("to_ext") == nil)
       else { throw invalid("link \(link.value("uid") ?? "") has a missing end") }
       try resolve(
-        link.value("from"), ExportFormat.linkTables[link.value("from_kind") ?? ""] ?? "",
+        link.value("from"), tables[link.value("from_kind") ?? ""] ?? "",
         from: "link")
       guard let to = link.value("to") else { continue }
       if link.value("to_kind") == "task_plan_rev" {
@@ -225,7 +249,7 @@ private struct RestoreValidation {
             "a link names plan revision \(revision) of \(to), which the tree doesn't hold")
         }
       } else {
-        try resolve(to, ExportFormat.linkTables[link.value("to_kind") ?? ""] ?? "", from: "link")
+        try resolve(to, tables[link.value("to_kind") ?? ""] ?? "", from: "link")
       }
     }
   }
