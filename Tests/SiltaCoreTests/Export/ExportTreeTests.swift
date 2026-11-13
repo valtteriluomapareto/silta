@@ -112,11 +112,23 @@ struct ExportTreeTests {
     "doc_rev":
       "SELECT count(*) FROM doc_rev WHERE doc_id IN (SELECT id FROM doc WHERE workspace_id=1)",
     "doc_verification":
-      "SELECT count(*) FROM doc_verification WHERE doc_rev_id IN (SELECT id FROM doc_rev WHERE doc_id IN (SELECT id FROM doc WHERE workspace_id=1))",
+      """
+    SELECT count(*) FROM doc_verification
+    WHERE doc_rev_id IN (SELECT id FROM doc_rev
+    WHERE doc_id IN (SELECT id FROM doc WHERE workspace_id=1))
+    """,
     "doc_revision_allocation":
-      "SELECT count(*) FROM (SELECT slug FROM doc WHERE workspace_id=1 UNION SELECT substr(scope,length('doc_rev:1:')+1) FROM seq_counter WHERE scope GLOB 'doc_rev:1:*')",
+      """
+    SELECT count(*) FROM (SELECT slug FROM doc WHERE workspace_id=1
+    UNION SELECT substr(scope,length('doc_rev:1:')+1)
+    FROM seq_counter WHERE scope GLOB 'doc_rev:1:*')
+    """,
     "doc_comment_sequence":
-      "SELECT count(*) FROM seq_counter c JOIN doc_rev r ON c.scope='comment:doc_rev:'||r.id JOIN doc d ON d.id=r.doc_id WHERE d.workspace_id=1",
+      """
+    SELECT count(*) FROM seq_counter c
+    JOIN doc_rev r ON c.scope='comment:doc_rev:'||r.id
+    JOIN doc d ON d.id=r.doc_id WHERE d.workspace_id=1
+    """,
   ]
 
   @Test func manifestListsEveryFileWithItsHashAndCountsMatchTheDatabase() throws {
