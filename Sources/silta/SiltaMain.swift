@@ -201,7 +201,9 @@ enum SiltaMain {
     arguments: [String], context: CommandContext
   ) -> CommandFailure {
     let path = commandPath(arguments)
-    if command is DocEditCommand { return CommandFailure(error: error, next: error.next) }
+    if command is DocEditCommand || command is DocArchiveCommand {
+      return CommandFailure(error: error, next: error.next)
+    }
     if error.code == .busy {
       return CommandFailure(error: error, next: [(command as? ExportCommand)?.retryCommand ?? path])
     }
@@ -285,6 +287,7 @@ extension SiltaMain {
       (command as? any WorkspaceArgumentCommand)?.workspaceArgument == nil
     else { return }
     if let edit = command as? DocEditCommand { try edit.authorize(context) }
+    if let archive = command as? DocArchiveCommand { try archive.authorize(context) }
     if command is WsEditCommand {
       try context.environment.actor.requireHuman(
         command: "silta ws edit -F <file>", approved: command.global.approved)

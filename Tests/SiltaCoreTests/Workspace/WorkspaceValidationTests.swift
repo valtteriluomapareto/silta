@@ -1,7 +1,8 @@
 import Foundation
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 struct WorkspaceValidationTests {
   static let invalidCases: [(String, String)] = [
@@ -74,7 +75,13 @@ struct WorkspaceValidationTests {
   @Test func workspaceErrorsHaveGoldenRecoveryCommands() {
     let errors: [WorkspaceError] = [
       .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"), .conflict,
-      .docAttachments(workspace: "acme", item: "service:push", docs: ["doc:push-rules"]),
+      .docAttachments(
+        workspace: "acme", item: "service:push", docs: ["doc:push-rules"],
+        commands: [
+          "silta --ws 'acme' doc edit 'doc:push-rules' --keep-body --about <replacement-ref>"
+            + " --approved \"<the human's words>\"",
+          "silta --ws 'acme' ws show",
+        ], nextBy: .human),
       .editor,
     ]
     let rendered = errors.map { OutputRouter.render(.failure($0), mode: .init(json: false)).stderr }
