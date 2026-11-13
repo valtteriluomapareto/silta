@@ -100,8 +100,8 @@ struct RestoreSnapshotPreflightTests {
         sql: """
           INSERT INTO doc_verification(uid,doc_rev_id,actor,app_shas,created_at)
           VALUES('foreign-verification',950,'human:other','[]','');
-          INSERT INTO task(id,uid,workspace_id,seq,title,created_by,created_at,updated_at)
-          VALUES(2700,'foreign-task',23,1,'Other task','human:other','','');
+          INSERT INTO task(id,uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
+          VALUES(2700,'foreign-task',23,1,'Other task','todo','human:other','','');
           INSERT INTO comment(uid,doc_rev_id,seq,kind,body_md,actor,created_at)
           VALUES('foreign-doc-comment',950,1,'comment','','human:other','');
           INSERT INTO comment(uid,task_id,seq,kind,body_md,actor,created_at)
