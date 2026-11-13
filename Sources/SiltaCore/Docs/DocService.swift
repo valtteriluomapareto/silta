@@ -19,23 +19,26 @@ package struct DocService {
     let range = try Self.lineRange(lines)
     do {
       let stored = try read(selection.slug, revision: selection.revision)
-      guard let snapshot = stored.revision else {
-        return DocReadResult(
-          ref: "doc:" + selection.slug,
-          output: "No accepted revision for doc:\(selection.slug).\n"
-            + "Pending revisions (\(stored.pendingCount)):\n"
-            + stored.pending.map { "doc:\(selection.slug)@\($0)\n" }.joined()
-            + (stored.pendingCount > stored.pending.count ? "next: " + listCommand + "\n" : ""))
+      let ref: String
+      let text: String
+      if let snapshot = stored.revision {
+        ref = "doc:\(snapshot.slug)@\(snapshot.revision)"
+        let state = snapshot.state + (stored.archived ? ", archived" : "")
+        text =
+          "\(ref) [\(state)]\n"
+          + "title: \(snapshot.title ?? "(unknown)")\nkind: \(snapshot.kind ?? "(unknown)")\n"
+          + "about: \(Self.about(snapshot.about))\nactor: \(snapshot.actor)\n"
+          + "created_at: \(snapshot.createdAt)\n\n\(snapshot.body)"
+      } else {
+        ref = "doc:" + selection.slug
+        text =
+          "No accepted revision for \(ref).\nPending revisions (\(stored.pendingCount)):\n"
+          + stored.pending.map { "\(ref)@\($0)\n" }.joined()
+          + (stored.pendingCount > stored.pending.count && Self.safeReference(ref)
+            ? "next: " + listCommand + "\n" : "")
       }
-      let pinned = "doc:\(snapshot.slug)@\(snapshot.revision)"
-      let state = snapshot.state + (stored.archived ? ", archived" : "")
-      let text =
-        "\(pinned) [\(state)]\n"
-        + "title: \(snapshot.title ?? "(unknown)")\nkind: \(snapshot.kind ?? "(unknown)")\n"
-        + "about: \(Self.about(snapshot.about))\nactor: \(snapshot.actor)\n"
-        + "created_at: \(snapshot.createdAt)\n\n\(snapshot.body)"
       return DocReadResult(
-        ref: pinned, output: bounded(SecretGuard.redacted(text), ref: pinned, range: range))
+        masking: ref, output: bounded(SecretGuard.redacted(text), ref: ref, range: range))
     } catch let error as DocError {
       throw CommandFailure(error: error, next: [listCommand])
     }
@@ -43,8 +46,10 @@ package struct DocService {
 
   var listCommand: String { workspaceCommand("silta doc ls", workspace: workspace) }
 
-  func showCommand(_ ref: String) -> String {
-    workspaceCommand("silta doc show " + shellWord(ref), workspace: workspace)
+  func showCommand(_ ref: String, lines: String? = nil) -> String {
+    guard Self.safeReference(ref) else { return listCommand }
+    return workspaceCommand("silta doc show " + shellWord(ref), workspace: workspace)
+      + (lines.map { " --lines " + $0 } ?? "")
   }
 
   static func about(_ refs: [String]?) -> String {
@@ -77,11 +82,14 @@ package struct DocService {
         + "next: " + showCommand(ref) + "\n"
     }
     let count = last - first + 1
-    let shown = min(count, count > 400 ? 399 : 400)
+    let unsafe = !Self.safeReference(ref)
+    let shown = min(count, count > 400 || unsafe ? 399 : 400)
     let output = lines.dropFirst(first - 1).prefix(shown).joined(separator: "\n") + "\n"
-    guard shown < count else { return output }
-    return output + "\(count - shown) lines omitted; next: " + showCommand(ref)
-      + " --lines \(first + shown)-\(last)\n"
+    guard shown < count else {
+      return output + (unsafe ? "next: " + listCommand + "\n" : "")
+    }
+    return output + "\(count - shown) lines omitted; next: "
+      + showCommand(ref, lines: "\(first + shown)-\(last)") + "\n"
   }
 
   private static func lineRange(_ raw: String?) throws -> ClosedRange<Int>? {

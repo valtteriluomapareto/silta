@@ -263,12 +263,10 @@ extension DocReadCommandTests {
         let result = try run(args, scratch, json: json)
         #expect(result.termination == .exit(0))
         let report = result.stdout + result.stderr
-        withKnownIssue("Document identity bypasses read masking or leaks through recovery") {
-          #expect(!report.contains(secret))
-          #expect(report.contains("silta --ws 'acme' doc ls"))
-          #expect(
-            !report.contains("doc ls --lines") && !report.contains("doc show 'doc:[REDACTED:"))
-        }
+        #expect(!report.contains(secret))
+        #expect(report.contains("silta --ws 'acme' doc ls"))
+        #expect(
+          !report.contains("doc ls --lines") && !report.contains("doc show 'doc:[REDACTED:"))
       }
     }
   }
@@ -302,9 +300,7 @@ extension DocReadCommandTests {
         let object = json ? try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) : nil
         let data = (object as? [String: Any])?["data"] as? [String: Any]
         let output = json ? try #require(data?["output"] as? String) : result.stdout
-        withKnownIssue("Pending-only document reads return before line selection") {
-          #expect(lines == "9999" ? output.hasPrefix(expected) : output == expected)
-        }
+        #expect(lines == "9999" ? output.hasPrefix(expected) : output == expected)
       }
     }
   }

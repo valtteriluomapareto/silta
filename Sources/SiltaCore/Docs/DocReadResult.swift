@@ -12,3 +12,10 @@ struct DocReadSelection {
   let pending: [Int]
   let pendingCount: Int
 }
+
+extension DocReadResult {
+  init(masking ref: String, output: String) {
+    self.ref = SecretGuard.redacted(ref)
+    self.output = SecretGuard.redacted(output)
+  }
+}

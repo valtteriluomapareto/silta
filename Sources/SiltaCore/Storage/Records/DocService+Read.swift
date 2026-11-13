@@ -99,11 +99,12 @@ extension DocService {
     } catch { throw StorageError.corrupt }
     let title: String? = row["title"]
     let kind: String? = row["kind"]
-    return DocListResult.Entry(
-      ref: ref, state: state,
+    let rendered = DocReadResult(
+      masking: ref,
       output: "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
         + "  kind: \(Self.preview(kind ?? "(unknown)")); about: \(Self.preview(Self.about(refs)))\n"
         + "  show: " + showCommand(ref) + "\n")
+    return DocListResult.Entry(ref: rendered.ref, state: state, output: rendered.output)
   }
 
 }
