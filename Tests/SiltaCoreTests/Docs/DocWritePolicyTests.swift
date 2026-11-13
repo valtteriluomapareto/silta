@@ -127,7 +127,7 @@ struct DocWritePolicyTests {
   }
 
   @Test(arguments: [
-    "archive", "pointer", "revision", "replacement", "creation", "body", "workspace",
+    "archive", "pointer", "revision", "replacement", "creation", "body", "workspace", "same-body",
   ])
   func fullBaselineRacePreservesCommittedChange(change: String) async throws {
     try await withScratchDirectory { home in
@@ -146,8 +146,8 @@ struct DocWritePolicyTests {
       request.about = ["service:push"]
       await Self.refusal(.conflict) {
         _ = try await Self.service(home, store).edit(request) {
-          if change == "creation" {
-            try Self.seed(store)
+          if change == "creation" || change == "same-body" {
+            try Self.seed(store, body: Self.secret)
           } else if let statement = sql[change] {
             try store.write { try $0.database.execute(sql: statement) }
           }
@@ -176,7 +176,7 @@ struct DocWritePolicyTests {
       do {
         _ = try await Self.service(home, store).edit(DocEditRequest(slug: "rules")) { "New" }
         Issue.record("Late approval failure did not roll back")
-      } catch {}
+      } catch { #expect(error is DatabaseError) }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
@@ -207,6 +207,62 @@ struct DocWritePolicyTests {
           command.contains("-F <file>") && !command.contains(Self.secret)
             && !command.contains("Rules"))
       }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func capturedEvidenceOutsideTransactionAndKeptBodyRace(keep: Bool) async throws {
+    try await withScratchDirectory { home in
+      let (store, repo) = try DocVerificationPreparationTests.setup(home)
+      var initial = DocVerificationPreparationTests.draft(["app:api"])
+      initial.slug = "rules"
+      _ = try DocStoreTests.accept(initial, in: store, ids: SeededIDGenerator(seed: 82))
+      var committed: [[String]] = []
+      let git = ScriptedGitRunner(
+        script: [
+          (
+            DocVerificationPreparationTests.request("origin/api", repo: repo),
+            DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
+          )
+        ],
+        beforeRequest: { _ in
+          if keep {
+            try store.write {
+              try $0.database.execute(sql: "UPDATE doc_rev SET uid='new-baseline'")
+            }
+          } else {
+            try store.write { _ in }
+          }
+          committed = try DocVerificationPreparationTests.truth(store)
+        })
+      var request = DocEditRequest(slug: "rules")
+      request.keepBody = keep
+      let service = try Self.service(home, store, git: git)
+      if keep {
+        await Self.refusal(.conflict) { _ = try await service.edit(request, input: nil) }
+        #expect(
+          !committed.isEmpty && (try DocVerificationPreparationTests.truth(store)) == committed)
+      } else {
+        let result = try await service.edit(request) { "New body" }
+        #expect(result.ref == "doc:rules@2")
+      }
+      #expect(git.isExhausted)
+    }
+  }
+
+  @Test(arguments: [65_536, 65_537])
+  func suppliedBodyBoundAndMissingInputPrecedeGit(bytes: Int) async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let service = try Self.service(home, store)
+      if bytes == 65_536 {
+        _ = try await service.edit(Self.request()) { String(repeating: ".", count: bytes) }
+      } else {
+        await Self.refusal(.invalid) {
+          _ = try await service.edit(Self.request()) { String(repeating: ".", count: bytes) }
+        }
+      }
+      await Self.refusal(.usage) { _ = try await service.edit(Self.request(), input: nil) }
     }
   }
 
