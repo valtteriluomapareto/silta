@@ -45,7 +45,7 @@ struct RestoreWriter {
 
   /// A uid of the tree that a row of another workspace holds; uids are unique across
   /// the database.
-  private func checkForeignUIDs() throws {
+  func checkForeignUIDs() throws {
     var uids: [String: [String]] = [:]
     for (section, format) in zip(tree.sections, ExportFormat.sections) {
       uids[format.table, default: []] += section.rows.compactMap { $0.value("uid") }
@@ -143,12 +143,19 @@ struct RestoreWriter {
     for comment in old.comments + new.1 { try tx.recordChange(kind: "comment", rowID: comment) }
   }
 
-  /// The task and comment ids the replace removes, for the change log.
-  private func removedIDs() throws -> (tasks: [Int64], comments: [Int64]) {
-    (
-      try Int64.fetchAll(
+  struct RowIDs {
+    var tasks: [Int64]
+    var docs: [Int64]
+    var comments: [Int64]
+  }
+
+  /// Owned row ids removed by replacement, for the change log.
+  func removedIDs() throws -> RowIDs {
+    RowIDs(
+      tasks: try Int64.fetchAll(
         db, sql: "SELECT id FROM task WHERE workspace_id IS ?", arguments: [workspace]),
-      try Int64.fetchAll(
+      docs: [],
+      comments: try Int64.fetchAll(
         db,
         sql:
           "SELECT id FROM comment WHERE task_id IN (SELECT id FROM task WHERE workspace_id IS ?)",

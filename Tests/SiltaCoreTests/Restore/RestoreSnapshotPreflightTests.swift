@@ -7,7 +7,9 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreSnapshotPreflightTests {
-  @Test(arguments: ["doc", "doc_rev", "doc_verification", "task-comment", "doc-comment", "doc-comment-doc"])
+  @Test(arguments: [
+    "doc", "doc_rev", "doc_verification", "task-comment", "doc-comment", "doc-comment-doc",
+  ])
   func foreignUIDsRefuseBeforeAnyWrite(_ kind: String) throws {
     try withScratchDirectory { home in
       let store = try RestoreDocumentGraphFixture.source(home)
@@ -43,7 +45,7 @@ struct RestoreSnapshotPreflightTests {
           try writer.checkForeignUIDs()
           Issue.record("Accepted a foreign-workspace \(kind) UID")
         } catch let error as ExportError {
-          #expect(error.code == "conflict")
+          #expect(error.code == .conflict)
         }
       }
       #expect(try RestoreSupport.dump(store) == before)

@@ -74,6 +74,8 @@ package struct ExportSnapshot: Equatable, Sendable {
   package var sections: [Section]
   /// Tasks in id order.
   package var tasks: [ExportTask]
+  /// Immutable document rows and independent allocation streams.
+  var documents: ExportDocumentSnapshot
   /// `links.jsonl` rows.
   package var links: [ExportRow]
   /// `alias_decisions.jsonl` rows.
@@ -90,7 +92,7 @@ package struct ExportSnapshot: Equatable, Sendable {
   }
 
   /// The tree's files keyed by relative path, `manifest.json` included.
-  package func files() -> [String: Data] {
+  package func files() throws -> [String: Data] {
     var files: [String: String] = [
       ExportFormat.workspaceFile: workspaceYAML(),
       ExportFormat.linksFile: ExportFormat.jsonl(links),

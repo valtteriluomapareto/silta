@@ -38,7 +38,9 @@ struct RestoreSnapshotReadbackTests {
         }
         try store.write(rollingBack: true) { tx in
           let writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
-          #expect(throws: ExportError.self) { try writer.check(damaged, revisionAllocations: floors) }
+          #expect(throws: ExportError.self) {
+            try writer.check(damaged, revisionAllocations: floors)
+          }
         }
       }
       try store.write(rollingBack: true) { tx in

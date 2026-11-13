@@ -27,7 +27,7 @@ struct ExportVersionTests {
     #expect(try Self.version(files) == "1")
     let parsed = try ExportTree.parse(files)
     #expect(parsed.schema == "v4")
-    ExportTreeTests.expectSame(parsed.files(), files)
+    ExportTreeTests.expectSame(try parsed.files(), files)
     let apps = try #require(parsed.sections.first { $0.name == "apps" })
     #expect(apps.rows.compactMap { $0.value("slug") } == ["mobile", "doc", "edge", "service"])
     let edges = try #require(parsed.sections.first { $0.name == "edges" })

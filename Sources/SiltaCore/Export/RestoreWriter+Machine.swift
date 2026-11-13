@@ -87,6 +87,10 @@ extension RestoreWriter {
     }
   }
 
+  func check(_ after: ExportSnapshot, revisionAllocations: [ExportRow]) throws {
+    throw ExportError.unsupported("document readback composition")
+  }
+
   /// The workspace read back must render as the tree does, with the current schema, the
   /// counter that never rewinds, and the merged approvals.
   func check() throws {
@@ -98,8 +102,8 @@ extension RestoreWriter {
       "next_task_seq", with: after.workspace.value("next_task_seq"),
       keys: ExportFormat.workspaceKeys)
     expected.approvals = after.approvals
-    let want = expected.files()
-    let got = after.files()
+    let want = try expected.files()
+    let got = try after.files()
     if let path = Set(want.keys).union(got.keys).filter({ want[$0] != got[$0] }).min(
       by: ExportSnapshot.byteOrder)
     {

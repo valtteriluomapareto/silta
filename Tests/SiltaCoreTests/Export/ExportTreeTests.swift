@@ -212,7 +212,7 @@ struct ExportTreeTests {
         task.row.value("title")?.utf8.elementsEqual(corpus.joined(separator: "|").utf8) == true)
       #expect(
         task.row.value("plan_md")?.utf8.elementsEqual(corpus.joined(separator: "\n").utf8) == true)
-      Self.expectSame(snapshot.files(), files)
+      Self.expectSame(try snapshot.files(), files)
     }
   }
 

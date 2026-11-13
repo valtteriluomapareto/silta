@@ -43,11 +43,13 @@ package enum ExportTree {
     let snapshot = ExportSnapshot(
       format: manifest.format, schema: manifest.schema, workspace: workspace, sections: sections,
       tasks: tasks,
+      documents: ExportDocumentSnapshot(
+        documents: [], revisionAllocations: [], commentSequences: []),
       links: try reader.jsonl(ExportFormat.linksFile, keys: ExportFormat.linkKeys),
       aliasDecisions: try reader.jsonl(
         ExportFormat.aliasDecisionsFile, keys: ExportFormat.aliasDecisionKeys),
       approvals: try reader.jsonl(ExportFormat.approvalsFile, keys: ExportFormat.approvalKeys))
-    let rendered = snapshot.files()
+    let rendered = try snapshot.files()
     if let path = files.keys.filter({ rendered[$0] != files[$0] }).min(by: ExportSnapshot.byteOrder)
     {
       throw refuse("\(path) is not in the form export writes")

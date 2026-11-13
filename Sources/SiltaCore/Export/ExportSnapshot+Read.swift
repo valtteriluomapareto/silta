@@ -43,6 +43,8 @@ extension ExportSnapshot {
     }
     return Self(
       schema: schema, workspace: workspace, sections: sections, tasks: tasks,
+      documents: ExportDocumentSnapshot(
+        documents: [], revisionAllocations: [], commentSequences: []),
       links: try rows(ExportLinks.query, ExportFormat.linkKeys),
       aliasDecisions: try rows(Query.aliasDecisions, ExportFormat.aliasDecisionKeys),
       approvals: try rows(Query.approvals, ExportFormat.approvalKeys, slug))
