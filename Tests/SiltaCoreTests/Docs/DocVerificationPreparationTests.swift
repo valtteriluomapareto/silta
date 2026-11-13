@@ -139,6 +139,34 @@ struct DocVerificationPreparationTests {
     }
   }
 
+  @Test func missingConfiguredRefKeepsExistingRecoveryAndWritesNothing() async throws {
+    try await withScratchDirectory { home in
+      let (store, repo) = try Self.setup(home)
+      let request = Self.request("origin/api", repo: repo)
+      let missing = GitResult(termination: .exit(1))
+      let unpeeled = GitRequest(
+        arguments: Array(request.arguments.dropLast()) + ["origin/api"],
+        directory: request.directory)
+      let git = ScriptedGitRunner(script: [
+        (request, .success(missing)), (unpeeled, .success(missing)),
+        (Self.request("origin/origin/api", repo: repo), .success(missing)),
+      ])
+      let before = try Self.truth(store)
+      do {
+        _ = try await DocVerification.prepare(
+          Self.draft(["app:api"]), workspace: 1,
+          environment: Self.environment(home, store: store, git: git))
+        Issue.record("A missing configured ref resolved")
+      } catch let error as CodeError {
+        #expect(error.code == .notFound)
+        #expect(
+          error.next == ["silta --ws 'acme' repo fetch 'platform'", "silta --ws 'acme' ws show"])
+      }
+      #expect(git.isExhausted)
+      #expect(try Self.truth(store) == before)
+    }
+  }
+
   @Test func gitFailureAndMissingLocalPathLeaveAllTruthUnchanged() async throws {
     try await withScratchDirectory { home in
       let (store, repo) = try Self.setup(home)
