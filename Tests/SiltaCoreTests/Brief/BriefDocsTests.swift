@@ -285,4 +285,26 @@ extension BriefDocsTests {
     }
   }
 
+  @Test func explicitTopicAliasesStayCanonicalWithoutASelectedTask() throws {
+    try withScratchDirectory { home in
+      let store = try Self.setup(home)
+      try Self.document("billing-guide", target: "topic", body: "Billing contract.", store: store)
+      try Self.document("other-guide", target: "topic", body: "Not selected.", store: store)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO topic(id,uid,workspace_id,slug,name) VALUES(2,'billing',1,'billing','Billing');
+            INSERT INTO topic_alias VALUES(1,2,'payments');
+            UPDATE link SET to_id=2 WHERE uid='link-billing-guide-topic';
+            """)
+      }
+      var location = try Self.location(home, store: store)
+      location.currentTask = nil
+      let groups = try Self.context(store, location: location, topics: ["PAYMENTS", "billing"])
+        .flatMap(\.documents)
+      #expect(groups.map(\.ref) == ["topic:billing"])
+      #expect(groups.first?.rows.first?.contains("Billing contract.") == true)
+    }
+  }
+
 }
