@@ -132,6 +132,13 @@ struct RestoreDocumentGraph {
     guard revisions[number]?.value("state") == "accepted" else {
       throw invalid("a document current revision is not an owned accepted revision")
     }
+    for key in ["title", "kind"] {
+      if let stored = revisions[number]?.value(key),
+        !stored.utf8.elementsEqual((document.row.value(key) ?? "").utf8)
+      {
+        throw invalid("current document metadata differs from its accepted revision")
+      }
+    }
     guard document.row.value("archived") == "1" || !about.isEmpty else {
       throw invalid("a current unarchived document has no live about target")
     }

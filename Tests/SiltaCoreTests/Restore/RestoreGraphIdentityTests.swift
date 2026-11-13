@@ -13,20 +13,18 @@ struct RestoreGraphIdentityTests {
     RestoreDocumentGraphFixture.document(&graph.documents, key, "Different projection")
     let files = try graph.documents.files()
     graph.documents = try ExportDocumentSnapshot.parse(files, workspace: "acme")
-    withKnownIssue("Known current metadata can disagree with the document projection.") {
-      do {
-        try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
-        Issue.record("Accepted inconsistent current document metadata")
-      } catch let error as ExportError {
-        #expect(
-          error
-            == .invalidTree(
-              reason: "current document metadata differs from its accepted revision",
-              workspace: "acme"))
-        let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
-        let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
-        Golden.forTests().check(text.stderr + json.stdout, "restore-doc-current-metadata.txt")
-      }
+    do {
+      try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
+      Issue.record("Accepted inconsistent current document metadata")
+    } catch let error as ExportError {
+      #expect(
+        error
+          == .invalidTree(
+            reason: "current document metadata differs from its accepted revision",
+            workspace: "acme"))
+      let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
+      let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
+      Golden.forTests().check(text.stderr + json.stdout, "restore-doc-current-metadata.txt")
     }
     RestoreDocumentGraphFixture.record(&graph.documents, 1, key, nil)
     try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
@@ -55,9 +53,7 @@ struct RestoreGraphIdentityTests {
       #expect(Set(captured.compactMap { $0.value("to_ext").map { Data($0.utf8) } }).count == 2)
       let documents = ExportDocumentSnapshot(
         documents: [], revisionAllocations: [], commentSequences: [])
-      withKnownIssue("Swift string identity collapses distinct SQLite link bytes.") {
-        try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
-      }
+      try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
       #expect(try RestoreSupport.dump(store) == before)
     }
   }
