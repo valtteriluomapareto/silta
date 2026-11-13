@@ -113,7 +113,7 @@ struct RestoreDocumentCommandTests {
         let shown = result.stdout + result.stderr
         #expect(shown.contains("only one triage audit field"))
         if target == "workspace" || name.count != 52 {
-          #expect(!shown.contains(name))
+          #expect(!shown.contains(name), "\(shown)")
         } else {
           #expect(shown.contains("doc:" + name + "@1"))
         }

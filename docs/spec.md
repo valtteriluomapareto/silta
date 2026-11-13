@@ -1558,7 +1558,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     includes `doc_revision_allocations.jsonl` and `doc_comment_sequences.jsonl`,
     even when empty. Their record counts and the doc/revision/verification counts
     are present in the manifest; format 1 does not add these files or count keys.
-    Exports and restores refuse document data and reserved revision history.
+    Format 2 includes documents, their immutable history and independent revision
+    reservations. Format 1 cannot contain these document files or streams.
   - **Values.** Every value is a double-quoted string, integers in decimal; a NULL
     column is left out. Only `"`, `\`, controls (U+0000–U+001F, U+007F–U+009F),
     U+2028, U+2029, U+FEFF, U+FFFE and U+FFFF are escaped: `\"`, `\\`, `\n`, `\r`,
@@ -1587,6 +1588,18 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     fence.
   - **`tasks/<ref>.jsonl`:** one row per line, `table` first: `task_plan_rev`, then
     `task_event`, `comment` and `review_request` rows.
+  - **`docs/<slug>.md`:** document metadata in front matter, followed by each
+    revision in increasing number order under `## Revision <number>`. Bodies use
+    the same literal fenced representation as task bodies, including empty bodies.
+    **`docs/<slug>.jsonl`** holds revision metadata without the body, followed by
+    verification and revision-owned comment rows. Nullable historical metadata
+    stays absent; original about refs and verification evidence stay literal even
+    when their map targets have been removed. Current title and kind must match
+    their accepted revision, and an unarchived accepted doc needs live attachments.
+  - **Document allocation streams:** `doc_revision_allocations.jsonl` holds each
+    reserved `slug` and its next revision number, including names without a doc.
+    `doc_comment_sequences.jsonl` holds each revision UID (`doc_rev`) and its next
+    comment number. Both streams use positive decimal integers and byte-sorted keys.
   - **`links.jsonl`:** `from` and `to` are the uids of the linked rows; a link to a
     plan revision names the task's uid in `to` and the revision in `to_rev`, the key
     right after `to`.
@@ -1603,10 +1616,10 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     read that way takes a new format number. The reader checks the form, byte for
     byte; restore checks the references.
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
-    paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq`.
+    paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq` and the
+    two document allocation streams.
   - **Refusals, with nothing written:** a database with migrations this binary
-    doesn't know; a workspace with docs or reserved doc revision numbers, until docs export ships
-    with docs (M2).
+    doesn't know; unknown link kinds or malformed document graphs.
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
     from the working directory, and an unexpanded `~` is refused. Export replaces
     `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous
@@ -1661,7 +1674,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     then everything the form doesn't show: integer values, settings as `ws edit`
     accepts them, unique uids, slugs, aliases, plan revisions and comment seqs,
     references that resolve inside the tree, no parent cycles. A database of a newer
-    schema or with docs in the workspace is refused, and so is a tree whose uid, task
+    schema is refused, and so is a tree whose uid, task
     prefix, row uids or approval uids another workspace holds.
   - The replace happens in one transaction, and nothing is written on failure. The
     workspace keeps its row; its other rows are deleted and the tree's inserted.
@@ -1669,7 +1682,12 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     never rewinds, so task refs already cited are never reused. Comment refs of
     comments the restore removes can be reused; the dry run lists their tasks as
     changed. Before committing, the workspace is read back and must render as the tree
-    does.
+    does. Document revision reservations retain the larger current or incoming
+    floor, including names whose docs the tree removes, so restoring older history
+    cannot reuse a revision ref. Revision-owned comment reservations come from the
+    incoming tree exactly, remapped through stable revision UIDs. The self-check
+    permits these merged revision floors while keeping incoming history and comment
+    floors exact (D47).
   - Repo paths and worktree overrides stay for repos and apps the tree keeps, and a
     task's worktree while its claim and branch are unchanged. Other repo paths are
     re-resolved with `silta init --scan`.

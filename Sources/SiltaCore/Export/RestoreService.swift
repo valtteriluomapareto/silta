@@ -45,7 +45,7 @@ package enum RestoreService {
     if let expected, expected != slug {
       throw ExportError.otherWorkspace(tree: slug, given: expected, directory: directory.path)
     }
-    try RestoreValidation(tree: tree, slug: slug).run()
+    try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: slug).run()
     let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
     if let manifest = request.manifest, manifest.isEmpty || !digest.hasPrefix(manifest) {
       throw ExportError.manifestChanged(approved: manifest, directory: directory.path)

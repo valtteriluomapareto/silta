@@ -107,10 +107,10 @@ extension RestoreWriter {
     }
   }
 
-  /// Public readback uses the public source admission guard.
+  /// Reads back all inserted truth and the merged revision reservations.
   func check() throws {
     try check(
       ExportSnapshot.read(db, workspace: slug),
-      revisionAllocations: tree.documents.revisionAllocations)
+      revisionAllocations: documentRevisionAllocations)
   }
 }

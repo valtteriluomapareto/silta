@@ -14,6 +14,7 @@ struct RestoreWriter {
   var current: ExportSnapshot?
   var ids: [String: [String: Int64]] = [:]
   var revisions: [String: Int64] = [:]
+  var documentRevisionAllocations: [ExportRow] = []
 
   init(tx: StorageTransaction, tree: ExportSnapshot, slug: String) {
     self.tx = tx
@@ -29,7 +30,7 @@ struct RestoreWriter {
     if try StorageSchema.migrator.hasBeenSuperseded(db) { throw StorageError.schemaTooNew }
     workspace = try Int64.fetchOne(
       db, sql: "SELECT id FROM workspace WHERE slug=?", arguments: [slug])
-    current = try workspace.map { _ in try ExportSnapshot.read(db, workspace: slug) }
+    current = try workspace.map { _ in try ExportSnapshot.capture(db, workspace: slug) }
     let uid = tree.workspace.value("uid") ?? ""
     let prefix = tree.workspace.value("task_prefix") ?? ""
     if let other = try String.fetchOne(
@@ -149,12 +150,18 @@ struct RestoreWriter {
       }
     }
     try insertTasks(workspace: id)
+    try insertDocuments(tree.documents, workspace: id)
     try insertLinks(workspace: id)
     for row in tree.aliasDecisions {
       try insert("alias_decision", row, extra: ["workspace_id": id])
     }
     try mergeApprovals()
     try counter(workspace: id)
+    documentRevisionAllocations = try restoreDocumentCounters(
+      tree.documents,
+      retaining: current?.documents
+        ?? ExportDocumentSnapshot(documents: [], revisionAllocations: [], commentSequences: []),
+      workspace: id)
     try restore(kept)
     try tx.recordChange(kind: "workspace", rowID: id)
     let new = (ids["task"]?.values.sorted() ?? [], ids["comment"]?.values.sorted() ?? [])
@@ -195,9 +202,10 @@ struct RestoreWriter {
   private func delete(_ workspace: Int64) throws {
     let tasks = "task_id IN (SELECT id FROM task WHERE workspace_id=:ws)"
     let apps = "app_id IN (SELECT id FROM app WHERE workspace_id=:ws)"
+    try db.execute(sql: "DELETE FROM link WHERE workspace_id=?", arguments: [workspace])
+    try deleteDocuments(workspace: workspace)
     try db.execute(
       sql: """
-        DELETE FROM link WHERE workspace_id=:ws;
         DELETE FROM alias_decision WHERE workspace_id=:ws;
         DELETE FROM review_request WHERE \(tasks);
         DELETE FROM comment WHERE \(tasks);

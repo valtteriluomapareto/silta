@@ -51,6 +51,8 @@ package enum ExportError: CodedError, Equatable {
   /// is the agent's.
   package var nextBy: NextBy {
     switch self {
+    case .invalidTree(_, .some(let workspace))
+    where !SecretGuard.matches(in: workspace).isEmpty: .agent
     case .notATree(_, _, .some), .otherWorkspace, .manifestChanged, .notWorkTree, .busy: .agent
     default: .human
     }
@@ -89,7 +91,7 @@ package enum ExportError: CodedError, Equatable {
         + "moved back; it is kept at \(path), next to the new tree. Move it back only while "
         + "\(target) is absent; if another export has put a tree there since, keep that one."
     case .invalidTree(let reason, _):
-      "Not an unchanged silta export tree: \(reason). Nothing was restored."
+      "Not an unchanged silta export tree: \(SecretGuard.redacted(reason)). Nothing was restored."
     case .notATree(let path, let reason, _):
       "\(path) is not an export tree: \(reason)."
     case .otherWorkspace(let tree, let given, _):
@@ -128,13 +130,17 @@ package enum ExportError: CodedError, Equatable {
       ["[ ! -e \(shellWord(target)) ] && mv \(shellWord(path)) \(shellWord(target))"]
     case .unsupported, .newerFormat: ["update silta"]
     case .invalidTree(_, let workspace):
-      [
-        workspace.map {
-          workspaceCommand(
-            "silta export  # again, on the machine the tree came from", workspace: $0)
-        } ?? "silta --ws <the tree's workspace> export"
-          + "  # again, on the machine the tree came from"
-      ]
+      if let workspace, !SecretGuard.matches(in: workspace).isEmpty {
+        ["silta ws ls"]
+      } else {
+        [
+          workspace.map {
+            workspaceCommand(
+              "silta export  # again, on the machine the tree came from", workspace: $0)
+          } ?? "silta --ws <the tree's workspace> export"
+            + "  # again, on the machine the tree came from"
+        ]
+      }
     case .notATree(let path, _, let child):
       child.map { ["silta restore " + shellWord(path + "/" + $0) + " --dry-run"] }
         ?? [

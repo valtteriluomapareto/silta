@@ -13,7 +13,6 @@ extension ExportSnapshot {
       throw WorkspaceError.unknown(slug)
     }
     let id: Int64 = found["id"]
-    try requireNoDocsOrReservations(db, workspace: id)
     if let kind = try String.fetchOne(db, sql: Query.unsupportedLink, arguments: [id, id]) {
       throw ExportError.unsupported("\(kind) links")
     }
@@ -59,20 +58,6 @@ extension ExportSnapshot {
       links: try rows(ExportLinks.query, ExportFormat.linkKeys),
       aliasDecisions: try rows(Query.aliasDecisions, ExportFormat.aliasDecisionKeys),
       approvals: try rows(Query.approvals, ExportFormat.approvalKeys, slug))
-  }
-  private static func requireNoDocsOrReservations(_ db: Database, workspace id: Int64) throws {
-    if try Bool.fetchOne(
-      db, sql: "SELECT EXISTS(SELECT 1 FROM doc WHERE workspace_id=?)", arguments: [id])
-      == true
-    {
-      throw ExportError.unsupported("docs")
-    }
-    if try Bool.fetchOne(
-      db, sql: "SELECT EXISTS(SELECT 1 FROM seq_counter WHERE scope GLOB ?)",
-      arguments: ["doc_rev:\(id):*"]) == true
-    {
-      throw ExportError.unsupported("reserved doc revision history")
-    }
   }
 }
 
@@ -159,10 +144,11 @@ private enum Query {
 
   /// A link end the public exporter cannot represent.
   static let unsupportedLink = """
-    SELECT from_kind FROM link WHERE workspace_id=? AND from_kind NOT IN ('task','comment')
+    SELECT from_kind FROM link WHERE workspace_id=? AND from_kind NOT IN ('task','comment','doc')
     UNION ALL
     SELECT to_kind FROM link WHERE workspace_id=? AND to_id IS NOT NULL
-      AND to_kind NOT IN ('task','task_plan_rev','comment','app','topic')
+      AND to_kind NOT IN ('task','task_plan_rev','comment','app','topic',
+        'doc','doc_rev','edge','service')
     LIMIT 1
     """
 
