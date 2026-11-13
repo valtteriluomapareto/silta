@@ -126,7 +126,8 @@ struct DocReadCommandTests {
           INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at,title,kind,about_refs)
           SELECT 'rev-accepted',id,2,'Accepted body','accepted','human:acme','2023-11-14',
             'Push rules','contract','["app:api"]' FROM doc;
-          INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,created_at,title,kind,about_refs)
+          INSERT INTO doc_rev(
+            uid,doc_id,rev,base_rev,body_md,state,actor,created_at,title,kind,about_refs)
           SELECT 'rev-pending',id,3,2,'Pending body','proposed','agent:codex:acme','2023-11-15',
             'Proposed rules','contract','["service:push"]' FROM doc;
           """)
