@@ -233,8 +233,10 @@ extension DocWritePolicyTests {
           if keep {
             try store.write {
               try $0.database.execute(
-                sql:
-                  "UPDATE doc_rev SET uid='new-baseline' WHERE doc_id=(SELECT id FROM doc WHERE slug='rules')"
+                sql: """
+                  UPDATE doc_rev SET uid='new-baseline'
+                  WHERE doc_id=(SELECT id FROM doc WHERE slug='rules')
+                  """
               )
             }
           } else {
