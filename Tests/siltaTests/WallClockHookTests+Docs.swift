@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-extension BriefCommandTests {
+extension WallClockHookTests {
   @Test func docViewsFollowExplicitCompactModeAndShareBoundedJSONText() throws {
     try withScratchDirectory { scratch in
       let repo = try contextFixture(scratch)
