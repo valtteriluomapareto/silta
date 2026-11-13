@@ -28,6 +28,16 @@ silta --ws acme task from-plan /tmp/acme-plan.md
 ```
 Use top-level checkboxes for numbered plan steps. A plan and a result go through stdin with a quoted heredoc, so shell substitutions stay literal.
 
+For a lasting document, ask in chat, then save complete UTF-8 Markdown with -F.
+Input is at most 65536 bytes. Repeat --about to replace every live attachment.
+For metadata-only edits use --keep-body instead of -F; an accepted owned body is
+required and stays literal, even without its source file. Title is one line of at
+most 120 characters; kind stays fixed unless --kind is explicit.
+```sh
+silta --ws acme doc edit rules -F rules.md --title Rules --about service:push --approved "<the human's words>"
+silta --ws acme doc edit doc:rules --keep-body --about topic:messaging --approved "<the human's words>"
+```
+
 Submit for review with `silta --ws acme task submit AC-12`. Finish when the required review gate is met; app tasks need their actual commit sha. A result always has exactly these three labelled parts, in order: `What was done:`, `Decisions:` (write `none` if there were none) and `What's left:`.
 ```sh
 silta --ws acme task submit AC-12

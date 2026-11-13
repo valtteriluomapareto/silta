@@ -1,0 +1,1 @@
+{"error":{"code":"usage","message":"A doc with no accepted revision requires: -F, --title, --about.","next":["silta --ws 'acme' doc edit 'doc:rules' -F <file> --title <title> --about <ref> --approved \"<the human's words>\""],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
