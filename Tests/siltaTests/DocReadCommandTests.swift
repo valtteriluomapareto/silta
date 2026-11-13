@@ -320,3 +320,52 @@ extension DocReadCommandTests {
   }
 
 }
+
+extension DocReadCommandTests {
+  @Test(
+    arguments: [false, true],
+    ["acme", "AKIA" + String(repeating: "A", count: 16), String(repeating: "a", count: 52)])
+  func workspaceRecoveryChecksScopeBeforeFlags(json: Bool, scope: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      try store.write {
+        try $0.database.execute(sql: "UPDATE workspace SET slug=?", arguments: [scope])
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Acme Beta','BE');
+            UPDATE meta SET value='beta' WHERE key='current_workspace';
+            """)
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET body_md=? WHERE rev=2",
+          arguments: [(1...450).map { "line \($0)" }.joined(separator: "\n")])
+      }
+      for (args, status) in [
+        (["ls", "--about", "app:api", "--archived", "--limit", "1"], Int32(0)),
+        (["show", "rules"], 0), (["show", "rules", "--lines", "9999"], 0),
+        (["show", "missing"], 2), (["ls", "--about", "topic:missing"], 2),
+        (["ls", "--about", "invalid"], 1),
+        (["ls", "--about", "edge:api/service:push/Password%3Dprivate123"], 2),
+      ] {
+        let result = try SiltaBinary.run(
+          ["--ws", scope, "doc"] + args + (json ? ["--json"] : []), in: scratch)
+        #expect(result.termination == .exit(status))
+        let report = result.stdout + result.stderr
+        #expect(!report.contains("private123"))
+        if scope == "acme" {
+          #expect(report.contains("silta --ws 'acme'"))
+        } else {
+          withKnownIssue("Sensitive workspace bypasses document command-scope safety") {
+            #expect(!report.contains(scope))
+            #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))
+            #expect(!report.contains("silta doc ls") && !report.contains("--ws '[REDACTED:"))
+          }
+        }
+      }
+      let unknown = try SiltaBinary.run(
+        ["--ws", scope + "-absent", "doc", "show", "rules"] + (json ? ["--json"] : []), in: scratch)
+      #expect(unknown.termination == .exit(2))
+      #expect((unknown.stdout + unknown.stderr).contains("silta ws ls"))
+      if scope != "acme" { #expect(!(unknown.stdout + unknown.stderr).contains(scope)) }
+    }
+  }
+}
