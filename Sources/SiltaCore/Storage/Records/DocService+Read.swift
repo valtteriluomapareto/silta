@@ -31,7 +31,7 @@ extension DocService {
         ref: "doc:" + slug,
         output: "No accepted revision for doc:\(slug).\nPending revisions (\(total)):\n"
           + pending.map { "doc:\(slug)@\($0)\n" }.joined()
-          + (total > pending.count && Self.safeReference("doc:" + slug)
+          + (total > pending.count && scopeIsSafe && Self.safeReference("doc:" + slug)
             ? "next: " + listCommand + "\n" : ""))
     }
   }
@@ -71,13 +71,11 @@ extension DocService {
           + join + " ORDER BY doc.slug,doc_rev.rev LIMIT ? OFFSET ?",
         arguments: arguments + [limit, offset])
       let entries = try rows.map { try entry($0, in: db) }
-      var command = listCommand
-      if let about { command += " --about " + shellWord(about) }
-      if archived { command += " --archived" }
-      let continuation =
-        about.map { !Self.safeReference($0) } == true
-        ? listCommand : command + " --offset \(offset + entries.count) --limit \(limit)"
-      let next = offset < total && entries.count < total - offset ? continuation : nil
+      let next =
+        offset < total && entries.count < total - offset
+        ? listPageCommand(
+          about: about, archived: archived, offset: offset + entries.count, limit: limit)
+        : nil
       return DocListResult(entries: entries, total: total, offset: offset, limit: limit, next: next)
     }
   }
@@ -87,10 +85,14 @@ extension DocService {
   {
     do {
       return try TaskLinkTarget.map(ref, workspace: workspaceID, in: db)
-    } catch let error as any CodedError where error.code == .notFound && !Self.safeReference(ref) {
-      throw CommandFailure(
-        error: TaskError.notFound("attachment " + (ref.removingPercentEncoding ?? ref)),
-        next: [workspaceCommand("silta ws show", workspace: workspace)])
+    } catch let error as any CodedError {
+      if error.code == .notFound && !Self.safeReference(ref) {
+        throw CommandFailure(
+          error: TaskError.notFound("attachment " + (ref.removingPercentEncoding ?? ref)),
+          next: [configurationCommand])
+      }
+      if !scopeIsSafe { throw CommandFailure(error: error, next: [configurationCommand]) }
+      throw error
     }
   }
 

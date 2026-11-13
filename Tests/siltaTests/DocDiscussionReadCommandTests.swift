@@ -313,11 +313,9 @@ extension DocDiscussionReadCommandTests {
         if scope == "acme" {
           #expect(report.contains("silta --ws 'acme'"))
         } else {
-          withKnownIssue("Discussion recovery constructs flags before checking workspace scope") {
-            #expect(!report.contains(scope))
-            #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))
-            #expect(!report.contains("silta doc ls") && !report.contains("--ws '[REDACTED:"))
-          }
+          #expect(!report.contains(scope))
+          #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))
+          #expect(!report.contains("silta doc ls") && !report.contains("--ws '[REDACTED:"))
         }
       }
       try store.write { try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE rev=3") }
@@ -325,10 +323,8 @@ extension DocDiscussionReadCommandTests {
         ["--ws", scope, "doc", "show", ref, "--diff"] + (json ? ["--json"] : []), in: scratch)
       #expect(missing.termination == .exit(2))
       if scope != "acme" {
-        withKnownIssue("Recorded-base recovery embeds sensitive workspace scope") {
-          #expect(!(missing.stdout + missing.stderr).contains(scope))
-          #expect((missing.stdout + missing.stderr).contains("silta ws ls"))
-        }
+        #expect(!(missing.stdout + missing.stderr).contains(scope))
+        #expect((missing.stdout + missing.stderr).contains("silta ws ls"))
       }
     }
   }

@@ -61,7 +61,7 @@ extension DocService {
     var output =
       "\(ref) comments (offset \(offset), limit \(limit), total \(total))\n"
       + rows.map { DocComments.render(CommentDetails(row: $0, task: ref)) }.joined(separator: "\n")
-    if offset < total && rows.count < total - offset && Self.safeReference(ref) {
+    if offset < total && rows.count < total - offset && scopeIsSafe && Self.safeReference(ref) {
       output +=
         "next: "
         + showCommand(
