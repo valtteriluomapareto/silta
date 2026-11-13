@@ -1,0 +1,2 @@
+{"table": "task_event", "actor": "agent:codex:acme", "kind": "created", "body": "proposed", "created_at": "2023-11-14T22:13:20.001Z"}
+{"table": "comment", "uid": "01HF7YAT01XP7G3PZ42G5HV2D9", "seq": "1", "kind": "comment", "body_md": "Check the fallback rule before changing the API.", "mentions": "[]", "accepted": "0", "actor": "agent:codex:acme", "created_at": "2023-11-14T22:13:20.001Z"}
