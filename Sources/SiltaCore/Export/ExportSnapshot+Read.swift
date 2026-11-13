@@ -8,6 +8,22 @@ extension ExportSnapshot {
   package static func read(_ db: Database, workspace slug: String) throws -> Self {
     let migrator = StorageSchema.migrator
     if try migrator.hasBeenSuperseded(db) { throw StorageError.schemaTooNew }
+    guard try migrator.hasCompletedMigrations(db) else { throw StorageError.internalMisuse }
+    guard let found = try Row.fetchOne(db, sql: Query.workspace, arguments: [slug]) else {
+      throw WorkspaceError.unknown(slug)
+    }
+    let id: Int64 = found["id"]
+    try requireNoDocsOrReservations(db, workspace: id)
+    if let kind = try String.fetchOne(db, sql: Query.unsupportedLink, arguments: [id, id]) {
+      throw ExportError.unsupported("\(kind) links")
+    }
+    return try capture(db, workspace: slug)
+  }
+
+  /// Captures literal rows without imposing incoming graph validity on a destination.
+  static func capture(_ db: Database, workspace slug: String) throws -> Self {
+    let migrator = StorageSchema.migrator
+    if try migrator.hasBeenSuperseded(db) { throw StorageError.schemaTooNew }
     guard try migrator.hasCompletedMigrations(db), let schema = migrator.migrations.last else {
       throw StorageError.internalMisuse
     }
@@ -16,10 +32,6 @@ extension ExportSnapshot {
     }
     let id: Int64 = found["id"]
     let workspace = try ExportRow(keys: ExportFormat.workspaceKeys, row: found)
-    try requireNoDocsOrReservations(db, workspace: id)
-    if let kind = try String.fetchOne(db, sql: Query.unsupportedLink, arguments: [id, id]) {
-      throw ExportError.unsupported("\(kind) links")
-    }
     func rows(_ sql: String, _ keys: [String], _ argument: any DatabaseValueConvertible = id) throws
       -> [ExportRow]
     {
@@ -43,6 +55,7 @@ extension ExportSnapshot {
     }
     return Self(
       schema: schema, workspace: workspace, sections: sections, tasks: tasks,
+      documents: try ExportDocumentSnapshot.read(db, workspace: id),
       links: try rows(ExportLinks.query, ExportFormat.linkKeys),
       aliasDecisions: try rows(Query.aliasDecisions, ExportFormat.aliasDecisionKeys),
       approvals: try rows(Query.approvals, ExportFormat.approvalKeys, slug))

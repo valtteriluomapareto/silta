@@ -14,7 +14,7 @@ struct ExportReaderTests {
       let files = try ExportTreeTests.render(store)
       let snapshot = try ExportTree.parse(files)
       #expect(snapshot == (try store.read { try ExportSnapshot.read($0, workspace: "acme") }))
-      ExportTreeTests.expectSame(snapshot.files(), files)
+      ExportTreeTests.expectSame(try snapshot.files(), files)
       let task = try #require(snapshot.tasks.first { $0.ref == "AC-10" })
       #expect(task.row.value("description_md") == "~~~\n## Plan\n")
       #expect(task.row.value("result_md") == nil)

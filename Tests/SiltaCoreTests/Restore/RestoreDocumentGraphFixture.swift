@@ -24,16 +24,16 @@ enum RestoreDocumentGraphFixture {
         ("created_by", "human:acme"), ("created_at", "2023-11-14T22:13:00.000Z"),
         ("updated_at", "2023-11-14T22:13:00.000Z"),
       ]), records: [])
+    let documents = try ExportDocumentSnapshot.parse(
+      ExportDocumentSnapshotTests.golden(), workspace: "acme")
     let tree = ExportSnapshot(
       schema: "v7",
       workspace: legacy.workspace.replacing(
         "next_task_seq", with: "3", keys: ExportFormat.workspaceKeys),
-      sections: legacy.sections, tasks: legacy.tasks + [source], links: try links(),
+      sections: legacy.sections, tasks: legacy.tasks + [source], documents: documents,
+      links: try links(),
       aliasDecisions: legacy.aliasDecisions, approvals: legacy.approvals)
-    return (
-      tree,
-      try ExportDocumentSnapshot.parse(ExportDocumentSnapshotTests.golden(), workspace: "acme")
-    )
+    return (tree, documents)
   }
 
   static func source(_ home: URL) throws -> DatabaseStore {

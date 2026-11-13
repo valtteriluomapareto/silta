@@ -74,6 +74,8 @@ package struct ExportSnapshot: Equatable, Sendable {
   package var sections: [Section]
   /// Tasks in id order.
   package var tasks: [ExportTask]
+  /// Immutable document rows and independent allocation streams.
+  var documents: ExportDocumentSnapshot
   /// `links.jsonl` rows.
   package var links: [ExportRow]
   /// `alias_decisions.jsonl` rows.
@@ -90,22 +92,27 @@ package struct ExportSnapshot: Equatable, Sendable {
   }
 
   /// The tree's files keyed by relative path, `manifest.json` included.
-  package func files() -> [String: Data] {
+  package func files() throws -> [String: Data] {
+    if format == "1",
+      !documents.documents.isEmpty || !documents.revisionAllocations.isEmpty
+        || !documents.commentSequences.isEmpty
+    {
+      throw ExportError.unsupported("document data in format 1")
+    }
     var files: [String: String] = [
       ExportFormat.workspaceFile: workspaceYAML(),
       ExportFormat.linksFile: ExportFormat.jsonl(links),
       ExportFormat.aliasDecisionsFile: ExportFormat.jsonl(aliasDecisions),
       ExportFormat.approvalsFile: ExportFormat.jsonl(approvals),
     ]
-    if format == "2" {
-      files[ExportFormat.docAllocationsFile] = ""
-      files[ExportFormat.docCommentSequencesFile] = ""
-    }
     for task in tasks {
       files["tasks/\(task.ref).md"] = Self.markdown(task.row)
       files["tasks/\(task.ref).jsonl"] = ExportFormat.jsonl(task.records)
     }
     var data = files.mapValues { Data($0.utf8) }
+    if format == "2" {
+      data.merge(try documents.files()) { _, incoming in incoming }
+    }
     data[ExportFormat.manifestFile] = Data(manifest(data).utf8)
     return data
   }
@@ -147,11 +154,14 @@ package struct ExportSnapshot: Equatable, Sendable {
         tasks.map { $0.records.filter { $0.value("table") == record.table }.count }.reduce(0, +)
     }
     if format == "2" {
-      for kind in [
-        "doc", "doc_rev", "doc_verification", "doc_revision_allocation", "doc_comment_sequence",
-      ] {
-        counts[kind] = 0
+      counts["doc"] = documents.documents.count
+      let records = documents.documents.flatMap(\.records)
+      for kind in ["doc_rev", "doc_verification"] {
+        counts[kind] = records.filter { $0.value("table") == kind }.count
       }
+      counts["doc_revision_allocation"] = documents.revisionAllocations.count
+      counts["doc_comment_sequence"] = documents.commentSequences.count
+      counts["comment", default: 0] += records.filter { $0.value("table") == "comment" }.count
     }
     counts["link"] = links.count
     counts["alias_decision"] = aliasDecisions.count
