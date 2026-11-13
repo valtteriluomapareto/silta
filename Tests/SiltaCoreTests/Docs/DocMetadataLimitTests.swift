@@ -16,8 +16,16 @@ struct DocMetadataLimitTests {
       var draft = DocVerificationPreparationTests.draft(["service:push"])
       draft.title = title
       let before = try DocStoreTests.snapshot(store)
-      #expect(throws: DocError.self) {
+      do {
         _ = try DocStoreTests.accept(draft, in: store, ids: SeededIDGenerator(seed: 71))
+        Issue.record("An invalid title was accepted")
+      } catch let error as any CodedError {
+        #expect(error.code == .invalid)
+        if title == "Rules\nmore" {
+          let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false)).stderr
+          let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true)).stdout
+          Golden.forTests().check(text + json, "doc-title-limit.txt")
+        }
       }
       #expect(try DocStoreTests.snapshot(store) == before)
     }

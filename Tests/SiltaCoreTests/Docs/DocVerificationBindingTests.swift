@@ -67,6 +67,11 @@ struct DocVerificationBindingTests {
       } catch let error as any CodedError {
         #expect(error.code == .conflict)
         #expect(error.next == ["silta --ws 'acme' ws show"])
+        if change == "ref" {
+          let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false)).stderr
+          let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true)).stdout
+          Golden.forTests().check(text + json, "doc-verification-changed.txt")
+        }
       }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }

@@ -62,10 +62,14 @@ struct DocStoreTests {
         let old = try DocStore.revision("push-rules", revision: 1, workspace: 1, in: db)
         #expect(old.body == "Keep unknown categories visible." && old.about == first.about)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_verification") == 2)
-        #expect(
-          try String.fetchAll(db, sql: "SELECT app_shas FROM doc_verification").allSatisfy {
-            $0.contains("\"app\":\"api\"") && $0.contains(String(repeating: "f", count: 40))
-          })
+        let expected = [
+          DocVerification.Snapshot(app: "api", ref: "main", sha: String(repeating: "f", count: 40))
+        ]
+        for raw in try String.fetchAll(db, sql: "SELECT app_shas FROM doc_verification") {
+          #expect(
+            try JSONDecoder().decode([DocVerification.Snapshot].self, from: Data(raw.utf8))
+              == expected)
+        }
         #expect(
           try String.fetchOne(db, sql: "SELECT verified_at FROM doc") == "2023-11-14T22:13:20.000Z")
         #expect(
