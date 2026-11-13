@@ -27,14 +27,14 @@ SUBCOMMANDS:
 
 OVERVIEW: Accept a complete document revision (human-only).
 
-Supply UTF-8 Markdown with -F, or preserve the accepted body with --keep-body.
-New docs require --title and --about; supplied about refs replace the whole set.
-Input is at most 65536 bytes. Kind stays fixed unless --kind is explicit.
-Use silta guide recipes for editing rules.
-Create (human): silta --ws acme doc edit rules --title Rules --about service:push -F rules.md
-Preserve (human): silta --ws acme doc edit rules --keep-body --about topic:messaging
+Use -F for complete UTF-8 Markdown, or --keep-body to retain it.
+New docs need --title and --about. About refs replace the whole set.
+Input: at most 65536 bytes. Kind stays fixed unless --kind is explicit.
+Read editing rules with silta guide recipes.
+Create (human): silta doc edit api -F api.md --title API --about app:api
+Preserve (human): silta doc edit api --keep-body --about app:api
 
-USAGE: silta doc edit [<options>] <slug>
+USAGE: silta doc edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <slug> [-F <file>] [--keep-body] [--title <title>] [--kind <kind>] [--about <about> ...] [--allow-secret]
 
 ARGUMENTS:
   <slug>                  Doc slug or doc:slug, without a revision.
@@ -48,15 +48,15 @@ GLOBAL OPTIONS:
   --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
-  -F <file>               Read complete UTF-8 Markdown from a file, or - for stdin;
-                          exclusive with --keep-body.
+  -F <file>               Read complete UTF-8 Markdown from a file, or - for
+                          stdin; exclusive with --keep-body.
   --keep-body             Copy the accepted owned body; exclusive with -F.
-  --title <title>         One line of at most 120 characters; required for a new
-                          doc, otherwise preserved.
-  --kind <kind>           contract, flow, runbook or reference; inferred for a new
-                          doc, otherwise preserved.
-  --about <about>         Canonical map ref; repeat to replace the complete set;
-                          required for a new doc.
+  --title <title>         One line of at most 120 characters; required for a
+                          new doc, otherwise preserved.
+  --kind <kind>           contract, flow, runbook or reference; inferred for a
+                          new doc, otherwise preserved.
+  --about <about>         Canonical map ref; repeat to replace the complete
+                          set; required for a new doc.
   --allow-secret          Retain detected secrets (human-only).
   --version               Show the version.
   -h, --help              Show help information.

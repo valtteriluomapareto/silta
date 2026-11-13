@@ -5,13 +5,12 @@ import SiltaCore
 struct DocEditCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit", abstract: "Accept a complete document revision (human-only).",
-    discussion: "Supply UTF-8 Markdown with -F, or preserve the accepted body with --keep-body.\n"
-      + "New docs require --title and --about; supplied about refs replace the whole set.\n"
-      + "Input is at most 65536 bytes. Kind stays fixed unless --kind is explicit.\n"
-      + "Use silta guide recipes for editing rules.\n"
-      + "Create (human): silta --ws acme doc edit rules --title Rules "
-      + "--about service:push -F rules.md\n"
-      + "Preserve (human): silta --ws acme doc edit rules --keep-body --about topic:messaging")
+    discussion: "Use -F for complete UTF-8 Markdown, or --keep-body to retain it.\n"
+      + "New docs need --title and --about. About refs replace the whole set.\n"
+      + "Input: at most 65536 bytes. Kind stays fixed unless --kind is explicit.\n"
+      + "Read editing rules with silta guide recipes.\n"
+      + "Create (human): silta doc edit api -F api.md --title API --about app:api\n"
+      + "Preserve (human): silta doc edit api --keep-body --about app:api")
   static let dataShape = Shape.object(["ref": .string, "archived": .bool, "changed": .bool])
   static let workspaceSource = WorkspaceSource.option
 
@@ -19,7 +18,9 @@ struct DocEditCommand: OutputCommand {
   @Argument(help: "Doc slug or doc:slug, without a revision.") var slug: String
   @Option(
     name: .customShort("F"),
-    help: "Read complete UTF-8 Markdown from a file, or - for stdin; exclusive with --keep-body.")
+    help: .init(
+      "Read complete UTF-8 Markdown from a file, or - for stdin; exclusive with --keep-body.",
+      valueName: "file"))
   var file: String?
   @Flag(help: "Copy the accepted owned body; exclusive with -F.") var keepBody = false
   @Option(help: "One line of at most 120 characters; required for a new doc, otherwise preserved.")

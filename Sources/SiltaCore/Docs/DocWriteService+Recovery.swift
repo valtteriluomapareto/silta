@@ -1,7 +1,8 @@
 extension DocWriteService {
   func recovery(_ error: any CodedError, request: DocEditRequest, workspace: String)
-    -> CommandFailure
+    -> any CodedError
   {
+    if error is StorageError { return error }
     guard safeScopeAndIdentity(request, workspace: workspace) else {
       return CommandFailure(error: error, next: [readCommand(workspace: workspace)], nextBy: .agent)
     }
