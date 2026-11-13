@@ -211,6 +211,9 @@ struct DocWritePolicyTests {
     }
   }
 
+}
+
+extension DocWritePolicyTests {
   @Test(arguments: [false, true])
   func capturedEvidenceOutsideTransactionAndKeptBodyRace(keep: Bool) async throws {
     try await withScratchDirectory { home in
@@ -242,8 +245,8 @@ struct DocWritePolicyTests {
       let service = try Self.service(home, store, git: git)
       if keep {
         await Self.refusal(.conflict) { _ = try await service.edit(request, input: nil) }
-        #expect(
-          !committed.isEmpty && (try DocVerificationPreparationTests.truth(store)) == committed)
+        #expect(committed.withLock { !$0.isEmpty })
+        #expect(try DocVerificationPreparationTests.truth(store) == committed.withLock { $0 })
       } else {
         let result = try await service.edit(request) { "New body" }
         #expect(result.ref == "doc:rules@2")
