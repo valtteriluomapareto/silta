@@ -58,7 +58,10 @@ struct DocVerificationPreparationTests {
       let tables = try String.fetchAll(
         db,
         sql:
-          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+          """
+          SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'
+          ORDER BY name
+          """
       )
       return try tables.map { table in
         try Row.fetchAll(db, sql: "SELECT * FROM \(table) ORDER BY rowid").map(\.description)

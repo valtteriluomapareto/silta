@@ -33,32 +33,7 @@ struct DocVerificationBindingTests {
       if change == "about" {
         draft.about = ["topic:messaging"]
       } else {
-        try store.write { tx in
-          switch change {
-          case "ref":
-            try tx.database.execute(sql: "UPDATE app SET ref='origin/changed' WHERE slug='api'")
-          case "unicode-ref":
-            try tx.database.execute(
-              sql: "UPDATE app SET ref=? WHERE slug='api'", arguments: ["origin/cafe\u{301}"])
-          case "path":
-            try tx.database.execute(
-              sql: "UPDATE repo_path SET path=?",
-              arguments: [repo.deletingLastPathComponent().appending(path: "acme-detached").path])
-          case "subpath":
-            try tx.database.execute(sql: "UPDATE app SET subpath='Sources' WHERE slug='api'")
-          case "app":
-            try tx.database.execute(sql: "UPDATE app SET uid='recreated-app' WHERE slug='api'")
-          case "repo": try tx.database.execute(sql: "UPDATE repo SET uid='recreated-repo'")
-          case "edge":
-            try tx.database.execute(
-              sql: "UPDATE edge SET uid='recreated-edge' WHERE kind='http-api'")
-          case "service", "service-endpoint":
-            try tx.database.execute(sql: "UPDATE service SET uid='recreated-service'")
-          case "topic": try tx.database.execute(sql: "UPDATE topic SET uid='recreated-topic'")
-          case "removed": try tx.database.execute(sql: "DELETE FROM edge WHERE kind='http-api'")
-          default: Issue.record("Unhandled binding change")
-          }
-        }
+        try Self.change(change, store: store, repo: repo)
       }
       let before = try DocVerificationPreparationTests.truth(store)
       do {
@@ -89,7 +64,10 @@ struct DocVerificationBindingTests {
           try String.fetchOne(
             $0,
             sql:
-              "SELECT v.app_shas FROM doc_verification v JOIN doc_rev r ON r.id=v.doc_rev_id WHERE r.rev=? AND r.doc_id=(SELECT id FROM doc WHERE slug='rules')",
+              """
+              SELECT v.app_shas FROM doc_verification v JOIN doc_rev r ON r.id=v.doc_rev_id
+              WHERE r.rev=? AND r.doc_id=(SELECT id FROM doc WHERE slug='rules')
+              """,
             arguments: [accepted.revision])
         })
       #expect(
@@ -103,6 +81,34 @@ struct DocVerificationBindingTests {
           try String.fetchOne(
             $0, sql: "SELECT app_shas FROM doc_verification ORDER BY id DESC LIMIT 1")
         } == raw)
+    }
+  }
+
+  static func change(_ change: String, store: DatabaseStore, repo: URL) throws {
+    let statements = [
+      "ref": "UPDATE app SET ref='origin/changed' WHERE slug='api'",
+      "subpath": "UPDATE app SET subpath='Sources' WHERE slug='api'",
+      "app": "UPDATE app SET uid='recreated-app' WHERE slug='api'",
+      "repo": "UPDATE repo SET uid='recreated-repo'",
+      "edge": "UPDATE edge SET uid='recreated-edge' WHERE kind='http-api'",
+      "service": "UPDATE service SET uid='recreated-service'",
+      "service-endpoint": "UPDATE service SET uid='recreated-service'",
+      "topic": "UPDATE topic SET uid='recreated-topic'",
+      "removed": "DELETE FROM edge WHERE kind='http-api'",
+    ]
+    try store.write { tx in
+      if change == "unicode-ref" {
+        try tx.database.execute(
+          sql: "UPDATE app SET ref=? WHERE slug='api'", arguments: ["origin/cafe\u{301}"])
+      } else if change == "path" {
+        try tx.database.execute(
+          sql: "UPDATE repo_path SET path=?",
+          arguments: [repo.deletingLastPathComponent().appending(path: "acme-detached").path])
+      } else if let sql = statements[change] {
+        try tx.database.execute(sql: sql)
+      } else {
+        Issue.record("Unhandled binding change")
+      }
     }
   }
 

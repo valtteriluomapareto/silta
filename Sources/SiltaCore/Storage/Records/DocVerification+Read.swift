@@ -46,23 +46,29 @@ extension DocVerification {
       }
       targets.append(TargetBinding(kind: target.kind, uid: uid, serviceUID: serviceUID))
     }
-    let apps = try appIDs.map { id -> AppBinding in
-      guard
-        let app = try Row.fetchOne(
-          db,
-          sql: """
-            SELECT app.uid,app.slug AS app,app.ref,app.subpath,repo.uid AS repo_uid,
-              repo.slug AS repo,repo_path.path
-            FROM app JOIN repo ON repo.id=app.repo_id LEFT JOIN repo_path ON repo_path.repo_id=repo.id
-            WHERE app.workspace_id=? AND app.id=?
-            """, arguments: [workspace, id])
-      else { throw StorageError.corrupt }
-      return AppBinding(
-        app: app["app"], uid: app["uid"], ref: app["ref"], repo: app["repo"],
-        repoUID: app["repo_uid"], path: app["path"], subpath: app["subpath"])
-    }.sorted { $0.app < $1.app }
+    let apps = try appIDs.map { try appBinding($0, workspace: workspace, in: db) }
+      .sorted { $0.app < $1.app }
     return Binding(
       workspace: row["slug"], workspaceUID: row["uid"], title: metadata.title,
       kind: metadata.kind, about: metadata.refs, targets: targets, apps: apps)
+  }
+
+  private static func appBinding(_ id: Int64, workspace: Int64, in db: Database) throws
+    -> AppBinding
+  {
+    guard
+      let app = try Row.fetchOne(
+        db,
+        sql: """
+          SELECT app.uid,app.slug AS app,app.ref,app.subpath,repo.uid AS repo_uid,
+            repo.slug AS repo,repo_path.path
+          FROM app JOIN repo ON repo.id=app.repo_id
+          LEFT JOIN repo_path ON repo_path.repo_id=repo.id
+          WHERE app.workspace_id=? AND app.id=?
+          """, arguments: [workspace, id])
+    else { throw StorageError.corrupt }
+    return AppBinding(
+      app: app["app"], uid: app["uid"], ref: app["ref"], repo: app["repo"],
+      repoUID: app["repo_uid"], path: app["path"], subpath: app["subpath"])
   }
 }

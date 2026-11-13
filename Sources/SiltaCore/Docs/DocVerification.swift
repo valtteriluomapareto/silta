@@ -98,6 +98,9 @@ struct DocVerification: Sendable {
   func encodedSnapshots() throws -> String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    return String(decoding: try encoder.encode(snapshots), as: UTF8.self)
+    guard let json = String(data: try encoder.encode(snapshots), encoding: .utf8) else {
+      throw StorageError.internalMisuse
+    }
+    return json
   }
 }
