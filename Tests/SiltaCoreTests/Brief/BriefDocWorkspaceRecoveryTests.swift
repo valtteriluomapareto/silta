@@ -10,7 +10,7 @@ struct BriefDocWorkspaceRecoveryTests {
       "AKIA" + String(repeating: "A", count: 16), String(repeating: "a", count: 52),
     ])
   func sensitiveWorkspaceRecoveryUsesTheWorkspaceList(json: Bool, workspace: String) throws {
-    try withKnownIssue(
+    withKnownIssue(
       "Document continuations expose a sensitive workspace instead of listing workspaces."
     ) {
       for compact in [false, true] {
