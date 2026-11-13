@@ -43,9 +43,10 @@ struct BriefDocs {
     let ref = try TaskLinkTarget(kind: kind, id: id).rendered(in: db)
     var previews: [String] = []
     if !compact {
+      // SQLite treats integer ORDER BY terms as result-column positions.
       let topicMatch =
         topics.isEmpty
-        ? "0"
+        ? "NULL"
         : """
         EXISTS(SELECT 1 FROM link t WHERE t.workspace_id=:workspace
           AND t.from_kind='doc' AND t.from_id=d.id AND t.rel='about' AND t.to_kind='topic'
