@@ -91,6 +91,10 @@ struct BriefDocs {
       $0.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     let first = lines.first { !$0.isEmpty && $0.firstMatch(of: /^#{1,6}(?:\s|$)/) == nil } ?? ""
-    return String(TaskError.shown(first).prefix(120))
+    let line = first.map { character in
+      character.unicodeScalars.allSatisfy { CharacterSet.controlCharacters.contains($0) }
+        ? " " : String(character)
+    }.joined()
+    return String(line.prefix(120))
   }
 }
