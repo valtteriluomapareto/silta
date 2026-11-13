@@ -1,6 +1,6 @@
 {
   "format": "1",
-  "schema": "v6",
+  "schema": "v7",
   "workspace": "acme",
   "counts": {"alias_decision": "1", "app": "2", "approval": "2", "comment": "2", "edge": "2", "environment": "1", "link": "3", "repo": "2", "review_request": "1", "service": "1", "source": "1", "task": "2", "task_event": "3", "task_plan_rev": "2", "topic": "1", "topic_alias": "2", "workspace": "1"},
   "files": [

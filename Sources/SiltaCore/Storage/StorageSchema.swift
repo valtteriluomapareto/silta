@@ -30,6 +30,10 @@ enum StorageSchema {
     migrator.registerMigration("v6") { db in
       try db.execute(sql: "UPDATE meta SET value='6' WHERE key='min_writer_version'")
     }
+    migrator.registerMigration("v7") { db in
+      try db.execute(sql: "ALTER TABLE doc_rev ADD COLUMN triaged_at TEXT")
+      try db.execute(sql: "ALTER TABLE doc_rev ADD COLUMN triaged_by TEXT")
+    }
     return migrator
   }
 

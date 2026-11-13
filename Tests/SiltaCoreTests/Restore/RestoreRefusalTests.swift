@@ -37,7 +37,7 @@ struct RestoreRefusalTests {
       "future format", .invalid, "manifest.json", #""format": "1""#, #""format": "2""#,
       rehash: false),
     .init(
-      "newer schema", .env, "manifest.json", #""schema": "v6""#, #""schema": "v99""#,
+      "newer schema", .env, "manifest.json", #""schema": "v7""#, #""schema": "v99""#,
       rehash: false),
     .init(
       "dangling parent", .invalid, "tasks/AC-10.md", #"parent: "\#(task2)""#,
