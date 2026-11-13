@@ -87,7 +87,7 @@ enum ExportFormat {
   /// Keys whose values are integers in decimal.
   static let integerKeys: Set<String> = [
     "seq", "priority", "plan_rev", "is_primary", "done_dirty", "rev", "accepted",
-    "next_task_seq", "to_rev",
+    "next_task_seq", "to_rev", "current_rev", "base_rev", "archived",
   ]
 
   /// A key written as another row's uid: the column it fills and the table that uid names.
@@ -112,7 +112,11 @@ enum ExportFormat {
     "topic_alias": ["topic": Reference("topic_id", "topic")],
     "source": ["repo": Reference("repo_id", "repo")],
     "task": ["parent": Reference("parent_id", "task"), "app": Reference("app_id", "app")],
-    "comment": ["thread": Reference("thread_id", "comment")],
+    "doc_rev": ["source_task": Reference("source_task_id", "task")],
+    "doc_verification": ["doc_rev": Reference("doc_rev_id", "doc_rev")],
+    "comment": [
+      "thread": Reference("thread_id", "comment"), "doc_rev": Reference("doc_rev_id", "doc_rev"),
+    ],
     "alias_decision": ["topic": Reference("topic_id", "topic")],
   ]
 
