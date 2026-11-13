@@ -166,9 +166,7 @@ struct RestoreDocumentGraphTests {
       #expect(links == expected)
       Golden.forTests().check(ExportFormat.jsonl(links), "export/typed-doc-links/links.jsonl")
       #expect(try RestoreSupport.dump(store) == before)
-      #expect(throws: ExportError.unsupported("docs")) {
-        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
+      #expect(try store.read { try ExportSnapshot.read($0, workspace: "acme").links } == links)
     }
   }
 }

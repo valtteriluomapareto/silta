@@ -27,10 +27,11 @@ struct DocReservationExportTests {
     try withScratchDirectory { home in
       let store = try Self.counterOnly(home)
       let before = try DocStoreTests.snapshot(store)
-      let error = ExportError.unsupported("reserved doc revision history")
-      #expect(throws: error) {
-        _ = try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
+      var snapshot = try store.read { try ExportSnapshot.read($0, workspace: "acme") }
+      #expect(!snapshot.documents.revisionAllocations.isEmpty)
+      snapshot.format = "1"
+      let error = ExportError.unsupported("document data in format 1")
+      #expect(throws: error) { try snapshot.files() }
       #expect(try DocStoreTests.snapshot(store) == before)
       let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
       let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))

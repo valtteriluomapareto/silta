@@ -46,9 +46,8 @@ struct ExportDocumentSnapshotTests {
       let parsed = try ExportDocumentSnapshot.parse(Self.golden(), workspace: "acme")
       #expect(parsed == snapshot)
       #expect(try RestoreSupport.dump(store) == before)
-      #expect(throws: ExportError.unsupported("docs")) {
-        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
+      #expect(
+        try store.read { try ExportSnapshot.read($0, workspace: "acme").documents } == snapshot)
     }
   }
 
@@ -126,9 +125,8 @@ struct ExportDocumentSnapshotTests {
         snapshot.revisionAllocations.map { $0.value("slug") } == ["gone-rules", "push-rules"])
       #expect(snapshot.revisionAllocations.map { $0.value("next") } == ["71", "20"])
       #expect(try ExportDocumentSnapshot.parse(snapshot.files(), workspace: "acme") == snapshot)
-      #expect(throws: ExportError.unsupported("reserved doc revision history")) {
-        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
+      #expect(
+        try store.read { try ExportSnapshot.read($0, workspace: "acme").documents } == snapshot)
     }
   }
 

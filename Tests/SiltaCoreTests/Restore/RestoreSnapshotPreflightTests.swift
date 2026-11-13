@@ -94,7 +94,7 @@ struct RestoreSnapshotPreflightTests {
     }
   }
 
-  private static func foreignRows(_ store: DatabaseStore) throws {
+  static func foreignRows(_ store: DatabaseStore) throws {
     try store.write {
       try $0.database.execute(
         sql: """

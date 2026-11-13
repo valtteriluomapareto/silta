@@ -15,14 +15,7 @@ package enum ExportTree {
   /// `ExportError.invalidTree` and one of a newer schema `StorageError.schemaTooNew`.
   /// This checks the form; whether rows reference each other is left to the caller.
   package static func parse(_ files: [String: Data]) throws -> ExportSnapshot {
-    let snapshot = try parseSnapshot(files)
-    for (path, data) in try snapshot.documents.files().sorted(by: {
-      ExportSnapshot.byteOrder($0.key, $1.key)
-    }) where !data.isEmpty {
-      throw invalid(
-        "\(path) is not in the form export writes", workspace: snapshot.workspace.value("slug"))
-    }
-    return snapshot
+    try parseSnapshot(files)
   }
 
   /// Parses all represented groups and checks their canonical bytes.

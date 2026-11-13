@@ -216,7 +216,7 @@ struct ExportTreeTests {
     }
   }
 
-  @Test func docsAreRefusedRatherThanDropped() throws {
+  @Test func documentMetadataIsExportedRatherThanDropped() throws {
     try withScratchDirectory { scratch in
       let store = try ExportFixture.make(scratch)
       try DatabaseQueue(path: store.path).write {
@@ -226,7 +226,8 @@ struct ExportTreeTests {
             VALUES('01HZDOC0000000000000000001',1,'auth','Auth','design','x','x')
             """)
       }
-      #expect(throws: ExportError.unsupported("docs")) { try Self.render(store) }
+      let tree = try ExportTree.parse(Self.render(store))
+      #expect(tree.documents.documents.map(\.slug) == ["auth"])
     }
   }
 

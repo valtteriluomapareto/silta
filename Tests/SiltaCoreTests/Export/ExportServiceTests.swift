@@ -232,13 +232,11 @@ struct ExportServiceTests {
       _ = try Self.export(store, home, to: root)
       let before = try Self.tree(root.appending(path: "acme"))
       try DatabaseQueue(path: store.path).write {
-        try $0.execute(
-          sql: """
-            INSERT INTO doc(uid,workspace_id,slug,title,kind,created_at,updated_at)
-            VALUES('01HZDOC0000000000000000001',1,'auth','Auth','design','x','x')
-            """)
+        try $0.execute(sql: "UPDATE link SET to_kind='future' WHERE to_kind='app'")
       }
-      #expect(throws: ExportError.unsupported("docs")) { try Self.export(store, home, to: root) }
+      #expect(throws: ExportError.unsupported("future links")) {
+        try Self.export(store, home, to: root)
+      }
       #expect(try Self.tree(root.appending(path: "acme")) == before)
       #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["acme"])
     }

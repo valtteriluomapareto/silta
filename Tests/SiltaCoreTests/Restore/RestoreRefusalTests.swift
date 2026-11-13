@@ -109,7 +109,7 @@ struct RestoreRefusalTests {
     }
   }
 
-  @Test func newerDatabaseAndDocsAreRefused() throws {
+  @Test func newerDatabaseIsRefusedAfterDocumentReplacement() throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "a")
       let store = try ExportFixture.make(home)
@@ -121,11 +121,11 @@ struct RestoreRefusalTests {
             VALUES('01HZDOC0000000000000000001',1,'auth','Auth','design','x','x')
             """)
       }
-      let docs = try RestoreSupport.dump(store)
-      #expect(throws: ExportError.unsupported("docs")) {
-        try RestoreSupport.restore(tree, into: store, home: home)
-      }
-      #expect(try RestoreSupport.dump(store) == docs)
+      _ = try RestoreSupport.restore(tree, into: store, home: home)
+      #expect(
+        try store.read {
+          try Int.fetchOne($0, sql: "SELECT count(*) FROM doc WHERE workspace_id=1")
+        } == 0)
       try DatabaseQueue(path: store.path).write {
         try $0.execute(sql: "DELETE FROM doc")
         try $0.execute(sql: "INSERT INTO grdb_migrations VALUES('v99')")

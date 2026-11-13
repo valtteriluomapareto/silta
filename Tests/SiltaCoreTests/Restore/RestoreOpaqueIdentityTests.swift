@@ -32,9 +32,8 @@ struct RestoreOpaqueIdentityTests {
         store, tree: tree, incoming: tree.documents)
       let after = try ExportDocumentSnapshotTests.read(store)
       ExportTreeTests.expectSame(try after.files(), try expected.files())
-      #expect(throws: ExportError.unsupported("docs")) {
-        try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-      }
+      let published = try store.read { try ExportSnapshot.read($0, workspace: "acme") }
+      #expect(published.documents.documents.count == 2)
     }
   }
 

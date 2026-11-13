@@ -5,7 +5,7 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreDocumentFixtureCommandTests {
-  @Test func documentExportRefusalPreservesDatabaseAndExistingTreeData() throws {
+  @Test func documentPublicationPreservesDatabaseAndExistingTreeData() throws {
     try withScratchDirectory { scratch in
       try RestoreDocumentCommandFixture.seed(scratch)
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
@@ -18,12 +18,12 @@ struct RestoreDocumentFixtureCommandTests {
       for json in [false, true] {
         let result = try SiltaBinary.run(
           ["--ws", "acme", "export", "--to", "out"] + (json ? ["--json"] : []), in: scratch)
-        #expect(result.termination == .exit(9), "\(result.stdout)\(result.stderr)")
-        #expect((result.stdout + result.stderr).contains("can't export"))
-        #expect((result.stdout + result.stderr).contains("update silta"))
+        #expect(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
         #expect(try RestoreDocumentCommandFixture.dump(queue) == before)
         #expect(try Data(contentsOf: marker) == bytes)
-        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "acme").path))
+        let document = root.appending(path: "acme/docs/rules.md")
+        #expect(FileManager.default.fileExists(atPath: document.path))
+        #expect(try Data(contentsOf: document).range(of: Data("Original rule.".utf8)) != nil)
       }
     }
   }
