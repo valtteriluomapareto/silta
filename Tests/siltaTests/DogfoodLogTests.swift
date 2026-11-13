@@ -326,11 +326,19 @@ extension DogfoodLogTests {
       try $0.database.execute(
         sql: """
           UPDATE doc_rev SET title='API rules',kind='reference',about_refs='["app:api"]';
+          INSERT INTO topic(uid,workspace_id,slug,name)
+            VALUES('acme-messaging',1,'messaging','Messaging');
           """)
     }
     return [
       (["--ws", "acme", "doc", "ls"], "acme"),
       (["--ws", "acme", "doc", "show", "rules"], "acme"),
+      (
+        [
+          "--ws", "acme", "doc", "edit", "rules", "--keep-body", "--about", "topic:messaging",
+          "--approved", "Keep Acme rules",
+        ], "acme"
+      ),
     ]
   }
 

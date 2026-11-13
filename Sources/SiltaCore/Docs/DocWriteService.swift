@@ -1,27 +1,21 @@
 import Foundation
 import GRDB
 
-struct DocEditRequest {
-  var slug: String
-  var title: String?
-  var kind: String?
-  var about: [String]?
-  var allowSecret = false
-  var keepBody = false
-}
-
-struct DocWriteResult {
-  let ref: String
-  let warnings: [OutputWarning]
-}
-
 /// Accepts explicit human-authorized edits without exposing owned bodies to callers.
-struct DocWriteService {
+package struct DocWriteService {
   let environment: SiltaEnvironment
   var workspace: String?
   var approved: String?
 
-  func authorizeEdit(_ request: DocEditRequest) throws -> HumanApproval? {
+  /// Uses command-scoped dependencies and an explicit or captured workspace selection.
+  package init(environment: SiltaEnvironment, workspace: String? = nil, approved: String? = nil) {
+    self.environment = environment
+    self.workspace = workspace
+    self.approved = approved
+  }
+
+  /// Applies the human gate without input, selection or storage I/O.
+  package func authorizeEdit(_ request: DocEditRequest) throws -> HumanApproval? {
     let command = command(request, workspace: workspace)
     do {
       return try environment.actor.requireHuman(command: command, approved: approved)
@@ -30,18 +24,24 @@ struct DocWriteService {
         throw CommandFailure(
           error: error, next: [readCommand(workspace: workspace)], nextBy: .agent)
       }
+      if case .invalidApproval? = error as? ActorError {
+        throw CommandFailure(
+          error: error, next: [retry(request, workspace: workspace)], nextBy: .human)
+      }
       throw error
     }
   }
 
-  func edit(_ request: DocEditRequest, input: (() throws -> String)?) async throws -> DocWriteResult
+  /// Saves one accepted revision and its used approval atomically; Git runs before the write.
+  package func edit(_ request: DocEditRequest, input: (() throws -> String)?) async throws
+    -> DocWriteResult
   {
     _ = try authorizeEdit(request)
-    guard request.keepBody == (input == nil) else {
+    guard !(request.keepBody && input != nil) else {
       throw CommandFailure(
         error: UsageError.usage(
-          message: "Supply either input or --keep-body.",
-          command: "silta doc show"), next: [readCommand(workspace: workspace)])
+          message: "Use exactly one of -F and --keep-body.",
+          command: "silta doc edit"), next: [retry(request, workspace: workspace)])
     }
     let slug = try WorkspaceSelection.resolve(
       workspace, in: environment.db,
@@ -51,8 +51,7 @@ struct DocWriteService {
     do { return try await selected.save(request, input: input, workspace: slug) } catch let error
       as any CodedError
     {
-      guard !safeScopeAndIdentity(request, workspace: slug) else { throw error }
-      throw CommandFailure(error: error, next: [readCommand(workspace: slug)], nextBy: .agent)
+      throw recovery(error, request: request, workspace: slug)
     }
   }
 
@@ -61,7 +60,7 @@ struct DocWriteService {
   )
     async throws -> DocWriteResult
   {
-    let captured = try capture(request, workspace: slug)
+    let captured = try capture(request, hasInput: input != nil, workspace: slug)
     var draft = captured.draft
     let (body, bodyRedacted) = try suppliedBody(
       input, baseline: captured.baseline,
@@ -88,11 +87,12 @@ struct DocWriteService {
         environment.actor.approvalWarnings(approved, used: approval != nil)
         + (captured.redacted || bodyRedacted ? [SecretGuard.warning] : [])
       return DocWriteResult(
-        ref: SecretGuard.redacted("doc:\(request.slug)@\(revision.revision)"), warnings: warnings)
+        ref: SecretGuard.redacted("doc:\(request.slug)@\(revision.revision)"), warnings: warnings,
+        workspace: slug, approvalUsed: approval != nil)
     }
   }
 
-  private func capture(_ request: DocEditRequest, workspace slug: String) throws
+  private func capture(_ request: DocEditRequest, hasInput: Bool, workspace slug: String) throws
     -> CapturedEdit
   {
     return try environment.db.read { db in
@@ -115,7 +115,14 @@ struct DocWriteService {
       draft.title = request.title
       draft.kind = request.kind
       draft.about = request.about
-      _ = try DocMetadata.resolve(draft, workspace: id, in: db)
+      do { _ = try DocMetadata.resolve(draft, workspace: id, in: db) } catch DocError.missing(
+        let fields)
+      {
+        throw DocError.missing((!hasInput && !request.keepBody ? ["-F"] : []) + fields)
+      }
+      if !hasInput && !request.keepBody {
+        throw UsageError.usage(message: "Supply -F or --keep-body.", command: "silta doc edit")
+      }
       var redacted = false
       if let title = draft.title,
         !baseline.accepted || !title.utf8.elementsEqual((baseline.title ?? "").utf8)
@@ -181,19 +188,19 @@ struct DocWriteService {
       : CommandFailure(error: error, next: [readCommand(workspace: workspace)], nextBy: .agent)
   }
 
-  private func safeScopeAndIdentity(_ request: DocEditRequest, workspace: String?) -> Bool {
+  func safeScopeAndIdentity(_ request: DocEditRequest, workspace: String?) -> Bool {
     (workspace.map { SecretGuard.matches(in: $0).isEmpty } ?? true)
       && DocService.safeReference("doc:" + request.slug)
   }
 
-  private func readCommand(workspace: String?) -> String {
+  func readCommand(workspace: String?) -> String {
     guard let workspace else { return "silta ws ls" }
     return DocService(workspace: workspace, store: environment.db).listCommand
   }
 
   private func auditCommand(_ request: DocEditRequest, workspace: String) -> String {
     SecretGuard.redacted(
-      workspaceCommand("silta doc edit " + shellWord(request.slug), workspace: workspace))
+      workspaceCommand("silta doc edit " + shellWord("doc:" + request.slug), workspace: workspace))
       + (request.keepBody ? " --keep-body" : " -F <file>")
       + (request.title == nil ? "" : " --title <title>")
       + (request.kind == nil ? "" : " --kind <kind>")
@@ -201,12 +208,12 @@ struct DocWriteService {
       + (request.allowSecret ? " --allow-secret" : "")
   }
 
-  private func command(_ request: DocEditRequest, workspace: String?) -> String {
+  func command(_ request: DocEditRequest, workspace: String?) -> String {
     guard safeScopeAndIdentity(request, workspace: workspace) else {
       return readCommand(workspace: workspace)
     }
     let base =
-      "silta doc edit " + shellWord(request.slug)
+      "silta doc edit " + shellWord("doc:" + request.slug)
       + (request.keepBody ? " --keep-body" : " -F <file>")
       + (request.title == nil ? "" : " --title <title>")
       + (request.kind == nil ? "" : " --kind <kind>")
