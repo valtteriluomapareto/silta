@@ -24,7 +24,8 @@ package enum WorkspaceError: CodedError {
   case conflict
 
   /// Removing a map item would detach current accepted knowledge.
-  case docAttachments(workspace: String, item: String, docs: [String])
+  case docAttachments(
+    workspace: String, item: String, docs: [String], commands: [String], nextBy: NextBy)
 
   /// The editor could not be started.
   case editor
@@ -58,8 +59,8 @@ package enum WorkspaceError: CodedError {
       "This repository belongs to several workspaces. "
         + "Retry the original command with --ws and a workspace from the candidates."
     case .conflict: "Configuration conflicts with an existing reference or unique value."
-    case .docAttachments(_, let item, let docs):
-      "Cannot remove \(TaskError.shown(item)); attached docs: "
+    case .docAttachments(_, let item, let docs, _, _):
+      "Cannot remove \(TaskError.shown(DocService.about([item]))); attached docs: "
         + docs.map { TaskError.shown($0) }.joined(separator: ", ")
         + ". Reattach the docs before removing this item."
     case .editor: "The editor could not be started; check EDITOR."
@@ -72,13 +73,18 @@ package enum WorkspaceError: CodedError {
     switch self {
     case .setting(let workspace, _, _), .unknownSetting(let workspace, _, _):
       ["silta --ws " + shellWord(workspace) + " ws show"]
-    case .docAttachments(let workspace, _, _):
-      ["silta --ws " + shellWord(workspace) + " ws show"]
+    case .docAttachments(_, _, _, let commands, _): commands
     case .notFound, .unknown: ["silta ws ls"]
     case .ambiguous(let workspaces): workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
     case .input: ["silta ws edit -F <file>"]
     default: ["silta ws edit"]
     }
+  }
+
+  /// Follows the prepared recovery action; protected read hubs remain agent-owned.
+  package var nextBy: NextBy {
+    if case .docAttachments(_, _, _, _, let owner) = self { return owner }
+    return code.nextBy
   }
 
   private static func preview(_ value: String) -> String {

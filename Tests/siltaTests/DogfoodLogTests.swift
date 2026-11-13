@@ -339,6 +339,7 @@ extension DogfoodLogTests {
           "--approved", "Keep Acme rules",
         ], "acme"
       ),
+      (["--ws", "acme", "doc", "archive", "rules", "--approved", "Archive Acme rules"], "acme"),
     ]
   }
 
