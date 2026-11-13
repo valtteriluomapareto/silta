@@ -1,3 +1,5 @@
+import Foundation
+
 enum DocDiff {
   static func render(_ revision: DocRevision, base: DocRevision?) -> String {
     let ref = "doc:\(revision.slug)@\(revision.revision)"
