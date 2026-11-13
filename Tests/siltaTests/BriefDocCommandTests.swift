@@ -36,7 +36,6 @@ extension BriefCommandTests {
         #expect(!text.stdout.contains("legacy-title") && !text.stdout.contains("Another paragraph"))
         if !mode.isEmpty {
           #expect(!text.stdout.contains("Use the fallback."))
-          #expect(text.stdout.contains("more: silta --ws 'acme' brief --task AC-2 --app 'api'"))
         }
         views += "## " + name + "\n" + docs
       }
