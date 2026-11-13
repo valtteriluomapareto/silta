@@ -28,10 +28,8 @@ struct DocReservationExportTests {
       let store = try Self.counterOnly(home)
       let before = try DocStoreTests.snapshot(store)
       let error = ExportError.unsupported("reserved doc revision history")
-      withKnownIssue("Format one omits document revision reservations") {
-        #expect(throws: error) {
-          _ = try store.read { try ExportSnapshot.read($0, workspace: "acme") }
-        }
+      #expect(throws: error) {
+        _ = try store.read { try ExportSnapshot.read($0, workspace: "acme") }
       }
       #expect(try DocStoreTests.snapshot(store) == before)
       let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
@@ -50,7 +48,8 @@ struct DocReservationExportTests {
       try store.write { tx in
         try tx.database.execute(
           sql: """
-            INSERT INTO workspace(id,uid,slug,name,task_prefix) VALUES(11,'beta','beta','Beta','BE');
+            INSERT INTO workspace(id,uid,slug,name,task_prefix)
+            VALUES(11,'beta','beta','Beta','BE');
             INSERT INTO seq_counter(scope,next) VALUES('doc_rev:11:orphan',20);
             INSERT INTO seq_counter(scope,next) VALUES('docXrev:1:other',20);
             """)

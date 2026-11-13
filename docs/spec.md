@@ -1554,7 +1554,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq`.
   - **Refusals, with nothing written:** a database with migrations this binary
-    doesn't know; a workspace with docs, until docs export ships with docs (M2).
+    doesn't know; a workspace with docs or reserved doc revision numbers, until docs export ships
+    with docs (M2).
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
     from the working directory, and an unexpanded `~` is refused. Export replaces
     `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous
