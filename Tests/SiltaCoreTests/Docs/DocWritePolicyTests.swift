@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 import SiltaTestSupport
+import Synchronization
 import Testing
 
 @testable import SiltaCore
@@ -25,11 +26,11 @@ struct DocWritePolicyTests {
     DocEditRequest(slug: slug, title: "Rules", about: ["service:push"])
   }
 
-  static func seed(_ store: DatabaseStore, body: String = "Original") throws {
+  static func seed(_ store: DatabaseStore, body: String = "Original", seed: UInt64 = 82) throws {
     var draft = DocDraft(slug: "rules", body: body)
     draft.title = "Rules"
     draft.about = ["service:push"]
-    _ = try DocStoreTests.accept(draft, in: store, ids: SeededIDGenerator(seed: 82))
+    _ = try DocStoreTests.accept(draft, in: store, ids: SeededIDGenerator(seed: seed))
   }
 
   static func refusal(_ code: ErrorCode, _ operation: () async throws -> Void) async {
@@ -147,7 +148,7 @@ struct DocWritePolicyTests {
       await Self.refusal(.conflict) {
         _ = try await Self.service(home, store).edit(request) {
           if change == "creation" || change == "same-body" {
-            try Self.seed(store, body: Self.secret)
+            try Self.seed(store, body: Self.secret, seed: 83)
           } else if let statement = sql[change] {
             try store.write { try $0.database.execute(sql: statement) }
           }
@@ -217,7 +218,7 @@ struct DocWritePolicyTests {
       var initial = DocVerificationPreparationTests.draft(["app:api"])
       initial.slug = "rules"
       _ = try DocStoreTests.accept(initial, in: store, ids: SeededIDGenerator(seed: 82))
-      var committed: [[String]] = []
+      let committed = Mutex<[[String]]>([])
       let git = ScriptedGitRunner(
         script: [
           (
@@ -233,7 +234,8 @@ struct DocWritePolicyTests {
           } else {
             try store.write { _ in }
           }
-          committed = try DocVerificationPreparationTests.truth(store)
+          let truth = try DocVerificationPreparationTests.truth(store)
+          committed.withLock { $0 = truth }
         })
       var request = DocEditRequest(slug: "rules")
       request.keepBody = keep

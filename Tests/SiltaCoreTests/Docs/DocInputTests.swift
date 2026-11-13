@@ -4,10 +4,10 @@ import Testing
 @testable import SiltaCore
 
 @Suite struct DocInputTests {
-  @Test(arguments: [
-    "", String(repeating: "a", count: 65_536), String(repeating: "é", count: 32_768),
-  ])
-  func boundedShortReadsPreserveLiteralUtf8(text: String) throws {
+  @Test(arguments: [0, 1, 2])
+  func boundedShortReadsPreserveLiteralUtf8(example: Int) throws {
+    let text = ["", String(repeating: "a", count: 65_536), String(repeating: "é", count: 32_768)][
+      example]
     var bytes = Data(text.utf8)
     let result = try DocInput.read { maximum in
       let chunk = bytes.prefix(min(maximum, 7))
