@@ -46,7 +46,7 @@ struct DocVerificationPreparationTests {
       arguments: [
         "--no-pager", "-c", "format.pretty=medium", "rev-parse", "--verify", "--quiet",
         "--end-of-options", ref + "^{commit}",
-      ], directory: repo)
+      ], directory: URL(filePath: repo.path, directoryHint: .isDirectory))
   }
 
   static func result(_ sha: String) -> Result<GitResult, any Error> {
@@ -110,6 +110,7 @@ struct DocVerificationPreparationTests {
   @Test func capturedSelectionSurvivesTwoAppABAAndGitRunsOutsideWrite() async throws {
     try await withScratchDirectory { home in
       let (store, repo) = try Self.setup(home)
+      let alternative = repo.deletingLastPathComponent().appending(path: "acme-detached").path
       let git = ScriptedGitRunner(
         script: [
           (Self.request("origin/api", repo: repo), Self.result(Self.apiSHA)),
@@ -121,6 +122,8 @@ struct DocVerificationPreparationTests {
           try store.write {
             try $0.database.execute(
               sql: "UPDATE app SET ref=? WHERE slug='mobile'", arguments: [ref])
+            try $0.database.execute(
+              sql: "UPDATE repo_path SET path=?", arguments: [first ? alternative : repo.path])
           }
         })
       let prepared = try await DocVerification.prepare(
@@ -128,6 +131,8 @@ struct DocVerificationPreparationTests {
         environment: Self.environment(home, store: store, git: git))
       #expect(prepared.snapshots.map(\.ref) == ["origin/api", "origin/mobile"])
       #expect(git.isExhausted)
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == repo.path)
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT ref FROM app WHERE slug='mobile'") }
           == "origin/mobile")
@@ -147,6 +152,7 @@ struct DocVerificationPreparationTests {
           environment: Self.environment(home, store: store, git: git))
       }
       #expect(try Self.truth(store) == before)
+      #expect(git.isExhausted)
       try store.write { try $0.database.execute(sql: "DELETE FROM repo_path") }
       let absent = try Self.truth(store)
       let idle = ScriptedGitRunner(script: [])

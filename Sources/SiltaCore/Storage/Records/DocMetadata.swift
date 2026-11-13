@@ -1,19 +1,20 @@
 import Foundation
 import GRDB
 
-extension DocStore {
-  struct Metadata {
-    let title: String
-    let kind: String
-    let refs: [String]
-    let targets: [TaskLinkTarget]
-  }
+struct DocMetadata {
+  let title: String
+  let kind: String
+  let refs: [String]
+  let targets: [TaskLinkTarget]
 
-  func metadata(_ draft: DocDraft, old: Row?) throws -> Metadata {
+  static func resolve(_ draft: DocDraft, workspace: Int64, in db: Database) throws -> Self {
+    let old = try Row.fetchOne(
+      db, sql: "SELECT * FROM doc WHERE workspace_id=? AND slug=?",
+      arguments: [workspace, draft.slug])
     guard WorkspaceConfig.isValidIdentifier(draft.slug) else {
       throw DocError.invalid("Use an identifier for the doc slug.")
     }
-    let accepted = try hasAcceptedRevision(old)
+    let accepted = try hasAcceptedRevision(old, in: db)
     if !accepted {
       var missing: [String] = []
       if draft.title == nil { missing.append("--title") }
@@ -25,23 +26,31 @@ extension DocStore {
     guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw DocError.invalid("--title must not be empty.")
     }
+    guard title.count <= 120, !title.unicodeScalars.contains(where: CharacterSet.newlines.contains)
+    else {
+      throw DocError.invalid("--title must be one line of at most 120 characters.")
+    }
     if let kind = draft.kind, !["contract", "flow", "runbook", "reference"].contains(kind) {
       throw DocError.invalid("Use contract, flow, runbook or reference for --kind.")
     }
     let previous =
-      try old.map { try attachments($0["id"]).map { try TaskLinkTarget.render($0, in: db) } } ?? []
+      try old.map {
+        try DocStore.attachments($0["id"], workspace: workspace, in: db).map {
+          try TaskLinkTarget.render($0, in: db)
+        }
+      } ?? []
     let refs = Array(Set(draft.about ?? previous)).sorted()
     guard !refs.isEmpty else {
       throw DocError.invalid("A doc needs at least one --about map item.")
     }
     let targets = try refs.map { try TaskLinkTarget.map($0, workspace: workspace, in: db) }
     let previousKind: String? = accepted ? old?["kind"] : nil
-    return Metadata(
+    return Self(
       title: title, kind: draft.kind ?? previousKind ?? Self.inferredKind(targets),
       refs: refs, targets: targets)
   }
 
-  private func hasAcceptedRevision(_ old: Row?) throws -> Bool {
+  private static func hasAcceptedRevision(_ old: Row?, in db: Database) throws -> Bool {
     guard let old, let revision: Int = old["current_rev"] else { return false }
     guard
       try Bool.fetchOne(

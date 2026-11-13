@@ -13,7 +13,7 @@ struct DocStore {
 
   func accept(_ draft: DocDraft) throws -> DocRevision {
     let old = try find(draft.slug)
-    let metadata = try metadata(draft, old: old)
+    let metadata = try DocMetadata.resolve(draft, workspace: workspace, in: db)
     let stamp = utcTimestamp(at)
     let id = try docID(draft, metadata: metadata, old: old, stamp: stamp)
     let number = try nextRevision(id, slug: draft.slug)
@@ -90,7 +90,7 @@ struct DocStore {
     return Int(try transaction.nextSequence(scope: scope))
   }
 
-  private func docID(_ draft: DocDraft, metadata: Metadata, old: Row?, stamp: String) throws
+  private func docID(_ draft: DocDraft, metadata: DocMetadata, old: Row?, stamp: String) throws
     -> Int64
   {
     if let old { return old["id"] }
