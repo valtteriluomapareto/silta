@@ -133,6 +133,18 @@ struct TaskLinkTarget {
         next: ["silta task link --help"])
     }
     _ = try TaskService.entity("app", slug: String(owner[0]), workspace: workspace, in: db)
+    _ = try storedCodeApp(value)
+    return Self(kind: "code", external: value)
+  }
+
+  /// Checks an already-classified code payload without resolving a historical app.
+  static func storedCodeApp(_ value: String) throws -> String {
+    guard let colon = value.firstIndex(of: ":") else {
+      throw TaskError.invalid("Invalid code reference.")
+    }
+    let owner = value[..<colon].split(
+      separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+    guard !owner[0].isEmpty else { throw TaskError.invalid("Invalid code reference.") }
     if owner.count == 2 && owner[1].isEmpty {
       throw TaskError.invalid("A code branch cannot be empty.")
     }
@@ -145,7 +157,7 @@ struct TaskLinkTarget {
       throw TaskError.invalid("Use an app-relative code path and optional #L<first>[-<last>].")
     }
     if target.count == 2 { try lines(String(target[1]), maximum: nil) }
-    return Self(kind: "code", external: value)
+    return String(owner[0])
   }
 
   private static func lineCount(_ text: String) -> Int {

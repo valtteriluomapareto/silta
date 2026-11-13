@@ -43,7 +43,7 @@ extension ExportSnapshot {
     }
     return Self(
       schema: schema, workspace: workspace, sections: sections, tasks: tasks,
-      links: try rows(Query.links, ExportFormat.linkKeys),
+      links: try rows(ExportLinks.query, ExportFormat.linkKeys),
       aliasDecisions: try rows(Query.aliasDecisions, ExportFormat.aliasDecisionKeys),
       approvals: try rows(Query.approvals, ExportFormat.approvalKeys, slug))
   }
@@ -144,29 +144,7 @@ private enum Query {
     """,
   ]
 
-  private static func uid(of column: String, kind: String) -> String {
-    """
-    CASE l.\(kind)
-      WHEN 'task' THEN (SELECT uid FROM task WHERE id=l.\(column))
-      WHEN 'task_plan_rev' THEN
-        (SELECT t.uid FROM task_plan_rev v JOIN task t ON t.id=v.task_id WHERE v.id=l.\(column))
-      WHEN 'comment' THEN (SELECT uid FROM comment WHERE id=l.\(column))
-      WHEN 'app' THEN (SELECT uid FROM app WHERE id=l.\(column))
-      WHEN 'topic' THEN (SELECT uid FROM topic WHERE id=l.\(column))
-    END
-    """
-  }
-
-  static let links = """
-    SELECT l.uid, l.from_kind, \(uid(of: "from_id", kind: "from_kind")) AS "from", l.rel,
-      l.to_kind, \(uid(of: "to_id", kind: "to_kind")) AS "to",
-      CASE WHEN l.to_kind='task_plan_rev' THEN (SELECT rev FROM task_plan_rev WHERE id=l.to_id)
-      END AS to_rev,
-      l.to_ext, l.created_by, l.created_at, l.anchor
-    FROM link l WHERE l.workspace_id=? ORDER BY l.id
-    """
-
-  /// A link end format 1 can't name by uid: a doc, or a kind it doesn't know.
+  /// A link end the public exporter cannot represent.
   static let unsupportedLink = """
     SELECT from_kind FROM link WHERE workspace_id=? AND from_kind NOT IN ('task','comment')
     UNION ALL
