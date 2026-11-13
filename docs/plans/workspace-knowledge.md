@@ -337,3 +337,9 @@ Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A
   compatibility rule. Only newly created identities require identifiers. The
   schema migration raises the writer floor; enabling reserved app creation rules
   and typed map targets requires another floor raise within K1 before K2–K4 start.
+
+- **Decision evidence and restore allocation (2026-11-13).** The maintainer accepted
+  nullable `triaged_at`/`triaged_by` before the parallel slices. Historical and
+  direct revisions remain unknown; proposal triage stores both with the decision.
+  Doc revision allocations never rewind across older restores, including names
+  absent from that snapshot. Comment counters follow the existing restore rule.

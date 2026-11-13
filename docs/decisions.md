@@ -706,3 +706,18 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   existing implicit values, including reserved app names and explicit branches,
   without rewriting storage. The explicit-prefix requirement applies to generic
   reference input.
+
+- **D46: Keep explicit doc proposal decision evidence.** Nullable `triaged_at` and
+  `triaged_by` distinguish a known proposal decision from a direct accepted edit
+  or unknown history. Triage writes both with the terminal state; the proposer and
+  creation time remain unchanged. Neither unrelated verification timestamps nor
+  user comments establish that evidence. Both NULL means unknown/not triaged;
+  restore rejects a half-populated pair. The maintainer accepted this on 2026-11-13.
+  The additive migration retains writer floor 6 (D32).
+
+- **D47: Doc revision allocations survive older restores.** The maintainer accepted
+  non-rewinding public doc revision numbers on 2026-11-13. Restore preserves the
+  higher allocation floor from retained history/reservations and the incoming tree,
+  including reservations for absent doc names. Comment counters retain the existing
+  restore rule; missing comment numbers may be reused. This does not prevent an
+  explicitly approved restore from replacing the snapshot's content.
