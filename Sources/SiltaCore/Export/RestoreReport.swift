@@ -95,6 +95,7 @@ package struct RestoreReport: Encodable, Equatable, Sendable {
   package var presented: Self {
     var report = self
     report.workspace = SecretGuard.redacted(workspace)
+    report.snapshot = snapshot.map(SecretGuard.redacted)
     report.removedDocs = removedDocs.map(SecretGuard.redacted)
     report.changedDocs = changedDocs.map(SecretGuard.redacted)
     return report
@@ -175,18 +176,20 @@ extension RestoreReport {
   private static func documentChanges(_ current: ExportSnapshot?, _ tree: ExportSnapshot)
     -> (removed: [String], changed: [String])
   {
+    guard let current else { return ([], []) }
     let incoming = Dictionary(
       tree.documents.documents.map { (Data(($0.row.value("uid") ?? "").utf8), $0) }
     ) { first, _ in first }
     var removed: [String] = []
     var changed: [String] = []
-    for document in current?.documents.documents ?? [] {
+    for document in current.documents.documents {
       guard let replacement = incoming[Data((document.row.value("uid") ?? "").utf8)] else {
         removed.append("doc:" + document.slug)
         continue
       }
       if replacement.row != document.row || replacement.records != document.records
         || !replacement.slug.utf8.elementsEqual(document.slug.utf8)
+        || documentLinks(document, in: current) != documentLinks(replacement, in: tree)
       {
         changed.append("doc:" + replacement.slug)
       }
@@ -194,6 +197,23 @@ extension RestoreReport {
     return (
       removed.sorted(by: ExportSnapshot.byteOrder), changed.sorted(by: ExportSnapshot.byteOrder)
     )
+  }
+
+  private static func documentLinks(_ document: ExportDocument, in tree: ExportSnapshot)
+    -> [ExportRow]
+  {
+    let uid = Data((document.row.value("uid") ?? "").utf8)
+    let comments = Set(
+      document.records.compactMap { row -> Data? in
+        guard row.value("table") == "comment", let uid = row.value("uid") else { return nil }
+        return Data(uid.utf8)
+      })
+    return tree.links.filter { link in
+      guard let owner = link.value("from") else { return false }
+      let source = Data(owner.utf8)
+      return (link.value("from_kind") == "doc" && source == uid)
+        || (link.value("from_kind") == "comment" && comments.contains(source))
+    }
   }
 
   /// The task refs before and after, each with its own workspace's prefix: the counter
