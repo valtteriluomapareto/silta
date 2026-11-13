@@ -72,6 +72,8 @@ struct DocDiscussionReadCommandTests {
       let encoded = try run(["show", "doc:rules@3", "--diff"], scratch)
       #expect(!encoded.stdout.contains("private123"))
       #expect(encoded.stdout.contains("[REDACTED:password]"))
+      #expect(encoded.stdout.contains("@@ -3,1 +3,1 @@"))
+      #expect(!encoded.stdout.contains("-title:"))
     }
   }
 

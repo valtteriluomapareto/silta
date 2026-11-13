@@ -5,10 +5,3 @@ package struct DocReadResult: Encodable, Sendable {
   /// Rendered metadata and content, with complete continuations when clipped.
   package let output: String
 }
-
-struct DocReadSelection {
-  let revision: DocRevision?
-  let archived: Bool
-  let pending: [Int]
-  let pendingCount: Int
-}

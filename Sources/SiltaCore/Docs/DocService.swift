@@ -11,34 +11,35 @@ package struct DocService {
     self.store = store
   }
 
-  /// Reads a current or explicit revision, masking before rendered-line selection.
-  package func show(_ ref: String, revision: Int? = nil, lines: String? = nil) throws
-    -> DocReadResult
-  {
-    let selection = try Self.selection(ref, revision: revision)
+  /// Reads a stored body, recorded-base diff or comments, masking before line selection.
+  package func show(
+    _ ref: String, revision: Int? = nil, lines: String? = nil, diff: Bool = false,
+    comments: Bool = false, offset: Int? = nil, limit: Int? = nil
+  ) throws -> DocReadResult {
+    let request = try DocReadView.parse(
+      ref, diff: diff, comments: comments, offset: offset, limit: limit)
+    let selection = try Self.selection(request.ref, revision: revision)
     let range = try Self.lineRange(lines)
     do {
-      let stored = try read(selection.slug, revision: selection.revision)
-      guard let snapshot = stored.revision else {
-        return DocReadResult(
-          ref: "doc:" + selection.slug,
-          output: "No accepted revision for doc:\(selection.slug).\n"
-            + "Pending revisions (\(stored.pendingCount)):\n"
-            + stored.pending.map { "doc:\(selection.slug)@\($0)\n" }.joined()
-            + (stored.pendingCount > stored.pending.count ? "next: " + listCommand + "\n" : ""))
-      }
-      let pinned = "doc:\(snapshot.slug)@\(snapshot.revision)"
-      let state = snapshot.state + (stored.archived ? ", archived" : "")
-      let text =
-        "\(pinned) [\(state)]\n"
-        + "title: \(snapshot.title ?? "(unknown)")\nkind: \(snapshot.kind ?? "(unknown)")\n"
-        + "about: \(Self.about(snapshot.about))\nactor: \(snapshot.actor)\n"
-        + "created_at: \(snapshot.createdAt)\n\n\(snapshot.body)"
+      let result = try read(selection.slug, revision: selection.revision, view: request.view)
       return DocReadResult(
-        ref: pinned, output: bounded(SecretGuard.redacted(text), ref: pinned, range: range))
+        ref: result.ref,
+        output: bounded(
+          SecretGuard.redacted(result.output),
+          command: showCommand(result.ref) + request.view.flags,
+          range: range))
     } catch let error as DocError {
       throw CommandFailure(error: error, next: [listCommand])
     }
+  }
+
+  func body(_ snapshot: DocRevision, archived: Bool) -> String {
+    let pinned = "doc:\(snapshot.slug)@\(snapshot.revision)"
+    let state = snapshot.state + (archived ? ", archived" : "")
+    return "\(pinned) [\(state)]\n"
+      + "title: \(snapshot.title ?? "(unknown)")\nkind: \(snapshot.kind ?? "(unknown)")\n"
+      + "about: \(Self.about(snapshot.about))\nactor: \(snapshot.actor)\n"
+      + "created_at: \(snapshot.createdAt)\n\n\(snapshot.body)"
   }
 
   var listCommand: String { workspaceCommand("silta doc ls", workspace: workspace) }
@@ -67,20 +68,20 @@ package struct DocService {
     return String(text.prefix(120)) + " [\(text.count - 120) characters omitted]"
   }
 
-  private func bounded(_ text: String, ref: String, range: ClosedRange<Int>?) -> String {
+  private func bounded(_ text: String, command: String, range: ClosedRange<Int>?) -> String {
     var lines = text.components(separatedBy: "\n")
     if lines.last == "" { lines.removeLast() }
     let first = range?.lowerBound ?? 1
     let last = min(range?.upperBound ?? lines.count, lines.count)
     guard first <= last else {
       return "Document has \(lines.count) rendered lines; selection is past the end.\n"
-        + "next: " + showCommand(ref) + "\n"
+        + "next: " + command + "\n"
     }
     let count = last - first + 1
     let shown = min(count, count > 400 ? 399 : 400)
     let output = lines.dropFirst(first - 1).prefix(shown).joined(separator: "\n") + "\n"
     guard shown < count else { return output }
-    return output + "\(count - shown) lines omitted; next: " + showCommand(ref)
+    return output + "\(count - shown) lines omitted; next: " + command
       + " --lines \(first + shown)-\(last)\n"
   }
 
