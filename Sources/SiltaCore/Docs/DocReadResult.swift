@@ -6,13 +6,6 @@ package struct DocReadResult: Encodable, Sendable {
   package let output: String
 }
 
-struct DocReadSelection {
-  let revision: DocRevision?
-  let archived: Bool
-  let pending: [Int]
-  let pendingCount: Int
-}
-
 extension DocReadResult {
   init(masking ref: String, output: String) {
     self.ref = SecretGuard.redacted(ref)

@@ -721,3 +721,16 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   including reservations for absent doc names. Comment counters retain the existing
   restore rule; missing comment numbers may be reused. This does not prevent an
   explicitly approved restore from replacing the snapshot's content.
+
+- **D48: Preserve an accepted doc body explicitly during metadata edits.** The
+  maintainer chose `--keep-body` on 2026-11-13. An edit supplies either new UTF-8
+  input or this explicit preservation request, never both. Preservation requires
+  an accepted revision, including for an archived document, and copies its owned
+  body literally without revealing it in output or applying a new-input limit or
+  secret scan retroactively. Changed metadata retains its normal validation and
+  secret policy. Each save creates a revision. Concurrent changes to the document,
+  accepted revision, preserved content or target identities refuse the edit.
+  This supports reattachment when the original file is gone or contains allowed
+  secrets that masked reads cannot reconstruct. Private Core policy establishes
+  this boundary; the CLI command, help and removal recovery ship together with
+  their public contract updates.
