@@ -2,8 +2,8 @@ import ArgumentParser
 
 struct DocCommand: ParsableCommand {
   static let configuration = CommandConfiguration(
-    commandName: "doc", abstract: "Read stored documents and their revisions.",
-    subcommands: [DocShowCommand.self, DocListCommand.self])
+    commandName: "doc", abstract: "Read and edit stored documents.",
+    subcommands: [DocShowCommand.self, DocListCommand.self, DocEditCommand.self])
 
   @OptionGroup(title: "Global Options") var global: GlobalOptions
 }
