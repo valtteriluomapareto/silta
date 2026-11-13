@@ -1538,7 +1538,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     links.jsonl, alias_decisions.jsonl, approvals.jsonl
   ```
 
-  **Format 1** (the contract restore reads):
+  **Formats 1 and 2** (the contracts restore reads):
+  - New exports use format 2. The reader preserves the exact canonical format-1
+    representation, including the schema named by an older tree. Format 2 always
+    includes `doc_revision_allocations.jsonl` and `doc_comment_sequences.jsonl`,
+    even when empty. Their record counts and the doc/revision/verification counts
+    are present in the manifest; format 1 does not add these files or count keys.
+    Exports and restores refuse document data and reserved revision history.
   - **Values.** Every value is a double-quoted string, integers in decimal; a NULL
     column is left out. Only `"`, `\`, controls (U+0000–U+001F, U+007F–U+009F),
     U+2028, U+2029, U+FEFF, U+FFFE and U+FFFF are escaped: `\"`, `\\`, `\n`, `\r`,
@@ -1590,7 +1596,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
     from the working directory, and an unexpanded `~` is refused. Export replaces
     `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous
-    export: a format 1 manifest naming the workspace, and no file it doesn't list
+    export: a supported-format manifest naming the workspace, and no file it doesn't list
     (`.DS_Store` aside; listed files may be missing). Anything else is refused for the
     human to decide. A target that overlaps a registered repo is refused, so workspace
     data never lands in a code repo. Exports are serialised, each reading its

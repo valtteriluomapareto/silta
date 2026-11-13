@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct ExportServiceTests {
@@ -36,7 +37,7 @@ struct ExportServiceTests {
       let first = try Self.export(store, home, to: root)
       let target = root.appending(path: "acme")
       #expect(first.workspace == "acme")
-      #expect(first.files == 9)
+      #expect(first.files == 11)
       #expect(URL(filePath: first.path).standardizedFileURL == target.standardizedFileURL)
       ExportTreeTests.expectSame(try Self.tree(target), try ExportTreeTests.golden("acme"))
       try DatabaseQueue(path: store.path).write {

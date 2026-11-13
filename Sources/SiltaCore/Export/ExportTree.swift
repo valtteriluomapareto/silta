@@ -1,7 +1,7 @@
 package import Foundation
 package import GRDB
 
-/// Format 1 of the export tree (spec §15): rendering from the database and the strict
+/// Canonical export trees (spec §15): rendering from the database and the strict
 /// reader that accepts only what rendering writes.
 package enum ExportTree {
   /// The workspace's tree, path to bytes. Throws `ExportError` or `StorageError`.
@@ -41,7 +41,8 @@ package enum ExportTree {
       }
       .sorted { Int($0.row.value("seq") ?? "") ?? 0 < Int($1.row.value("seq") ?? "") ?? 0 }
     let snapshot = ExportSnapshot(
-      schema: manifest.schema, workspace: workspace, sections: sections, tasks: tasks,
+      format: manifest.format, schema: manifest.schema, workspace: workspace, sections: sections,
+      tasks: tasks,
       links: try reader.jsonl(ExportFormat.linksFile, keys: ExportFormat.linkKeys),
       aliasDecisions: try reader.jsonl(
         ExportFormat.aliasDecisionsFile, keys: ExportFormat.aliasDecisionKeys),
@@ -61,6 +62,7 @@ package enum ExportTree {
 
 /// The parts of `manifest.json` the reader and the target check need.
 struct ExportManifest {
+  var format: String
   var schema: String
   var workspace: String
   var files: [String: String]
@@ -72,13 +74,20 @@ struct ExportManifest {
       let object = parsed as? [String: Any],
       let format = object["format"] as? String
     else { throw ExportTree.invalid("manifest.json is not a format manifest") }
-    guard format == ExportFormat.version else {
-      throw ExportTree.invalid("format \(format) is not format \(ExportFormat.version)")
+    if !format.isEmpty, !format.hasPrefix("0"),
+      format.utf8.allSatisfy({ (0x30...0x39).contains($0) }),
+      format.utf8.count > ExportFormat.version.utf8.count || format > ExportFormat.version
+    {
+      throw ExportError.newerFormat
+    }
+    guard ["1", "2"].contains(format) else {
+      throw ExportTree.invalid("format \(format) is not a supported format (1 or 2)")
     }
     guard let schema = object["schema"] as? String,
       let workspace = object["workspace"] as? String,
       let list = object["files"] as? [[String: String]]
     else { throw ExportTree.invalid("manifest.json is not a format manifest") }
+    self.format = format
     self.schema = schema
     self.workspace = workspace
     files = Dictionary(list.map { ($0["path"] ?? "", $0["sha256"] ?? "") }) { first, _ in first }
