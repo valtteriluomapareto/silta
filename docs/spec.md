@@ -1021,6 +1021,21 @@ JSON success data is `{ref,archived,changed}`; text says accepted and quiet prin
 the immutable revision ref. Missing creation fields recover together in a body-free
 edit retry. Unsafe identities/scopes use the protected read hubs described above.
 
+`doc archive <slug|doc:slug>` is human-only, removes live about links and retains
+history, comments, verification evidence and revision allocations. It runs no Git
+and creates no revision. An already archived doc without live links is a true no-op,
+with no doc/approval change and an unused-approval warning when appropriate;
+residual links are a real cleanup mutation. JSON uses `{ref,archived,changed}`.
+Missing docs recover through a protected scoped doc list.
+
+Map removal conflicts prepare one human-owned `doc edit --keep-body` command per
+active accepted doc, preserving every surviving live attachment and requiring an
+explicit replacement ref, then show the workspace. Add the replacement map item
+first, replay the complete reattachments, inspect the map and retry removal.
+Owned bodies remain literal even if their original file is gone or secret-bearing.
+Unsafe identities/scopes/retained refs use agent-owned inspection fallbacks without
+write flags. Legacy encoded ref diagnostics are inspected decoded once for masking.
+
 The following document write and review design is planned:
 
 - Bodies are markdown with `[[ref]]` links (§5.1), parsed into `link` rows when a
@@ -1029,7 +1044,7 @@ The following document write and review design is planned:
 - **Accept:** `silta doc accept <slug> <rev>` refuses (exit 6) if `base_rev` isn't the
   current revision; `--rebase` opens a 3-way merge in `$EDITOR`, or takes the merged
   text with `-F <file>`. Reject with `doc reject`.
-- `silta doc verify <slug>` stamps `verified_at`. `doc archive` hides a doc.
+- `silta doc verify <slug>` stamps `verified_at`.
 - Writing rule (shown in `doc new` templates): point at code, don't copy it.
 - Renaming a slug adds the old one to `previous_slugs`, so old `[[doc:…]]` links keep
   resolving and `verify` suggests updating them.
@@ -1965,7 +1980,7 @@ silta doc propose [M2]
 silta doc accept [M2]
 silta doc reject [M2]
 silta doc verify [M2]
-silta doc archive [M2]
+silta doc archive
 
 # maintenance
 silta export

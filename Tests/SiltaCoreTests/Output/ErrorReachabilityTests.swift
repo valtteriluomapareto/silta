@@ -72,7 +72,13 @@ extension WorkspaceError: ErrorExamples {
     [
       .invalid(["line 1: expected a mapping"]), .notFound, .unknown("acme-two"),
       .ambiguous(["acme", "beta"]), .conflict,
-      .docAttachments(workspace: "acme", item: "service:push", docs: ["doc:push-rules"]),
+      .docAttachments(
+        workspace: "acme", item: "service:push", docs: ["doc:push-rules"],
+        commands: [
+          "silta --ws 'acme' doc edit 'doc:push-rules' --keep-body --about <replacement-ref>"
+            + " --approved \"<the human's words>\"",
+          "silta --ws 'acme' ws show",
+        ], nextBy: .human),
       .editor, .input, .setting("acme", key: "review_gate", value: "\"robot\""),
       .unknownSetting("acme", key: "review_gate", value: "\"future\""),
     ]

@@ -1,2 +1,3 @@
 error: Cannot remove service:push; attached docs: doc:push-rules. Reattach the docs before removing this item. [conflict]
-next: silta --ws 'acme' ws show
+ask human: silta --ws 'acme' doc edit 'doc:push-rules' --keep-body --about <replacement-ref> --approved "<the human's words>"
+ask human: silta --ws 'acme' ws show
