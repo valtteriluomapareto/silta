@@ -92,6 +92,11 @@ struct RestoreDocumentGraphTests {
     .init(testDescription: "duplicate link identity") { t, _ in
       t.links.append(t.links[0].replacing("uid", with: "another", keys: ExportFormat.linkKeys))
     },
+    .init(testDescription: "empty anchor aliases absent anchor") { t, _ in
+      let duplicate = t.links[0].replacing("uid", with: "another", keys: ExportFormat.linkKeys)
+        .replacing("anchor", with: "", keys: ExportFormat.linkKeys)
+      t.links.append(duplicate)
+    },
     .init(testDescription: "invalid historical about array") { _, d in
       RestoreDocumentGraphFixture.record(&d, 1, "about_refs", "{}")
     },
