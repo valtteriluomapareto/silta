@@ -84,6 +84,7 @@ extension DocError: ErrorExamples {
     [
       .missing(["--title", "--about"]),
       .invalid("A doc needs at least one --about map item."), .notFound("missing"),
+      .changed(workspace: "acme"),
     ]
   }
 }
