@@ -1,10 +1,12 @@
-import Foundation
+package import Foundation
 
 /// Bounded, strict UTF-8 supplied document input. Retained bodies do not pass this loader.
-enum DocInput {
-  static let maximumBytes = 64 * 1024
+package enum DocInput {
+  /// The fixed supplied-input byte limit, before and after redaction.
+  package static let maximumBytes = 64 * 1024
 
-  static func read(nextBytes: (Int) throws -> Data?) throws -> String {
+  /// Reads at most limit+1 bytes across short reads and refuses oversized or invalid UTF-8.
+  package static func read(nextBytes: (Int) throws -> Data?) throws -> String {
     var bytes = Data()
     while let chunk = try nextBytes(maximumBytes + 1 - bytes.count), !chunk.isEmpty {
       bytes.append(chunk)
