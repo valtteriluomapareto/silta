@@ -117,8 +117,8 @@ struct DocVerificationPreparationTests {
           (Self.request("origin/mobile", repo: repo), Self.result(Self.mobileSHA)),
         ],
         beforeRequest: { request in
-          let ref =
-            request.arguments.contains("origin/api^{commit}") ? "origin/changed" : "origin/mobile"
+          let first = request.arguments.contains("origin/api^{commit}")
+          let ref = first ? "origin/changed" : "origin/mobile"
           try store.write {
             try $0.database.execute(
               sql: "UPDATE app SET ref=? WHERE slug='mobile'", arguments: [ref])
