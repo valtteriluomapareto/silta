@@ -28,7 +28,7 @@ struct DocAuditMigrationTests {
   }
 
   @Test func fixtureIsGenuineV6WithAllLegacyStates() throws {
-    try DatabaseQueue(path: Self.fixture.path).read { db in
+    try DatabaseQueue(path: Self.fixture.path).read { (db: Database) throws in
       #expect(
         try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid")
           == ["v1", "v2", "v3", "v4", "v5", "v6"])
@@ -47,7 +47,8 @@ struct DocAuditMigrationTests {
     try withScratchDirectory { home in
       let source = version == 4 ? DocsMigrationTests.fixture : Self.fixture
       let store = try Self.copy(source, to: home)
-      let tables = ["doc", "doc_rev", "link", "comment", "seq_counter", "task", "workspace"]
+      var tables = ["doc", "doc_rev", "link", "comment", "seq_counter", "task", "workspace"]
+      if version == 6 { tables.append("doc_verification") }
       let columns = try tables.map { try Self.columns(store.path, table: $0) }
       let before = try zip(tables, columns).map {
         try Self.rows(store.path, table: $0, columns: $1)
