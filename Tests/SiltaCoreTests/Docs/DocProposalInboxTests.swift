@@ -89,7 +89,8 @@ struct DocProposalInboxTests {
       #expect(result.count == 2 && result.map(\.total) == [1, 1])
       if mode == "redacted" {
         #expect(result[0].ref == result[1].ref)
-        #expect(result.allSatisfy { $0.members.first?.read == "silta --ws 'acme' doc ls" })
+        #expect(
+          result.allSatisfy { $0.members.first?.read == "silta --ws 'acme' doc ls --archived" })
       } else {
         #expect(result.map(\.ref) == ["doc:second", "doc:rules"])
       }

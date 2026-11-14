@@ -79,7 +79,7 @@ extension DocProposalInboxTests {
           sql: "UPDATE doc SET slug=?", arguments: [String(repeating: "r", count: 600)])
       }
       let group = try #require(try preview(store, workspace: scope).first)
-      let hub = scope == "acme" ? "silta --ws 'acme' doc ls" : "silta ws ls"
+      let hub = scope == "acme" ? "silta --ws 'acme' doc ls --archived" : "silta ws ls"
       #expect(group.next == hub && group.members.allSatisfy { $0.read == hub })
       #expect(group.ref.count <= 120 && group.ref.utf8.count <= 512)
       #expect(try replay(hub, home).termination == .exit(0))
@@ -161,8 +161,8 @@ extension DocProposalInboxTests {
       }
       let group = try #require(try preview(store).first)
       #expect(group.ref == "doc:rules tail")
-      #expect(group.next == "silta --ws 'acme' doc ls")
-      #expect(group.members.allSatisfy { $0.read == "silta --ws 'acme' doc ls" })
+      #expect(group.next == "silta --ws 'acme' doc ls --archived")
+      #expect(group.members.allSatisfy { $0.read == "silta --ws 'acme' doc ls --archived" })
     }
   }
 
@@ -179,7 +179,7 @@ extension DocProposalInboxTests {
       let member = try #require(try preview(store).first?.members.first)
       let expected = "silta --ws 'acme' doc show 'doc:\(slug)@4' --diff"
       #expect(expected.utf8.count == bytes)
-      #expect(member.read == (bytes == 512 ? expected : "silta --ws 'acme' doc ls"))
+      #expect(member.read == (bytes == 512 ? expected : "silta --ws 'acme' doc ls --archived"))
       #expect(try replay(member.read, home).termination == .exit(0))
     }
   }
@@ -201,9 +201,7 @@ extension DocProposalInboxTests {
       for command in [try #require(group.next), try #require(group.members.first?.read)] {
         let result = try replay(command, home)
         #expect(result.termination == .exit(0))
-        withKnownIssue("Protected list recovery must include archived pending revisions") {
-          #expect(result.stdout.contains("doc:"))
-        }
+        #expect(result.stdout.contains("doc:"))
       }
     }
   }

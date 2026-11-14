@@ -71,7 +71,7 @@ extension DocProposalInbox {
   private var hub: String {
     guard WorkspaceConfig.isValidIdentifier(workspace), SecretGuard.matches(in: workspace).isEmpty
     else { return "silta ws ls" }
-    let command = workspaceCommand("silta doc ls", workspace: workspace)
+    let command = workspaceCommand("silta doc ls --archived", workspace: workspace)
     return command.utf8.count <= 512 ? command : "silta ws ls"
   }
 
