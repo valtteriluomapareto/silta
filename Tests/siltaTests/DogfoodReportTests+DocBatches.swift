@@ -135,14 +135,15 @@ extension DogfoodReportTests {
 }
 
 extension DogfoodReportTests {
-  @Test func impossibleDocumentBatchTimesDoNotBecomeObservedEvidence() throws {
+  @Test(arguments: [false, true])
+  func impossibleDocumentBatchTimesDoNotBecomeObservedEvidence(withApproval: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
       let tools = try Self.tools(scratch)
       let invalid = "2023-11-14T00:00:60.000Z"
       let log = try Self.line(["command": "silta doc triage", "timestamp": invalid])
       try Self.docLogs(scratch, actors: [], extra: [log])
-      try Self.docApproval(store, at: invalid)
+      if withApproval { try Self.docApproval(store, at: invalid) }
       let report = try Self.docReport(scratch, tools: tools)
       #expect(
         report.contains("Successful doc-triage batches observed in range: 0 human; 0 agent."))
