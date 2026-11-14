@@ -55,8 +55,10 @@ struct DocProposalServiceTests {
     }
   }
 
-  @Test(arguments: [String?.none, "1"])
-  func proposalDefaultsMetadataToCurrentAcceptedEvenWithHistoricalBase(base: String?) throws {
+  @Test(arguments: [String?.none, "1"], [false, true])
+  func proposalDefaultsMetadataToCurrentAcceptedEvenWithHistoricalBase(base: String?, replace: Bool)
+    throws
+  {
     try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       try DocWritePolicyTests.seed(store)
@@ -71,14 +73,18 @@ struct DocProposalServiceTests {
       }
       let before = try DocStoreTests.snapshot(store)
       let result = try Self.service(home, store).propose(
-        DocProposalRequest(slug: "doc:rules", base: base, why: "Share current knowledge."),
+        DocProposalRequest(
+          slug: "doc:rules", title: replace ? "Proposed title" : nil,
+          about: replace ? ["service:push"] : nil, base: base, why: "Share current knowledge."),
         input: { "Proposed body" })
       #expect(result.ref == "doc:rules@3")
       let row = try Self.row(store, revision: 3)
       #expect(
         row["state"] as String == "proposed" && row["base_rev"] as Int? == (base == nil ? 2 : 1))
-      #expect(row["title"] as String == "Current title" && row["kind"] as String == "flow")
-      #expect(row["about_refs"] as String == "[\"app:api\"]")
+      #expect(
+        row["title"] as String == (replace ? "Proposed title" : "Current title")
+          && row["kind"] as String == "flow")
+      #expect(row["about_refs"] as String == (replace ? "[\"service:push\"]" : "[\"app:api\"]"))
       #expect(
         row["body_md"] as String == "Proposed body"
           && row["message"] as String == "Share current knowledge.")
