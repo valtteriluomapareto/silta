@@ -28,10 +28,8 @@ extension DocEvidenceReadCommandTests {
         for json in [false, true] {
           let result = try run(flags, scratch, json: json)
           #expect(result.termination == .exit(0) && result.stderr.isEmpty)
-          withKnownIssue("Stored TEXT must retain its NUL and credential footer before masking") {
-            #expect(!result.stdout.contains("private-acme"))
-            #expect(result.stdout.contains("[REDACTED:private_key]"))
-          }
+          #expect(!result.stdout.contains("private-acme"))
+          #expect(result.stdout.contains("[REDACTED:private_key]"))
         }
       }
       #expect(try truth(store) == before)
