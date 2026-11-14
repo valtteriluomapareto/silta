@@ -1,0 +1,12 @@
+doc:rules@2 [rejected]
+title: Rules
+kind: contract
+about: app:api
+actor: agent:codex:writer
+created_at: 2023-11-15
+source_task: (not recorded)
+triaged_by: (not recorded)
+triaged_at: (not recorded)
+why: (not recorded)
+
+Same body

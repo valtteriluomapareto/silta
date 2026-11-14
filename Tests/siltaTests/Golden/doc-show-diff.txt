@@ -3,14 +3,22 @@ actor: agent:codex:acme
 created_at: 2023-11-15
 --- doc:rules@1
 +++ doc:rules@3
-@@ -1,5 +1,5 @@
+@@ -1,9 +1,9 @@
 -title: Base rules
 -kind: contract
 -about: app:api
+-source_task: (not recorded)
+-triaged_by: (not recorded)
+-triaged_at: (not recorded)
+-why: (not recorded)
 -
 -Base body
 +title: Proposed rules
 +kind: contract
 +about: service:push
++source_task: (not recorded)
++triaged_by: (not recorded)
++triaged_at: (not recorded)
++why: (not recorded)
 +
 +Proposed body

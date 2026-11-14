@@ -35,7 +35,7 @@ struct DocDiscussionReadCommandTests {
       let empty = try run(["show", "doc:rules@3", "--diff"], scratch)
       #expect(empty.termination == .exit(0))
       #expect(
-        empty.stdout.contains("diff against (empty)") && empty.stdout.contains("@@ -0,0 +1,5 @@"))
+        empty.stdout.contains("diff against (empty)") && empty.stdout.contains("@@ -0,0 +1,9 @@"))
       try store.write { try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE rev=3") }
       let missing = try run(["show", "doc:rules@3", "--diff"], scratch, json: true)
       #expect(missing.termination == .exit(2))

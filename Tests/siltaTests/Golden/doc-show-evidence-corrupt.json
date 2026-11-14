@@ -1,0 +1,1 @@
+{"error":{"code":"env","message":"Database is corrupt: SQLite reported corruption or a stored value or reference cannot be read.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

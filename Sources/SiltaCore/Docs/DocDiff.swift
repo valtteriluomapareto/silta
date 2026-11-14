@@ -32,7 +32,8 @@ enum DocDiff {
   private static func lines(_ revision: DocRevision) -> [String] {
     let text =
       "title: \(revision.title ?? "(unknown)")\nkind: \(revision.kind ?? "(unknown)")\n"
-      + "about: \(DocService.about(revision.about))\n\n\(revision.body)"
+      + "about: \(DocService.about(revision.about))\n"
+      + DocService.evidence(revision) + "\n\(revision.body)"
     return SecretGuard.redacted(text).components(separatedBy: "\n")
   }
 }

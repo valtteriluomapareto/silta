@@ -1,0 +1,14 @@
+doc:rules@2 [rejected]
+title: Rules
+kind: contract
+about: app:api
+actor: agent:codex:writer
+created_at: 2023-11-15
+source_task: AC-1
+triaged_by: human:reviewer
+triaged_at: 2023-11-16
+why:
+  Line one
+  Line two
+
+Same body

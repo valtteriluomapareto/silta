@@ -1,0 +1,1 @@
+{"data":{"output":"doc:rules@2 [rejected]\ntitle: Rules\nkind: contract\nabout: app:api\nactor: agent:codex:writer\ncreated_at: 2023-11-15\nsource_task: AC-1\ntriaged_by: human:reviewer\ntriaged_at: 2023-11-16\nwhy:\n  Line one\n  Line two\n\nSame body\n","ref":"doc:rules@2"},"ok":true,"schema":1,"warnings":[]}
