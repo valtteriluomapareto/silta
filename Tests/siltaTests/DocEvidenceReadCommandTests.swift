@@ -117,20 +117,19 @@ struct DocEvidenceReadCommandTests {
       let store = try fixture(scratch)
       let queue = try DatabaseQueue(path: store.path)
       try queue.write {
-        try $0.execute(sql: """
-          ALTER TABLE doc_rev DROP COLUMN triaged_by;
-          ALTER TABLE doc_rev DROP COLUMN triaged_at;
-          DELETE FROM grdb_migrations WHERE identifier='v7';
-          """)
+        try $0.execute(
+          sql: """
+            ALTER TABLE doc_rev DROP COLUMN triaged_by;
+            ALTER TABLE doc_rev DROP COLUMN triaged_at;
+            DELETE FROM grdb_migrations WHERE identifier='v7';
+            """)
       }
       let before = try truth(store)
       for flags in [[], ["--diff"]] {
         let result = try run(flags, scratch)
-        withKnownIssue("SI-119: Existing document reads must tolerate absent decision columns") {
-          #expect(result.termination == .exit(0))
-          #expect(result.stdout.contains("triaged_by: (not recorded)\n"))
-          #expect(result.stdout.contains("triaged_at: (not recorded)\n"))
-        }
+        #expect(result.termination == .exit(0))
+        #expect(result.stdout.contains("triaged_by: (not recorded)\n"))
+        #expect(result.stdout.contains("triaged_at: (not recorded)\n"))
       }
       #expect(try truth(store) == before)
       let migrated = try queue.read {
