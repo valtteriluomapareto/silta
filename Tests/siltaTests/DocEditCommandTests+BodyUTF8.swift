@@ -13,7 +13,7 @@ extension DocEditCommandTests {
     try withScratchDirectory { scratch in
       let store = try AcmeDocAttachments.make(in: scratch)
       let bodies = [
-        "Acme\u{0}tail", "\u{0}é", "é\u{0}",
+        "", "Acme\u{0}tail", "\u{0}é", "é\u{0}",
         "\u{0}" + String(repeating: "é", count: 32_767) + "x",
       ]
       for (index, body) in bodies.enumerated() {
@@ -44,9 +44,7 @@ extension DocEditCommandTests {
               arguments: [index + 1])
           } == "text")
         let stored = try Self.bodyBytes(store, revision: index + 1)
-        withKnownIssue("Supplied valid UTF-8 body must survive SQLite binding after NUL") {
-          #expect(stored == Data(body.utf8))
-        }
+        #expect(stored == Data(body.utf8))
       }
     }
   }
@@ -65,11 +63,9 @@ extension DocEditCommandTests {
         environment: TaskCommandTests.fixed)
       #expect(shown.termination == .exit(0))
       let stored = try Self.bodyBytes(store, revision: 1)
-      withKnownIssue("Allowed body storage must preserve the complete masked credential") {
-        #expect(stored == Data(Self.nulKey.utf8))
-        #expect(
-          shown.stdout.contains("[REDACTED:private_key]") && !shown.stdout.contains("private-acme"))
-      }
+      #expect(stored == Data(Self.nulKey.utf8))
+      #expect(
+        shown.stdout.contains("[REDACTED:private_key]") && !shown.stdout.contains("private-acme"))
       let log = try String(
         contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)
       #expect(!log.contains("private-acme"))
@@ -106,11 +102,9 @@ extension DocEditCommandTests {
         environment: TaskCommandTests.fixed)
       #expect(shown.termination == .exit(0))
       let retained = try Self.bodyBytes(store, revision: 2)
-      withKnownIssue("Retained accepted body must be copied byte-for-byte after NUL") {
-        #expect(retained == Data(body.utf8))
-        #expect(
-          shown.stdout.contains("[REDACTED:private_key]") && !shown.stdout.contains("private-acme"))
-      }
+      #expect(retained == Data(body.utf8))
+      #expect(
+        shown.stdout.contains("[REDACTED:private_key]") && !shown.stdout.contains("private-acme"))
     }
   }
 
@@ -127,11 +121,9 @@ extension DocEditCommandTests {
       let before = try DocEditPreparationCommandTests.truth(store)
       let result = try Self.run(["rules", "--keep-body"], scratch)
       let after = try DocEditPreparationCommandTests.truth(store)
-      withKnownIssue("Corrupt retained bytes must refuse without creating a replacement body") {
-        #expect(result.termination == .exit(9) && result.stderr.isEmpty)
-        Golden.forTests().check(result.stdout, "doc-show-evidence-corrupt.json")
-        #expect(after == before)
-      }
+      #expect(result.termination == .exit(9) && result.stderr.isEmpty)
+      Golden.forTests().check(result.stdout, "doc-show-evidence-corrupt.json")
+      #expect(after == before)
       #expect(try Self.bodyBytes(store, revision: 1) == bytes)
     }
   }

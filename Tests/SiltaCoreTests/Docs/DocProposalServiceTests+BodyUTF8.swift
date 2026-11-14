@@ -11,7 +11,7 @@ extension DocProposalServiceTests {
       let store = try AcmeDocAttachments.make(in: home)
       let service = try Self.service(home, store)
       for (index, body) in [
-        "Acme\u{0}tail", "é\u{0}",
+        "", "Acme\u{0}tail", "é\u{0}",
         "\u{0}" + String(repeating: "é", count: 32_767) + "x",
       ].enumerated() {
         let result = try service.propose(Self.request(), input: { body })
@@ -21,9 +21,7 @@ extension DocProposalServiceTests {
             $0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE rev=?",
             arguments: [index + 1])
         }
-        withKnownIssue("Pending supplied body must retain complete UTF-8 bytes after NUL") {
-          #expect(bytes == Data(body.utf8))
-        }
+        #expect(bytes == Data(body.utf8))
         #expect(
           try store.read {
             try String.fetchOne(
@@ -34,7 +32,7 @@ extension DocProposalServiceTests {
       #expect(
         try store.read {
           try Int.fetchOne($0, sql: "SELECT count(*) FROM doc_rev WHERE state='proposed'")
-        } == 3)
+        } == 4)
       #expect(
         try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM doc_verification") } == 0)
     }
