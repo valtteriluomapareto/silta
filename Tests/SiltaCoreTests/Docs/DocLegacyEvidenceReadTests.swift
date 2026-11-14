@@ -38,7 +38,7 @@ struct DocLegacyEvidenceReadTests {
       #expect(migrations.last == version && !migrations.contains("v5"))
     }
   }
-  private func fixture(_ scratch: URL, version: String) throws -> (DatabaseStore, DatabaseQueue) {
+  func fixture(_ scratch: URL, version: String) throws -> (DatabaseStore, DatabaseQueue) {
     let home = scratch.appending(path: "silta-home")
     try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
     let store = DatabaseStore(
