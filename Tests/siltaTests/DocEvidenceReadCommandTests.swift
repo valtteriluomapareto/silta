@@ -133,9 +133,10 @@ struct DocEvidenceReadCommandTests {
         }
       }
       #expect(try truth(store) == before)
-      try queue.read {
-        #expect(try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations WHERE identifier='v7'") == 0)
+      let migrated = try queue.read {
+        try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations WHERE identifier='v7'")
       }
+      #expect(migrated == 0)
     }
   }
 
