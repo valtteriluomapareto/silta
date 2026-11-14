@@ -173,11 +173,9 @@ extension DogfoodReportTests {
       let report = try Self.docReport(scratch, tools: tools)
       #expect(
         report.contains("Known decisions in range: 1 accepted; 0 rejected; acceptance rate 100%."))
-      withKnownIssue("SI-125: impossible document timestamps must not normalize into evidence") {
-        #expect(report.contains("Decision wait: median n/a; maximum n/a."))
-        #expect(report.contains("Decision waits unavailable: 1."))
-        #expect(report.contains("Invalid document event timestamps: 1; coverage is incomplete."))
-      }
+      #expect(report.contains("Decision wait: median n/a; maximum n/a."))
+      #expect(report.contains("Decision waits unavailable: 1."))
+      #expect(report.contains("Invalid document event timestamps: 1; coverage is incomplete."))
     }
   }
 

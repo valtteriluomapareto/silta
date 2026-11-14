@@ -144,16 +144,14 @@ extension DogfoodReportTests {
       try Self.docLogs(scratch, actors: [], extra: [log])
       try Self.docApproval(store, at: invalid)
       let report = try Self.docReport(scratch, tools: tools)
-      withKnownIssue("SI-125: invalid document batch times must not normalize into observations") {
-        #expect(
-          report.contains("Successful doc-triage batches observed in range: 0 human; 0 agent."))
-        #expect(report.contains("Recorded doc-triage approvals in range: 0."))
-        #expect(report.contains("Observed approvals per successful batch (human + agent): n/a."))
-        #expect(
-          report.contains(
-            "Batch coverage: incomplete; absent, rotated, untagged, unreadable "
-              + "or inconsistent evidence prevents a ratio."))
-      }
+      #expect(
+        report.contains("Successful doc-triage batches observed in range: 0 human; 0 agent."))
+      #expect(report.contains("Recorded doc-triage approvals in range: 0."))
+      #expect(report.contains("Observed approvals per successful batch (human + agent): n/a."))
+      #expect(
+        report.contains(
+          "Batch coverage: incomplete; absent, rotated, untagged, unreadable "
+            + "or inconsistent evidence prevents a ratio."))
     }
   }
 }

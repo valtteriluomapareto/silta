@@ -193,7 +193,11 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   ] as $done |
   ($done | map(select(.friction == "")) | map(.ref)) as $missing |
   def in_range: . != null and . >= $start and . <= $now;
-  def time_or_unknown: try seconds catch null;
+  def time_or_unknown:
+    try (. as $text | seconds as $time |
+      ($text | sub("\\.[0-9]+Z$";"Z")) as $whole |
+      if ($whole|fromdateiso8601|strftime("%Y-%m-%dT%H:%M:%SZ")) == $whole
+      then $time else null end) catch null;
   def paired: .triaged_at != null and .triaged_by != null;
   def terminal: .state == "accepted" or .state == "rejected" or .state == "superseded";
   ($docs[0] | map(. + {born:(.created_at|time_or_unknown), decided:(.triaged_at|time_or_unknown)})) as $documents |
@@ -207,13 +211,15 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   ($documents | map(select(.actor != $actor and terminal and (paired|not) and (.born|in_range))) | length) as $doc_unattributed |
   (([$documents[] | select(.actor != $actor and .born == null)] | length) +
     ([$documents[] | select(paired and .triaged_by != $actor and .decided == null)] | length)) as $doc_invalid |
-  ($logs | map(select(.command == "silta doc triage" and .exit_code == 0 and (stamp|in_range)))) as $doc_batches |
+  ($logs | map(select(.command == "silta doc triage" and .exit_code == 0 and (.timestamp|time_or_unknown|in_range)))) as $doc_batches |
   ($doc_batches | map(select(.actor|startswith("human:"))) | length) as $human_batches |
   ($doc_batches | map(select(.actor|startswith("agent:"))) | length) as $agent_batches |
   ($approvals[0] | map(select(.command == "silta doc triage" or (.command|startswith("silta doc triage "))))) as $doc_approval_rows |
   ($doc_approval_rows | map(select(.created_at|time_or_unknown|in_range)) | length) as $doc_approvals |
   ($oldest != "none" and $oldest <= $since and $unreadable == 0 and
     ([$selected[] | select(.workspace == null and (stamp|in_range))] | length) == 0 and
+    all($own[] | select(type == "object" and .workspace == $ws and .actor != $actor and
+      .command == "silta doc triage"); (.timestamp|time_or_unknown) != null) and
     all($doc_approval_rows[]; (.created_at|time_or_unknown) != null) and
     $doc_approvals == $agent_batches and ($human_batches+$agent_batches) == ($doc_batches|length)) as $batch_covered |
   "# Silta dogfood report", "",
