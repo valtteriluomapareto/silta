@@ -43,8 +43,9 @@ extension DocEditCommandTests {
               $0, sql: "SELECT typeof(body_md) FROM doc_rev WHERE rev=?",
               arguments: [index + 1])
           } == "text")
+        let stored = try Self.bodyBytes(store, revision: index + 1)
         withKnownIssue("Supplied valid UTF-8 body must survive SQLite binding after NUL") {
-          #expect(try Self.bodyBytes(store, revision: index + 1) == Data(body.utf8))
+          #expect(stored == Data(body.utf8))
         }
       }
     }
@@ -62,8 +63,9 @@ extension DocEditCommandTests {
       let shown = try SiltaBinary.run(
         ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch)
       #expect(shown.termination == .exit(0))
+      let stored = try Self.bodyBytes(store, revision: 1)
       withKnownIssue("Allowed body storage must preserve the complete masked credential") {
-        #expect(try Self.bodyBytes(store, revision: 1) == Data(Self.nulKey.utf8))
+        #expect(stored == Data(Self.nulKey.utf8))
         #expect(
           shown.stdout.contains("[REDACTED:private_key]") && !shown.stdout.contains("private-acme"))
       }
@@ -100,8 +102,9 @@ extension DocEditCommandTests {
       let shown = try SiltaBinary.run(
         ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch)
       #expect(shown.termination == .exit(0))
+      let retained = try Self.bodyBytes(store, revision: 2)
       withKnownIssue("Retained accepted body must be copied byte-for-byte after NUL") {
-        #expect(try Self.bodyBytes(store, revision: 2) == Data(body.utf8))
+        #expect(retained == Data(body.utf8))
         #expect(
           shown.stdout.contains("[REDACTED:private_key]") && !shown.stdout.contains("private-acme"))
       }
@@ -120,10 +123,11 @@ extension DocEditCommandTests {
       #expect(try Self.bodyBytes(store, revision: 1) == bytes)
       let before = try DocEditPreparationCommandTests.truth(store)
       let result = try Self.run(["rules", "--keep-body"], scratch)
+      let after = try DocEditPreparationCommandTests.truth(store)
       withKnownIssue("Corrupt retained bytes must refuse without creating a replacement body") {
         #expect(result.termination == .exit(9) && result.stderr.isEmpty)
         Golden.forTests().check(result.stdout, "doc-show-evidence-corrupt.json")
-        #expect(try DocEditPreparationCommandTests.truth(store) == before)
+        #expect(after == before)
       }
       #expect(try Self.bodyBytes(store, revision: 1) == bytes)
     }
