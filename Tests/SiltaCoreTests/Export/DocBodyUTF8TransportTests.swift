@@ -24,12 +24,8 @@ struct DocBodyUTF8TransportTests {
       let snapshot = try ExportDocumentSnapshotTests.read(store)
       let parsed = try ExportDocumentSnapshot.parse(snapshot.files(), workspace: "acme")
       let expected: [Data?] = Array(repeating: Data(body.utf8), count: 5)
-      withKnownIssue("Document export capture must retain revision body bytes after NUL") {
-        #expect(Self.values(snapshot) == expected)
-        #expect(Self.values(parsed) == expected)
-      } when: {
-        body.contains("\u{0}")
-      }
+      #expect(Self.values(snapshot) == expected)
+      #expect(Self.values(parsed) == expected)
       #expect(try RestoreSupport.dump(store) == before)
       #expect(try Self.bodies(store) == bytes)
     }
@@ -51,11 +47,7 @@ struct DocBodyUTF8TransportTests {
         store, tree: graph.tree, incoming: graph.documents)
       let bytes = try Self.bodies(store)
       let wanted = Array(repeating: Data(body.utf8), count: 5)
-      withKnownIssue("Document restore must bind complete independently authored body bytes") {
-        #expect(bytes == wanted)
-      } when: {
-        body.contains("\u{0}")
-      }
+      #expect(bytes == wanted)
       let after = try ExportDocumentSnapshotTests.read(store)
       #expect(after.revisionAllocations == expected.revisionAllocations)
       #expect(after.commentSequences == expected.commentSequences)
@@ -106,10 +98,8 @@ struct DocBodyUTF8TransportTests {
         #expect(error == .corrupt)
         failure = error
       }
-      withKnownIssue("Invalid stored export body must refuse before returning replacement text") {
-        #expect(failure == .corrupt)
-        #expect(captured == nil && files == nil)
-      }
+      #expect(failure == .corrupt)
+      #expect(captured == nil && files == nil)
       #expect(try RestoreSupport.dump(store) == before)
       #expect(try Self.bodies(store) == bytes)
     }

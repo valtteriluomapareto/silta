@@ -17,13 +17,18 @@ extension RestoreWriter {
       if let reference = references[field.key] {
         columns.append(reference.column)
         values.append(deferred.contains(field.key) ? nil : try id(field.value, in: reference.table))
+      } else if table == "doc_rev" && field.key == "body_md" {
+        columns.append(field.key)
+        values.append(Data(field.value.utf8))
       } else {
         columns.append(field.key)
         values.append(
           ExportFormat.integerKeys.contains(field.key) ? Int64(field.value) : field.value)
       }
     }
-    let placeholders = columns.map { _ in "?" }.joined(separator: ",")
+    let placeholders = columns.map {
+      table == "doc_rev" && $0 == "body_md" ? "CAST(? AS TEXT)" : "?"
+    }.joined(separator: ",")
     try db.execute(
       sql:
         "INSERT INTO \(table)(\(columns.joined(separator: ","))) VALUES(\(placeholders))",

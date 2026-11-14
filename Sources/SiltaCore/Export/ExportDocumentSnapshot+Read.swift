@@ -7,7 +7,14 @@ extension ExportDocumentSnapshot {
     var records: [Int64: [ExportRow]] = [:]
     for (format, sql) in zip(ExportFormat.docRecords, DocumentQuery.records) {
       for row in try Row.fetchAll(db, sql: sql, arguments: [workspace]) {
-        records[row["doc_id"], default: []].append(try ExportRow(keys: format.keys, row: row))
+        let keys = format.table == "doc_rev" ? format.keys.filter { $0 != "body_md" } : format.keys
+        var record = try ExportRow(keys: keys, row: row)
+        if format.table == "doc_rev" {
+          guard let bytes: Data = row["body_md"], let body = String(data: bytes, encoding: .utf8)
+          else { throw StorageError.corrupt }
+          record = record.replacing("body_md", with: body, keys: format.keys)
+        }
+        records[row["doc_id"], default: []].append(record)
       }
     }
     let documents = try Row.fetchAll(db, sql: DocumentQuery.documents, arguments: [workspace]).map {
@@ -51,8 +58,9 @@ private enum DocumentQuery {
 
   static let records = [
     """
-    SELECT r.doc_id,'doc_rev' AS "table",r.uid,r.rev,r.base_rev,r.body_md,r.state,r.actor,
-      r.message,r.created_at,r.title,r.kind,r.about_refs,t.uid AS source_task,
+    SELECT r.doc_id,'doc_rev' AS "table",r.uid,r.rev,r.base_rev,
+      CAST(r.body_md AS BLOB) AS body_md,r.state,r.actor,r.message,r.created_at,
+      r.title,r.kind,r.about_refs,t.uid AS source_task,
       r.triaged_at,r.triaged_by
     FROM doc_rev r JOIN doc d ON d.id=r.doc_id LEFT JOIN task t ON t.id=r.source_task_id
     WHERE d.workspace_id=? ORDER BY r.doc_id,r.rev
