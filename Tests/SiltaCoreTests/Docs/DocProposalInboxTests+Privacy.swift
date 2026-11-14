@@ -184,6 +184,26 @@ extension DocProposalInboxTests {
     }
   }
 
+  @Test func archivedPendingMembersAreReachableThroughProtectedListHubs() throws {
+    try withScratchDirectory { home in
+      let store = try fixture(home)
+      try add(3, in: store)
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc SET archived=1,slug=?", arguments: [String(repeating: "r", count: 600)])
+      }
+      let group = try #require(try preview(store).first)
+      #expect(group.total == 3 && group.omitted == 1)
+      for command in [try #require(group.next), try #require(group.members.first?.read)] {
+        let result = try replay(command, home)
+        #expect(result.termination == .exit(0))
+        withKnownIssue("Protected list recovery must include archived pending revisions") {
+          #expect(result.stdout.contains("doc:"))
+        }
+      }
+    }
+  }
+
   func setPreviewFields(_ text: String, in store: DatabaseStore) throws {
     try store.write {
       try $0.database.execute(
