@@ -64,18 +64,19 @@ struct DocProposalInboxTests {
     }
   }
 
-  @Test(arguments: [false, true])
-  func binaryIdentitySurvivesUnicodeAndEqualRedactedDisplays(redacted: Bool) throws {
+  @Test(arguments: ["unicode", "case", "redacted"])
+  func binaryIdentitySurvivesUnicodeAndEqualRedactedDisplays(mode: String) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try AcmeDocAttachments.attach("second", to: "app", in: store)
       try add(1, in: store)
       try add(1, doc: "second", in: store)
       try store.write { tx in
-        for (slug, uid) in [("rules", "é"), ("second", "e\u{301}")] {
+        let uids = mode == "case" ? ["a", "A"] : ["é", "e\u{301}"]
+        for (slug, uid) in zip(["rules", "second"], uids) {
           try tx.database.execute(sql: "UPDATE doc SET uid=? WHERE slug=?", arguments: [uid, slug])
         }
-        if redacted {
+        if mode == "redacted" {
           try tx.database.execute(
             sql: "UPDATE doc SET slug=CASE slug WHEN 'rules' THEN ? ELSE ? END",
             arguments: [
@@ -86,7 +87,7 @@ struct DocProposalInboxTests {
       }
       let result = try preview(store)
       #expect(result.count == 2 && result.map(\.total) == [1, 1])
-      if redacted {
+      if mode == "redacted" {
         #expect(result[0].ref == result[1].ref)
         #expect(result.allSatisfy { $0.members.first?.read == "silta --ws 'acme' doc ls" })
       } else {
@@ -124,8 +125,8 @@ struct DocProposalInboxTests {
   func recordedBaseAndGlobalPageCommandsAreReplayable(missing: Bool) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
-      try AcmeDocAttachments.attach("alpha", to: "app", in: store)
-      try add(3, doc: "alpha", days: 20, in: store)
+      try AcmeDocAttachments.attach("Rules", to: "app", in: store)
+      try add(3, doc: "Rules", days: 20, in: store)
       try add(3, in: store)
       if missing {
         try store.write {
@@ -145,24 +146,31 @@ struct DocProposalInboxTests {
     }
   }
 
-  @Test func byteComparisonsDoNotUseCharacterOrLengthEquality() throws {
+  @Test(arguments: ["unicode", "same-length", "nul"])
+  func byteComparisonsDoNotUseCharacterOrLengthEquality(mode: String) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try add(1, in: store)
+      let base = mode == "unicode" ? "e\u{301}" : mode == "nul" ? "x\u{0}a" : "one"
+      let next = mode == "unicode" ? "é" : mode == "nul" ? "x\u{0}b" : "two"
       try store.write {
         try $0.database.execute(
-          sql: "UPDATE doc_rev SET body_md=?,title=? WHERE rev=1",
-          arguments: ["e\u{301}", "e\u{301}"])
+          sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT),title=CAST(? AS TEXT) WHERE rev=1",
+          arguments: [Data(base.utf8), Data(base.utf8)])
         try $0.database.execute(
-          sql: "UPDATE doc_rev SET body_md=?,title=? WHERE rev=2", arguments: ["é", "é"])
+          sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT),title=CAST(? AS TEXT) WHERE rev=2",
+          arguments: [Data(next.utf8), Data(next.utf8)])
       }
       let member = try #require(try preview(store).first?.members.first)
-      #expect(member.summary == "body changed (3→2 bytes); title changed")
+      #expect(
+        member.summary
+          == "body changed (\(base.utf8.count)→\(next.utf8.count) bytes); title changed")
       try store.write {
         try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=NULL WHERE rev=2")
       }
       let empty = try #require(try preview(store).first?.members.first)
-      #expect(empty.summary.contains("0→2 bytes") && empty.read.hasSuffix(" --diff"))
+      #expect(
+        empty.summary.contains("0→\(next.utf8.count) bytes") && empty.read.hasSuffix(" --diff"))
     }
   }
 
