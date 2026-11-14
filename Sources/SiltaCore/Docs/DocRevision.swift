@@ -11,4 +11,7 @@ struct DocRevision: Sendable {
   let actor: String
   let message: String?
   let createdAt: String
+  let sourceTask: String?
+  let triagedBy: String?
+  let triagedAt: String?
 }

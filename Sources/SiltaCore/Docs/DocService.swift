@@ -39,7 +39,23 @@ package struct DocService {
     return "\(pinned) [\(state)]\n"
       + "title: \(snapshot.title ?? "(unknown)")\nkind: \(snapshot.kind ?? "(unknown)")\n"
       + "about: \(Self.about(snapshot.about))\nactor: \(snapshot.actor)\n"
-      + "created_at: \(snapshot.createdAt)\n\n\(snapshot.body)"
+      + "created_at: \(snapshot.createdAt)\n" + Self.evidence(snapshot) + "\n\(snapshot.body)"
+  }
+
+  static func evidence(_ snapshot: DocRevision) -> String {
+    let why: String
+    switch snapshot.message {
+    case nil: why = "why: (not recorded)\n"
+    case "": why = "why: (empty)\n"
+    case .some(let text):
+      why =
+        "why:\n"
+        + SecretGuard.redacted(text).components(separatedBy: "\n")
+        .map { "  " + $0 }.joined(separator: "\n") + "\n"
+    }
+    return "source_task: " + (snapshot.sourceTask.map { about([$0]) } ?? "(not recorded)") + "\n"
+      + "triaged_by: \(snapshot.triagedBy ?? "(not recorded)")\n"
+      + "triaged_at: \(snapshot.triagedAt ?? "(not recorded)")\n" + why
   }
 
   var scopeIsSafe: Bool { SecretGuard.matches(in: workspace).isEmpty }

@@ -37,12 +37,17 @@ struct DocEvidenceReadCommandTests {
       let store = try fixture(scratch)
       try store.write {
         try $0.database.execute(
-          sql: "UPDATE doc_rev SET message=?,source_task_id=NULL,triaged_by=NULL,triaged_at=NULL WHERE rev=2",
+          sql:
+            """
+            UPDATE doc_rev SET message=?,source_task_id=NULL,triaged_by=NULL,triaged_at=NULL
+            WHERE rev=2
+            """,
           arguments: [empty ? "" : nil])
       }
       let result = try run([], scratch)
       #expect(result.termination == .exit(0))
-      Golden.forTests().check(result.stdout, "doc-evidence-" + (empty ? "empty" : "unknown") + ".txt")
+      Golden.forTests().check(
+        result.stdout, "doc-evidence-" + (empty ? "empty" : "unknown") + ".txt")
       #expect(!result.stdout.contains("human:reviewer"))
     }
   }
@@ -53,7 +58,8 @@ struct DocEvidenceReadCommandTests {
       let store = try fixture(scratch)
       try store.write {
         try $0.database.execute(sql: "UPDATE doc_rev SET state=? WHERE rev=2", arguments: [state])
-        try $0.database.execute(sql: "UPDATE task SET status='done',claimed_by=NULL,claimed_at=NULL")
+        try $0.database.execute(
+          sql: "UPDATE task SET status='done',claimed_by=NULL,claimed_at=NULL")
         try $0.database.execute(sql: "UPDATE doc SET archived=1")
       }
       let before = try truth(store)
@@ -79,7 +85,13 @@ struct DocEvidenceReadCommandTests {
         case "missing-source":
           try db.execute(sql: "UPDATE doc_rev SET source_task_id=999 WHERE rev=2")
         case "foreign-source":
-          try db.execute(sql: "INSERT INTO workspace(id,uid,slug,name,task_prefix) VALUES(2,'beta','beta','Beta','BE')")
+          try db.execute(
+            sql:
+              """
+              INSERT INTO workspace(id,uid,slug,name,task_prefix)
+              VALUES(2,'beta','beta','Beta','BE')
+              """
+          )
           try db.execute(sql: "UPDATE task SET workspace_id=2")
         case "half-actor": try db.execute(sql: "UPDATE doc_rev SET triaged_at=NULL WHERE rev=2")
         default: try db.execute(sql: "UPDATE doc_rev SET triaged_by=NULL WHERE rev=2")
@@ -112,17 +124,18 @@ struct DocEvidenceReadCommandTests {
     let store = try AcmeDocAttachments.make(in: scratch)
     try AcmeDocAttachments.attach("rules", to: "app", in: store)
     try store.write {
-      try $0.database.execute(sql: """
-        INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
-        VALUES('source',1,1,'Recorded source','done','human:acme','2023-11-14','2023-11-14');
-        UPDATE doc_rev SET body_md='Same body',title='Rules',kind='contract',
-          about_refs='["app:api"]',actor='agent:codex:base',created_at='2023-11-14' WHERE rev=1;
-        INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,created_at,
-          title,kind,about_refs,message,source_task_id,triaged_by,triaged_at)
-        SELECT 'recorded',id,2,1,'Same body','rejected','agent:codex:writer','2023-11-15',
-          'Rules','contract','["app:api"]','Line one'||char(10)||'Line two',
-          (SELECT id FROM task WHERE uid='source'),'human:reviewer','2023-11-16' FROM doc;
-        """)
+      try $0.database.execute(
+        sql: """
+          INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
+          VALUES('source',1,1,'Recorded source','done','human:acme','2023-11-14','2023-11-14');
+          UPDATE doc_rev SET body_md='Same body',title='Rules',kind='contract',
+            about_refs='["app:api"]',actor='agent:codex:base',created_at='2023-11-14' WHERE rev=1;
+          INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,created_at,
+            title,kind,about_refs,message,source_task_id,triaged_by,triaged_at)
+          SELECT 'recorded',id,2,1,'Same body','rejected','agent:codex:writer','2023-11-15',
+            'Rules','contract','["app:api"]','Line one'||char(10)||'Line two',
+            (SELECT id FROM task WHERE uid='source'),'human:reviewer','2023-11-16' FROM doc;
+          """)
     }
     return store
   }
@@ -130,8 +143,16 @@ struct DocEvidenceReadCommandTests {
   func truth(_ store: DatabaseStore) throws -> [[String]] {
     try store.read { db in
       let tables = try String.fetchAll(
-        db, sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-      return try tables.map { try Row.fetchAll(db, sql: "SELECT * FROM \($0) ORDER BY rowid").map(\.description) }
+        db,
+        sql:
+          """
+          SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'
+          ORDER BY name
+          """
+      )
+      return try tables.map {
+        try Row.fetchAll(db, sql: "SELECT * FROM \($0) ORDER BY rowid").map(\.description)
+      }
     }
   }
 }

@@ -961,6 +961,14 @@ An explicit revision can be proposed, rejected, superseded or archived. Historic
 NULL metadata is shown as unknown, without resolving historical map targets or
 substituting current metadata. A conflicting reference revision and `--rev` is usage.
 
+Show includes the complete stored why, recorded source task and paired decision actor/time.
+The original proposer and creation time remain attributed to the revision. NULL why/source
+and paired NULL decision values mean not recorded; an empty recorded why is distinct.
+A non-NULL source must resolve to a task in the selected workspace; a missing or foreign
+source, or a half-recorded decision pair, is corrupt. These reads do not infer a source
+from current claims or invoke Git, verification or writes. Complete why text is masked
+before indentation and the existing rendered-line bounds, without a preview limit.
+
 `doc ls [--about <canonical-map-ref>] [--archived] [--offset N] [--limit N]`
 lists current accepted and individual pending revisions, ordered by slug then revision.
 The default page has 20 entries, with a maximum of 100. Accepted entries match current
@@ -985,11 +993,13 @@ Percent-encoded attachment refs are inspected as decoded text for secrets; safe 
 retain their canonical spelling. A credential-bearing list filter is omitted from
 recovery: its continuation restarts the broader scoped list without a filter or offset.
 
-`doc show <ref> --diff` compares stored title, kind, attachments and body with the
+`doc show <ref> --diff` compares stored title, kind, attachments, why, source task,
+paired decision metadata and body with the
 revision's recorded `base_rev`, using one replacement hunk with unchanged leading
 and trailing lines removed. A missing recorded base refuses with plain-show recovery;
 a nil base is empty. Masking precedes comparison; identical masked views say
-"no visible changes". Actor and time are shown separately from the compared content.
+"no visible changes". Original proposer and creation time are shown separately from
+the compared content; decision attribution never replaces proposer attribution.
 
 `doc show <ref> --comments [--offset N] [--limit N]` pages comments in sequence order,
 20 by default and at most 20 per page. `doc show doc:slug@revision/comment` reads one
