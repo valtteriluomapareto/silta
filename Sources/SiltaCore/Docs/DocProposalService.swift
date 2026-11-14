@@ -51,12 +51,13 @@ struct DocProposalService {
       } catch let error as any CodedError where !(error is StorageError) {
         throw DocError.changed(workspace: workspace)
       }
+      var draft = DocDraft(slug: request.slug, body: body.0)
+      draft.message = captured.why
       let revision = try DocStore(
         workspace: captured.id, transaction: tx, actor: environment.actor, ids: environment.ids,
         at: at
       ).propose(
-        request.slug, metadata: captured.metadata, body: body.0, why: captured.why,
-        base: captured.base, source: captured.source.id)
+        draft, metadata: captured.metadata, base: captured.base, source: captured.source.id)
       return DocProposalResult(
         ref: SecretGuard.redacted("doc:\(request.slug)@\(revision.revision)"),
         warnings: environment.actor.approvalWarnings(approved, used: false)
@@ -81,13 +82,7 @@ struct DocProposalService {
     let id = try TaskService.workspaceID(workspace, in: db)
     let baseline = try DocEditBaseline.read(request.slug, workspace: id, keepBody: false, in: db)
     if baseline.revision != nil && !baseline.accepted { throw StorageError.corrupt }
-    var missing = hasInput ? [] : ["-F"]
-    if request.why == nil { missing.append("-m") }
-    if !baseline.accepted {
-      if request.title == nil { missing.append("--title") }
-      if request.about == nil { missing.append("--about") }
-    }
-    guard missing.isEmpty, let why = request.why else { throw DocError.missing(missing) }
+    let why = try requiredWhy(request, hasInput: hasInput, accepted: baseline.accepted)
     if !baseline.accepted { try identityCheck("doc:" + request.slug) }
     for ref in request.about ?? []
     where !baseline.accepted
@@ -121,6 +116,19 @@ struct DocProposalService {
       identity: binding(metadata, base: base, request: request, id: id, in: db),
       source: source(request, workspace: workspace, id: id, at: at, in: db),
       why: reason.0, redacted: redacted || reason.1)
+  }
+
+  private func requiredWhy(_ request: DocProposalRequest, hasInput: Bool, accepted: Bool) throws
+    -> String
+  {
+    var missing = hasInput ? [] : ["-F"]
+    if request.why == nil { missing.append("-m") }
+    if !accepted {
+      if request.title == nil { missing.append("--title") }
+      if request.about == nil { missing.append("--about") }
+    }
+    guard missing.isEmpty, let why = request.why else { throw DocError.missing(missing) }
+    return why
   }
 
   private func checked(_ text: String, keeping old: String? = nil) throws -> (String, Bool) {
