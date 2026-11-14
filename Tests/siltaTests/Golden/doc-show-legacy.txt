@@ -4,5 +4,9 @@ kind: (unknown)
 about: (unknown)
 actor: human:acme
 created_at: 2023-11-14T22:13:20.000Z
+source_task: (not recorded)
+triaged_by: (not recorded)
+triaged_at: (not recorded)
+why: (not recorded)
 
 Legacy body

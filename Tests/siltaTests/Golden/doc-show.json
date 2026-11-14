@@ -1,1 +1,1 @@
-{"data":{"output":"doc:rules@2 [accepted]\ntitle: Push rules\nkind: contract\nabout: app:api\nactor: human:acme\ncreated_at: 2023-11-14\n\nAccepted body\n","ref":"doc:rules@2"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"output":"doc:rules@2 [accepted]\ntitle: Push rules\nkind: contract\nabout: app:api\nactor: human:acme\ncreated_at: 2023-11-14\nsource_task: (not recorded)\ntriaged_by: (not recorded)\ntriaged_at: (not recorded)\nwhy: (not recorded)\n\nAccepted body\n","ref":"doc:rules@2"},"ok":true,"schema":1,"warnings":[]}
