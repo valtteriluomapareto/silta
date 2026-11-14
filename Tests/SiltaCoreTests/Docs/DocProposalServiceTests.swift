@@ -235,10 +235,18 @@ struct DocProposalServiceTests {
       }
       let before = try DocVerificationPreparationTests.truth(store)
       let request = DocProposalRequest(slug: "rules", base: base, why: "Why")
-      _ = Self.refusal(base == "99" ? .notFound : .invalid) {
-        _ = try Self.service(home, store).propose(request) {
-          Issue.record("Invalid base read input")
-          return "Body"
+      let error = try #require(
+        Self.refusal(base == "99" ? .notFound : .invalid) {
+          _ = try Self.service(home, store).propose(request) {
+            Issue.record("Invalid base read input")
+            return "Body"
+          }
+        })
+      if base == "99" {
+        #expect(error.next.first == "silta --ws 'acme' doc show 'doc:rules'")
+      } else {
+        withKnownIssue("SI-118: Invalid bases need current revision recovery") {
+          #expect(error.next.first == "silta --ws 'acme' doc show 'doc:rules'")
         }
       }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
