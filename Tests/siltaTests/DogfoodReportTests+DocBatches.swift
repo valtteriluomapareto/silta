@@ -156,3 +156,28 @@ extension DogfoodReportTests {
     }
   }
 }
+
+extension DogfoodReportTests {
+  @Test func untaggedImpossibleDocumentTimeMakesCoverageUnknown() throws {
+    try withScratchDirectory { scratch in
+      let store = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let untagged = try Self.line([
+        "command": "silta doc triage", "timestamp": "2023-02-30T00:00:00.000Z",
+        "workspace": NSNull(),
+      ])
+      try Self.docLogs(scratch, actors: [Self.actor], extra: [untagged])
+      try Self.docApproval(store)
+      let report = try Self.docReport(scratch, tools: tools)
+      #expect(report.contains("Successful doc-triage batches observed in range: 0 human; 1 agent."))
+      #expect(report.contains("Recorded doc-triage approvals in range: 1."))
+      withKnownIssue("SI-125: untagged impossible document times leave coverage unproven") {
+        #expect(report.contains("Observed approvals per successful batch (human + agent): n/a."))
+        #expect(
+          report.contains(
+            "Batch coverage: incomplete; absent, rotated, untagged, unreadable "
+              + "or inconsistent evidence prevents a ratio."))
+      }
+    }
+  }
+}
