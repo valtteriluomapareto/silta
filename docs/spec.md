@@ -959,7 +959,8 @@ stored revision metadata and markdown. The default is the current accepted revis
 without one it lists up to 20 pending revision refs and points to `doc ls` for more.
 An explicit revision can be proposed, rejected, superseded or archived. Historical
 NULL metadata is shown as unknown, without resolving historical map targets or
-substituting current metadata. A conflicting reference revision and `--rev` is usage.
+substituting current metadata. Stores that predate snapshot evidence columns remain
+readable without migration. A conflicting reference revision and `--rev` is usage.
 
 Show includes the complete stored why, recorded source task and paired decision actor/time.
 The original proposer and creation time remain attributed to the revision. NULL why/source
