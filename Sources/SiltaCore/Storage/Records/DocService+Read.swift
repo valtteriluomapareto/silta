@@ -71,7 +71,7 @@ extension DocService {
       let rows = try Row.fetchAll(
         db,
         sql:
-          "SELECT doc.slug,doc_rev.id,doc_rev.rev,doc_rev.state," + columns
+          "SELECT CAST(doc.slug AS BLOB) AS slug,doc_rev.id,doc_rev.rev,doc_rev.state," + columns
           + join + " ORDER BY doc.slug,doc_rev.rev LIMIT ? OFFSET ?",
         arguments: arguments + [limit, offset])
       let entries = try rows.map { try entry($0, in: db) }
@@ -101,13 +101,14 @@ extension DocService {
   }
 
   private func entry(_ row: Row, in db: Database) throws -> DocListResult.Entry {
-    let ref = "doc:\(row["slug"] as String)@\(row["rev"] as Int)"
-    let state: String = row["state"]
     func text(_ name: String) throws -> String? {
       guard let bytes: Data = row[name] else { return nil }
       guard let value = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
       return value
     }
+    guard let slug = try text("slug") else { throw StorageError.corrupt }
+    let ref = "doc:\(slug)@\(row["rev"] as Int)"
+    let state: String = row["state"]
     let raw = try text("about_refs")
     let refs: [String]?
     do {

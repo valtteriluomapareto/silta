@@ -102,11 +102,9 @@ struct DocListMetadataUTF8Tests {
           #expect(ordinary["ref"] as? String == "doc:rules@1")
           #expect((ordinary["output"] as? String)?.contains(normal) == true)
         }
-        withKnownIssue("Stored NUL identities must not become another document's ref or command") {
-          #expect((other["ref"] as? String).map { Data($0.utf8) } == Data("doc:\(slug)@1".utf8))
-          #expect(!output.contains(normal))
-          #expect(output.contains("doc ls --archived"))
-        }
+        #expect((other["ref"] as? String).map { Data($0.utf8) } == Data("doc:\(slug)@1".utf8))
+        #expect(!output.contains(normal))
+        #expect(output.contains("doc ls --archived"))
       }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
       #expect(
@@ -120,13 +118,15 @@ struct DocListMetadataUTF8Tests {
     try store.write {
       try $0.database.execute(
         sql: """
-          INSERT INTO doc(uid,workspace_id,slug,title,kind,current_rev,archived,created_at,updated_at)
+          INSERT INTO doc(uid,workspace_id,slug,title,kind,current_rev,archived,
+          created_at,updated_at)
           SELECT 'nul-doc',workspace_id,CAST(? AS TEXT),'Other projection','reference',1,1,
             created_at,updated_at FROM doc WHERE slug='rules';
           INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at,title,kind,about_refs)
           SELECT 'nul-revision',id,1,'Other body','accepted','human:acme','2023-11-14',
             'Other snapshot','reference','["app:api"]' FROM doc WHERE uid='nul-doc';
-          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
+          created_by,created_at)
           SELECT 'nul-about',workspace_id,'doc',(SELECT id FROM doc WHERE uid='nul-doc'),rel,
             to_kind,to_id,created_by,created_at FROM link WHERE from_kind='doc';
           """, arguments: [Data(slug.utf8)])
