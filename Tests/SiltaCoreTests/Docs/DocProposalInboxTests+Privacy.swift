@@ -137,19 +137,50 @@ extension DocProposalInboxTests {
     }
   }
 
-  @Test(arguments: ["v1", "v2", "v3", "v4"])
-  func historicalSnapshotsKeepUnknownMetadataWithoutMigration(version: String) throws {
+  @Test(arguments: ["v1", "v2", "v3", "v4"], ["normal", "long", "secret"])
+  func historicalSnapshotsKeepUnknownMetadataWithoutMigration(version: String, identity: String)
+    throws
+  {
     try withScratchDirectory { home in
-      let (store, _) = try DocLegacyEvidenceReadTests().fixture(home, version: version)
+      let (store, queue) = try DocLegacyEvidenceReadTests().fixture(home, version: version)
+      let slug =
+        identity == "long"
+        ? String(repeating: "r", count: 600)
+        : identity == "secret" ? "AKIA" + String(repeating: "A", count: 16) : "rules"
+      try queue.write {
+        try $0.execute(
+          sql: """
+            INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,created_at,message)
+            VALUES('third',1,3,1,'Third','proposed','agent:codex:writer','2023-11-15','Legacy why'),
+              ('fourth',1,4,1,'Fourth','proposed','agent:codex:writer','2023-11-15','Legacy why');
+            UPDATE doc SET slug=?,archived=1;
+            """, arguments: [slug])
+      }
       let before = try DocVerificationPreparationTests.truth(store)
-      let member = try #require(try preview(store).first?.members.first)
+      #expect(try queue.read { try $0.columns(in: "doc_rev").allSatisfy { $0.name != "title" } })
+      let group = try #require(try preview(store).first)
+      #expect(group.total == 3 && group.omitted == 1 && group.members.count == 2)
+      let member = try #require(group.members.first)
       #expect(member.title == "(unknown)" && member.kind == "(unknown)")
       #expect(member.why == "Legacy why" && member.sourceTask == "(not recorded)")
       #expect(member.summary.contains("unknown"))
-      #expect(try replay(member.read, home).termination == .exit(0))
+      for command in [member.read, try #require(group.next)] {
+        let result = try replay(command, home)
+        if command.contains(" doc ls") {
+          #expect(command.contains(" --archived"))
+          withKnownIssue("Historical omitted-member and protected list recovery must be replayable")
+          {
+            #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+            #expect(result.stdout.contains("@2"))
+          }
+        } else {
+          #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+        }
+      }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
+
   @Test func storedNULIdentityUsesTheListHubWithoutRetargeting() throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
