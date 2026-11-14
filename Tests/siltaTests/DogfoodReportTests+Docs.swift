@@ -76,16 +76,16 @@ extension DogfoodReportTests {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
       try Self.document(
-        store, state: "accepted", created: "2023-11-14T00:00:00.000Z",
-        decided: "2023-11-14T00:00:01.000Z", by: "human:acme")
+        store, state: "accepted", created: "2023-11-14T00:00:00.999Z",
+        decided: "2023-11-14T00:00:01.001Z", by: "human:acme")
       try Self.document(
-        store, state: "rejected", created: "2023-11-14T00:00:00.000Z",
-        decided: "2023-11-14T00:00:03.000Z", by: "human:acme")
+        store, state: "rejected", created: "2023-11-14T00:00:00.999Z",
+        decided: "2023-11-14T00:00:01.003Z", by: "human:acme")
       let tools = try Self.tools(scratch)
       let report = try Self.docReport(scratch, tools: tools)
       #expect(
         report.contains("Known decisions in range: 1 accepted; 1 rejected; acceptance rate 50%."))
-      #expect(report.contains("Decision wait: median 2000 ms; maximum 3000 ms."))
+      #expect(report.contains("Decision wait: median 3 ms; maximum 4 ms."))
       #expect(report.contains("Recorded doc-triage approvals in range: 0."))
     }
   }
@@ -157,6 +157,44 @@ extension DogfoodReportTests {
       #expect(report.contains("Invalid document event timestamps: 1; coverage is incomplete."))
       #expect(
         report.contains("Known decisions in range: 0 accepted; 0 rejected; acceptance rate n/a."))
+    }
+  }
+}
+
+extension DogfoodReportTests {
+  @Test(arguments: ["2023-02-30T00:00:00.000Z", "2023-11-14T00:00:60.000Z"])
+  func impossibleDocumentTimestampsRemainUnknown(created: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try Self.setup(scratch)
+      try Self.document(
+        store, state: "accepted", created: created,
+        decided: "2023-11-14T00:02:00.000Z", by: "human:acme")
+      let tools = try Self.tools(scratch)
+      let report = try Self.docReport(scratch, tools: tools)
+      #expect(
+        report.contains("Known decisions in range: 1 accepted; 0 rejected; acceptance rate 100%."))
+      withKnownIssue("SI-125: impossible document timestamps must not normalize into evidence") {
+        #expect(report.contains("Decision wait: median n/a; maximum n/a."))
+        #expect(report.contains("Decision waits unavailable: 1."))
+        #expect(report.contains("Invalid document event timestamps: 1; coverage is incomplete."))
+      }
+    }
+  }
+
+  @Test func validLeapDayKeepsSubsecondDocumentWait() throws {
+    try withScratchDirectory { scratch in
+      let store = try Self.setup(scratch)
+      try Self.document(
+        store, state: "accepted", created: "2024-02-29T23:59:59.999Z",
+        decided: "2024-03-01T00:00:00.003Z", by: "human:acme")
+      let tools = try Self.tools(scratch)
+      try Self.tool("date", text: "#!/bin/bash\necho 2024-03-01T00:00:01Z\n", in: tools)
+      let report = try Self.docReport(scratch, tools: tools)
+      #expect(report.contains("Known submissions created in range: 1."))
+      #expect(
+        report.contains("Known decisions in range: 1 accepted; 0 rejected; acceptance rate 100%."))
+      #expect(report.contains("Decision wait: median 4 ms; maximum 4 ms."))
+      #expect(report.contains("Invalid document event timestamps: 0."))
     }
   }
 }
