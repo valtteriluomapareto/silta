@@ -43,7 +43,8 @@ extension DogfoodReportTests {
       #expect(report.contains("Observed approvals per successful batch (human + agent): 0.67."))
       #expect(
         report.contains(
-          "Batch coverage: retained readable workspace logs only; no durable approval-to-batch linkage."
+          "Batch coverage: retained readable workspace logs only; "
+            + "no durable approval-to-batch linkage."
         ))
     }
   }
@@ -90,7 +91,8 @@ extension DogfoodReportTests {
       #expect(report.contains("Observed approvals per successful batch (human + agent): n/a."))
       #expect(
         report.contains(
-          "Batch coverage: incomplete; absent, rotated, untagged, unreadable or inconsistent evidence prevents a ratio."
+          "Batch coverage: incomplete; absent, rotated, untagged, unreadable or inconsistent "
+            + "evidence prevents a ratio."
         ))
       #expect(!report.contains("Acme private malformed event"))
     }

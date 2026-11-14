@@ -106,7 +106,8 @@ extension DogfoodReportTests {
         report.contains("Known decisions in range: 1 accepted; 1 rejected; acceptance rate 50%."))
       #expect(
         report.contains(
-          "Unattributed terminal history created in range: 3 (direct or legacy; not known proposal decisions)."
+          "Unattributed terminal history created in range: 3 "
+            + "(direct or legacy; not known proposal decisions)."
         ))
     }
   }
