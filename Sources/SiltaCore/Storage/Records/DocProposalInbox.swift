@@ -63,21 +63,22 @@ struct DocProposalInbox {
       }
       let previews = try members.map(member)
       return DocProposalPreviewGroup(
-        id: group.id, ref: text(first, "doc_ref", reference: true), total: group.total,
+        id: group.id, ref: try text(first, "doc_ref", reference: true), total: group.total,
         members: previews,
-        next: group.total > previews.count ? try page(first["slug"]) : nil)
+        next: group.total > previews.count ? try page(value(first, "slug")) : nil)
     }
   }
 
   private func memberSQL(ids: [Int64], metadata: Bool) -> String {
-    let title = metadata ? "r.title" : "NULL", kind = metadata ? "r.kind" : "NULL"
+    let title = metadata ? "r.title" : "NULL"
+    let kind = metadata ? "r.kind" : "NULL"
     let about = metadata ? "r.about_refs" : "NULL"
     let source = metadata ? "r.source_task_id" : "NULL"
     let fields = [
       "d.id AS doc_id,r.rev,r.base_rev,b.id AS base_id,\(source) AS source_id,s.id AS source_owner",
       Self.bounded("'doc:'||d.slug", "doc_ref"),
       Self.bounded("'doc:'||d.slug||'@'||r.rev", "ref"),
-      "CASE WHEN length(CAST(d.slug AS BLOB))<=512 THEN d.slug END AS slug",
+      "CASE WHEN length(CAST(d.slug AS BLOB))<=512 THEN CAST(d.slug AS BLOB) END AS slug",
       Self.bounded(title, "title"), Self.bounded(kind, "kind"), Self.bounded("r.message", "why"),
       Self.bounded("w.task_prefix||'-'||s.seq", "source"),
       "length(CAST(r.body_md AS BLOB)) AS new_bytes",
@@ -106,7 +107,7 @@ struct DocProposalInbox {
   }
 
   private static func bounded(_ expression: String, _ name: String) -> String {
-    "CASE WHEN length(CAST(\(expression) AS BLOB))<=65536 THEN \(expression) END AS \(name),"
+    "CASE WHEN length(CAST(\(expression) AS BLOB))<=65536 THEN CAST(\(expression) AS BLOB) END AS \(name),"
       + "length(CAST(\(expression) AS BLOB)) AS \(name)_bytes"
   }
 

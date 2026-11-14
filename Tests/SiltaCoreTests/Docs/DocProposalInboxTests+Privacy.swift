@@ -47,17 +47,9 @@ extension DocProposalInboxTests {
         member.summary,
       ]
       #expect(fields.allSatisfy { $0.count <= 120 && $0.utf8.count <= 512 })
-      withKnownIssue("Copied SQLite text truncates before a stored key footer") {
-        #expect(fields.allSatisfy { !$0.contains("private-acme") })
-      } when: {
-        value == "key-nul"
-      }
+      #expect(fields.allSatisfy { !$0.contains("private-acme") })
       if value == "key" || value == "key-nul" {
-        withKnownIssue("Complete stored key must be masked before clipping") {
-          #expect(member.why.contains("[REDACTED:private_key]"))
-        } when: {
-          value == "key-nul"
-        }
+        #expect(member.why.contains("[REDACTED:private_key]"))
       }
       if value == "unicode" {
         #expect(member.why.contains("characters omitted"))
@@ -170,4 +162,38 @@ extension DocProposalInboxTests {
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
+  @Test func storedNULIdentityUsesTheListHubWithoutRetargeting() throws {
+    try withScratchDirectory { home in
+      let store = try fixture(home)
+      try add(3, in: store)
+      let slug = "rules\u{0}tail"
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc SET slug=CAST(? AS TEXT)", arguments: [Data(slug.utf8)])
+      }
+      let group = try #require(try preview(store).first)
+      #expect(group.ref == "doc:rules tail")
+      #expect(group.next == "silta --ws 'acme' doc ls")
+      #expect(group.members.allSatisfy { $0.read == "silta --ws 'acme' doc ls" })
+    }
+  }
+
+  @Test(arguments: [512, 513])
+  func readCommandByteLimitIncludesTheCompleteCommand(bytes: Int) throws {
+    try withScratchDirectory { home in
+      let store = try fixture(home)
+      try add(3, in: store)
+      let fixed = "silta --ws 'acme' doc show 'doc:@4' --diff"
+      let slug = String(repeating: "r", count: bytes - fixed.utf8.count)
+      try store.write {
+        try $0.database.execute(sql: "UPDATE doc SET slug=?", arguments: [slug])
+      }
+      let member = try #require(try preview(store).first?.members.first)
+      let expected = "silta --ws 'acme' doc show 'doc:\(slug)@4' --diff"
+      #expect(expected.utf8.count == bytes)
+      #expect(member.read == (bytes == 512 ? expected : "silta --ws 'acme' doc ls"))
+      #expect(try replay(member.read, home).termination == .exit(0))
+    }
+  }
+
 }

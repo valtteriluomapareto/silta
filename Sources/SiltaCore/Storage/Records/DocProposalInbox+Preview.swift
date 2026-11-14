@@ -3,22 +3,25 @@ import GRDB
 
 extension DocProposalInbox {
   func member(_ row: Row) throws -> DocProposalPreview {
-    let source: Int64? = row["source_id"], owner: Int64? = row["source_owner"]
+    let source: Int64? = row["source_id"]
+    let owner: Int64? = row["source_owner"]
     guard source == nil || owner != nil else { throw StorageError.corrupt }
     let missing = (row["base_rev"] as Int?) != nil && (row["base_id"] as Int64?) == nil
     return DocProposalPreview(
-      ref: text(row, "ref", reference: true), title: text(row, "title"), kind: text(row, "kind"),
-      why: text(row, "why", missing: "(not recorded)"),
-      sourceTask: text(row, "source", missing: "(not recorded)", reference: true),
-      summary: summary(row), read: read(row["slug"], revision: row["rev"], missing: missing))
+      ref: try text(row, "ref", reference: true), title: try text(row, "title"),
+      kind: try text(row, "kind"),
+      why: try text(row, "why", missing: "(not recorded)"),
+      sourceTask: try text(row, "source", missing: "(not recorded)", reference: true),
+      summary: summary(row),
+      read: read(try value(row, "slug"), revision: row["rev"], missing: missing))
   }
 
   func text(_ row: Row, _ name: String, missing: String = "(unknown)", reference: Bool = false)
-    -> String
+    throws -> String
   {
     let bytes: Int? = row[name + "_bytes"]
     if let bytes, bytes > 65_536 { return "(\(bytes) bytes omitted)" }
-    guard let value: String = row[name] else { return missing }
+    guard let value = try value(row, name) else { return missing }
     let masked = SecretGuard.redacted(reference ? DocService.about([value]) : value)
     let flat = masked.map { character in
       character.unicodeScalars.allSatisfy { CharacterSet.controlCharacters.contains($0) }
@@ -36,10 +39,19 @@ extension DocProposalInbox {
     return "[\(characters.count) characters omitted]"
   }
 
+  func value(_ row: Row, _ name: String) throws -> String? {
+    guard let bytes: Data = row[name] else { return nil }
+    guard let value = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
+    return value
+  }
+
   private func summary(_ row: Row) -> String {
-    let base: Int? = row["base_rev"], id: Int64? = row["base_id"]
+    let base: Int? = row["base_rev"]
+    let id: Int64? = row["base_id"]
     if base != nil && id == nil { return "recorded base unavailable" }
-    let equal: Bool = row["body_equal"], old: Int = row["old_bytes"], new: Int = row["new_bytes"]
+    let equal: Bool = row["body_equal"]
+    let old: Int = row["old_bytes"]
+    let new: Int = row["new_bytes"]
     var fields = [equal ? "body unchanged" : "body changed (\(old)→\(new) bytes)"]
     if base != nil {
       for name in ["title", "kind", "about"] {
