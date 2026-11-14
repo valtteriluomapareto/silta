@@ -1,3 +1,4 @@
+import Foundation
 import GRDB
 
 extension DocStore {
@@ -12,10 +13,11 @@ extension DocStore {
       sql: """
         INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,
           title,kind,about_refs,source_task_id,triaged_at,triaged_by)
-        VALUES(?,?,?,?,?,'proposed',?,?,?,?,?,?,?,NULL,NULL)
+        VALUES(?,?,?,?,CAST(? AS TEXT),'proposed',?,?,?,?,?,?,?,NULL,NULL)
         """,
       arguments: [
-        try ids.next(at: at), id, revision, base, draft.body, actor.description, draft.message,
+        try ids.next(at: at), id, revision, base, Data(draft.body.utf8), actor.description,
+        draft.message,
         stamp,
         metadata.title, metadata.kind, try WorkspaceConfig.json(metadata.refs), source,
       ])

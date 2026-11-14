@@ -1,3 +1,4 @@
+import Foundation
 import GRDB
 
 /// Exact owned state used to preserve content or exempt it from a new-content scan.
@@ -20,7 +21,8 @@ struct DocEditBaseline {
       db,
       sql: """
         SELECT d.id,d.uid,d.current_rev,d.archived,d.title,d.kind,r.uid AS revision_uid,
-          r.rev,r.state,CASE WHEN ? OR length(CAST(r.body_md AS BLOB))<=? THEN r.body_md END AS body
+          r.rev,r.state,CASE WHEN ? OR length(CAST(r.body_md AS BLOB))<=?
+            THEN CAST(r.body_md AS BLOB) END AS body
         FROM doc d LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
         WHERE d.workspace_id=? AND d.slug=?
         """, arguments: [keepBody, DocInput.maximumBytes, workspace, slug])
@@ -33,7 +35,10 @@ struct DocEditBaseline {
     let pointer: Int? = row["current_rev"]
     let revision: Int? = row["rev"]
     let archived: Bool = row["archived"]
-    let body: String? = row["body"]
+    let body = try (row["body"] as Data?).map { bytes in
+      guard let text = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
+      return text
+    }
     let state: String? = row["state"]
     let title: String = row["title"]
     var fields: [String?] = [
