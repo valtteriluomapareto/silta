@@ -53,7 +53,8 @@ struct DocInboxCommandTests {
       let members = try #require(properties["members"] as? [String: Any])
       let member = try #require(members["array"] as? [String: Any])
       let evidence = try #require(member["object"] as? [String: Any])
-      #expect(Set(evidence.keys) == ["ref", "title", "kind", "why", "source_task", "summary", "read"])
+      #expect(
+        Set(evidence.keys) == ["ref", "title", "kind", "why", "source_task", "summary", "read"])
     }
   }
 
@@ -67,7 +68,8 @@ struct DocInboxCommandTests {
           SELECT 'source',id,1,'Acme source','doing','agent:codex:writer',?,? FROM workspace;
           UPDATE doc_rev SET title='Base rules',kind='contract',about_refs='["app:api"]',
             body_md='Base body';
-          """, arguments: [TaskCommandTests.fixed["SILTA_NOW"], TaskCommandTests.fixed["SILTA_NOW"]])
+          """,
+        arguments: [TaskCommandTests.fixed["SILTA_NOW"], TaskCommandTests.fixed["SILTA_NOW"]])
       for revision in 2...4 {
         try tx.database.execute(
           sql: """

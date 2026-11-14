@@ -9,7 +9,10 @@ extension DocInboxCommandTests {
       _ = try fixture(scratch)
       var result = try SiltaBinary.runProcess(
         URL(filePath: "/usr/bin/script"),
-        ["-q", "/dev/null", try SiltaBinary.url().path, "brief", "--ws", "acme", "--app", "api", "--json"],
+        [
+          "-q", "/dev/null", try SiltaBinary.url().path, "brief", "--ws", "acme", "--app", "api",
+          "--json",
+        ],
         in: scratch, cwd: repo,
         environment: Self.environment.merging(["SILTA_ACTOR": "human:acme"]) { $1 })
       result.stdout = result.stdout.replacingOccurrences(of: "\r\n", with: "\n")

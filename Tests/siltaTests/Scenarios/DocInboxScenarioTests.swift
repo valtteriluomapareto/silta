@@ -21,7 +21,9 @@ struct DocInboxScenarioTests {
     steps:
       - args: [--ws, acme, inbox, --for, me, --json]
         env: {SILTA_ACTOR: 'agent:codex:acme', USER: acme}
-        expect: {exit: 0, json: {data.items.0.kind: doc_proposal, data.items.0.doc_proposal.total: 3}}
+        expect:
+          exit: 0
+          json: {data.items.0.kind: doc_proposal, data.items.0.doc_proposal.total: 3}
       - args: [--ws, acme, doc, show, 'doc:rules@4', --diff, --json]
         env: {SILTA_ACTOR: 'agent:codex:acme', USER: acme}
         expect: {exit: 0, json: {data.ref: 'doc:rules@4'}}

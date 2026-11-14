@@ -24,15 +24,16 @@ struct BriefDiscussion {
   /// Sections for the current task and sections after it; the inbox is empty exactly
   /// when the caller has no attention.
   func sections() throws -> (task: [BriefSection], inbox: [BriefSection]) {
-    let items = try service.inboxItems(
-      for: caller, workspace: workspace, all: false, at: now, in: db)
+    let attention = try service.inboxAttention(
+      for: caller, workspace: workspace, all: false, at: now, limit: Self.items, in: db)
+    let items = attention.items
     var emitted: Set<String> = []
     var task: [BriefSection] = []
     if let current {
       let posts = try TaskService.discussion(current, timeline: true, in: db)
       if let handoff = TaskService.newestHandoff(posts) { task.append(section(handoff)) }
       task += items.filter { onTask($0) }.prefix(Self.items).map {
-        BriefSection(id: "task_inbox", text: render($0, emitted: &emitted))
+        section($0, id: "task_inbox", emitted: &emitted)
       }
       let open = posts.filter {
         $0.kind == "question" && $0.replyTo == nil && !$0.deleted && $0.resolvedAt == nil
@@ -47,7 +48,7 @@ struct BriefDiscussion {
       }
     }
     guard !items.isEmpty else { return (task, []) }
-    let count = items.count
+    let count = attention.total
     let above = items.filter { onTask($0) }.count
     var sections = [
       BriefSection(
@@ -57,9 +58,19 @@ struct BriefDiscussion {
       )
     ]
     sections += items.filter { !onTask($0) }.prefix(Self.items).map {
-      BriefSection(id: "inbox", text: render($0, emitted: &emitted))
+      section($0, id: "inbox", emitted: &emitted)
     }
     return (task, sections)
+  }
+
+  private func section(_ item: InboxItem, id: String, emitted: inout Set<String>) -> BriefSection {
+    guard let group = item.proposalGroup else {
+      return BriefSection(id: id, text: render(item, emitted: &emitted))
+    }
+    var section = BriefSection(
+      id: id, text: String(repeating: " ", count: DocProposalPreviewGroup.reservation))
+    section.docProposalGroup = group
+    return section
   }
 
   private func section(_ handoff: CommentDetails) -> BriefSection {

@@ -16,37 +16,43 @@ package struct BriefService {
   ) async throws -> BriefReport {
     let location = try await LocationService(environment: environment).resolve(
       path: path, workspace: workspace, app: app, task: task, cacheWrites: !hook)
+    let now = environment.clock.now()
+    return try environment.db.read {
+      try report(
+        location, app: app, topics: topics, budget: budget, compact: short || hook, at: now, in: $0)
+    }
+  }
+
+  /// Assembles, trims and hydrates the report in the caller's read snapshot.
+  func report(
+    _ location: LocationResult, app: String? = nil, topics: [String] = [], budget: Int = 2500,
+    compact: Bool = false, at now: Date, in db: Database
+  ) throws -> BriefReport {
     let command = "silta --ws " + shellWord(location.workspace)
     let characters = BriefBudget.characters(tokens: budget)
-    let now = environment.clock.now()
-    let (current, settings, discussion, context) = try environment.db.read { db in
-      let id = try TaskService.workspaceID(location.workspace, in: db)
-      let settings = BriefSettings(
-        try WorkspaceSettings.read(workspaceID: id, in: db), workspace: location.workspace)
-      var selected = try location.currentTask.map {
-        try TaskService.lookup($0.ref, workspace: location.workspace, in: db)
-      }
-      if let current = selected {
-        selected?.waiting = try TaskService.waiting(current, at: now, in: db)
-      }
-      let discussion = try BriefDiscussion(
-        db: db, service: TaskService(environment: environment, workspace: location.workspace),
-        caller: environment.actor, workspace: location.workspace, command: command,
-        current: selected, now: now, characters: characters
-      ).sections()
-      return (
-        selected, settings, discussion,
-        try BriefContext(
-          db: db, location: location, actor: environment.actor, date: now,
-          archiveDays: settings.archiveAfterDays ?? WorkspaceSettings.defaultArchiveAfterDays
-        ).sections(topics: topics, compact: short || hook)
-      )
+    let id = try TaskService.workspaceID(location.workspace, in: db)
+    let settings = BriefSettings(
+      try WorkspaceSettings.read(workspaceID: id, in: db), workspace: location.workspace)
+    var selected = try location.currentTask.map {
+      try TaskService.lookup($0.ref, workspace: location.workspace, in: db)
     }
+    if let current = selected {
+      selected?.waiting = try TaskService.waiting(current, at: now, in: db)
+    }
+    let discussion = try BriefDiscussion(
+      db: db, service: TaskService(environment: environment, workspace: location.workspace),
+      caller: environment.actor, workspace: location.workspace, command: command,
+      current: selected, now: now, characters: characters
+    ).sections()
+    let context = try BriefContext(
+      db: db, location: location, actor: environment.actor, date: now,
+      archiveDays: settings.archiveAfterDays ?? WorkspaceSettings.defaultArchiveAfterDays
+    ).sections(topics: topics, compact: compact)
     let selection =
       (app.map { " --app " + shellWord($0) } ?? "")
       + topics.map { " --topic " + shellWord($0) }.joined()
     let more =
-      (current.map {
+      (selected.map {
         (budget < 2500 ? [command + " brief --task " + $0.ref + selection] : [])
           + [command + " task show " + $0.ref]
       }
@@ -54,13 +60,15 @@ package struct BriefService {
       + (discussion.inbox.isEmpty ? [] : [command + " inbox"])
     var report = BriefReport(
       location: BriefLocation(location), settings: settings,
-      currentTask: current?.ref,
+      currentTask: selected?.ref,
       sections: sections(
-        location, current: current, topics: topics,
+        location, current: selected, topics: topics,
         discussion: discussion.task, characters: characters)
         + discussion.inbox + context.sections,
       more: more, warnings: location.warnings + settings.warnings + context.warnings)
     report.trim(tokens: budget)
+    try report.hydrateDocProposals(
+      DocProposalInbox(workspace: location.workspace, at: now, in: db))
     report.insertDocuments(tokens: budget)
     return report
   }

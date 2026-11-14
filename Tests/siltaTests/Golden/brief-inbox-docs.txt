@@ -12,7 +12,7 @@ doc proposal doc:rules (3 pending)
 > why: A complete why
 > source: AC-1
 > body changed (9→8 bytes)
-(1 more proposed revisions)
+(1 more proposed revision)
 next: silta --ws 'acme' doc show 'doc:rules@4' --diff
 next: silta --ws 'acme' doc show 'doc:rules@3' --diff
 next: silta --ws 'acme' doc ls --archived --offset 0 --limit 20
