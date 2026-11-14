@@ -17,10 +17,18 @@ extension DocWritePolicyTests {
       let changed = Data("Acme\u{0}two".utf8)
       try store.write {
         try $0.database.execute(
-          sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT)", arguments: [original])
+          sql:
+            "UPDATE doc_rev SET body_md=CAST(? AS TEXT) WHERE doc_id=(SELECT id FROM doc WHERE slug='rules')",
+          arguments: [original])
       }
       #expect(
-        try store.read { try Data.fetchOne($0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev") }
+        try store.read {
+          try Data.fetchOne(
+            $0,
+            sql:
+              "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE doc_id=(SELECT id FROM doc WHERE slug='rules')"
+          )
+        }
           == original)
       let committed = Mutex<[[String]]>([])
       let git = ScriptedGitRunner(
@@ -33,7 +41,9 @@ extension DocWritePolicyTests {
         beforeRequest: { _ in
           try store.write {
             try $0.database.execute(
-              sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT)", arguments: [changed])
+              sql:
+                "UPDATE doc_rev SET body_md=CAST(? AS TEXT) WHERE doc_id=(SELECT id FROM doc WHERE slug='rules')",
+              arguments: [changed])
           }
           let truth = try DocVerificationPreparationTests.truth(store)
           committed.withLock { $0 = truth }
@@ -50,7 +60,11 @@ extension DocWritePolicyTests {
       #expect(git.isExhausted && committed.withLock { !$0.isEmpty })
       #expect(
         try store.read {
-          try Data.fetchOne($0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE rev=1")
+          try Data.fetchOne(
+            $0,
+            sql:
+              "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE rev=1 AND doc_id=(SELECT id FROM doc WHERE slug='rules')"
+          )
         } == changed)
       let after = try DocVerificationPreparationTests.truth(store)
       withKnownIssue("Kept-body baseline must compare bytes after NUL before allocating or writing")

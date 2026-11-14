@@ -61,7 +61,8 @@ extension DocEditCommandTests {
       #expect(result.termination == .exit(0) && result.stderr.isEmpty)
       #expect(!(result.stdout + result.stderr).contains("private-acme"))
       let shown = try SiltaBinary.run(
-        ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch)
+        ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch,
+        environment: TaskCommandTests.fixed)
       #expect(shown.termination == .exit(0))
       let stored = try Self.bodyBytes(store, revision: 1)
       withKnownIssue("Allowed body storage must preserve the complete masked credential") {
@@ -91,7 +92,8 @@ extension DocEditCommandTests {
       }
       #expect(try Self.bodyBytes(store, revision: 1) == Data(body.utf8))
       let original = try SiltaBinary.run(
-        ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch)
+        ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch,
+        environment: TaskCommandTests.fixed)
       #expect(
         original.termination == .exit(0) && original.stdout.contains("[REDACTED:private_key]"))
       #expect(!original.stdout.contains("private-acme"))
@@ -100,7 +102,8 @@ extension DocEditCommandTests {
       #expect(!result.stdout.contains("private-acme"))
       #expect(try Self.bodyBytes(store, revision: 1) == Data(body.utf8))
       let shown = try SiltaBinary.run(
-        ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch)
+        ["--ws", "acme", "doc", "show", "rules", "--json"], in: scratch,
+        environment: TaskCommandTests.fixed)
       #expect(shown.termination == .exit(0))
       let retained = try Self.bodyBytes(store, revision: 2)
       withKnownIssue("Retained accepted body must be copied byte-for-byte after NUL") {
