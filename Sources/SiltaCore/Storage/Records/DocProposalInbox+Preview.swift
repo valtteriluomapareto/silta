@@ -24,7 +24,9 @@ extension DocProposalInbox {
     guard let value = try value(row, name) else { return missing }
     let masked = SecretGuard.redacted(reference ? DocService.about([value]) : value)
     let flat = masked.map { character in
-      character.unicodeScalars.allSatisfy { CharacterSet.controlCharacters.contains($0) }
+      character.unicodeScalars.allSatisfy {
+        CharacterSet.controlCharacters.contains($0) || CharacterSet.newlines.contains($0)
+      }
         ? " " : String(character)
     }.joined()
     guard flat.count > 120 || flat.utf8.count > 512 else { return flat }

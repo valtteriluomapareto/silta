@@ -21,28 +21,7 @@ extension DocProposalInboxTests {
           : value == "linebreaks"
             ? "First\u{2028}Second\u{2029}" + family
             : String(repeating: "private-acme", count: 6000)
-      try store.write {
-        try $0.database.execute(
-          sql: """
-            UPDATE doc_rev SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),message=CAST(? AS TEXT)
-            WHERE state='proposed'
-            """, arguments: [Data(text.utf8), Data(text.utf8), Data(text.utf8)])
-        try $0.database.execute(
-          sql:
-            """
-            INSERT INTO task(id,uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
-            VALUES(1,'source',1,1,'Source','done','human:acme','','')
-            """
-        )
-        try $0.database.execute(
-          sql: "UPDATE workspace SET task_prefix=CAST(? AS TEXT)", arguments: [Data(text.utf8)])
-        try $0.database.execute(sql: "UPDATE doc_rev SET source_task_id=1 WHERE state='proposed'")
-      }
-      let stored = try store.read { db in
-        try Data.fetchOne(
-          db, sql: "SELECT CAST(message AS BLOB) FROM doc_rev WHERE state='proposed'")
-      }
-      #expect(stored == Data(text.utf8))
+      try setPreviewFields(text, in: store)
       let group = try #require(try preview(store).first)
       let member = try #require(group.members.first)
       let fields = [
@@ -55,12 +34,11 @@ extension DocProposalInboxTests {
         #expect(member.why.contains("[REDACTED:private_key]"))
       }
       if value == "linebreaks" {
-        withKnownIssue("Preview Unicode line separators must be flattened") {
-          #expect(
-            fields.allSatisfy { !$0.unicodeScalars.contains(where: CharacterSet.newlines.contains) }
-          )
-          #expect(member.why == "First Second " + family)
-        }
+        #expect(
+          fields.allSatisfy {
+            !$0.unicodeScalars.contains(where: CharacterSet.newlines.contains)
+          })
+        #expect(member.why == "First Second " + family)
       }
       if value == "unicode" {
         #expect(member.why.contains("characters omitted"))
@@ -80,12 +58,11 @@ extension DocProposalInboxTests {
       let tail = "\n-----END PRIVATE KEY-----"
       let value =
         head + String(repeating: "x", count: bytes - head.utf8.count - tail.utf8.count) + tail
-      try store.write {
-        try $0.database.execute(
-          sql: "UPDATE doc_rev SET message=? WHERE state='proposed'", arguments: [value])
-      }
+      try setPreviewFields(value, in: store)
       let member = try #require(try preview(store).first?.members.first)
-      #expect(member.why == (bytes == 65_536 ? "[REDACTED:private_key]" : "(65537 bytes omitted)"))
+      let expected = bytes == 65_536 ? "[REDACTED:private_key]" : "(65537 bytes omitted)"
+      #expect(member.why == expected && member.title == expected && member.kind == expected)
+      #expect(member.sourceTask == "(\(bytes + 2) bytes omitted)")
     }
   }
 
@@ -205,6 +182,31 @@ extension DocProposalInboxTests {
       #expect(member.read == (bytes == 512 ? expected : "silta --ws 'acme' doc ls"))
       #expect(try replay(member.read, home).termination == .exit(0))
     }
+  }
+
+  func setPreviewFields(_ text: String, in store: DatabaseStore) throws {
+    try store.write {
+      try $0.database.execute(
+        sql: """
+          UPDATE doc_rev SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),message=CAST(? AS TEXT)
+          WHERE state='proposed'
+          """, arguments: [Data(text.utf8), Data(text.utf8), Data(text.utf8)])
+      try $0.database.execute(
+        sql:
+          """
+          INSERT INTO task(id,uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
+          VALUES(1,'source',1,1,'Source','done','human:acme','','')
+          """
+      )
+      try $0.database.execute(
+        sql: "UPDATE workspace SET task_prefix=CAST(? AS TEXT)", arguments: [Data(text.utf8)])
+      try $0.database.execute(sql: "UPDATE doc_rev SET source_task_id=1 WHERE state='proposed'")
+    }
+    let stored = try store.read { db in
+      try Data.fetchOne(
+        db, sql: "SELECT CAST(message AS BLOB) FROM doc_rev WHERE state='proposed'")
+    }
+    #expect(stored == Data(text.utf8))
   }
 
 }
