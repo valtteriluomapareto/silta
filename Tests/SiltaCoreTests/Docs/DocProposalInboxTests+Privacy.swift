@@ -42,16 +42,15 @@ extension DocProposalInboxTests {
       #expect(stored == Data(text.utf8))
       let group = try #require(try preview(store).first)
       let member = try #require(group.members.first)
-      for field in [
+      let fields = [
         group.ref, member.ref, member.title, member.kind, member.why, member.sourceTask,
         member.summary,
-      ] {
-        #expect(field.count <= 120 && field.utf8.count <= 512)
-        withKnownIssue("Copied SQLite text truncates before a stored key footer") {
-          #expect(!field.contains("private-acme"))
-        } when: {
-          value == "key-nul"
-        }
+      ]
+      #expect(fields.allSatisfy { $0.count <= 120 && $0.utf8.count <= 512 })
+      withKnownIssue("Copied SQLite text truncates before a stored key footer") {
+        #expect(fields.allSatisfy { !$0.contains("private-acme") })
+      } when: {
+        value == "key-nul"
       }
       if value == "key" || value == "key-nul" {
         withKnownIssue("Complete stored key must be masked before clipping") {
