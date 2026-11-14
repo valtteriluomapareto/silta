@@ -56,8 +56,8 @@ extension DocProposalInboxTests {
   @Test func selectedWindowReturnsNoBodiesOrOversizedFields() throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
-      try add(100, in: store)
       try AcmeDocAttachments.attach("other", to: "app", in: store)
+      try add(100, in: store)
       try add(100, doc: "other", days: 1, in: store)
       let marker = "NEVER_RETURN_WHOLE_FIELD"
       let huge = String(repeating: marker, count: 4000)
