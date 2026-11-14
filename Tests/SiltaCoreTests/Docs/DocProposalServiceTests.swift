@@ -134,7 +134,7 @@ struct DocProposalServiceTests {
         let result = try service.propose(Self.request("rules-\(index)"), input: { "Shared body" })
         #expect(result.warnings.map(\.code) == (approval == nil ? [] : ["approval_unused"]))
       }
-      try store.read { db in
+      try store.read { (db: Database) throws in
         #expect(
           try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev WHERE state='proposed'") == 3)
         for table in ["link", "doc_verification", "approval"] {
@@ -179,6 +179,20 @@ struct DocProposalServiceTests {
     }
   }
 
+  @Test func sourceRecheckUsesTheCapturedClockInstant() throws {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      try Self.task(store, seq: 1)
+      let service = try Self.service(home, store)
+      let clock = try #require(service.environment.clock as? FakeClock)
+      _ = try service.propose(Self.request()) {
+        clock.advance(milliseconds: 10_800_000)
+        return "Body"
+      }
+      #expect(try Self.row(store)["source_task_id"] as Int64? != nil)
+    }
+  }
+
   @Test func explicitSourceUsesOwnedUIDWithoutRequiringFreshClaim() throws {
     try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
@@ -209,6 +223,16 @@ struct DocProposalServiceTests {
             "INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at) VALUES('pending',1,2,'Pending','proposed','human:acme','')"
         )
       }
+      var foreign = DocDraft(slug: "other", body: "Other document")
+      foreign.title = "Other"
+      foreign.about = ["service:push"]
+      _ = try DocStoreTests.accept(foreign, in: store, ids: SeededIDGenerator(seed: 93))
+      try store.write {
+        try $0.database.execute(
+          sql:
+            "UPDATE doc_rev SET rev=99 WHERE doc_id=(SELECT id FROM doc WHERE slug='other'); UPDATE doc SET current_rev=99 WHERE slug='other'"
+        )
+      }
       let before = try DocVerificationPreparationTests.truth(store)
       let request = DocProposalRequest(slug: "rules", base: base, why: "Why")
       _ = Self.refusal(base == "99" ? .notFound : .invalid) {
@@ -222,7 +246,8 @@ struct DocProposalServiceTests {
   }
 
   @Test(arguments: [
-    "pointer", "target", "base", "doc", "workspace", "claim", "claim-count", "explicit-source",
+    "pointer", "target", "base", "doc", "workspace", "claim", "heartbeat", "claim-count",
+    "explicit-source",
   ])
   func changedBaselineBindingOrSourceRollsBack(change: String) throws {
     try withScratchDirectory { home in
@@ -237,6 +262,7 @@ struct DocProposalServiceTests {
         "doc": "UPDATE doc SET uid='changed-doc'",
         "workspace": "UPDATE workspace SET uid='changed-workspace'",
         "claim": "UPDATE task SET claimed_by='agent:codex:other'",
+        "heartbeat": "UPDATE task SET claimed_at='2023-11-14T22:13:20.001Z'",
         "explicit-source": "UPDATE task SET uid='changed-task'",
       ]
       var request = DocProposalRequest(slug: "rules", base: "1", why: "Why")
@@ -253,7 +279,8 @@ struct DocProposalServiceTests {
           return "Proposed body"
         }
       }
-      #expect(!committed.isEmpty && (try DocVerificationPreparationTests.truth(store)) == committed)
+      #expect(!committed.isEmpty)
+      #expect(try DocVerificationPreparationTests.truth(store) == committed)
     }
   }
 
@@ -288,6 +315,8 @@ struct DocProposalServiceTests {
       try store.write {
         try $0.database.execute(
           sql: "UPDATE doc SET title=?,kind='legacy label'", arguments: [title])
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET title=?,kind='legacy label' WHERE rev=1", arguments: [title])
       }
       let service = try Self.service(home, store)
       _ = try service.propose(
@@ -297,6 +326,10 @@ struct DocProposalServiceTests {
       #expect(
         row["kind"] as String == "legacy label"
           && row["body_md"] as String == DocWritePolicyTests.secret)
+      let unchanged = try service.propose(
+        DocProposalRequest(slug: "rules", title: title, why: "Why"),
+        input: { DocWritePolicyTests.secret })
+      #expect(unchanged.ref == "doc:rules@3" && unchanged.warnings.isEmpty)
       var changed = DocProposalRequest(slug: "rules", title: title + " changed", why: "Why")
       _ = Self.refusal(.invalid) { _ = try service.propose(changed, input: { "Safe" }) }
       changed.title = "Valid"
