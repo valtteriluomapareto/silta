@@ -2,6 +2,7 @@
 """Replay authored actions through real Silta; emit native events, never call a model."""
 import json
 import os
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -87,6 +88,7 @@ def command(args, stdin=None):
     command.counter += 1
     if run.returncode:
         raise RuntimeError(f'Replay action failed: {rendered}\n{run.stdout}\n{run.stderr}')
+    return run
 
 
 command.counter = 0
@@ -107,6 +109,21 @@ for action in recording['phases'][phase]:
     elif 'file' in action:
         path = Path.cwd() / action['file']
         command(['/bin/sh', '-c', 'printf %s ' + shlex.quote(action['body']) + ' > ' + shlex.quote(str(path))])
+    elif 'doc_context' in action:
+        shown = command(['silta', '--ws', 'acme', 'brief', '--json'])
+        sections = json.loads(shown.stdout)['data']['sections']
+        refs = re.findall(r'doc:[a-z0-9][a-z0-9-]*', '\n'.join(
+            section['text'] for section in sections if section['id'] == 'docs'))
+        value = None
+        if refs:
+            shown = command(['silta', '--ws', 'acme', 'doc', 'show', refs[0], '--json'])
+            rule = re.search(r'^Fallback category: ([A-Z0-9_]+)$',
+                             json.loads(shown.stdout)['data']['output'], re.M)
+            value = rule[1] if rule else None
+        body = 'Unknown push category rule remains unresolved.'
+        if value and action['doc_context'] == 'pass':
+            body = 'Handle unknown push categories with ' + value + '.'
+        command(['silta', '--ws', 'acme', 'task', 'plan', 'AC-1', '-F', '-', '--json'], body)
     elif 'proposal' in action:
         args = evals.proposal_command(variant, trial_root)
         if action['proposal'] == 'approved':

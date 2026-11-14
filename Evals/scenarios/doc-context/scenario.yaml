@@ -1,0 +1,8 @@
+{
+  "id": "doc-context",
+  "prompt": "Plan how Acme mobile should handle unknown push categories on AC-1, then stop. Do not implement code.",
+  "timeout_s": 180,
+  "variants": [
+    "default"
+  ]
+}

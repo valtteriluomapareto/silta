@@ -98,5 +98,9 @@
   "backend_unchanged": {
     "scenario": "start-cross-repo",
     "variant": "default"
+  },
+  "doc_context": {
+    "scenario": "doc-context",
+    "variant": "default"
   }
 }

@@ -23,13 +23,26 @@ python3 -B Evals/tests/plant_open_faults.py artifacts/evals/open-faults.json
 python3 -B Evals/tests/plant_profile_faults.py artifacts/evals/profile-faults.json
 ```
 
-The output directory must not exist. The default matrix has both adapters, all six
-scenarios and three repeats. A policy scenario passes a repeat only when **all**
+The output directory must not exist. The default positive matrix has both adapters, seven scenarios and three repeats.
+`--core` retains the original four M1 scenarios. The document context outcome is
+the fallback token in a trial-authored recorded plan or result; a particular read
+method is not an outcome requirement. A policy scenario passes a repeat only when **all**
 its variants pass. `--recording fail --repeats 1` replays the authored failing
 behavior per scenario and must exit 1. Every individual scenario × variant × adapter
 trial must fail; aggregate failures cannot hide a passing negative control. Neither path discovers or launches an
 installed model client, even for a version check. `scripts/verify.sh full` includes
 the offline unittest suite after the Swift scenario tier.
+
+The diagnostic `doc-context-no-doc` is selected explicitly and omitted from the
+positive default matrix. Use the existing `--scenario doc-context-no-doc` selection
+with `--stub Evals/tests/stub_harness.py` and a fresh temporary output directory.
+Its normal authored replay must return 1, write complete JSON and HTML reports,
+and raw-fail the context outcome without an infrastructure error. Each adapter
+is tested. The report's scenario pass rate is the diagnostic; separate primary
+and control reports are not automatically combined. The control file named
+`pass` means ordinary replay behavior, not a passing verdict. No additional live
+invocation or sign-in is launched automatically. Live model outcomes and the
+maintainer-only M1 criterion remain separate.
 
 The stub executes recorded actions through the actual Silta binary, emitting the
 Claude or Codex native event shape. The paired recordings are authored fixtures,

@@ -1,5 +1,5 @@
 {
-  "stub_sha256": "3b223e20cc1091ae921689c3c4d47536d085f6311df45c5ab850a78a3cc119b4",
+  "stub_sha256": "e259e6cefc63b02bb0d2503b77bad5b2a31dedf999d3834c9416a7df53426fe5",
   "recordings": {
     "start-cross-repo-pass": {
       "sha256": "f0fea00a9402b4597416e33719bc04952f67e633778dd7ac377e0e96dfb2a4ee",
@@ -416,6 +416,50 @@
             "tool-audit"
           ],
           "reason": "The actual task operations contain no forbidden activity; nonzero harness exit is separately rejected."
+        }
+      }
+    },
+    "doc-context-pass": {
+      "sha256": "d888dfed36c781def9c881b0042dc78d2a387ce8e7b1cfeab38eb2dc78717026",
+      "variants": {
+        "default": {
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters execute scoped brief/start/read/plan commands with complete matching native pairs and successful actor logs. The printed edge-attached document leads to its actual body; its fallback value is recorded in a new trial-owned AC-1 plan. No forbidden activity observed."
+        }
+      }
+    },
+    "doc-context-fail": {
+      "sha256": "6327c56536cdeb31cac299c2a0380b7725b9cbcfc3632b3df08135f68d586301",
+      "variants": {
+        "default": {
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters read the actual attached document through scoped commands with complete native/log evidence, then deliberately record an unresolved AC-1 plan. Tool behavior is certifiable; the missing recorded fallback remains an independent outcome failure."
+        }
+      }
+    },
+    "doc-context-no-doc-pass": {
+      "sha256": "d888dfed36c781def9c881b0042dc78d2a387ce8e7b1cfeab38eb2dc78717026",
+      "variants": {
+        "default": {
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters complete scoped brief/start/plan operations normally. No document exists or is shown; the new trial-owned plan remains unresolved. The pass filename describes normal replay, not a passing outcome."
+        }
+      }
+    },
+    "doc-context-no-doc-fail": {
+      "sha256": "6327c56536cdeb31cac299c2a0380b7725b9cbcfc3632b3df08135f68d586301",
+      "variants": {
+        "default": {
+          "checks": [
+            "tool-audit"
+          ],
+          "reason": "Both adapters complete scoped brief/start/plan operations normally without a document or doc-show invocation, recording an unresolved trial-owned plan. No forbidden activity observed; no positive outcome is certified."
         }
       }
     }
