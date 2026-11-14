@@ -23,7 +23,7 @@ struct DocBodyUTF8TransportTests {
       let before = try RestoreSupport.dump(store)
       let snapshot = try ExportDocumentSnapshotTests.read(store)
       let parsed = try ExportDocumentSnapshot.parse(snapshot.files(), workspace: "acme")
-      let expected = Array(repeating: Data(body.utf8), count: 5)
+      let expected: [Data?] = Array(repeating: Data(body.utf8), count: 5)
       withKnownIssue("Document export capture must retain revision body bytes after NUL") {
         #expect(Self.values(snapshot) == expected)
         #expect(Self.values(parsed) == expected)
