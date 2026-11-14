@@ -98,6 +98,36 @@ class DocContext(unittest.TestCase):
         e['baseline']['plans'] = copy.deepcopy(e['phases'][-1]['state']['plans'])
         self.assertFalse(self.outcome(e))
 
+    def check_complete_token_boundaries(self, method):
+        self.prepare()
+        if method == 'plan':
+            self.phase(lambda: self.run_cli(['task', 'plan', 'AC-1', '-F', '-', '--json'],
+                                           stdin=TOKEN + 'ä'))
+        else:
+            self.phase(lambda: self.edit(result=TOKEN + 'ä'))
+        self.assertFalse(self.outcome(), method + ' must reject a real Unicode-suffixed outcome')
+        for body, expected in [(TOKEN, True), ('Use ' + TOKEN + '.', True),
+                               ('(' + TOKEN + ')', True), ('NOT_' + TOKEN, False),
+                               (TOKEN + '_EXTRA', False), (TOKEN.lower(), False),
+                               ('é' + TOKEN, False), (TOKEN + 'ä', False),
+                               ('٢' + TOKEN, False), (TOKEN + '٢', False)]:
+            evidence = copy.deepcopy(self.e)
+            state = evidence['phases'][-1]['state']
+            if method == 'plan':
+                state['plans'][-1]['body_md'] = body
+            else:
+                state['tasks'][0]['result_md'] = body
+            with self.subTest(method=method, body=body):
+                self.assertEqual(self.outcome(evidence), expected)
+
+    @unittest.expectedFailure
+    def test_plan_requires_complete_unicode_token_word(self):
+        self.check_complete_token_boundaries('plan')
+
+    @unittest.expectedFailure
+    def test_result_requires_complete_unicode_token_word(self):
+        self.check_complete_token_boundaries('result')
+
     def test_result_done_drop_edit_and_triage_drop(self):
         original = self.root
         for method in ['done', 'drop', 'edit', 'triage']:
@@ -213,23 +243,34 @@ class DocContext(unittest.TestCase):
 
     def test_explicit_control_has_raw_failure_full_reports_and_no_infrastructure_error(self):
         for harness in ['claude', 'codex']:
-            output = self.root / (harness + '-control')
-            run = subprocess.run([sys.executable, '-B', str(ROOT / 'evals.py'), '--silta', str(BINARY),
-                                  '--stub', str(STUB), '--harness', harness, '--scenario',
-                                  'doc-context-no-doc', '--repeats', '1', '--output', str(output)],
-                                 text=True, capture_output=True)
-            self.assertEqual(run.returncode, 1, run.stderr)
-            report = json.loads((output / 'report.json').read_text())
-            self.assertTrue((output / 'report.html').exists())
-            trial = report['trials'][0]
-            self.assertIn('doc_context', trial['checks'])
-            self.assertFalse(trial['checks']['doc_context'])
-            self.assertNotIn('infrastructure', trial['checks'])
-            e = json.loads((output / trial['evidence']).read_text())
-            self.assertEqual(e['phases'][0]['exit'], 0)
-            self.assertTrue(e['phases'][0]['complete'])
-            self.assertFalse(trial['passed'])
-            self.assertEqual(report['groups'][0]['pass_rate'], 0)
+            for recording in ['pass', 'fail']:
+                with self.subTest(harness=harness, recording=recording):
+                    output = self.root / (harness + '-control-' + recording)
+                    run = subprocess.run([sys.executable, '-B', str(ROOT / 'evals.py'), '--silta', str(BINARY),
+                                          '--stub', str(STUB), '--harness', harness, '--scenario',
+                                          'doc-context-no-doc', '--recording', recording, '--repeats', '3',
+                                          '--output', str(output)], text=True, capture_output=True)
+                    self.assertEqual(run.returncode, 1, run.stderr)
+                    report = json.loads((output / 'report.json').read_text())
+                    self.assertTrue((output / 'report.html').exists())
+                    self.assertEqual(len(report['trials']), 3)
+                    self.assertEqual({trial['repeat'] for trial in report['trials']}, {1, 2, 3})
+                    for trial in report['trials']:
+                        self.assertFalse(trial['checks']['doc_context'])
+                        self.assertNotIn('infrastructure', trial['checks'])
+                        self.assertTrue(all(value is True for name, value in trial['checks'].items()
+                                            if name != 'doc_context'))
+                        evidence = json.loads((output / trial['evidence']).read_text())
+                        self.assertEqual(evidence['recording'], recording)
+                        phase = evidence['phases'][0]
+                        self.assertEqual(phase['exit'], 0)
+                        self.assertTrue(phase['complete'])
+                        self.assertIs(evals.trace_matches_logs(phase, harness), True)
+                        self.assertFalse(trial['passed'])
+                    self.assertEqual(len(report['groups']), 1)
+                    self.assertEqual(report['groups'][0]['repeats'], 3)
+                    self.assertEqual(report['groups'][0]['pass_rate'], 0)
+                    self.assertFalse(report['groups'][0]['all_repeats_pass'])
 
     def test_default_core_and_explicit_control_selection(self):
         for selection, expected in [([], set(evals.SCENARIOS) - {'doc-context-no-doc'}),
