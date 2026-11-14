@@ -168,11 +168,8 @@ extension DocProposalInboxTests {
         let result = try replay(command, home)
         if command.contains(" doc ls") {
           #expect(command.contains(" --archived"))
-          withKnownIssue("Historical omitted-member and protected list recovery must be replayable")
-          {
-            #expect(result.termination == .exit(0) && result.stderr.isEmpty)
-            #expect(result.stdout.contains("@2"))
-          }
+          #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+          #expect(result.stdout.contains("@2"))
         } else {
           #expect(result.termination == .exit(0) && result.stderr.isEmpty)
         }
