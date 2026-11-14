@@ -6,7 +6,7 @@ import Testing
 @testable import SiltaCore
 
 extension DocProposalInboxTests {
-  @Test(arguments: ["key", "key-nul", "unicode", "oversize"])
+  @Test(arguments: ["key", "key-nul", "unicode", "linebreaks", "oversize"])
   func fullFieldsAreMaskedBeforeCharacterAndByteBounds(value: String) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
@@ -17,7 +17,10 @@ extension DocProposalInboxTests {
         ? "-----BEGIN PRIVATE KEY-----\n" + String(repeating: "private-acme", count: 30)
           + (value == "key-nul" ? "\u{0}" : "") + "\n-----END PRIVATE KEY-----"
         : value == "unicode"
-          ? String(repeating: family, count: 100) : String(repeating: "private-acme", count: 6000)
+          ? String(repeating: family, count: 100)
+          : value == "linebreaks"
+            ? "First\u{2028}Second\u{2029}" + family
+            : String(repeating: "private-acme", count: 6000)
       try store.write {
         try $0.database.execute(
           sql: """
@@ -50,6 +53,14 @@ extension DocProposalInboxTests {
       #expect(fields.allSatisfy { !$0.contains("private-acme") })
       if value == "key" || value == "key-nul" {
         #expect(member.why.contains("[REDACTED:private_key]"))
+      }
+      if value == "linebreaks" {
+        withKnownIssue("Preview Unicode line separators must be flattened") {
+          #expect(
+            fields.allSatisfy { !$0.unicodeScalars.contains(where: CharacterSet.newlines.contains) }
+          )
+          #expect(member.why == "First Second " + family)
+        }
       }
       if value == "unicode" {
         #expect(member.why.contains("characters omitted"))
