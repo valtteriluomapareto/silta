@@ -143,7 +143,8 @@ extension DocProposalServiceTests {
     }
   }
   @Test(arguments: [
-    "pointer", "target", "base", "doc", "workspace", "claim", "heartbeat", "claim-count",
+    "pointer", "target", "new-target", "base", "doc", "workspace", "claim", "heartbeat",
+    "claim-count",
     "explicit-source",
   ])
   func changedBaselineBindingOrSourceRollsBack(change: String) throws {
@@ -155,6 +156,7 @@ extension DocProposalServiceTests {
       let statements = [
         "pointer": "UPDATE doc SET current_rev=1",
         "target": "UPDATE service SET uid='changed-service'",
+        "new-target": "UPDATE app SET uid='changed-app'",
         "base": "UPDATE doc_rev SET uid='changed-base' WHERE rev=1",
         "doc": "UPDATE doc SET uid='changed-doc'",
         "workspace": "UPDATE workspace SET uid='changed-workspace'",
@@ -164,6 +166,7 @@ extension DocProposalServiceTests {
       ]
       var request = DocProposalRequest(slug: "rules", base: "1", why: "Why")
       if change == "explicit-source" { request.task = "AC-1" }
+      if change == "new-target" { request.about = ["app:api"] }
       var committed: [[String]] = []
       _ = Self.refusal(.conflict) {
         _ = try Self.service(home, store).propose(request) {
