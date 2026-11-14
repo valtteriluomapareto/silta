@@ -57,19 +57,15 @@ struct DocLegacyEvidenceReadTests {
         for json in [false, true] {
           let result = try SiltaBinary.run(
             ["--ws", "acme", "doc", "ls"] + flags + (json ? ["--json"] : []), in: scratch)
-          withKnownIssue("Historical list queries must not require later revision metadata") {
-            #expect(result.termination == .exit(0) && result.stderr.isEmpty)
-            #expect(result.stdout.contains(json ? "\"total\":\(total)" : "total \(total))"))
-            if total > 0 {
-              #expect(result.stdout.contains("doc:rules@4") && result.stdout.contains("(unknown)"))
-            }
-            #expect(!result.stdout.contains("Projection title"))
+          #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+          #expect(result.stdout.contains(json ? "\"total\":\(total)" : "total \(total))"))
+          if total > 0 {
+            #expect(result.stdout.contains("doc:rules@4") && result.stdout.contains("(unknown)"))
           }
+          #expect(!result.stdout.contains("Projection title"))
         }
       }
-      withKnownIssue("Historical global continuation must reveal every omitted member") {
-        try replayListPages(scratch)
-      }
+      try replayListPages(scratch)
       let missing = try SiltaBinary.run(
         ["--ws", "acme", "doc", "ls", "--about", "app:missing", "--json"], in: scratch)
       #expect(missing.termination == .exit(2))
@@ -91,7 +87,8 @@ struct DocLegacyEvidenceReadTests {
           INSERT INTO repo(id,uid,workspace_id,slug) VALUES(1,'platform',1,'platform');
           INSERT INTO app(id,uid,workspace_id,slug,name,repo_id,ref)
           VALUES(1,'api',1,'api','API',1,'main'),(2,'other',1,'other','Other',1,'other');
-          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
+            created_by,created_at)
           VALUES('about',1,'doc',1,'about','app',1,'human:acme','2023-11-14');
           INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,created_at)
           VALUES('third',1,3,1,'Third','proposed','agent:codex:writer','2023-11-15'),

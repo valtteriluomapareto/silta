@@ -24,12 +24,8 @@ struct DocListMetadataUTF8Tests {
           let result = try SiltaBinary.run(
             ["--ws", "acme", "doc", "ls"] + flags + (json ? ["--json"] : []), in: scratch)
           #expect(result.termination == .exit(0) && result.stderr.isEmpty)
-          withKnownIssue("Copied list metadata must retain the credential footer after NUL") {
-            #expect(!result.stdout.contains("private-acme"))
-            #expect(result.stdout.contains("[REDACTED:private_key]"))
-          } when: {
-            field != "about_refs"
-          }
+          #expect(!result.stdout.contains("private-acme"))
+          #expect(result.stdout.contains("[REDACTED:private_key]"))
         }
       }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
@@ -49,17 +45,15 @@ struct DocListMetadataUTF8Tests {
       }
       #expect(try stored(field, in: store) == bytes)
       let before = try DocVerificationPreparationTests.truth(store)
-      withKnownIssue("Invalid stored list metadata must use the existing corruption refusal") {
-        #expect(throws: StorageError.corrupt) {
-          _ = try DocService(workspace: "acme", store: store).list()
-        }
-        let result = try SiltaBinary.run(["--ws", "acme", "doc", "ls", "--json"], in: scratch)
-        #expect(result.termination == .exit(9) && result.stderr.isEmpty)
-        let envelope = try #require(
-          try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
-        let error = try #require(envelope["error"] as? [String: Any])
-        #expect(error["code"] as? String == "env" && envelope["data"] == nil)
+      #expect(throws: StorageError.corrupt) {
+        _ = try DocService(workspace: "acme", store: store).list()
       }
+      let result = try SiltaBinary.run(["--ws", "acme", "doc", "ls", "--json"], in: scratch)
+      #expect(result.termination == .exit(9) && result.stderr.isEmpty)
+      let envelope = try #require(
+        try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+      let error = try #require(envelope["error"] as? [String: Any])
+      #expect(error["code"] as? String == "env" && envelope["data"] == nil)
       #expect(try DocVerificationPreparationTests.truth(store) == before)
       #expect(try stored(field, in: store) == bytes)
     }
