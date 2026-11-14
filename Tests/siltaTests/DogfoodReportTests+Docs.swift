@@ -18,9 +18,10 @@ extension DogfoodReportTests {
           WHERE NOT EXISTS(SELECT 1 FROM doc WHERE workspace_id=?);
           """, arguments: ["report-doc-\(workspace)", workspace, workspace])
       let id = try #require(
-        Int.fetchOne(db, sql: "SELECT id FROM doc WHERE workspace_id=?", arguments: [workspace]))
+        try Int.fetchOne(db, sql: "SELECT id FROM doc WHERE workspace_id=?", arguments: [workspace])
+      )
       let seq = try #require(
-        Int.fetchOne(
+        try Int.fetchOne(
           db, sql: "SELECT coalesce(max(rev),0)+1 FROM doc_rev WHERE doc_id=?", arguments: [id]))
       try db.execute(
         sql: """

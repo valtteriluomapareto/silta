@@ -21,7 +21,7 @@ extension DogfoodReportTests {
     workspace: String = "silta"
   ) throws {
     try store.write { tx in
-      let count = try #require(Int.fetchOne(tx.database, sql: "SELECT count(*) FROM approval"))
+      let count = try #require(try Int.fetchOne(tx.database, sql: "SELECT count(*) FROM approval"))
       try tx.database.execute(
         sql: """
           INSERT INTO approval(uid,workspace,actor,command,words,created_at)
