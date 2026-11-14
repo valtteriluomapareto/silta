@@ -46,6 +46,11 @@ extension DocService {
     }
     return try store.read { db in
       let workspaceID = try TaskService.workspaceID(workspace, in: db)
+      let metadata = try db.columns(in: "doc_rev").contains { $0.name == "about_refs" }
+      let snapshotRefs = metadata ? "doc_rev.about_refs" : "NULL"
+      let columns = ["title", "kind", "about_refs"].map {
+        metadata ? "CAST(doc_rev.\($0) AS BLOB) AS \($0)" : "NULL AS \($0)"
+      }.joined(separator: ",")
       var predicate =
         "doc.workspace_id=? AND (? OR doc.archived=0)"
         + " AND ((doc_rev.rev=doc.current_rev AND doc_rev.state='accepted')"
@@ -57,7 +62,7 @@ extension DocService {
            AND (EXISTS(SELECT 1 FROM link WHERE link.workspace_id=doc.workspace_id
              AND from_kind='doc' AND from_id=doc.id AND rel='about' AND to_kind=? AND to_id=?)
              OR (doc_rev.state='proposed' AND EXISTS(
-               SELECT 1 FROM json_each(doc_rev.about_refs) WHERE value=?)))
+               SELECT 1 FROM json_each(\(snapshotRefs)) WHERE value=?)))
           """
         arguments += [target.kind, target.id, about]
       }
@@ -66,8 +71,7 @@ extension DocService {
       let rows = try Row.fetchAll(
         db,
         sql:
-          "SELECT doc.slug,doc_rev.id,doc_rev.rev,doc_rev.state,doc_rev.title,doc_rev.kind,"
-          + "doc_rev.about_refs"
+          "SELECT CAST(doc.slug AS BLOB) AS slug,doc_rev.id,doc_rev.rev,doc_rev.state," + columns
           + join + " ORDER BY doc.slug,doc_rev.rev LIMIT ? OFFSET ?",
         arguments: arguments + [limit, offset])
       let entries = try rows.map { try entry($0, in: db) }
@@ -97,15 +101,21 @@ extension DocService {
   }
 
   private func entry(_ row: Row, in db: Database) throws -> DocListResult.Entry {
-    let ref = "doc:\(row["slug"] as String)@\(row["rev"] as Int)"
+    func text(_ name: String) throws -> String? {
+      guard let bytes: Data = row[name] else { return nil }
+      guard let value = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
+      return value
+    }
+    guard let slug = try text("slug") else { throw StorageError.corrupt }
+    let ref = "doc:\(slug)@\(row["rev"] as Int)"
     let state: String = row["state"]
-    let raw: String? = row["about_refs"]
+    let raw = try text("about_refs")
     let refs: [String]?
     do {
       refs = try raw.map { try JSONDecoder().decode([String].self, from: Data($0.utf8)) }
     } catch { throw StorageError.corrupt }
-    let title: String? = row["title"]
-    let kind: String? = row["kind"]
+    let title = try text("title")
+    let kind = try text("kind")
     let rendered = DocReadResult(
       masking: ref,
       output: "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
