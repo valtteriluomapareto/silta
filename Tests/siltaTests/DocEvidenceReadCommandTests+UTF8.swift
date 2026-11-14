@@ -24,7 +24,7 @@ extension DocEvidenceReadCommandTests {
       try store.write { try $0.database.execute(sql: sql, arguments: [Data(value.utf8)]) }
       #expect(try store.read { try Data.fetchOne($0, sql: read) } == Data(value.utf8))
       let before = try truth(store)
-      for flags in [[], ["--diff"], ["--lines", "1:400"]] {
+      for flags in [[], ["--diff"], ["--lines", "1-400"]] {
         for json in [false, true] {
           let result = try run(flags, scratch, json: json)
           #expect(result.termination == .exit(0) && result.stderr.isEmpty)
