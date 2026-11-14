@@ -35,7 +35,17 @@ extension DocProposalService {
     _ request: DocProposalRequest, workspace: String, id: Int64, at: Date, in db: Database
   ) throws -> (id: Int64?, fields: [String?]) {
     if let ref = request.task {
-      let task = try TaskService.lookup(ref, workspace: workspace, in: db)
+      let task: TaskDetails
+      do { task = try TaskService.lookup(ref, workspace: workspace, in: db) } catch let error
+        as TaskError
+      {
+        throw CommandFailure(
+          error: error,
+          next: [
+            workspaceCommand(
+              "silta task ls --proposed --promoted --archived", workspace: workspace)
+          ])
+      }
       guard
         let uid = try String.fetchOne(
           db, sql: "SELECT uid FROM task WHERE id=?", arguments: [task.id])

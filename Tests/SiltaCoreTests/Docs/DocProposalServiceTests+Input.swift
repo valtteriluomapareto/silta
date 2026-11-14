@@ -29,10 +29,8 @@ extension DocProposalServiceTests {
       } else {
         let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
         let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
-        withKnownIssue("SI-118/8: Preparation discovery must survive proposal recovery") {
-          Golden.forTests().check(
-            text.stderr + json.stdout, "doc-proposal-discovery-" + kind + ".txt")
-        }
+        Golden.forTests().check(
+          text.stderr + json.stdout, "doc-proposal-discovery-" + kind + ".txt")
       }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
