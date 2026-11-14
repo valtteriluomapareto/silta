@@ -115,7 +115,7 @@ extension DogfoodReportTests {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
       for time in [
-        "2023-10-01T00:00:00.000Z", "2023-10-31T23:59:59.999Z", "2023-11-01T00:00:00.000Z",
+        "2023-10-01T00:00:00.000Z", "2023-10-30T23:59:59.999Z", "2023-10-31T00:00:00.000Z",
         "2023-11-16T00:00:00.000Z", "2023-11-16T00:00:00.001Z",
       ] {
         try Self.document(store, created: time)
