@@ -19,7 +19,7 @@ extension DocProposalService {
     if request.task != nil || fields.contains("--task") { retry += " --task <ref>" }
     let read = DocService(workspace: workspace, store: environment.db)
     let next =
-      error.code == .notFound || error.code == .conflict
+      error.code == .notFound || error.code == .conflict || request.base != nil
       ? [read.showCommand("doc:" + request.slug), workspaceCommand(retry, workspace: workspace)]
       : [workspaceCommand(retry, workspace: workspace)]
     return CommandFailure(error: error, next: next, nextBy: .agent, message: message)
