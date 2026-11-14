@@ -242,13 +242,7 @@ struct DocProposalServiceTests {
             return "Body"
           }
         })
-      if base == "99" {
-        #expect(error.next.first == "silta --ws 'acme' doc show 'doc:rules'")
-      } else {
-        withKnownIssue("SI-118: Invalid bases need current revision recovery") {
-          #expect(error.next.first == "silta --ws 'acme' doc show 'doc:rules'")
-        }
-      }
+      #expect(error.next.first == "silta --ws 'acme' doc show 'doc:rules'")
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
@@ -383,7 +377,7 @@ struct DocProposalServiceTests {
     }
   }
 
-  @Test(arguments: ["oversize", "redaction", "counter", "insert"])
+  @Test(arguments: ["oversize", "redaction", "redaction-shrink", "counter", "insert"])
   func boundsAndLateFailuresWriteNothing(failure: String) throws {
     try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
@@ -402,10 +396,16 @@ struct DocProposalServiceTests {
         }
       }
       let before = try DocVerificationPreparationTests.truth(store)
-      let body =
-        failure == "redaction"
-        ? "Pwd=x " + String(repeating: ".", count: 65_530)
-        : String(repeating: ".", count: failure == "oversize" ? 65_537 : 65_536)
+      let body: String
+      switch failure {
+      case "redaction": body = "Pwd=x " + String(repeating: ".", count: 65_530)
+      case "redaction-shrink": body = "Pwd=" + String(repeating: "x", count: 65_533)
+      default: body = String(repeating: ".", count: failure == "oversize" ? 65_537 : 65_536)
+      }
+      if failure == "redaction-shrink" {
+        #expect(body.utf8.count > DocInput.maximumBytes)
+        #expect(SecretGuard.redacted(body).utf8.count < DocInput.maximumBytes)
+      }
       if failure == "counter" || failure == "insert" {
         #expect(
           throws: failure == "counter" ? StorageError.resourceExhausted : .constraintViolation
