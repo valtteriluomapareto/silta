@@ -5,6 +5,39 @@ import Testing
 @testable import SiltaCore
 
 extension DocProposalServiceTests {
+  @Test(arguments: ["workspace", "about", "source", "storage"])
+  func preparationFailuresKeepScopedDiscoveryAndStorageIdentity(kind: String) throws {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      var service = try Self.service(home, store)
+      var request = Self.request()
+      if kind == "workspace" { service.workspace = "missing" }
+      if kind == "about" { request.about = ["service:missing"] }
+      if kind == "source" { request.task = "AC-99" }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let error = try #require(
+        Self.refusal(kind == "storage" ? .env : .notFound) {
+          _ = try service.propose(request) {
+            if kind == "storage" { throw StorageError.accessDenied }
+            Issue.record("Preparation failure read input")
+            return "Private input"
+          }
+        })
+      if kind == "storage" {
+        #expect(error as? StorageError == .accessDenied)
+        #expect(error.next == ["silta doctor"])
+      } else {
+        let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
+        let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
+        withKnownIssue("SI-118/8: Preparation discovery must survive proposal recovery") {
+          Golden.forTests().check(
+            text.stderr + json.stdout, "doc-proposal-discovery-" + kind + ".txt")
+        }
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
   @Test(arguments: [false, true])
   func suppliedSecretsRefuseHumanAndRedactAgent(human: Bool) throws {
     try withScratchDirectory { home in

@@ -1,0 +1,4 @@
+error: service missing not found. [not_found]
+next: silta --ws 'acme' ws show
+next: silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --title <title> --about <ref>
+{"error":{"code":"not_found","message":"service missing not found.","next":["silta --ws 'acme' ws show","silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --title <title> --about <ref>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
