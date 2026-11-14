@@ -24,7 +24,7 @@ struct DocInboxCommandTests {
       let next = try #require(items.first?["next"] as? [String])
       #expect(next.count == 3 && Set(next).count == 3)
       for command in next {
-        let script = shellWord(try SiltaBinary.url().path) + command.dropFirst(5)
+        let script = shellWord(try SiltaBinary.url().path) + String(command.dropFirst(5))
         let replay = try SiltaBinary.runProcess(
           URL(filePath: "/bin/sh"), ["-c", script], in: scratch, environment: Self.environment)
         #expect(replay.termination == .exit(0) && replay.stderr.isEmpty)
