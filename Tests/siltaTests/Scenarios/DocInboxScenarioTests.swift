@@ -19,14 +19,14 @@ struct DocInboxScenarioTests {
 
   private static let contract = """
     steps:
-      - args: [--ws, acme, inbox, --json]
-        env: {SILTA_ACTOR: 'human:acme', USER: acme}
+      - args: [--ws, acme, inbox, --for, me, --json]
+        env: {SILTA_ACTOR: 'agent:codex:acme', USER: acme}
         expect: {exit: 0, json: {data.items.0.kind: doc_proposal, data.items.0.doc_proposal.total: 3}}
       - args: [--ws, acme, doc, show, 'doc:rules@4', --diff, --json]
-        env: {SILTA_ACTOR: 'human:acme', USER: acme}
+        env: {SILTA_ACTOR: 'agent:codex:acme', USER: acme}
         expect: {exit: 0, json: {data.ref: 'doc:rules@4'}}
       - args: [--ws, acme, doc, ls, --archived, --json]
-        env: {SILTA_ACTOR: 'human:acme', USER: acme}
+        env: {SILTA_ACTOR: 'agent:codex:acme', USER: acme}
         expect: {exit: 0, json: {data.total: 4}}
     """
 }

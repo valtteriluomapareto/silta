@@ -10,7 +10,7 @@ struct DocInboxCommandTests {
   func concreteDocumentPayloadAndEveryReadCommand(json: Bool) throws {
     try withScratchDirectory { scratch in
       _ = try fixture(scratch)
-      let args = ["--ws", "acme", "inbox"]
+      let args = ["--ws", "acme", "inbox", "--for", "me"]
       let result = try run(args + (json ? ["--json"] : []), scratch)
       #expect(result.termination == .exit(0) && result.stderr.isEmpty)
       Golden.forTests().check(result.stdout, "inbox-docs.\(json ? "json" : "txt")")
@@ -65,6 +65,6 @@ struct DocInboxCommandTests {
   }
 
   static let environment = TaskCommandTests.fixed.merging([
-    "SILTA_ACTOR": "human:acme", "USER": "acme",
+    "SILTA_ACTOR": "agent:codex:acme", "USER": "acme",
   ]) { $1 }
 }

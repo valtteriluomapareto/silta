@@ -7,9 +7,13 @@ extension DocInboxCommandTests {
     try withScratchDirectory { scratch in
       let repo = try WhereCommandTests().setup(scratch)
       _ = try fixture(scratch)
-      let result = try SiltaBinary.run(
-        ["brief", "--ws", "acme", "--app", "api", "--json"], in: scratch, cwd: repo,
-        environment: Self.environment)
+      var result = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/script"),
+        ["-q", "/dev/null", try SiltaBinary.url().path, "brief", "--ws", "acme", "--app", "api", "--json"],
+        in: scratch, cwd: repo,
+        environment: Self.environment.merging(["SILTA_ACTOR": "human:acme"]) { $1 })
+      result.stdout = result.stdout.replacingOccurrences(of: "\r\n", with: "\n")
+        .replacingOccurrences(of: "^D\u{08}\u{08}", with: "")
       #expect(result.termination == .exit(0) && result.stderr.isEmpty)
       let data = try TaskStateRegressionTests.data(result)
       let sections = try #require(data["sections"] as? [[String: Any]])
