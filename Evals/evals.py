@@ -1084,7 +1084,7 @@ def doc_context(e):
         return next((t for t in (state or {}).get('tasks', [])
                      if t['id'] == original['id'] and t['uid'] == original['uid']), None)
     def names_token(body):
-        return bool(re.search(r'(?<![A-Za-z0-9_])UNSORTED_Q7(?![A-Za-z0-9_])', body or ''))
+        return bool(re.search(r'(?<!\w)UNSORTED_Q7(?!\w)', body or ''))
     final = phases[-1].get('state')
     if any(task(p.get('state')) is None for p in phases):
         return False

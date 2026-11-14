@@ -120,11 +120,9 @@ class DocContext(unittest.TestCase):
             with self.subTest(method=method, body=body):
                 self.assertEqual(self.outcome(evidence), expected)
 
-    @unittest.expectedFailure
     def test_plan_requires_complete_unicode_token_word(self):
         self.check_complete_token_boundaries('plan')
 
-    @unittest.expectedFailure
     def test_result_requires_complete_unicode_token_word(self):
         self.check_complete_token_boundaries('result')
 
