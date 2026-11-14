@@ -48,10 +48,11 @@ extension TaskService {
   }
 
   /// Ordered attention metadata and its uncapped count inside the caller's snapshot.
-  /// The optional window bounds document IDs; no proposal previews are hydrated here.
+  /// The optional window excludes current-task attention when it has separate display slots.
+  /// Only document IDs are selected; no proposal previews are hydrated here.
   func inboxAttention(
     for actor: ActorID, workspace slug: String, all: Bool, at: Date, limit: Int? = nil,
-    in db: Database
+    currentTask: String? = nil, in db: Database
   ) throws -> (items: [InboxItem], total: Int) {
     let command = "silta --ws " + shellWord(slug)
     let workspaceID = try Self.workspaceID(slug, in: db)
@@ -64,7 +65,8 @@ extension TaskService {
     let proposals = Array(backlog.prefix { $0.kind == "proposal" })
     let reader = try DocProposalInbox(workspace: slug, at: at, all: all, in: db)
     let count = try reader.count()
-    let groups = try reader.groups(limit: limit.map { max(0, $0 - urgent.count) })
+    let preceding = urgent.filter { $0.task == nil || $0.task != currentTask }.count
+    let groups = try reader.groups(limit: limit.map { max(0, $0 - preceding) })
     let documents = groups.map {
       InboxItem(kind: "doc_proposal", createdAt: $0.newestAt, next: [], proposalGroup: $0)
     }

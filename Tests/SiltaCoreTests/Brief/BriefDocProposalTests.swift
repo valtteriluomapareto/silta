@@ -150,11 +150,7 @@ struct BriefDocProposalTests {
         return (report, rows)
       }
       let kept = report.sections.filter { $0.text.hasPrefix("doc proposal ") }.count
-      withKnownIssue("On-current-task attention must not consume the separate document window") {
-        #expect(kept == (budget == 0 ? 0 : 3))
-      } when: {
-        budget > 0
-      }
+      #expect(kept == (budget == 0 ? 0 : 3))
       #expect(rows == kept * 2)
       if budget > 0 {
         #expect(report.sections.filter { $0.id == "task_inbox" }.count == questions)
@@ -164,7 +160,9 @@ struct BriefDocProposalTests {
     }
   }
 
-  private func makeReport(_ service: TaskService, budget: Int, current: TaskDetails? = nil, in db: Database) throws
+  private func makeReport(
+    _ service: TaskService, budget: Int, current: TaskDetails? = nil, in db: Database
+  ) throws
     -> BriefReport
   {
     var location = LocationResult(

@@ -25,7 +25,8 @@ struct BriefDiscussion {
   /// when the caller has no attention.
   func sections() throws -> (task: [BriefSection], inbox: [BriefSection]) {
     let attention = try service.inboxAttention(
-      for: caller, workspace: workspace, all: false, at: now, limit: Self.items, in: db)
+      for: caller, workspace: workspace, all: false, at: now, limit: Self.items,
+      currentTask: current?.ref, in: db)
     let items = attention.items
     var emitted: Set<String> = []
     var task: [BriefSection] = []
