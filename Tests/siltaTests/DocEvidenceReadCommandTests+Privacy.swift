@@ -35,6 +35,32 @@ extension DocEvidenceReadCommandTests {
     }
   }
 
+  @Test(arguments: ["triaged_by", "triaged_at"])
+  func completeDecisionMetadataIsMaskedBeforeDiffComparison(field: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      try store.write {
+        let db = $0.database
+        try db.execute(
+          sql: """
+            UPDATE doc_rev SET source_task_id=NULL,message=NULL,
+              triaged_by='human:reviewer',triaged_at='2023-11-16';
+            """)
+        for (revision, secret) in [(1, "Password=base-private"), (2, "Password=proposal-private")] {
+          try db.execute(
+            sql: "UPDATE doc_rev SET \(field)=? WHERE rev=?", arguments: [secret, revision])
+        }
+      }
+      let before = try truth(store)
+      let result = try run(["--diff"], scratch, json: true)
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("no visible changes"))
+      #expect(
+        !result.stdout.contains("base-private") && !result.stdout.contains("proposal-private"))
+      #expect(try truth(store) == before)
+    }
+  }
+
   @Test(arguments: [false, true])
   func longWhyRetainsPinnedContinuationsAndFullRead(diff: Bool) throws {
     try withScratchDirectory { scratch in
