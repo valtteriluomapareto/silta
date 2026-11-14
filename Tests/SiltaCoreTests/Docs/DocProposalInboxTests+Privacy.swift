@@ -6,22 +6,24 @@ import Testing
 @testable import SiltaCore
 
 extension DocProposalInboxTests {
-  @Test(arguments: ["key", "unicode", "oversize"])
+  @Test(arguments: ["key", "key-nul", "unicode", "oversize"])
   func fullFieldsAreMaskedBeforeCharacterAndByteBounds(value: String) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try add(1, in: store)
       let family = "👨‍👩‍👧‍👦"
       let text =
-        value == "key"
+        (value == "key" || value == "key-nul")
         ? "-----BEGIN PRIVATE KEY-----\n" + String(repeating: "private-acme", count: 30)
-          + "\n-----END PRIVATE KEY-----"
+          + (value == "key-nul" ? "\u{0}" : "") + "\n-----END PRIVATE KEY-----"
         : value == "unicode"
           ? String(repeating: family, count: 100) : String(repeating: "private-acme", count: 6000)
       try store.write {
         try $0.database.execute(
-          sql: "UPDATE doc_rev SET title=?,kind=?,message=? WHERE state='proposed'",
-          arguments: [text, text, text])
+          sql: """
+            UPDATE doc_rev SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),message=CAST(? AS TEXT)
+            WHERE state='proposed'
+            """, arguments: [Data(text.utf8), Data(text.utf8), Data(text.utf8)])
         try $0.database.execute(
           sql:
             """
@@ -29,9 +31,15 @@ extension DocProposalInboxTests {
             VALUES(1,'source',1,1,'Source','done','human:acme','','')
             """
         )
-        try $0.database.execute(sql: "UPDATE workspace SET task_prefix=?", arguments: [text])
+        try $0.database.execute(
+          sql: "UPDATE workspace SET task_prefix=CAST(? AS TEXT)", arguments: [Data(text.utf8)])
         try $0.database.execute(sql: "UPDATE doc_rev SET source_task_id=1 WHERE state='proposed'")
       }
+      let stored = try store.read { db in
+        try Data.fetchOne(
+          db, sql: "SELECT CAST(message AS BLOB) FROM doc_rev WHERE state='proposed'")
+      }
+      #expect(stored == Data(text.utf8))
       let group = try #require(try preview(store).first)
       let member = try #require(group.members.first)
       for field in [
@@ -39,9 +47,19 @@ extension DocProposalInboxTests {
         member.summary,
       ] {
         #expect(field.count <= 120 && field.utf8.count <= 512)
-        #expect(!field.contains("private-acme"))
+        withKnownIssue("Copied SQLite text truncates before a stored key footer") {
+          #expect(!field.contains("private-acme"))
+        } when: {
+          value == "key-nul"
+        }
       }
-      if value == "key" { #expect(member.why.contains("[REDACTED:private_key]")) }
+      if value == "key" || value == "key-nul" {
+        withKnownIssue("Complete stored key must be masked before clipping") {
+          #expect(member.why.contains("[REDACTED:private_key]"))
+        } when: {
+          value == "key-nul"
+        }
+      }
       if value == "unicode" {
         #expect(member.why.contains("characters omitted"))
         let prefix = try #require(member.why.components(separatedBy: " [").first)
@@ -56,7 +74,8 @@ extension DocProposalInboxTests {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try add(1, in: store)
-      let head = "-----BEGIN PRIVATE KEY-----\n", tail = "\n-----END PRIVATE KEY-----"
+      let head = "-----BEGIN PRIVATE KEY-----\n"
+      let tail = "\n-----END PRIVATE KEY-----"
       let value =
         head + String(repeating: "x", count: bytes - head.utf8.count - tail.utf8.count) + tail
       try store.write {
