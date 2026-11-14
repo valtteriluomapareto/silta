@@ -74,6 +74,65 @@ struct DocListMetadataUTF8Tests {
     }
   }
 
+  @Test func listIdentityBytesNeverRetargetAnotherDocument() throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let slug = "rules\u{0}tail"
+      try addIdentity(slug, in: store)
+      let original = try store.read {
+        try Data.fetchAll($0, sql: "SELECT CAST(slug AS BLOB) FROM doc ORDER BY id")
+      }
+      #expect(original == [Data("rules".utf8), Data(slug.utf8)])
+      let before = try DocVerificationPreparationTests.truth(store)
+      for flags in [["--archived"], ["--archived", "--offset", "1", "--limit", "1"]] {
+        let result = try SiltaBinary.run(
+          ["--ws", "acme", "doc", "ls"] + flags + ["--json"], in: scratch)
+        #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+        let object = try #require(
+          try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+        let data = try #require(object["data"] as? [String: Any])
+        let entries = try #require(data["entries"] as? [[String: Any]])
+        let other = try #require(
+          entries.first { ($0["output"] as? String)?.contains("Other snapshot") == true })
+        let output = try #require(other["output"] as? String)
+        let normal = "silta --ws 'acme' doc show 'doc:rules@1'"
+        if entries.count == 2 {
+          let ordinary = try #require(
+            entries.first { ($0["output"] as? String)?.contains("Other snapshot") == false })
+          #expect(ordinary["ref"] as? String == "doc:rules@1")
+          #expect((ordinary["output"] as? String)?.contains(normal) == true)
+        }
+        withKnownIssue("Stored NUL identities must not become another document's ref or command") {
+          #expect((other["ref"] as? String).map { Data($0.utf8) } == Data("doc:\(slug)@1".utf8))
+          #expect(!output.contains(normal))
+          #expect(output.contains("doc ls --archived"))
+        }
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+      #expect(
+        try store.read {
+          try Data.fetchAll($0, sql: "SELECT CAST(slug AS BLOB) FROM doc ORDER BY id")
+        } == original)
+    }
+  }
+
+  private func addIdentity(_ slug: String, in store: DatabaseStore) throws {
+    try store.write {
+      try $0.database.execute(
+        sql: """
+          INSERT INTO doc(uid,workspace_id,slug,title,kind,current_rev,archived,created_at,updated_at)
+          SELECT 'nul-doc',workspace_id,CAST(? AS TEXT),'Other projection','reference',1,1,
+            created_at,updated_at FROM doc WHERE slug='rules';
+          INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at,title,kind,about_refs)
+          SELECT 'nul-revision',id,1,'Other body','accepted','human:acme','2023-11-14',
+            'Other snapshot','reference','["app:api"]' FROM doc WHERE uid='nul-doc';
+          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+          SELECT 'nul-about',workspace_id,'doc',(SELECT id FROM doc WHERE uid='nul-doc'),rel,
+            to_kind,to_id,created_by,created_at FROM link WHERE from_kind='doc';
+          """, arguments: [Data(slug.utf8)])
+    }
+  }
+
   private func fixture(_ scratch: URL) throws -> DatabaseStore {
     let store = try AcmeDocAttachments.make(in: scratch)
     try AcmeDocAttachments.attach("rules", to: "app", in: store)
