@@ -13,7 +13,7 @@ struct DocEvidenceReadCommandTests {
       let before = try truth(store)
       let result = try run([], scratch, json: json, quiet: quiet)
       #expect(result.termination == .exit(0) && result.stderr.isEmpty)
-      Golden.forTests().check(result.stdout, "doc-evidence." + (json ? "json" : "txt"))
+      Golden.forTests().check(result.stdout, "doc-show-evidence." + (json ? "json" : "txt"))
       #expect(try truth(store) == before)
     }
   }
@@ -25,7 +25,7 @@ struct DocEvidenceReadCommandTests {
       let before = try truth(store)
       let result = try run(["--diff"], scratch, json: json)
       #expect(result.termination == .exit(0) && result.stderr.isEmpty)
-      Golden.forTests().check(result.stdout, "doc-evidence-diff." + (json ? "json" : "txt"))
+      Golden.forTests().check(result.stdout, "doc-show-evidence-diff." + (json ? "json" : "txt"))
       #expect(!result.stdout.contains("-Same body") && !result.stdout.contains("+Same body"))
       #expect(try truth(store) == before)
     }
@@ -47,7 +47,7 @@ struct DocEvidenceReadCommandTests {
       let result = try run([], scratch)
       #expect(result.termination == .exit(0))
       Golden.forTests().check(
-        result.stdout, "doc-evidence-" + (empty ? "empty" : "unknown") + ".txt")
+        result.stdout, "doc-show-evidence-" + (empty ? "empty" : "unknown") + ".txt")
       #expect(!result.stdout.contains("human:reviewer"))
     }
   }
@@ -104,7 +104,7 @@ struct DocEvidenceReadCommandTests {
           #expect(result.termination == .exit(9))
           Golden.forTests().check(
             json ? result.stdout : result.stderr,
-            "doc-evidence-corrupt." + (json ? "json" : "txt"))
+            "doc-show-evidence-corrupt." + (json ? "json" : "txt"))
           #expect(json ? result.stderr.isEmpty : result.stdout.isEmpty)
         }
       }
