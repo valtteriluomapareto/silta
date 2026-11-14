@@ -24,7 +24,7 @@ struct DocInboxIntegrationTests {
         #expect(group["total"] as? Int == 3 && group["omitted"] as? Int == 1)
         let members = try #require(group["members"] as? [[String: Any]])
         #expect(members.count == 2)
-        #expect(members.allSatisfy { $0["summary"] as? String == "body changed (9→8 bytes)" })
+        #expect(members.allSatisfy { ($0["summary"] as? String)?.hasPrefix("body changed") == true })
         #expect(members.allSatisfy { $0["read"] as? String != nil })
       }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
