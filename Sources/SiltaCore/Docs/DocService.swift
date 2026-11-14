@@ -78,6 +78,12 @@ package struct DocService {
 
   func showCommand(_ ref: String, flags: String = "", lines: String? = nil) -> String {
     guard scopeIsSafe, Self.safeReference(ref) else { return listCommand }
+    do {
+      let parsed = try DocReadView.parse(ref, diff: false, comments: false, offset: nil, limit: nil)
+      _ = try Self.selection(parsed.ref, revision: nil)
+    } catch {
+      return listPageCommand(about: nil, archived: true, offset: 0, limit: 20)
+    }
     return workspaceCommand("silta doc show " + shellWord(ref), workspace: workspace) + flags
       + (lines.map { " --lines " + $0 } ?? "")
   }
