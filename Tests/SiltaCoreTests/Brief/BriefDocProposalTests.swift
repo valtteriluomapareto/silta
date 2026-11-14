@@ -61,12 +61,23 @@ struct BriefDocProposalTests {
     }
   }
 
-  @Test func rendererKeepsEvidenceAndUsesOnlySelectedCommands() throws {
+  @Test(arguments: [false, true])
+  func rendererKeepsEvidenceAndUsesOnlySelectedCommands(unsafe: Bool) throws {
     try withScratchDirectory { home in
       let (store, _) = try DocInboxIntegrationTests().fixture(home, groups: 1)
+      let fixed = "silta --ws 'acme' doc show 'doc:@4' --diff"
+      let length = unsafe ? 600 : 512 - fixed.utf8.count
       try store.write {
         try $0.database.execute(
-          sql: "UPDATE doc SET slug=?", arguments: [String(repeating: "r", count: 478)])
+          sql: "UPDATE doc SET slug=?", arguments: [String(repeating: "r", count: length)])
+        try $0.database.execute(
+          sql: """
+            UPDATE workspace SET task_prefix=?;
+            INSERT INTO task(uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
+            SELECT 'source',id,1,'Acme source','doing','human:acme','','' FROM workspace;
+            UPDATE doc_rev SET source_task_id=(SELECT id FROM task),about_refs='[]'
+              WHERE state='proposed';
+            """, arguments: [String(repeating: "S", count: 118)])
         try $0.database.execute(
           sql: "UPDATE doc_rev SET title=?,kind=?,message=? WHERE state='proposed'",
           arguments: [String(repeating: "t", count: 120), String(repeating: "k", count: 120),
@@ -74,14 +85,18 @@ struct BriefDocProposalTests {
       }
       let group = try #require(try DocProposalInboxTests().preview(store).first)
       let next = Array(Set(group.members.map(\.read) + [try #require(group.next)])).sorted()
+      try #require(next.count == (unsafe ? 1 : 3))
+      if !unsafe { #expect(group.members.allSatisfy { $0.read.utf8.count == 512 }) }
       let complete = group.render(next: next)
       #expect(complete.hasPrefix("doc proposal ") && complete.count <= 4096)
+      #expect(complete.components(separatedBy: "> ref: ").count == 3)
       for member in group.members { #expect(complete.contains(member.ref)) }
       for command in next { #expect(complete.components(separatedBy: command).count == 2) }
       let omitted = group.render(next: [])
       #expect(!omitted.contains("next:") && omitted.contains(group.members[0].why))
       let selected = group.render(next: [next[0]])
-      #expect(selected.contains(next[0]) && !selected.contains(next[1]))
+      #expect(selected.components(separatedBy: next[0]).count == 2)
+      for command in next.dropFirst() { #expect(!selected.contains(command)) }
     }
   }
 
