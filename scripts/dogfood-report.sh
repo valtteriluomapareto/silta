@@ -218,7 +218,7 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   ($doc_approval_rows | map(select(.created_at|time_or_unknown|in_range)) | length) as $doc_approvals |
   ($oldest != "none" and $oldest <= $since and $unreadable == 0 and
     ([$selected[] | select(.workspace == null and (stamp|in_range))] | length) == 0 and
-    all($own[] | select(type == "object" and .workspace == $ws and .actor != $actor and
+    all($own[] | select(type == "object" and .actor != $actor and
       .command == "silta doc triage"); (.timestamp|time_or_unknown) != null) and
     all($doc_approval_rows[]; (.created_at|time_or_unknown) != null) and
     $doc_approvals == $agent_batches and ($human_batches+$agent_batches) == ($doc_batches|length)) as $batch_covered |
