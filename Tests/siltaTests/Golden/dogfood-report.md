@@ -110,3 +110,17 @@ Triage wait: median 20159.5 min; maximum 30240 min.
 Questions to @me: n/a (S11).
 Inbox size and oldest item: n/a (S11).
 Target: under 12 inbox items, none older than one week.
+
+## Document proposals
+
+Known submissions created in range: 0.
+Known decisions in range: 0 accepted; 0 rejected; acceptance rate n/a.
+Decision wait: median n/a; maximum n/a.
+Decision waits unavailable: 0.
+Pending at report time: 0; crossed 14 days in range: 0.
+Unattributed terminal history created in range: 0 (direct or legacy; not known proposal decisions).
+Invalid document event timestamps: 0.
+Successful doc-triage batches observed in range: 0 human; 0 agent.
+Recorded doc-triage approvals in range: 0.
+Observed approvals per successful batch (human + agent): n/a.
+Batch coverage: incomplete; absent, rotated, untagged, unreadable or inconsistent evidence prevents a ratio.
