@@ -36,6 +36,27 @@ struct DocInboxCommandTests {
     }
   }
 
+  @Test func schemaAndHelpNameConcreteDocumentGroups() throws {
+    try withScratchDirectory { scratch in
+      #expect(try run(["inbox", "--help"], scratch).stdout.contains("document proposals"))
+      let data = try TaskStateRegressionTests.data(run(["schema", "inbox", "--json"], scratch))
+      let commands = try #require(data["commands"] as? [[String: Any]])
+      let shape = try #require(commands.first?["data"] as? [String: Any])
+      let object = try #require(shape["object"] as? [String: Any])
+      let items = try #require(object["items"] as? [String: Any])
+      let array = try #require(items["array"] as? [String: Any])
+      let fields = try #require(array["object"] as? [String: Any])
+      let group = try #require(fields["doc_proposal"] as? [String: Any])
+      let optional = try #require(group["optional"] as? [String: Any])
+      let properties = try #require(optional["object"] as? [String: Any])
+      #expect(Set(properties.keys) == ["ref", "total", "omitted", "members", "next"])
+      let members = try #require(properties["members"] as? [String: Any])
+      let member = try #require(members["array"] as? [String: Any])
+      let evidence = try #require(member["object"] as? [String: Any])
+      #expect(Set(evidence.keys) == ["ref", "title", "kind", "why", "source_task", "summary", "read"])
+    }
+  }
+
   func fixture(_ scratch: URL) throws -> DatabaseStore {
     let store = try AcmeDocAttachments.make(in: scratch)
     try AcmeDocAttachments.attach("rules", to: "app", in: store)
