@@ -35,7 +35,8 @@ struct DocProposalInboxTests {
         let reader = try DocProposalInbox(workspace: "acme", at: AcmeDocAttachments.instant, in: db)
         #expect(try reader.count() == (days < 14 ? 1 : 0))
         #expect(try reader.groups().count == (days < 14 ? 1 : 0))
-        let all = try DocProposalInbox(workspace: "acme", at: AcmeDocAttachments.instant, all: true, in: db)
+        let all = try DocProposalInbox(
+          workspace: "acme", at: AcmeDocAttachments.instant, all: true, in: db)
         #expect(try all.count() == 1 && all.groups().first?.total == 1)
       }
     }
@@ -45,7 +46,9 @@ struct DocProposalInboxTests {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try AcmeDocAttachments.attach("second", to: "app", in: store)
-      for (rev, days) in [(2, 13.0), (3, 14.0), (4, 15.0)] { try add(1, first: rev, days: days, in: store) }
+      for (rev, days) in [(2, 13.0), (3, 14.0), (4, 15.0)] {
+        try add(1, first: rev, days: days, in: store)
+      }
       #expect(try preview(store).first?.total == 1)
       let all = try preview(store, all: true)
       #expect(all.first?.total == 3 && all.first?.omitted == 1)
@@ -73,8 +76,12 @@ struct DocProposalInboxTests {
           try tx.database.execute(sql: "UPDATE doc SET uid=? WHERE slug=?", arguments: [uid, slug])
         }
         if redacted {
-          try tx.database.execute(sql: "UPDATE doc SET slug=CASE slug WHEN 'rules' THEN ? ELSE ? END",
-            arguments: ["AKIA" + String(repeating: "A", count: 16), "AKIA" + String(repeating: "B", count: 16)])
+          try tx.database.execute(
+            sql: "UPDATE doc SET slug=CASE slug WHEN 'rules' THEN ? ELSE ? END",
+            arguments: [
+              "AKIA" + String(repeating: "A", count: 16),
+              "AKIA" + String(repeating: "B", count: 16),
+            ])
         }
       }
       let result = try preview(store)
@@ -82,7 +89,9 @@ struct DocProposalInboxTests {
       if redacted {
         #expect(result[0].ref == result[1].ref)
         #expect(result.allSatisfy { $0.members.first?.read == "silta --ws 'acme' doc ls" })
-      } else { #expect(result.map(\.ref) == ["doc:second", "doc:rules"]) }
+      } else {
+        #expect(result.map(\.ref) == ["doc:second", "doc:rules"])
+      }
     }
   }
 
@@ -96,11 +105,14 @@ struct DocProposalInboxTests {
       let queue = try DatabaseQueue(path: store.path, configuration: configuration)
       try queue.write { db in
         if failure == "foreign" {
-          try db.execute(sql: """
-            INSERT INTO workspace(id,uid,slug,name,task_prefix) VALUES(2,'beta','beta','Beta','BE');
-            INSERT INTO task(id,uid,workspace_id,seq,title,status,created_by,created_at,updated_at)
-            VALUES(1,'foreign',2,1,'Acme foreign','done','human:acme','','');
-            """)
+          try db.execute(
+            sql: """
+              INSERT INTO workspace(id,uid,slug,name,task_prefix)
+              VALUES(2,'beta','beta','Beta','BE');
+              INSERT INTO task(id,uid,workspace_id,seq,title,status,
+                created_by,created_at,updated_at)
+              VALUES(1,'foreign',2,1,'Acme foreign','done','human:acme','','');
+              """)
         }
         try db.execute(sql: "UPDATE doc_rev SET source_task_id=1 WHERE state='proposed'")
       }
@@ -115,7 +127,11 @@ struct DocProposalInboxTests {
       try AcmeDocAttachments.attach("alpha", to: "app", in: store)
       try add(3, doc: "alpha", days: 20, in: store)
       try add(3, in: store)
-      if missing { try store.write { try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE state='proposed'") } }
+      if missing {
+        try store.write {
+          try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE state='proposed'")
+        }
+      }
       let group = try #require(try preview(store).first)
       #expect(group.next == "silta --ws 'acme' doc ls --archived --offset 4 --limit 20")
       let member = try #require(group.members.first)
@@ -134,8 +150,11 @@ struct DocProposalInboxTests {
       let store = try fixture(home)
       try add(1, in: store)
       try store.write {
-        try $0.database.execute(sql: "UPDATE doc_rev SET body_md=?,title=? WHERE rev=1", arguments: ["e\u{301}", "e\u{301}"])
-        try $0.database.execute(sql: "UPDATE doc_rev SET body_md=?,title=? WHERE rev=2", arguments: ["é", "é"])
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET body_md=?,title=? WHERE rev=1",
+          arguments: ["e\u{301}", "e\u{301}"])
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET body_md=?,title=? WHERE rev=2", arguments: ["é", "é"])
       }
       let member = try #require(try preview(store).first?.members.first)
       #expect(member.summary == "body changed (3→2 bytes); title changed")
@@ -147,37 +166,95 @@ struct DocProposalInboxTests {
     }
   }
 
+  @Test func allGroupsCrossQueryBatchesWithoutLosingMembers() throws {
+    try withScratchDirectory { home in
+      let store = try fixture(home)
+      let names = (0..<65).map { String(format: "doc-%02d", $0) }
+      for name in names { try AcmeDocAttachments.attach(name, to: "app", in: store) }
+      for name in names { try add(2, doc: name, in: store) }
+      let result = try preview(store, all: true)
+      #expect(result.count == 65 && result.flatMap(\.members).count == 130)
+      #expect(result.allSatisfy { $0.total == 2 && $0.omitted == 0 && $0.next == nil })
+    }
+  }
+
+  @Test func workspaceAndStateSelectionIncludesArchivedPendingWithoutWriting() throws {
+    try withScratchDirectory { home in
+      let store = try fixture(home)
+      try add(3, in: store)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            UPDATE doc SET archived=1;
+            UPDATE doc_rev SET state='rejected' WHERE rev=3;
+            UPDATE doc_rev SET state='superseded' WHERE rev=4;
+            INSERT INTO workspace(id,uid,slug,name,task_prefix)
+              VALUES(2,'beta','beta','Beta','BE');
+            INSERT INTO doc(id,uid,workspace_id,slug,title,kind,created_at,updated_at)
+            VALUES(100,'foreign-doc',2,'rules','Acme foreign','reference','','');
+            INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at,title,kind,about_refs)
+            VALUES('foreign-rev',100,1,'Acme foreign body','proposed','human:acme',?,
+              'Acme foreign','reference','["service:push"]');
+            """, arguments: [utcTimestamp(AcmeDocAttachments.instant)])
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let result = try preview(store)
+      #expect(result.count == 1 && result.first?.total == 1)
+      #expect(result.first?.members.map(\.ref) == ["doc:rules@2"])
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
   func fixture(_ home: URL) throws -> DatabaseStore {
     let store = try AcmeDocAttachments.make(in: home)
     try AcmeDocAttachments.attach("rules", to: "app", in: store)
     try store.write {
-      try $0.database.execute(sql: "UPDATE doc_rev SET title='Base rules',kind='contract',about_refs='[\"app:api\"]',body_md='Base body'")
+      try $0.database.execute(
+        sql:
+          """
+          UPDATE doc_rev SET title='Base rules',kind='contract',about_refs='["app:api"]',
+            body_md='Base body'
+          """
+      )
     }
     return store
   }
 
-  func add(_ count: Int, doc: String = "rules", first: Int = 2, days: Double = 0, in store: DatabaseStore) throws {
+  func add(
+    _ count: Int, doc: String = "rules", first: Int = 2, days: Double = 0, in store: DatabaseStore
+  ) throws {
     try store.write { tx in
       for revision in first..<(first + count) {
-        try tx.database.execute(sql: """
-          INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,title,kind,about_refs)
-          SELECT ?,id,?,1,'New body','proposed','agent:codex:writer','A complete why',?,
-            'Base rules','contract','["app:api"]' FROM doc WHERE slug=?
-          """, arguments: ["pending-\(doc)-\(revision)", revision,
-            utcTimestamp(AcmeDocAttachments.instant.addingTimeInterval(-days * 86400)), doc])
+        try tx.database.execute(
+          sql: """
+            INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,message,
+              created_at,title,kind,about_refs)
+            SELECT ?,id,?,1,'New body','proposed','agent:codex:writer','A complete why',?,
+              'Base rules','contract','["app:api"]' FROM doc WHERE slug=?
+            """,
+          arguments: [
+            "pending-\(doc)-\(revision)", revision,
+            utcTimestamp(AcmeDocAttachments.instant.addingTimeInterval(-days * 86400)), doc,
+          ])
       }
     }
   }
 
-  func preview(_ store: DatabaseStore, all: Bool = false, workspace: String = "acme") throws -> [DocProposalPreviewGroup] {
+  func preview(_ store: DatabaseStore, all: Bool = false, workspace: String = "acme") throws
+    -> [DocProposalPreviewGroup]
+  {
     try store.read { db in
-      let reader = try DocProposalInbox(workspace: workspace, at: AcmeDocAttachments.instant, all: all, in: db)
+      let reader = try DocProposalInbox(
+        workspace: workspace, at: AcmeDocAttachments.instant, all: all, in: db)
       return try reader.previews(reader.groups())
     }
   }
 
   func replay(_ command: String, _ home: URL) throws -> CLIResult {
-    try SiltaBinary.runProcess(URL(filePath: "/bin/bash"), ["-c", command], in: home,
-      environment: ["PATH": try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"])
+    try SiltaBinary.runProcess(
+      URL(filePath: "/bin/bash"), ["-c", command], in: home,
+      environment: [
+        "PATH": try SiltaBinary.url().deletingLastPathComponent().path + ":/usr/bin:/bin"
+      ])
   }
 }
