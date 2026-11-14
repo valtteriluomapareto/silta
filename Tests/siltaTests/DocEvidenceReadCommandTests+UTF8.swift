@@ -36,4 +36,41 @@ extension DocEvidenceReadCommandTests {
       #expect(try store.read { try Data.fetchOne($0, sql: read) } == Data(value.utf8))
     }
   }
+  @Test(arguments: ["body_md", "message"])
+  func harmlessStoredNULRetainsTheFollowingText(field: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let value = "Acme\u{0}tail"
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET \(field)=CAST(? AS TEXT) WHERE rev=2",
+          arguments: [Data(value.utf8)])
+      }
+      let result = try run([], scratch, json: true)
+      #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+      let envelope = try #require(
+        try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
+      let data = try #require(envelope["data"] as? [String: Any])
+      #expect((data["output"] as? String)?.contains(value) == true)
+    }
+  }
+
+  @Test(arguments: ["body_md", "message", "source"])
+  func invalidStoredUTF8RefusesWithoutPartialOutput(field: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let sql =
+        field == "source"
+        ? "UPDATE workspace SET task_prefix=CAST(X'41FF42' AS TEXT)"
+        : "UPDATE doc_rev SET \(field)=CAST(X'41FF42' AS TEXT) WHERE rev=2"
+      try store.write { try $0.database.execute(sql: sql) }
+      for flags in [[], ["--diff"]] {
+        let result = try run(flags, scratch, json: true)
+        #expect(result.termination == .exit(9) && result.stderr.isEmpty)
+        Golden.forTests().check(result.stdout, "doc-show-evidence-corrupt.json")
+        #expect(!result.stdout.contains("doc:rules@2"))
+      }
+    }
+  }
+
 }
