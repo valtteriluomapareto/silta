@@ -4,7 +4,9 @@ import SiltaCore
 struct InboxCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "inbox", abstract: "Read current local attention without marking it read.",
-    discussion: "Human inboxes include grouped blockers, proposals and promoted task pointers. "
+    discussion:
+      "Human inboxes include grouped blockers, task and document proposals, "
+      + "and promoted task pointers. "
       + "Tracker status is not refreshed. --for me means human:<USER>, independent of the caller. "
       + "ask human: is a confirmation instruction, not an executable command. "
       + "See `silta guide questions` for relay and approval rules. Reads never clear attention.\n"
@@ -19,6 +21,15 @@ struct InboxCommand: OutputCommand {
         "created_at": .optional(.string), "post_kind": .optional(.string),
         "reply_to": .optional(.string), "relayed_by": .optional(.array(.string)),
         "target": .optional(.string), "follow_up_at": .optional(.string),
+        "doc_proposal": .optional(
+          .object([
+            "ref": .string, "total": .int, "omitted": .int, "next": .optional(.string),
+            "members": .array(
+              .object([
+                "ref": .string, "title": .string, "kind": .string, "why": .string,
+                "source_task": .string, "summary": .string, "read": .string,
+              ])),
+          ])),
         "tasks": .optional(
           .array(
             .object([
@@ -53,6 +64,7 @@ struct InboxCommand: OutputCommand {
   }
 
   private static func detail(_ item: InboxItem) -> String {
+    if let group = item.docProposal { return String(group.render(next: item.next).dropLast()) }
     if let tasks = item.tasks { return groupedDetail(item, tasks: tasks) }
     guard let ref = item.ref, let task = item.task, let author = item.author,
       let bodyText = item.body, let postKind = item.postKind

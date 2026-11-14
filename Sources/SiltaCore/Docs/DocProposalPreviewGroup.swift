@@ -1,4 +1,5 @@
-struct DocProposalPreviewGroup: Encodable, Sendable {
+/// Bounded, masked evidence for one document proposal group.
+package struct DocProposalPreviewGroup: Encodable, Sendable {
   let id: Int64
   let ref: String
   let total: Int

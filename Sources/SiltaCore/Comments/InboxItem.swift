@@ -24,6 +24,9 @@ package struct InboxItem: Encodable, Sendable {
 
   /// Tasks and asks in a grouped item, or the single proposal/tracker pointer.
   package var tasks: [InboxTask]?
+  /// Bounded document evidence, distinct from task proposal pointers.
+  package var docProposal: DocProposalPreviewGroup?
+  var proposalGroup: DocProposalGroup?
   /// External party or URL for a due group, redacted for display.
   package var target: String?
   /// Earliest follow-up day in a due group or fallback.
@@ -31,6 +34,7 @@ package struct InboxItem: Encodable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case kind, ref, task, author, body, next, tasks, target
+    case docProposal = "doc_proposal"
     case followUpAt = "follow_up_at"
     case createdAt = "created_at"
     case postKind = "post_kind"

@@ -899,9 +899,10 @@ inbox is short and grouped:
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
   agent asks first, and maps "the rest" only to items it showed.
 
-**Available M1 query:** text identifies current local attention and says tracker
-status is not refreshed; JSON uses `scope: "local"`. Review requests and doc
-proposals wait for M2. Promoted attention consists of open, unarchived local task
+**Available query:** text identifies current local attention and says tracker
+status is not refreshed; JSON uses `scope: "local"`. Review requests wait for M2.
+Human attention includes pending document proposal groups. Promoted attention
+consists of open, unarchived local task
 pointers, ordered by task id, with their `external_ref` and a read-only `task show`
 action. It does not infer status from the tracker (M4).
 
@@ -916,11 +917,32 @@ due groups sort by earliest follow-up, first task id, then stored target. Follow
 is due at the start of its UTC day. Ready `next` is `task unblock`; every other block
 uses `task ls --status todo`, just like `task start` (D35), with inspection actions
 for every task. Blocked and proposed attention remains visible despite explicit
-archiving. Proposals appear only while `created_at` is strictly newer than 14 days
+archiving. Task proposals appear only while `created_at` is strictly newer than 14 days
 before the read instant, newest first with descending task id breaking ties;
 `--all` includes older proposals without changing their status. Proposal actions
 are direct for human callers; agent callers get an ask-human instruction naming
 only that displayed proposal's accept/drop commands and approval placeholder.
+
+Document proposals use `kind: "doc_proposal"` and a concrete `doc_proposal`
+object, separate from `tasks`: `ref`, eligible `total`, at most two `members`,
+`omitted`, and an optional `next` global-list continuation. Each member has bounded
+`ref`, `title`, `kind`, `why`, `source_task`, a factual `summary`, and a complete
+`read` command. The summary compares body bytes and metadata without loading bodies.
+Unknown historical metadata stays unknown. Mask complete fields before flattening
+line breaks and limiting each display to 120 characters and 512 UTF-8 bytes,
+including omission markers. Fields larger than 65,536 bytes report their omitted
+byte count instead of returning a partial value. Commands are complete and at most
+512 bytes; unusable refs recover through the existing protected archived list or
+workspace list.
+
+Apply the strict 14-day cutoff before grouping by stored document UID; archive
+status does not hide pending proposals. Members sort newest first, then descending
+revision and binary UID. Groups share the task-proposal category, newest first;
+tasks precede documents on a cross-kind time tie, preserving existing task ties and
+binary document UID ties. The shared cap and `remaining` count groups rather than
+members; `--all` includes older groups but still previews at most two members each.
+Only retained inbox groups load preview fields. Omitted members are reachable with
+existing pinned reads and archived global-list pagination.
 
 Within each discussion category, stored post id breaks time ties. Each live post
 appears once, with question/answer attention taking precedence over claimed-task
@@ -942,7 +964,7 @@ It lists:
   awaiting acceptance, and addressees receive questions without a qualifying answer;
   deleted question roots never appear in either question category
 - open review requests for the actor's tool (M2)
-- for humans, also: `proposed` tasks, pending doc proposals (M2), and promoted tasks
+- for humans, also: `proposed` tasks, pending doc proposal groups, and promoted tasks
   needing attention
 - for humans, also: blocked tasks that are ready to unblock, have a dropped blocker
   ("re-plan"), or have reached their follow-up day, each with its `next` (D35)
@@ -1457,6 +1479,14 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    quoted `<ref>: <title>` lines. Every item ends with its `next:` lines; a command
    an earlier item printed is not repeated. When the caller has any item, `more:`
    adds `silta --ws acme inbox`, which no trim removes.
+   Document proposal items use the same bounded evidence and complete read commands
+   as the inbox, with at most two members. Their groups are atomic under the budget:
+   a conservative reservation may omit a group even when its current shorter preview
+   would fit. The header still counts every eligible group and the complete inbox
+   recovery remains. Count, ordering, trimming and preview hydration share one read
+   snapshot; only groups retained by the budget load preview fields. Text and JSON
+   contain no reservations or internal grouping IDs. Repeated protected document
+   recovery commands appear once while every retained member's evidence remains.
 4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
    the resolved worktree's repo root with its on-disk casing, including for subpath apps,
    only when that file exists.

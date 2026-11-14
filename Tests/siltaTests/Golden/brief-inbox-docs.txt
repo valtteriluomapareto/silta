@@ -1,0 +1,18 @@
+inbox: 1 item for human:acme
+doc proposal doc:rules (3 pending)
+> ref: doc:rules@4
+> title: Base rules
+> kind: contract
+> why: A complete why
+> source: AC-1
+> body changed (9→8 bytes)
+> ref: doc:rules@3
+> title: Base rules
+> kind: contract
+> why: A complete why
+> source: AC-1
+> body changed (9→8 bytes)
+(1 more proposed revision)
+next: silta --ws 'acme' doc show 'doc:rules@4' --diff
+next: silta --ws 'acme' doc show 'doc:rules@3' --diff
+next: silta --ws 'acme' doc ls --archived --offset 0 --limit 20
