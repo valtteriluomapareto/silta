@@ -118,8 +118,26 @@ FROM approval
 WHERE workspace='$ws' AND actor<>'$SILTA_ACTOR' AND substr(created_at,1,10)>='$since';
 " > "$temporary/approvals" 2>/dev/null || fail 'approval metadata read failed.'
 [[ -s "$temporary/approvals" ]] || echo '[]' > "$temporary/approvals"
+# Read only audit metadata, including on databases predating the paired decision fields.
+/usr/bin/sqlite3 -readonly -json "$home/silta.db" 'PRAGMA table_info(doc_rev);' \
+  > "$temporary/doc-columns" 2>/dev/null || fail 'document metadata capability read failed.'
+audit="$(/usr/bin/jq -er 'if length == 0 then error("missing doc_rev") else
+  [.[] | select(.name == "triaged_at" or .name == "triaged_by")] | length end' \
+  "$temporary/doc-columns")" || fail 'document metadata capability read failed.'
+case "$audit" in
+  0) audit='NULL AS triaged_at,NULL AS triaged_by';;
+  2) audit='r.triaged_at,r.triaged_by';;
+  *) fail 'document decision metadata is incomplete.';;
+esac
+/usr/bin/sqlite3 -readonly -json "$home/silta.db" "
+SELECT r.state,r.actor,r.created_at,$audit
+FROM doc_rev r JOIN doc d ON d.id=r.doc_id JOIN workspace w ON w.id=d.workspace_id
+WHERE w.slug='$ws';
+" > "$temporary/docs" 2>/dev/null || fail 'document metadata read failed.'
+[[ -s "$temporary/docs" ]] || echo '[]' > "$temporary/docs"
 if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$temporary/detail-array" \
   --slurpfile schema "$temporary/schema" --slurpfile approvals "$temporary/approvals" \
+  --slurpfile docs "$temporary/docs" \
   --arg since "$since" --arg asof "$asof" --arg oldest "$oldest" --arg actor "$SILTA_ACTOR" --arg ws "$ws" '
   def seconds: (capture("^(?<whole>[^.]+)(?<fraction>\\.[0-9]+)?Z$") // error("invalid timestamp")) |
     ((.whole+"Z"|fromdateiso8601) + ((.fraction // "0")|tonumber));
@@ -174,6 +192,36 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
       friction:($line | if startswith("Friction: ") then ltrimstr("Friction: ") | sub("\\s+$";"") else "" end)}
   ] as $done |
   ($done | map(select(.friction == "")) | map(.ref)) as $missing |
+  def in_range: . != null and . >= $start and . <= $now;
+  def time_or_unknown:
+    try (. as $text | seconds as $time |
+      ($text | sub("\\.[0-9]+Z$";"Z")) as $whole |
+      if ($whole|fromdateiso8601|strftime("%Y-%m-%dT%H:%M:%SZ")) == $whole
+      then $time else null end) catch null;
+  def paired: .triaged_at != null and .triaged_by != null;
+  def terminal: .state == "accepted" or .state == "rejected" or .state == "superseded";
+  ($docs[0] | map(. + {born:(.created_at|time_or_unknown), decided:(.triaged_at|time_or_unknown)})) as $documents |
+  ($documents | map(select(.actor != $actor and (.born|in_range) and
+    (.state == "proposed" or (terminal and paired))))) as $doc_submissions |
+  ($documents | map(select(paired and .triaged_by != $actor and (.decided|in_range) and
+    (.state == "accepted" or .state == "rejected")))) as $doc_decisions |
+  ($doc_decisions | map(select(.state == "accepted")) | length) as $doc_accepted |
+  ($doc_decisions | map(select(.born != null and .born <= .decided) | ((.decided-.born)*1000|round))) as $doc_waits |
+  ($documents | map(select(.actor != $actor and .state == "proposed" and .born != null and .born <= $now))) as $doc_pending |
+  ($documents | map(select(.actor != $actor and terminal and (paired|not) and (.born|in_range))) | length) as $doc_unattributed |
+  (([$documents[] | select(.actor != $actor and .born == null)] | length) +
+    ([$documents[] | select(paired and .triaged_by != $actor and .decided == null)] | length)) as $doc_invalid |
+  ($logs | map(select(.command == "silta doc triage" and .exit_code == 0 and (.timestamp|time_or_unknown|in_range)))) as $doc_batches |
+  ($doc_batches | map(select(.actor|startswith("human:"))) | length) as $human_batches |
+  ($doc_batches | map(select(.actor|startswith("agent:"))) | length) as $agent_batches |
+  ($approvals[0] | map(select(.command == "silta doc triage" or (.command|startswith("silta doc triage "))))) as $doc_approval_rows |
+  ($doc_approval_rows | map(select(.created_at|time_or_unknown|in_range)) | length) as $doc_approvals |
+  ($oldest != "none" and $oldest <= $since and $unreadable == 0 and
+    ([$selected[] | select(.workspace == null and (stamp|in_range))] | length) == 0 and
+    all($own[] | select(type == "object" and .actor != $actor and
+      .command == "silta doc triage"); (.timestamp|time_or_unknown) != null) and
+    all($doc_approval_rows[]; (.created_at|time_or_unknown) != null) and
+    $doc_approvals == $agent_batches and ($human_batches+$agent_batches) == ($doc_batches|length)) as $batch_covered |
   "# Silta dogfood report", "",
   "Since: \($since) (UTC, inclusive).",
   "Until: \($asof) (UTC, report time).",
@@ -229,7 +277,22 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   "Oldest pending proposal: \(if ($pending|length) == 0 then "none" else "\($pending | map(($now-.born)/86400|floor) | max) days" end).",
   "Triage wait: \(stats($waits; "min")).",
   "Questions to @me: n/a (S11).", "Inbox size and oldest item: n/a (S11).",
-  "Target: under 12 inbox items, none older than one week."
+  "Target: under 12 inbox items, none older than one week.",
+  "", "## Document proposals", "",
+  "Known submissions created in range: \($doc_submissions|length).",
+  "Known decisions in range: \($doc_accepted) accepted; \(($doc_decisions|length)-$doc_accepted) rejected; acceptance rate " +
+    (if ($doc_decisions|length) == 0 then "n/a" else "\((1000*$doc_accepted/($doc_decisions|length)|round)/10)%" end) + ".",
+  "Decision wait: \(stats($doc_waits; "ms")).",
+  "Decision waits unavailable: \(($doc_decisions|length)-($doc_waits|length)).",
+  "Pending at report time: \($doc_pending|length); crossed 14 days in range: \($doc_pending | map(select((.born+1209600)|in_range)) | length).",
+  "Unattributed terminal history created in range: \($doc_unattributed) (direct or legacy; not known proposal decisions).",
+  "Invalid document event timestamps: \($doc_invalid)" + (if $doc_invalid == 0 then "." else "; coverage is incomplete." end),
+  "Successful doc-triage batches observed in range: \($human_batches) human; \($agent_batches) agent.",
+  "Recorded doc-triage approvals in range: \($doc_approvals).",
+  "Observed approvals per successful batch (human + agent): " +
+    (if $batch_covered and ($doc_batches|length) > 0 then "\((100*$doc_approvals/($doc_batches|length)|round)/100)" else "n/a" end) + ".",
+  (if $batch_covered then "Batch coverage: retained readable workspace logs only; no durable approval-to-batch linkage."
+    else "Batch coverage: incomplete; absent, rotated, untagged, unreadable or inconsistent evidence prevents a ratio." end)
 ' > "$temporary/report" 2> "$temporary/error"; then
   fail 'could not summarize collected data; no report was published.'
 fi

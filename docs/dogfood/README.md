@@ -144,6 +144,20 @@ workspace and excludes its own actor's calls and approvals.
   proposal shows what still waits. The first report's numbers are mostly the setup
   triage. Questions and inbox measurements are `n/a` until S11.
 
+Document evidence separates submissions created in the inclusive UTC range from
+accepted/rejected decisions made in it. Paired terminal history proves a known
+submission; superseded history does not imply a decision verdict. Unpaired terminal
+history remains unattributed direct-or-legacy data. Decision waits retain millisecond
+precision; invalid timestamps and unavailable waits are explicit. Pending counts and
+14-day crossings do not change state. Each event excludes the report actor.
+
+Every retained successful document-triage log row is one observed batch, even when
+actor and timestamp repeat. Human and agent counts stay separate. Approvals are
+counted independently; the observed approvals-per-successful-batch ratio includes
+human and agent batches and is unavailable when coverage or counts are inconsistent.
+Readable retained logs never prove durable approval-to-batch linkage or complete
+history. Document reads select only workspace-scoped state, actors and timestamps.
+
 **Private report (DF3).** `scripts/dogfood-report.sh --ws <slug>` reports on any
 workspace, `silta` included, and keeps it on this machine:
 
