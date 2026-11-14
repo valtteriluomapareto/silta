@@ -128,12 +128,49 @@ struct BriefDocProposalTests {
     }
   }
 
-  private func makeReport(_ service: TaskService, budget: Int, in db: Database) throws
+  @Test(arguments: [1, 3], [0, 10_000])
+  func currentTaskAttentionKeepsSeparateDocumentWindow(questions: Int, budget: Int) async throws {
+    try await withScratchDirectory { home in
+      let (store, service) = try DocInboxIntegrationTests().fixture(home, groups: 3)
+      _ = try await InboxGroupTests.add(service, home)
+      for _ in 0..<questions {
+        _ = try CommentQuestionTests.post(service, kind: "question", to: ["human:acme"])
+      }
+      let standalone = try service.inbox()
+      #expect(standalone.items.count == questions + 3 && standalone.remaining == 0)
+      let before = try DocVerificationPreparationTests.truth(store)
+      let (report, rows) = try store.read { db in
+        let current = try TaskService.lookup("AC-1", workspace: "acme", in: db)
+        var sql: [String] = []
+        db.trace { if case .statement(let statement) = $0 { sql.append(statement.expandedSQL) } }
+        let report = try makeReport(service, budget: budget, current: current, in: db)
+        db.trace(nil)
+        let rows = try sql.filter { $0.contains("WITH eligible AS") }
+          .map { try Row.fetchAll(db, sql: $0).count }.reduce(0, +)
+        return (report, rows)
+      }
+      let kept = report.sections.filter { $0.text.hasPrefix("doc proposal ") }.count
+      withKnownIssue("On-current-task attention must not consume the separate document window") {
+        #expect(kept == (budget == 0 ? 0 : 3))
+      } when: {
+        budget > 0
+      }
+      #expect(rows == kept * 2)
+      if budget > 0 {
+        #expect(report.sections.filter { $0.id == "task_inbox" }.count == questions)
+        #expect(report.text.contains("(\(questions) on this task)"))
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  private func makeReport(_ service: TaskService, budget: Int, current: TaskDetails? = nil, in db: Database) throws
     -> BriefReport
   {
-    let location = LocationResult(
+    var location = LocationResult(
       path: "/acme", worktree: "/acme", workspace: "acme", repo: "platform", branch: "main",
       head: "a", confidence: "high", reason: "single", candidates: [])
+    location.currentTask = current
     return try BriefService(environment: service.environment).report(
       location, budget: budget, at: AcmeDocAttachments.instant, in: db)
   }
