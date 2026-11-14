@@ -23,13 +23,7 @@ struct DocMetadata {
     }
     let previousTitle: String? = old?["title"]
     let title = draft.title ?? previousTitle ?? ""
-    guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw DocError.invalid("--title must not be empty.")
-    }
-    guard title.count <= 120, !title.unicodeScalars.contains(where: CharacterSet.newlines.contains)
-    else {
-      throw DocError.invalid("--title must be one line of at most 120 characters.")
-    }
+    try checkTitle(title)
     if let kind = draft.kind, !["contract", "flow", "runbook", "reference"].contains(kind) {
       throw DocError.invalid("Use contract, flow, runbook or reference for --kind.")
     }
@@ -49,6 +43,38 @@ struct DocMetadata {
     return Self(
       title: title, kind: draft.kind ?? previousKind ?? Self.inferredKind(targets),
       refs: refs, targets: targets)
+  }
+
+  static func checkTitle(_ title: String) throws {
+    guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw DocError.invalid("--title must not be empty.")
+    }
+    guard title.count <= 120, !title.unicodeScalars.contains(where: CharacterSet.newlines.contains)
+    else {
+      throw DocError.invalid("--title must be one line of at most 120 characters.")
+    }
+  }
+
+  static func proposal(
+    _ request: DocProposalRequest, baseline: DocEditBaseline, workspace: Int64, in db: Database
+  ) throws -> Self {
+    guard WorkspaceConfig.isValidIdentifier(request.slug) else {
+      throw DocError.invalid("Use an identifier for the doc slug.")
+    }
+    let title = request.title ?? baseline.title ?? ""
+    if !baseline.accepted || !title.utf8.elementsEqual((baseline.title ?? "").utf8) {
+      try checkTitle(title)
+    }
+    let refs = Array(Set(request.about ?? baseline.refs)).sorted()
+    guard !refs.isEmpty else {
+      if request.about == nil { throw DocError.missing(["--about"]) }
+      throw DocError.invalid("A doc needs at least one --about map item.")
+    }
+    let targets = try refs.map { try TaskLinkTarget.map($0, workspace: workspace, in: db) }
+    guard let kind = baseline.accepted ? baseline.kind : Self.inferredKind(targets) else {
+      throw StorageError.corrupt
+    }
+    return Self(title: title, kind: kind, refs: refs, targets: targets)
   }
 
   private static func hasAcceptedRevision(_ old: Row?, in db: Database) throws -> Bool {

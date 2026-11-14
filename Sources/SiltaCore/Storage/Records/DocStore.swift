@@ -25,7 +25,7 @@ struct DocStore {
       throw DocError.changed(workspace: verification.binding.workspace)
     }
     let stamp = utcTimestamp(at)
-    let id = try docID(draft, metadata: metadata, old: old, stamp: stamp)
+    let id = try docID(draft.slug, metadata: metadata, old: old, stamp: stamp)
     let number = try nextRevision(id, slug: draft.slug)
     let base: Int? = old?["current_rev"]
     try db.execute(
@@ -80,7 +80,7 @@ struct DocStore {
       arguments: [workspace, slug])
   }
 
-  private func nextRevision(_ doc: Int64, slug: String) throws -> Int {
+  func nextRevision(_ doc: Int64, slug: String) throws -> Int {
     let previous =
       try Int64.fetchOne(
         db, sql: "SELECT MAX(rev) FROM doc_rev WHERE doc_id=?", arguments: [doc]) ?? 0
@@ -100,7 +100,7 @@ struct DocStore {
     return Int(try transaction.nextSequence(scope: scope))
   }
 
-  private func docID(_ draft: DocDraft, metadata: DocMetadata, old: Row?, stamp: String) throws
+  func docID(_ slug: String, metadata: DocMetadata, old: Row?, stamp: String) throws
     -> Int64
   {
     if let old { return old["id"] }
@@ -110,7 +110,7 @@ struct DocStore {
         VALUES(?,?,?,?,?,?,?)
         """,
       arguments: [
-        try ids.next(at: at), workspace, draft.slug,
+        try ids.next(at: at), workspace, slug,
         metadata.title, metadata.kind, stamp, stamp,
       ])
     return db.lastInsertedRowID

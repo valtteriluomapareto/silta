@@ -7,6 +7,8 @@ struct DocEditBaseline {
   let accepted: Bool
   let body: String?
   let title: String?
+  let kind: String?
+  let revision: Int?
   let refs: [String]
 
   static func read(_ slug: String, workspace: Int64, keepBody: Bool, in db: Database) throws -> Self
@@ -25,6 +27,7 @@ struct DocEditBaseline {
     guard let row else {
       return Self(
         fields: [workspaceUID], documentExists: false, accepted: false, body: nil, title: nil,
+        kind: nil, revision: nil,
         refs: [])
     }
     let pointer: Int? = row["current_rev"]
@@ -50,7 +53,7 @@ struct DocEditBaseline {
     }
     return Self(
       fields: fields, documentExists: true, accepted: state == "accepted",
-      body: body, title: title, refs: refs)
+      body: body, title: title, kind: row["kind"], revision: pointer, refs: refs)
   }
 
   func matches(_ other: Self) -> Bool {
