@@ -1,4 +1,4 @@
-/// The body and optional metadata for one accepted document revision.
+/// The body and optional metadata for one document write.
 struct DocDraft: Sendable {
   var slug: String
   var body: String
