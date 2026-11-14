@@ -44,12 +44,12 @@ struct DocProposalInboxTests {
   @Test func mixedAgesHaveTruthfulTotalsAndSelectedMetadataLimits() throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
+      try AcmeDocAttachments.attach("second", to: "app", in: store)
       for (rev, days) in [(2, 13.0), (3, 14.0), (4, 15.0)] { try add(1, first: rev, days: days, in: store) }
       #expect(try preview(store).first?.total == 1)
       let all = try preview(store, all: true)
       #expect(all.first?.total == 3 && all.first?.omitted == 1)
       #expect(all.first?.members.map(\.ref) == ["doc:rules@2", "doc:rules@3"])
-      try AcmeDocAttachments.attach("second", to: "app", in: store)
       try add(3, doc: "second", in: store)
       try store.read { (db: Database) throws in
         let reader = try DocProposalInbox(workspace: "acme", at: AcmeDocAttachments.instant, in: db)
