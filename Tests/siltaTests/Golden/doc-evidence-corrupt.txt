@@ -1,0 +1,2 @@
+error: Database is corrupt: SQLite reported corruption or a stored value or reference cannot be read. [env]
+ask human: silta doctor
