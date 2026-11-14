@@ -184,13 +184,17 @@ extension DocProposalInboxTests {
     }
   }
 
-  @Test func archivedPendingMembersAreReachableThroughProtectedListHubs() throws {
+  @Test(arguments: ["long", "secret"])
+  func archivedPendingMembersAreReachableThroughProtectedListHubs(identity: String) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try add(3, in: store)
+      let slug =
+        identity == "long"
+        ? String(repeating: "r", count: 600)
+        : "AKIA" + String(repeating: "A", count: 16)
       try store.write {
-        try $0.database.execute(
-          sql: "UPDATE doc SET archived=1,slug=?", arguments: [String(repeating: "r", count: 600)])
+        try $0.database.execute(sql: "UPDATE doc SET archived=1,slug=?", arguments: [slug])
       }
       let group = try #require(try preview(store).first)
       #expect(group.total == 3 && group.omitted == 1)
