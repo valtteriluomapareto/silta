@@ -6,7 +6,8 @@ extension ExportDocumentSnapshot {
   static func read(_ db: Database, workspace: Int64) throws -> Self {
     var records: [Int64: [ExportRow]] = [:]
     for (format, sql) in zip(ExportFormat.docRecords, DocumentQuery.records) {
-      for row in try Row.fetchAll(db, sql: sql, arguments: [workspace]) {
+      let cursor = try Row.fetchCursor(db, sql: sql, arguments: [workspace])
+      while let row = try cursor.next() {
         let keys = format.table == "doc_rev" ? format.keys.filter { $0 != "body_md" } : format.keys
         var record = try ExportRow(keys: keys, row: row)
         if format.table == "doc_rev" {
@@ -17,17 +18,18 @@ extension ExportDocumentSnapshot {
         records[row["doc_id"], default: []].append(record)
       }
     }
-    let documents = try Row.fetchAll(db, sql: DocumentQuery.documents, arguments: [workspace]).map {
-      let row = try ExportRow(keys: ExportFormat.docKeys, row: $0)
-      return ExportDocument(
-        slug: row.value("slug") ?? "", row: row, records: records[$0["id"]] ?? [])
-    }
+    let documents = try Array(
+      Row.fetchCursor(db, sql: DocumentQuery.documents, arguments: [workspace]).map {
+        let row = try ExportRow(keys: ExportFormat.docKeys, row: $0)
+        return ExportDocument(
+          slug: row.value("slug") ?? "", row: row, records: records[$0["id"]] ?? [])
+      })
     var snapshot = Self(documents: documents, revisionAllocations: [], commentSequences: [])
     var floors = try snapshot.minimumFloors()
     let prefix = "doc_rev:\(workspace):"
-    for found in try Row.fetchAll(
+    let counters = try Row.fetchCursor(
       db, sql: "SELECT scope,next FROM seq_counter WHERE scope GLOB ?", arguments: [prefix + "*"])
-    {
+    while let found = try counters.next() {
       let row = try ExportRow(keys: ["scope", "next"], row: found)
       let name = String((row.value("scope") ?? "").dropFirst(prefix.count))
       guard WorkspaceConfig.isValidIdentifier(name) else {
@@ -36,7 +38,8 @@ extension ExportDocumentSnapshot {
       floors.revisions[name] = max(
         floors.revisions[name] ?? 1, try Self.positive(row.value("next")))
     }
-    for found in try Row.fetchAll(db, sql: DocumentQuery.commentFloors, arguments: [workspace]) {
+    let comments = try Row.fetchCursor(db, sql: DocumentQuery.commentFloors, arguments: [workspace])
+    while let found = try comments.next() {
       let row = try ExportRow(keys: ["doc_rev", "next"], row: found)
       let owner = row.value("doc_rev") ?? ""
       floors.comments[Data(owner.utf8)] = (

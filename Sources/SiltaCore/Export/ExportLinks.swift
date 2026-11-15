@@ -7,9 +7,10 @@ enum ExportLinks {
   ]) { _, new in new }
 
   static func read(_ db: Database, workspace: Int64) throws -> [ExportRow] {
-    try Row.fetchAll(db, sql: query, arguments: [workspace]).map {
-      try ExportRow(keys: ExportFormat.linkKeys, row: $0)
-    }
+    try Array(
+      Row.fetchCursor(db, sql: query, arguments: [workspace]).map {
+        try ExportRow(keys: ExportFormat.linkKeys, row: $0)
+      })
   }
 
   private static func uid(of column: String, kind: String) -> String {
