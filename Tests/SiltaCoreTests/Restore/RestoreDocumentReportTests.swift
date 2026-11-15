@@ -94,13 +94,15 @@ struct RestoreDocumentReportTests {
     #expect(Self.report(before, after).changedDocs == ["doc:push-rules"])
   }
 
-  @Test func canonicallyEquivalentUIDsRemainDifferentIdentities() throws {
+  @Test func admittedDifferentASCIIUIDsRemainDifferentIdentities() throws {
     var before = try RestoreDocumentGraphFixture.graph().tree
-    before.documents.documents[0].row = before.documents.documents[0].row.replacing(
-      "uid", with: "caf\u{e9}", keys: ExportFormat.docKeys)
+    let uid = try #require(before.documents.documents.first?.row.value("uid"))
+    RestoreOpaqueIdentityFixture.rename(&before, from: uid, to: "doc-before")
     var after = before
-    after.documents.documents[0].row = after.documents.documents[0].row.replacing(
-      "uid", with: "cafe\u{301}", keys: ExportFormat.docKeys)
+    RestoreOpaqueIdentityFixture.rename(&after, from: "doc-before", to: "doc-after")
+    for tree in [before, after] {
+      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+    }
     let result = Self.report(before, after)
     #expect(result.removedDocs == ["doc:push-rules"])
     #expect(result.changedDocs.isEmpty)

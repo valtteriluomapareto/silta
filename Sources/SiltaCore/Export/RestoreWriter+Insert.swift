@@ -34,12 +34,12 @@ extension RestoreWriter {
         "INSERT INTO \(table)(\(columns.joined(separator: ","))) VALUES(\(placeholders))",
       arguments: StatementArguments(values))
     let rowID = db.lastInsertedRowID
-    if let uid = row.value("uid") { ids[table, default: [:]][Data(uid.utf8)] = rowID }
+    if let uid = row.value("uid") { ids[table, default: [:]][uid] = rowID }
     return rowID
   }
 
   func id(_ uid: String, in table: String) throws -> Int64 {
-    guard let id = ids[table]?[Data(uid.utf8)] else {
+    guard let id = ids[table]?[uid] else {
       throw ExportError.invalidTree(reason: "\(uid) names no \(table) of the tree", workspace: slug)
     }
     return id
@@ -62,7 +62,7 @@ extension RestoreWriter {
         let table = record.value("table") ?? ""
         let rowID = try insert(table, record, extra: ["task_id": taskID], deferred: ["thread"])
         if table == "task_plan_rev" {
-          revisions[Data("\(taskUID)@\(record.value("rev") ?? "")".utf8)] = rowID
+          revisions["\(taskUID)@\(record.value("rev") ?? "")"] = rowID
         }
       }
       for record in task.records {
@@ -82,7 +82,7 @@ extension RestoreWriter {
       var to: Int64?
       if let target = link.value("to") {
         if toKind == "task_plan_rev" {
-          guard let revision = revisions[Data("\(target)@\(link.value("to_rev") ?? "")".utf8)]
+          guard let revision = revisions["\(target)@\(link.value("to_rev") ?? "")"]
           else {
             throw ExportError.invalidTree(
               reason: "a link names a plan revision the tree doesn't hold", workspace: slug)

@@ -6,7 +6,8 @@ extension ExportDocumentSnapshot {
   static func read(_ db: Database, workspace: Int64) throws -> Self {
     var records: [Int64: [ExportRow]] = [:]
     for (format, sql) in zip(ExportFormat.docRecords, DocumentQuery.records) {
-      for row in try Row.fetchAll(db, sql: sql, arguments: [workspace]) {
+      let cursor = try Row.fetchCursor(db, sql: sql, arguments: [workspace])
+      while let row = try cursor.next() {
         let keys = format.table == "doc_rev" ? format.keys.filter { $0 != "body_md" } : format.keys
         var record = try ExportRow(keys: keys, row: row)
         if format.table == "doc_rev" {
@@ -17,17 +18,18 @@ extension ExportDocumentSnapshot {
         records[row["doc_id"], default: []].append(record)
       }
     }
-    let documents = try Row.fetchAll(db, sql: DocumentQuery.documents, arguments: [workspace]).map {
-      let row = try ExportRow(keys: ExportFormat.docKeys, row: $0)
-      return ExportDocument(
-        slug: row.value("slug") ?? "", row: row, records: records[$0["id"]] ?? [])
-    }
+    let documents = try Array(
+      Row.fetchCursor(db, sql: DocumentQuery.documents, arguments: [workspace]).map {
+        let row = try ExportRow(keys: ExportFormat.docKeys, row: $0)
+        return ExportDocument(
+          slug: row.value("slug") ?? "", row: row, records: records[$0["id"]] ?? [])
+      })
     var snapshot = Self(documents: documents, revisionAllocations: [])
     var floors = try snapshot.minimumRevisionFloors()
     let prefix = "doc_rev:\(workspace):"
-    for found in try Row.fetchAll(
+    let counters = try Row.fetchCursor(
       db, sql: "SELECT scope,next FROM seq_counter WHERE scope GLOB ?", arguments: [prefix + "*"])
-    {
+    while let found = try counters.next() {
       let row = try ExportRow(keys: ["scope", "next"], row: found)
       let name = String((row.value("scope") ?? "").dropFirst(prefix.count))
       guard WorkspaceConfig.isValidIdentifier(name) else {
@@ -72,4 +74,10 @@ private enum DocumentQuery {
     """,
   ]
 
+  static let commentFloors = """
+    SELECT r.uid AS doc_rev,c.next
+    FROM seq_counter c JOIN doc_rev r ON c.scope='comment:doc_rev:'||r.id
+      JOIN doc d ON d.id=r.doc_id
+    WHERE d.workspace_id=?
+    """
 }

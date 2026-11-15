@@ -1688,12 +1688,17 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     `\t`, else `\uXXXX` with uppercase hex. So a row is at once a JSON object and a
     YAML flow mapping, `{"key": "value", …}` with `", "` and `": "` separators.
     JSON-array columns and `settings` are written as their stored text. SQLite text
-    as Silta reads it ends at U+0000, so values never hold it.
+    as Silta reads it ends at U+0000; owned document bodies instead retain complete
+    UTF-8 bytes, including existing NUL bytes.
   - **Keys and references.** Keys are the column names, in schema order, `uid`
     first. A foreign key is written as its target's `uid` under the column name
     without `_id` (`repo`, `app`, `parent`, `thread`, `topic`, `from_app`, `to_app`,
     `to_service`). Integer ids and `workspace_id` are never written; the file implies
-    the workspace or the task.
+    the workspace or the task. Imported row UIDs and UID references must be nonempty
+    ASCII without NUL; no other opaque-ID grammar is imposed. Restore checks this
+    before building identity maps. Export and destination capture inspect complete
+    stored UID bytes too. Unsupported stored IDs refuse without changes (`env`),
+    with human-owned `silta backup` recovery for inspection rather than renaming IDs.
   - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), and
     tasks by `seq`, so the bytes don't depend on integer ids. Files in byte order of
     their path. Every listed file is always present; a file with no rows is empty, and
