@@ -72,23 +72,35 @@ struct DocVerification: Sendable {
       at: environment.clock.now())
     var snapshots: [Snapshot] = []
     for app in binding.apps {
-      guard let path = app.path else {
-        throw RepoError.localPath(repo: app.repo, workspace: binding.workspace)
+      guard let path = app.path else { continue }
+      do {
+        let sha = try await code.resolveCommit(
+          app: app.app, ref: app.ref, repo: app.repo, path: path)
+        snapshots.append(Snapshot(app: app.app, ref: app.ref, sha: sha))
+      } catch let error as CodeError {
+        guard !Task.isCancelled else { throw error }
+        switch error {
+        case .notFound, .git, .timeout: continue
+        case .invalid, .fetch: throw error
+        }
+      } catch let error as RepoError {
+        guard case .localPath = error, !Task.isCancelled else { throw error }
       }
-      let sha = try await code.resolveCommit(app: app.app, ref: app.ref, repo: app.repo, path: path)
-      snapshots.append(Snapshot(app: app.app, ref: app.ref, sha: sha))
     }
     return Self(binding: binding, snapshots: snapshots)
   }
 
   func matches(_ current: Binding) -> Bool {
-    binding == current && snapshots.count == current.apps.count
-      && zip(snapshots, current.apps).allSatisfy {
-        DocVerification.same($0.app, $1.app) && DocVerification.same($0.ref, $1.ref)
-      }
-      && snapshots.allSatisfy {
-        [40, 64].contains($0.sha.count) && $0.sha.allSatisfy(\.isHexDigit)
-      }
+    guard binding == current,
+      snapshots.allSatisfy({ [40, 64].contains($0.sha.count) && $0.sha.allSatisfy(\.isHexDigit) })
+    else { return false }
+    var index = 0
+    for app in current.apps {
+      guard index < snapshots.count else { break }
+      let snapshot = snapshots[index]
+      if Self.same(snapshot.app, app.app) && Self.same(snapshot.ref, app.ref) { index += 1 }
+    }
+    return index == snapshots.count
   }
 
   private static func same(_ lhs: String?, _ rhs: String?) -> Bool {
