@@ -203,7 +203,7 @@ struct DocPartialCloneTests {
           _ = try await DocWritePolicyTests.service(home, store, git: git).edit(
             Self.request(["app:api"]), input: { "A rule." })
           return false
-        } catch let error as any CodedError { return error.code == .git }
+        } catch let error as any CodedError { return error.code == .env }
       }
       #expect(try await operation.value)
       #expect(try DocVerificationPreparationTests.truth(store) == before)
