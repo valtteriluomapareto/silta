@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -12,7 +13,7 @@ struct DocProposalAvailabilityTests {
         #expect(result.termination == .exit(0))
         let text =
           args.contains("--json")
-          ? try #require(GuideContractTests.data(result)["text"] as? String) : result.stdout
+          ? try #require(try GuideContractTests.data(result)["text"] as? String) : result.stdout
         #expect(text.contains("cannot submit or decide them"))
         #expect(text.contains("Map gap:"))
         #expect(text.contains("never create a task or file for a map gap"))
