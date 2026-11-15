@@ -8,10 +8,11 @@ import Testing
 struct DocSuppliedBodyTests {
   static let refusal = "Doc input must not contain NUL bytes."
 
-  @Test(arguments: [
-    "\u{0}tail", "Acme\u{0}tail", "é\u{0}", String(repeating: "a", count: 65_535) + "\u{0}",
-  ])
-  func nulRefusesShortReadsAndDirectStrings(body: String) {
+  @Test(arguments: 0..<4)
+  func nulRefusesShortReadsAndDirectStrings(example: Int) {
+    let body = [
+      "\u{0}tail", "Acme\u{0}tail", "é\u{0}", String(repeating: "a", count: 65_535) + "\u{0}",
+    ][example]
     var bytes = Data(body.utf8)
     let read = Self.failure {
       _ = try DocInput.read { maximum in
