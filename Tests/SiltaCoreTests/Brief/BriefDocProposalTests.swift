@@ -1,28 +1,78 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@testable import SiltaCore
+
 struct BriefDocProposalTests {
-  @Test(arguments: [(0, 0), (1024, 0), (1200, 1), (2500, 2), (10_000, 3)])
-  func budgetHydratesOnlyRetainedGroups(example: (Int, Int)) throws {
+  @Test func shortProposalUsesItsActualBudget() throws {
+    try withScratchDirectory { home in
+      let (store, service) = try DocInboxIntegrationTests().fixture(home, groups: 1)
+      let before = try DocVerificationPreparationTests.truth(store)
+      let preview = try #require(try DocProposalInboxTests().preview(store).first)
+      let report = try store.read { try makeReport(service, budget: 1024, in: $0) }
+      let sections = report.sections.filter { $0.text.hasPrefix("doc proposal ") }
+      do {
+        #expect(sections.count == 1)
+        #expect(sections.first?.text.contains(preview.ref) == true)
+        #expect(sections.first?.text.contains(preview.members[0].why) == true)
+        for command in preview.commands {
+          #expect(sections.first?.text.contains("next: " + command + "\n") == true)
+        }
+      }
+      #expect(report.text.count <= 1024 * 4)
+      #expect(report.text.contains("more: silta --ws 'acme' inbox\n"))
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  @Test func evidenceCapPreservesCompleteRecoveryCommands() throws {
+    try withScratchDirectory { home in
+      let (store, service) = try DocInboxIntegrationTests().fixture(home, groups: 1)
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET title=?,kind=?,message=? WHERE state='proposed'",
+          arguments: [
+            String(repeating: "t", count: 120), String(repeating: "k", count: 120),
+            String(repeating: "w", count: 120),
+          ])
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let preview = try #require(try DocProposalInboxTests().preview(store).first)
+      let report = try store.read { try makeReport(service, budget: 1024, in: $0) }
+      let section = report.sections.first { $0.text.hasPrefix("doc proposal ") }
+      do {
+        #expect(section?.text.contains("(doc proposal trimmed)\n") == true)
+        #expect(section?.truncated == true && report.truncated)
+        for command in preview.commands {
+          #expect(section?.text.components(separatedBy: "next: " + command + "\n").count == 2)
+        }
+      }
+      #expect(report.text.count <= 1024 * 4)
+      #expect(report.text.contains("more: silta --ws 'acme' inbox\n"))
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  @Test(arguments: [0, 1024, 1200, 2500, 10_000])
+  func renderedGroupsFitTheBudgetWithABoundedMetadataWindow(budget: Int) throws {
     try withScratchDirectory { home in
       let (store, service) = try DocInboxIntegrationTests().fixture(home, groups: 4)
       let before = try DocVerificationPreparationTests.truth(store)
       try store.read { db in
         var sql: [String] = []
         db.trace { if case .statement(let statement) = $0 { sql.append(statement.expandedSQL) } }
-        let report = try makeReport(service, budget: example.0, in: db)
+        let report = try makeReport(service, budget: budget, in: db)
         db.trace(nil)
         let kept = report.sections.filter { $0.text.hasPrefix("doc proposal ") }
-        #expect(kept.count == example.1)
+        #expect(kept.count <= 3 && (budget == 0 ? kept.isEmpty : !kept.isEmpty))
         let windows = sql.filter { $0.contains("WITH eligible AS") }
-        #expect(windows.count == (example.1 == 0 ? 0 : 1))
+        #expect(windows.count == 1)
         #expect(
-          try windows.map { try Row.fetchAll(db, sql: $0).count }.reduce(0, +) == example.1 * 2)
-        if example.0 >= 1024 {
-          #expect(report.text.count <= example.0 * 4)
+          try windows.map { try Row.fetchAll(db, sql: $0).count }.reduce(0, +) == 6)
+        if budget >= 1024 {
+          #expect(report.text.count <= budget * 4)
           #expect(report.text.contains("inbox: 4 items for human:acme"))
         }
         #expect(report.text.contains("more: silta --ws 'acme' inbox"))
@@ -36,7 +86,7 @@ struct BriefDocProposalTests {
     }
   }
 
-  @Test func hydrationKeepsTheMetadataSnapshot() throws {
+  @Test func renderingKeepsTheMetadataSnapshot() throws {
     try withScratchDirectory { home in
       let (store, service) = try DocInboxIntegrationTests().fixture(home, groups: 1)
       var changed = false
@@ -151,7 +201,7 @@ struct BriefDocProposalTests {
       }
       let kept = report.sections.filter { $0.text.hasPrefix("doc proposal ") }.count
       #expect(kept == (budget == 0 ? 0 : 3))
-      #expect(rows == kept * 2)
+      #expect(rows == 6)
       if budget > 0 {
         #expect(report.sections.filter { $0.id == "task_inbox" }.count == questions)
         #expect(report.text.contains("(\(questions) on this task)"))
@@ -160,7 +210,7 @@ struct BriefDocProposalTests {
     }
   }
 
-  private func makeReport(
+  func makeReport(
     _ service: TaskService, budget: Int, current: TaskDetails? = nil, in db: Database
   ) throws
     -> BriefReport

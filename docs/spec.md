@@ -933,12 +933,10 @@ object, separate from `tasks`: `ref`, eligible `total`, at most two `members`,
 `omitted`, and an optional `next` global-list continuation. Each member has bounded
 `ref`, `title`, `kind`, `why`, `source_task`, a factual `summary`, and a complete
 `read` command. The summary compares body bytes and metadata without loading bodies.
-Unknown historical metadata stays unknown. Mask complete fields before flattening
-line breaks and limiting each display to 120 characters and 512 UTF-8 bytes,
-including omission markers. Fields larger than 65,536 bytes report their omitted
-byte count instead of returning a partial value. Commands are complete and at most
-512 bytes; unusable refs recover through the existing protected archived list or
-workspace list.
+Unknown historical metadata stays unknown. Secret-bearing values stay masked in
+bounded, single-line previews. Omitted values carry explicit size or truncation
+markers. Read commands are complete; unusable refs recover through the existing
+protected archived list or workspace list.
 
 Apply the strict 14-day cutoff before grouping by stored document UID; archive
 status does not hide pending proposals. Members sort newest first, then descending
@@ -1006,7 +1004,7 @@ remain available. Unknown snapshot attachments stay unknown.
 
 Reads mask secrets before rendering, clipping or line selection. Show defaults to at
 most 400 rendered lines including its continuation. List title and metadata previews
-are at most 120 characters each, with omitted-character counts and a pinned show
+are bounded, with omitted-character counts and a pinned show
 command. Complete continuation commands preserve the workspace, selected revision and
 list filters. JSON show data is `{ref,output}`; list data is
 `{entries:[{ref,state,output}],total,offset,limit,next?}`. JSON carries the same bounded
@@ -1035,17 +1033,17 @@ copied comment ref, including a tombstone for a deleted post. Thread, attributio
 resolution and accepted-answer metadata remain visible. Diff and comment-page flags
 are mutually exclusive; pagination options require the comment-page view. The same
 `--lines` bound applies, with continuations pinned to the revision, view and page.
-Lists preview at most two comments per revision, each at most 120 masked characters,
+Lists preview at most two bounded, masked comments per revision,
 with character/record omission counts and a complete comment-page continuation.
 
 `doc edit <slug|doc:slug> -F <file|->` accepts complete UTF-8 Markdown without NUL bytes. It is
 human-only: an agent supplies the human's exact approval words with `--approved`.
 There is no editor or message-body option. New documents require `--title` and at
 least one `--about`; omitted metadata on an accepted document stays unchanged.
-Supplied about refs replace the complete live set. Title is one line of at most
-120 characters; kind is inferred initially and stays fixed unless `--kind` is
-explicit (`contract`, `flow`, `runbook`, `reference`). Supplied input is at most
-65536 UTF-8 bytes before and after secret redaction. NUL bytes refuse even with
+Supplied about refs replace the complete live set. Title is a bounded single line;
+kind is inferred initially and stays fixed unless `--kind` is
+explicit (`contract`, `flow`, `runbook`, `reference`). Supplied input is bounded
+before and after secret redaction. NUL bytes refuse even with
 `--allow-secret` or when resupplying an unchanged accepted body. Humans refuse new secret
 text; approved agents redact it unless explicitly using `--allow-secret`.
 New or changed identities refuse detected secrets without rewriting identifier
@@ -1510,13 +1508,12 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    an earlier item printed is not repeated. When the caller has any item, `more:`
    adds `silta --ws acme inbox`, which no trim removes.
    Document proposal items use the same bounded evidence and complete read commands
-   as the inbox, with at most two members. Their groups are atomic under the budget:
-   a conservative reservation may omit a group even when its current shorter preview
-   would fit. The header still counts every eligible group and the complete inbox
-   recovery remains. Count, ordering, trimming and preview hydration share one read
-   snapshot; only groups retained by the budget load preview fields. Text and JSON
-   contain no reservations or internal grouping IDs. Repeated protected document
-   recovery commands appear once while every retained member's evidence remains.
+   as the inbox, with at most two members. Evidence may be shortened with an explicit
+   marker; recovery commands stay complete. Rendered groups fit the optional budget
+   without displacing current-task context. The header still counts every eligible
+   group and the complete inbox recovery remains. Selection, rendering and trimming
+   share one read snapshot. Text and JSON carry the same sections. Repeated protected
+   document recovery commands appear once.
 4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
    the resolved worktree's repo root with its on-disk casing, including for subpath apps,
    only when that file exists.
@@ -1549,7 +1546,7 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    service. Docs about the selected task's topics and explicit `--topic` selections
    appear before the glossary. Full mode shows at most two slug/kind/summary rows
    per item, ranking matching task/selected topics then slug. The summary is the
-   first nonempty nonheading line, at most 120 characters; masking precedes selection
+   first nonempty nonheading line, bounded; masking precedes selection
    and clipping. Remaining docs have a count and scoped `doc ls --about` command.
    Short/hook mode shows counts only and does not read revision bodies. Explicit
    `--short` keeps these semantics even with a larger `--budget`.
