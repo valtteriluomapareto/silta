@@ -1083,14 +1083,17 @@ Owned bodies remain literal even if their original file is gone or secret-bearin
 Unsafe identities/scopes/retained refs use agent-owned inspection fallbacks without
 write flags. Legacy encoded ref diagnostics are inspected decoded once for masking.
 
-The following document proposal and review workflow is planned. This build only
-registers `doc show`, `doc ls`, `doc edit` and `doc archive`. Restored pending
-revisions and their inbox groups are readable, but cannot be submitted or decided
-through public commands yet. Doc-specific review measurements wait for that workflow.
+Document submission is available through `doc propose`, alongside `doc show`,
+`doc ls`, `doc edit` and `doc archive`. Submissions remain pending, including
+from a human or with approval words. Human inbox groups expose read commands;
+this build cannot decide proposals yet. The triage workflow below remains planned,
+and doc-specific review measurements wait for that command.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
-  omitted accepted metadata stays. Source defaults to the session's claimed task.
+  omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
+  database-dependent selection, defaults and validation; insertion uses one write
+  and never runs Git.
   A submission stays proposed, including from a human or with `--approved`.
 - **Review:** the agent reads pinned proposal diffs, checks the code and prepares
   existing proposal refs with accept/reject recommendations in one chat message.

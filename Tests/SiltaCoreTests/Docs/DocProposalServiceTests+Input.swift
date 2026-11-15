@@ -6,7 +6,7 @@ import Testing
 
 extension DocProposalServiceTests {
   @Test(arguments: ["workspace", "about", "source", "storage"])
-  func preparationFailuresKeepScopedDiscoveryAndStorageIdentity(kind: String) throws {
+  func postInputFailuresKeepScopedDiscoveryAndStorageIdentity(kind: String) throws {
     try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       var service = try Self.service(home, store)
@@ -19,7 +19,6 @@ extension DocProposalServiceTests {
         Self.refusal(kind == "storage" ? .env : .notFound) {
           _ = try service.propose(request) {
             if kind == "storage" { throw StorageError.accessDenied }
-            Issue.record("Preparation failure read input")
             return "Private input"
           }
         })
@@ -117,7 +116,6 @@ extension DocProposalServiceTests {
       let error = try #require(
         Self.refusal(scope == "acme" ? .invalid : .notFound) {
           _ = try service.propose(Self.request(DocWritePolicyTests.credential)) {
-            Issue.record("Unsafe identity read input")
             return "Body"
           }
         })
@@ -173,46 +171,4 @@ extension DocProposalServiceTests {
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
-  @Test(arguments: [
-    "pointer", "target", "new-target", "base", "doc", "workspace", "claim", "heartbeat",
-    "claim-count",
-    "explicit-source",
-  ])
-  func changedBaselineBindingOrSourceRollsBack(change: String) throws {
-    try withScratchDirectory { home in
-      let store = try AcmeDocAttachments.make(in: home)
-      try DocWritePolicyTests.seed(store)
-      try DocWritePolicyTests.seed(store, seed: 83)
-      try Self.task(store, seq: 1)
-      let statements = [
-        "pointer": "UPDATE doc SET current_rev=1",
-        "target": "UPDATE service SET uid='changed-service'",
-        "new-target": "UPDATE app SET uid='changed-app'",
-        "base": "UPDATE doc_rev SET uid='changed-base' WHERE rev=1",
-        "doc": "UPDATE doc SET uid='changed-doc'",
-        "workspace": "UPDATE workspace SET uid='changed-workspace'",
-        "claim": "UPDATE task SET claimed_by='agent:codex:other'",
-        "heartbeat": "UPDATE task SET claimed_at='2023-11-14T22:13:20.001Z'",
-        "explicit-source": "UPDATE task SET uid='changed-task'",
-      ]
-      var request = DocProposalRequest(slug: "rules", base: "1", why: "Why")
-      if change == "explicit-source" { request.task = "AC-1" }
-      if change == "new-target" { request.about = ["app:api"] }
-      var committed: [[String]] = []
-      _ = Self.refusal(.conflict) {
-        _ = try Self.service(home, store).propose(request) {
-          if change == "claim-count" {
-            try Self.task(store, seq: 2)
-          } else if let sql = statements[change] {
-            try store.write { try $0.database.execute(sql: sql) }
-          }
-          committed = try DocVerificationPreparationTests.truth(store)
-          return "Proposed body"
-        }
-      }
-      #expect(!committed.isEmpty)
-      #expect(try DocVerificationPreparationTests.truth(store) == committed)
-    }
-  }
-
 }

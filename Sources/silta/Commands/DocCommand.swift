@@ -5,6 +5,7 @@ struct DocCommand: ParsableCommand {
     commandName: "doc", abstract: "Read and edit stored documents.",
     subcommands: [
       DocShowCommand.self, DocListCommand.self, DocEditCommand.self, DocArchiveCommand.self,
+      DocProposeCommand.self,
     ])
 
   @OptionGroup(title: "Global Options") var global: GlobalOptions

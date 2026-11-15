@@ -9,7 +9,7 @@ import Testing
 struct DocProposalIdentityTests {
   @Test(arguments: ["defaults", "target", "clock"])
   func submissionUsesPostInputTruth(change: String) throws {
-    withKnownIssue("SI-137: proposal resolves after input in one write") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         try DocWritePolicyTests.seed(store)
