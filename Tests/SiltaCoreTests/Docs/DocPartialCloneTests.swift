@@ -66,17 +66,22 @@ struct DocPartialCloneTests {
     }
   }
 
-  @Test func mixedCloneEdgeKeepsBothBindingsAndOnlyObservedSHA() async throws {
+  @Test(arguments: [false, true])
+  func mixedCloneEdgeKeepsBothBindingsAndOnlyObservedSHA(bothMissing: Bool) async throws {
     try await withScratchDirectory { home in
       let (store, repo) = try DocVerificationPreparationTests.setup(home)
       try Self.separateMobile(store)
+      if bothMissing { try store.write { try $0.database.execute(sql: "DELETE FROM repo_path") } }
       let draft = DocVerificationPreparationTests.draft(["edge:mobile/api/http-api"])
-      let git = ScriptedGitRunner(script: [
-        (
-          DocVerificationPreparationTests.request("origin/api", repo: repo),
-          DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
-        )
-      ])
+      let git = ScriptedGitRunner(
+        script: bothMissing
+          ? []
+          : [
+            (
+              DocVerificationPreparationTests.request("origin/api", repo: repo),
+              DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
+            )
+          ])
       var prepared: DocVerification?
       do {
         prepared = try await DocVerification.prepare(
@@ -94,15 +99,21 @@ struct DocPartialCloneTests {
       withKnownIssue("SI-128: a missing edge endpoint prevents partial observations") {
         #expect(prepared?.binding.apps.map(\.app) == ["api", "mobile"])
         #expect(
-          prepared?.snapshots == [
-            .init(app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA)
-          ])
+          prepared?.snapshots
+            == (bothMissing
+              ? []
+              : [
+                .init(app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA)
+              ]))
         #expect(accepted?.about == ["edge:mobile/api/http-api"])
         #expect(
           state.stamp == "unknown"
-            && state.evidence?.contains(DocVerificationPreparationTests.apiSHA) == true)
+            && (bothMissing
+              ? state.evidence == "[]"
+              : state.evidence?.contains(DocVerificationPreparationTests.apiSHA) == true)
+        )
       }
-      #expect(git.requests.count == 1 && git.isExhausted)
+      #expect(git.requests.count == (bothMissing ? 0 : 1) && git.isExhausted)
       if accepted != nil {
         let snapshot = try ExportDocumentSnapshotTests.read(store, workspace: 1)
         let parsed = try ExportDocumentSnapshot.parse(snapshot.files(), workspace: "acme")
@@ -243,4 +254,53 @@ struct DocPartialCloneTests {
       #expect(git.isExhausted)
     }
   }
+  @Test(arguments: ["service:push", "app:api"])
+  func zeroAppAndCompleteEvidenceRetainStamp(ref: String) async throws {
+    try await withScratchDirectory { home in
+      let (store, repo) = try DocVerificationPreparationTests.setup(home)
+      let git = ScriptedGitRunner(
+        script: ref.hasPrefix("app:")
+          ? [
+            (
+              DocVerificationPreparationTests.request("origin/api", repo: repo),
+              DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
+            )
+          ] : [])
+      _ = try await DocWritePolicyTests.service(home, store, git: git).edit(
+        Self.request([ref]), input: { "A complete rule." })
+      #expect(try Self.latest(store).stamp == "2023-11-14T22:13:20.000Z")
+      #expect(git.isExhausted)
+    }
+  }
+
+  @Test(arguments: ["foreign", "duplicate", "ref", "sha", "reversed"])
+  func invalidPreparedObservationsCannotMutateRows(mode: String) throws {
+    try withScratchDirectory { home in
+      let (store, _) = try DocVerificationPreparationTests.setup(home)
+      let draft = DocVerificationPreparationTests.draft(["edge:mobile/api/http-api"])
+      let binding = try DocVerification.readBinding(draft, workspace: 1, store: store)
+      let api = DocVerification.Snapshot(
+        app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA)
+      let mobile = DocVerification.Snapshot(
+        app: "mobile", ref: "origin/mobile", sha: DocVerificationPreparationTests.mobileSHA)
+      let samples: [String: [DocVerification.Snapshot]] = [
+        "foreign": [.init(app: "foreign", ref: api.ref, sha: api.sha)],
+        "duplicate": [api, api],
+        "ref": [.init(app: api.app, ref: "other", sha: api.sha)],
+        "sha": [.init(app: api.app, ref: api.ref, sha: "invalid")],
+        "reversed": [mobile, api],
+      ]
+      let snapshots = try #require(samples[mode])
+      let before = try DocVerificationPreparationTests.truth(store)
+      do {
+        _ = try store.write {
+          try DocStoreTests.writer($0, ids: SeededIDGenerator(seed: 71))
+            .accept(draft, verification: DocVerification(binding: binding, snapshots: snapshots))
+        }
+        Issue.record("Invalid observations were accepted")
+      } catch let error as any CodedError { #expect(error.code == .conflict) }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
 }
