@@ -171,4 +171,32 @@ extension DocProposalServiceTests {
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
+  @Test func explicitSourceUsesOwnedUIDWithoutRequiringFreshClaim() throws {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      try Self.task(store, seq: 1, status: "dropped", age: 999_999)
+      var request = Self.request()
+      request.task = "AC-1"
+      let service = try Self.service(home, store)
+      _ = try service.propose(request, input: { "Body" })
+      #expect(try Self.row(store)["source_task_id"] as Int64? != nil)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(id,uid,slug,name,task_prefix)
+            VALUES(2,'beta','beta','Beta','BE')
+            """)
+      }
+      try Self.task(store, seq: 1, workspace: 2)
+      let before = try DocVerificationPreparationTests.truth(store)
+      request.task = "BE-1"
+      _ = Self.refusal(.invalid) {
+        _ = try service.propose(request) {
+          return "Body"
+        }
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
 }

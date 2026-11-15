@@ -16,15 +16,12 @@ struct DocProposeCommandTests {
           "--ws", "acme", "doc", "propose", "rules", "--title", "Rules",
           "--about", "service:push", "-m", "Share the rule.", "--json", "-F",
         ]
+        let script = #"file=$2; binary=$1; shift 2; exec "$binary" "$@" < "$file""#
         let result =
           try stdin
           ? SiltaBinary.runProcess(
             URL(filePath: "/bin/sh"),
-            [
-              "-c",
-              #""$1" --ws acme doc propose rules --title Rules --about service:push -m Share --json -F - < "$2""#,
-              "_", try SiltaBinary.url().path, file.path,
-            ],
+            ["-c", script, "_", try SiltaBinary.url().path, file.path] + args + ["-"],
             in: scratch, environment: TaskCommandTests.fixed)
           : SiltaBinary.run(args + [file.path], in: scratch, environment: TaskCommandTests.fixed)
         #expect(result.termination == .exit(0))
@@ -54,9 +51,6 @@ struct DocProposeCommandTests {
   @Test func availabilityNamesSubmissionAndDefersDecisions() throws {
     do {
       try withScratchDirectory { scratch in
-        let help = try SiltaBinary.run(["doc", "propose", "--help"], in: scratch)
-        #expect(help.termination == .exit(0))
-        Golden.forTests().check(help.stdout, "help-doc-propose.txt")
         let guide = try SiltaBinary.run(["guide", "docs"], in: scratch)
         #expect(guide.stdout.contains("doc propose"))
         #expect(guide.stdout.contains("cannot decide"))

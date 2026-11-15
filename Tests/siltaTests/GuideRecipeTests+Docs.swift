@@ -13,7 +13,7 @@ extension GuideRecipeTests {
       try #require(guide.termination == .exit(0), "\(guide.stderr)")
       Golden.forTests().check(guide.stdout, "guide-docs.txt")
       let blocks = Self.blocks(guide.stdout)
-      try #require(blocks.count == 3)
+      try #require(blocks.count == 4)
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
       let split = "silta --ws acme doc edit doc:rules"
       let first = blocks[0].components(separatedBy: split)
@@ -42,6 +42,36 @@ extension GuideRecipeTests {
       #expect(archived.stdout.contains("doc:rules@3 [accepted, archived]"))
       try Self.expectArchived(queue, body: body)
       try Self.expectApprovals(queue)
+      try Self.expectProposal(blocks[3], fixture: fixture, queue: queue)
+    }
+  }
+
+  private static func expectProposal(
+    _ block: String, fixture: GuideRecipeFixture, queue: DatabaseQueue
+  ) throws {
+    let approvals = try queue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") }
+    let proposal = try fixture.execute(block, task: "AC-1")
+    #expect(proposal.termination == .exit(0), "\(proposal.stderr)")
+    #expect(proposal.stdout.contains("doc:delivery@1 proposed"))
+    try queue.read { (db: Database) throws in
+      #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == approvals)
+      #expect(
+        try Int.fetchOne(
+          db, sql: "SELECT count(*) FROM doc WHERE slug='delivery' AND current_rev IS NULL") == 1)
+      #expect(
+        try Int.fetchOne(
+          db,
+          sql: """
+            SELECT count(*) FROM doc_rev r JOIN doc d ON d.id=r.doc_id
+            WHERE d.slug='delivery' AND r.state='proposed'
+              AND r.triaged_at IS NULL AND r.triaged_by IS NULL
+            """) == 1)
+      #expect(
+        try String.fetchOne(
+          db,
+          sql: """
+            SELECT body_md FROM doc_rev r JOIN doc d ON d.id=r.doc_id WHERE d.slug='delivery'
+            """)?.contains("$DELIVERY_MODE") == true)
     }
   }
 

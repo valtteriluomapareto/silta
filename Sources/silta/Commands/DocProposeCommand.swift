@@ -19,7 +19,9 @@ struct DocProposeCommand: OutputCommand {
     help: .init(
       "Read complete UTF-8 Markdown from a file, or - for stdin.", valueName: "file"))
   var file: String?
-  @Option(name: .customShort("m"), help: "Explain why this knowledge should be shared.")
+  @Option(
+    name: .customShort("m"),
+    help: .init("Explain why this knowledge should be shared.", valueName: "why"))
   var why: String?
   @Option(help: "One line of at most 120 characters; required for a new doc.")
   var title: String?
