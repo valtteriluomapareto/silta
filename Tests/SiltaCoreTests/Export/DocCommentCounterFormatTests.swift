@@ -5,7 +5,7 @@ import Testing
 
 @testable import SiltaCore
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocCommentCounterFormatTests {
   @Test func legacyReservationsAreIgnoredAndExhaustionDoesNotOverflow() throws {
     try withScratchDirectory { scratch in

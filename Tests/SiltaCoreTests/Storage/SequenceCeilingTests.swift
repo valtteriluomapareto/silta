@@ -5,7 +5,7 @@ import Testing
 
 @testable import SiltaCore
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct SequenceCeilingTests {
   @Test(arguments: ["task:17", "comment:doc_rev:901"], [false, true])
   func terminalCounterRefusesWithoutChangingTransactionTruth(scope: String, atMaximum: Bool) throws
