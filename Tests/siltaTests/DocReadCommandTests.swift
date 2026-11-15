@@ -37,7 +37,7 @@ struct DocReadCommandTests {
       _ = try fixture(scratch)
       let live = try run(["ls", "--about", "app:api"], scratch)
       #expect(live.termination == .exit(0))
-      #expect(live.stdout.contains("doc:rules@2") && live.stdout.contains("doc:rules@3"))
+      #expect(live.stdout.contains("doc:rules@2") && !live.stdout.contains("doc:rules@3"))
       let proposed = try run(["ls", "--about", "service:push"], scratch)
       #expect(proposed.termination == .exit(0))
       #expect(!proposed.stdout.contains("doc:rules@2"))
@@ -185,6 +185,8 @@ struct DocReadCommandTests {
             UPDATE edge SET kind='Password=private123';
             UPDATE link SET to_kind='edge',to_id=(SELECT id FROM edge LIMIT 1);
             UPDATE doc_rev SET about_refs=? WHERE rev IN (2,3);
+            UPDATE doc_rev SET about_targets=(
+              SELECT json_array(json_object('kind','edge','uid',uid)) FROM edge) WHERE rev=3;
             """, arguments: ["[\"\(unsafe)\"]"])
       }
       let result = try run(["ls", "--about", unsafe, "--limit", "1"], scratch, json: json)
@@ -245,6 +247,8 @@ struct DocReadCommandTests {
             uid,doc_id,rev,base_rev,body_md,state,actor,created_at,title,kind,about_refs)
           SELECT 'rev-pending',id,3,2,'Pending body','proposed','agent:codex:acme','2023-11-15',
             'Proposed rules','contract','["service:push"]' FROM doc;
+          UPDATE doc_rev SET about_targets=(
+            SELECT json_array(json_object('kind','service','uid',uid)) FROM service) WHERE rev=3;
           """)
     }
     return store

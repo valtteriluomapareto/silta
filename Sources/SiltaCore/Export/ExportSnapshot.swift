@@ -119,9 +119,15 @@ package struct ExportSnapshot: Equatable, Sendable {
         "format 2 requires its legacy comment reservation stream",
         workspace: workspace.value("slug"))
     }
-    if format == "3", documents.legacyCommentSequences != nil {
+    if !["1", "2"].contains(format), documents.legacyCommentSequences != nil {
       throw ExportTree.invalid(
-        "format 3 cannot hold legacy comment reservations", workspace: workspace.value("slug"))
+        "format \(format) cannot hold legacy comment reservations",
+        workspace: workspace.value("slug"))
+    }
+    if format != "4",
+      documents.documents.flatMap(\.records).contains(where: { $0.value("about_targets") != nil })
+    {
+      throw ExportTree.invalid("format \(format) cannot hold target snapshots")
     }
     if format != "1" {
       data.merge(try documents.files()) { _, incoming in incoming }

@@ -55,7 +55,7 @@ struct StorageSchemaTests {
         #expect(try Int.fetchOne(db, sql: "PRAGMA busy_timeout") == 5000)
         #expect(
           try String.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-            == "6")
+            == "8")
         let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(task)").map {
           $0["name"] as String
         }
@@ -216,7 +216,7 @@ struct StorageSchemaTests {
       let version = try store.read {
         try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
       }
-      #expect(version == 6)
+      #expect(version == 8)
     }
   }
 

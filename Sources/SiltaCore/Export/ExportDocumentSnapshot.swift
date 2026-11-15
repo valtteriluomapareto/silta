@@ -6,7 +6,8 @@ struct ExportDocumentSnapshot: Equatable, Sendable {
   var revisionAllocations: [ExportRow]
   var legacyCommentSequences: [ExportRow]?
 
-  static func parse(_ files: [String: Data], workspace: String) throws -> Self {
+  static func parse(_ files: [String: Data], workspace: String, targets: Bool = true) throws -> Self
+  {
     let reader = ExportFileReader(files: files, slug: workspace)
     let names = files.keys.filter { $0.hasPrefix("docs/") && $0.hasSuffix(".md") }
       .map { String($0.dropFirst("docs/".count).dropLast(".md".count)) }
@@ -14,7 +15,7 @@ struct ExportDocumentSnapshot: Equatable, Sendable {
     let documents = try names.map { name in
       let paths = ["docs/\(name).md", "docs/\(name).jsonl"]
       let pair = files.filter { paths.contains($0.key) }
-      return try ExportTree.parseDocument(pair, slug: name, workspace: workspace)
+      return try ExportTree.parseDocument(pair, slug: name, workspace: workspace, targets: targets)
     }
     let snapshot = Self(
       documents: documents,

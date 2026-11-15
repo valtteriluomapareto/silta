@@ -34,6 +34,10 @@ enum StorageSchema {
       try db.execute(sql: "ALTER TABLE doc_rev ADD COLUMN triaged_at TEXT")
       try db.execute(sql: "ALTER TABLE doc_rev ADD COLUMN triaged_by TEXT")
     }
+    migrator.registerMigration("v8") { db in
+      try db.execute(sql: "ALTER TABLE doc_rev ADD COLUMN about_targets TEXT")
+      try db.execute(sql: "UPDATE meta SET value='8' WHERE key='min_writer_version'")
+    }
     return migrator
   }
 

@@ -102,7 +102,7 @@ struct ExportCoverageTests {
       "requested_by": .plain, "created_at": .plain, "taken_by": .plain, "taken_at": .plain,
       "done_at": .plain,
     ],
-    // Export refuses docs, so none of their columns are written.
+    // Document columns are checked by the document transport suites.
     "doc": [
       "id": .excluded, "uid": .excluded, "workspace_id": .excluded, "slug": .excluded,
       "previous_slugs": .excluded, "title": .excluded, "kind": .excluded, "owner": .excluded,
@@ -113,7 +113,7 @@ struct ExportCoverageTests {
       "id": .excluded, "uid": .excluded, "doc_id": .excluded, "rev": .excluded,
       "base_rev": .excluded, "body_md": .excluded, "state": .excluded, "actor": .excluded,
       "message": .excluded, "created_at": .excluded,
-      "title": .excluded, "kind": .excluded, "about_refs": .excluded,
+      "title": .excluded, "kind": .excluded, "about_refs": .excluded, "about_targets": .excluded,
       "source_task_id": .excluded, "triaged_at": .excluded, "triaged_by": .excluded,
     ],
     "doc_verification": [

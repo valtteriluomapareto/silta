@@ -8,7 +8,7 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocProposalExportTests {
   @Test func targetSnapshotsAreVersionedAndRoundTripWithoutCurrentTargets() throws {
-    withKnownIssue("SI-138: format four retains immutable target UIDs") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         _ = try DocProposalServiceTests.service(home, store).propose(

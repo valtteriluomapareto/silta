@@ -23,7 +23,7 @@ extension DocProposalService {
     for ref in metadata.refs {
       let target = try TaskLinkTarget.map(ref, workspace: id, in: db)
       guard let targetID = target.id,
-        let uid = try String.fetchOne(
+        let uid = try StoredUID.fetch(
           db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [targetID])
       else { throw StorageError.corrupt }
       fields += [ref, target.kind, String(targetID), uid]

@@ -3,14 +3,14 @@ import Foundation
 extension ExportTree {
   /// Reads an immutable document pair without interpreting historical refs or evidence.
   static func parseDocument(
-    _ files: [String: Data], slug: String, workspace: String
+    _ files: [String: Data], slug: String, workspace: String, targets: Bool = true
   ) throws -> ExportDocument {
-    try ExportFileReader(files: files, slug: workspace).document(slug)
+    try ExportFileReader(files: files, slug: workspace).document(slug, targets: targets)
   }
 }
 
 extension ExportFileReader {
-  func document(_ name: String) throws -> ExportDocument {
+  func document(_ name: String, targets: Bool) throws -> ExportDocument {
     guard WorkspaceConfig.isValidIdentifier(name) else {
       throw invalid("the document file name is not an identifier")
     }
@@ -19,7 +19,7 @@ extension ExportFileReader {
     let values = try frontmatter(&lines, in: path)
     guard values["slug"] == name else { throw invalid("\(path) names another document") }
     let bodies = try documentBodies(&lines, in: path)
-    let records = try documentRecords("docs/\(name).jsonl", bodies: bodies)
+    let records = try documentRecords("docs/\(name).jsonl", bodies: bodies, targets: targets)
     let document = ExportDocument(
       slug: name, row: ExportRow(keys: ExportFormat.docKeys, values: values), records: records)
     let rendered = try document.files()
@@ -51,7 +51,9 @@ extension ExportFileReader {
     return bodies
   }
 
-  private func documentRecords(_ path: String, bodies: [String: String]) throws -> [ExportRow] {
+  private func documentRecords(_ path: String, bodies: [String: String], targets: Bool) throws
+    -> [ExportRow]
+  {
     var rank = 0
     var revisions: Set<String> = []
     let records = try lines(path).map { line in
@@ -60,7 +62,7 @@ extension ExportFileReader {
         next >= rank
       else { throw invalid("\(path) has an unknown or unordered record group") }
       rank = next
-      let keys = ExportFormat.docRecords[next].keys
+      let keys = ExportFormat.docRecords[next].keys.filter { targets || $0 != "about_targets" }
       let record = try row(line, keys: keys, in: path)
       guard table == "doc_rev" else { return record }
       guard let revision = record.value("rev"), let body = bodies[revision],

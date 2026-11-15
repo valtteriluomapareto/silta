@@ -51,7 +51,7 @@ struct DocLegacyEvidenceReadTests {
       for (flags, total) in [
         ([String](), archived ? 0 : 4),
         (["--archived", "--offset", "0", "--limit", "20"], 4),
-        (["--archived", "--about", "app:api"], 4),
+        (["--archived", "--about", "app:api"], 1),
         (["--archived", "--about", "app:other"], 0),
       ] {
         for json in [false, true] {
@@ -60,7 +60,9 @@ struct DocLegacyEvidenceReadTests {
           #expect(result.termination == .exit(0) && result.stderr.isEmpty)
           #expect(result.stdout.contains(json ? "\"total\":\(total)" : "total \(total))"))
           if total > 0 {
-            #expect(result.stdout.contains("doc:rules@4") && result.stdout.contains("(unknown)"))
+            #expect(
+              result.stdout.contains(total == 4 ? "doc:rules@4" : "doc:rules@1")
+                && result.stdout.contains("(unknown)"))
           }
           #expect(!result.stdout.contains("Projection title"))
         }

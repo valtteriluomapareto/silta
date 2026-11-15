@@ -9,7 +9,7 @@ import Testing
 struct DocProposalIdentityTests {
   @Test(arguments: ["app", "topic", "service", "edge"])
   func pendingTargetsFollowRenameAndRefuseReplacement(kind: String) throws {
-    withKnownIssue("SI-138: pending attachment filters use stored target UIDs") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         let old = [
@@ -43,7 +43,7 @@ struct DocProposalIdentityTests {
 
   @Test(arguments: [false, true])
   func acceptedAProposedBFilterIsolation(unknownLegacy: Bool) throws {
-    withKnownIssue("SI-138: pending rows never borrow accepted attachments") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         var draft = DocDraft(slug: "rules", body: "Accepted")
@@ -72,7 +72,7 @@ struct DocProposalIdentityTests {
 
   @Test(arguments: [false, true])
   func invalidTargetUIDRaceKeepsHumanBackupRecovery(nul: Bool) throws {
-    withKnownIssue("SI-138: preserve target UID admission through private recheck") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         let uid = try #require(

@@ -57,7 +57,7 @@ struct DocCommentCounterFormatTests {
         try JSONSerialization.jsonObject(with: bytes) as? [String: Any])
       let counts = try #require(manifest["counts"] as? [String: String])
       do {
-        #expect(manifest["format"] as? String == "3")
+        #expect(manifest["format"] as? String == "4")
         #expect(files["doc_comment_sequences.jsonl"] == nil)
         #expect(counts["doc_comment_sequence"] == nil)
       }
