@@ -22,7 +22,7 @@ struct ExportSnapshotCompositionTests {
       let files = try snapshot.files()
       ExportTreeTests.expectSame(
         files.filter { $0.key.hasPrefix("docs/") || $0.key.hasPrefix("doc_") },
-        try ExportDocumentSnapshotTests.golden())
+        try ExportDocumentSnapshotTests.currentGolden())
       #expect(snapshot.documents == (try ExportDocumentSnapshotTests.read(store)))
       #expect(snapshot.links == (try RestoreDocumentGraphFixture.links()))
       let parsed = try ExportTree.parseSnapshot(files)
@@ -59,7 +59,7 @@ struct ExportSnapshotCompositionTests {
     graph.tree.format = "1"
     #expect(throws: ExportError.self) { try graph.tree.files() }
     graph.tree.documents.documents = []
-    graph.tree.documents.commentSequences = []
+    graph.tree.documents.legacyCommentSequences = nil
     #expect(throws: ExportError.self) { try graph.tree.files() }
   }
 

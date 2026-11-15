@@ -12,9 +12,9 @@ package struct StorageTransaction {
         database,
         sql: """
           INSERT INTO seq_counter(scope,next) VALUES(?,2)
-          ON CONFLICT(scope) DO UPDATE SET next=next+1 RETURNING next-1
-          """, arguments: [scope])
-    else { throw StorageError.internalMisuse }
+          ON CONFLICT(scope) DO UPDATE SET next=next+1 WHERE next<? RETURNING next-1
+          """, arguments: [scope, Int64.max])
+    else { throw StorageError.resourceExhausted }
     return value
   }
 

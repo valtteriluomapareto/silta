@@ -45,9 +45,9 @@ package enum ExportTree {
       throw refuse("format 1 cannot hold document files or allocation streams")
     }
     let documents =
-      manifest.format == "2"
+      manifest.format != "1"
       ? try ExportDocumentSnapshot.parse(documentFiles, workspace: manifest.workspace)
-      : ExportDocumentSnapshot(documents: [], revisionAllocations: [], commentSequences: [])
+      : ExportDocumentSnapshot(documents: [], revisionAllocations: [])
     let snapshot = ExportSnapshot(
       format: manifest.format, schema: manifest.schema, workspace: workspace, sections: sections,
       tasks: tasks,
@@ -89,8 +89,8 @@ struct ExportManifest {
     {
       throw ExportError.newerFormat
     }
-    guard ["1", "2"].contains(format) else {
-      throw ExportTree.invalid("format \(format) is not a supported format (1 or 2)")
+    guard ["1", "2", "3"].contains(format) else {
+      throw ExportTree.invalid("format \(format) is not a supported format (1, 2 or 3)")
     }
     guard let schema = object["schema"] as? String,
       let workspace = object["workspace"] as? String,

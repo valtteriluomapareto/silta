@@ -160,7 +160,7 @@ struct RestoreWriter {
     documentRevisionAllocations = try restoreDocumentCounters(
       tree.documents,
       retaining: current?.documents
-        ?? ExportDocumentSnapshot(documents: [], revisionAllocations: [], commentSequences: []),
+        ?? ExportDocumentSnapshot(documents: [], revisionAllocations: []),
       workspace: id)
     try restore(kept)
     try tx.recordChange(kind: "workspace", rowID: id)

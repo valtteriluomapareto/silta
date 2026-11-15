@@ -55,8 +55,7 @@ struct RestoreDocumentGraphTests {
     },
     .init(testDescription: "cross revision thread") { _, d in
       RestoreDocumentGraphFixture.record(&d, 6, "doc_rev", ExportDocumentTests.uid("053"))
-      d.commentSequences[2] = d.commentSequences[2].replacing(
-        "next", with: "2", keys: ["doc_rev", "next"])
+
     },
     .init(testDescription: "missing thread") { _, d in
       RestoreDocumentGraphFixture.record(&d, 7, "thread", "gone")
