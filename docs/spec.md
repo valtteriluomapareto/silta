@@ -2034,13 +2034,10 @@ silta comment delete
 silta inbox
 silta inbox take [M2]
 
-# docs
+# docs (available; planned proposal/review commands are described in §9)
 silta doc ls
 silta doc show
 silta doc edit
-silta doc propose [planned; §9]
-silta doc triage [planned; §9]
-silta doc verify [planned; §9]
 silta doc archive
 
 # maintenance
