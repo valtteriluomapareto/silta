@@ -2073,6 +2073,7 @@ silta doc ls
 silta doc show
 silta doc edit
 silta doc archive
+silta doc propose
 
 # maintenance
 silta export

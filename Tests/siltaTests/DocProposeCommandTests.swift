@@ -26,9 +26,7 @@ struct DocProposeCommandTests {
           : SiltaBinary.run(args + [file.path], in: scratch, environment: TaskCommandTests.fixed)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
-        #expect(
-          result.stdout == #"{"data":{"ref":"doc:rules@1"},"ok":true,"schema":1,"warnings":[]}"#
-            + "\n")
+        Golden.forTests().check(result.stdout, "doc-propose.json")
         if result.termination == .exit(0) {
           try store.read { (db: Database) throws in
             #expect(
