@@ -1036,14 +1036,15 @@ are mutually exclusive; pagination options require the comment-page view. The sa
 Lists preview at most two bounded, masked comments per revision,
 with character/record omission counts and a complete comment-page continuation.
 
-`doc edit <slug|doc:slug> -F <file|->` accepts complete UTF-8 Markdown. It is
+`doc edit <slug|doc:slug> -F <file|->` accepts complete UTF-8 Markdown without NUL bytes. It is
 human-only: an agent supplies the human's exact approval words with `--approved`.
 There is no editor or message-body option. New documents require `--title` and at
 least one `--about`; omitted metadata on an accepted document stays unchanged.
 Supplied about refs replace the complete live set. Title is a bounded single line;
 kind is inferred initially and stays fixed unless `--kind` is
 explicit (`contract`, `flow`, `runbook`, `reference`). Supplied input is bounded
-before and after secret redaction. Humans refuse new secret
+before and after secret redaction. NUL bytes refuse even with
+`--allow-secret` or when resupplying an unchanged accepted body. Humans refuse new secret
 text; approved agents redact it unless explicitly using `--allow-secret`.
 New or changed identities refuse detected secrets without rewriting identifier
 bytes; explicit `--allow-secret` retains them. Typed doc identifier exemptions
@@ -1052,7 +1053,8 @@ remain valid. Unchanged accepted fields are preserved after an exact state reche
 `doc edit <ref> --keep-body` explicitly copies the accepted owned body instead
 of reading input; it is exclusive with `-F`. An archived accepted body is eligible,
 but reactivation needs replacement about refs after its live links are removed.
-Retained bodies are not rescanned or retroactively capped. Each save creates one
+Retained bodies are not rescanned or retroactively capped; existing NUL bytes stay literal.
+Each save creates one
 accepted revision. Concurrent changes to the owned baseline or prepared target
 bindings refuse atomically. Used agent approval is recorded in the same transaction.
 Acceptance records an observation row with actor, message, time and the SHAs actually
