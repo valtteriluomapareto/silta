@@ -16,14 +16,17 @@ struct RestoreASCIIIdentityCommandTests {
         try $0.execute(sql: "UPDATE doc SET uid=CAST(? AS TEXT)", arguments: [bytes])
       }
       let before = try RestoreDocumentCommandFixture.dump(queue)
-      let arguments = ["restore", "out/acme"]
+      let arguments =
+        ["restore", "out/acme"]
         + (dryRun ? ["--dry-run"] : ["--approved", "Restore the Acme docs"])
         + (json ? ["--json"] : [])
       let result = try SiltaBinary.run(
         arguments, in: scratch, environment: RestoreCommandTests.agent)
       let shown = result.stdout + result.stderr
       let after = try RestoreDocumentCommandFixture.dump(queue)
-      let afterUID = try queue.read { try Data.fetchOne($0, sql: "SELECT CAST(uid AS BLOB) FROM doc") }
+      let afterUID = try queue.read {
+        try Data.fetchOne($0, sql: "SELECT CAST(uid AS BLOB) FROM doc")
+      }
       withKnownIssue("SI-133: stored unsupported UIDs need backup recovery before replacement") {
         #expect(result.termination == .exit(9), "\(shown)")
         #expect(shown.contains("ASCII") && shown.contains("silta backup"))
