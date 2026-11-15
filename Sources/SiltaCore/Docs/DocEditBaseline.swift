@@ -3,7 +3,7 @@ import GRDB
 
 /// Exact owned state used to preserve content or exempt it from a new-content scan.
 struct DocEditBaseline: Equatable {
-  let literalFields: [Data?]
+  let literalFields: [Data]
   let identities: [String?]
   let archived: Bool
   let rowRevision: Int?
@@ -15,6 +15,20 @@ struct DocEditBaseline: Equatable {
   let kind: String?
   let revision: Int?
   let refs: [String]
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    guard lhs.literalFields == rhs.literalFields, lhs.identities == rhs.identities,
+      lhs.archived == rhs.archived, lhs.rowRevision == rhs.rowRevision, lhs.state == rhs.state,
+      lhs.documentExists == rhs.documentExists, lhs.accepted == rhs.accepted,
+      lhs.revision == rhs.revision, lhs.title == rhs.title, lhs.kind == rhs.kind,
+      lhs.refs == rhs.refs
+    else { return false }
+    switch (lhs.body, rhs.body) {
+    case (nil, nil): return true
+    case (let left?, let right?): return left.utf8.elementsEqual(right.utf8)
+    default: return false
+    }
+  }
 
   static func read(_ slug: String, workspace: Int64, keepBody: Bool, in db: Database) throws -> Self
   {
@@ -47,7 +61,7 @@ struct DocEditBaseline: Equatable {
     let state: String? = row["state"]
     let title: String = row["title"]
     let kind: String = row["kind"]
-    var literalFields: [Data?] = [Data(title.utf8), Data(kind.utf8), bodyBytes]
+    var literalFields: [Data] = [Data(title.utf8), Data(kind.utf8)]
     var identities = [
       workspaceUID, try StoredUID.read(from: row), try StoredUID.read("revision_uid", from: row),
     ]
