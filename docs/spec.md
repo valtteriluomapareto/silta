@@ -363,6 +363,7 @@ CREATE TABLE doc_rev (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   base_rev INTEGER,                           -- the revision this proposal was written against
   body_md TEXT NOT NULL,
   title TEXT, kind TEXT, about_refs TEXT,      -- revision metadata; NULL when legacy history is unknown
+  about_targets TEXT,                        -- kind/UID snapshots; NULL when identity is unknown
   source_task_id INTEGER REFERENCES task(id),
   triaged_at TEXT, triaged_by TEXT,            -- both NULL: direct edit or unknown decision
   state TEXT NOT NULL,                        -- proposed | accepted | rejected | superseded
@@ -998,8 +999,7 @@ before indentation and the existing rendered-line bounds, without a preview limi
 `doc ls [--about <canonical-map-ref>] [--archived] [--offset N] [--limit N]`
 lists current accepted and individual pending revisions, ordered by slug then revision.
 The default page has 20 entries, with a maximum of 100. Accepted entries match current
-live attachments; pending entries match either the current attachment or their stored
-proposal snapshot. Archived documents require `--archived` in lists, but explicit reads
+live attachments; pending entries match only their stored target kind and UID. Archived documents require `--archived` in lists, but explicit reads
 remain available. Unknown snapshot attachments stay unknown.
 
 Reads mask secrets before rendering, clipping or line selection. Show defaults to at
@@ -1082,6 +1082,12 @@ first, replay the complete reattachments, inspect the map and retry removal.
 Owned bodies remain literal even if their original file is gone or secret-bearing.
 Unsafe identities/scopes/retained refs use agent-owned inspection fallbacks without
 write flags. Legacy encoded ref diagnostics are inspected decoded once for masking.
+
+Pending revisions with known attachment identities match item filters by stored target
+kind and UID. Renaming a target preserves that match; replacing it under the same
+spelling does not. Legacy NULL identities remain broadly readable but absent from
+item-filtered pending results. Accepted rows use live attachments independently.
+Target snapshots preserve historical display refs and may name removed targets.
 
 The following document proposal and review workflow is planned. This build only
 registers `doc show`, `doc ls`, `doc edit` and `doc archive`. Restored pending
@@ -1672,9 +1678,10 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     links.jsonl, alias_decisions.jsonl, approvals.jsonl
   ```
 
-  **Formats 1, 2 and 3** (the contracts restore reads):
-  - New exports use format 3, which omits per-revision comment reservations and
-    their manifest count. The reader preserves exact canonical format-1 and format-2
+  **Formats 1, 2, 3 and 4** (the contracts restore reads):
+  - New exports use format 4, which adds nullable proposal target snapshots to format 3.
+    Format 3 omits per-revision comment reservations and
+    their manifest count. The reader preserves exact canonical format-1, format-2 and format-3
     representations, including the schema named by an older tree. Format 2 always
     includes `doc_revision_allocations.jsonl` and `doc_comment_sequences.jsonl`,
     even when empty. Their record counts and the doc/revision/verification counts
@@ -1719,7 +1726,12 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     revision in increasing number order under `## Revision <number>`. Bodies use
     the same literal fenced representation as task bodies, including empty bodies.
     **`docs/<slug>.jsonl`** holds revision metadata without the body, followed by
-    verification and revision-owned comment rows. Nullable historical metadata
+    verification and revision-owned comment rows. Format 4 adds nullable
+    `about_targets`: an array of `{kind,uid}` identities. Known snapshots
+    are nonempty, unique, use fixed map kinds and admitted UIDs, and match their
+    display refs in count and outer kind. They may name removed targets; validation
+    never resolves historical spelling through today's map. Formats 1–3 keep their
+    original key sets and unknown identities. Nullable historical metadata
     stays absent; original about refs and verification evidence stay literal even
     when their map targets have been removed. Restore requires current title and kind
     to match their accepted revision, and an unarchived accepted doc needs live attachments.

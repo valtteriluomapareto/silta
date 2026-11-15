@@ -113,6 +113,23 @@ struct RestoreDocumentGraph {
       throw invalid("doc:\(document.slug)@\(number) has only one triage audit field")
     }
     try stringArray(revision.value("about_refs"))
+    if let snapshot = revision.value("about_targets") {
+      let targets: [DocTargetIdentity]
+      let refs: [String]
+      do {
+        targets = try JSONDecoder().decode([DocTargetIdentity].self, from: Data(snapshot.utf8))
+        refs = try JSONDecoder().decode(
+          [String].self, from: Data((revision.value("about_refs") ?? "").utf8))
+      } catch { throw invalid("a document target snapshot is malformed") }
+      let kinds = ["app", "edge", "service", "topic"]
+      let refKinds = refs.compactMap { ref in
+        ref.firstIndex(of: ":").map { String(ref[..<$0]) }
+      }.sorted()
+      guard !targets.isEmpty, targets.count == refs.count,
+        targets.allSatisfy({ kinds.contains($0.kind) && StoredUID.valid(Data($0.uid.utf8)) }),
+        Set(targets).count == targets.count, targets.map(\.kind).sorted() == refKinds
+      else { throw invalid("a document target snapshot is incomplete or invalid") }
+    }
   }
 
   private func current(_ document: ExportDocument, revisions: [Int64: ExportRow]) throws {

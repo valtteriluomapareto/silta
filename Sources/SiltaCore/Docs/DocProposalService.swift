@@ -48,7 +48,7 @@ struct DocProposalService {
         guard Self.same(captured.identity, identity),
           Self.same(captured.source.fields, source.fields)
         else { throw DocError.changed(workspace: workspace) }
-      } catch let error as any CodedError where !(error is StorageError) {
+      } catch let error as any CodedError where !(error is StorageError) && error.code != .env {
         throw DocError.changed(workspace: workspace)
       }
       var draft = DocDraft(slug: request.slug, body: body.0)
