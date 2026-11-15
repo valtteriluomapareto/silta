@@ -1195,11 +1195,12 @@ silta code ls   <app>[@<ref>] [<dir>]
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need the human's go-ahead (D38): `task promote`, `task edit`,
-  `doc edit|accept|reject`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
+  `doc edit|archive`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
   session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
   `ws edit`, `restore` except `--dry-run` (§15), and an agent's `task unblock` of a block
   that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
+  Planned `doc triage` follows the same human gate (§9).
   - A `human:*` actor (a TTY, or the app) runs them directly; `--approved` from a
     human is ignored.
   - An agent runs them with `--approved "<the human's words>"`: what the human wrote
@@ -2624,7 +2625,7 @@ qwen3-coder fell from 31% to 9%".
 | M | Scope | Done when |
 |---|---|---|
 | **M1 Daily use** | Package, GRDB storage and migrations, `SILTA_HOME`; `init --scan` and `ws edit` (YAML); `where` (§7) with fixtures; `code *` with `@ref`; tasks: add/start/plan/steps/from-plan/submit/done with result and sha/archive/triage/promote; blockers with follow-up days and external parties; comments with kinds, threads, batch resolve; inbox (questions, proposed tasks, blocked tasks due back); **brief (sections 1–7) and the SessionStart hook**; actors and sessions; `agents install` incl. Codex writable root; `silta guide`; secret guard; JSON envelope and exit codes; daily backup, export, restore; logs and `doctor`. | The `start-cross-repo`, `plan-not-file`, `handoff-resume` and `done-with-result` evals pass for Claude Code and Codex on the fixtures. Stress, `where`-matrix, round-trip, migration and secret-corpus tests are green. |
-| **M2 Reviews + docs** | `task diff`, reviews with verdicts and line comments, anchors with snippets, review requests + `inbox take`, review gate (opt-in), rate limits; docs with proposals, `base_rev` and accept/rebase; brief adds docs and review state; Darwin notify is *not* yet included. | The `review-loop` eval passes (Codex reviews, Claude fixes, human approves). Gate truth table and anchor fixtures (amend, rebase, force-push) are green. |
+| **M2 Reviews + docs** | `task diff`, reviews with verdicts and line comments, anchors with snippets, review requests + `inbox take`, review gate (opt-in), rate limits; docs with `base_rev`, `doc propose` and human-owned `doc triage` (§9); brief adds docs and review state; Darwin notify is *not* yet included. | The `review-loop` eval passes (Codex reviews, Claude fixes, human approves). Gate truth table and anchor fixtures (amend, rebase, force-push) are green. |
 | **M3 Index + search** | Notes and repo-doc sources, section extraction, alias suggestions with human decisions, change-log indexing with a lease, Finnish-safe search, `verify`. | The Finnish search corpus passes (`sää`≠`saa`; `viesti` finds `viestit` and `tekstiviestipalvelu`). "What was decided about messaging?" returns note citations. Incremental index equals a rebuild. |
 | **M4 Tracker + importers** | Tracker status for promoted tasks (Azure DevOps first); scheduled export and verify (launchd); importers for dex, beads and backlog-md; the full eval matrix including open models. | Eval report published for at least 3 harnesses × 4 models. |
 | **M5 App** | SwiftUI app on SiltaCore: board, task timeline with threads and reviews, inbox, doc diffs, brief preview; change signal and WAL watching; embedded CLI. | You triage the inbox and approve a review without the CLI. |
