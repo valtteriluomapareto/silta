@@ -8,7 +8,7 @@ import Testing
 struct DocProposeCommandTests {
   @Test(arguments: [false, true])
   func publicSubmissionHasBodyFreeReceiptAndNoApproval(stdin: Bool) throws {
-    try withKnownIssue("SI-137: public proposal submission") {
+    withKnownIssue("SI-137: public proposal submission") {
       try withScratchDirectory { scratch in
         let store = try AcmeDocAttachments.make(in: scratch)
         let file = try DocEditCommandTests.input(scratch, "Shared knowledge.")
@@ -33,13 +33,13 @@ struct DocProposeCommandTests {
           result.stdout == #"{"data":{"ref":"doc:rules@1"},"ok":true,"schema":1,"warnings":[]}"#
             + "\n")
         if result.termination == .exit(0) {
-          try store.read {
+          try store.read { (db: Database) throws in
             #expect(
-              try String.fetchOne($0, sql: "SELECT body_md FROM doc_rev") == "Shared knowledge.")
-            #expect(try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") == 0)
-            #expect(try Int.fetchOne($0, sql: "SELECT count(*) FROM link") == 0)
+              try String.fetchOne(db, sql: "SELECT body_md FROM doc_rev") == "Shared knowledge.")
+            #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == 0)
+            #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM link") == 0)
             #expect(
-              try Int.fetchOne($0, sql: "SELECT count(*) FROM doc WHERE current_rev IS NULL") == 1)
+              try Int.fetchOne(db, sql: "SELECT count(*) FROM doc WHERE current_rev IS NULL") == 1)
           }
           let inbox = try SiltaBinary.run(
             ["--ws", "acme", "inbox", "--all", "--json"], in: scratch,
@@ -52,7 +52,7 @@ struct DocProposeCommandTests {
   }
 
   @Test func availabilityNamesSubmissionAndDefersDecisions() throws {
-    try withKnownIssue("SI-137: guide and schema expose submission truthfully") {
+    withKnownIssue("SI-137: guide and schema expose submission truthfully") {
       try withScratchDirectory { scratch in
         let guide = try SiltaBinary.run(["guide", "docs"], in: scratch)
         #expect(guide.stdout.contains("doc propose"))

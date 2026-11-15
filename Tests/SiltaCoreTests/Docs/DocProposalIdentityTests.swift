@@ -9,7 +9,7 @@ import Testing
 struct DocProposalIdentityTests {
   @Test(arguments: ["defaults", "target", "clock"])
   func submissionUsesPostInputTruth(change: String) throws {
-    try withKnownIssue("SI-137: proposal resolves after input in one write") {
+    withKnownIssue("SI-137: proposal resolves after input in one write") {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         try DocWritePolicyTests.seed(store)
@@ -47,7 +47,7 @@ struct DocProposalIdentityTests {
 
   @Test(arguments: ["app", "topic", "service", "edge"])
   func pendingTargetsFollowRenameAndRefuseReplacement(kind: String) throws {
-    try withKnownIssue("SI-137: pending attachment filters use stored target UIDs") {
+    withKnownIssue("SI-137: pending attachment filters use stored target UIDs") {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         let old = [
@@ -60,18 +60,20 @@ struct DocProposalIdentityTests {
         ]
         let field = kind == "edge" ? "kind" : "slug"
         let name = ["app": "api", "topic": "messaging", "service": "push", "edge": "sdk"]
+        let oldRef = try #require(old[kind])
+        let newRef = try #require(renamed[kind])
         let request = DocProposalRequest(
-          slug: "rules", title: "Rules", about: [try #require(old[kind])], why: "Share")
+          slug: "rules", title: "Rules", about: [oldRef], why: "Share")
         _ = try DocProposalServiceTests.service(home, store).propose(request, input: { "Body" })
         let service = DocService(workspace: "acme", store: store)
         try store.write { try $0.database.execute(sql: "UPDATE \(kind) SET \(field)='renamed'") }
         #expect(
-          try service.list(about: #require(renamed[kind])).entries.map(\.ref) == ["doc:rules@1"])
+          try service.list(about: newRef).entries.map(\.ref) == ["doc:rules@1"])
         try store.write {
           try $0.database.execute(
             sql: "UPDATE \(kind) SET \(field)=?,uid='replacement'", arguments: [name[kind]])
         }
-        #expect(try service.list(about: #require(old[kind])).entries.isEmpty)
+        #expect(try service.list(about: oldRef).entries.isEmpty)
         #expect(try service.list().entries.map(\.ref) == ["doc:rules@1"])
       }
     }
@@ -79,13 +81,13 @@ struct DocProposalIdentityTests {
 
   @Test(arguments: [false, true])
   func acceptedAProposedBFilterIsolation(unknownLegacy: Bool) throws {
-    try withKnownIssue("SI-137: pending rows never borrow accepted attachments") {
+    withKnownIssue("SI-137: pending rows never borrow accepted attachments") {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         var draft = DocDraft(slug: "rules", body: "Accepted")
         draft.title = "Rules"
         draft.about = ["app:api"]
-        _ = try DocStoreTests.accept(draft, in: store)
+        _ = try DocStoreTests.accept(draft, in: store, ids: SeededIDGenerator(seed: 82))
         _ = try DocProposalServiceTests.service(home, store).propose(
           DocProposalServiceTests.request(), input: { "Proposed" })
         if unknownLegacy {
