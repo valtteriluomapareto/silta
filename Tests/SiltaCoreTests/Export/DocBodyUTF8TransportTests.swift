@@ -7,7 +7,7 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct DocBodyUTF8TransportTests {
-  @Test(arguments: [0, 1, 2])
+  @Test(arguments: [0, 1])
   func captureAndFilesRetainCompleteRevisionBody(sample: Int) throws {
     let body = Self.samples[sample]
     try withScratchDirectory { home in
@@ -32,7 +32,7 @@ struct DocBodyUTF8TransportTests {
     }
   }
 
-  @Test(arguments: [0, 1, 2])
+  @Test(arguments: [0, 1])
   func authoredRestoreRetainsCompleteRevisionBody(sample: Int) throws {
     let body = Self.samples[sample]
     try withScratchDirectory { home in
@@ -107,7 +107,7 @@ struct DocBodyUTF8TransportTests {
     }
   }
 
-  private static let samples = ["", "Acme\u{0}tail", "é\u{0}尾"]
+  private static let samples = ["", "Acme\u{0}é尾"]
 
   private static func values(_ snapshot: ExportDocumentSnapshot) -> [Data?] {
     snapshot.documents.flatMap(\.records).filter { $0.value("table") == "doc_rev" }

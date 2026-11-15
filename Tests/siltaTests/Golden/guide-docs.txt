@@ -25,7 +25,7 @@ attachments (one edge: contract; several edges: flow; service: runbook;
 otherwise: reference) and stays fixed unless --kind is explicit.
 Omitted accepted metadata stays unchanged.
 Supplied about refs replace the complete live set; repeat --about for every attachment.
-Save complete UTF-8 Markdown with -F, at most 65536 bytes before and after redaction:
+Save NUL-free UTF-8 Markdown with -F, at most 65536 bytes before and after redaction:
 ```sh
 silta --ws acme doc edit rules -F rules.md --title Rules --about service:push \
 --approved "<the human's words>"
