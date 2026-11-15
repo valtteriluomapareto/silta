@@ -1,5 +1,4 @@
 import Foundation
-import SiltaTestSupport
 import Testing
 
 @testable import SiltaCore
@@ -14,7 +13,7 @@ extension ExportVersionTests {
       values[missing] = nil
     }
     let files = try Self.legacyCounterFiles(values)
-    withKnownIssue("Legacy counter rows retain both original string fields") {
+    do {
       var failure: ExportError?
       do { _ = try ExportTree.parse(files) } catch let error as ExportError { failure = error }
       #expect(failure?.code == .invalid)
@@ -24,7 +23,8 @@ extension ExportVersionTests {
 
   @Test(arguments: [false, true])
   func completeLegacyCounterValuesStayUninterpreted(empty: Bool) throws {
-    let values = empty
+    let values =
+      empty
       ? ["doc_rev": "", "next": ""]
       : ["doc_rev": "discarded-owner", "next": "not-a-number"]
     let files = try Self.legacyCounterFiles(values)

@@ -23,6 +23,11 @@ struct ExportDocumentSnapshot: Equatable, Sendable {
       legacyCommentSequences: files[ExportFormat.docCommentSequencesFile] == nil
         ? nil
         : try reader.jsonl(ExportFormat.docCommentSequencesFile, keys: ["doc_rev", "next"]))
+    if snapshot.legacyCommentSequences?.contains(where: {
+      $0.value("doc_rev") == nil || $0.value("next") == nil
+    }) == true {
+      throw reader.invalid("doc_comment_sequences.jsonl rows require doc_rev and next")
+    }
     try snapshot.validateCounters(workspace: workspace)
     guard try snapshot.files() == files else {
       throw reader.invalid("document files or allocation streams are not in the form export writes")
