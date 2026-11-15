@@ -136,8 +136,12 @@ extension DocPartialCloneTests {
               DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
             )
           ] : [])
-      _ = try await DocWritePolicyTests.service(home, store, git: git).edit(
-        Self.request([ref]), input: { "A complete rule." })
+      var failure: ErrorCode?
+      do {
+        _ = try await DocWritePolicyTests.service(home, store, git: git).edit(
+          Self.request([ref]), input: { "A complete rule." })
+      } catch let error as any CodedError { failure = error.code }
+      #expect(failure == nil)
       #expect(try Self.latest(store).stamp == "2023-11-14T22:13:20.000Z")
       #expect(git.isExhausted)
     }
