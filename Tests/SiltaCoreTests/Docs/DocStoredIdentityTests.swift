@@ -12,8 +12,9 @@ struct DocStoredIdentityTests {
     "service-endpoint", "app-endpoint",
   ]
 
-  @Test(arguments: Self.kinds, ["K\u{0}tail", "K"])
-  func editRefusesUnsupportedStoredIdentity(kind: String, uid: String) async throws {
+  @Test(arguments: Self.kinds, [false, true])
+  func editRefusesUnsupportedStoredIdentity(kind: String, nulSuffix: Bool) async throws {
+    let uid = nulSuffix ? "K\u{0}tail" : "K"
     try await withScratchDirectory { home in
       let (store, request) = try Self.fixture(home, kind: kind)
       let table = Self.table(kind)
