@@ -19,7 +19,8 @@ extension DocsMigrationTests {
       }
       #expect(
         metadata
-          == "[\"app:mobile\",\"edge:mobile/api/HTTP%20API%2F%CE%B2\",\"service:Push%20API%2F%E9%9B%AA\"]"
+          == "[\"app:mobile\",\"edge:mobile/api/HTTP%20API%2F%CE%B2\","
+          + "\"service:Push%20API%2F%E9%9B%AA\"]"
       )
       #expect(
         try store.read {
