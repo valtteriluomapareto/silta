@@ -125,9 +125,9 @@ struct RestoreDocumentGraph {
       let refKinds = refs.compactMap { ref in
         ref.firstIndex(of: ":").map { String(ref[..<$0]) }
       }.sorted()
-      guard !targets.isEmpty, targets.count == refs.count, Set(targets).count == targets.count,
+      guard !targets.isEmpty, targets.count == refs.count,
         targets.allSatisfy({ kinds.contains($0.kind) && StoredUID.valid(Data($0.uid.utf8)) }),
-        targets.map(\.kind).sorted() == refKinds
+        Set(targets).count == targets.count, targets.map(\.kind).sorted() == refKinds
       else { throw invalid("a document target snapshot is incomplete or invalid") }
     }
   }

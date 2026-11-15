@@ -117,8 +117,9 @@ struct DocAuditMigrationTests {
     let binary = try #require(ProcessInfo.processInfo.environment["SILTA_V6_BINARY"])
     try withScratchDirectory { home in
       let store = try Self.copy(Self.fixture, to: home)
-      try store.initialize()
-      try Self.seedDecision(store)
+      let queue = try DatabaseQueue(path: store.path)
+      try StorageSchema.migrator.migrate(queue, upTo: "v7")
+      try queue.write { try Self.seedDecision(in: $0) }
       let before = try Self.auditRows(store)
       let result = try SiltaBinary.runProcess(
         URL(filePath: binary),
@@ -163,13 +164,13 @@ struct DocAuditMigrationTests {
   }
 
   static func seedDecision(_ store: DatabaseStore) throws {
-    try store.write {
-      try $0.database.execute(
-        sql:
-          "UPDATE doc_rev SET triaged_at=?,triaged_by=? WHERE id=14",
-        arguments: ["2023-11-14T22:14:00.000Z", "human:acme"]
-      )
-    }
+    try store.write { try seedDecision(in: $0.database) }
+  }
+
+  static func seedDecision(in db: Database) throws {
+    try db.execute(
+      sql: "UPDATE doc_rev SET triaged_at=?,triaged_by=? WHERE id=14",
+      arguments: ["2023-11-14T22:14:00.000Z", "human:acme"])
   }
 
   static func auditRows(_ store: DatabaseStore) throws -> [String] {
