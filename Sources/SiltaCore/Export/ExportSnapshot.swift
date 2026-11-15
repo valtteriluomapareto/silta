@@ -40,26 +40,16 @@ package struct ExportRow: Equatable, Sendable {
   init(keys: [String], row: Row) throws {
     var values: [String: String] = [:]
     for key in keys {
+      if ExportIdentity.keys.contains(key) {
+        if let uid = try StoredUID.read(key, from: row) { values[key] = uid }
+        continue
+      }
       let value: DatabaseValue = row[key]
       switch value.storage {
       case .null: continue
-      case .int64(let number):
-        guard !ExportIdentity.keys.contains(key) else { throw ExportIdentity.unsupported }
-        values[key] = String(number)
-      case .string(let text):
-        if ExportIdentity.keys.contains(key) {
-          values[key] = try row.withUnsafeData(named: key) { bytes in
-            guard let bytes, ExportIdentity.valid(bytes),
-              let uid = String(data: bytes, encoding: .utf8)
-            else { throw ExportIdentity.unsupported }
-            return uid
-          }
-        } else {
-          values[key] = text
-        }
-      case .double, .blob:
-        if ExportIdentity.keys.contains(key) { throw ExportIdentity.unsupported }
-        throw ExportError.unsupported("non-text values in \(key)")
+      case .int64(let number): values[key] = String(number)
+      case .string(let text): values[key] = text
+      case .double, .blob: throw ExportError.unsupported("non-text values in \(key)")
       }
     }
     self.init(keys: keys, values: values)
