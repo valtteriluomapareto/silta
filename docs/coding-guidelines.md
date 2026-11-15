@@ -235,6 +235,21 @@ written first. The Tester reviewer checks it.
   (task text, comments, plans, file contents), so secrets and project data can't
   leak into logs (review).
 
+### Document output bounds
+
+Document proposal previews mask each complete field before flattening line breaks
+and clipping to 120 characters and 512 UTF-8 bytes, including omission markers.
+Fields larger than 65,536 bytes report their omitted size. Read commands are
+complete and at most 512 UTF-8 bytes; unsafe or oversized identities use the
+protected document or workspace list. Brief evidence takes the handoff's 15% local
+share, followed by whole deduplicated commands; global trimming keeps groups atomic.
+The inbox/brief privacy and budget tests fix these implementation limits.
+
+Supplied document bodies are capped at 65,536 UTF-8 bytes before and after
+redaction. Titles are single lines capped at 120 characters; comment list previews
+are masked and capped at 120 characters. The doc input, list and guide goldens cover
+these bounds. Retained bodies follow the separate literal-preservation contract.
+
 ### Help pages
 
 Every command's help has an abstract of one sentence, at most 80 characters,

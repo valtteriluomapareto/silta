@@ -28,13 +28,15 @@ struct BriefDiscussion {
       for: caller, workspace: workspace, all: false, at: now, limit: Self.items,
       currentTask: current?.ref, in: db)
     let items = attention.items
+    let previews = try DocProposalInbox(workspace: workspace, at: now, in: db)
+      .previews(items.compactMap(\.proposalGroup))
     var emitted: Set<String> = []
     var task: [BriefSection] = []
     if let current {
       let posts = try TaskService.discussion(current, timeline: true, in: db)
       if let handoff = TaskService.newestHandoff(posts) { task.append(section(handoff)) }
-      task += items.filter { onTask($0) }.prefix(Self.items).map {
-        section($0, id: "task_inbox", emitted: &emitted)
+      task += try items.filter { onTask($0) }.prefix(Self.items).map {
+        try section($0, id: "task_inbox", previews: previews, emitted: &emitted)
       }
       let open = posts.filter {
         $0.kind == "question" && $0.replyTo == nil && !$0.deleted && $0.resolvedAt == nil
@@ -58,19 +60,30 @@ struct BriefDiscussion {
           + (above == 0 ? "" : " (\(above) on this task)") + "\n"
       )
     ]
-    sections += items.filter { !onTask($0) }.prefix(Self.items).map {
-      section($0, id: "inbox", emitted: &emitted)
+    sections += try items.filter { !onTask($0) }.prefix(Self.items).map {
+      try section($0, id: "inbox", previews: previews, emitted: &emitted)
     }
     return (task, sections)
   }
 
-  private func section(_ item: InboxItem, id: String, emitted: inout Set<String>) -> BriefSection {
+  private func section(
+    _ item: InboxItem, id: String, previews: [DocProposalPreviewGroup], emitted: inout Set<String>
+  ) throws -> BriefSection {
     guard let group = item.proposalGroup else {
       return BriefSection(id: id, text: render(item, emitted: &emitted))
     }
-    var section = BriefSection(
-      id: id, text: String(repeating: " ", count: DocProposalPreviewGroup.reservation))
-    section.docProposalGroup = group
+    guard let preview = previews.first(where: { $0.id == group.id }) else {
+      throw StorageError.corrupt
+    }
+    let commands = preview.commands.filter { emitted.insert($0).inserted }
+      .map { "next: " + $0 + "\n" }.joined()
+    var section = BriefBudget.capped(
+      BriefSection(
+        id: id, text: preview.evidence, policy: .excerpt(marker: "(doc proposal trimmed)\n")),
+      characters: max(
+        0, BriefBudget.share(15, of: characters) - preview.heading.count - commands.count))
+    section.text = preview.heading + section.text + commands
+    section.policy = .atomic
     return section
   }
 
