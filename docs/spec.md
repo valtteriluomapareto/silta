@@ -1059,6 +1059,13 @@ Retained bodies are not rescanned or retroactively capped; existing NUL bytes st
 Each save creates one
 accepted revision. Concurrent changes to the owned baseline or prepared target
 bindings refuse atomically. Used agent approval is recorded in the same transaction.
+Acceptance records an observation row with actor, message, time and the SHAs actually
+read for configured apps, including both ends of an app edge. Missing clones or
+unavailable Git evidence leave those apps absent from the array; they do not block
+edits or reattachment. All attachment and app bindings are still checked at commit.
+Incomplete configured-app evidence clears `verified_at`; it cannot retain an older
+complete stamp. With no required apps, the attachment-only check is complete.
+Explicit verification requires all its requested evidence (§14).
 JSON success data is `{ref,archived,changed}`; text says accepted and quiet prints
 the immutable revision ref. Missing creation fields recover together in a body-free
 edit retry. Unsafe identities/scopes use the protected read hubs described above.
@@ -1627,7 +1634,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 
 `silta verify` reports:
 - **Code refs:** refs that don't resolve on their ref, or that point to a moved path.
-- **Docs:** docs never verified, or older than `stale_days`.
+- **Docs:** docs with incomplete configured-app evidence, never verified, or older
+  than `stale_days`. Ordinary acceptance observations do not claim complete
+  verification when clones or Git evidence are unavailable.
 - **Links:** broken `[[…]]` links, and links using `previous_slugs`.
 - **Repos:** repos not fetched in 7 days, and app refs that no longer exist.
 - **Notes:** notes tagged with unknown app or topic slugs.

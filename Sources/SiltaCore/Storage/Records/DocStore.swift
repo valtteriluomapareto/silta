@@ -25,6 +25,7 @@ struct DocStore {
       throw DocError.changed(workspace: verification.binding.workspace)
     }
     let stamp = utcTimestamp(at)
+    let verifiedAt = verification.snapshots.count == current.apps.count ? stamp : nil
     let id = try docID(draft.slug, metadata: metadata, old: old, stamp: stamp)
     let number = try nextRevision(id, slug: draft.slug)
     let base: Int? = old?["current_rev"]
@@ -44,7 +45,7 @@ struct DocStore {
     try db.execute(
       sql: """
         UPDATE doc SET title=?,kind=?,current_rev=?,verified_at=?,archived=0,updated_at=? WHERE id=?
-        """, arguments: [metadata.title, metadata.kind, number, stamp, stamp, id])
+        """, arguments: [metadata.title, metadata.kind, number, verifiedAt, stamp, id])
     try db.execute(
       sql: """
         INSERT INTO doc_verification(uid,doc_rev_id,actor,message,app_shas,created_at)

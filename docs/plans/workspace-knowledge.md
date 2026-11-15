@@ -184,8 +184,13 @@ mechanism for it:
 
 ### Staying true
 
-- A doc's verification records the actor, a message and the SHA of each app it refers
-  to (a `doc_verification` row). Accepting a revision counts as verifying it.
+- Acceptance records the actor, a message and each actually observed app/ref SHA
+  in a `doc_verification` row. Missing clones or unavailable Git evidence do not
+  block acceptance, metadata edits or reattachment; omitted apps remain unknown.
+  All configured bindings, including both edge endpoints, are still rechecked.
+  Only complete configured-app evidence stamps `verified_at`; partial acceptance
+  clears an older stamp. Zero required apps is a complete attachment-only check.
+  Explicit `doc verify` remains strict about the evidence it checks.
 - **In the brief, cheap:** a doc is stale when its verification is older than
   `stale_days`, or when a referenced app's ref has moved since that SHA. One
   `rev-parse` per app; hook mode shows only what the index cache (`index.db`, D8)
