@@ -27,7 +27,9 @@ struct RestoreASCIIIdentityCommandTests {
       let afterUID = try queue.read {
         try Data.fetchOne($0, sql: "SELECT CAST(uid AS BLOB) FROM doc")
       }
-      withKnownIssue("SI-133: stored unsupported UIDs need backup recovery before replacement") {
+      Golden.forTests().check(
+        shown, json ? "stored-uid-unsupported.json" : "stored-uid-unsupported.txt")
+      do {
         #expect(result.termination == .exit(9), "\(shown)")
         #expect(shown.contains("ASCII") && shown.contains("silta backup"))
         #expect(!shown.contains("private-suffix") && !shown.contains("update silta"))

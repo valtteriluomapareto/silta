@@ -40,40 +40,6 @@ enum RestoreOpaqueIdentityFixture {
     return store
   }
 
-  static func base(_ home: URL, offset o: Int64 = 0) throws -> DatabaseStore {
-    let store = try ExportFixture.make(home, offset: o)
-    try store.write { tx in
-      try tx.database.execute(
-        sql: """
-          UPDATE task SET uid=:task1 WHERE id=:first;
-          UPDATE task SET uid=:task2,worktree='/private/acme/second-task-wt' WHERE id=:second;
-          UPDATE task SET plan_rev=2,plan_md='Second plan' WHERE id=:second;
-          INSERT INTO task_plan_rev(id,task_id,rev,body_md,actor,created_at)
-          VALUES(:plan,:second,2,'Second plan','human:acme','');
-          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
-          created_by,created_at)
-          VALUES('second-plan-link',:workspace,'task',:first,'cites','task_plan_rev',:plan,
-          'human:acme','');
-          UPDATE comment SET uid=:comment1 WHERE id=:first;
-          UPDATE comment SET uid=:comment2 WHERE id=:second;
-          UPDATE repo SET uid=:repo1 WHERE id=:first;
-          UPDATE repo SET uid=:repo2 WHERE id=:second;
-          UPDATE app SET uid=:app1 WHERE id=:first;
-          UPDATE app SET uid=:app2 WHERE id=:second;
-          INSERT INTO repo_path(repo_id,path) VALUES(:second,'/private/acme/notes');
-          INSERT INTO worktree_override(path,app_id,set_by)
-          VALUES('/private/acme/api-wt',:second,'human:acme');
-          """,
-        arguments: [
-          "first": 1 + o, "second": 2 + o, "workspace": 1 + o, "plan": 1000 + o,
-          "task1": nfc("task"), "task2": nfd("task"),
-          "comment1": nfc("comment"), "comment2": nfd("comment"),
-          "repo1": nfc("repo"), "repo2": nfd("repo"), "app1": nfc("app"), "app2": nfd("app"),
-        ])
-    }
-    return store
-  }
-
   static func rename(_ tree: inout ExportSnapshot, from old: String, to new: String) {
     func row(_ original: ExportRow) -> ExportRow {
       var result = original

@@ -141,14 +141,14 @@ extension RestoreReport {
     dryRun: Bool
   ) -> RestoreReport {
     let incoming = Dictionary(
-      tree.tasks.map { (Data(($0.row.value("uid") ?? "").utf8), $0) },
+      tree.tasks.map { (($0.row.value("uid") ?? ""), $0) },
       uniquingKeysWith: { first, _ in first })
     let existing = current?.tasks ?? []
     var removed: [String] = []
     var changed: [String] = []
     var claims: [Claim] = []
     for task in existing {
-      let replacement = incoming[Data((task.row.value("uid") ?? "").utf8)]
+      let replacement = incoming[(task.row.value("uid") ?? "")]
       if replacement == nil {
         removed.append(task.ref)
       } else if replacement != task {
@@ -162,8 +162,8 @@ extension RestoreReport {
     return RestoreReport(
       workspace: workspace, dryRun: dryRun, created: current == nil,
       sameUID: current.map {
-        $0.workspace.value("uid").map { Data($0.utf8) }
-          == tree.workspace.value("uid").map { Data($0.utf8) }
+        $0.workspace.value("uid")
+          == tree.workspace.value("uid")
       } ?? true,
       manifestSHA256: digest, tasks: Counts(before: existing.count, after: tree.tasks.count),
       docs: Counts(
@@ -181,12 +181,12 @@ extension RestoreReport {
   {
     guard let current else { return ([], []) }
     let incoming = Dictionary(
-      tree.documents.documents.map { (Data(($0.row.value("uid") ?? "").utf8), $0) }
+      tree.documents.documents.map { (($0.row.value("uid") ?? ""), $0) }
     ) { first, _ in first }
     var removed: [String] = []
     var changed: [String] = []
     for document in current.documents.documents {
-      guard let replacement = incoming[Data((document.row.value("uid") ?? "").utf8)] else {
+      guard let replacement = incoming[(document.row.value("uid") ?? "")] else {
         removed.append("doc:" + document.slug)
         continue
       }
@@ -205,15 +205,15 @@ extension RestoreReport {
   private static func documentLinks(_ document: ExportDocument, in tree: ExportSnapshot)
     -> [ExportRow]
   {
-    let uid = Data((document.row.value("uid") ?? "").utf8)
+    let uid = (document.row.value("uid") ?? "")
     let comments = Set(
-      document.records.compactMap { row -> Data? in
+      document.records.compactMap { row -> String? in
         guard row.value("table") == "comment", let uid = row.value("uid") else { return nil }
-        return Data(uid.utf8)
+        return uid
       })
     return tree.links.filter { link in
       guard let owner = link.value("from") else { return false }
-      let source = Data(owner.utf8)
+      let source = owner
       return (link.value("from_kind") == "doc" && source == uid)
         || (link.value("from_kind") == "comment" && comments.contains(source))
     }

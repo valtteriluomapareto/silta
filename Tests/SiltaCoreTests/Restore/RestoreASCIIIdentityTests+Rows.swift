@@ -6,6 +6,43 @@ import Testing
 @testable import SiltaCore
 
 extension RestoreASCIIIdentityTests {
+  @Test(arguments: ["from", "to", "thread", "doc_rev", "repo"], [0, 1])
+  func referenceFieldsRequireASCII(field: String, example: Int) throws {
+    var tree = try RestoreDocumentGraphFixture.graph().tree
+    let value = ["K", "K\u{0}tail"][example]
+    if ["from", "to"].contains(field) {
+      RestoreDocumentGraphFixture.link(&tree, 0, field, value)
+    } else if field == "repo" {
+      let index = try #require(tree.sections.firstIndex { $0.name == "apps" })
+      let row = tree.sections[index].rows[0]
+      tree.sections[index].rows[0] = row.replacing(field, with: value, keys: row.fields.map(\.key))
+    } else {
+      RestoreDocumentGraphFixture.record(&tree.documents, 5, field, value)
+    }
+    let error = Self.failure {
+      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+    }
+    #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
+    #expect(error?.message.contains("tail") == false)
+  }
+
+  @Test func unrelatedWorkspaceUnsupportedUIDDoesNotBlockCapture() throws {
+    try withScratchDirectory { home in
+      let store = try RestoreDocumentGraphFixture.source(home)
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc SET uid=CAST(? AS TEXT) WHERE id=92",
+          arguments: [Data("foreign\u{0}identity".utf8)])
+      }
+      let before = try RestoreSupport.dump(store)
+      let raw = try Self.rawUIDs(store, table: "doc")
+      let tree = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
+      #expect(tree.documents.documents.count == 1)
+      #expect(try RestoreSupport.dump(store) == before)
+      #expect(try Self.rawUIDs(store, table: "doc") == raw)
+    }
+  }
+
   @Test(arguments: ["workspace", "task", "approval", "link", "doc_rev", "comment"], [0, 1, 2])
   func everyPrimaryIdentityIsAdmitted(table: String, example: Int) throws {
     var tree = try RestoreDocumentGraphFixture.graph().tree
@@ -27,7 +64,7 @@ extension RestoreASCIIIdentityTests {
     let error = Self.failure {
       try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
     }
-    withKnownIssue("SI-133: primary identity admission must precede every restore map") {
+    do {
       #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
       #expect(error?.message.contains("tail") == false)
     }

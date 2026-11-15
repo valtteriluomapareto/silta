@@ -22,21 +22,21 @@ struct RestoreASCIIIdentityTests {
     let error = Self.failure {
       try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
     }
-    withKnownIssue("SI-133: incoming UID admission is not centralized before identity maps") {
+    do {
       #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
     }
   }
 
-  @Test(arguments: ["uid", "source_task"], [0, 1])
+  @Test(arguments: ["uid", "source_task", "doc_rev"], [0, 1])
   func separateDocumentBundleIsAdmitted(field: String, example: Int) throws {
     let tree = try RestoreDocumentGraphFixture.graph().tree
     var documents = tree.documents
     let value = ["K", "K\u{0}tail"][example]
-    RestoreDocumentGraphFixture.record(&documents, 1, field, value)
+    RestoreDocumentGraphFixture.record(&documents, field == "doc_rev" ? 5 : 1, field, value)
     let error = Self.failure {
       try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
     }
-    withKnownIssue("SI-133: actual separately supplied document identities lack admission") {
+    do {
       #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
     }
   }
@@ -80,7 +80,7 @@ struct RestoreASCIIIdentityTests {
       let after = try RestoreSupport.dump(target)
       let afterUIDs = try Self.rawUIDs(target, table: kind)
       let afterMachine = try RestoreOpaqueIdentityFixture.machineRows(target)
-      withKnownIssue("SI-133: unsupported stored UID can reach replacement and machine maps") {
+      do {
         #expect(error?.code == .env && error?.next == ["silta backup"])
         #expect(error?.message.contains("ASCII") == true && error?.nextBy == .human)
         #expect(report == nil && after == before && afterUIDs == raw && afterMachine == machine)
@@ -102,7 +102,7 @@ struct RestoreASCIIIdentityTests {
       let error = Self.failure {
         _ = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
       }
-      withKnownIssue("SI-133: copied rows can truncate or retain unsupported UID data") {
+      do {
         #expect(error?.code == .env && error?.next == ["silta backup"])
       }
       #expect(try RestoreSupport.dump(store) == before)

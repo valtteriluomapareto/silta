@@ -26,7 +26,9 @@ extension ExportSnapshot {
     guard try migrator.hasCompletedMigrations(db), let schema = migrator.migrations.last else {
       throw StorageError.internalMisuse
     }
-    guard let found = try Row.fetchOne(db, sql: Query.workspace, arguments: [slug]) else {
+    let cursor = try Row.fetchCursor(db, sql: Query.workspace, arguments: [slug])
+    defer { withExtendedLifetime(cursor) {} }
+    guard let found = try cursor.next() else {
       throw WorkspaceError.unknown(slug)
     }
     let id: Int64 = found["id"]
@@ -34,24 +36,27 @@ extension ExportSnapshot {
     func rows(_ sql: String, _ keys: [String], _ argument: any DatabaseValueConvertible = id) throws
       -> [ExportRow]
     {
-      try Row.fetchAll(db, sql: sql, arguments: [argument]).map {
-        try ExportRow(keys: keys, row: $0)
-      }
+      try Array(
+        Row.fetchCursor(db, sql: sql, arguments: [argument]).map {
+          try ExportRow(keys: keys, row: $0)
+        })
     }
     let sections = try zip(ExportFormat.sections, Query.sections).map { format, sql in
       Section(name: format.name, rows: try rows(sql, format.keys))
     }
     var records: [Int64: [ExportRow]] = [:]
     for (format, sql) in zip(ExportFormat.records, Query.records) {
-      for row in try Row.fetchAll(db, sql: sql, arguments: [id]) {
+      let cursor = try Row.fetchCursor(db, sql: sql, arguments: [id])
+      while let row = try cursor.next() {
         records[row["task_id"], default: []].append(try ExportRow(keys: format.keys, row: row))
       }
     }
-    let tasks = try Row.fetchAll(db, sql: Query.tasks, arguments: [id]).map { row in
-      let exported = try ExportRow(keys: ExportFormat.taskKeys, row: row)
-      return ExportTask(
-        ref: exported.value("ref") ?? "", row: exported, records: records[row["id"]] ?? [])
-    }
+    let tasks = try Array(
+      Row.fetchCursor(db, sql: Query.tasks, arguments: [id]).map { row in
+        let exported = try ExportRow(keys: ExportFormat.taskKeys, row: row)
+        return ExportTask(
+          ref: exported.value("ref") ?? "", row: exported, records: records[row["id"]] ?? [])
+      })
     return Self(
       schema: schema, workspace: workspace, sections: sections, tasks: tasks,
       documents: try ExportDocumentSnapshot.read(db, workspace: id),
