@@ -61,7 +61,7 @@ enum RestoreOpaqueIdentityFixture {
       tree.documents.documents[index].row = row(tree.documents.documents[index].row)
       tree.documents.documents[index].records = tree.documents.documents[index].records.map(row)
     }
-    tree.documents.commentSequences = tree.documents.commentSequences.map(row)
+    tree.documents.legacyCommentSequences = tree.documents.legacyCommentSequences?.map(row)
     tree.links = tree.links.map(row)
   }
 

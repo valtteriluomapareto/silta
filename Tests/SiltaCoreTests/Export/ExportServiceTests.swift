@@ -37,7 +37,7 @@ struct ExportServiceTests {
       let first = try Self.export(store, home, to: root)
       let target = root.appending(path: "acme")
       #expect(first.workspace == "acme")
-      #expect(first.files == 11)
+      #expect(first.files == 10)
       #expect(URL(filePath: first.path).standardizedFileURL == target.standardizedFileURL)
       ExportTreeTests.expectSame(try Self.tree(target), try ExportTreeTests.golden("acme"))
       try DatabaseQueue(path: store.path).write {

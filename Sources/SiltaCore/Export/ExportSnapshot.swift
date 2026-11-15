@@ -109,7 +109,7 @@ package struct ExportSnapshot: Equatable, Sendable {
   package func files() throws -> [String: Data] {
     if format == "1",
       !documents.documents.isEmpty || !documents.revisionAllocations.isEmpty
-        || !documents.commentSequences.isEmpty
+        || documents.legacyCommentSequences != nil
     {
       throw ExportError.unsupported("document data in format 1")
     }
@@ -124,7 +124,16 @@ package struct ExportSnapshot: Equatable, Sendable {
       files["tasks/\(task.ref).jsonl"] = ExportFormat.jsonl(task.records)
     }
     var data = files.mapValues { Data($0.utf8) }
-    if format == "2" {
+    if format == "2", documents.legacyCommentSequences == nil {
+      throw ExportTree.invalid(
+        "format 2 requires its legacy comment reservation stream",
+        workspace: workspace.value("slug"))
+    }
+    if format == "3", documents.legacyCommentSequences != nil {
+      throw ExportTree.invalid(
+        "format 3 cannot hold legacy comment reservations", workspace: workspace.value("slug"))
+    }
+    if format != "1" {
       data.merge(try documents.files()) { _, incoming in incoming }
     }
     data[ExportFormat.manifestFile] = Data(manifest(data).utf8)
@@ -167,14 +176,16 @@ package struct ExportSnapshot: Equatable, Sendable {
       counts[record.table] =
         tasks.map { $0.records.filter { $0.value("table") == record.table }.count }.reduce(0, +)
     }
-    if format == "2" {
+    if format != "1" {
       counts["doc"] = documents.documents.count
       let records = documents.documents.flatMap(\.records)
       for kind in ["doc_rev", "doc_verification"] {
         counts[kind] = records.filter { $0.value("table") == kind }.count
       }
       counts["doc_revision_allocation"] = documents.revisionAllocations.count
-      counts["doc_comment_sequence"] = documents.commentSequences.count
+      if format == "2" {
+        counts["doc_comment_sequence"] = documents.legacyCommentSequences?.count ?? 0
+      }
       counts["comment", default: 0] += records.filter { $0.value("table") == "comment" }.count
     }
     counts["link"] = links.count
