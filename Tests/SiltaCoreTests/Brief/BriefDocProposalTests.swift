@@ -210,7 +210,7 @@ struct BriefDocProposalTests {
     }
   }
 
-  private func makeReport(
+  func makeReport(
     _ service: TaskService, budget: Int, current: TaskDetails? = nil, in db: Database
   ) throws
     -> BriefReport

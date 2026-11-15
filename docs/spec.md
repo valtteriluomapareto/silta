@@ -1004,7 +1004,7 @@ remain available. Unknown snapshot attachments stay unknown.
 
 Reads mask secrets before rendering, clipping or line selection. Show defaults to at
 most 400 rendered lines including its continuation. List title and metadata previews
-are at most 120 characters each, with omitted-character counts and a pinned show
+are bounded, with omitted-character counts and a pinned show
 command. Complete continuation commands preserve the workspace, selected revision and
 list filters. JSON show data is `{ref,output}`; list data is
 `{entries:[{ref,state,output}],total,offset,limit,next?}`. JSON carries the same bounded
@@ -1546,7 +1546,7 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    service. Docs about the selected task's topics and explicit `--topic` selections
    appear before the glossary. Full mode shows at most two slug/kind/summary rows
    per item, ranking matching task/selected topics then slug. The summary is the
-   first nonempty nonheading line, at most 120 characters; masking precedes selection
+   first nonempty nonheading line, bounded; masking precedes selection
    and clipping. Remaining docs have a count and scoped `doc ls --about` command.
    Short/hook mode shows counts only and does not read revision bodies. Explicit
    `--short` keeps these semantics even with a larger `--budget`.

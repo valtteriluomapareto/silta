@@ -247,7 +247,8 @@ The inbox/brief privacy and budget tests fix these implementation limits.
 
 Supplied document bodies are capped at 65,536 UTF-8 bytes before and after
 redaction. Titles are single lines capped at 120 characters; comment list previews
-are masked and capped at 120 characters. The doc input, list and guide goldens cover
+are masked and capped at 120 characters. List title/metadata previews and accepted-doc
+brief summaries are also capped at 120 characters. The doc input, list and guide goldens cover
 these bounds. Retained bodies follow the separate literal-preservation contract.
 
 ### Help pages
