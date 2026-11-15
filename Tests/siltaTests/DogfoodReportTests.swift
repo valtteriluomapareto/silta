@@ -490,3 +490,17 @@ extension DogfoodReportTests {
     }
   }
 }
+
+extension DogfoodReportTests {
+  @Test func hardLogReadFailureStillPublishesNothing() throws {
+    try withScratchDirectory { scratch in
+      _ = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let log = scratch.appending(path: "silta-home/log/2023-11-14.jsonl")
+      try FileManager.default.removeItem(at: log)
+      try FileManager.default.createDirectory(at: log, withIntermediateDirectories: false)
+      let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
+      #expect(result.termination != .exit(0) && result.stdout.isEmpty)
+    }
+  }
+}

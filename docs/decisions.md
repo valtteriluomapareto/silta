@@ -352,9 +352,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     shows the command with the placeholder, which is itself refused as `invalid`.
   - When no answer can come, the agent doesn't wait: it leaves a `question` for `@me`
     listing the pending commands, writes a handoff and picks other work.
-  - Every `$EDITOR` command also reads `-F <file>`: `ws edit`, `task edit`, `doc edit`
-    and `doc accept --rebase` (M2). `ws show` prints the current YAML, so an agent can
-    show the change first. An agent edits a task it claims without approval.
+  - Commands with an editor also read `-F <file>`: `ws edit` and `task edit`.
+    Doc edits use supplied `-F` input or explicit `--keep-body`; the planned doc
+    review workflow uses propose/triage, without an editor merge. `ws show` prints
+    current YAML so an agent can show the change first. An agent edits a task it
+    claims without approval.
   - Still a guard against accidents, not security: an agent could invent a quote. The
     `refusals` and `forbidden` evals check that agents never do.
   - Rejected:
@@ -408,8 +410,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - **No human present under `ask`:** ideas go under "what's left" in the handoff
     or the `done` result. Never a `question`, which would be triage in a heavier
     form, and never a TODO comment or file.
-  - The complete list of settings: `review_gate`, `archive_after_days`, `stale_days`,
-    `proposals`, `ask_about`, and `agent_doc_writes` (M2).
+  - The current settings are `review_gate`, `archive_after_days`, `stale_days`,
+    `proposals` and `ask_about`. Direct agent doc writes and their proposed setting
+    remain deferred by the workspace-knowledge design.
   - **Rules for every setting:**
     - A setting changes what Silta does and what agents are told. It never changes
       `silta schema` or the error codes. A switched-off feature answers with an
@@ -461,7 +464,7 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
       the human never tunes keys one by one. Presets would be a second mechanism to
       test.
     - **A general per-command approval toggle.** Each gate change is its own named
-      setting, like `proposals` and `agent_doc_writes`. The dogfood report counts
+      setting, like `proposals`. The dogfood report counts
       approvals per week by command (D37). A new setting comes if some other
       command turns out to cost the human time.
     - **Other values nobody has asked to change:** the inbox cap and proposal window,
