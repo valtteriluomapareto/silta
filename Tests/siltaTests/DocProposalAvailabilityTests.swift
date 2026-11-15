@@ -35,10 +35,7 @@ struct DocProposalAvailabilityTests {
       try store.write {
         try $0.database.execute(sql: "ALTER TABLE doc_rev RENAME TO deferred_doc_rev")
       }
-      let before = try store.read {
-        try String.fetchAll(
-          $0, sql: "SELECT name||':'||coalesce(sql,'') FROM sqlite_master ORDER BY name")
-      }
+      let before = try Self.reportTruth(store)
       let tools = try DogfoodReportTests.tools(scratch)
       let flags = (privateReport ? ["--ws", "silta"] : []) + ["--since", "2023-11-14"]
       let result = try DogfoodReportTests.run(flags, scratch: scratch, tools: tools)
@@ -55,11 +52,22 @@ struct DocProposalAvailabilityTests {
       #expect(text.contains("## Human load"))
       #expect(text.contains("Proposals accepted: 5; dropped: 1;"))
       #expect(!text.contains("## Document proposals") && !text.contains("doc-triage"))
-      #expect(
-        try store.read {
-          try String.fetchAll(
-            $0, sql: "SELECT name||':'||coalesce(sql,'') FROM sqlite_master ORDER BY name")
-        } == before)
+      let after = try Self.reportTruth(store)
+      #expect(after == before)
     }
   }
+  private static func reportTruth(_ store: DatabaseStore) throws -> [String] {
+    try store.read { db in
+      let schema = try String.fetchAll(
+        db, sql: "SELECT name||':'||coalesce(sql,'') FROM sqlite_master ORDER BY name")
+      let rows = try [
+        "task", "task_event", "approval", "doc", "deferred_doc_rev", "meta",
+        "grdb_migrations",
+      ].flatMap {
+        try Row.fetchAll(db, sql: "SELECT * FROM \($0) ORDER BY 1").map(\.description)
+      }
+      return schema + rows
+    }
+  }
+
 }
