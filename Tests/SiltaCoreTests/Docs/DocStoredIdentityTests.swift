@@ -84,6 +84,57 @@ struct DocStoredIdentityTests {
     }
   }
 
+  @Test func canonicalEquivalentBodyRaceRefuses() async throws {
+    try await withScratchDirectory { home in
+      let (store, initial) = try Self.fixture(home, kind: "doc")
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT)",
+          arguments: [Data("café".utf8)])
+      }
+      let changed = Data("cafe\u{301}".utf8)
+      #expect(String(data: changed, encoding: .utf8) == "café")
+      #expect(changed != Data("café".utf8))
+      var request = initial
+      request.keepBody = false
+      var committed: [[String]] = []
+      let error = await Self.failure {
+        _ = try await DocWritePolicyTests.service(home, store).edit(request) {
+          try store.write {
+            try $0.database.execute(
+              sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT)", arguments: [changed])
+          }
+          committed = try DocVerificationPreparationTests.truth(store)
+          return "Replacement"
+        }
+      }
+      #expect(error?.code == .conflict)
+      #expect(try DocVerificationPreparationTests.truth(store) == committed)
+      #expect(
+        try store.read { try Data.fetchOne($0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev") }
+          == changed)
+    }
+  }
+
+  @Test func proposalKeepsBackupRecoveryForUnsupportedBaseline() async throws {
+    try await withScratchDirectory { home in
+      let (store, _) = try Self.fixture(home, kind: "workspace")
+      try Self.replaceUID("owned\u{0}suffix", table: "workspace", store: store)
+      #expect(try Self.uidBytes("workspace", store: store)?.contains(0) == true)
+      let before = try DocVerificationPreparationTests.truth(store)
+      let git = ScriptedGitRunner(script: [])
+      let environment = try DocVerificationPreparationTests.environment(
+        home, store: store, git: git)
+      let error = await Self.failure {
+        _ = try DocProposalService(environment: environment, workspace: "acme", approved: nil)
+          .propose(DocProposalRequest(slug: "rules", why: "Record the Acme rule")) { "Original" }
+      }
+      Self.expectBackup(error)
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+      #expect(git.requests.isEmpty)
+    }
+  }
+
   static func fixture(_ home: URL, kind: String) throws
     -> (DatabaseStore, DocEditRequest)
   {
