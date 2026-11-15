@@ -15,11 +15,12 @@ struct DocStoredIdentityTests {
   @Test(arguments: Self.kinds, ["K\u{0}tail", "K"])
   func editRefusesUnsupportedStoredIdentity(kind: String, uid: String) async throws {
     try await withScratchDirectory { home in
-      let (store, request, table) = try Self.fixture(home, kind: kind)
+      let (store, request) = try Self.fixture(home, kind: kind)
+      let table = Self.table(kind)
       try Self.replaceUID(uid, table: table, store: store)
       let before = try DocVerificationPreparationTests.truth(store)
       let git = ScriptedGitRunner(script: [])
-      await withKnownIssue("Stored document identities need complete-byte admission") {
+      do {
         let error = await Self.failure {
           _ = try await DocWritePolicyTests.service(home, store, git: git)
             .edit(request, input: nil)
@@ -37,13 +38,14 @@ struct DocStoredIdentityTests {
   ])
   func bindingRefusesBeforeDecodingIdentity(kind: String) throws {
     try withScratchDirectory { home in
-      let (store, request, table) = try Self.fixture(home, kind: kind)
+      let (store, request) = try Self.fixture(home, kind: kind)
+      let table = Self.table(kind)
       try Self.replaceUID("K\u{0}tail", table: table, store: store)
       let before = try DocVerificationPreparationTests.truth(store)
       var draft = DocDraft(slug: request.slug, body: "Original")
       draft.title = request.title
       draft.about = request.about
-      withKnownIssue("Binding capture must inspect live UID bytes") {
+      do {
         var failure: (any CodedError)?
         do {
           _ = try DocVerification.readBinding(draft, workspace: 1, store: store)
@@ -55,18 +57,21 @@ struct DocStoredIdentityTests {
   }
 
   @Test(arguments: Self.kinds)
-  func NULSuffixRaceKeepsTheCommittedIdentity(kind: String) async throws {
+  func nulSuffixRaceKeepsTheCommittedIdentity(kind: String) async throws {
     try await withScratchDirectory { home in
-      let (store, initial, table) = try Self.fixture(home, kind: kind)
+      let (store, initial) = try Self.fixture(home, kind: kind)
+      let table = Self.table(kind)
       let original = try #require(try Self.uidBytes(table, store: store))
       let changed = original + Data("\u{0}changed".utf8)
+      let changedText = try #require(String(data: changed, encoding: .utf8))
       var request = initial
       request.keepBody = false
       var committed: [[String]] = []
-      await withKnownIssue("A NUL suffix must not alias a captured document identity") {
+      do {
         let error = await Self.failure {
           _ = try await DocWritePolicyTests.service(home, store).edit(request) {
-            try Self.replaceUID(String(decoding: changed, as: UTF8.self), table: table, store: store)
+            try Self.replaceUID(
+              changedText, table: table, store: store)
             committed = try DocVerificationPreparationTests.truth(store)
             return "Replacement"
           }
@@ -80,7 +85,7 @@ struct DocStoredIdentityTests {
   }
 
   static func fixture(_ home: URL, kind: String) throws
-    -> (DatabaseStore, DocEditRequest, String)
+    -> (DatabaseStore, DocEditRequest)
   {
     let store = try AcmeDocAttachments.make(in: home)
     try DocWritePolicyTests.seed(store)
@@ -93,8 +98,11 @@ struct DocStoredIdentityTests {
       request.about = ["edge:api/service:push/sdk"]
     default: break
     }
-    let table = kind == "service-endpoint" ? "service" : kind == "app-endpoint" ? "app" : kind
-    return (store, request, table)
+    return (store, request)
+  }
+
+  static func table(_ kind: String) -> String {
+    kind == "service-endpoint" ? "service" : kind == "app-endpoint" ? "app" : kind
   }
 
   static func replaceUID(_ uid: String, table: String, store: DatabaseStore) throws {

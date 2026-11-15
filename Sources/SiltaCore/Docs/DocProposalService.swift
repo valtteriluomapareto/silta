@@ -35,8 +35,8 @@ struct DocProposalService {
     try DocInput.check(body.0)
     return try environment.db.write { tx in
       guard
-        captured.baseline.matches(
-          try DocEditBaseline.read(
+        captured.baseline
+          == (try DocEditBaseline.read(
             request.slug, workspace: captured.id, keepBody: false, in: tx.database))
       else { throw DocError.changed(workspace: workspace) }
       do {
