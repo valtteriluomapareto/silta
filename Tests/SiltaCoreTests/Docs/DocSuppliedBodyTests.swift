@@ -21,7 +21,7 @@ struct DocSuppliedBodyTests {
       }
     }
     let direct = Self.failure { try DocInput.check(body) }
-    withKnownIssue("SI-129: supplied NUL bodies are accepted") {
+    do {
       #expect(read?.code == .invalid && read?.message == Self.refusal)
       #expect(direct?.code == .invalid && direct?.message == Self.refusal)
     }
@@ -48,8 +48,7 @@ struct DocSuppliedBodyTests {
       do { _ = try await service.edit(request, input: { body }) } catch let error as any CodedError
       { failure = error }
       let after = try DocVerificationPreparationTests.truth(store)
-      withKnownIssue("SI-129: edit permits supplied NUL, including unchanged bodies and overrides")
-      {
+      do {
         #expect(failure?.code == .invalid && failure?.message == Self.refusal)
         #expect(git.requests.isEmpty)
         #expect(after == before)
@@ -66,7 +65,7 @@ struct DocSuppliedBodyTests {
         _ = try service.propose(DocProposalServiceTests.request(), input: { "Acme\u{0}tail" })
       }
       let after = try DocVerificationPreparationTests.truth(store)
-      withKnownIssue("SI-129: direct proposal input permits NUL") {
+      do {
         #expect(failure?.code == .invalid && failure?.message == Self.refusal)
         #expect(after == before)
       }

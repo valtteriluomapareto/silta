@@ -20,7 +20,7 @@ extension DocEditCommandTests {
         try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
       let error = object["error"] as? [String: Any]
       let after = try DocEditPreparationCommandTests.truth(store)
-      withKnownIssue("SI-129: direct humans can supply NUL bodies") {
+      do {
         #expect(error?["code"] as? String == "invalid")
         #expect(error?["message"] as? String == "Doc input must not contain NUL bytes.")
         #expect(after == before)
@@ -57,7 +57,7 @@ extension DocEditCommandTests {
         try JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
       let error = object["error"] as? [String: Any]
       let after = try DocEditPreparationCommandTests.truth(store)
-      withKnownIssue("SI-129: file and stdin doc edits accept NUL") {
+      do {
         #expect(result.termination == .exit(1) && result.stderr.isEmpty)
         #expect(error?["code"] as? String == "invalid")
         #expect(error?["message"] as? String == "Doc input must not contain NUL bytes.")
