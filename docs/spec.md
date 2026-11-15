@@ -95,7 +95,7 @@ in product repos.
 | D2 | **External sources are indexed, never owned.** Meeting-note folders and repo docs are read-only and re-indexed on change. | Notes stay the output of whatever produces them; repo docs stay in repos. |
 | D3 | **Deterministic export** to a text tree for backup and diff. `silta restore` replaces a workspace from it. | A `.db` file can't be diffed or reviewed; the export can. |
 | D4 | **CLI only, `--json` everywhere. No MCP server, no daemon.** | Every target harness has a shell tool. If shell-less clients ever matter, it would be a `silta mcp` stdio subcommand, never hosted in the app. |
-| D5 | **Agent writes are gated.** Unsolicited agent tasks start as `proposed`. Agent doc edits are proposed revisions. Human-only commands need the human's go-ahead (D38). | Prevents spam and rot by default, without blocking work the human asked for in chat (§8). |
+| D5 | **Agent writes are gated.** Unsolicited agent tasks start as `proposed`. Agent doc changes are proposed revisions or human-approved edits (D38). Human-only commands need the human's go-ahead (D38). | Prevents spam and rot by default, without blocking work the human asked for in chat (§8). |
 | D6 | **`silta` resolves "where am I"** from cwd, git branch, upstream and claimed task (§7). | Agents shouldn't need to know which branch is which app. |
 | D7 | **Code access is read-only** via `git show`/`grep`/`log` on configured refs. | No checkout means you can't edit the wrong branch. |
 | D8 | **Truth and derived data in separate files.** `silta.db` holds plain tables only, including every human decision. `index.db` holds search, caches and verify results, and can be deleted at any time. | The search engine and indexes can change without risk to data people wrote. |
@@ -230,7 +230,7 @@ CREATE TABLE workspace (
   slug TEXT NOT NULL UNIQUE,                  -- 'acme'
   name TEXT NOT NULL,
   task_prefix TEXT NOT NULL UNIQUE,           -- 'AC'
-  settings TEXT NOT NULL DEFAULT '{}'         -- JSON (D39): review_gate, archive_after_days, stale_days, proposals, ask_about, agent_doc_writes
+  settings TEXT NOT NULL DEFAULT '{}'         -- JSON (D39): review_gate, archive_after_days, stale_days, proposals, ask_about
 );
 
 CREATE TABLE repo (
@@ -375,6 +375,11 @@ CREATE TABLE doc_verification (
   app_shas TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL);
 -- app_shas is an array of {app,ref,sha} snapshots, retaining multiple refs and deleted apps.
 -- Migration fills metadata only for the current accepted revision; it invents no verification.
+
+-- A pending-only document has current_rev NULL. Its row-level title and kind may
+-- come from a proposal but do not establish accepted metadata. Routing, accepted
+-- projection and map-removal protection require an accepted current revision and
+-- its live about links; pending snapshots never pin map items.
 
 -- Typed links. Owned targets by id; external targets as strings.
 CREATE TABLE link (
@@ -1071,18 +1076,33 @@ Owned bodies remain literal even if their original file is gone or secret-bearin
 Unsafe identities/scopes/retained refs use agent-owned inspection fallbacks without
 write flags. Legacy encoded ref diagnostics are inspected decoded once for masking.
 
-The following document write and review design is planned:
+The following document proposal and review workflow is planned. This build only
+registers `doc show`, `doc ls`, `doc edit` and `doc archive`. Restored pending
+revisions and their inbox groups are readable, but cannot be submitted or decided
+through public commands yet. Doc-specific review measurements wait for that workflow.
 
-- Bodies are markdown with `[[ref]]` links (§5.1), parsed into `link` rows when a
-  revision is accepted.
-- **Agents:** `doc propose <slug> -F - -m "why" [--base <rev>]`.
-- **Accept:** `silta doc accept <slug> <rev>` refuses (exit 6) if `base_rev` isn't the
-  current revision; `--rebase` opens a 3-way merge in `$EDITOR`, or takes the merged
-  text with `-F <file>`. Reject with `doc reject`.
-- `silta doc verify <slug>` stamps `verified_at`.
-- Writing rule (shown in `doc new` templates): point at code, don't copy it.
-- Renaming a slug adds the old one to `previous_slugs`, so old `[[doc:…]]` links keep
-  resolving and `verify` suggests updating them.
+- **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
+  [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
+  omitted accepted metadata stays. Source defaults to the session's claimed task.
+  A submission stays proposed, including from a human or with `--approved`.
+- **Review:** the agent reads pinned proposal diffs, checks the code and prepares
+  existing proposal refs with accept/reject recommendations in one chat message.
+  Only then does it run `doc triage --accept <refs> --reject <refs>` with the
+  human's exact approval. One transaction records every decision or writes nothing;
+  original proposer, creation time and revision content remain immutable.
+- **Concurrency and recovery:** the proposed batch base/overlap rules and complete
+  workflow live in the [workspace-knowledge plan](plans/workspace-knowledge.md#reviewing-one-batch-one-answer).
+  A stale proposal is inspected and reproposed with supplied text and an explicit
+  base. There is no accept/reject subcommand, rebase flag or editor merge flow.
+- **Map gaps:** with no human present, record `Map gap:` in a handoff or result,
+  never in a new task or file. The human approves map edits through the existing
+  workspace-edit gate. Direct agent doc edits without that gate remain deferred;
+  there is no `agent_doc_writes: direct` setting.
+- **Freshness:** planned `doc verify <slug> -m "<what was checked>"` performs the
+  explicit verification checks. Body link indexing and rename aliases are separate
+  future work; accepted attachments remain the current `about` links.
+
+Point at code rather than copying it; `silta guide docs` gives the available recipes.
 
 ## 10. Code access (read-only)
 
@@ -1175,11 +1195,12 @@ silta code ls   <app>[@<ref>] [<dir>]
   command environment on 2026-11-02; its value was not recorded. OpenCode remains
   unverified; callers can use the explicit actor and session overrides.
 - **Human-only commands** need the human's go-ahead (D38): `task promote`, `task edit`,
-  `doc edit|accept|reject`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
+  `doc edit|archive`, effective `where --set|--unset` changes (§7), `task triage`, `--steal` over another
   session's fresh claim, `--force` past an unmet review gate, `--allow-secret`,
   `ws edit`, `restore` except `--dry-run` (§15), and an agent's `task unblock` of a block
   that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
+  Planned `doc triage` follows the same human gate (§9).
   - A `human:*` actor (a TTY, or the app) runs them directly; `--approved` from a
     human is ignored.
   - An agent runs them with `--approved "<the human's words>"`: what the human wrote
@@ -2014,15 +2035,10 @@ silta comment delete
 silta inbox
 silta inbox take [M2]
 
-# docs
-silta doc new [M2]
+# docs (available; planned proposal/review commands are described in §9)
 silta doc ls
 silta doc show
 silta doc edit
-silta doc propose [M2]
-silta doc accept [M2]
-silta doc reject [M2]
-silta doc verify [M2]
 silta doc archive
 
 # maintenance
@@ -2609,7 +2625,7 @@ qwen3-coder fell from 31% to 9%".
 | M | Scope | Done when |
 |---|---|---|
 | **M1 Daily use** | Package, GRDB storage and migrations, `SILTA_HOME`; `init --scan` and `ws edit` (YAML); `where` (§7) with fixtures; `code *` with `@ref`; tasks: add/start/plan/steps/from-plan/submit/done with result and sha/archive/triage/promote; blockers with follow-up days and external parties; comments with kinds, threads, batch resolve; inbox (questions, proposed tasks, blocked tasks due back); **brief (sections 1–7) and the SessionStart hook**; actors and sessions; `agents install` incl. Codex writable root; `silta guide`; secret guard; JSON envelope and exit codes; daily backup, export, restore; logs and `doctor`. | The `start-cross-repo`, `plan-not-file`, `handoff-resume` and `done-with-result` evals pass for Claude Code and Codex on the fixtures. Stress, `where`-matrix, round-trip, migration and secret-corpus tests are green. |
-| **M2 Reviews + docs** | `task diff`, reviews with verdicts and line comments, anchors with snippets, review requests + `inbox take`, review gate (opt-in), rate limits; docs with proposals, `base_rev` and accept/rebase; brief adds docs and review state; Darwin notify is *not* yet included. | The `review-loop` eval passes (Codex reviews, Claude fixes, human approves). Gate truth table and anchor fixtures (amend, rebase, force-push) are green. |
+| **M2 Reviews + docs** | `task diff`, reviews with verdicts and line comments, anchors with snippets, review requests + `inbox take`, review gate (opt-in), rate limits; docs with `base_rev`, `doc propose` and human-owned `doc triage` (§9); brief adds docs and review state; Darwin notify is *not* yet included. | The `review-loop` eval passes (Codex reviews, Claude fixes, human approves). Gate truth table and anchor fixtures (amend, rebase, force-push) are green. |
 | **M3 Index + search** | Notes and repo-doc sources, section extraction, alias suggestions with human decisions, change-log indexing with a lease, Finnish-safe search, `verify`. | The Finnish search corpus passes (`sää`≠`saa`; `viesti` finds `viestit` and `tekstiviestipalvelu`). "What was decided about messaging?" returns note citations. Incremental index equals a rebuild. |
 | **M4 Tracker + importers** | Tracker status for promoted tasks (Azure DevOps first); scheduled export and verify (launchd); importers for dex, beads and backlog-md; the full eval matrix including open models. | Eval report published for at least 3 harnesses × 4 models. |
 | **M5 App** | SwiftUI app on SiltaCore: board, task timeline with threads and reviews, inbox, doc diffs, brief preview; change signal and WAL watching; embedded CLI. | You triage the inbox and approve a review without the CLI. |
@@ -2835,7 +2851,6 @@ including workspaces using the default; older writers must update before writing
 | `stale_days` | 90, or any whole number ≥ 0 | When docs count as stale (§14) | S6 |
 | `proposals` | `triage`, `ask` | `ask`: agents ask in chat instead of proposing (§8) | S11 |
 | `ask_about` | `standard`, `short` | `short`: agents ask about fewer things (§11) | S13 |
-| `agent_doc_writes` | `propose`, `direct` | `direct`: agents edit docs without approval (§9) | M2 |
 
 When writing a workspace's YAML, leave out keys that keep their default, so a later
 change of default reaches the workspace. The [annotated Acme example](examples/acme-workspace.yaml)
