@@ -8,7 +8,7 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocProposalExportTests {
   @Test func targetSnapshotsAreVersionedAndRoundTripWithoutCurrentTargets() throws {
-    withKnownIssue("SI-137: format four retains immutable target UIDs") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         _ = try DocProposalServiceTests.service(home, store).propose(
@@ -45,10 +45,12 @@ struct DocProposalExportTests {
   }
 
   @Test(arguments: [
-    "[]", "[{}]", #"[{"kind":"unknown","uid":"id"}]"#,
+    "[]", "[{}]", "null", #"[{"kind":"unknown","uid":"id"}]"#,
     #"[{"kind":"service","uid":""}]"#, #"[{"kind":"service","uid":"\u212a"}]"#,
     #"[{"kind":"service","uid":"id\u0000suffix"}]"#,
     #"[{"kind":"app","uid":"historical"}]"#,
+    #"[{"kind":"service","uid":1}]"#,
+    #"[{"kind":"service","uid":"id"},{"kind":"service","uid":"other"}]"#,
     #"[{"kind":"service","uid":"id"},{"kind":"service","uid":"id"}]"#,
   ])
   func malformedKnownTargetsRefuse(snapshot: String) throws {
@@ -58,13 +60,38 @@ struct DocProposalExportTests {
         DocProposalServiceTests.request(), input: { "Body" })
       var tree = try ExportTree.parse(ExportTreeTests.render(store))
       tree.format = "4"
-      let record = try #require(tree.documents.documents.first?.records.first)
+      var record = try #require(tree.documents.documents.first?.records.first)
+      if snapshot.contains(#""kind":"unknown""#) {
+        record = record.replacing(
+          "about_refs", with: #"["unknown:historical"]"#, keys: record.fields.map(\.key))
+      }
+      if snapshot == #"[{"kind":"service","uid":"id"},{"kind":"service","uid":"id"}]"# {
+        record = record.replacing(
+          "about_refs", with: #"["service:push","service:push"]"#, keys: record.fields.map(\.key))
+      }
+      let keys =
+        record.fields.map(\.key)
+        + (record.value("about_targets") == nil ? ["about_targets"] : [])
       tree.documents.documents[0].records[0] = record.replacing(
-        "about_targets", with: snapshot, keys: record.fields.map(\.key) + ["about_targets"])
+        "about_targets", with: snapshot, keys: keys)
       #expect(throws: ExportError.self) {
         let parsed = try ExportTree.parse(tree.files())
         try RestoreDocumentGraph(tree: parsed, documents: parsed.documents, slug: "acme").run()
       }
+    }
+  }
+
+  @Test func olderFormatCannotAcquireTargetSnapshots() throws {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      _ = try DocProposalServiceTests.service(home, store).propose(
+        DocProposalServiceTests.request(), input: { "Body" })
+      var files = try ExportTreeTests.render(store)
+      let data = try #require(files["manifest.json"])
+      let manifest = try #require(String(data: data, encoding: .utf8))
+      files["manifest.json"] = Data(
+        manifest.replacingOccurrences(of: #""format": "4""#, with: #""format": "3""#).utf8)
+      #expect(throws: ExportError.self) { try ExportTree.parse(files) }
     }
   }
 

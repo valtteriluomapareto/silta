@@ -11,8 +11,8 @@ struct RestoreSnapshotReadbackTests {
       let store = try ExportFixture.make(home)
       let incoming = try ExportTree.parse(ExportVersionTests.frozen())
       var after = incoming
-      after.format = "3"
-      after.schema = "v7"
+      after.format = "4"
+      after.schema = "v8"
       try store.write(rollingBack: true) { tx in
         let writer = RestoreWriter(tx: tx, tree: incoming, slug: "acme")
         try writer.check(after, revisionAllocations: [])
@@ -26,7 +26,7 @@ struct RestoreSnapshotReadbackTests {
       var graph = try RestoreDocumentGraphFixture.graph()
       graph.tree.documents = graph.documents
       var after = graph.tree
-      after.schema = "v7"
+      after.schema = "v8"
       after.documents.legacyCommentSequences = nil
       after.workspace = after.workspace.replacing(
         "next_task_seq", with: "900", keys: ExportFormat.workspaceKeys)
@@ -43,7 +43,7 @@ struct RestoreSnapshotReadbackTests {
         let writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
         try writer.check(after, revisionAllocations: floors)
       }
-      for key in ["unknown-title", "triaged_by", "app_shas", "body_md"] {
+      for key in ["unknown-title", "triaged_by", "app_shas", "body_md", "about_targets"] {
         var damaged = after
         let index = key == "app_shas" ? 5 : (key == "unknown-title" ? 0 : 1)
         RestoreDocumentGraphFixture.record(

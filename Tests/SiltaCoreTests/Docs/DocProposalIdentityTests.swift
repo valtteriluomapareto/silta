@@ -47,7 +47,7 @@ struct DocProposalIdentityTests {
 
   @Test(arguments: ["app", "topic", "service", "edge"])
   func pendingTargetsFollowRenameAndRefuseReplacement(kind: String) throws {
-    withKnownIssue("SI-137: pending attachment filters use stored target UIDs") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         let old = [
@@ -81,7 +81,7 @@ struct DocProposalIdentityTests {
 
   @Test(arguments: [false, true])
   func acceptedAProposedBFilterIsolation(unknownLegacy: Bool) throws {
-    withKnownIssue("SI-137: pending rows never borrow accepted attachments") {
+    do {
       try withScratchDirectory { home in
         let store = try AcmeDocAttachments.make(in: home)
         var draft = DocDraft(slug: "rules", body: "Accepted")
@@ -104,6 +104,35 @@ struct DocProposalIdentityTests {
           try service.list(about: "service:push").entries.map(\.ref)
             == (unknownLegacy ? [] : ["doc:rules@2"]))
         #expect(try service.list().entries.count == 2)
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func invalidTargetUIDRaceKeepsHumanBackupRecovery(nul: Bool) throws {
+    do {
+      try withScratchDirectory { home in
+        let store = try AcmeDocAttachments.make(in: home)
+        let uid = try #require(
+          store.read { try String.fetchOne($0, sql: "SELECT uid FROM service") })
+        var committed: [[String]] = []
+        var failure: (any CodedError)?
+        do {
+          _ = try DocProposalServiceTests.service(home, store).propose(
+            DocProposalServiceTests.request()
+          ) {
+            try store.write {
+              try $0.database.execute(
+                sql: "UPDATE service SET uid=CAST(? AS TEXT)",
+                arguments: [Data((nul ? uid + "\u{0}suffix" : "\u{212a}").utf8)])
+            }
+            committed = try DocVerificationPreparationTests.truth(store)
+            return "Body"
+          }
+        } catch let error as any CodedError { failure = error }
+        DocStoredIdentityTests.expectBackup(failure)
+        #expect(!committed.isEmpty)
+        #expect(try DocVerificationPreparationTests.truth(store) == committed)
       }
     }
   }

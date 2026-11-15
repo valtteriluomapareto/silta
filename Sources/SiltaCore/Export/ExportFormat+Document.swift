@@ -10,7 +10,7 @@ extension ExportFormat {
       "doc_rev",
       [
         "table", "uid", "rev", "base_rev", "body_md", "state", "actor", "message", "created_at",
-        "title", "kind", "about_refs", "source_task", "triaged_at", "triaged_by",
+        "title", "kind", "about_refs", "about_targets", "source_task", "triaged_at", "triaged_by",
       ]
     ),
     (

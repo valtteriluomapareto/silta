@@ -287,7 +287,7 @@ struct TreeDamage: Sendable, CustomTestStringConvertible {
     edit("crlf", "tasks/AC-10.jsonl", "\n", "\r\n"),
     edit("wrong ref", "tasks/AC-2.md", #"ref: "AC-2""#, #"ref: "AC-3""#),
     edit("unquoted frontmatter", "tasks/AC-10.md", #"type: "chore""#, "type: chore"),
-    edit("future format", "manifest.json", #""format": "3""#, #""format": "4""#, rehash: false),
+    edit("future format", "manifest.json", #""format": "4""#, #""format": "5""#, rehash: false),
     edit("escaped slash", "workspace.yaml", "src/Portal", #"src\/Portal"#),
     edit("wider fence", "tasks/AC-2.md", "~~~\nWaiting.\n~~~", "~~~~\nWaiting.\n~~~~"),
     Self(testDescription: "record groups out of order") { files in

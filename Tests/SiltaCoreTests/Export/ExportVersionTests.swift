@@ -39,7 +39,7 @@ struct ExportVersionTests {
       _ = try RestoreSupport.restore(directory, into: store, home: home)
       _ = try ExportService.export(workspace: "acme", to: root, store: store, home: home)
       let current = try RestoreService.readTree(directory)
-      #expect(try Self.version(current) == "3")
+      #expect(try Self.version(current) == "4")
       #expect(current["doc_comment_sequences.jsonl"] == nil)
       ExportTreeTests.expectSame(current, try ExportTreeTests.render(store))
     }
@@ -92,11 +92,11 @@ struct ExportVersionTests {
     #expect(edges.rows.compactMap { $0.value("kind") } == ["HTTP API", "SDK / v1"])
   }
 
-  @Test func newExportsUseFormatThreeAndOnlyRevisionAllocations() throws {
+  @Test func newExportsUseFormatFourAndOnlyRevisionAllocations() throws {
     try withScratchDirectory { scratch in
       let store = try ExportFixture.make(scratch)
       let files = try ExportTreeTests.render(store)
-      #expect(try Self.version(files) == "3")
+      #expect(try Self.version(files) == "4")
       #expect(files["doc_revision_allocations.jsonl"] == Data())
       #expect(files["doc_comment_sequences.jsonl"] == nil)
       do { ExportTreeTests.expectSame(try ExportTree.parse(files).files(), files) } catch {
@@ -112,7 +112,7 @@ struct ExportVersionTests {
       try store.initialize()
       _ = try RestoreSupport.restore(Self.frozenDirectory, into: store, home: home)
       let files = try ExportTreeTests.render(store)
-      #expect(try Self.version(files) == "3")
+      #expect(try Self.version(files) == "4")
       let after = try ExportTree.parse(files)
       #expect(after.sections == before.sections)
       #expect(after.tasks == before.tasks)
@@ -131,7 +131,7 @@ struct ExportVersionTests {
       let target = try RestoreSupport.write(Self.frozen(), to: root.appending(path: "acme"))
       _ = try ExportService.export(workspace: "acme", to: root, store: store, home: home)
       let files = try RestoreService.readTree(target)
-      #expect(try Self.version(files) == "3")
+      #expect(try Self.version(files) == "4")
       ExportTreeTests.expectSame(files, try ExportTreeTests.render(store))
     }
   }
@@ -142,7 +142,7 @@ struct ExportVersionTests {
     let manifest = try #require(String(data: data, encoding: .utf8))
     files["manifest.json"] = Data(
       manifest.replacingOccurrences(
-        of: #""format": "1""#, with: #""format": "4""#
+        of: #""format": "1""#, with: #""format": "5""#
       ).utf8)
     #expect(throws: ExportError.self) { try ExportTree.parse(files) }
   }

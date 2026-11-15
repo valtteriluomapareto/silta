@@ -17,7 +17,7 @@ struct ExportFormatRecoveryTests {
     return files
   }
 
-  @Test(arguments: ["4", "10", "999999999999999999999999999999"])
+  @Test(arguments: ["5", "10", "999999999999999999999999999999"])
   func futureFormatsAskForAnUpdate(format: String) throws {
     do {
       _ = try ExportTree.parse(Self.files(format: format))
@@ -26,7 +26,7 @@ struct ExportFormatRecoveryTests {
       #expect(error.code == .env)
       #expect(error.nextBy == .human)
       #expect(error.next == ["update silta"])
-      if format == "4" {
+      if format == "5" {
         let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
         let json = OutputRouter.render(.failure(error), mode: OutputMode(json: true))
         #expect(text.exitCode == 9 && json.exitCode == 9)
@@ -59,7 +59,7 @@ struct ExportFormatRecoveryTests {
       let before = initialized ? try RestoreSupport.dump(store) : [:]
       let backups = try RestoreSupport.backups(home)
       let tree = try RestoreSupport.write(
-        Self.files(format: "4"), to: scratch.appending(path: "tree/acme"))
+        Self.files(format: "5"), to: scratch.appending(path: "tree/acme"))
       do {
         _ = try RestoreSupport.restore(tree, into: store, home: home, dryRun: dryRun)
         Issue.record("Restored an unsupported future format")
