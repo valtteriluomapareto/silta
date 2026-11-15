@@ -30,7 +30,7 @@ struct SequenceCeilingTests {
         }
       } catch { failure = error }
       let after = try RestoreSupport.dump(store)
-      withKnownIssue("SI-132: sequence allocation can advance SQLite integers past the ceiling") {
+      do {
         #expect((failure as? StorageError) == .resourceExhausted)
         #expect(allocated == nil && after == before)
       }
