@@ -98,6 +98,7 @@ extension RestoreWriter {
       keys: ExportFormat.workspaceKeys)
     expected.approvals = after.approvals
     expected.documents.revisionAllocations = revisionAllocations
+    expected.documents.legacyCommentSequences = nil
     let want = try expected.files()
     let got = try after.files()
     if let path = Set(want.keys).union(got.keys).filter({ want[$0] != got[$0] }).min(

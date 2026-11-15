@@ -36,7 +36,7 @@ struct RestoreDocumentRowTests {
               + "('comment:doc_rev:901','comment:doc_rev:1100','comment:doc_rev:1101')") == 0)
         #expect(try String.fetchOne(db, sql: "PRAGMA foreign_key_check") == nil)
       }
-      #expect(after.commentSequences[1].value("next") == "9")
+      #expect(after.legacyCommentSequences == nil)
       #expect(after.documents[0].records[0].value("title") == nil)
       #expect(after.documents[0].records[1].value("triaged_by") == "human:acme")
       #expect(after.documents[0].records[5].value("app_shas") == ExportDocumentTests.shas)
@@ -53,12 +53,11 @@ struct RestoreDocumentRowTests {
         documents: [],
         revisionAllocations: [
           ExportDocumentTests.row([("slug", "incoming-only"), ("next", "400")])
-        ],
-        commentSequences: [])
+        ])
       let expected = try RestoreDocumentRowSupport.replace(
         store, tree: graph.tree, incoming: incoming)
       let after = try store.read { try ExportDocumentSnapshot.read($0, workspace: 17) }
-      #expect(after.documents.isEmpty && after.commentSequences.isEmpty)
+      #expect(after.documents.isEmpty && after.legacyCommentSequences == nil)
       ExportTreeTests.expectSame(try after.files(), try expected.files())
       #expect(
         after.revisionAllocations.map { $0.value("slug") } == [
@@ -75,9 +74,6 @@ struct RestoreDocumentRowTests {
       RestoreDocumentGraphFixture.otherDocument(&graph.documents)
       graph.documents.documents[1].records[0] = graph.documents.documents[1].records[0]
         .replacing("uid", with: "owned-legacy-revision", keys: ExportFormat.docRecords[0].keys)
-      let last = graph.documents.commentSequences.count - 1
-      graph.documents.commentSequences[last] = graph.documents.commentSequences[last]
-        .replacing("doc_rev", with: "owned-legacy-revision", keys: ["doc_rev", "next"])
       let expected = try RestoreDocumentRowSupport.replace(
         store, tree: graph.tree, incoming: graph.documents)
       let after = try store.read { try ExportDocumentSnapshot.read($0, workspace: 17) }
@@ -130,7 +126,7 @@ struct RestoreDocumentRowTests {
       #expect(
         try RestoreDocumentRowSupport.accept("removed-rules", store: store, ids: ids).revision
           == 236)
-      #expect(try RestoreDocumentFixture.commentSequence(store) == 9)
+      #expect(try RestoreDocumentFixture.commentSequence(store) == 8)
     }
   }
 

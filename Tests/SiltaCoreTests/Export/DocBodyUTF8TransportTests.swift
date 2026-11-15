@@ -52,7 +52,7 @@ struct DocBodyUTF8TransportTests {
       #expect(bytes == wanted)
       let after = try ExportDocumentSnapshotTests.read(store)
       #expect(after.revisionAllocations == expected.revisionAllocations)
-      #expect(after.commentSequences == expected.commentSequences)
+      #expect(after.legacyCommentSequences == nil && expected.legacyCommentSequences == nil)
       #expect(try RestoreDocumentRowSupport.keptRows(store) == kept)
       #expect(
         try store.read {

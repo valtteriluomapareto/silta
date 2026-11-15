@@ -58,6 +58,7 @@ enum RestoreDocumentRowSupport {
       try writer.insertLinks(workspace: 17)
       var expected = incoming
       expected.revisionAllocations = floors
+      expected.legacyCommentSequences = nil
       return expected
     }
   }

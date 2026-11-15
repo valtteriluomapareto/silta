@@ -22,8 +22,8 @@ extension ExportDocumentSnapshot {
       return ExportDocument(
         slug: row.value("slug") ?? "", row: row, records: records[$0["id"]] ?? [])
     }
-    var snapshot = Self(documents: documents, revisionAllocations: [], commentSequences: [])
-    var floors = try snapshot.minimumFloors()
+    var snapshot = Self(documents: documents, revisionAllocations: [])
+    var floors = try snapshot.minimumRevisionFloors()
     let prefix = "doc_rev:\(workspace):"
     for found in try Row.fetchAll(
       db, sql: "SELECT scope,next FROM seq_counter WHERE scope GLOB ?", arguments: [prefix + "*"])
@@ -33,19 +33,10 @@ extension ExportDocumentSnapshot {
       guard WorkspaceConfig.isValidIdentifier(name) else {
         throw ExportTree.invalid("a reserved document name is not an identifier")
       }
-      floors.revisions[name] = max(
-        floors.revisions[name] ?? 1, try Self.positive(row.value("next")))
+      floors[name] = max(
+        floors[name] ?? 1, try Self.positive(row.value("next")))
     }
-    for found in try Row.fetchAll(db, sql: DocumentQuery.commentFloors, arguments: [workspace]) {
-      let row = try ExportRow(keys: ["doc_rev", "next"], row: found)
-      let owner = row.value("doc_rev") ?? ""
-      floors.comments[Data(owner.utf8)] = (
-        owner,
-        max(floors.comments[Data(owner.utf8)]?.next ?? 1, try Self.positive(row.value("next")))
-      )
-    }
-    snapshot.revisionAllocations = Self.floorRows(floors.revisions, key: "slug")
-    snapshot.commentSequences = Self.commentFloorRows(floors.comments)
+    snapshot.revisionAllocations = Self.floorRows(floors, key: "slug")
     return snapshot
   }
 }
@@ -81,10 +72,4 @@ private enum DocumentQuery {
     """,
   ]
 
-  static let commentFloors = """
-    SELECT r.uid AS doc_rev,c.next
-    FROM seq_counter c JOIN doc_rev r ON c.scope='comment:doc_rev:'||r.id
-      JOIN doc d ON d.id=r.doc_id
-    WHERE d.workspace_id=?
-    """
 }

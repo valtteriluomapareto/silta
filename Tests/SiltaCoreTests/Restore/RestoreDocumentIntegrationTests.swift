@@ -23,7 +23,7 @@ struct RestoreDocumentIntegrationTests {
       let parsed = try ExportTree.parse(files)
       #expect(parsed.documents.documents.count == 1)
       ExportTreeTests.expectSame(
-        try parsed.documents.files(), try ExportDocumentSnapshotTests.golden())
+        try parsed.documents.files(), try ExportDocumentSnapshotTests.currentGolden())
       #expect(Array(parsed.links.prefix(10)) == (try RestoreDocumentGraphFixture.links()))
       let notes = parsed.links.filter { $0.value("to_kind") == "note" }
       #expect(
@@ -77,7 +77,8 @@ struct RestoreDocumentIntegrationTests {
       let tree = try ExportTree.parse(restored)
       let incoming = try ExportDocumentSnapshotTests.read(source)
       #expect(tree.documents.documents == incoming.documents)
-      #expect(tree.documents.commentSequences == incoming.commentSequences)
+      #expect(
+        tree.documents.legacyCommentSequences == nil && incoming.legacyCommentSequences == nil)
       try target.read { db in
         #expect(
           try Int64.fetchOne(
@@ -98,7 +99,7 @@ struct RestoreDocumentIntegrationTests {
       #expect(
         try RestoreDocumentRowSupport.accept("removed-rules", store: target, ids: ids).revision
           == 236)
-      #expect(try RestoreDocumentFixture.commentSequence(target) == 9)
+      #expect(try RestoreDocumentFixture.commentSequence(target) == 8)
     }
   }
 

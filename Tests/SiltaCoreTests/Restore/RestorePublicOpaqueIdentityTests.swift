@@ -23,14 +23,6 @@ struct RestorePublicOpaqueIdentityTests {
       let files = try RestoreService.readTree(directory)
       let tree = try ExportTree.parse(files)
       #expect(tree.documents.documents.count == 2)
-      let floors = tree.documents.commentSequences.filter {
-        ($0.value("doc_rev") ?? "").hasPrefix("rev-caf")
-      }
-      #expect(
-        Data(ExportFormat.jsonl(floors).utf8)
-          == Data(
-            ("{\"doc_rev\": \"rev-cafe\u{301}\", \"next\": \"27\"}\n"
-              + "{\"doc_rev\": \"rev-caf\u{e9}\", \"next\": \"13\"}\n").utf8))
       #expect(try RestoreSupport.dump(source) == before)
       let home = scratch.appending(path: "target")
       let target: DatabaseStore

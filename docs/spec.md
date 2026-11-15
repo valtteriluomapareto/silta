@@ -1671,18 +1671,20 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     workspace.yaml       # settings, repos (slug, remote), apps, envs, services, edges, topics+aliases, sources
     tasks/AC-12.md       # frontmatter + Description / Plan / Acceptance / Result
     tasks/AC-12.jsonl    # events, plan revisions, comments, review requests
-    docs/<slug>.md, docs/<slug>.jsonl   # (M2)
+    docs/<slug>.md, docs/<slug>.jsonl
     links.jsonl, alias_decisions.jsonl, approvals.jsonl
   ```
 
-  **Formats 1 and 2** (the contracts restore reads):
-  - New exports use format 2. The reader preserves the exact canonical format-1
-    representation, including the schema named by an older tree. Format 2 always
+  **Formats 1, 2 and 3** (the contracts restore reads):
+  - New exports use format 3, which omits per-revision comment reservations and
+    their manifest count. The reader preserves exact canonical format-1 and format-2
+    representations, including the schema named by an older tree. Format 2 always
     includes `doc_revision_allocations.jsonl` and `doc_comment_sequences.jsonl`,
     even when empty. Their record counts and the doc/revision/verification counts
     are present in the manifest; format 1 does not add these files or count keys.
     Format 2 includes documents, their immutable history and independent revision
-    reservations. Format 1 cannot contain these document files or streams.
+    reservations. Format 3 retains the document revision allocation stream and
+    refuses the obsolete comment stream. Format 1 cannot contain document files or streams.
   - **Values.** Every value is a double-quoted string, integers in decimal; a NULL
     column is left out. Only `"`, `\`, controls (U+0000–U+001F, U+007F–U+009F),
     U+2028, U+2029, U+FEFF, U+FFFE and U+FFFF are escaped: `\"`, `\\`, `\n`, `\r`,
@@ -1721,8 +1723,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     to match their accepted revision, and an unarchived accepted doc needs live attachments.
   - **Document allocation streams:** `doc_revision_allocations.jsonl` holds each
     reserved `slug` and its next revision number, including names without a doc.
-    `doc_comment_sequences.jsonl` holds each revision UID (`doc_rev`) and its next
-    comment number. Both streams use positive decimal integers and byte-sorted keys.
+    Its positive decimal floors have byte-sorted keys. Format 2 additionally holds
+    `doc_comment_sequences.jsonl`; the reader retains its canonical string rows
+    only to check historical bytes. Those reservations do not control restored allocation.
   - **`links.jsonl`:** `from` and `to` are the uids of the linked rows; a link to a
     plan revision names the task's uid in `to` and the revision in `to_rev`, the key
     right after `to`.
@@ -1740,7 +1743,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     byte; restore checks the references.
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq` and the
-    two document allocation streams.
+    document revision allocation stream.
   - **Refusals, with nothing written:** a database with migrations this binary
     doesn't know; unknown link kinds.
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
@@ -1807,10 +1810,12 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     changed. Before committing, the workspace is read back and must render as the tree
     does. Document revision reservations retain the larger current or incoming
     floor, including names whose docs the tree removes, so restoring older history
-    cannot reuse a revision ref. Revision-owned comment reservations come from the
-    incoming tree exactly, remapped through stable revision UIDs. The self-check
-    permits these merged revision floors while keeping incoming history and comment
-    floors exact (D47).
+    cannot reuse a revision ref. Revision-owned comment counters are rebuilt as
+    one past the highest retained comment number, including deleted comments; no
+    comments means 1. Exhausted numbers remain exhausted. Incoming legacy reservation
+    gaps and current gaps are ignored, as D47 permits reuse after discarded history.
+    The self-check permits merged revision floors and the explicit format/legacy-counter
+    normalization while keeping document, revision, comment, body and link truth exact.
   - Repo paths and worktree overrides stay for repos and apps the tree keeps, and a
     task's worktree while its claim and branch are unchanged. Other repo paths are
     re-resolved with `silta init --scan`.

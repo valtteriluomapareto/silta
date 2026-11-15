@@ -20,23 +20,16 @@ struct ExportDocumentCounterTests {
   }
 
   @Test(arguments: [
-    "missing allocation stream", "missing comment stream", "missing doc floor",
-    "missing comment floor", "revision collision", "comment collision", "unknown owner",
+    "missing allocation stream", "missing doc floor", "revision collision",
     "unsafe slug", "duplicate row", "unknown field", "unordered rows", "orphan jsonl",
   ])
   func refusesIncompleteOrIgnoredCounterTruth(_ damage: String) throws {
     var files = try ExportDocumentSnapshotTests.golden()
     let allocations = ExportFormat.docAllocationsFile
-    let comments = ExportFormat.docCommentSequencesFile
     if !Self.remove(&files, damage) {
       switch damage {
       case "revision collision":
         Self.replace(&files, allocations, #""next": "20""#, #""next": "7""#)
-      case "comment collision":
-        Self.replace(&files, comments, #""next": "9""#, #""next": "7""#)
-      case "unknown owner":
-        Self.replace(
-          &files, comments, ExportDocumentTests.uid("003"), ExportDocumentTests.uid("999"))
       case "unsafe slug": Self.replace(&files, allocations, "gone-rules", "../gone-rules")
       case "duplicate row":
         files[allocations]?.append(
@@ -57,19 +50,12 @@ struct ExportDocumentCounterTests {
 
   static func remove(_ files: inout [String: Data], _ damage: String) -> Bool {
     let allocations = ExportFormat.docAllocationsFile
-    let comments = ExportFormat.docCommentSequencesFile
     switch damage {
     case "missing allocation stream": files[allocations] = nil
-    case "missing comment stream": files[comments] = nil
     case "missing doc floor":
       files[allocations] = Data(
         (text(files[allocations] ?? Data()).split(separator: "\n")
           .filter { !$0.contains("push-rules") }.joined(separator: "\n") + "\n").utf8)
-    case "missing comment floor":
-      let uid = ExportDocumentTests.uid("003")
-      files[comments] = Data(
-        (text(files[comments] ?? Data()).split(separator: "\n")
-          .filter { !$0.contains(uid) }.joined(separator: "\n") + "\n").utf8)
     default: return false
     }
     return true
@@ -86,7 +72,7 @@ struct ExportDocumentCounterTests {
     let snapshot = try ExportDocumentSnapshot.parse(files, workspace: "acme")
     #expect(snapshot.documents.isEmpty)
     #expect(snapshot.revisionAllocations.isEmpty)
-    #expect(snapshot.commentSequences.isEmpty)
+    #expect(snapshot.legacyCommentSequences == [])
     ExportTreeTests.expectSame(try snapshot.files(), files)
   }
 }

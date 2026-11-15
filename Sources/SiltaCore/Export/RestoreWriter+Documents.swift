@@ -62,7 +62,7 @@ extension RestoreWriter {
     }
   }
 
-  /// Writes captured/current revision floors and exact incoming comment reservations.
+  /// Preserves revision floors and rebuilds comment counters from retained rows.
   func restoreDocumentCounters(
     _ incoming: ExportDocumentSnapshot, retaining current: ExportDocumentSnapshot, workspace: Int64
   ) throws -> [ExportRow] {
@@ -82,14 +82,14 @@ extension RestoreWriter {
           ON CONFLICT(scope) DO UPDATE SET next=MAX(next,excluded.next)
           """, arguments: ["doc_rev:\(workspace):\(name)", next])
     }
-    for row in incoming.commentSequences {
-      let owner = try id(row.value("doc_rev") ?? "", in: "doc_rev")
-      let next = try ExportDocumentSnapshot.positive(row.value("next"), workspace: slug)
+    for record in incoming.documents.flatMap(\.records) where record.value("table") == "doc_rev" {
+      let owner = try id(record.value("uid") ?? "", in: "doc_rev")
+      let highest =
+        try Int64.fetchOne(
+          db, sql: "SELECT max(seq) FROM comment WHERE doc_rev_id=?", arguments: [owner]) ?? 0
       try db.execute(
-        sql: """
-          INSERT INTO seq_counter(scope,next) VALUES(?,?)
-          ON CONFLICT(scope) DO UPDATE SET next=excluded.next
-          """, arguments: ["comment:doc_rev:\(owner)", next])
+        sql: "INSERT INTO seq_counter(scope,next) VALUES(?,?)",
+        arguments: ["comment:doc_rev:\(owner)", ExportDocumentSnapshot.nextFloor(after: highest)])
     }
     return ExportDocumentSnapshot.floorRows(revisions, key: "slug")
   }

@@ -21,10 +21,6 @@ struct RestoreOpaqueIdentityTests {
       }
       let tree = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
       try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
-      let rows = tree.documents.commentSequences.filter {
-        ($0.value("doc_rev") ?? "").hasPrefix("rev-caf")
-      }
-      Golden.forTests().check(ExportFormat.jsonl(rows), "restore-opaque-comment-floors.jsonl")
       let files = try tree.documents.files()
       #expect(try ExportDocumentSnapshot.parse(files, workspace: "acme") == tree.documents)
       #expect(try RestoreSupport.dump(store) == before)

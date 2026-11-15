@@ -52,7 +52,7 @@ struct RestoreGraphIdentityTests {
       #expect(raw.map { Data($0.utf8) } == targets.map { Data($0.utf8) })
       #expect(Set(captured.compactMap { $0.value("to_ext").map { Data($0.utf8) } }).count == 2)
       let documents = ExportDocumentSnapshot(
-        documents: [], revisionAllocations: [], commentSequences: [])
+        documents: [], revisionAllocations: [])
       try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
       #expect(try RestoreSupport.dump(store) == before)
     }
