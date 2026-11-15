@@ -23,7 +23,7 @@ package struct BriefService {
     }
   }
 
-  /// Assembles, trims and hydrates the report in the caller's read snapshot.
+  /// Renders and trims the report in the caller's read snapshot.
   func report(
     _ location: LocationResult, app: String? = nil, topics: [String] = [], budget: Int = 2500,
     compact: Bool = false, at now: Date, in db: Database
@@ -67,8 +67,6 @@ package struct BriefService {
         + discussion.inbox + context.sections,
       more: more, warnings: location.warnings + settings.warnings + context.warnings)
     report.trim(tokens: budget)
-    try report.hydrateDocProposals(
-      DocProposalInbox(workspace: location.workspace, at: now, in: db))
     report.insertDocuments(tokens: budget)
     return report
   }
