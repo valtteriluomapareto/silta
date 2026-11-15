@@ -86,17 +86,29 @@ struct DocStoredIdentityTests {
   }
 
   @Test func canonicalEquivalentBodyRaceRefuses() async throws {
+    let changed = Data("cafe\u{301}".utf8)
+    #expect(String(data: changed, encoding: .utf8) == "café")
+    #expect(changed != Data("café".utf8))
+    try await Self.bodyRace(initial: "café", changed: changed)
+  }
+
+  @Test func cappedAndEmptyBaselineBodiesStayDistinct() async throws {
+    try await Self.bodyRace(
+      initial: String(repeating: "x", count: DocInput.maximumBytes + 1), changed: Data())
+  }
+
+  static func bodyRace(initial: String, changed: Data) async throws {
     try await withScratchDirectory { home in
-      let (store, initial) = try Self.fixture(home, kind: "doc")
+      let (store, initialRequest) = try Self.fixture(home, kind: "doc")
       try store.write {
         try $0.database.execute(
-          sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT)",
-          arguments: [Data("café".utf8)])
+          sql: "UPDATE doc_rev SET body_md=CAST(? AS TEXT)", arguments: [Data(initial.utf8)])
       }
-      let changed = Data("cafe\u{301}".utf8)
-      #expect(String(data: changed, encoding: .utf8) == "café")
-      #expect(changed != Data("café".utf8))
-      var request = initial
+      let captured = try store.read {
+        try DocEditBaseline.read("rules", workspace: 1, keepBody: false, in: $0)
+      }
+      #expect(captured.body == (initial.utf8.count > DocInput.maximumBytes ? nil : initial))
+      var request = initialRequest
       request.keepBody = false
       var committed: [[String]] = []
       let error = await Self.failure {
