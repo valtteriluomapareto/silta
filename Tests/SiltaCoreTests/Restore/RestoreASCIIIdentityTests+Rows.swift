@@ -6,6 +6,23 @@ import Testing
 @testable import SiltaCore
 
 extension RestoreASCIIIdentityTests {
+  @Test(arguments: [false, true])
+  func invalidIncomingIdentityDoesNotInitializeDestination(dryRun: Bool) throws {
+    try withScratchDirectory { scratch in
+      var tree = try RestoreDocumentGraphFixture.graph().tree
+      RestoreDocumentGraphFixture.record(&tree.documents, 1, "source_task", "K")
+      let directory = try RestoreSupport.write(
+        tree.files(), to: scratch.appending(path: "out/acme"))
+      let home = scratch.appending(path: "absent")
+      let store = ExportFixture.store(home)
+      let error = Self.failure {
+        _ = try RestoreSupport.restore(directory, into: store, home: home, dryRun: dryRun)
+      }
+      #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
+      #expect(!FileManager.default.fileExists(atPath: home.path))
+    }
+  }
+
   @Test(arguments: ["from", "to", "thread", "doc_rev", "repo"], [0, 1])
   func referenceFieldsRequireASCII(field: String, example: Int) throws {
     var tree = try RestoreDocumentGraphFixture.graph().tree
