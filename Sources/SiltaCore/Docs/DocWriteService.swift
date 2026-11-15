@@ -71,8 +71,8 @@ package struct DocWriteService {
     return try environment.db.write { tx in
       let approval = try authorizeEdit(request)
       guard
-        captured.baseline.matches(
-          try DocEditBaseline.read(
+        captured.baseline
+          == (try DocEditBaseline.read(
             request.slug, workspace: captured.id,
             keepBody: request.keepBody, in: tx.database))
       else { throw DocError.changed(workspace: slug) }

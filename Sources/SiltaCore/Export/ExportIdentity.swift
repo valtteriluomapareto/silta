@@ -7,17 +7,6 @@ enum ExportIdentity {
     "source_task", "doc_rev", "thread", "from", "to",
   ]
 
-  static func valid(_ bytes: Data) -> Bool {
-    !bytes.isEmpty && bytes.allSatisfy { $0 > 0 && $0 < 128 }
-  }
-
-  static var unsupported: CommandFailure {
-    CommandFailure(
-      error: ExportError.unsupported("stored IDs outside nonempty ASCII text without NUL"),
-      next: ["silta backup"],
-      message: "Stored IDs must be nonempty ASCII text without NUL. Nothing was changed. "
-        + "Create a database backup and ask the human to inspect it before repairing IDs.")
-  }
 }
 
 extension RestoreValidation {
@@ -28,7 +17,7 @@ extension RestoreValidation {
         throw invalid("\(table) UID must be nonempty ASCII text without NUL")
       }
       for field in row.fields where ExportIdentity.keys.contains(field.key) {
-        guard ExportIdentity.valid(Data(field.value.utf8)) else {
+        guard StoredUID.valid(Data(field.value.utf8)) else {
           throw invalid("\(table) \(field.key) must be nonempty ASCII text without NUL")
         }
       }

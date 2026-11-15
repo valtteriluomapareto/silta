@@ -3,6 +3,7 @@ extension DocWriteService {
     -> any CodedError
   {
     if error is StorageError { return error }
+    if error.code == .env, error.next == ["silta backup"] { return error }
     let message = SecretGuard.redacted(error.message)
     guard safeScopeAndIdentity(request, workspace: workspace) else {
       return CommandFailure(

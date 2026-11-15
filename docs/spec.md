@@ -1696,8 +1696,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     `to_service`). Integer ids and `workspace_id` are never written; the file implies
     the workspace or the task. Imported row UIDs and UID references must be nonempty
     ASCII without NUL; no other opaque-ID grammar is imposed. Restore checks this
-    before building identity maps. Export and destination capture inspect complete
-    stored UID bytes too. Unsupported stored IDs refuse without changes (`env`),
+    before building identity maps. Export, destination and document-write capture
+    inspect complete stored UID bytes too. Unsupported stored IDs refuse without changes (`env`),
     with human-owned `silta backup` recovery for inspection rather than renaming IDs.
   - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), and
     tasks by `seq`, so the bytes don't depend on integer ids. Files in byte order of

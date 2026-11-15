@@ -1,6 +1,7 @@
 extension DocProposalService {
   func recovery(_ error: any CodedError, request: DocProposalRequest) -> any CodedError {
     if error is StorageError { return error }
+    if error.code == .env, error.next == ["silta backup"] { return error }
     let message = SecretGuard.redacted(error.message)
     if let selection = error as? WorkspaceError {
       let safe = selection.next.allSatisfy(DocService.safeReference)
