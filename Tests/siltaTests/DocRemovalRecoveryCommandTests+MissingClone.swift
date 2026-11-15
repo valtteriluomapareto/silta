@@ -44,26 +44,28 @@ extension DocRemovalRecoveryCommandTests {
         in: scratch, environment: TaskCommandTests.fixed)
       let shown = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
       let removed = try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.fixed)
-      let bytes = try store.read {
-        try Data.fetchOne($0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE rev=2")
-      }
-      let state = try store.read {
-        try String.fetchOne(
-          $0, sql: "SELECT coalesce(verified_at,'unknown') FROM doc WHERE slug='rules'")
-      }
-      let refs = try store.read {
-        try String.fetchAll(
-          $0, sql: "SELECT to_kind FROM link WHERE from_kind='doc' AND rel='about' ORDER BY to_kind"
-        )
-      }
-      withKnownIssue("SI-128: recovery still requires the surviving app's absent clone") {
-        #expect(reattached.termination == .exit(0) && removed.termination == .exit(0))
-        #expect(bytes == Data(body.utf8))
-        #expect(state == "unknown" && refs == ["app", "topic"])
-      }
+      #expect(reattached.termination == .exit(0) && removed.termination == .exit(0))
+      try assertReattached(store, body: body)
       #expect(shown.termination == .exit(0) && shown.stdout.contains("replacement"))
       #expect(!(reattached.stdout + reattached.stderr).contains("private123"))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 0)
     }
   }
+  private func assertReattached(_ store: DatabaseStore, body: String) throws {
+    let bytes = try store.read {
+      try Data.fetchOne($0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE rev=2")
+    }
+    let state = try store.read {
+      try String.fetchOne(
+        $0, sql: "SELECT coalesce(verified_at,'unknown') FROM doc WHERE slug='rules'")
+    }
+    let refs = try store.read {
+      try String.fetchAll(
+        $0, sql: "SELECT to_kind FROM link WHERE from_kind='doc' AND rel='about' ORDER BY to_kind"
+      )
+    }
+    #expect(bytes == Data(body.utf8))
+    #expect(state == "unknown" && refs == ["app", "topic"])
+  }
+
 }
