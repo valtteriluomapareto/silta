@@ -127,6 +127,10 @@ extension GuideCommand {
         complete continuations for bounded reads. Historical unknown metadata stays unknown;
         do not replace it with today's map or treat it as a verification claim.
 
+        Restored pending revisions are read-only here: this build cannot submit or decide them.
+        With no human present, record map gaps as `Map gap:` in your handoff or result;
+        never create a task or file for a map gap.
+
         A workspace doc holds lasting cross-app knowledge. Repo instructions and repo docs stay
         in their repositories: point to code refs instead of copying code or repo documentation.
         The summary is the first nonempty nonheading line, at most 120 characters. Write the
