@@ -97,22 +97,20 @@ struct DocPartialCloneTests {
         }
       }
       let state = try Self.latest(store)
+      let expected: [DocVerification.Snapshot] =
+        bothMissing
+        ? []
+        : [
+          .init(app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA)
+        ]
+      let observed = try state.evidence.map {
+        try JSONDecoder().decode([DocVerification.Snapshot].self, from: Data($0.utf8))
+      }
       do {
         #expect(prepared?.binding.apps.map(\.app) == ["api", "mobile"])
-        #expect(
-          prepared?.snapshots
-            == (bothMissing
-              ? []
-              : [
-                .init(app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA)
-              ]))
+        #expect(prepared?.snapshots == expected && observed == expected)
         #expect(accepted?.about == ["edge:mobile/api/http-api"])
-        #expect(
-          state.stamp == "unknown"
-            && (bothMissing
-              ? state.evidence == "[]"
-              : state.evidence?.contains(DocVerificationPreparationTests.apiSHA) == true)
-        )
+        #expect(state.stamp == "unknown")
       }
       #expect(git.requests.count == (bothMissing ? 0 : 1) && git.isExhausted)
       if accepted != nil { try Self.roundTripEvidence(store, home: home, evidence: state.evidence) }
