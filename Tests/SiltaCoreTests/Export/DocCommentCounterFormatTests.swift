@@ -15,8 +15,9 @@ struct DocCommentCounterFormatTests {
       let directory = try RestoreDocumentIntegrationTests.publish(
         store, home: home, to: scratch.appending(path: "out"))
       let files = try RestoreService.readTree(directory)
+      let bytes = try #require(files["manifest.json"])
       let manifest = try #require(
-        try JSONSerialization.jsonObject(with: #require(files["manifest.json"])) as? [String: Any])
+        try JSONSerialization.jsonObject(with: bytes) as? [String: Any])
       let counts = try #require(manifest["counts"] as? [String: String])
       withKnownIssue("SI-132: current exports include unnecessary comment reservations") {
         #expect(manifest["format"] as? String == "3")
