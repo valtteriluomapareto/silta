@@ -7,6 +7,44 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocProposalIdentityTests {
+  @Test(arguments: ["defaults", "target", "clock"])
+  func submissionUsesPostInputTruth(change: String) throws {
+    do {
+      try withScratchDirectory { home in
+        let store = try AcmeDocAttachments.make(in: home)
+        try DocWritePolicyTests.seed(store)
+        try DocProposalServiceTests.task(store, seq: 1)
+        let service = try DocProposalServiceTests.service(home, store)
+        let clock = try #require(service.environment.clock as? FakeClock)
+        var saved = false
+        do {
+          _ = try service.propose(DocProposalRequest(slug: "rules", why: "Share")) {
+            if change == "clock" {
+              clock.advance(milliseconds: 10_800_000)
+            } else {
+              try store.write {
+                try $0.database.execute(
+                  sql: change == "target"
+                    ? "UPDATE service SET uid='replacement'"
+                    : "UPDATE doc SET title='Updated'; UPDATE doc_rev SET title='Updated'")
+              }
+            }
+            return "Proposed body"
+          }
+          saved = true
+        } catch let error as any CodedError {
+          Issue.record("Post-input truth must be used: \(error.code)")
+        }
+        #expect(saved)
+        if saved {
+          let row = try DocProposalServiceTests.row(store, revision: 2)
+          #expect(row["title"] as String == (change == "defaults" ? "Updated" : "Rules"))
+          #expect((row["source_task_id"] as Int64? == nil) == (change == "clock"))
+        }
+      }
+    }
+  }
+
   @Test(arguments: ["app", "topic", "service", "edge"])
   func pendingTargetsFollowRenameAndRefuseReplacement(kind: String) throws {
     do {

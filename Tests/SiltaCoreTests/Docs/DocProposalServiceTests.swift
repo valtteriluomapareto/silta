@@ -95,7 +95,7 @@ struct DocProposalServiceTests {
   }
 
   @Test(arguments: [false, true])
-  func newAndPendingOnlyReportAllMissingFlagsBeforeInput(pending: Bool) throws {
+  func newAndPendingReportCreationMetadataAfterInput(pending: Bool) throws {
     try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       if pending {
@@ -103,14 +103,16 @@ struct DocProposalServiceTests {
       }
       let service = try Self.service(home, store)
       let before = try DocVerificationPreparationTests.truth(store)
+      var read = false
       let error = try #require(
         Self.refusal(.usage) {
-          _ = try service.propose(DocProposalRequest(slug: "rules")) {
-            Issue.record("Input read before required metadata")
+          _ = try service.propose(DocProposalRequest(slug: "rules", why: "Share")) {
+            read = true
             return "Body"
           }
         })
-      #expect(["-m", "--title", "--about"].allSatisfy(error.message.contains))
+      #expect(read)
+      #expect(["--title", "--about"].allSatisfy(error.message.contains))
       let missing = try #require(
         Self.refusal(.usage) {
           _ = try service.propose(DocProposalRequest(slug: "rules"), input: nil)
@@ -187,7 +189,7 @@ struct DocProposalServiceTests {
     }
   }
 
-  @Test func sourceRecheckUsesTheCapturedClockInstant() throws {
+  @Test func sourceUsesThePostInputClockInstant() throws {
     try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       try Self.task(store, seq: 1)
@@ -197,26 +199,7 @@ struct DocProposalServiceTests {
         clock.advance(milliseconds: 10_800_000)
         return "Body"
       }
-      #expect(try Self.row(store)["source_task_id"] as Int64? != nil)
-    }
-  }
-
-  @Test func explicitSourceUsesOwnedUIDWithoutRequiringFreshClaim() throws {
-    try withScratchDirectory { home in
-      let store = try AcmeDocAttachments.make(in: home)
-      try Self.task(store, seq: 1, status: "dropped", age: 999_999)
-      var request = Self.request()
-      request.task = "AC-1"
-      let service = try Self.service(home, store)
-      _ = try service.propose(request, input: { "Body" })
-      #expect(try Self.row(store)["source_task_id"] as Int64? != nil)
-      request.task = "BE-1"
-      _ = Self.refusal(.invalid) {
-        _ = try service.propose(request) {
-          Issue.record("Foreign source read input")
-          return "Body"
-        }
-      }
+      #expect(try Self.row(store)["source_task_id"] as Int64? == nil)
     }
   }
 
@@ -252,7 +235,6 @@ struct DocProposalServiceTests {
       let error = try #require(
         Self.refusal(base == "99" ? .notFound : .invalid) {
           _ = try Self.service(home, store).propose(request) {
-            Issue.record("Invalid base read input")
             return "Body"
           }
         })

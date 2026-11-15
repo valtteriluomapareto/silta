@@ -1,3 +1,3 @@
-error: Missing required doc fields: -F, -m, --title, --about. [usage]
-next: silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --title <title> --about <ref>
-{"error":{"code":"usage","message":"Missing required doc fields: -F, -m, --title, --about.","next":["silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --title <title> --about <ref>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+error: Missing required doc fields: -F, -m. [usage]
+next: silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why>
+{"error":{"code":"usage","message":"Missing required doc fields: -F, -m.","next":["silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
