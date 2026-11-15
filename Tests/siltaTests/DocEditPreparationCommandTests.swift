@@ -11,7 +11,9 @@ struct DocEditPreparationCommandTests {
   @Test(
     arguments: [false, true],
     ["path", "ref", "pat-ref", "pat-repo", "ref52", "repo52", "scope", "repo-git"])
-  func preparationRepairsAndDisplayedIdentitiesStaySafe(json: Bool, variant: String) throws {
+  func unavailableObservationsAcceptWithoutExposingConfiguredIdentities(json: Bool, variant: String)
+    throws
+  {
     try withScratchDirectory { scratch in
       let repo = try CodeCommandTests().setup(scratch)
       let store = DatabaseStore(
@@ -21,7 +23,7 @@ struct DocEditPreparationCommandTests {
       let missingPath = ["path", "pat-repo", "repo52"].contains(variant)
       let configured =
         variant.hasPrefix("pat-") || ["scope", "repo-git"].contains(variant)
-        ? Self.token : Self.bare
+        ? Self.token : String(repeating: "r", count: 52)
       try configure(
         variant, in: store, scope: scope, configured: configured, missingPath: missingPath)
       if variant == "repo-git" {
@@ -36,29 +38,26 @@ struct DocEditPreparationCommandTests {
           "--about", "app:console", "-F", file.path, "--approved", "Keep these rules",
         ]
           + (json ? ["--json"] : []), in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
-      #expect(result.termination == .exit(missingPath || variant == "repo-git" ? 9 : 2))
-      #expect(try Self.truth(store) == before)
-      let error = json ? try DocEditCommandTests.error(result) : [:]
-      let next =
-        scope != "acme"
-        ? ["silta ws ls"]
-        : variant == "repo-git"
-          ? ["silta --ws 'acme' ws show"]
-          : missingPath
-            ? ["silta --ws 'acme' init --scan <directory>"]
-            : ["silta --ws 'acme' repo fetch 'platform'", "silta --ws 'acme' ws show"]
-      let owner = scope == "acme" && missingPath ? "human" : "agent"
+      #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+      #expect(try Self.truth(store) != before)
       let report = result.stdout + result.stderr
-      if json {
-        #expect(error["next"] as? [String] == next && error["next_by"] as? String == owner)
-      } else {
-        #expect(next.allSatisfy(report.contains))
-        #expect(report.contains(owner == "human" ? "ask human:" : "next:"))
-      }
       if variant != "path" && variant != "ref" { #expect(!report.contains(configured)) }
       #expect(!report.contains("doc edit") && !report.contains("--approved"))
+      try store.read { (db: Database) throws in
+        #expect(
+          try Int.fetchOne(
+            db,
+            sql: "SELECT count(*) FROM doc WHERE slug=? AND current_rev=1 AND verified_at IS NULL",
+            arguments: [Self.bare]) == 1)
+        #expect(try String.fetchOne(db, sql: "SELECT app_shas FROM doc_verification") == "[]")
+        #expect(
+          try Int.fetchOne(db, sql: "SELECT count(*) FROM approval WHERE command LIKE '%doc edit%'")
+            == 1)
+      }
       if variant == "pat-ref" {
-        Golden.forTests().check(report, "doc-edit-preparation-secret." + (json ? "json" : "txt"))
+        Golden.forTests().check(
+          report.replacingOccurrences(of: Self.bare, with: "rules"),
+          "doc-edit-" + (json ? "json.json" : "text.txt"))
       }
     }
   }
@@ -81,7 +80,7 @@ struct DocEditPreparationCommandTests {
   }
 
   static func truth(_ store: DatabaseStore) throws -> [[Data]] {
-    try store.read { db in
+    try store.read { (db: Database) throws in
       try String.fetchAll(
         db,
         sql: """

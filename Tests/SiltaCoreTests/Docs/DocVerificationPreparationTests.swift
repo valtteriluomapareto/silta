@@ -142,7 +142,7 @@ struct DocVerificationPreparationTests {
     }
   }
 
-  @Test func missingConfiguredRefKeepsExistingRecoveryAndWritesNothing() async throws {
+  @Test func missingConfiguredRefRecordsNoObservationAndWritesNothing() async throws {
     try await withScratchDirectory { home in
       let (store, repo) = try Self.setup(home)
       let request = Self.request("origin/api", repo: repo)
@@ -155,43 +155,35 @@ struct DocVerificationPreparationTests {
         (Self.request("origin/origin/api", repo: repo), .success(missing)),
       ])
       let before = try Self.truth(store)
-      do {
-        _ = try await DocVerification.prepare(
-          Self.draft(["app:api"]), workspace: 1,
-          environment: Self.environment(home, store: store, git: git))
-        Issue.record("A missing configured ref resolved")
-      } catch let error as CodeError {
-        #expect(error.code == .notFound)
-        #expect(
-          error.next == ["silta --ws 'acme' repo fetch 'platform'", "silta --ws 'acme' ws show"])
-      }
+      let prepared = try await DocVerification.prepare(
+        Self.draft(["app:api"]), workspace: 1,
+        environment: Self.environment(home, store: store, git: git))
+      #expect(prepared.snapshots.isEmpty && prepared.binding.apps.map(\.ref) == ["origin/api"])
       #expect(git.isExhausted)
       #expect(try Self.truth(store) == before)
     }
   }
 
-  @Test func gitFailureAndMissingLocalPathLeaveAllTruthUnchanged() async throws {
+  @Test func unavailableGitAndLocalPathsRecordNoObservationWithoutWriting() async throws {
     try await withScratchDirectory { home in
       let (store, repo) = try Self.setup(home)
       let git = ScriptedGitRunner(script: [
         (Self.request("origin/api", repo: repo), .failure(SeamError.gitUnavailable))
       ])
       let before = try Self.truth(store)
-      await #expect(throws: CodeError.self) {
-        try await DocVerification.prepare(
-          Self.draft(["app:api"]), workspace: 1,
-          environment: Self.environment(home, store: store, git: git))
-      }
+      let unavailable = try await DocVerification.prepare(
+        Self.draft(["app:api"]), workspace: 1,
+        environment: Self.environment(home, store: store, git: git))
+      #expect(unavailable.snapshots.isEmpty && unavailable.binding.apps.count == 1)
       #expect(try Self.truth(store) == before)
       #expect(git.isExhausted)
       try store.write { try $0.database.execute(sql: "DELETE FROM repo_path") }
       let absent = try Self.truth(store)
       let idle = ScriptedGitRunner(script: [])
-      await #expect(throws: RepoError.localPath(repo: "platform", workspace: "acme")) {
-        try await DocVerification.prepare(
-          Self.draft(["app:api"]), workspace: 1,
-          environment: Self.environment(home, store: store, git: idle))
-      }
+      let unregistered = try await DocVerification.prepare(
+        Self.draft(["app:api"]), workspace: 1,
+        environment: Self.environment(home, store: store, git: idle))
+      #expect(unregistered.snapshots.isEmpty && unregistered.binding.apps.count == 1)
       #expect(idle.requests.isEmpty)
       #expect(try Self.truth(store) == absent)
     }
