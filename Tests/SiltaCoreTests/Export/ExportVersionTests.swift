@@ -54,14 +54,24 @@ struct ExportVersionTests {
       text.split(separator: "\n", omittingEmptySubsequences: false)
         .filter { !$0.contains(#""path": "doc_comment_sequences.jsonl""#) }.joined(separator: "\n")
         .utf8)
-    #expect(throws: ExportError.self) { try ExportTree.parse(missing) }
+    #expect(
+      throws: ExportError.invalidTree(
+        reason: "format 2 requires its legacy comment reservation stream", workspace: "acme")
+    ) {
+      try ExportTree.parse(missing)
+    }
     var forbidden = try Self.frozenTwo()
     forbidden["manifest.json"] = Data(
       text.replacingOccurrences(
         of: #""format": "2""#,
         with: #""format": "3""#
       ).utf8)
-    #expect(throws: ExportError.self) { try ExportTree.parse(forbidden) }
+    #expect(
+      throws: ExportError.invalidTree(
+        reason: "format 3 cannot hold legacy comment reservations", workspace: "acme")
+    ) {
+      try ExportTree.parse(forbidden)
+    }
   }
 
   static func version(_ files: [String: Data]) throws -> String {
@@ -89,7 +99,9 @@ struct ExportVersionTests {
       #expect(try Self.version(files) == "3")
       #expect(files["doc_revision_allocations.jsonl"] == Data())
       #expect(files["doc_comment_sequences.jsonl"] == nil)
-      ExportTreeTests.expectSame(try ExportTree.parse(files).files(), files)
+      do { ExportTreeTests.expectSame(try ExportTree.parse(files).files(), files) } catch {
+        #expect(Bool(false), "Current format must parse without a comment stream: \(error)")
+      }
     }
   }
 
@@ -142,7 +154,12 @@ struct ExportVersionTests {
       try #require(original["doc_revision_allocations.jsonl"] != nil)
       var missing = original
       missing["doc_revision_allocations.jsonl"] = nil
-      #expect(throws: ExportError.self) { try ExportTree.parse(missing) }
+      #expect(
+        throws: ExportError.invalidTree(
+          reason: "doc_revision_allocations.jsonl is missing", workspace: "acme")
+      ) {
+        try ExportTree.parse(missing)
+      }
       var changed = original
       changed["doc_revision_allocations.jsonl"] = Data(
         #"{"slug": "rules", "next": "20", "unknown": "ignored"}"#.appending("\n").utf8)

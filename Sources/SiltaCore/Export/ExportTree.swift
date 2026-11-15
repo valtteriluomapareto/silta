@@ -48,12 +48,6 @@ package enum ExportTree {
       manifest.format != "1"
       ? try ExportDocumentSnapshot.parse(documentFiles, workspace: manifest.workspace)
       : ExportDocumentSnapshot(documents: [], revisionAllocations: [])
-    if manifest.format == "2", documents.legacyCommentSequences == nil {
-      throw refuse("format 2 requires its legacy comment reservation stream")
-    }
-    if manifest.format == "3", documents.legacyCommentSequences != nil {
-      throw refuse("format 3 cannot hold legacy comment reservations")
-    }
     let snapshot = ExportSnapshot(
       format: manifest.format, schema: manifest.schema, workspace: workspace, sections: sections,
       tasks: tasks,

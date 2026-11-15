@@ -111,10 +111,13 @@ package struct ExportSnapshot: Equatable, Sendable {
     }
     var data = files.mapValues { Data($0.utf8) }
     if format == "2", documents.legacyCommentSequences == nil {
-      throw ExportError.unsupported("format 2 without its legacy comment stream")
+      throw ExportTree.invalid(
+        "format 2 requires its legacy comment reservation stream",
+        workspace: workspace.value("slug"))
     }
     if format == "3", documents.legacyCommentSequences != nil {
-      throw ExportTree.invalid("format 3 cannot hold legacy comment reservations")
+      throw ExportTree.invalid(
+        "format 3 cannot hold legacy comment reservations", workspace: workspace.value("slug"))
     }
     if format != "1" {
       data.merge(try documents.files()) { _, incoming in incoming }

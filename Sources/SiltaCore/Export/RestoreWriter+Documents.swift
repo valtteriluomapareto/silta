@@ -88,7 +88,10 @@ extension RestoreWriter {
         try Int64.fetchOne(
           db, sql: "SELECT max(seq) FROM comment WHERE doc_rev_id=?", arguments: [owner]) ?? 0
       try db.execute(
-        sql: "INSERT INTO seq_counter(scope,next) VALUES(?,?)",
+        sql: """
+          INSERT INTO seq_counter(scope,next) VALUES(?,?)
+          ON CONFLICT(scope) DO UPDATE SET next=excluded.next
+          """,
         arguments: ["comment:doc_rev:\(owner)", ExportDocumentSnapshot.nextFloor(after: highest)])
     }
     return ExportDocumentSnapshot.floorRows(revisions, key: "slug")

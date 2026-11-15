@@ -32,7 +32,7 @@ extension DocCommentCounterFormatTests {
       do { _ = try RestoreSupport.restore(directory, into: target, home: home) } catch {
         failure = error
       }
-      withKnownIssue("SI-132: a reused physical revision scope conflicts with its orphan counter") {
+      do {
         #expect(failure == nil)
       }
       guard failure == nil else { return }

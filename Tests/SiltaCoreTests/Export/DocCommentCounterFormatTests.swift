@@ -25,7 +25,10 @@ struct DocCommentCounterFormatTests {
         tree.files(), to: scratch.appending(path: "out/acme"))
       let home = scratch.appending(path: "target")
       let target = try RestoreDocumentRowSupport.make(home)
-      _ = try RestoreSupport.restore(directory, into: target, home: home)
+      do { _ = try RestoreSupport.restore(directory, into: target, home: home) } catch {
+        #expect(Bool(false), "Legacy restore must ignore its reservation values: \(error)")
+        return
+      }
       let highest = try target.read {
         try Int64.fetchOne($0, sql: "SELECT max(seq) FROM comment WHERE doc_rev_id IS NOT NULL")
       }
