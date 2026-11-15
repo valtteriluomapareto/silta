@@ -31,7 +31,7 @@ package struct DocProposalService {
       }
       return try environment.db.write { tx in
         let workspace = try WorkspaceSelection.resolve(
-          selected.workspace, in: tx.database, prepared: environment.workspaceSelection)
+          self.workspace, in: tx.database, prepared: environment.workspaceSelection)
         selected.workspace = workspace
         let at = environment.clock.now()
         let prepared = try selected.capture(
