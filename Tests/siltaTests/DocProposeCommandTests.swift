@@ -28,6 +28,14 @@ struct DocProposeCommandTests {
         #expect(result.stderr.isEmpty)
         Golden.forTests().check(result.stdout, "doc-propose.json")
         if result.termination == .exit(0) {
+          let schema = try GuideContractTests.data(
+            SiltaBinary.run(["schema", "doc", "propose", "--json"], in: scratch))
+          let commands = try #require(schema["commands"] as? [[String: Any]])
+          let shape = try #require(commands.first?["data"])
+          #expect(
+            ShapeCheck.violations(
+              of: try GuideContractTests.data(result), against: shape
+            ).isEmpty)
           try store.read { (db: Database) throws in
             #expect(
               try String.fetchOne(db, sql: "SELECT body_md FROM doc_rev") == "Shared knowledge.")
