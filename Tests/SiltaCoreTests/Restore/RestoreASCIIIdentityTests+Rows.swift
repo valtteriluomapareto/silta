@@ -34,7 +34,7 @@ extension RestoreASCIIIdentityTests {
       let row = tree.sections[index].rows[0]
       tree.sections[index].rows[0] = row.replacing(field, with: value, keys: row.fields.map(\.key))
     } else {
-      RestoreDocumentGraphFixture.record(&tree.documents, 5, field, value)
+      RestoreDocumentGraphFixture.record(&tree.documents, field == "thread" ? 6 : 5, field, value)
     }
     let error = Self.failure {
       try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
