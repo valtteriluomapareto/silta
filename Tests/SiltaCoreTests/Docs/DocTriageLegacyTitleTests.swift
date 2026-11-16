@@ -24,13 +24,7 @@ struct DocTriageLegacyTitleTests {
       try store.read { (db: Database) throws in
         #expect(try Data.fetchOne(db, sql: "SELECT CAST(title AS BLOB) FROM doc_rev") == bytes)
         let current = try Data.fetchOne(db, sql: "SELECT CAST(title AS BLOB) FROM doc")
-        if embeddedNul {
-          withKnownIssue("Accepted legacy title retains complete bytes") {
-            #expect(current == bytes)
-          }
-        } else {
-          #expect(current == bytes)
-        }
+        #expect(current == bytes)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev") == 1)
       }
     }
