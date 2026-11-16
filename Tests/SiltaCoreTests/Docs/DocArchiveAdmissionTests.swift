@@ -6,6 +6,30 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct DocArchiveAdmissionTests {
+  @Test(arguments: ["proposed", "rejected", "missing"])
+  func invalidCurrentRevisionRefusesBeforeApproval(state: String) throws {
+    withKnownIssue("Archive refuses non-accepted or dangling current revisions.") {
+      try withScratchDirectory { home in
+        let store = try AcmeDocAttachments.make(in: home)
+        try AcmeDocAttachments.attach("rules", to: "service", in: store)
+        try store.write {
+          if state == "missing" {
+            try $0.database.execute(sql: "UPDATE doc SET current_rev=99")
+          } else {
+            try $0.database.execute(sql: "UPDATE doc_rev SET state=?", arguments: [state])
+          }
+        }
+        let before = try DocVerificationPreparationTests.truth(store)
+        var failure: (any CodedError)?
+        do { _ = try DocWritePolicyTests.service(home, store).archive("rules") } catch let error
+          as any CodedError
+        { failure = error }
+        #expect(failure?.code == .invalid)
+        #expect(try DocVerificationPreparationTests.truth(store) == before)
+      }
+    }
+  }
+
   @Test(arguments: [false, true])
   func neverAcceptedArchiveRefusesWithoutConsumingApproval(human: Bool) throws {
     try withScratchDirectory { home in
