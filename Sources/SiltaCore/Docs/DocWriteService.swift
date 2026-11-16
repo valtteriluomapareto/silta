@@ -102,20 +102,23 @@ package struct DocWriteService {
       if request.keepBody && (!baseline.accepted || baseline.body == nil) {
         throw DocError.missing(["-F", "--title", "--about"])
       }
+      let policy = policy(request, workspace: slug)
       if !baseline.accepted {
-        try checkIdentity("doc:" + request.slug, request: request, workspace: slug)
+        try policy.identity("doc:" + request.slug)
       }
       for ref in request.about ?? []
       where !baseline.accepted
         || !baseline.refs.contains(where: { $0.utf8.elementsEqual(ref.utf8) })
       {
-        try checkIdentity(ref.removingPercentEncoding ?? ref, request: request, workspace: slug)
+        try policy.identity(ref.removingPercentEncoding ?? ref)
       }
       var draft = DocDraft(slug: request.slug, body: "")
       draft.title = request.title
       draft.kind = request.kind
       draft.about = request.about
-      do { _ = try DocMetadata.resolve(draft, workspace: id, in: db) } catch DocError.missing(
+      do {
+        _ = try DocMetadata.resolve(draft, baseline: baseline, workspace: id, in: db)
+      } catch DocError.missing(
         let fields)
       {
         throw DocError.missing((!hasInput && !request.keepBody ? ["-F"] : []) + fields)
@@ -124,14 +127,13 @@ package struct DocWriteService {
         throw UsageError.usage(message: "Supply -F or --keep-body.", command: "silta doc edit")
       }
       var redacted = false
-      if let title = draft.title,
-        !baseline.accepted || !title.utf8.elementsEqual((baseline.title ?? "").utf8)
-      {
-        let checked = try checked(title, request: request, workspace: slug)
+      if let title = draft.title {
+        let checked = try policy.title(
+          title, keeping: baseline.accepted ? baseline.title : nil)
         draft.title = checked.0
         redacted = checked.1
       }
-      let metadata = try DocMetadata.resolve(draft, workspace: id, in: db)
+      let metadata = try DocMetadata.resolve(draft, baseline: baseline, workspace: id, in: db)
       return CapturedEdit(
         id: id, baseline: baseline, draft: draft,
         binding: try DocVerification.binding(metadata, workspace: id, in: db), redacted: redacted)
@@ -158,34 +160,15 @@ package struct DocWriteService {
     try DocInput.check(text)
     let unchanged = baseline.body.map { text.utf8.elementsEqual($0.utf8) } ?? false
     let value =
-      unchanged ? (text, false) : try checked(text, request: request, workspace: workspace)
+      unchanged ? (text, false) : try policy(request, workspace: workspace).checked(text)
     try DocInput.check(value.0)
     return value
   }
 
-  private func checkIdentity(_ text: String, request: DocEditRequest, workspace: String) throws {
-    if !request.allowSecret, !SecretGuard.matches(in: text).isEmpty {
-      throw secretFailure(text, request: request, workspace: workspace)
-    }
-  }
-
-  private func checked(_ text: String, request: DocEditRequest, workspace: String) throws -> (
-    String, Bool
-  ) {
-    guard !request.allowSecret, !SecretGuard.matches(in: text).isEmpty else { return (text, false) }
-    if environment.actor.isHuman {
-      throw secretFailure(text, request: request, workspace: workspace)
-    }
-    return (SecretGuard.redacted(text), true)
-  }
-
-  private func secretFailure(_ text: String, request: DocEditRequest, workspace: String)
-    -> any CodedError
-  {
-    let error = SecretError(command: command(request, workspace: workspace), text: text)
-    return safeScopeAndIdentity(request, workspace: workspace)
-      ? error
-      : CommandFailure(error: error, next: [readCommand(workspace: workspace)], nextBy: .agent)
+  private func policy(_ request: DocEditRequest, workspace: String) -> DocInputPolicy {
+    DocInputPolicy(
+      actor: environment.actor, allowSecret: request.allowSecret,
+      command: command(request, workspace: workspace))
   }
 
   func safeScopeAndIdentity(_ request: DocEditRequest, workspace: String?) -> Bool {

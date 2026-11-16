@@ -12,7 +12,7 @@ struct BriefDocGroup: Equatable, Sendable {
     if SecretGuard.matches(in: workspace).isEmpty {
       command =
         "silta --ws " + shellWord(workspace) + " doc ls"
-        + (Self.safe(ref) ? " --about " + shellWord(ref) : "")
+        + (DocService.safeReference(ref) ? " --about " + shellWord(ref) : "")
     } else {
       command = "silta ws ls"
     }
@@ -29,10 +29,7 @@ struct BriefDocGroup: Equatable, Sendable {
   }
 
   static func shown(_ ref: String) -> String {
-    TaskError.shown(safe(ref) ? ref : ref.removingPercentEncoding ?? ref)
+    TaskError.shown(DocService.safeReference(ref) ? ref : ref.removingPercentEncoding ?? ref)
   }
 
-  private static func safe(_ ref: String) -> Bool {
-    SecretGuard.matches(in: ref.removingPercentEncoding ?? ref).isEmpty
-  }
 }

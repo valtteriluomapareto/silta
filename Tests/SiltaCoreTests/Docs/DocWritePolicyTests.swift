@@ -369,29 +369,17 @@ extension DocWritePolicyTests {
       try store.write {
         try $0.database.execute(
           sql:
-            "UPDATE doc SET title=?,kind='legacy label'; UPDATE doc_rev SET title=?,kind='legacy label'",
+            "UPDATE doc SET title=?,kind='legacy label';"
+            + " UPDATE doc_rev SET title=?,kind='legacy label'",
           arguments: [title, title])
       }
       var request = DocEditRequest(slug: "rules", title: explicit ? title : nil)
-      var ref: String?
-      do {
-        let result = try await Self.write(
-          proposal, service: service, request: request, body: Self.secret)
-        ref = result.ref
-        #expect(result.warnings.isEmpty)
-      } catch let error as any CodedError { #expect(error.code == .invalid) }
-      if proposal {
-        #expect(ref == "doc:rules@2")
-      } else {
-        withKnownIssue("An accepted unchanged title is rejected as new metadata") {
-          #expect(ref == "doc:rules@2")
-        }
-      }
-      if ref != nil {
-        let row = try DocProposalServiceTests.row(store, revision: 2)
-        #expect((row["title"] as String).utf8.elementsEqual(title.utf8))
-        #expect(row["kind"] as String == "legacy label" && row["body_md"] as String == Self.secret)
-      }
+      let result = try await Self.write(
+        proposal, service: service, request: request, body: Self.secret)
+      #expect(result.ref == "doc:rules@2" && result.warnings.isEmpty)
+      let row = try DocProposalServiceTests.row(store, revision: 2)
+      #expect((row["title"] as String).utf8.elementsEqual(title.utf8))
+      #expect(row["kind"] as String == "legacy label" && row["body_md"] as String == Self.secret)
       request.title = title + " changed"
       await Self.refusal(.invalid) {
         _ = try await Self.write(proposal, service: service, request: request, body: "Safe")
@@ -489,7 +477,7 @@ extension DocWritePolicyTests {
       do {
         _ = try await Self.write(proposal, service: service, request: request, body: body)
       } catch let error as any CodedError { failure = error }
-      #expect(failure?.code == .invalid && failure?.message == DocSuppliedBodyTests.refusal)
+      #expect(failure?.code == .invalid && failure?.message == DocInputTests.refusal)
       #expect(git.requests.isEmpty)
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
