@@ -140,6 +140,36 @@ struct DocLineDiffTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func fallbackPreservesEveryChangedLineAndContext(contextual: Bool) async throws {
+    try await withScratchDirectory { home in
+      let prefix = contextual ? (1...8).map { "Prefix \($0)" } : []
+      let suffix = contextual ? (1...8).map { "Suffix \($0)" } : []
+      let removed = (1...1100).map { "Old \($0)" }
+      let added = (1...1100).map { "New \($0)" }
+      let store = try await fixture(
+        home, old: (prefix + removed + suffix).joined(separator: "\n"),
+        new: (prefix + added + suffix).joined(separator: "\n"))
+      let output = try store.read { db in
+        try DocDiff.render(
+          DocStore.revision("rules", revision: 2, workspace: 1, in: db),
+          base: DocStore.revision("rules", revision: 1, workspace: 1, in: db))
+      }
+      let lines = output.components(separatedBy: "\n")
+      #expect(
+        lines.filter { $0.hasPrefix("-") && !$0.hasPrefix("--- ") }
+          .map { String($0.dropFirst()) } == removed)
+      #expect(
+        lines.filter { $0.hasPrefix("+") && !$0.hasPrefix("+++ ") }
+          .map { String($0.dropFirst()) } == added)
+      #expect(output.contains(contextual ? "@@ -6,1106 +6,1106 @@" : "@@ -1,1100 +1,1100 @@"))
+      if contextual {
+        #expect(output.contains(" Prefix 6\n Prefix 7\n Prefix 8\n"))
+        #expect(output.contains(" Suffix 1\n Suffix 2\n Suffix 3\n"))
+      }
+    }
+  }
+
   private func fixture(_ home: URL, old: String, new: String) async throws -> DatabaseStore {
     let store = try AcmeDocAttachments.make(in: home)
     let writer = try DocWritePolicyTests.service(home, store)
