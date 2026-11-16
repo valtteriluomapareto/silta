@@ -186,7 +186,8 @@ struct DocProposalInboxTests {
             """, arguments: [utcTimestamp(AcmeDocAttachments.instant)])
       }
       let before = try DocVerificationPreparationTests.truth(store)
-      let result = try preview(store)
+      #expect(try preview(store).isEmpty)
+      let result = try preview(store, all: true)
       #expect(result.count == 1 && result.first?.total == 1)
       #expect(result.first?.members.map(\.ref) == ["doc:rules@2"])
       #expect(try DocVerificationPreparationTests.truth(store) == before)

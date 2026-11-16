@@ -45,15 +45,7 @@ struct DocStore {
         try WorkspaceConfig.json(metadata.refs), targets,
       ])
     let revisionID = db.lastInsertedRowID
-    try replaceAttachments(metadata.targets, doc: id, stamp: stamp)
-    try db.execute(
-      sql: """
-        UPDATE doc SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),current_rev=?,verified_at=?,
-          archived=0,updated_at=? WHERE id=?
-        """,
-      arguments: [
-        Data(metadata.title.utf8), Data(metadata.kind.utf8), number, verifiedAt, stamp, id,
-      ])
+    try updateCurrent(metadata, doc: id, revision: number, verifiedAt: verifiedAt, stamp: stamp)
     try db.execute(
       sql: """
         INSERT INTO doc_verification(uid,doc_rev_id,actor,message,app_shas,created_at)
@@ -65,6 +57,20 @@ struct DocStore {
       ])
     try transaction.recordChange(kind: "doc", rowID: id)
     return try Self.revision(draft.slug, revision: number, workspace: workspace, in: db)
+  }
+
+  func updateCurrent(
+    _ metadata: DocMetadata, doc: Int64, revision: Int, verifiedAt: String?, stamp: String
+  ) throws {
+    try replaceAttachments(metadata.targets, doc: doc, stamp: stamp)
+    try db.execute(
+      sql: """
+        UPDATE doc SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),current_rev=?,verified_at=?,
+          archived=0,updated_at=? WHERE id=?
+        """,
+      arguments: [
+        Data(metadata.title.utf8), Data(metadata.kind.utf8), revision, verifiedAt, stamp, doc,
+      ])
   }
 
   func archive(_ slug: String) throws -> Bool {

@@ -179,7 +179,7 @@ extension DocProposalInboxTests {
       }
       let before = try DocVerificationPreparationTests.truth(store)
       #expect(try queue.read { try $0.columns(in: "doc_rev").allSatisfy { $0.name != "title" } })
-      let group = try #require(try preview(store).first)
+      let group = try #require(try preview(store, all: true).first)
       #expect(group.total == 3 && group.omitted == 1 && group.members.count == 2)
       let member = try #require(group.members.first)
       #expect(member.title == "(unknown)" && member.kind == "(unknown)")
@@ -242,7 +242,7 @@ extension DocProposalInboxTests {
       try store.write {
         try $0.database.execute(sql: "UPDATE doc SET archived=1,slug=?", arguments: [slug])
       }
-      let group = try #require(try preview(store).first)
+      let group = try #require(try preview(store, all: true).first)
       #expect(group.total == 3 && group.omitted == 1)
       for command in [try #require(group.next), try #require(group.members.first?.read)] {
         let result = try replay(command, home)

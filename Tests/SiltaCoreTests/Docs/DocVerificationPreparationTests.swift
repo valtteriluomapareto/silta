@@ -83,8 +83,10 @@ struct DocVerificationPreparationTests {
         ]), workspace: 1, environment: Self.environment(home, store: store, git: git))
       #expect(
         prepared.snapshots == [
-          .init(app: "api", ref: "origin/api", sha: Self.apiSHA),
-          .init(app: "mobile", ref: "origin/mobile", sha: Self.mobileSHA),
+          .init(app: "api", ref: "origin/api", sha: Self.apiSHA, uid: "01HF7YAT01MMY3DNVCXJCY0XC5"),
+          .init(
+            app: "mobile", ref: "origin/mobile", sha: Self.mobileSHA,
+            uid: "01HF7YAT01Q6TG3MERAJXQ3002"),
         ])
       #expect(git.isExhausted && git.requests.count == 2)
       #expect(try Self.truth(store) == before)
@@ -103,7 +105,12 @@ struct DocVerificationPreparationTests {
         Self.draft([about]), workspace: 1,
         environment: Self.environment(home, store: store, git: git))
       #expect(
-        prepared.snapshots == (edge ? [.init(app: "api", ref: "origin/api", sha: Self.apiSHA)] : [])
+        prepared.snapshots
+          == (edge
+            ? [
+              .init(
+                app: "api", ref: "origin/api", sha: Self.apiSHA, uid: "01HF7YAT01MMY3DNVCXJCY0XC5")
+            ] : [])
       )
       #expect(git.requests.count == (edge ? 1 : 0) && git.isExhausted)
       #expect(try Self.truth(store) == before)
