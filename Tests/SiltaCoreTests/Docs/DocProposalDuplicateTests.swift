@@ -113,6 +113,36 @@ struct DocProposalDuplicateTests {
     }
   }
 
+  @Test(arguments: ["title", "kind"], [false, true])
+  func retainedMetadataSurvivesProposalAndItsRepeatRefuses(field: String, embeddedNul: Bool) throws
+  {
+    try withScratchDirectory { home in
+      let (store, service) = try Self.setup(home, accepted: true)
+      let value =
+        (field == "title" ? "Rules" : "runbook")
+        + (embeddedNul ? "\u{0}retained" : " retained")
+      let bytes = Data(value.utf8)
+      try store.write {
+        try $0.database.execute(
+          sql:
+            "UPDATE doc SET \(field)=CAST(? AS TEXT); UPDATE doc_rev SET \(field)=CAST(? AS TEXT)",
+          arguments: [bytes, bytes])
+      }
+      let request = DocProposalRequest(slug: "rules", why: "Share knowledge.")
+      let body = "Proposed knowledge."
+      let first = try service.propose(request, input: { body })
+      let pending = try store.read {
+        try Data.fetchOne($0, sql: "SELECT CAST(\(field) AS BLOB) FROM doc_rev WHERE rev=2")
+      }
+      try withKnownIssue {
+        #expect(pending == bytes)
+        try Self.refuse(service, request: request, body: body, existing: first.ref)
+      } when: {
+        embeddedNul
+      }
+    }
+  }
+
   @Test func changedKindIsMeaningfulAgainstHistoricalBase() throws {
     try withScratchDirectory { home in
       let (store, service) = try Self.setup(home, accepted: true)
