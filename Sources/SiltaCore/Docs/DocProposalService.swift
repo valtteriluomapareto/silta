@@ -25,6 +25,9 @@ package struct DocProposalService {
       guard missing.isEmpty, let input else { throw DocError.missing(missing) }
       let supplied = try input()
       try DocInput.check(supplied)
+      guard !supplied.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        throw DocError.invalid("A proposal body must not be blank.")
+      }
       if !FileManager.default.fileExists(atPath: environment.db.path) {
         _ = try WorkspaceSelection.resolve(
           workspace, in: environment.db, prepared: environment.workspaceSelection)

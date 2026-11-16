@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"A proposal body must not be blank.","next":["silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --title <title> --about <ref>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

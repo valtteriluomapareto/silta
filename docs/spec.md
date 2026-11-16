@@ -1002,11 +1002,16 @@ source, or a half-recorded decision pair, is corrupt. These reads do not infer a
 from current claims or invoke Git, verification or writes. Complete why text is masked
 before indentation and the existing rendered-line bounds, without a preview limit.
 
-`doc ls [--about <canonical-map-ref>] [--archived] [--offset N] [--limit N]`
+`doc ls [--about <map-ref>] [--archived] [--offset N] [--limit N]`
 lists current accepted and individual pending revisions, ordered by slug then revision.
 The default page has 20 entries, with a maximum of 100. Accepted entries match current
 live attachments; pending entries match only their stored target kind and UID. Archived documents require `--archived` in lists, but explicit reads
 remain available. Unknown snapshot attachments stay unknown.
+Topic aliases follow brief normalization and canonical-slug precedence in this workspace.
+New metadata stores canonical refs once per resolved target; aliases never duplicate an
+attachment. Historical snapshots stay literal. List continuations use canonical refs.
+A bare app remains invalid typed input, with a safe typed-app read suggestion when it exists.
+A missing pinned revision recovers through an archived-inclusive list so history is reachable.
 
 Reads mask secrets before rendering, clipping or line selection. Show defaults to at
 most 400 rendered lines including its continuation. List title and metadata previews
@@ -1122,6 +1127,8 @@ measurements remain deferred.
   Omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
   database-dependent selection, defaults and validation; insertion uses one write
   and never runs Git.
+  Empty or whitespace-only supplied proposal bodies refuse with `invalid` before database
+  selection or allocation. This does not change accepted-edit empty-body behavior.
   Final body and metadata identical to the selected accepted base, or to a pending
   revision with the same base, refuse with `conflict` and a read of the existing
   immutable ref before any allocation or change. Attachment equality uses UID sets;
@@ -1429,7 +1436,8 @@ attribution. Live continuation behavior remains unverified; follow the
 The full agent manual, printed by the binary and versioned with it. The installed
 skill points at it instead of copying it, and Codex's block does the same, so every
 harness reads the rules the binary ships. `silta guide <topic>` prints one
-section. Topics are `when`, `start`, `recipes`, `docs`, `human`, `questions`, `blocked`,
+section. The default manual summarizes document decisions and points to `guide docs`;
+that topic carries the executable document recipes. Topics are `when`, `start`, `recipes`, `docs`, `human`, `questions`, `blocked`,
 `handoff`, `reviews`, `refusals`, `refs` and `output`, also listed in `guide --help`.
 Topic names match exactly (case-sensitive). An unknown topic returns `invalid`,
 naming the rejected topic and valid topics, with `next: silta guide --help`.
