@@ -32,17 +32,12 @@ extension DocWritePolicyTests {
         })
       var request = DocEditRequest(slug: "rules")
       request.keepBody = true
-      var refused = false
-      do {
+      await Self.refusal(.conflict) {
         _ = try await Self.service(home, store, git: git).edit(request, input: nil)
-      } catch let error as any CodedError {
-        #expect(error.code == .conflict)
-        refused = error.code == .conflict
       }
       #expect(git.isExhausted && committed.withLock { !$0.isEmpty })
       #expect(try Self.baselineBytes(store) == changed)
       let after = try DocVerificationPreparationTests.truth(store)
-      #expect(refused)
       #expect(after == committed.withLock { $0 })
     }
   }
@@ -57,15 +52,10 @@ extension DocWritePolicyTests {
       let before = try DocVerificationPreparationTests.truth(store)
       var request = DocEditRequest(slug: "rules")
       request.keepBody = true
-      var failure: StorageError?
-      do {
+      await #expect(throws: StorageError.corrupt) {
         _ = try await Self.service(home, store).edit(request, input: nil)
-      } catch let error as StorageError {
-        #expect(error == .corrupt)
-        failure = error
       }
       let after = try DocVerificationPreparationTests.truth(store)
-      #expect(failure == .corrupt)
       #expect(after == before)
       #expect(try Self.baselineBytes(store) == invalid)
     }

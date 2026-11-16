@@ -6,9 +6,7 @@ struct DocEditBaseline: Equatable {
   let literalFields: [Data]
   let identities: [String?]
   let archived: Bool
-  let rowRevision: Int?
   let state: String?
-  let documentExists: Bool
   let accepted: Bool
   let body: String?
   let title: String?
@@ -18,10 +16,7 @@ struct DocEditBaseline: Equatable {
 
   static func == (lhs: Self, rhs: Self) -> Bool {
     guard lhs.literalFields == rhs.literalFields, lhs.identities == rhs.identities,
-      lhs.archived == rhs.archived, lhs.rowRevision == rhs.rowRevision, lhs.state == rhs.state,
-      lhs.documentExists == rhs.documentExists, lhs.accepted == rhs.accepted,
-      lhs.revision == rhs.revision, lhs.title == rhs.title, lhs.kind == rhs.kind,
-      lhs.refs == rhs.refs
+      lhs.archived == rhs.archived, lhs.state == rhs.state, lhs.revision == rhs.revision
     else { return false }
     switch (lhs.body, rhs.body) {
     case (nil, nil): return true
@@ -39,7 +34,7 @@ struct DocEditBaseline: Equatable {
       sql: """
         SELECT d.id,d.uid,d.current_rev,d.archived,CAST(d.title AS BLOB) AS title,
           CAST(d.kind AS BLOB) AS kind,r.uid AS revision_uid,
-          r.rev,r.state,CASE WHEN ? OR length(CAST(r.body_md AS BLOB))<=?
+          r.state,CASE WHEN ? OR length(CAST(r.body_md AS BLOB))<=?
             THEN CAST(r.body_md AS BLOB) END AS body
         FROM doc d LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
         WHERE d.workspace_id=? AND d.slug=?
@@ -47,12 +42,11 @@ struct DocEditBaseline: Equatable {
     defer { withExtendedLifetime(cursor) {} }
     guard let row = try cursor.next() else {
       return Self(
-        literalFields: [], identities: [workspaceUID], archived: false, rowRevision: nil,
-        state: nil, documentExists: false, accepted: false, body: nil, title: nil, kind: nil,
+        literalFields: [], identities: [workspaceUID], archived: false,
+        state: nil, accepted: false, body: nil, title: nil, kind: nil,
         revision: nil, refs: [])
     }
     let pointer: Int? = row["current_rev"]
-    let revision: Int? = row["rev"]
     let archived: Bool = row["archived"]
     let bodyBytes: Data? = row["body"]
     let body = try bodyBytes.map(text)
@@ -77,7 +71,7 @@ struct DocEditBaseline: Equatable {
     }
     return Self(
       literalFields: literalFields, identities: identities, archived: archived,
-      rowRevision: revision, state: state, documentExists: true, accepted: state == "accepted",
+      state: state, accepted: state == "accepted",
       body: body, title: title, kind: kind, revision: pointer, refs: refs)
   }
 
