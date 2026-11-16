@@ -78,12 +78,8 @@ package struct DocProposalService {
     if baseline.revision != nil && !baseline.accepted { throw StorageError.corrupt }
     let why = try requiredWhy(request, accepted: baseline.accepted)
     if !baseline.accepted { try policy.identity("doc:" + request.slug) }
-    for ref in request.about ?? []
-    where !baseline.accepted
-      || !baseline.refs.contains(where: { $0.utf8.elementsEqual(ref.utf8) })
-    {
-      try policy.identity(ref.removingPercentEncoding ?? ref)
-    }
+    let retainedRefs = baseline.accepted ? baseline.refs : []
+    try policy.identities(request.about ?? [], keeping: retainedRefs)
     var safe = request
     var redacted = false
     if let title = request.title {
@@ -96,6 +92,7 @@ package struct DocProposalService {
     draft.about = safe.about
     let metadata = try DocMetadata.resolve(
       draft, baseline: baseline, workspace: id, in: db)
+    try policy.identities(metadata.refs, keeping: retainedRefs)
     let reason = try policy.checked(why)
     let base = try acceptedBase(request, baseline: baseline, workspace: id, in: db)
     return try Prepared(

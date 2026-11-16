@@ -9,30 +9,26 @@ import Testing
 struct DocAliasBoundaryTests {
   @Test(arguments: ["canonical", "alias"], [false, true])
   func nulSuffixNeverSelectsThePrefix(kind: String, exact: Bool) async throws {
-    await withKnownIssue(
-      "Topic aliases preserve complete lookup bytes and canonical identity policy."
-    ) {
-      try await withScratchDirectory { home in
-        let store = try fixture(home)
-        try AcmeDocAttachments.attach("rules", to: "topic", in: store)
-        let value = (kind == "canonical" ? "messaging" : "CHECKOUT") + "\u{0}tail"
-        if exact { try fullAlias(WorkspaceConfig.normalize(value), in: store) }
-        let before = try DocVerificationPreparationTests.truth(store)
-        let environment = try DocTriageServiceTests.environment(home, store)
-        try checkReads("topic:" + value, exact: exact, store: store)
-        #expect(try DocVerificationPreparationTests.truth(store) == before)
-        for operation in ["propose", "edit"] {
-          var failure: (any CodedError)?
-          do {
-            _ = try await invoke(operation, about: "topic:" + value, environment: environment)
-          } catch let error as any CodedError { failure = error }
-          if exact {
-            #expect(failure == nil)
-            #expect(try targetUID("candidate-" + operation, store: store) == "full-alias")
-          } else {
-            #expect(failure?.code == .notFound)
-            #expect(try DocVerificationPreparationTests.truth(store) == before)
-          }
+    try await withScratchDirectory { home in
+      let store = try fixture(home)
+      try AcmeDocAttachments.attach("rules", to: "topic", in: store)
+      let value = (kind == "canonical" ? "messaging" : "CHECKOUT") + "\u{0}tail"
+      if exact { try fullAlias(WorkspaceConfig.normalize(value), in: store) }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let environment = try DocTriageServiceTests.environment(home, store)
+      try checkReads("topic:" + value, exact: exact, store: store)
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+      for operation in ["propose", "edit"] {
+        var failure: (any CodedError)?
+        do {
+          _ = try await invoke(operation, about: "topic:" + value, environment: environment)
+        } catch let error as any CodedError { failure = error }
+        if exact {
+          #expect(failure == nil)
+          #expect(try targetUID("candidate-" + operation, store: store) == "full-alias")
+        } else {
+          #expect(failure?.code == .notFound)
+          #expect(try DocVerificationPreparationTests.truth(store) == before)
         }
       }
     }
@@ -40,27 +36,23 @@ struct DocAliasBoundaryTests {
 
   @Test(arguments: ["propose", "edit"])
   func canonicalAndAliasShareIdentityAdmission(operation: String) async throws {
-    await withKnownIssue(
-      "Topic aliases preserve complete lookup bytes and canonical identity policy."
-    ) {
-      try await withScratchDirectory { home in
-        let store = try fixture(home)
-        let sensitive = "AKIA" + String(repeating: "A", count: 16)
-        try store.write {
-          try $0.database.execute(sql: "UPDATE topic SET slug=?", arguments: [sensitive])
-        }
-        let before = try DocVerificationPreparationTests.truth(store)
-        let environment = try DocTriageServiceTests.environment(home, store)
-        for about in ["topic:" + sensitive, "topic:checkout"] {
-          var failure: (any CodedError)?
-          do { _ = try await invoke(operation, about: about, environment: environment) } catch let
-            error as any CodedError
-          { failure = error }
-          #expect(
-            failure?.code == .invalid
-              && failure?.message.hasPrefix("Secret content detected:") == true)
-          #expect(try DocVerificationPreparationTests.truth(store) == before)
-        }
+    try await withScratchDirectory { home in
+      let store = try fixture(home)
+      let sensitive = "AKIA" + String(repeating: "A", count: 16)
+      try store.write {
+        try $0.database.execute(sql: "UPDATE topic SET slug=?", arguments: [sensitive])
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let environment = try DocTriageServiceTests.environment(home, store)
+      for about in ["topic:" + sensitive, "topic:checkout"] {
+        var failure: (any CodedError)?
+        do { _ = try await invoke(operation, about: about, environment: environment) } catch let
+          error as any CodedError
+        { failure = error }
+        #expect(
+          failure?.code == .invalid
+            && failure?.message.hasPrefix("Secret content detected:") == true)
+        #expect(try DocVerificationPreparationTests.truth(store) == before)
       }
     }
   }
@@ -75,17 +67,21 @@ struct DocAliasBoundaryTests {
       let editor = try DocWritePolicyTests.service(home, store, human: true, approved: nil)
       let request = DocEditRequest(
         slug: "rules", title: "Rules", about: ["topic:checkout"], allowSecret: true)
-      _ = try await editor.edit(request, input: { "Password=private123" })
-      var keep = DocEditRequest(slug: "rules")
-      keep.keepBody = true
-      _ = try await editor.edit(keep, input: nil)
-      _ = try DocProposalService(environment: editor.environment, workspace: "acme").propose(
-        DocProposalRequest(slug: "rules", why: "Clarify the rule."),
-        input: { "New safe Acme rule." })
-      #expect(
-        try store.read {
-          try Data.fetchOne($0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE rev=2")
-        } == Data("Password=private123".utf8))
+      var failure: (any CodedError)?
+      do {
+        _ = try await editor.edit(request, input: { "Password=private123" })
+        var keep = DocEditRequest(slug: "rules")
+        keep.keepBody = true
+        _ = try await editor.edit(keep, input: nil)
+        _ = try DocProposalService(environment: editor.environment, workspace: "acme").propose(
+          DocProposalRequest(slug: "rules", why: "Clarify the rule."),
+          input: { "New safe Acme rule." })
+        #expect(
+          try store.read {
+            try Data.fetchOne($0, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev WHERE rev=2")
+          } == Data("Password=private123".utf8))
+      } catch let error as any CodedError { failure = error }
+      #expect(failure == nil)
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM doc_rev") } == 3)
     }
   }

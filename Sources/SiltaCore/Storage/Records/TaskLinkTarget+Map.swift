@@ -39,14 +39,17 @@ extension TaskLinkTarget {
   }
 
   private static func topic(_ value: String, workspace: Int64, in db: Database) throws -> Self {
+    let raw = Data(value.utf8)
+    let alias = Data(WorkspaceConfig.normalize(value).utf8)
     guard
       let id = try Int64.fetchOne(
         db,
         sql: """
           SELECT topic.id FROM topic LEFT JOIN topic_alias ON topic_alias.topic_id=topic.id
-          WHERE topic.workspace_id=? AND (topic.slug=? OR topic_alias.alias=?)
-          ORDER BY (topic.slug=?) DESC,topic.slug LIMIT 1
-          """, arguments: [workspace, value, WorkspaceConfig.normalize(value), value])
+          WHERE topic.workspace_id=? AND (topic.slug=CAST(? AS TEXT)
+            OR topic_alias.alias=CAST(? AS TEXT))
+          ORDER BY (topic.slug=CAST(? AS TEXT)) DESC,topic.slug LIMIT 1
+          """, arguments: [workspace, raw, alias, raw])
     else { throw TaskError.notFound("topic " + value) }
     return Self(kind: "topic", id: id)
   }
