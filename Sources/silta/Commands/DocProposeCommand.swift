@@ -27,7 +27,8 @@ struct DocProposeCommand: OutputCommand {
   var title: String?
   @Option(help: "Canonical map ref; repeat to replace the complete set; required for a new doc.")
   var about: [String] = []
-  @Option(help: "Accepted owned revision used as the proposal's baseline.") var base: String?
+  @Option(help: "Accepted baseline revision number or doc:slug@revision for this doc.")
+  var base: String?
   @Option(help: "Owned source task; otherwise use the session's sole live claim.") var task: String?
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {

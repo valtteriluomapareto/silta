@@ -1108,7 +1108,12 @@ measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
-  omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
+  the target is a bare slug or `doc:slug`, without a revision. A well-formed pinned
+  target refuses with a corrected unpinned retry; malformed targets use discovery.
+  `--base` accepts a positive revision number or canonical `doc:slug@revision`
+  naming an accepted revision of this same owned doc in the selected workspace.
+  Omission selects the current accepted revision; older accepted bases remain valid.
+  Omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
   database-dependent selection, defaults and validation; insertion uses one write
   and never runs Git.
   Final body and metadata identical to the selected accepted base, or to a pending

@@ -24,7 +24,15 @@ extension DocProposalService {
     }
     var fields: [String] = []
     if case .missing(let missing) = error as? DocError { fields = missing }
-    let scopedRetry = workspaceCommand(retryCommand(request, fields: fields), workspace: workspace)
+    var retry = request
+    if !WorkspaceConfig.isValidIdentifier(request.slug) {
+      guard let ref = try? DocTriage.selection("doc:" + request.slug) else {  // Use discovery.
+        return CommandFailure(error: error, next: [hub], nextBy: .agent, message: message)
+      }
+      retry.slug = ref.0
+      fields += ["--title", "--about"]
+    }
+    let scopedRetry = workspaceCommand(retryCommand(retry, fields: fields), workspace: workspace)
     let next: [String]
     let owner: NextBy
     if let preparation = error as? CommandFailure {

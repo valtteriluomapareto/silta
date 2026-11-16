@@ -67,6 +67,9 @@ package struct DocProposalService {
   private func capture(
     _ request: DocProposalRequest, workspace: String, at: Date, in db: Database
   ) throws -> Prepared {
+    guard WorkspaceConfig.isValidIdentifier(request.slug) else {
+      throw DocError.invalid("Use an identifier for the doc slug.")
+    }
     let id = try TaskService.workspaceID(workspace, in: db)
     let baseline = try DocEditBaseline.read(request.slug, workspace: id, keepBody: false, in: db)
     if baseline.revision != nil && !baseline.accepted { throw StorageError.corrupt }
@@ -91,12 +94,27 @@ package struct DocProposalService {
     let metadata = try DocMetadata.resolve(
       draft, baseline: baseline, workspace: id, in: db)
     let reason = try policy.checked(why)
+    let base = try acceptedBase(request, baseline: baseline, workspace: id, in: db)
+    return try Prepared(
+      id: id, baseline: baseline, metadata: metadata, base: base,
+      source: source(request, workspace: workspace, id: id, at: at, in: db),
+      why: reason.0, redacted: redacted || reason.1)
+  }
+
+  private func acceptedBase(
+    _ request: DocProposalRequest, baseline: DocEditBaseline, workspace id: Int64, in db: Database
+  ) throws -> Int? {
     let base: Int?
     if let supplied = request.base {
-      guard let number = Int(supplied), number > 0 else {
-        throw DocError.invalid("--base must be a positive revision.")
+      if let number = Int(supplied), number > 0 {
+        base = number
+      } else {
+        let (slug, number) = try DocTriage.selection(supplied)
+        guard slug == request.slug else {
+          throw DocError.invalid("--base must name an accepted revision of this doc.")
+        }
+        base = number
       }
-      base = number
     } else {
       base = baseline.accepted ? baseline.revision : nil
     }
@@ -113,10 +131,7 @@ package struct DocProposalService {
         throw DocError.invalid("--base must name an accepted revision of this doc.")
       }
     }
-    return try Prepared(
-      id: id, baseline: baseline, metadata: metadata, base: base,
-      source: source(request, workspace: workspace, id: id, at: at, in: db),
-      why: reason.0, redacted: redacted || reason.1)
+    return base
   }
 
   private func requiredWhy(_ request: DocProposalRequest, accepted: Bool) throws
