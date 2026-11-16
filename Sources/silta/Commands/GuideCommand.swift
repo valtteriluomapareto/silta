@@ -130,10 +130,10 @@ extension GuideCommand {
         Submit lasting knowledge with doc propose; submissions remain pending, even from a human.
         Usually propose nothing; never more than two task and document proposals per session.
         Read the returned immutable ref and its recorded-base diff before handing it off.
-        Read pinned proposals and ask for one approval before running
-        doc triage --reject <refs>. The whole batch succeeds or writes nothing.
-        Reject stale or orphaned proposals; use approved doc edit for accepted knowledge.
-        The human inbox currently shows read commands; name rejections explicitly in chat.
+        Read pinned diffs and check the code. Recommend existing refs in one chat message,
+        then run doc triage --accept <refs> --reject <refs> with the human's exact approval.
+        Acceptances need current bases and one per doc; rejections may be stale or orphaned.
+        The human inbox currently shows read commands; name decisions explicitly in chat.
         With no human present, record map gaps as `Map gap:` in your handoff or result;
         never create a task or file for a map gap.
 

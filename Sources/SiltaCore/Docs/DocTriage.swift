@@ -1,11 +1,18 @@
-/// Explicit immutable proposal rejections, applied as one human-owned batch.
+/// Explicit immutable proposal decisions, applied as one human-owned batch.
 package struct DocTriage: Sendable {
+  package let accept: [String]
   package let reject: [String]
 
-  package init(reject: [String]) { self.reject = reject }
+  package init(accept: [String] = [], reject: [String]) {
+    self.accept = accept
+    self.reject = reject
+  }
+
+  var refs: [String] { accept + reject }
 
   var command: String {
-    "silta doc triage" + reject.map { " --reject " + shellWord($0) }.joined()
+    "silta doc triage" + accept.map { " --accept " + shellWord($0) }.joined()
+      + reject.map { " --reject " + shellWord($0) }.joined()
   }
 
   static func selection(_ ref: String) throws -> (String, Int) {

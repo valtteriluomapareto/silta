@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Rejects existing proposals atomically without reading their retained content or running Git.
+/// Decides existing proposals atomically; accepting content prepares Git outside the write lock.
 package struct DocTriageService {
   let environment: SiltaEnvironment
   var workspace: String?
@@ -19,7 +19,7 @@ package struct DocTriageService {
       approval = try environment.actor.requireHuman(command: command(batch), approved: approved)
     } catch let error as ActorError {
       let safe =
-        batch.reject.allSatisfy(DocService.safeReference)
+        batch.refs.allSatisfy(DocService.safeReference)
         && (workspace.map { SecretGuard.matches(in: $0).isEmpty } ?? true)
       throw CommandFailure(
         error: error,
@@ -27,17 +27,17 @@ package struct DocTriageService {
         nextBy: safe ? .human : .agent)
     }
     do {
-      guard !batch.reject.isEmpty, Set(batch.reject).count == batch.reject.count else {
-        throw DocError.invalid("Choose each proposal exactly once with --reject.")
+      guard !batch.refs.isEmpty, Set(batch.refs).count == batch.refs.count else {
+        throw DocError.invalid("Choose each proposal exactly once with --accept or --reject.")
       }
-      for ref in batch.reject { _ = try DocTriage.selection(ref) }
+      for ref in batch.refs { _ = try DocTriage.selection(ref) }
     } catch let error as DocError {
       throw CommandFailure(error: error, next: ["silta doc triage --help"], nextBy: .agent)
     }
     return approval
   }
 
-  package func triage(_ batch: DocTriage) throws -> DocTriageResult {
+  private func reject(_ batch: DocTriage) throws -> DocTriageResult {
     let approval = try authorize(batch)
     if !FileManager.default.fileExists(atPath: environment.db.path) {
       _ = try WorkspaceSelection.resolve(
@@ -96,10 +96,21 @@ package struct DocTriageService {
         nextBy: safe ? selection.nextBy : .agent, message: SecretGuard.redacted(selection.message))
     }
     let read = (selected ?? workspace).map { DocService(workspace: $0, store: environment.db) }
+    var next = read.map { read in batch.refs.map { read.showCommand($0) } } ?? [hub]
+    if let read, !batch.accept.isEmpty, [.conflict, .staleRev].contains(error.code) {
+      next += batch.accept.map { ref in
+        guard let selected = try? DocTriage.selection(ref),  // Invalid refs use the read hub.
+          read.scopeIsSafe, DocService.safeReference(ref)
+        else { return hub }
+        return workspaceCommand(
+          "silta doc propose " + shellWord("doc:" + selected.0)
+            + " -F <file> -m <why> --base <rev> --title <title> --about <ref>",
+          workspace: read.workspace)
+      }
+    }
     return CommandFailure(
-      error: error,
-      next: read.map { read in batch.reject.map { read.showCommand($0) } } ?? [hub],
-      nextBy: .agent, message: SecretGuard.redacted(error.message))
+      error: error, next: next, nextBy: .agent,
+      message: SecretGuard.redacted(error.message))
   }
 
   private var hub: String {
@@ -107,9 +118,104 @@ package struct DocTriageService {
   }
 
   private func command(_ batch: DocTriage) -> String {
-    guard batch.reject.allSatisfy(DocService.safeReference),
+    guard batch.refs.allSatisfy(DocService.safeReference),
       workspace.map({ SecretGuard.matches(in: $0).isEmpty }) ?? true
     else { return hub }
     return workspace.map { workspaceCommand(batch.command, workspace: $0) } ?? batch.command
+  }
+}
+
+extension DocTriageService {
+  package func triage(_ batch: DocTriage) async throws -> DocTriageResult {
+    if batch.accept.isEmpty { return try reject(batch) }
+    let approval = try authorize(batch)
+    var selected = self
+    do {
+      selected.workspace = try WorkspaceSelection.resolve(
+        workspace, in: environment.db,
+        prepared: environment.workspaceSelection)
+      let captured = try environment.db.read { try selected.members(batch, in: $0) }
+      var evidence: [DocVerification] = []
+      for member in captured {
+        if let binding = member.binding {
+          evidence.append(try await DocVerification.prepare(binding, environment: environment))
+        }
+      }
+      return try selected.accept(
+        batch, captured: captured, evidence: evidence,
+        approval: approval, originalWorkspace: workspace)
+    } catch let error as any CodedError {
+      throw selected.recovery(error, batch: batch, selected: selected.workspace)
+    }
+  }
+
+  private func members(_ batch: DocTriage, in db: Database) throws -> [DocTriageMember] {
+    let slug = try WorkspaceSelection.resolve(
+      workspace, in: db,
+      prepared: environment.workspaceSelection)
+    let id = try TaskService.workspaceID(slug, in: db)
+    var accepted: Set<Int64> = []
+    return try batch.refs.enumerated().map { index, ref in
+      let member = try DocTriageMember.read(
+        ref, accept: index < batch.accept.count,
+        workspace: id, in: db)
+      if member.binding != nil, !accepted.insert(member.raw["doc_id"]).inserted {
+        throw DocError.overlap(batch.accept)
+      }
+      return member
+    }
+  }
+
+  private func accept(
+    _ batch: DocTriage, captured: [DocTriageMember],
+    evidence: [DocVerification], approval: HumanApproval?, originalWorkspace: String?
+  )
+    throws -> DocTriageResult
+  {
+    guard let workspace else { throw StorageError.internalMisuse }
+    let at = environment.clock.now()
+    return try environment.db.write { tx in
+      let current: [DocTriageMember]
+      do {
+        guard
+          try WorkspaceSelection.resolve(
+            originalWorkspace, in: tx.database,
+            prepared: environment.workspaceSelection
+          ).utf8.elementsEqual(workspace.utf8)
+        else {
+          throw DocError.changed(workspace: workspace)
+        }
+        current = try members(batch, in: tx.database)
+      } catch let error as any CodedError
+        where ![.env, .busy].contains(error.code)
+      {
+        throw DocError.changed(workspace: workspace)
+      }
+      guard zip(current, captured).allSatisfy({ $0.same(as: $1) }),
+        zip(evidence, current.compactMap(\.binding)).allSatisfy({ $0.matches($1) })
+      else { throw DocError.changed(workspace: workspace) }
+      let id = try TaskService.workspaceID(workspace, in: tx.database)
+      let store = DocStore(
+        workspace: id, transaction: tx, actor: environment.actor,
+        ids: environment.ids, at: at)
+      for (index, member) in current.enumerated() {
+        if index < batch.accept.count {
+          try store.acceptProposal(member, verification: evidence[index])
+        } else {
+          try store.reject(member.raw)
+        }
+      }
+      try approval?.record(
+        command: SecretGuard.redacted(workspaceCommand(batch.command, workspace: workspace)),
+        workspace: workspace, identity: (environment.ids, at), in: tx)
+      return DocTriageResult(
+        docs: current.map {
+          DocDecision(
+            ref: SecretGuard.redacted($0.ref),
+            state: $0.binding == nil ? "rejected" : "accepted")
+        }, workspace: workspace,
+        warnings: environment.actor.approvalWarnings(approved, used: approval != nil),
+        approvalUsed: approval != nil)
+    }
   }
 }

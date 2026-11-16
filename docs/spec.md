@@ -1099,8 +1099,7 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-read commands; rejections name explicit immutable proposal refs. Acceptance and mixed batches
-remain planned. Doc-specific review
+read commands; decisions name explicit immutable proposal refs. Doc-specific review
 measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
@@ -1126,12 +1125,17 @@ measurements remain deferred.
   JSON data is `{docs:[{ref,state}]}` with state `rejected`; text prints refs and
   states, quiet only refs. Operational backup and workspace discovery retain their
   safe recovery and ownership.
-- **Planned acceptance and mixed review:** acceptances require the pre-batch current
+- **Acceptance and mixed review:** acceptances require the pre-batch current
   base and at most one acceptance per doc. Rejections may be stale and several may
   accompany an accepted replacement. Acceptance follows recorded target UIDs through
   renames and refuses replaced or unknown identities. Git runs outside the write;
   all immutable members, accepted baselines, sources and bindings are rechecked before
   any write. Decisions reuse existing revisions without changing original content.
+  Run `doc triage --accept <refs> --reject <refs>` only after the human's exact
+  approval. Acceptances retain admitted legacy title and content bytes and reuse
+  the existing revision. Their terminal state is `accepted`; mixed receipts list
+  all selected decisions. Reject-only batches retain the single-transaction cleanup
+  path above. Operational backup and workspace recovery keep their category and owner.
   A stale proposal is inspected and reproposed with supplied text and an explicit
   base. There is no accept/reject subcommand, rebase flag or editor merge flow.
 - **Map gaps:** with no human present, record `Map gap:` in a handoff or result,

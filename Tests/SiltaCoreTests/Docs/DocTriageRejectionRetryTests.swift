@@ -9,8 +9,8 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocTriageRejectionRetryTests {
   @Test(arguments: ["current", "explicit", "prepared", "uid"])
-  func retryNeverRetargetsTheSameRefInAnotherWorkspace(mode: String) throws {
-    try withScratchDirectory { home in
+  func retryNeverRetargetsTheSameRefInAnotherWorkspace(mode: String) async throws {
+    try await withScratchDirectory { home in
       let (base, ref) = try Self.mirror(home)
       let seed = base.db
       let expected = Mutex<[[String]]?>(nil)
@@ -38,7 +38,7 @@ struct DocTriageRejectionRetryTests {
       if mode == "prepared" { env.workspaceSelection = .success("acme") }
       var failure: (any CodedError)?
       do {
-        _ = try DocTriageService(
+        _ = try await DocTriageService(
           environment: env,
           workspace: mode == "explicit" || mode == "uid" ? "acme" : nil, approved: "Reject rules"
         )
@@ -88,8 +88,8 @@ struct DocTriageRejectionRetryTests {
   }
 
   @Test(arguments: ["unsafe-scope", "initial-uid", "approval", "change_log"])
-  func auditDiagnosticsAndLateFailureKeepTheirContracts(mode: String) throws {
-    try withScratchDirectory { home in
+  func auditDiagnosticsAndLateFailureKeepTheirContracts(mode: String) async throws {
+    try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let env = try DocTriageServiceTests.environment(home, store)
       let ref = try DocTriageServiceTests.propose(env, about: "service:push")
@@ -109,7 +109,7 @@ struct DocTriageRejectionRetryTests {
       let before = try DocVerificationPreparationTests.truth(store)
       var failure: (any CodedError)?
       do {
-        _ = try DocTriageService(environment: env, workspace: scope, approved: "Reject rules")
+        _ = try await DocTriageService(environment: env, workspace: scope, approved: "Reject rules")
           .triage(DocTriage(reject: [ref]))
       } catch let error as any CodedError { failure = error }
       if mode == "unsafe-scope" {

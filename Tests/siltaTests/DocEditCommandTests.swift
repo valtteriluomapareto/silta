@@ -228,7 +228,7 @@ struct DocEditCommandTests {
         in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
       #expect(
         try Self.error(result)["code"] as? String
-          == (selectors.contains("--accept") ? "usage" : "invalid"))
+          == "invalid")
       #expect(try Data(contentsOf: trace).isEmpty)
     }
   }

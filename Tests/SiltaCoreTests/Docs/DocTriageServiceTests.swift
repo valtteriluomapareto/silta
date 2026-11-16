@@ -24,8 +24,8 @@ struct DocTriageServiceTests {
   }
 
   @Test(arguments: [false, true])
-  func rejectedHistoryNeedsNoLiveMetadataSourceTargetOrBodyAdmission(human: Bool) throws {
-    try withScratchDirectory { home in
+  func rejectedHistoryNeedsNoLiveMetadataSourceTargetOrBodyAdmission(human: Bool) async throws {
+    try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let env = try Self.environment(home, store, human: human)
       try DocProposalServiceTests.task(store, seq: 1, actor: env.actor.description)
@@ -43,7 +43,7 @@ struct DocTriageServiceTests {
       }
       try AcmeDocAttachments.apply(AcmeDocAttachments.yaml(removing: "service"), to: store)
       let before = try store.read { try Row.fetchAll($0, sql: "SELECT * FROM seq_counter") }
-      let result = try DocTriageService(
+      let result = try await DocTriageService(
         environment: env, workspace: "acme", approved: human ? nil : "Reject obsolete Acme rules"
       ).triage(DocTriage(reject: [ref]))
       #expect(result.docs.map(\.state) == ["rejected"])
@@ -62,8 +62,8 @@ struct DocTriageServiceTests {
   }
 
   @Test(arguments: ["accepted", "rejected", "foreign"])
-  func invalidSecondMemberNeverChangesTheFirst(kind: String) throws {
-    try withScratchDirectory { home in
+  func invalidSecondMemberNeverChangesTheFirst(kind: String) async throws {
+    try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let env = try Self.environment(home, store)
       let first = try Self.propose(env, about: "service:push")
@@ -74,7 +74,7 @@ struct DocTriageServiceTests {
         second = "doc:rules@2"
       } else if kind == "rejected" {
         second = try Self.propose(env, about: "service:push", slug: "obsolete")
-        _ = try service.triage(DocTriage(reject: [second]))
+        _ = try await service.triage(DocTriage(reject: [second]))
       } else {
         try store.write {
           try $0.database.execute(
@@ -91,7 +91,7 @@ struct DocTriageServiceTests {
       }
       let before = try DocVerificationPreparationTests.truth(store)
       var failure: (any CodedError)?
-      do { _ = try service.triage(DocTriage(reject: [first, second])) } catch let error
+      do { _ = try await service.triage(DocTriage(reject: [first, second])) } catch let error
         as any CodedError
       { failure = error }
       #expect(failure?.code == (kind == "foreign" ? .notFound : .invalid))
