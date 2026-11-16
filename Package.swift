@@ -52,7 +52,7 @@ let package = Package(
     .testTarget(
       name: "SiltaCoreTests",
       dependencies: [
-        "SiltaCore", "SiltaTestSupport",
+        "SiltaCore", "SiltaAppSupport", "SiltaTestSupport",
         .product(name: "GRDB", package: "GRDB.swift"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
