@@ -21,6 +21,8 @@ out="$1"
 mkdir -p "$out"
 
 toolchain="$(swift --version 2>/dev/null | sed -n 1p)"
+# The stamp must name the toolchain, or a toolchain change would reuse a stale binary.
+[[ -n "$toolchain" ]] || { echo 'build-prior-writer: swift --version printed nothing' >&2; exit 1; }
 stamp_for() { printf 'commit=%s\nswift=%s\nsha256=%s\n' "$prior_commit" "$toolchain" "$1"; }
 sha_of() { shasum -a 256 "$1" | cut -d' ' -f1; }
 

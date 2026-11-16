@@ -15,9 +15,12 @@ concurrency:
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# `scripts/verify.sh full` split in two parallel jobs; `verify` is the required check.
+# PRs, the weekly run and manual runs: `scripts/verify.sh full` split in two parallel jobs,
+# with `verify` as the required check. A push to main only refills the shared caches: with
+# squash merges and the up-to-date rule its tree is the one its PR just verified (D19).
 jobs:
   swift:
+    if: github.event_name != 'push'
     runs-on: xcode-27   # GitHub public-preview image with Xcode 27.1 (D18)
     timeout-minutes: 35
     steps:
@@ -35,17 +38,17 @@ jobs:
       # build-prior-writer.sh pins the commits and checks each cached binary's stamp
       # (commit, Swift toolchain, SHA-256). A bad entry is rebuilt but not saved again until
       # the key changes. The weekly run builds them from source.
-      - name: Name the toolchain for the prior-writer cache
+      - name: Name the prior-writer cache
         if: github.event_name != 'schedule'
-        id: toolchain
-        run: echo "swift=$(swift --version 2>/dev/null | head -1 | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        id: prior-writers
+        run: bash scripts/ci/prior-writer-cache-key.sh >> "$GITHUB_OUTPUT"
 
       - name: Restore prior writers
         if: github.event_name != 'schedule'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/prior-writers
-          key: prior-writers-${{ runner.arch }}-${{ steps.toolchain.outputs.swift }}-${{ hashFiles('scripts/build-prior-writer.sh') }}
+          key: ${{ steps.prior-writers.outputs.key }}
 
       - name: Verify (Swift, slow tiers, wall-clock)
         env:
@@ -61,6 +64,7 @@ jobs:
           if-no-files-found: ignore
 
   evals:
+    if: github.event_name != 'push'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -76,10 +80,11 @@ jobs:
         run: scripts/verify.sh evals
 
   # A job whose needs failed is skipped, and a skipped required check counts as passing,
-  # so this always runs and accepts only two successes.
+  # so this always runs (except on push, which verifies nothing) and accepts only two
+  # successes.
   verify:
     needs: [swift, evals]
-    if: always()
+    if: always() && github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -90,3 +95,47 @@ jobs:
         run: |
           echo "swift: $SWIFT, evals: $EVALS"
           [[ "$SWIFT" == success && "$EVALS" == success ]]
+
+  # PRs can read caches saved on main but not each other's, so main keeps the shared
+  # prior-writer cache filled: after each merge, and weekly so a runner-image toolchain
+  # change refills it before the next merge. On a hit this only looks the key up.
+  warm-caches:
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # build-prior-writer.sh archives the pinned commits
+
+      - name: Select Xcode
+        run: bash scripts/ci/select-xcode.sh
+
+      - name: Name the prior-writer cache
+        id: prior-writers
+        run: bash scripts/ci/prior-writer-cache-key.sh >> "$GITHUB_OUTPUT"
+
+      - name: Look up prior writers
+        id: lookup
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/prior-writers
+          key: ${{ steps.prior-writers.outputs.key }}
+          lookup-only: true
+
+      - name: Build prior writers
+        if: steps.lookup.outputs.cache-hit != 'true'
+        env:
+          SILTA_PRIOR_WRITER_CACHE: ${{ runner.temp }}/prior-writers
+        run: |
+          out="$(mktemp -d)"
+          bash scripts/build-prior-writer.sh "$out/prior" prior
+          bash scripts/build-prior-writer.sh "$out/v6" v6
+
+      - name: Save prior writers
+        if: steps.lookup.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/prior-writers
+          key: ${{ steps.prior-writers.outputs.key }}

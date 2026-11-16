@@ -39,8 +39,12 @@ export PATH="$(paste -sd: "$silta_tools/path"):$PATH"
 CI runs `full-swift` and `evals` as two parallel jobs on the `xcode-27` runner, and a
 `verify` job, the required check, passes only when both succeed. Two macOS jobs per run
 also means two chances to wait for a preview runner. The `swift` job reuses the prior-writer
-binaries from the Actions cache, keyed on the Swift toolchain and
-`scripts/build-prior-writer.sh`; the weekly scheduled run builds them from source.
+binaries from the Actions cache, keyed by `scripts/ci/prior-writer-cache-key.sh` on the
+Swift toolchain and `scripts/build-prior-writer.sh`; the weekly scheduled run builds them
+from source. A push to `main` runs only `warm-caches`, which fills that cache in `main`'s
+scope where every PR can read it; it verifies nothing, because the PR already verified the
+same tree. That holds only while the `main` ruleset has no bypass actors; if one is added,
+restore the full push run (D19).
 
 Each script's header comment says how to run it. What each target and folder holds is
 in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
