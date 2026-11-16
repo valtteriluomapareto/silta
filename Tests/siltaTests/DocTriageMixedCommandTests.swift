@@ -16,7 +16,7 @@ struct DocTriageMixedCommandTests {
           ["rules"] + DocEditCommandTests.creation + ["-F", file.path], scratch
         ).termination == .exit(0))
       #expect(try DocTriageCommandTests.propose(scratch) == "doc:rules@2")
-      #expect(try DocTriageCommandTests.propose(scratch) == "doc:rules@3")
+      try AcmeDocAttachments.copyLatestRulesProposal(in: store)
       try #require(
         try DocEditCommandTests.run(
           ["rules", "-F", file.path], scratch

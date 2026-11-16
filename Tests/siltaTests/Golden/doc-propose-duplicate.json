@@ -1,0 +1,1 @@
+{"error":{"code":"conflict","message":"Document body and metadata already match doc:rules@1.","next":["silta --ws 'acme' doc show 'doc:rules@1'"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -17,15 +17,14 @@ extension DocProposalService {
     else {
       return CommandFailure(error: error, next: [hub], nextBy: .agent, message: message)
     }
+    let read = DocService(workspace: workspace, store: environment.db)
+    if case .duplicate(let ref) = error as? DocError {
+      return CommandFailure(
+        error: error, next: [read.showCommand(ref)], nextBy: .agent, message: message)
+    }
     var fields: [String] = []
     if case .missing(let missing) = error as? DocError { fields = missing }
-    var retry = "silta doc propose " + shellWord("doc:" + request.slug) + " -F <file> -m <why>"
-    if request.title != nil || fields.contains("--title") { retry += " --title <title>" }
-    if request.about != nil || fields.contains("--about") { retry += " --about <ref>" }
-    if request.base != nil { retry += " --base <rev>" }
-    if request.task != nil || fields.contains("--task") { retry += " --task <ref>" }
-    let read = DocService(workspace: workspace, store: environment.db)
-    let scopedRetry = workspaceCommand(retry, workspace: workspace)
+    let scopedRetry = workspaceCommand(retryCommand(request, fields: fields), workspace: workspace)
     let next: [String]
     let owner: NextBy
     if let preparation = error as? CommandFailure {
@@ -39,5 +38,14 @@ extension DocProposalService {
       owner = .agent
     }
     return CommandFailure(error: error, next: next, nextBy: owner, message: message)
+  }
+
+  private func retryCommand(_ request: DocProposalRequest, fields: [String]) -> String {
+    var retry = "silta doc propose " + shellWord("doc:" + request.slug) + " -F <file> -m <why>"
+    if request.title != nil || fields.contains("--title") { retry += " --title <title>" }
+    if request.about != nil || fields.contains("--about") { retry += " --about <ref>" }
+    if request.base != nil { retry += " --base <rev>" }
+    if request.task != nil || fields.contains("--task") { retry += " --task <ref>" }
+    return retry
   }
 }

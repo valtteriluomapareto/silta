@@ -374,6 +374,7 @@ extension DocWritePolicyTests {
           arguments: [title, title])
       }
       var request = DocEditRequest(slug: "rules", title: explicit ? title : nil)
+      if proposal { request.about = ["service:push", "topic:messaging"] }
       let result = try await Self.write(
         proposal, service: service, request: request, body: Self.secret)
       #expect(result.ref == "doc:rules@2" && result.warnings.isEmpty)

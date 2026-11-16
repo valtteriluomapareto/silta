@@ -6,28 +6,26 @@ extension DocStore {
   func propose(
     _ draft: DocDraft, metadata: DocMetadata, base: Int?, source: Int64?
   ) throws -> DocRevision {
-    let targets = try metadata.targets.map { target in
-      guard let id = target.id,
-        let uid = try StoredUID.fetch(
-          db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [id])
-      else { throw StorageError.corrupt }
-      return DocTargetIdentity(kind: target.kind, uid: uid)
-    }
+    let targets = try targetIdentities(metadata.targets)
+    let old = try find(draft.slug)
+    try refuseDuplicate(draft, metadata: metadata, base: base, targets: targets, old: old)
     let snapshot = try DocTargetIdentity.encoded(targets)
     let stamp = utcTimestamp(at)
-    let id = try docID(draft.slug, metadata: metadata, old: find(draft.slug), stamp: stamp)
+    let id = try docID(draft.slug, metadata: metadata, old: old, stamp: stamp)
     let revision = try nextRevision(id, slug: draft.slug)
     try db.execute(
       sql: """
         INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,
           title,kind,about_refs,about_targets,source_task_id,triaged_at,triaged_by)
-        VALUES(?,?,?,?,CAST(? AS TEXT),'proposed',?,?,?,?,?,?,?,?,NULL,NULL)
+        VALUES(?,?,?,?,CAST(? AS TEXT),'proposed',?,?,?,
+          CAST(? AS TEXT),CAST(? AS TEXT),?,?,?,NULL,NULL)
         """,
       arguments: [
         try ids.next(at: at), id, revision, base, Data(draft.body.utf8), actor.description,
         draft.message,
         stamp,
-        metadata.title, metadata.kind, try WorkspaceConfig.json(metadata.refs), snapshot, source,
+        Data(metadata.title.utf8), Data(metadata.kind.utf8),
+        try WorkspaceConfig.json(metadata.refs), snapshot, source,
       ])
     try transaction.recordChange(kind: "doc", rowID: id)
     return try Self.revision(draft.slug, revision: revision, workspace: workspace, in: db)

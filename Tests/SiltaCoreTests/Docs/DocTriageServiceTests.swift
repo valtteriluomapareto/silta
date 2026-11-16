@@ -14,12 +14,14 @@ struct DocTriageServiceTests {
     try DocWritePolicyTests.service(home, store, human: human, approved: nil, git: git).environment
   }
 
-  static func propose(_ env: SiltaEnvironment, about: String, slug: String = "rules") throws
+  static func propose(
+    _ env: SiltaEnvironment, about: String, slug: String = "rules", body: String = "Shared café."
+  ) throws
     -> String
   {
     try DocProposalService(environment: env, workspace: "acme").propose(
       DocProposalRequest(slug: slug, title: "Rules", about: [about], why: "Share."),
-      input: { "Shared café." }
+      input: { body }
     ).ref
   }
 

@@ -71,13 +71,15 @@ struct DocLineDiffTests {
 
   @Test func metadataOnlyChangeHasNoBodyHunk() async throws {
     try await withScratchDirectory { home in
-      let store = try await fixture(home, old: "Same body", new: "Same body")
+      let store = try await fixture(
+        home, old: "Same body", new: "Same body", title: "Refined rules")
       let output = try DocService(workspace: "acme", store: store).show("doc:rules@2", diff: true)
         .output
       #expect(
         output.contains("Review.") && !output.contains("-Same body")
           && !output.contains("+Same body"))
       #expect(!output.contains("@@ "))
+      #expect(output.contains("Refined rules"))
     }
   }
 
@@ -99,7 +101,8 @@ struct DocLineDiffTests {
         }
       }
       _ = try DocProposalService(environment: writer.environment, workspace: "acme").propose(
-        DocProposalRequest(slug: "rules", why: "Review."), input: { "Same body" })
+        DocProposalRequest(slug: "rules", title: "Proposed rules", why: "Review."),
+        input: { "Same body" })
       if mode == "reordered" {
         let raw = try #require(
           try store.read {
@@ -173,12 +176,14 @@ struct DocLineDiffTests {
     }
   }
 
-  private func fixture(_ home: URL, old: String, new: String) async throws -> DatabaseStore {
+  private func fixture(_ home: URL, old: String, new: String, title: String? = nil) async throws
+    -> DatabaseStore
+  {
     let store = try AcmeDocAttachments.make(in: home)
     let writer = try DocWritePolicyTests.service(home, store)
     _ = try await writer.edit(DocWritePolicyTests.request(), input: { old })
     _ = try DocProposalService(environment: writer.environment, workspace: "acme").propose(
-      DocProposalRequest(slug: "rules", why: "Review."), input: { new })
+      DocProposalRequest(slug: "rules", title: title, why: "Review."), input: { new })
     return store
   }
 }
