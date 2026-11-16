@@ -71,8 +71,8 @@ execution, CI screenshot approval, and changes to Paper or Poimi.
   Existing clock/ID conformance suites exercise these shared implementations.
   Test-support helpers that need DEBUG-only types are also DEBUG-gated so Release
   product builds still compile. Other fakes stay in test support; no package guard
-  is relaxed. The minimal whole-file DEBUG guard and its Python self-tests ship with A1's first fixture sources; C1a
-  extends coverage to App control files and Release launch behavior.
+  is relaxed. The minimal whole-file DEBUG guard and its Python self-tests ship
+  with A1's first fixture sources; C1a extends coverage to App control files and Release launch behavior.
 - Seed ordinary fixtures through core service APIs before opening the read-only
   app connection. `missing-store` creates no database. `newer-schema` starts from
   a valid seed and adds an unknown migration marker through a fixture-only helper;
