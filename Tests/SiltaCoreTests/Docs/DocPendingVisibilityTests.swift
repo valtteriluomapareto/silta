@@ -30,9 +30,9 @@ struct DocPendingVisibilityTests {
       let comments = try read.show("rules", comments: true).output
       let suffix = archived ? " --archived" : ""
       let command = "silta --ws 'acme' doc ls\(suffix) --offset 0 --limit 20"
-      withKnownIssue {
-        #expect(unpinned.components(separatedBy: "\n")[0].contains("2 pending: " + command))
-      }
+
+      #expect(unpinned.components(separatedBy: "\n")[0].contains("2 pending: " + command))
+
       #expect(!pinned.contains("pending:") && explicit == pinned)
       #expect(!diff.contains("pending:") && !comments.contains("pending:"))
       #expect(try DocVerificationPreparationTests.truth(store) == before)

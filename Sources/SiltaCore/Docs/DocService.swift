@@ -33,13 +33,19 @@ package struct DocService {
     }
   }
 
-  func body(_ snapshot: DocRevision, archived: Bool) -> String {
+  func body(_ snapshot: DocRevision, archived: Bool, pending: Int) -> DocReadResult {
     let pinned = "doc:\(snapshot.slug)@\(snapshot.revision)"
     let state = snapshot.state + (archived ? ", archived" : "")
-    return "\(pinned) [\(state)]\n"
+    let hint =
+      pending > 0
+      ? "; \(pending) pending: "
+        + listPageCommand(about: nil, archived: archived, offset: 0, limit: 20) : ""
+    let output =
+      "\(pinned) [\(state)]\(hint)\n"
       + "title: \(snapshot.title ?? "(unknown)")\nkind: \(snapshot.kind ?? "(unknown)")\n"
       + "about: \(Self.about(snapshot.about))\nactor: \(snapshot.actor)\n"
       + "created_at: \(snapshot.createdAt)\n" + Self.evidence(snapshot) + "\n\(snapshot.body)"
+    return DocReadResult(ref: pinned, output: output)
   }
 
   static func evidence(_ snapshot: DocRevision) -> String {

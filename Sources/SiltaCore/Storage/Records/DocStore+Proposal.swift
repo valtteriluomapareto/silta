@@ -6,16 +6,12 @@ extension DocStore {
   func propose(
     _ draft: DocDraft, metadata: DocMetadata, base: Int?, source: Int64?
   ) throws -> DocRevision {
-    let targets = try metadata.targets.map { target in
-      guard let id = target.id,
-        let uid = try StoredUID.fetch(
-          db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [id])
-      else { throw StorageError.corrupt }
-      return DocTargetIdentity(kind: target.kind, uid: uid)
-    }
+    let targets = try targetIdentities(metadata.targets)
+    let old = try find(draft.slug)
+    try refuseDuplicate(draft, metadata: metadata, base: base, targets: targets, old: old)
     let snapshot = try DocTargetIdentity.encoded(targets)
     let stamp = utcTimestamp(at)
-    let id = try docID(draft.slug, metadata: metadata, old: find(draft.slug), stamp: stamp)
+    let id = try docID(draft.slug, metadata: metadata, old: old, stamp: stamp)
     let revision = try nextRevision(id, slug: draft.slug)
     try db.execute(
       sql: """

@@ -4,6 +4,7 @@ enum DocError: CodedError {
   case invalid(String)
   case notFound(String)
   case stale(String)
+  case duplicate(String)
   case overlap([String])
   case changed(workspace: String)
 
@@ -13,7 +14,7 @@ enum DocError: CodedError {
     case .invalid: .invalid
     case .notFound: .notFound
     case .stale: .staleRev
-    case .overlap, .changed: .conflict
+    case .duplicate, .overlap, .changed: .conflict
     }
   }
 
@@ -25,6 +26,8 @@ enum DocError: CodedError {
     case .notFound(let ref): "Doc " + TaskError.shown(ref) + " not found."
     case .stale(let ref):
       "Proposal " + TaskError.shown(ref) + " has a stale base; inspect and repropose."
+    case .duplicate(let ref):
+      "Document body and metadata already match " + TaskError.shown(ref) + "."
     case .overlap(let refs):
       "Accept at most one proposal per doc: " + refs.map(TaskError.shown).joined(separator: ", ")
     case .changed: "Document metadata or app configuration changed; prepare the write again."

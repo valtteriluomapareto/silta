@@ -195,11 +195,11 @@ struct DocProposalDuplicateTests {
       failure = error
     }
     let after = try DocVerificationPreparationTests.truth(service.environment.db)
-    withKnownIssue {
-      #expect(failure?.code == .conflict)
-      #expect(failure?.message.contains(existing) == true)
-      #expect(failure?.next == ["silta --ws 'acme' doc show '\(existing)'"])
-      #expect(before == after)
-    }
+
+    #expect(failure?.code == .conflict)
+    #expect(failure?.message.contains(existing) == true)
+    #expect(failure?.next == ["silta --ws 'acme' doc show '\(existing)'"])
+    #expect(before == after)
+
   }
 }

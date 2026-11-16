@@ -15,13 +15,13 @@ struct DocPendingWorkflowCommandTests {
       let result = try Self.propose("Shared knowledge.", scratch, mode: mode)
       let after = try Self.counters(store)
       let count = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM doc_rev") }
-      withKnownIssue {
-        #expect(result.termination == .exit(6))
-        #expect(before == after && count == 1)
-        Golden.forTests().check(
-          mode == "json" ? result.stdout : result.stderr,
-          "doc-propose-duplicate" + (mode == "json" ? ".json" : ".txt"))
-      }
+
+      #expect(result.termination == .exit(6))
+      #expect(before == after && count == 1)
+      Golden.forTests().check(
+        mode == "json" ? result.stdout : result.stderr,
+        "doc-propose-duplicate" + (mode == "json" ? ".json" : ".txt"))
+
       if result.termination == .exit(6) {
         #expect((mode == "json" ? result.stderr : result.stdout).isEmpty)
         #expect(!(result.stdout + result.stderr).contains("Shared knowledge."))
@@ -58,7 +58,7 @@ struct DocPendingWorkflowCommandTests {
       let shown = try SiltaBinary.run(["--ws", "acme", "doc", "show", "rules"], in: scratch)
       try #require(shown.termination == .exit(0))
       let lines = shown.stdout.components(separatedBy: "\n")
-      withKnownIssue { #expect(lines[0].contains("2 pending: silta --ws 'acme' doc ls")) }
+      #expect(lines[0].contains("2 pending: silta --ws 'acme' doc ls"))
       #expect(lines.count <= 401)
       let footer = try #require(lines.first { $0.contains("lines omitted; next: ") })
       let next = try #require(footer.components(separatedBy: "; next: ").last)
@@ -77,11 +77,11 @@ struct DocPendingWorkflowCommandTests {
     try withScratchDirectory { scratch in
       let guide = try SiltaBinary.run(["guide", "docs"], in: scratch)
       try #require(guide.termination == .exit(0))
-      withKnownIssue {
-        #expect(guide.stdout.contains("doc ls --about <ref>"))
-        #expect(guide.stdout.contains("revise an existing doc"))
-        #expect(guide.stdout.contains("rediscover"))
-      }
+
+      #expect(guide.stdout.contains("doc ls --about <ref>"))
+      #expect(guide.stdout.contains("revise an existing doc"))
+      #expect(guide.stdout.contains("rediscover"))
+
     }
   }
 

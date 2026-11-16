@@ -127,6 +127,9 @@ extension GuideCommand {
         complete continuations for bounded reads. Historical unknown metadata stays unknown;
         do not replace it with today's map or treat it as a verification claim.
 
+        Before proposing, run doc ls --about <ref> and revise an existing doc when it fits.
+        Check whether an agent in another app would rediscover this knowledge from its about items.
+
         Submit lasting knowledge with doc propose; submissions remain pending, even from a human.
         Usually propose nothing; never more than two task and document proposals per session.
         Read the returned immutable ref and its recorded-base diff before handing it off.

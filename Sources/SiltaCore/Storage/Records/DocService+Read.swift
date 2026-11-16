@@ -16,7 +16,16 @@ extension DocService {
       if let selected = revision ?? (doc["current_rev"] as Int?) {
         let snapshot = try DocStore.revision(
           slug, revision: selected, workspace: workspaceID, in: db)
-        return try render(snapshot, archived: archived, view: view, workspace: workspaceID, in: db)
+        if revision == nil, case .body = view {
+          let pending =
+            try Int.fetchOne(
+              db, sql: "SELECT count(*) FROM doc_rev WHERE doc_id=? AND state='proposed'",
+              arguments: [doc["id"]]) ?? 0
+          return body(snapshot, archived: archived, pending: pending)
+        }
+        return try render(
+          snapshot, archived: archived, view: view, workspace: workspaceID, in: db
+        )
       }
       let id: Int64 = doc["id"]
       let total =

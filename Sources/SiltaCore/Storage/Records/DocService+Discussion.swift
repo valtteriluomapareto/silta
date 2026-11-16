@@ -9,12 +9,13 @@ extension DocService {
     """
 
   func render(
-    _ snapshot: DocRevision, archived: Bool, view: DocReadView, workspace workspaceID: Int64,
+    _ snapshot: DocRevision, archived: Bool, view: DocReadView,
+    workspace workspaceID: Int64,
     in db: Database
   ) throws -> DocReadResult {
     let ref = "doc:\(snapshot.slug)@\(snapshot.revision)"
     switch view {
-    case .body: return DocReadResult(ref: ref, output: body(snapshot, archived: archived))
+    case .body: return body(snapshot, archived: archived, pending: 0)
     case .diff:
       let base: DocRevision?
       do {
