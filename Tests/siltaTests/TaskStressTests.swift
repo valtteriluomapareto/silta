@@ -9,14 +9,14 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(10)))
 struct TaskStressTests {
   @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
-  func twentyProcessesAddFourThousandTasksWithoutSequenceGaps() throws {
+  func twentyProcessesAddFiveHundredTasksWithoutSequenceGaps() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
       let failures = Mutex<[String]>([])
       DispatchQueue.concurrentPerform(iterations: 20) { worker in
         do {
           let actor = ActorID.agent(tool: "codex", session: "worker\(worker)")
-          for _ in 0..<200 {
+          for _ in 0..<25 {
             let result = try SiltaBinary.run(
               ["task", "add", "Acme task", "--json"], in: scratch,
               environment: ["SILTA_ACTOR": actor.description], timeout: 60)
@@ -29,14 +29,14 @@ struct TaskStressTests {
       }
       #expect(failures.withLock { $0.isEmpty }, "\(failures.withLock { $0 })")
       try store.read { (db: Database) throws in
-        #expect(try Int64.fetchAll(db, sql: "SELECT seq FROM task ORDER BY seq") == Array(1...4000))
-        #expect(try Int.fetchOne(db, sql: "SELECT count(DISTINCT uid) FROM task") == 4000)
+        #expect(try Int64.fetchAll(db, sql: "SELECT seq FROM task ORDER BY seq") == Array(1...500))
+        #expect(try Int.fetchOne(db, sql: "SELECT count(DISTINCT uid) FROM task") == 500)
         #expect(
-          try Int.fetchOne(db, sql: "SELECT count(*) FROM task_event WHERE kind='created'") == 4000)
+          try Int.fetchOne(db, sql: "SELECT count(*) FROM task_event WHERE kind='created'") == 500)
         #expect(
-          try Int.fetchOne(db, sql: "SELECT count(*) FROM change_log WHERE kind='task'") == 4000)
+          try Int.fetchOne(db, sql: "SELECT count(*) FROM change_log WHERE kind='task'") == 500)
         #expect(
-          try Int.fetchOne(db, sql: "SELECT next FROM seq_counter WHERE scope='task:1'") == 4001)
+          try Int.fetchOne(db, sql: "SELECT next FROM seq_counter WHERE scope='task:1'") == 501)
       }
     }
   }

@@ -139,6 +139,13 @@ They're summarised here so every decision has one index.
     - no approvals are required and nobody bypasses the rules
 
     Auto-merge is on, so a PR can be queued to merge when CI passes.
+  - **↳ update 2026-11-16:** a push to `main` no longer runs the full verify. With squash
+    merges, the up-to-date rule and no bypass, the tree on `main` after a merge is the
+    tree its PR's `verify` run just tested, so the push run repeated that work and took
+    two macOS runners from open PRs. The push now only refills the Actions caches that PRs
+    read (PR-scoped caches are invisible to other PRs). The weekly scheduled run and manual
+    runs still verify `main` in full. If the ruleset ever gains a bypass, restore the push
+    run.
 - **D20: Dogfood from DF0** (spec §22.1).
   - GitHub issues are the public record, and Silta is the working layer. Tasks link
     their issue with a `url:` link and are not promoted, so they stay editable.
