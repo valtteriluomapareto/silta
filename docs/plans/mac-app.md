@@ -35,8 +35,8 @@ the human copies.
   each actionable inbox entry and each distinct review task once;
   it does not count visual groups. The maintainer chose actionable-item counts on
   2026-11-16; Paper v2's “4 waiting” group count is not the acceptance value.
-- **Board:** blocked tasks stay in Todo with a blocked label; lanes show plan progress,
-  and a task inspector shows the plan, claim,
+- **Board:** blocked tasks stay in Todo with a blocked label; lanes show plan
+  progress, and a task inspector shows the plan, claim,
   properties and discussion.
 - **Workspace:** apps and connections with a connection inspector, read from the
   workspace model rather than YAML.
@@ -69,8 +69,8 @@ the human copies.
   - **Root package target `SiltaAppSupport`** (Foundation + SiltaCore, no SwiftUI).
     It holds read models for the screens and command templates, with a small `public`
     API. Shared development fixture seeding is whole-file DEBUG code here, with a
-    SiltaTestSupport wrapper (D23); the app never links test support. SiltaCore's services are `package`-scoped, so this target must live in the
-    root package.
+    `SiltaTestSupport` wrapper (D23); the app never links test support. SiltaCore's
+    services are `package`-scoped, so this target must live in the root package.
   - **Thin Xcode project `App/SiltaApp.xcodeproj`** (target `SiltaApp`). It holds the
     SwiftUI views and the asset catalog, links `SiltaAppSupport`, and pins MarkdownUI
     (D18) only there.
@@ -88,7 +88,8 @@ the human copies.
   on a 5-second timer while the window is frontmost. Reload only when it changed. The
   §17 change signal (`notify_post` after each commit) replaces the timer once a slice
   adds it to SiltaCore writes.
-- **Copy text:** runnable templates carry the selected `SILTA_HOME`. Use the inbox's human-form `next` where it is a runnable command,
+- **Copy text:** runnable templates carry the selected `SILTA_HOME`. Use the inbox's
+  human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
   nothing is pre-filled for drop or reject, and there's no `-F -`.
 - **Layout:** `NavigationSplitView` (three columns for Docs), `.inspector`,
@@ -99,16 +100,18 @@ the human copies.
 
 | Slice | Scope | Depends on | Verify with |
 |---|---|---|---|
-| A1a (SI-154) | `SiltaAppSupport`: workspace list, human inbox and review tasks, board and task detail; shared DEBUG v2 seed and release-isolation guard | — | `swift test` on the seed: task counts reconcile; models match `task ls`/`task show`/`inbox --for me`; Release package build excludes fixtures |
+| A1a (SI-154) | `SiltaAppSupport`: workspace list, human inbox and review tasks, board and task detail; shared v2 seed in DEBUG `SiltaAppSupport/Control/` with a `SiltaTestSupport` wrapper and release-isolation guard | — | `swift test` on the seed: task counts reconcile; models match `task ls`/`task show`/`inbox --for me`; Release package build excludes fixtures |
 | A1b (SI-155) | Typed workspace-map read models and persistent `data_version` probe | A1a | Map counts and edges match the seed; probe sees an external CLI write and stays unchanged by reads |
 | A2 | Xcode app shell: sidebar, toolbar, My work, ref chip and command block with copy, store states, focus/⌘R/timer refresh | A1a, A1b | Build locally; command templates execute in a fixture with placeholders filled; unfilled placeholders are refused with no write; manual pass on the dogfood workspace |
-| A3 | Board and task inspector | A2, C1/C2 in [control plan](mac-app-control.md) | View-model tests on the seed; manual pass |
-| A4 | Workspace and connection inspector | A2, C1/C2 in [control plan](mac-app-control.md) | View-model tests on `docs/examples/acme-workspace.yaml` loaded into a store |
-| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A2, C1/C2, SI-126, SI-134 | Read-model tests on fixture docs, including pending-only, archived, legacy metadata and a doc over 400 lines; manual pass |
+| A3 | Board and task inspector | A2, C1b / SI-153 in [control plan](mac-app-control.md) | View-model tests on the seed; manual pass |
+| A4 | Workspace and connection inspector | A2, C1b / SI-153 in [control plan](mac-app-control.md) | View-model tests on `docs/examples/acme-workspace.yaml` loaded into a store |
+| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A2, C1b / SI-153, C2, SI-126, SI-134 | Read-model tests on fixture docs, including pending-only, archived, legacy metadata and a doc over 400 lines; manual pass |
 
-The [development control plane](mac-app-control.md) runs C1 then C2 after A2,
-before A3/A4. A3 and A4 can then run in parallel and add their routes/actions to
-the same control surface. Each slice targets one PR of about 800 lines.
+The [development control plane](mac-app-control.md) runs C1a / SI-152 then
+C1b / SI-153 after A2. C2, A3 and A4 can then run alongside one another. A3/A4
+add their routes and selection state with their screens, and their live actions
+after C2 is available. A5 additionally waits for C2 and its docs prerequisites.
+Each slice targets one PR of about 800 lines.
 
 ## Validation
 
@@ -119,9 +122,9 @@ the same control surface. Each slice targets one PR of about 800 lines.
   placeholders must fail with no write and never wait for input.
 - **CI** (A2 adds it with the Xcode project; the runner already has the pinned Xcode):
   - `SiltaAppSupportTests` run in the existing `swift` job. Read-model tests stay
-    in-process except CLI parity and recovery replay checks; command-template tests also start
-    processes. That job is CPU-bound and the slowest one, so A1 and each later slice
-    report how much test time they add.
+    in-process except CLI parity and recovery replay checks; command-template tests
+    also start processes. That job is CPU-bound and the slowest one, so A1 and each
+    later slice report how much test time they add.
   - A third job, `app`, runs `scripts/verify.sh app` beside `swift` and `evals`, and the
     `verify` gate requires it. `full` includes `app`, and AGENTS.md gains an `App/` rung.
   - `verify.sh app` runs `xcodebuild test` for `SiltaAppTests` (Debug), then

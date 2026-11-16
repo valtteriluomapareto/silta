@@ -91,6 +91,7 @@ extension DocError: ErrorExamples {
     [
       .missing(["--title", "--about"]),
       .invalid("A doc needs at least one --about map item."), .notFound("missing"),
+      .stale("doc:rules@1"), .overlap(["doc:rules@1", "doc:rules@2"]),
       .changed(workspace: "acme"),
     ]
   }

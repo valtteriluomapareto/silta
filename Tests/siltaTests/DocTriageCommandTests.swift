@@ -51,12 +51,12 @@ struct DocTriageCommandTests {
       ).isEmpty)
   }
 
-  @Test func rejectionOnlySurfaceMatchesItsContract() throws {
+  @Test func decisionSurfaceMatchesItsContract() throws {
     try withScratchDirectory { scratch in
       for args in [["doc", "triage", "--help"], ["schema", "doc", "triage"]] {
         let result = try SiltaBinary.run(args, in: scratch)
         #expect(result.termination == .exit(0) && result.stdout.contains("--reject"))
-        #expect(!result.stdout.contains("--accept"))
+        #expect(result.stdout.contains("--accept"))
       }
     }
   }
@@ -157,8 +157,7 @@ struct DocTriageCommandTests {
       if result.termination != .exit(0) {
         #expect(
           try DocEditCommandTests.error(result)["code"] as? String
-            == (args.contains("--accept")
-              ? "usage" : args.last == "doc:missing@1" ? "not_found" : "invalid"))
+            == (args.last == "doc:missing@1" ? "not_found" : "invalid"))
       }
       #expect(try Self.truth(store) == before)
     }
