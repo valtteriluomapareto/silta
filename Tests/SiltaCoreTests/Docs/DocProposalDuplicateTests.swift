@@ -134,12 +134,8 @@ struct DocProposalDuplicateTests {
       let pending = try store.read {
         try Data.fetchOne($0, sql: "SELECT CAST(\(field) AS BLOB) FROM doc_rev WHERE rev=2")
       }
-      try withKnownIssue {
-        #expect(pending == bytes)
-        try Self.refuse(service, request: request, body: body, existing: first.ref)
-      } when: {
-        embeddedNul
-      }
+      #expect(pending == bytes)
+      try Self.refuse(service, request: request, body: body, existing: first.ref)
     }
   }
 

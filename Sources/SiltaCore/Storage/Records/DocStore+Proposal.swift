@@ -17,13 +17,15 @@ extension DocStore {
       sql: """
         INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,
           title,kind,about_refs,about_targets,source_task_id,triaged_at,triaged_by)
-        VALUES(?,?,?,?,CAST(? AS TEXT),'proposed',?,?,?,?,?,?,?,?,NULL,NULL)
+        VALUES(?,?,?,?,CAST(? AS TEXT),'proposed',?,?,?,
+          CAST(? AS TEXT),CAST(? AS TEXT),?,?,?,NULL,NULL)
         """,
       arguments: [
         try ids.next(at: at), id, revision, base, Data(draft.body.utf8), actor.description,
         draft.message,
         stamp,
-        metadata.title, metadata.kind, try WorkspaceConfig.json(metadata.refs), snapshot, source,
+        Data(metadata.title.utf8), Data(metadata.kind.utf8),
+        try WorkspaceConfig.json(metadata.refs), snapshot, source,
       ])
     try transaction.recordChange(kind: "doc", rowID: id)
     return try Self.revision(draft.slug, revision: revision, workspace: workspace, in: db)
