@@ -18,10 +18,13 @@ struct DocTriageServiceTests {
       db: store, log: base.log, actor: base.actor, human: base.human)
   }
 
-  static func propose(_ env: SiltaEnvironment, about: String, slug: String = "rules") throws -> String {
+  static func propose(_ env: SiltaEnvironment, about: String, slug: String = "rules") throws
+    -> String
+  {
     try DocProposalService(environment: env, workspace: "acme").propose(
       DocProposalRequest(slug: slug, title: "Rules", about: [about], why: "Share."),
-      input: { "Shared café." }).ref
+      input: { "Shared café." }
+    ).ref
   }
 
   @Test(arguments: [false, true])
@@ -31,13 +34,15 @@ struct DocTriageServiceTests {
       let env = try Self.environment(home, store, human: human)
       try DocProposalServiceTests.task(store, seq: 1, actor: env.actor.description)
       let ref = try Self.propose(env, about: "service:push")
-      let body = Data(("Password=private123 " + String(repeating: "é", count: 40_000) + "\u{0}end").utf8)
+      let body = Data(
+        ("Password=private123 " + String(repeating: "é", count: 40_000) + "\u{0}end").utf8)
       try store.write {
-        try $0.database.execute(sql: """
-          INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
-          UPDATE task SET workspace_id=2;
-          UPDATE doc_rev SET title=NULL,kind=NULL,about_refs=NULL,about_targets=NULL,body_md=CAST(? AS TEXT)
-          """, arguments: [body])
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
+            UPDATE task SET workspace_id=2;
+            UPDATE doc_rev SET title=NULL,kind=NULL,about_refs=NULL,about_targets=NULL,body_md=CAST(? AS TEXT)
+            """, arguments: [body])
       }
       try AcmeDocAttachments.apply(AcmeDocAttachments.yaml(removing: "service"), to: store)
       let before = try store.read { try Row.fetchAll($0, sql: "SELECT * FROM seq_counter") }
@@ -49,10 +54,12 @@ struct DocTriageServiceTests {
         #expect(try Data.fetchOne(db, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev") == body)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev") == 1)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == (human ? 0 : 1))
-        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc WHERE current_rev IS NOT NULL") == 0)
+        #expect(
+          try Int.fetchOne(db, sql: "SELECT count(*) FROM doc WHERE current_rev IS NOT NULL") == 0)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_verification") == 0)
         #expect(try Row.fetchAll(db, sql: "SELECT * FROM seq_counter") == before)
-        #expect(try String.fetchOne(db, sql: "SELECT triaged_by FROM doc_rev") == env.actor.description)
+        #expect(
+          try String.fetchOne(db, sql: "SELECT triaged_by FROM doc_rev") == env.actor.description)
       }
     }
   }
@@ -62,12 +69,17 @@ struct DocTriageServiceTests {
     try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let env = try Self.environment(home, store)
-      let old = kind == "edge" ? "edge:api/service:push/sdk"
+      let old =
+        kind == "edge"
+        ? "edge:api/service:push/sdk"
         : kind + ":" + (kind == "app" ? "api" : kind == "service" ? "push" : "messaging")
       let ref = try Self.propose(env, about: old)
       try store.write {
-        try $0.database.execute(sql: replace ? "UPDATE \(kind) SET uid='replacement'"
-          : kind == "edge" ? "UPDATE edge SET kind='HTTP API'" : "UPDATE \(kind) SET slug='renamed'")
+        try $0.database.execute(
+          sql: replace
+            ? "UPDATE \(kind) SET uid='replacement'"
+            : kind == "edge"
+              ? "UPDATE edge SET kind='HTTP API'" : "UPDATE \(kind) SET slug='renamed'")
       }
       let before = try DocVerificationPreparationTests.truth(store)
       do {
@@ -85,7 +97,8 @@ struct DocTriageServiceTests {
           let target = try #require(try DocStore.attachments(1, workspace: 1, in: db).first)
           let expected = kind == "edge" ? "edge:api/service:push/HTTP%20API" : kind + ":renamed"
           #expect(try TaskLinkTarget.render(target, in: db) == expected)
-          #expect(try String.fetchOne(db, sql: "SELECT about_refs FROM doc_rev") == "[\"" + old + "\"]")
+          #expect(
+            try String.fetchOne(db, sql: "SELECT about_refs FROM doc_rev") == "[\"" + old + "\"]")
           #expect(try Int.fetchOne(db, sql: "SELECT current_rev FROM doc") == 1)
           let verified = try String.fetchOne(db, sql: "SELECT verified_at FROM doc")
           #expect((verified == nil) == ["app", "edge"].contains(kind))
@@ -103,8 +116,12 @@ struct DocTriageServiceTests {
       let (store, repo) = try DocVerificationPreparationTests.setup(home)
       let expected = Mutex<[[Row]]?>(nil)
       let runner = ScriptedGitRunner(
-        script: [(DocVerificationPreparationTests.request("origin/api", repo: repo),
-          DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA))],
+        script: [
+          (
+            DocVerificationPreparationTests.request("origin/api", repo: repo),
+            DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
+          )
+        ],
         beforeRequest: { _ in
           try Self.mutate(change, store: store)
           let truth = try DocVerificationPreparationTests.truth(store)
@@ -124,6 +141,68 @@ struct DocTriageServiceTests {
       }
       #expect(runner.isExhausted)
       #expect(try DocVerificationPreparationTests.truth(store) == expected.withLock { $0 })
+    }
+  }
+
+  @Test(arguments: [
+    "stale", "overlap", "unknown", "source", "decided", "foreign",
+    "doc_verification", "approval",
+  ])
+  func invalidAcceptanceAndLateFailuresLeaveTheWholeBatchUntouched(fault: String) async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let env = try Self.environment(home, store)
+      try DocProposalServiceTests.task(store, seq: 1, actor: env.actor.description)
+      let first = try Self.propose(env, about: "service:push")
+      let second = try Self.propose(env, about: "service:push")
+      if fault == "stale" {
+        _ = try await DocWriteService(environment: env, workspace: "acme", approved: "Update rules")
+          .edit(
+            DocEditRequest(slug: "rules", title: "Rules", about: ["service:push"]),
+            input: { "Updated." })
+      }
+      try store.write { tx in
+        let sql = [
+          "unknown": "UPDATE doc_rev SET about_targets=NULL WHERE rev=1",
+          "source": "DELETE FROM task",
+          "decided": "UPDATE doc_rev SET state='rejected' WHERE rev=1",
+          "foreign": "UPDATE doc SET workspace_id=99",
+        ][fault]
+        if let sql {
+          if fault == "foreign" {
+            try tx.database.execute(
+              sql:
+                "INSERT INTO workspace(id,uid,slug,name,task_prefix) VALUES(99,'beta','beta','Beta','BE')"
+            )
+          }
+          try tx.database.execute(sql: sql)
+        }
+        if ["doc_verification", "approval"].contains(fault) {
+          try tx.database.execute(
+            sql:
+              "CREATE TRIGGER fail_decision BEFORE INSERT ON \(fault) BEGIN SELECT RAISE(ABORT,'decision fault'); END"
+          )
+        }
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let expected: ErrorCode =
+        fault == "stale"
+        ? .staleRev
+        : fault == "foreign"
+          ? .notFound
+          : ["doc_verification", "approval"].contains(fault)
+            ? .env
+            : fault == "decided" ? .invalid : .conflict
+      await DocWritePolicyTests.refusal(expected) {
+        _ = try await DocTriageService(
+          environment: env, workspace: "acme", approved: "Review rules"
+        )
+        .triage(
+          DocTriage(
+            accept: fault == "overlap" ? [first, second] : [first],
+            reject: fault == "overlap" ? [] : [second]))
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
 
