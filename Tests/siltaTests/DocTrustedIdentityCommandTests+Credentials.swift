@@ -30,10 +30,10 @@ extension DocTrustedIdentityCommandTests {
           if kind == "edge-target" {
             try db.execute(
               sql: """
-                INSERT INTO app(uid,workspace_id,slug,repo_id,ref)
-                SELECT 'credential-peer',workspace_id,'safe-peer',repo_id,ref FROM app LIMIT 1;
-                INSERT INTO edge(uid,workspace_id,from_app_id,to_app_id,kind)
-                SELECT 'credential-edge',a.workspace_id,p.id,a.id,'peer'
+                INSERT INTO app(uid,workspace_id,slug,name,repo_id,ref,is_primary)
+                SELECT 'credential-peer',workspace_id,'safe-peer','Peer',repo_id,ref,0 FROM app LIMIT 1;
+                INSERT INTO edge(uid,workspace_id,from_app_id,to_app_id,kind,summary)
+                SELECT 'credential-edge',a.workspace_id,p.id,a.id,'peer','Peer'
                 FROM app a JOIN app p ON p.workspace_id=a.workspace_id
                 WHERE a.slug=? AND p.slug='safe-peer'
                 """, arguments: [DocTrustedIdentityFixture.app])
