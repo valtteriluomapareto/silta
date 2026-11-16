@@ -15,10 +15,11 @@ concurrency:
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# `scripts/verify.sh full` split in two parallel jobs; `verify` is the required check.
 jobs:
-  verify:
+  swift:
     runs-on: xcode-27   # GitHub public-preview image with Xcode 27.1 (D18)
-    timeout-minutes: 45
+    timeout-minutes: 35
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,9 +32,25 @@ jobs:
       - name: Install pinned Swift tools
         run: bash scripts/ci/install-swift-tools.sh
 
-      # The slow tiers take seconds, so every run includes them.
-      - name: Verify
-        run: scripts/verify.sh full
+      # build-prior-writer.sh pins the commits and checks each cached binary's stamp
+      # (commit, Swift toolchain, SHA-256). A bad entry is rebuilt but not saved again until
+      # the key changes. The weekly run builds them from source.
+      - name: Name the toolchain for the prior-writer cache
+        if: github.event_name != 'schedule'
+        id: toolchain
+        run: echo "swift=$(swift --version 2>/dev/null | head -1 | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore prior writers
+        if: github.event_name != 'schedule'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/prior-writers
+          key: prior-writers-${{ runner.arch }}-${{ steps.toolchain.outputs.swift }}-${{ hashFiles('scripts/build-prior-writer.sh') }}
+
+      - name: Verify (Swift, slow tiers, wall-clock)
+        env:
+          SILTA_PRIOR_WRITER_CACHE: ${{ github.event_name != 'schedule' && format('{0}/prior-writers', runner.temp) || '' }}
+        run: scripts/verify.sh full-swift
 
       - name: Upload scenario evidence on failure
         if: failure()
@@ -42,3 +59,34 @@ jobs:
           name: scenario-evidence
           path: artifacts/scenarios
           if-no-files-found: ignore
+
+  evals:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: bash scripts/ci/select-xcode.sh
+
+      - name: Verify (offline agent eval replays)
+        run: scripts/verify.sh evals
+
+  # A job whose needs failed is skipped, and a skipped required check counts as passing,
+  # so this always runs and accepts only two successes.
+  verify:
+    needs: [swift, evals]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require both jobs to succeed
+        env:
+          SWIFT: ${{ needs.swift.result }}
+          EVALS: ${{ needs.evals.result }}
+        run: |
+          echo "swift: $SWIFT, evals: $EVALS"
+          [[ "$SWIFT" == success && "$EVALS" == success ]]
