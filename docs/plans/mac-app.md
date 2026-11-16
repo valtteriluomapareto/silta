@@ -68,8 +68,8 @@ the human copies.
   - **Root package target `SiltaAppSupport`** (Foundation + SiltaCore, no SwiftUI).
     It holds read models for the screens and command templates, with a small `public`
     API. Shared development fixture seeding is whole-file DEBUG code here, with a
-    SiltaTestSupport wrapper (D23); the app never links test support. SiltaCore's services are `package`-scoped, so this target must live in the
-    root package.
+    `SiltaTestSupport` wrapper (D23); the app never links test support. SiltaCore's
+    services are `package`-scoped, so this target must live in the root package.
   - **Thin Xcode project `App/SiltaApp.xcodeproj`** (target `SiltaApp`). It holds the
     SwiftUI views and the asset catalog, links `SiltaAppSupport`, and pins MarkdownUI
     (D18) only there.
@@ -96,15 +96,17 @@ the human copies.
 
 | Slice | Scope | Depends on | Verify with |
 |---|---|---|---|
-| A1 | `SiltaAppSupport`: read models for workspaces, the human inbox and review tasks, the board, task detail and the workspace map; the v2 fixture dataset as a `SiltaTestSupport` seed; `data_version` probe | — | `swift test` on the seed: every count in the v2 notes reconciles; models match `task ls`/`task show`/`inbox --for me` output for the same store |
+| A1 | `SiltaAppSupport`: read models for workspaces, the human inbox and review tasks, the board, task detail and the workspace map; the shared v2 seed in DEBUG `SiltaAppSupport/Control/`, with a `SiltaTestSupport` wrapper; `data_version` probe | — | `swift test` on the seed: every count in the v2 notes reconciles; models match `task ls`/`task show`/`inbox --for me` output for the same store |
 | A2 | Xcode app shell: sidebar, toolbar, My work, ref chip and command block with copy, store states, focus/⌘R/timer refresh | A1 | Build locally; command templates execute in a fixture with placeholders filled; unfilled placeholders are refused with no write; manual pass on the dogfood workspace |
-| A3 | Board and task inspector | A2, C1/C2 in [control plan](mac-app-control.md) | View-model tests on the seed; manual pass |
-| A4 | Workspace and connection inspector | A2, C1/C2 in [control plan](mac-app-control.md) | View-model tests on `docs/examples/acme-workspace.yaml` loaded into a store |
-| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A2, C1/C2, SI-126, SI-134 | Read-model tests on fixture docs, including pending-only, archived, legacy metadata and a doc over 400 lines; manual pass |
+| A3 | Board and task inspector | A2, C1b / SI-153 in [control plan](mac-app-control.md) | View-model tests on the seed; manual pass |
+| A4 | Workspace and connection inspector | A2, C1b / SI-153 in [control plan](mac-app-control.md) | View-model tests on `docs/examples/acme-workspace.yaml` loaded into a store |
+| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A2, C1b / SI-153, C2, SI-126, SI-134 | Read-model tests on fixture docs, including pending-only, archived, legacy metadata and a doc over 400 lines; manual pass |
 
-The [development control plane](mac-app-control.md) runs C1 then C2 after A2,
-before A3/A4. A3 and A4 can then run in parallel and add their routes/actions to
-the same control surface. Each slice targets one PR of about 800 lines.
+The [development control plane](mac-app-control.md) runs C1a / SI-152 then
+C1b / SI-153 after A2. C2, A3 and A4 can then run alongside one another. A3/A4
+add their routes and selection state with their screens, and their live actions
+after C2 is available. A5 additionally waits for C2 and its docs prerequisites.
+Each slice targets one PR of about 800 lines.
 
 ## Validation
 

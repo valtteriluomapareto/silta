@@ -45,10 +45,12 @@ execution, CI screenshot approval, and changes to Paper or Poimi.
 
 - All control Swift files live under a directory named `Control/` and are wrapped
   as whole files in `#if DEBUG`. Flag parsing lives in one `ControlLaunch.swift`.
-  Release has no control parser, mailbox observer or snapshot writer. Its generic
-  startup argument validator rejects all unknown launch arguments before opening
-  storage, including development flags; it cannot fall back to normal data access.
-  Allow only the documented operating-system launch arguments needed by the app.
+  Release has no control parser, mailbox observer or snapshot writer. Before
+  opening storage, its startup check refuses only arguments beginning with
+  `-Silta`, including unknown `-Silta*` flags. It leaves other arguments to macOS
+  and Xcode, including `-NSDocumentRevisionsDebugMode`,
+  `-ApplePersistenceIgnoreState` and `-AppleLanguages`; there is no general
+  unknown-argument rejection or operating-system argument allowlist.
 - One `ControlFixture` enum is shared by launch, previews and fixture tests:
   `v2`, `empty`, `newer-schema`, `missing-store`, `many-items`, `long-text`.
   Its home is the DEBUG-only control sources of the root app-support target, so
@@ -60,9 +62,16 @@ execution, CI screenshot approval, and changes to Paper or Poimi.
   one dataset and seeding path. The wrapper is also DEBUG-gated so Release builds
   cannot reference an absent seed. Test support may depend on app support; app support
   never depends on test support. This is the narrow D23 update recorded with this
-  plan: DEBUG fixture clock/ID adapters may live beside that seed. General-purpose
-  fakes stay in test support; no package guard is relaxed. The minimal whole-file
-  DEBUG guard and its Python self-tests ship with A1's first fixture sources; C1a
+  plan: one fixed fixture/test clock implementation lives beside the seed in
+  DEBUG `SiltaAppSupport/Control/`, and test support reuses it through an alias or
+  forwarding wrapper, without another implementation. The seeded ID algorithm
+  already serves the CLI in SiltaCore; it remains the single implementation there.
+  DEBUG Control exposes shared access to that same generator, reused by test
+  support, rather than copying its algorithm or making Core depend on app support.
+  Existing clock/ID conformance suites exercise these shared implementations.
+  Test-support helpers that need DEBUG-only types are also DEBUG-gated so Release
+  product builds still compile. Other fakes stay in test support; no package guard
+  is relaxed. The minimal whole-file DEBUG guard and its Python self-tests ship with A1's first fixture sources; C1a
   extends coverage to App control files and Release launch behavior.
 - Seed ordinary fixtures through core service APIs before opening the read-only
   app connection. `missing-store` creates no database. `newer-schema` starts from
@@ -111,7 +120,9 @@ scripts/silta-app.sh shot /tmp/silta-mywork.png
 - Required fields: `snapshotVersion`, `run`, `revision`, `fixture`, `appearance`,
   `screen`, `route`, typed `selection`, `inspectorOpen`, `counts` (board lanes,
   sidebar badges), `refresh` (phase, last observed data_version, coded load error),
-  `pending` and `idle`. Unsupported/unloaded counts are null, never invented zeros.
+  `pid`, `windowNumber` and `idle`. `windowNumber` is the owned `NSWindow`
+  number, or null until its window exists. Unsupported/unloaded counts are null,
+  never invented zeros.
   Bodies, comments, paths, credentials and arbitrary error strings are excluded.
 - `idle` means startup, route application, read-model loading and refresh have
   completed and the snapshot includes their results. Error states can be idle;
@@ -120,15 +131,30 @@ scripts/silta-app.sh shot /tmp/silta-mywork.png
   change notifications and a monotonic deadline, not fixed sleeps or a busy loop.
   Predicates use jq; invalid predicates fail immediately. Timeout must be finite
   and positive (at most 120 seconds). Register the file watch before the first read
-  and re-read after registration/events to avoid lost changes. jq has its ordinary
-  missing-key semantics: predicates must use `has(...)` or explicit type checks
-  before nullable comparisons; the script does not try to parse jq into a schema.
-  Timeout reports the
-  unmet predicates and last snapshot, including when no snapshot was published.
-- `shot` waits for current-run idle, targets the app's window by the recorded
-  process (not its title or the frontmost window), and captures only that window.
-  A missing window or Screen Recording permission is an actionable error, never a
-  screenshot of another app. Inspect every screenshot used as visual evidence.
+  and re-read after registration/events to avoid lost changes. Examples use
+  `has(...)` or type checks before nullable comparisons under ordinary jq semantics.
+  Timeout reports the unmet predicates and last snapshot, including when no
+  snapshot was published. C1b decides whether undeclared paths fail immediately
+  (follow-up below); this plan does not select a jq/schema parsing mechanism.
+- `shot` waits for current-run idle and a positive `windowNumber`. The app writes
+  its actual window number and PID into `state.json`; the script verifies that the
+  window still belongs to the recorded run's live PID using Core Graphics window
+  metadata. It then runs `/usr/sbin/screencapture -l"$windowNumber" -o "$output"`
+  to capture only that window, without its shadow. Never select by title, frontmost
+  app or screen bounds. A closed/reused window or denied Screen Recording access
+  fails explicitly. Inspect every screenshot used as visual evidence.
+- Before starting C1b / SI-153, run a capture preflight from the same execution host
+  and permission context as the script, against a temporary synthetic owned window.
+  Record the command, result and inspected artifact on SI-153; another tool's screen
+  capture permission does not prove that `screencapture` can run here. Repeat when
+  the execution host or permissions change. Do not enable permissions automatically.
+  If blocked, the human can grant Screen Recording and relaunch the host, or run
+  the same `shot` command from a Screen Recording-authorized Terminal and provide
+  its result and file. Manual capture of the owned app window is a visual-only
+  fallback: pair it with the current run/route/revision and inspect it. It does not
+  verify the script. Record the execution host for successful script capture; keep
+  automated-capture acceptance open until that succeeds. Launch/state/wait work can
+  proceed while the capture capability is blocked.
 
 ### Live actions (C2)
 
@@ -148,8 +174,9 @@ accepts action JSON rather than introducing an action-specific argument parser.
   reject symlinks. Only one client writes to a run at a time. Repeated sequences
   return the prior response without repeating effects; stale-run requests fail.
 - Actions: `nav`, `select.task`, `select.doc`, `select.connection`, `inspector`,
-  `copy.ref`, `copy.command`, `refresh`. Add each screen's actions
-  with that screen. Unsupported actions return `refused(unsupported)`.
+  `copy.ref`, `copy.command`, `refresh`. Add each screen's action registration
+  after both its UI and C2 are available; track that follow-up on the screen task
+  when its UI ships first. Unsupported actions return `refused(unsupported)`.
 - UI actions call the same app handler as a click or keyboard command. The control
   layer only decodes, dispatches and projects. Results are `accepted`, `noop` or
   `refused(reason)`; accepted means admitted, not finished.
@@ -172,17 +199,31 @@ accepts action JSON rather than introducing an action-specific argument parser.
 
 | Slice | Scope | Depends on | Verify with |
 |---|---|---|---|
-| C1a / SI-146 / #178 | Shared named fixtures, launch and My work route, atomic snapshot, extend A1 release guard | A2; reuse A1 seed | SwiftPM fixture tests, Xcode launch/snapshot tests, Python guard self-tests, Debug and Release builds |
-| C1b / SI-146 / #178 | `launch/state/wait/shot`, process ownership, AGENTS.md onboarding | C1a | Python script/wait tests; Debug fixture launch and inspected light/dark window screenshots |
-| C2 / SI-147 / #179 | Mailbox, dispatch to shared handlers, sequence barriers, copy and fixture-write refresh | C1 | Strict-decoding and action tests; isolated CLI write changes read-model counts on the existing reader; real UI wiring check |
+| C1a / SI-152 / #178 | Shared named fixtures, launch and My work route, atomic snapshot, extend A1 release guard | A2; reuse A1 seed | SwiftPM fixture tests, Xcode launch/snapshot tests, Python guard self-tests, Debug and Release builds |
+| C1b / SI-153 / #178 | `launch/state/wait/shot`, process ownership, AGENTS.md onboarding | C1a; capture preflight recorded before starting | Python script/wait/shot tests; Debug fixture launch and inspected light/dark window screenshots |
+| C2 / SI-147 / #179 | Mailbox, dispatch to shared handlers, sequence barriers, copy and fixture-write refresh | C1b | Strict-decoding and action tests; isolated CLI write changes read-model counts on the existing reader; real UI wiring check |
 
-Schedule A1 → A2 → C1a → C1b → C2 before A3/A4. A3 and A4 add their own routes/actions
-without a second control-plane implementation. A5 still waits for SI-126 and
-SI-134. Keep each PR near 800 lines; split a task into linked subtasks if its
-acceptance tests and implementation exceed a reviewable change. Create C1a/C1b
-subtasks while C1 is claimed; link their PRs to #178 without duplicating its issue.
-The planning PR
-is part of C1, not a duplicate task; C1 stays unfinished until its implementation.
+Schedule A1 → A2 → C1a → C1b, then C2, A3 and A4 can run alongside one another.
+A3/A4 require reach-and-look, not live actions: they add routes and selection state
+with their screens, then add live actions after C2 is available. A5 still waits for
+C2, SI-126 and SI-134. No second control-plane
+implementation is needed. Keep each PR near 800 lines; split oversized work into
+linked subtasks.
+
+SI-146 is the C1 implementation parent, with SI-152 and SI-153 beneath it. Keep it
+`doing` and out of review until both implementation parts are complete. Plan-only
+PR #186 belongs to its own child SI-159; only that child tracks the planning review.
+Plan-only children link their PR, not the parent issue, so finish automation cannot
+close #178 for documentation. Never pass SI-146 to `dogfood-finish` for #186. Use a
+separate subtask for future plan-only PRs too; #178 remains open for C1 code.
+
+### C1b follow-up: undeclared wait paths
+
+Evaluate Poimi's immediate failure for a snapshot path that is not declared, instead
+of making every caller rely on `has()`. Decide this in C1b / SI-153, with tests that
+distinguish an undeclared path from a declared field whose value is null. The decision
+must cover supported jq expressions and an actionable error; no implementation or
+custom jq/schema parser is part of #186.
 
 ## Validation
 
@@ -197,7 +238,9 @@ alone proves no Xcode tests ran. Report unexecuted local or CI suites by name.
 
 
 - C1: `ControlFixtureTests` proves every named fixture, deterministic time/IDs,
-  A1 count parity, empty and long/scale cases. `ControlLaunchTests` proves route
+  A1 count parity, empty and long/scale cases. Existing `DeterminismTests` clock/ID
+  contracts must exercise the shared Control/test-support types, with no second
+  fixed-clock or seeded-ID implementation. `ControlLaunchTests` proves route
   parsing, unsupported screens, invalid flags and isolation (including symlinked
   real-home rejection) before storage access. `ControlSnapshotTests` proves schema,
   no bodies/paths, atomic replacement, terminal errors and honest idle. Test the
@@ -205,9 +248,19 @@ alone proves no Xcode tests ran. Report unexecuted local or CI suites by name.
   run success, invalid jq, timeout, absent/malformed snapshot and stale run. Cover
   a change during observer registration, invalid timeout bounds, and missing-key
   predicates using `has` before null comparisons.
+- C1b: `ControlShotTests` inject process/window metadata and a capture runner.
+  Cover a positive owned window number and exact `screencapture -lID -o` arguments;
+  null, missing or stale windows; wrong PID/run ownership; denied/failed capture;
+  and partial output that must not be accepted as an artifact. Ownership failures
+  must refuse before invoking capture. These are unit-test seams, not runtime
+  executable overrides. The actual-host permission preflight and inspected image
+  remain separate acceptance checks.
 - C1 guard: Python self-tests plant unwrapped files, an early `#endif`, nested
-  directives, empty trees and a Release-visible launch flag. Require whole-file
-  DEBUG wrapping for every control source in App and Sources; run the guard in CI.
+  directives, empty trees and a Release-visible launch flag. Release startup tests
+  refuse known and unknown `-Silta*` arguments before any storage open, while
+  accepting unrelated arguments, including the three macOS/Xcode examples above.
+  Require whole-file DEBUG wrapping for every control source in App and Sources;
+  run the guard in CI.
 - C2: `ControlMailboxTests` covers each action, each refusal, duplicate/stale
   sequences, malformed/oversized files and symlinks; fake-clock tests cover timeouts
   and the accepted-to-settled barrier. A refresh acceptance test uses two database
@@ -221,9 +274,13 @@ alone proves no Xcode tests ran. Report unexecuted local or CI suites by name.
   Xcode, record local-only app validation and the missing CI coverage explicitly.
 - Launch fixtures, read state and inspect captured screenshots for each new screen.
   A real click/keyboard pass proves wiring; invoking a shared handler cannot.
-  Launch Release with development arguments and an isolated sentinel data home;
-  assert it exits before creating files or reading that sentinel. Spy on the
-  storage opener in Xcode tests to prove no default/real home is opened either.
+  Launch Release with known and unknown `-Silta*` arguments and an isolated sentinel
+  data home; assert refusal before creating files or reading that sentinel. Spy on
+  the storage opener in Xcode tests to prove no default/real home is opened either.
+  Separate Release tests pass `-NSDocumentRevisionsDebugMode YES`,
+  `-ApplePersistenceIgnoreState YES`, the argument pair `["-AppleLanguages", "(en)"]`
+  and an unrelated argument through normal startup in an isolated home; they must not trigger
+  control-argument refusal.
 
 ## Risks
 
