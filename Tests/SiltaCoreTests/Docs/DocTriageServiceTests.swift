@@ -87,7 +87,8 @@ struct DocTriageServiceTests {
           #expect(try TaskLinkTarget.render(target, in: db) == expected)
           #expect(try String.fetchOne(db, sql: "SELECT about_refs FROM doc_rev") == "[\"" + old + "\"]")
           #expect(try Int.fetchOne(db, sql: "SELECT current_rev FROM doc") == 1)
-          #expect(try String.fetchOne(db, sql: "SELECT verified_at FROM doc") == nil)
+          let verified = try String.fetchOne(db, sql: "SELECT verified_at FROM doc")
+          #expect((verified == nil) == ["app", "edge"].contains(kind))
         }
       }
     }
@@ -133,14 +134,14 @@ struct DocTriageServiceTests {
       "reject-body": "UPDATE doc_rev SET body_md='changed reject' WHERE doc_id=2",
       "revision": "UPDATE doc_rev SET uid='replacement-revision' WHERE doc_id=1",
       "state": "UPDATE doc_rev SET state='rejected' WHERE doc_id=1",
-      "source": "UPDATE task SET uid='replacement-source'",
+      "source": "UPDATE task SET uid='replacement-source' WHERE seq=80",
       "app": "UPDATE app SET uid='replacement-app' WHERE slug='api'",
       "edge": "UPDATE edge SET uid='replacement-edge' WHERE kind='sdk'",
-      "service": "UPDATE service SET uid='replacement-service'",
+      "service": "UPDATE service SET uid='replacement-service' WHERE slug='push'",
       "repo": "UPDATE repo SET uid='replacement-repo'",
       "path": "UPDATE repo_path SET path='/acme/changed'",
       "ref": "UPDATE app SET ref='origin/new' WHERE slug='api'",
-      "workspace": "UPDATE workspace SET uid='replacement-workspace'",
+      "workspace": "UPDATE workspace SET uid='replacement-workspace' WHERE slug='acme'",
     ]
     let sql = try #require(statements[change])
     try store.write { try $0.database.execute(sql: sql) }
