@@ -42,10 +42,11 @@ class ModuleResult:
     def problem(self) -> str | None:
         if self.exit_code is None:
             return f"timed out after {self.seconds:.0f}s"
-        if self.exit_code != 0:
-            return f"exit {self.exit_code}"
+        # Before the exit code: Python 3.12+ exits 5 when no tests ran.
         if self.tests == 0:
             return "ran no tests"
+        if self.exit_code != 0:
+            return f"exit {self.exit_code}"
         if SKIPPED.search(self.output):
             return "skipped tests"
         return None
