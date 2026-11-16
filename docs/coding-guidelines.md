@@ -104,6 +104,9 @@ quietly diverge.
 - **Fakes live in the `SiltaTestSupport` target**, so unit tests, CLI tests and the
   scenario runner share them. Production targets never depend on it (guard:
   `check_package_graph.py`).
+  The narrow D23 exception is a shared Mac development seed and its deterministic
+  clock/ID adapters in whole-file DEBUG `SiltaAppSupport/Control/` sources,
+  guarded from Release. SiltaTestSupport wraps it; app targets never link test support.
 - **Every seam with a system and a fake implementation has a conformance suite** that
   runs against both (§6), so fakes can't drift from reality.
 
