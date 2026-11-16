@@ -251,6 +251,14 @@ are masked and capped at 120 characters. List title/metadata previews and accept
 brief summaries are also capped at 120 characters. The doc input, list and guide goldens cover
 these bounds. Retained bodies follow the separate literal-preservation contract.
 
+Document diffs use three context lines per hunk. The private Myers search is capped
+at 1,024 edit levels and 1,000,000 frontier/line-comparison steps, with about 16 MiB
+of frontier trace storage. Input and rendered-output storage still scale with the
+stored content. If the search cannot finish within those limits, the complete
+trimmed middle is rendered as removals and additions, with common context retained.
+These are implementation bounds, not restrictions on readable historical bodies.
+The small-change, fallback-preservation and real CLI workload tests fix the behavior.
+
 ### Help pages
 
 Every command's help has an abstract of one sentence, at most 80 characters,

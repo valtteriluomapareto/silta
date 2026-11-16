@@ -25,34 +25,39 @@ extension DocStore {
       let createdAt = try text("created_at")
     else { throw StorageError.corrupt }
     let raw = try text("about_refs")
+    let rawTargets = try text("about_targets")
     let about: [String]?
+    let targets: [DocTargetIdentity]?
     do {
       about = try raw.map { try JSONDecoder().decode([String].self, from: Data($0.utf8)) }
-    } catch { throw StorageError.corrupt }
-    let sourceID: Int64? = row["source_task_id"]
-    let source: String?
-    if let sourceID {
-      let bytes = try Data.fetchOne(
-        db,
-        sql: """
-          SELECT CAST(workspace.task_prefix||'-'||task.seq AS BLOB) FROM task
-          JOIN workspace ON workspace.id=task.workspace_id
-          WHERE task.id=? AND task.workspace_id=?
-          """, arguments: [sourceID, workspace])
-      guard let bytes, let value = String(data: bytes, encoding: .utf8) else {
-        throw StorageError.corrupt
+      targets = try rawTargets.map {
+        try JSONDecoder().decode([DocTargetIdentity].self, from: Data($0.utf8))
       }
-      source = value
-    } else {
-      source = nil
-    }
+    } catch { throw StorageError.corrupt }
+    let source = try sourceTask(row["source_task_id"], workspace: workspace, in: db)
     let triagedBy = try text("triaged_by")
     let triagedAt = try text("triaged_at")
     guard (triagedBy == nil) == (triagedAt == nil) else { throw StorageError.corrupt }
     return try DocRevision(
       slug: storedSlug, revision: row["rev"], baseRevision: row["base_rev"],
-      body: body, title: text("title"), kind: text("kind"), about: about,
+      body: body, title: text("title"), kind: text("kind"), about: about, aboutTargets: targets,
       state: state, actor: actor, message: text("message"),
       createdAt: createdAt, sourceTask: source, triagedBy: triagedBy, triagedAt: triagedAt)
   }
+  private static func sourceTask(_ id: Int64?, workspace: Int64, in db: Database) throws -> String?
+  {
+    guard let id else { return nil }
+    let bytes = try Data.fetchOne(
+      db,
+      sql: """
+        SELECT CAST(workspace.task_prefix||'-'||task.seq AS BLOB) FROM task
+        JOIN workspace ON workspace.id=task.workspace_id
+        WHERE task.id=? AND task.workspace_id=?
+        """, arguments: [id, workspace])
+    guard let bytes, let value = String(data: bytes, encoding: .utf8) else {
+      throw StorageError.corrupt
+    }
+    return value
+  }
+
 }

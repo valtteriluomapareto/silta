@@ -1019,13 +1019,18 @@ Percent-encoded attachment refs are inspected as decoded text for secrets; safe 
 retain their canonical spelling. A credential-bearing list filter is omitted from
 recovery: its continuation restarts the broader scoped list without a filter or offset.
 
-`doc show <ref> --diff` compares stored title, kind, attachments, why, source task,
-paired decision metadata and body with the
-revision's recorded `base_rev`, using one replacement hunk with unchanged leading
-and trailing lines removed. A missing recorded base refuses with plain-show recovery;
-a nil base is empty. Masking precedes comparison; identical masked views say
-"no visible changes". Original proposer and creation time are shown separately from
-the compared content; decision attribution never replaces proposer attribution.
+`doc show <ref> --diff` compares the body with the revision's recorded `base_rev`
+using contextual line hunks whose coordinates refer to the masked body. Separate
+metadata headers show stored title, kind, attachments, why, source task and paired
+decision evidence. Known attachment identities can change even when their displayed
+refs do not; that change is shown without resolving historical targets or exposing
+their internal ids. Historical unknown identities are not inferred.
+A bounded search may render a broader replacement hunk for complex edits; it
+preserves the complete change. A missing recorded base refuses with plain-show
+recovery; a nil base is empty. Masking precedes comparison and line selection;
+identical masked views say "no visible changes". Original proposer and creation time
+are shown separately from the compared content; decision attribution never replaces
+proposer attribution.
 
 `doc show <ref> --comments [--offset N] [--limit N]` pages comments in sequence order,
 20 by default and at most 20 per page. `doc show doc:slug@revision/comment` reads one
@@ -1055,7 +1060,9 @@ of reading input; it is exclusive with `-F`. An archived accepted body is eligib
 but reactivation needs replacement about refs after its live links are removed.
 Retained bodies are not rescanned or retroactively capped; existing NUL bytes stay literal.
 Each save creates one
-accepted revision. Concurrent changes to the owned baseline or prepared target
+accepted revision and captures its known attachment kind/UID pairs, as proposals do.
+Historical NULL target snapshots remain unknown and are not inferred from current names.
+Concurrent changes to the owned baseline or prepared target
 bindings refuse atomically. Used agent approval is recorded in the same transaction.
 Acceptance records an observation row with actor, message, time and the SHAs actually
 read for configured apps, including both ends of an app edge. Missing clones or

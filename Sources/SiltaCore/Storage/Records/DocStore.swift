@@ -24,6 +24,8 @@ struct DocStore {
     guard verification.matches(current) else {
       throw DocError.changed(workspace: verification.binding.workspace)
     }
+    let targets = try DocTargetIdentity.encoded(
+      current.targets.map { DocTargetIdentity(kind: $0.kind, uid: $0.uid) })
     let stamp = utcTimestamp(at)
     let verifiedAt = verification.snapshots.count == current.apps.count ? stamp : nil
     let id = try docID(draft.slug, metadata: metadata, old: old, stamp: stamp)
@@ -32,13 +34,14 @@ struct DocStore {
     try db.execute(
       sql: """
         INSERT INTO doc_rev(
-          uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,title,kind,about_refs)
-        VALUES(?,?,?,?,CAST(? AS TEXT),'accepted',?,?,?,?,?,?)
+          uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,
+          title,kind,about_refs,about_targets)
+        VALUES(?,?,?,?,CAST(? AS TEXT),'accepted',?,?,?,?,?,?,?)
         """,
       arguments: [
         try ids.next(at: at), id, number, base, Data(draft.body.utf8),
         actor.description, draft.message, stamp, metadata.title, metadata.kind,
-        try WorkspaceConfig.json(metadata.refs),
+        try WorkspaceConfig.json(metadata.refs), targets,
       ])
     let revisionID = db.lastInsertedRowID
     try replaceAttachments(metadata.targets, doc: id, stamp: stamp)
