@@ -35,7 +35,8 @@ the human copies.
   each actionable inbox entry and each distinct review task once;
   it does not count visual groups. The maintainer chose actionable-item counts on
   2026-11-16; Paper v2's “4 waiting” group count is not the acceptance value.
-- **Board:** lanes with plan progress, and a task inspector showing the plan, claim,
+- **Board:** blocked tasks stay in Todo with a blocked label; lanes show plan progress,
+  and a task inspector shows the plan, claim,
   properties and discussion.
 - **Workspace:** apps and connections with a connection inspector, read from the
   workspace model rather than YAML.
@@ -96,8 +97,9 @@ the human copies.
 
 | Slice | Scope | Depends on | Verify with |
 |---|---|---|---|
-| A1 | `SiltaAppSupport`: read models for workspaces, the human inbox and review tasks, the board, task detail and the workspace map; the v2 fixture dataset as a `SiltaTestSupport` seed; `data_version` probe | — | `swift test` on the seed: every count in the v2 notes reconciles; models match `task ls`/`task show`/`inbox --for me` output for the same store |
-| A2 | Xcode app shell: sidebar, toolbar, My work, ref chip and command block with copy, store states, focus/⌘R/timer refresh | A1 | Build locally; command templates execute in a fixture with placeholders filled; unfilled placeholders are refused with no write; manual pass on the dogfood workspace |
+| A1a (SI-154) | `SiltaAppSupport`: workspace list, human inbox and review tasks, board and task detail; shared DEBUG v2 seed and release-isolation guard | — | `swift test` on the seed: task counts reconcile; models match `task ls`/`task show`/`inbox --for me`; Release package build excludes fixtures |
+| A1b (SI-155) | Typed workspace-map read models and persistent `data_version` probe | A1a | Map counts and edges match the seed; probe sees an external CLI write and stays unchanged by reads |
+| A2 | Xcode app shell: sidebar, toolbar, My work, ref chip and command block with copy, store states, focus/⌘R/timer refresh | A1a, A1b | Build locally; command templates execute in a fixture with placeholders filled; unfilled placeholders are refused with no write; manual pass on the dogfood workspace |
 | A3 | Board and task inspector | A2, C1/C2 in [control plan](mac-app-control.md) | View-model tests on the seed; manual pass |
 | A4 | Workspace and connection inspector | A2, C1/C2 in [control plan](mac-app-control.md) | View-model tests on `docs/examples/acme-workspace.yaml` loaded into a store |
 | A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A2, C1/C2, SI-126, SI-134 | Read-model tests on fixture docs, including pending-only, archived, legacy metadata and a doc over 400 lines; manual pass |

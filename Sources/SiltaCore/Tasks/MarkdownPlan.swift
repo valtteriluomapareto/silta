@@ -3,12 +3,12 @@ import Foundation
 /// The small Markdown subset used for importing and ticking task checklists.
 package struct MarkdownPlan: Sendable {
   /// A top-level checkbox outside fences: what `--step N` counts, from 1.
-  struct Checkbox: Sendable {
+  package struct Checkbox: Sendable {
     let line: Int
 
-    let done: Bool
+    package let done: Bool
 
-    let title: String
+    package let title: String
   }
 
   struct Step: Sendable {
@@ -70,7 +70,8 @@ package struct MarkdownPlan: Sendable {
     checklist = output.joined(separator: "\n")
   }
 
-  static func checkboxes(_ text: String) -> [Checkbox] {
+  /// Reads top-level checkboxes with the same fence and indentation rules as ticking.
+  package static func checkboxes(_ text: String) -> [Checkbox] {
     let lines = text.components(separatedBy: "\n")
     return visibleLines(lines).compactMap { index in
       checkbox(lines[index], lineNumber: index)

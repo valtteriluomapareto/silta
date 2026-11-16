@@ -1,7 +1,7 @@
-import SiltaCore
+public import SiltaCore
 
 /// A body-free coded failure exposed without package-scoped implementation types.
-public struct AppReadError: Error, Sendable {
+public struct AppReadError: CodedError {
   /// Presentation states that cannot be selected by error code alone.
   public enum Kind: Sendable {
     /// The store cannot be opened, including a missing data folder.
@@ -16,21 +16,39 @@ public struct AppReadError: Error, Sendable {
   /// Typed presentation category for the viewer's store states.
   public let kind: Kind
   /// Stable core error code.
-  public let code: String
+  public let code: ErrorCode
   /// Human-readable explanation.
   public let message: String
   /// Suggested recovery commands.
   public let next: [String]
+  /// Retry delay supplied by the core, when present.
+  public let retryAfter: Int?
+  /// Owner of the recovery commands.
+  public let nextBy: NextBy
+
+}
+
+extension AppReadError {
+  static let migrationRequired = AppReadError(
+    kind: .migrationRequired, code: .env,
+    message: "Silta data needs migrations; run the matching CLI first.", next: ["silta init"],
+    retryAfter: nil, nextBy: .human)
 
   init(_ error: any Error) {
+    if let existing = error as? AppReadError {
+      self = existing
+      return
+    }
     switch error {
     case StorageError.cannotOpen: kind = .unavailableStore
     case StorageError.schemaTooNew: kind = .newerSchema
     default: kind = .other
     }
     let coded: any CodedError = (error as? any CodedError) ?? StorageError.unknown
-    code = coded.code.rawValue
+    code = coded.code
     message = coded.message
     next = coded.next
+    retryAfter = coded.retryAfter
+    nextBy = coded.nextBy
   }
 }

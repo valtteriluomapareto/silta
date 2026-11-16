@@ -1,3 +1,5 @@
+import SiltaCore
+
 /// One core inbox action; separate questions on one task stay separate entries.
 public struct AppAttention: Equatable, Sendable {
   /// Core inbox category.
@@ -18,4 +20,14 @@ public struct AppAttention: Equatable, Sendable {
   public let createdAt: String?
   /// Human-form core next commands; copy templates are a separate presentation concern.
   public let commands: [String]
+}
+
+extension AppAttention {
+  init(_ item: InboxItem) {
+    self.init(
+      kind: item.kind, ref: item.ref,
+      refs: item.tasks?.map(\.ref) ?? item.task.map { [$0] } ?? item.ref.map { [$0] } ?? [],
+      task: item.task, title: item.tasks?.first?.title, author: item.author,
+      body: item.body ?? item.tasks?.first?.why, createdAt: item.createdAt, commands: item.next)
+  }
 }

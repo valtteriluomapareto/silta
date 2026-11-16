@@ -1,3 +1,5 @@
+import SiltaCore
+
 /// Task values shared by board cards, review attention and the inspector.
 public struct AppTask: Equatable, Sendable {
   /// Canonical task reference.
@@ -36,4 +38,22 @@ public struct AppTask: Equatable, Sendable {
   public let closedAt: String?
   /// Discussion included when reading task detail.
   public let comments: [AppComment]
+}
+
+extension AppTask {
+  init(_ task: TaskDetails) {
+    self.init(
+      ref: task.ref, title: task.title, status: task.status, app: task.app,
+      priority: task.priority, description: task.description, plan: task.plan,
+      planRevision: task.planRev,
+      steps: MarkdownPlan.checkboxes(task.plan).map { AppPlanStep(title: $0.title, done: $0.done) },
+      claimedBy: task.claimedBy, claimedAt: task.claimedAt, branch: task.branch,
+      worktree: task.worktree, createdBy: task.createdBy, createdAt: task.createdAt,
+      updatedAt: task.updatedAt, closedAt: task.closedAt,
+      comments: (task.comments ?? []).map {
+        AppComment(
+          ref: $0.ref, kind: $0.kind, actor: $0.actor, body: $0.body,
+          createdAt: $0.createdAt, replyTo: $0.replyTo)
+      })
+  }
 }

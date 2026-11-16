@@ -124,6 +124,8 @@ quietly diverge.
 | Target or folder | Holds |
 |---|---|
 | `Sources/SiltaCore` | The domain library: storage, policy, git access, actors, brief and output. No UI or CLI frameworks (AGENTS.md invariant 1) |
+| `Sources/SiltaAppSupport` | Foundation-only public viewer read models over SiltaCore; shared development fixtures under whole-file DEBUG `Control/` (D23) |
+| `Tests/SiltaAppSupportTests` | Viewer read-model acceptance, core/CLI agreement and storage-safety tests |
 | `Sources/silta` | The CLI: ArgumentParser commands under `Commands/`, plus the entry point, global options and text renderers next to them |
 | `Sources/SiltaTestSupport` | Fakes (clock, log, git runner), the golden helper, scratch directories, `SiltaBinary` and the `.slow` tag. Only test targets depend on it (D23) |
 | `Tests/SiltaCoreTests` | Unit and fixture tests of `SiltaCore`, in folders that mirror its feature folders; error-code goldens in `Golden/` |
