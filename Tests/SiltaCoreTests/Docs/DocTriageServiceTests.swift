@@ -61,4 +61,50 @@ struct DocTriageServiceTests {
     }
   }
 
+  @Test(arguments: ["accepted", "rejected", "foreign"])
+  func invalidSecondMemberNeverChangesTheFirst(kind: String) throws {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let env = try Self.environment(home, store)
+      let first = try Self.propose(env, about: "service:push")
+      let service = DocTriageService(environment: env, workspace: "acme", approved: "Reject rules")
+      let second: String
+      if kind == "accepted" {
+        try DocWritePolicyTests.seed(store, seed: 93)
+        second = "doc:rules@2"
+      } else if kind == "rejected" {
+        second = try Self.propose(env, about: "service:push", slug: "obsolete")
+        _ = try service.triage(DocTriage(reject: [second]))
+      } else {
+        try store.write {
+          try $0.database.execute(
+            sql: """
+              INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
+              INSERT INTO service(uid,workspace_id,slug,name) VALUES('beta-push',2,'push','Push');
+              """)
+        }
+        second = try DocProposalService(environment: env, workspace: "beta").propose(
+          DocProposalRequest(
+            slug: "foreign", title: "Rules", about: ["service:push"], why: "Share."),
+          input: { "Beta rules." }
+        ).ref
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      var failure: (any CodedError)?
+      do { _ = try service.triage(DocTriage(reject: [first, second])) } catch let error
+        as any CodedError
+      { failure = error }
+      #expect(failure?.code == (kind == "foreign" ? .notFound : .invalid))
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+      #expect(
+        try store.read {
+          try String.fetchOne(
+            $0,
+            sql:
+              "SELECT r.state FROM doc_rev r JOIN doc d ON d.id=r.doc_id WHERE d.slug='rules' AND r.rev=1"
+          )
+        } == "proposed")
+    }
+  }
+
 }

@@ -64,6 +64,11 @@ struct DocTriageCommandTests {
       #expect(result.termination == .exit(2))
       let error = try DocEditCommandTests.error(result)
       #expect(error["next"] as? [String] == ["silta ws ls"])
+      withKnownIssue("Approved missing-workspace rejection does not initialize storage") {
+        #expect(
+          !FileManager.default.fileExists(
+            atPath: scratch.appending(path: "silta-home/silta.db").path))
+      }
     }
   }
 
