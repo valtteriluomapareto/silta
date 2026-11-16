@@ -81,12 +81,14 @@ the human copies.
   - A store with a newer schema shows the "update Silta" state.
   - Queries run as `human:<USER>`, so the inbox gives human-form `next` commands such
     as `task triage --accept …`. No `--approved` placeholders.
+  - Runnable recovery commands carry the selected `SILTA_HOME` with literal shell
+    quoting, so a custom app home cannot recover a different default store.
   - Reads aren't logged; §19 logging belongs to the CLI front-end.
 - **Freshness:** check `PRAGMA data_version` when the window gains focus, on ⌘R, and
   on a 5-second timer while the window is frontmost. Reload only when it changed. The
   §17 change signal (`notify_post` after each commit) replaces the timer once a slice
   adds it to SiltaCore writes.
-- **Copy text:** the inbox's human-form `next` where it is a runnable command,
+- **Copy text:** runnable templates carry the selected `SILTA_HOME`. Use the inbox's human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
   nothing is pre-filled for drop or reject, and there's no `-F -`.
 - **Layout:** `NavigationSplitView` (three columns for Docs), `.inspector`,
@@ -117,7 +119,7 @@ the same control surface. Each slice targets one PR of about 800 lines.
   placeholders must fail with no write and never wait for input.
 - **CI** (A2 adds it with the Xcode project; the runner already has the pinned Xcode):
   - `SiltaAppSupportTests` run in the existing `swift` job. Read-model tests stay
-    in-process except the required CLI parity check; command-template tests also start
+    in-process except CLI parity and recovery replay checks; command-template tests also start
     processes. That job is CPU-bound and the slowest one, so A1 and each later slice
     report how much test time they add.
   - A third job, `app`, runs `scripts/verify.sh app` beside `swift` and `evals`, and the

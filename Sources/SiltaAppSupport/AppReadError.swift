@@ -1,3 +1,4 @@
+import Foundation
 public import SiltaCore
 
 /// A body-free coded failure exposed without package-scoped implementation types.
@@ -19,7 +20,7 @@ public struct AppReadError: CodedError {
   public let code: ErrorCode
   /// Human-readable explanation.
   public let message: String
-  /// Suggested recovery commands.
+  /// Runnable recovery commands include the selected data home.
   public let next: [String]
   /// Retry delay supplied by the core, when present.
   public let retryAfter: Int?
@@ -33,6 +34,15 @@ extension AppReadError {
     kind: .migrationRequired, code: .env,
     message: "Silta data needs migrations; run the matching CLI first.", next: ["silta init"],
     retryAfter: nil, nextBy: .human)
+
+  func scoped(to home: URL) -> Self {
+    Self(
+      kind: kind, code: code, message: message,
+      next: next.map { command in
+        command == "silta" || command.hasPrefix("silta ")
+          ? "SILTA_HOME=" + shellWord(home.path) + " " + command : command
+      }, retryAfter: retryAfter, nextBy: nextBy)
+  }
 
   init(_ error: any Error) {
     if let existing = error as? AppReadError {

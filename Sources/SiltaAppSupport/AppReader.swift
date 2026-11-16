@@ -8,7 +8,7 @@ public struct AppReader: Sendable {
   /// Configures an existing data home without opening, initializing or migrating it.
   /// `now` supplies injected time. Configuration and read failures throw `AppReadError`.
   public init(home: URL, user: String, now: @escaping @Sendable () -> Date = { Date() }) throws {
-    environment = try Self.checked {
+    environment = try Self.checked(home: home) {
       let clock = AppReadClock(provider: now)
       let location = try SiltaHome.resolve(
         environment: ["SILTA_HOME": home.path], userHome: home.deletingLastPathComponent())
@@ -22,7 +22,7 @@ public struct AppReader: Sendable {
 
   /// Lists workspaces without writing selection or command logs.
   public func workspaces() throws -> [AppWorkspace] {
-    try Self.checked {
+    try Self.checked(home: environment.home.url) {
       try checkSchema()
       return try WorkspaceSelection.list(in: environment.db).map {
         AppWorkspace(slug: $0.slug, name: $0.name)
@@ -32,7 +32,7 @@ public struct AppReader: Sendable {
 
   /// Loads task counts once and reads the current, capped human inbox separately.
   public func snapshot(workspace: String) throws -> AppSnapshot {
-    try Self.checked {
+    try Self.checked(home: environment.home.url) {
       try checkSchema()
       let service = TaskService(environment: environment, workspace: workspace)
       var filter = TaskFilter()
@@ -69,7 +69,7 @@ public struct AppReader: Sendable {
 
   /// Reads task properties, parsed plan and discussion through the core service.
   public func task(_ ref: String, workspace: String) throws -> AppTask {
-    try Self.checked {
+    try Self.checked(home: environment.home.url) {
       try checkSchema()
       return AppTask(try TaskService(environment: environment, workspace: workspace).show(ref))
     }
@@ -79,8 +79,8 @@ public struct AppReader: Sendable {
     if try environment.db.readerNeedsMigration() { throw AppReadError.migrationRequired }
   }
 
-  private static func checked<Value>(_ body: () throws -> Value) throws -> Value {
-    do { return try body() } catch { throw AppReadError(error) }
+  private static func checked<Value>(home: URL, _ body: () throws -> Value) throws -> Value {
+    do { return try body() } catch { throw AppReadError(error).scoped(to: home) }
   }
 }
 

@@ -148,7 +148,10 @@
         let shown = try Self.cli(["task", "show", "AC-12", "--json"], scratch)
         let inbox = try Self.cli(["inbox", "--for", "me", "--json"], scratch)
         let items = try #require(inbox["items"] as? [[String: Any]])
+        let observer = try DatabaseQueue(path: scratch.appending(path: "silta-home/silta.db").path)
+        let version = try Self.dataVersion(observer)
         let snapshot = try reader.snapshot(workspace: "acme")
+        _ = try reader.workspaces()
         let board = snapshot.board
         #expect(
           Set((board.todo + board.doing + board.review).map(\.ref))
@@ -160,6 +163,13 @@
         #expect(detail.plan == shown["plan"] as? String)
         #expect(snapshot.work.items.compactMap(\.ref) == items.compactMap { $0["ref"] as? String })
         #expect(try Data(contentsOf: scratch.appending(path: "silta-home/silta.db")) == before)
+        let after = try Self.dataVersion(observer)
+        #expect(after == version)
+        _ = try TaskService(
+          environment: Self.writerEnvironment(reader.environment), workspace: "acme"
+        ).comment("AC-15", CommentDraft(body: "Checked the Acme context."))
+        let changed = try Self.dataVersion(observer)
+        #expect(changed != version)
       }
     }
 
@@ -222,6 +232,7 @@
           newerFailure = error
         }
         #expect(newerFailure?.kind == .newerSchema)
+        #expect(newerFailure?.next == ["update silta"])
         #expect(try Data(contentsOf: scratch.appending(path: "silta-home/silta.db")) == before)
       }
     }
@@ -267,6 +278,13 @@
         }
         let snapshot = try reader.snapshot(workspace: "acme")
         #expect(snapshot.work.waitingCount == 5)
+      }
+    }
+
+    private static func dataVersion(_ observer: DatabaseQueue) throws -> Int {
+      try observer.read { db in
+        let value = try Int.fetchOne(db, sql: "PRAGMA data_version")
+        return try #require(value)
       }
     }
 

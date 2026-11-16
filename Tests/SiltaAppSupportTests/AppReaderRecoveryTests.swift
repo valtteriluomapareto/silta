@@ -16,16 +16,14 @@
         let error = try failure(reader)
         #expect(error.kind == .unavailableStore)
         let command = try #require(error.next.first)
-        withKnownIssue {
-          let result = try SiltaBinary.runProcess(
-            URL(filePath: "/bin/sh"),
-            ["-c", "silta() { printf '%s' \"$SILTA_HOME\"; }\n" + command], in: scratch)
-          #expect(result.termination == .exit(0))
-          #expect(result.stdout == selected.path)
-          #expect(!FileManager.default.fileExists(atPath: selected.path))
-          #expect(
-            !FileManager.default.fileExists(atPath: scratch.appending(path: "work/escaped").path))
-        }
+        let result = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"),
+          ["-c", "silta() { printf '%s' \"$SILTA_HOME\"; }\n" + command], in: scratch)
+        #expect(result.termination == .exit(0))
+        #expect(result.stdout == selected.path)
+        #expect(!FileManager.default.fileExists(atPath: selected.path))
+        #expect(
+          !FileManager.default.fileExists(atPath: scratch.appending(path: "work/escaped").path))
       }
     }
 
@@ -44,23 +42,21 @@
         #expect(error.kind == .migrationRequired)
         let command = try #require(error.next.first)
         let binary = try SiltaBinary.url()
-        withKnownIssue {
-          let result = try SiltaBinary.runProcess(
-            URL(filePath: "/bin/sh"),
-            ["-c", "silta() { " + shellWord(binary.path) + " \"$@\"; }\n" + command],
-            in: scratch,
-            environment: [
-              "USER": AppV2Fixture.user, "SILTA_NOW": "2026-11-16T12:00:00.000Z",
-              "SILTA_ID_SEED": "951",
-            ])
-          #expect(result.termination == .exit(0))
-          #expect(
-            try queue.read { try StorageSchema.migrator.appliedIdentifiers($0) }
-              == Set(StorageSchema.migrator.migrations))
-          #expect(try Data(contentsOf: defaultDB) == before)
-          #expect(
-            !FileManager.default.fileExists(atPath: scratch.appending(path: "work/escaped").path))
-        }
+        let result = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"),
+          ["-c", "silta() { " + shellWord(binary.path) + " \"$@\"; }\n" + command],
+          in: scratch,
+          environment: [
+            "USER": AppV2Fixture.user, "SILTA_NOW": "2026-11-16T12:00:00.000Z",
+            "SILTA_ID_SEED": "951",
+          ])
+        #expect(result.termination == .exit(0))
+        #expect(
+          try queue.read { try StorageSchema.migrator.appliedIdentifiers($0) }
+            == Set(StorageSchema.migrator.migrations))
+        #expect(try Data(contentsOf: defaultDB) == before)
+        #expect(
+          !FileManager.default.fileExists(atPath: scratch.appending(path: "work/escaped").path))
       }
     }
 
