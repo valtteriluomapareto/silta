@@ -54,6 +54,7 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 - `silta doc ls`
 - `silta doc propose`
 - `silta doc show`
+- `silta doc triage`
 - `silta doctor`
 - `silta export`
 - `silta guide`
