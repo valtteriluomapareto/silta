@@ -71,10 +71,10 @@ struct DocTriageRecoveryTests {
       } catch let error as any CodedError { failure = error }
       if ["implicit", "initial-uid", "raced-uid", "busy-implicit", "unsafe-scope"].contains(mode) {
         withKnownIssue("Triage preserves selection and diagnostic policy") {
-          try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before)
+          try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before, ref)
         }
       } else {
-        try Self.check(mode, failure, seed, before)
+        try Self.check(mode, failure, seed, before, ref)
       }
     }
   }
@@ -93,7 +93,7 @@ struct DocTriageRecoveryTests {
 
   private static func check(
     _ mode: String, _ failure: (any CodedError)?,
-    _ store: DatabaseStore, _ before: [[String]]
+    _ store: DatabaseStore, _ before: [[String]], _ ref: String
   ) throws {
     if mode.contains("uid") {
       #expect(failure?.code == .env)
@@ -105,7 +105,7 @@ struct DocTriageRecoveryTests {
       let command = try store.read { try String.fetchOne($0, sql: "SELECT command FROM approval") }
       #expect(
         command?.contains("doc triage --accept ") == true
-          && command?.contains("doc:rules@1") == true)
+          && command?.contains(ref) == true)
       return
     }
     #expect(try DocVerificationPreparationTests.truth(store) == before)
