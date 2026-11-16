@@ -220,6 +220,23 @@ struct DocEditCommandTests {
     }
   }
 
+  private static func checkInvalidBatchGate(_ scratch: URL, _ repo: URL, _ trace: URL) throws {
+    for selectors in [
+      [], ["--accept", "rules"],
+      ["--reject", "doc:rules@1", "doc:rules@1"],
+      ["--accept", "doc:rules@1", "--reject", "doc:rules@1"],
+    ] {
+      try Data().write(to: trace)
+      let result = try SiltaBinary.run(
+        ["doc", "triage"] + selectors + ["--approved", "Review Acme docs", "--json"],
+        in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
+      #expect(try Self.error(result)["code"] as? String == "invalid")
+      withKnownIssue("Approved invalid batches refuse before location Git") {
+        #expect(try Data(contentsOf: trace).isEmpty)
+      }
+    }
+  }
+
   private static func checkImplicitWriteGate(command: String) throws {
     try withScratchDirectory { scratch in
       let repo = try CodeCommandTests().setup(scratch)
@@ -251,6 +268,7 @@ struct DocEditCommandTests {
         arguments + ["--approved", "Review Acme docs", "--json"],
         in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
       #expect(!(try Data(contentsOf: trace)).isEmpty)
+      if command == "triage" { try Self.checkInvalidBatchGate(scratch, repo, trace) }
     }
   }
 

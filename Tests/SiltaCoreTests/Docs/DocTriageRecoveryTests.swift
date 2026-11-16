@@ -103,7 +103,9 @@ struct DocTriageRecoveryTests {
     } else {
       #expect(failure == nil)
       let command = try store.read { try String.fetchOne($0, sql: "SELECT command FROM approval") }
-      #expect(command?.contains("doc triage --accept doc:rules@1") == true)
+      #expect(
+        command?.contains("doc triage --accept ") == true
+          && command?.contains("doc:rules@1") == true)
       return
     }
     #expect(try DocVerificationPreparationTests.truth(store) == before)

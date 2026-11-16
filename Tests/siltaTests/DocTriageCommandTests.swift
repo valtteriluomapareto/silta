@@ -43,6 +43,22 @@ struct DocTriageCommandTests {
       ).isEmpty)
   }
 
+  @Test func missingWorkspaceKeepsUsableDiscoveryRecovery() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(
+        [
+          "--ws", "missing", "doc", "triage", "--reject", "doc:rules@1",
+          "--approved", "Review Acme rules", "--json",
+        ],
+        in: scratch, environment: TaskCommandTests.fixed)
+      #expect(result.termination == .exit(2))
+      let error = try DocEditCommandTests.error(result)
+      withKnownIssue("Missing workspace recovery preserves discovery") {
+        #expect(error["next"] as? [String] == ["silta ws ls"])
+      }
+    }
+  }
+
   @Test func agentGateNeverInitializesAnAbsentStore() throws {
     try withScratchDirectory { scratch in
       let denied = try Self.run(["--accept", "doc:rules@1", "--json"], scratch, approved: false)
