@@ -1,5 +1,4 @@
 import Foundation
-import SiltaTestSupport
 import Testing
 
 @testable import SiltaCore
@@ -22,55 +21,8 @@ struct DocSuppliedBodyTests {
       }
     }
     let direct = Self.failure { try DocInput.check(body) }
-    do {
-      #expect(read?.code == .invalid && read?.message == Self.refusal)
-      #expect(direct?.code == .invalid && direct?.message == Self.refusal)
-    }
-  }
-
-  @Test(arguments: [false, true], [false, true])
-  func editRefusesBeforeGitOrMutation(human: Bool, unchanged: Bool) async throws {
-    try await withScratchDirectory { home in
-      let (store, repo) = try DocVerificationPreparationTests.setup(home)
-      let body = "Acme\u{0}private-tail"
-      if unchanged { try DocWritePolicyTests.seed(store, body: body) }
-      let before = try DocVerificationPreparationTests.truth(store)
-      let git = ScriptedGitRunner(script: [
-        (
-          DocVerificationPreparationTests.request("origin/api", repo: repo),
-          DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
-        )
-      ])
-      let service = try DocWritePolicyTests.service(home, store, human: human, git: git)
-      var request = DocWritePolicyTests.request()
-      request.about = ["app:api"]
-      request.allowSecret = true
-      var failure: (any CodedError)?
-      do { _ = try await service.edit(request, input: { body }) } catch let error as any CodedError
-      { failure = error }
-      let after = try DocVerificationPreparationTests.truth(store)
-      do {
-        #expect(failure?.code == .invalid && failure?.message == Self.refusal)
-        #expect(git.requests.isEmpty)
-        #expect(after == before)
-      }
-    }
-  }
-
-  @Test func proposalStringInputRefusesWithoutMutation() throws {
-    try withScratchDirectory { home in
-      let store = try AcmeDocAttachments.make(in: home)
-      let service = try DocProposalServiceTests.service(home, store)
-      let before = try DocVerificationPreparationTests.truth(store)
-      let failure = Self.failure {
-        _ = try service.propose(DocProposalServiceTests.request(), input: { "Acme\u{0}tail" })
-      }
-      let after = try DocVerificationPreparationTests.truth(store)
-      do {
-        #expect(failure?.code == .invalid && failure?.message == Self.refusal)
-        #expect(after == before)
-      }
-    }
+    #expect(read?.code == .invalid && read?.message == Self.refusal)
+    #expect(direct?.code == .invalid && direct?.message == Self.refusal)
   }
 
   private static func failure(_ operation: () throws -> Void) -> (any CodedError)? {

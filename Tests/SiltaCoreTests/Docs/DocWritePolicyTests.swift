@@ -64,32 +64,10 @@ struct DocWritePolicyTests {
     }
   }
 
-  @Test(arguments: [false, true])
-  func textSecretsRefuseHumanAndRedactApprovedAgent(human: Bool) async throws {
-    try await withScratchDirectory { home in
-      let store = try AcmeDocAttachments.make(in: home)
-      let service = try Self.service(home, store, human: human)
-      if human {
-        await Self.refusal(.invalid) { _ = try await service.edit(Self.request()) { Self.secret } }
-      } else {
-        let result = try await service.edit(Self.request()) { Self.secret }
-        #expect(result.ref == "doc:rules@1" && result.warnings.contains(SecretGuard.warning))
-        #expect(
-          try store.read { try String.fetchOne($0, sql: "SELECT body_md FROM doc_rev") }
-            == "[REDACTED:password]")
-      }
-    }
-  }
-
-  @Test func identitiesRefuseWithoutRewriteAndTyped52ExemptionSurvives() async throws {
+  @Test func explicitSecretIdentityOverrideAndOwnedKeepBodyRemainLiteral() async throws {
     try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let service = try Self.service(home, store)
-      let before = try DocVerificationPreparationTests.truth(store)
-      await Self.refusal(.invalid) {
-        _ = try await service.edit(Self.request(Self.credential)) { "Safe" }
-      }
-      #expect(try DocVerificationPreparationTests.truth(store) == before)
       var allowed = Self.request(Self.credential)
       allowed.allowSecret = true
       _ = try await service.edit(allowed) { "Safe" }
@@ -99,14 +77,6 @@ struct DocWritePolicyTests {
       var preserve = DocEditRequest(slug: Self.credential)
       preserve.keepBody = true
       _ = try await service.edit(preserve, input: nil)
-      _ = try await service.edit(Self.request(String(repeating: "a", count: 52))) { "Safe" }
-      try store.write {
-        try $0.database.execute(
-          sql: "UPDATE service SET slug=?", arguments: [Self.secret])
-      }
-      var encoded = Self.request("encoded")
-      encoded.about = ["service:Password%3Dprivate123"]
-      await Self.refusal(.invalid) { _ = try await service.edit(encoded) { "Safe" } }
     }
   }
 
@@ -266,19 +236,12 @@ extension DocWritePolicyTests {
     }
   }
 
-  @Test(arguments: [65_536, 65_537])
-  func suppliedBodyBoundAndMissingInputPrecedeGit(bytes: Int) async throws {
+  @Test func missingSuppliedInputPrecedesGit() async throws {
     try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
-      let service = try Self.service(home, store)
-      if bytes == 65_536 {
-        _ = try await service.edit(Self.request()) { String(repeating: ".", count: bytes) }
-      } else {
-        await Self.refusal(.invalid) {
-          _ = try await service.edit(Self.request()) { String(repeating: ".", count: bytes) }
-        }
+      await Self.refusal(.usage) {
+        _ = try await Self.service(home, store).edit(Self.request(), input: nil)
       }
-      await Self.refusal(.usage) { _ = try await service.edit(Self.request(), input: nil) }
     }
   }
 
@@ -307,31 +270,227 @@ extension DocWritePolicyTests {
     }
   }
 
-  @Test func proposalTitleIsNotAnAcceptedSecretExemption() async throws {
+}
+
+extension DocWritePolicyTests {
+  static func write(
+    _ proposal: Bool, service: DocWriteService, request: DocEditRequest, body: String,
+    why: String = "Share."
+  ) async throws -> (ref: String, warnings: [OutputWarning]) {
+    if proposal {
+      let result = try DocProposalService(
+        environment: service.environment, workspace: service.workspace
+      ).propose(
+        DocProposalRequest(
+          slug: request.slug, title: request.title, about: request.about, why: why),
+        input: { body })
+      return (result.ref, result.warnings)
+    }
+    let result = try await service.edit(request, input: { body })
+    return (result.ref, result.warnings)
+  }
+
+  @Test(
+    arguments: [false, true].flatMap { proposal in [false, true].map { (proposal, $0) } },
+    ["body", "metadata", "pending"])
+  func newSecretTextRespectsCaller(caller: (Bool, Bool), field: String) async throws {
+    let (proposal, human) = caller
     try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
-      try AcmeDocAttachments.attach("pending", to: "service", in: store, state: "proposed")
-      try store.write {
-        try $0.database.execute(sql: "UPDATE doc SET title=?", arguments: [Self.secret])
+      let service = try Self.service(home, store, human: human)
+      let metadata = field != "body"
+      let slug = field == "pending" ? "pending" : "rules"
+      if field == "pending" {
+        try AcmeDocAttachments.attach(slug, to: "service", in: store, state: "proposed")
+        try store.write {
+          try $0.database.execute(sql: "UPDATE doc SET title=?", arguments: [Self.secret])
+        }
       }
-      var request = Self.request("pending")
-      request.title = Self.secret
-      _ = try await Self.service(home, store).edit(request) { "Safe body" }
-      #expect(
-        try store.read { try String.fetchOne($0, sql: "SELECT title FROM doc") }
-          == "[REDACTED:password]")
+      var request = Self.request(slug)
+      request.title = metadata ? Self.secret : "Rules"
+      let body = metadata ? "Safe" : Self.secret
+      let why = metadata ? Self.secret : "Share."
+      if human {
+        await Self.refusal(.invalid) {
+          _ = try await Self.write(
+            proposal, service: service, request: request, body: body, why: why)
+        }
+      } else {
+        let result = try await Self.write(
+          proposal, service: service, request: request, body: body, why: why)
+        #expect(result.warnings.contains(SecretGuard.warning))
+        let row = try DocProposalServiceTests.row(store, revision: field == "pending" ? 2 : 1)
+        #expect(row["title"] as String == (metadata ? "[REDACTED:password]" : "Rules"))
+        if !proposal {
+          #expect(
+            try store.read { try String.fetchOne($0, sql: "SELECT title FROM doc") }
+              == row["title"] as String)
+        }
+        #expect(row["body_md"] as String == (metadata ? "Safe" : "[REDACTED:password]"))
+        if proposal {
+          #expect(row["message"] as String == (metadata ? "[REDACTED:password]" : "Share."))
+        }
+      }
     }
   }
 
-  @Test func postRedactionExpansionIsBoundedBeforeStore() async throws {
+  @Test(arguments: [false, true])
+  func identitiesRefuseWithoutRewriteAndTypedReferencesWork(proposal: Bool) async throws {
     try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
-      let text = "Pwd=x " + String(repeating: ".", count: 65_530)
-      #expect(text.utf8.count == 65_536 && SecretGuard.redacted(text).utf8.count > 65_536)
+      let service = try Self.service(home, store)
       let before = try DocVerificationPreparationTests.truth(store)
       await Self.refusal(.invalid) {
-        _ = try await Self.service(home, store).edit(Self.request()) { text }
+        _ = try await Self.write(
+          proposal, service: service, request: Self.request(Self.credential), body: "Safe")
       }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+      _ = try await Self.write(
+        proposal, service: service, request: Self.request(String(repeating: "a", count: 52)),
+        body: "Safe")
+      try store.write {
+        try $0.database.execute(sql: "UPDATE service SET slug=?", arguments: [Self.secret])
+      }
+      var encoded = Self.request()
+      encoded.about = ["service:Password%3Dprivate123"]
+      await Self.refusal(.invalid) {
+        _ = try await Self.write(proposal, service: service, request: encoded, body: "Safe")
+      }
+    }
+  }
+
+  @Test(arguments: [false, true], [false, true])
+  func ownedLegacyMetadataAndContentRemainLiteral(proposal: Bool, explicit: Bool) async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let service = try Self.service(home, store)
+      try Self.seed(store, body: Self.secret)
+      let title = "Legacy\n" + String(repeating: "é", count: 140) + Self.secret
+      try store.write {
+        try $0.database.execute(
+          sql:
+            "UPDATE doc SET title=?,kind='legacy label'; UPDATE doc_rev SET title=?,kind='legacy label'",
+          arguments: [title, title])
+      }
+      var request = DocEditRequest(slug: "rules", title: explicit ? title : nil)
+      var ref: String?
+      do {
+        let result = try await Self.write(
+          proposal, service: service, request: request, body: Self.secret)
+        ref = result.ref
+        #expect(result.warnings.isEmpty)
+      } catch let error as any CodedError { #expect(error.code == .invalid) }
+      if proposal {
+        #expect(ref == "doc:rules@2")
+      } else {
+        withKnownIssue("An accepted unchanged title is rejected as new metadata") {
+          #expect(ref == "doc:rules@2")
+        }
+      }
+      if ref != nil {
+        let row = try DocProposalServiceTests.row(store, revision: 2)
+        #expect((row["title"] as String).utf8.elementsEqual(title.utf8))
+        #expect(row["kind"] as String == "legacy label" && row["body_md"] as String == Self.secret)
+      }
+      request.title = title + " changed"
+      await Self.refusal(.invalid) {
+        _ = try await Self.write(proposal, service: service, request: request, body: "Safe")
+      }
+      request.title = "Valid"
+      request.about = ["service:Password%3Dprivate123"]
+      await Self.refusal(.invalid) {
+        _ = try await Self.write(proposal, service: service, request: request, body: "Safe")
+      }
+    }
+  }
+
+  @Test(arguments: [false, true], ["raw", "masked"])
+  func titleLimitsApplyBeforeAndAfterMasking(proposal: Bool, boundary: String) async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let service = try Self.service(home, store)
+      let title =
+        boundary == "raw"
+        ? "Pwd=" + String(repeating: "x", count: 121)
+        : "Pwd=x " + String(repeating: ".", count: 114)
+      var request = Self.request()
+      request.title = title
+      #expect((title.count > 120) == (boundary == "raw"))
+      #expect((SecretGuard.redacted(title).count > 120) == (boundary == "masked"))
+      let before = try DocVerificationPreparationTests.truth(store)
+      await Self.refusal(.invalid) {
+        _ = try await Self.write(proposal, service: service, request: request, body: "Safe")
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  @Test(arguments: [false, true], ["limit", "oversize", "redaction", "shrink"])
+  func suppliedBodyBoundsPreserveStore(proposal: Bool, boundary: String) async throws {
+    try await withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let service = try Self.service(home, store)
+      let body: String
+      switch boundary {
+      case "redaction": body = "Pwd=x " + String(repeating: ".", count: 65_530)
+      case "shrink": body = "Pwd=" + String(repeating: "x", count: 65_533)
+      default: body = String(repeating: ".", count: boundary == "limit" ? 65_536 : 65_537)
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      if boundary == "limit" {
+        if proposal {
+          try AcmeDocAttachments.attach("rules", to: "service", in: store, state: "proposed")
+          try store.write {
+            try $0.database.execute(
+              sql:
+                "DELETE FROM link; INSERT INTO seq_counter(scope,next) VALUES('doc_rev:1:rules',20)"
+            )
+          }
+        }
+        let result = try await Self.write(
+          proposal, service: service, request: Self.request(), body: body)
+        #expect(result.ref == (proposal ? "doc:rules@20" : "doc:rules@1"))
+        let row = try DocProposalServiceTests.row(store, revision: proposal ? 20 : 1)
+        #expect((row["body_md"] as String).utf8.count == 65_536)
+        if proposal {
+          #expect(row["base_rev"] as Int? == nil && row["kind"] as String == "runbook")
+        }
+      } else {
+        await Self.refusal(.invalid) {
+          _ = try await Self.write(
+            proposal, service: service, request: Self.request(), body: body)
+        }
+        #expect(try DocVerificationPreparationTests.truth(store) == before)
+      }
+    }
+  }
+
+  @Test(
+    arguments: [false, true].flatMap { proposal in [false, true].map { (proposal, $0) } },
+    [false, true])
+  func suppliedNulRefusesBeforeGitOrMutation(caller: (Bool, Bool), unchanged: Bool) async throws {
+    let (proposal, human) = caller
+    try await withScratchDirectory { home in
+      let (store, repo) = try DocVerificationPreparationTests.setup(home)
+      let body = "Acme\u{0}private-tail"
+      if unchanged { try Self.seed(store, body: body) }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let git = ScriptedGitRunner(script: [
+        (
+          DocVerificationPreparationTests.request("origin/api", repo: repo),
+          DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
+        )
+      ])
+      let service = try Self.service(home, store, human: human, git: git)
+      var request = Self.request()
+      request.about = ["app:api"]
+      request.allowSecret = true
+      var failure: (any CodedError)?
+      do {
+        _ = try await Self.write(proposal, service: service, request: request, body: body)
+      } catch let error as any CodedError { failure = error }
+      #expect(failure?.code == .invalid && failure?.message == DocSuppliedBodyTests.refusal)
+      #expect(git.requests.isEmpty)
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
