@@ -26,10 +26,10 @@ extension DocProposalService {
     if case .missing(let missing) = error as? DocError { fields = missing }
     var retry = request
     if !WorkspaceConfig.isValidIdentifier(request.slug) {
-      guard let (slug, _) = try? DocTriage.selection("doc:" + request.slug) else {  // Malformed targets use discovery.
+      guard let ref = try? DocTriage.selection("doc:" + request.slug) else {  // Use discovery.
         return CommandFailure(error: error, next: [hub], nextBy: .agent, message: message)
       }
-      retry.slug = slug
+      retry.slug = ref.0
       fields += ["--title", "--about"]
     }
     let scopedRetry = workspaceCommand(retryCommand(retry, fields: fields), workspace: workspace)

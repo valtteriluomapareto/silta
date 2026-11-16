@@ -94,6 +94,16 @@ package struct DocProposalService {
     let metadata = try DocMetadata.resolve(
       draft, baseline: baseline, workspace: id, in: db)
     let reason = try policy.checked(why)
+    let base = try acceptedBase(request, baseline: baseline, workspace: id, in: db)
+    return try Prepared(
+      id: id, baseline: baseline, metadata: metadata, base: base,
+      source: source(request, workspace: workspace, id: id, at: at, in: db),
+      why: reason.0, redacted: redacted || reason.1)
+  }
+
+  private func acceptedBase(
+    _ request: DocProposalRequest, baseline: DocEditBaseline, workspace id: Int64, in db: Database
+  ) throws -> Int? {
     let base: Int?
     if let supplied = request.base {
       if let number = Int(supplied), number > 0 {
@@ -121,10 +131,7 @@ package struct DocProposalService {
         throw DocError.invalid("--base must name an accepted revision of this doc.")
       }
     }
-    return try Prepared(
-      id: id, baseline: baseline, metadata: metadata, base: base,
-      source: source(request, workspace: workspace, id: id, at: at, in: db),
-      why: reason.0, redacted: redacted || reason.1)
+    return base
   }
 
   private func requiredWhy(_ request: DocProposalRequest, accepted: Bool) throws

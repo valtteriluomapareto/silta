@@ -19,7 +19,10 @@ struct DocProposalReferenceTests {
       try store.write {
         try $0.database.execute(
           sql:
-            "INSERT INTO meta(key,value) VALUES('current_workspace','acme') ON CONFLICT(key) DO UPDATE SET value='acme'"
+            """
+            INSERT INTO meta(key,value) VALUES('current_workspace','acme')
+            ON CONFLICT(key) DO UPDATE SET value='acme'
+            """
         )
       }
       let service = DocProposalService(
@@ -104,7 +107,10 @@ struct DocProposalReferenceTests {
         for (number, state) in [(3, "proposed"), (4, "rejected"), (5, "superseded")] {
           try $0.database.execute(
             sql:
-              "INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at) VALUES(?,1,?,'Other',?,'human:acme','')",
+              """
+              INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at)
+              VALUES(?,1,?,'Other',?,'human:acme','')
+              """,
             arguments: ["revision-\(number)", number, state])
         }
         try $0.database.execute(
@@ -113,7 +119,8 @@ struct DocProposalReferenceTests {
             INSERT INTO doc(uid,workspace_id,slug,title,kind,current_rev,created_at,updated_at)
             VALUES('other-doc',1,'other','Other','reference',1,'','');
             INSERT INTO doc_rev(uid,doc_id,rev,body_md,state,actor,created_at)
-            SELECT 'other-rev',id,1,'Foreign','accepted','human:acme','' FROM doc WHERE slug='other';
+            SELECT 'other-rev',id,1,'Foreign','accepted','human:acme',''
+            FROM doc WHERE slug='other';
             INSERT INTO workspace(id,uid,slug,name,task_prefix) VALUES(2,'beta','beta','Beta','BE');
             INSERT INTO doc(id,uid,workspace_id,slug,title,kind,current_rev,created_at,updated_at)
             VALUES(20,'beta-doc',2,'rules','Private Beta','reference',99,'','');
