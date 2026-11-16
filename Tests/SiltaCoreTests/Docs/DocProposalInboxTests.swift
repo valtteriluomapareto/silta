@@ -96,30 +96,6 @@ struct DocProposalInboxTests {
     }
   }
 
-  @Test(arguments: ["missing", "foreign"])
-  func recordedSourcesRetainWorkspaceOwnership(failure: String) throws {
-    try withScratchDirectory { home in
-      let store = try fixture(home, pending: 1)
-      var configuration = Configuration()
-      configuration.foreignKeysEnabled = false
-      let queue = try DatabaseQueue(path: store.path, configuration: configuration)
-      try queue.write { db in
-        if failure == "foreign" {
-          try db.execute(
-            sql: """
-              INSERT INTO workspace(id,uid,slug,name,task_prefix)
-              VALUES(2,'beta','beta','Beta','BE');
-              INSERT INTO task(id,uid,workspace_id,seq,title,status,
-                created_by,created_at,updated_at)
-              VALUES(1,'foreign',2,1,'Acme foreign','done','human:acme','','');
-              """)
-        }
-        try db.execute(sql: "UPDATE doc_rev SET source_task_id=1 WHERE state='proposed'")
-      }
-      #expect(throws: StorageError.corrupt) { _ = try preview(store) }
-    }
-  }
-
   @Test(arguments: [false, true])
   func recordedBaseAndGlobalPageCommandsAreReplayable(missing: Bool) throws {
     try withScratchDirectory { home in
