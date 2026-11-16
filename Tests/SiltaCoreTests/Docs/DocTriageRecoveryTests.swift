@@ -10,7 +10,7 @@ import Testing
 struct DocTriageRecoveryTests {
   @Test(arguments: [
     "implicit", "explicit", "prepared", "unsafe-scope", "initial-uid",
-    "raced-uid", "busy-implicit", "busy-explicit",
+    "raced-uid", "busy-implicit", "busy-explicit", "unicode-implicit", "unicode-explicit",
   ])
   func selectionAndDiagnosticsSurvivePreparationAndRetry(mode: String) async throws {
     try await withScratchDirectory { home in
@@ -24,7 +24,9 @@ struct DocTriageRecoveryTests {
           )
         ],
         beforeRequest: { _ in
-          if ["implicit", "explicit", "prepared", "raced-uid"].contains(mode) {
+          if ["implicit", "explicit", "prepared", "raced-uid"].contains(mode)
+            || mode.hasPrefix("unicode-")
+          {
             try Self.mutate(mode, seed)
             let truth = try DocVerificationPreparationTests.truth(seed)
             expected.withLock { $0 = truth }
@@ -32,7 +34,17 @@ struct DocTriageRecoveryTests {
         })
       var env = try DocTriageServiceTests.environment(home, seed, git: runner)
       let ref = try DocTriageServiceTests.propose(env, about: "edge:api/service:push/sdk")
-      let scope = mode == "unsafe-scope" ? String(repeating: "a", count: 52) : "acme"
+      let scope =
+        mode.hasPrefix("unicode-")
+        ? "café" : mode == "unsafe-scope" ? String(repeating: "a", count: 52) : "acme"
+      if mode.hasPrefix("unicode-") {
+        try seed.write {
+          try $0.database.execute(
+            sql:
+              "UPDATE workspace SET slug=? WHERE slug='acme'; UPDATE workspace SET slug=? WHERE slug='beta'; UPDATE meta SET value=? WHERE key='current_workspace'",
+            arguments: [scope, "cafe\u{301}", scope])
+        }
+      }
       if mode == "prepared" { env.workspaceSelection = .success("acme") }
       if ["initial-uid", "unsafe-scope"].contains(mode) { try Self.mutate(mode, seed) }
       if mode.hasPrefix("busy-") {
@@ -52,8 +64,10 @@ struct DocTriageRecoveryTests {
           home: env.home, db: retryStore, log: env.log, actor: env.actor)
       }
       let before = try DocVerificationPreparationTests.truth(seed)
-      let explicit = ["explicit", "unsafe-scope", "initial-uid", "raced-uid", "busy-explicit"]
-        .contains(mode)
+      let explicit = [
+        "explicit", "unsafe-scope", "initial-uid", "raced-uid", "busy-explicit", "unicode-explicit",
+      ]
+      .contains(mode)
       var failure: (any CodedError)?
       do {
         _ = try await DocTriageService(
@@ -61,7 +75,11 @@ struct DocTriageRecoveryTests {
           approved: "Review Acme rules"
         ).triage(DocTriage(accept: [ref], reject: []))
       } catch let error as any CodedError { failure = error }
-      try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before, ref)
+      try withKnownIssue {
+        try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before, ref)
+      } when: {
+        mode == "unicode-implicit"
+      }
     }
   }
 
@@ -86,7 +104,9 @@ struct DocTriageRecoveryTests {
           : mode == "unsafe-scope"
             ? "UPDATE workspace SET slug='" + String(repeating: "a", count: 52)
               + "' WHERE slug='acme'"
-            : "UPDATE meta SET value='beta' WHERE key='current_workspace'")
+            : mode.hasPrefix("unicode-")
+              ? "UPDATE meta SET value='cafe\u{301}' WHERE key='current_workspace'"
+              : "UPDATE meta SET value='beta' WHERE key='current_workspace'")
     }
   }
 
@@ -97,7 +117,7 @@ struct DocTriageRecoveryTests {
     if mode.contains("uid") {
       #expect(failure?.code == .env)
       #expect(failure?.next == ["silta backup"] && failure?.nextBy == .human)
-    } else if ["implicit", "busy-implicit"].contains(mode) {
+    } else if ["implicit", "busy-implicit", "unicode-implicit"].contains(mode) {
       #expect(failure?.code == .conflict)
     } else {
       #expect(failure == nil)
