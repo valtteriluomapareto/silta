@@ -40,8 +40,9 @@ the human copies.
   menu and paging.
 - **Copy:**
   - a ref chip on every item;
-  - command blocks whose placeholders are shell-inert words such as `ANSWER` and
-    `REFS`, which Silta refuses as invalid if left unfilled;
+  - command blocks whose placeholders fail safe if left unfilled: refs and shas are
+    words Silta rejects (`REFS`, `MERGE_SHA`), and message text is `-m ""`, which
+    Silta refuses as an empty body;
   - a Copied state;
   - ⌘C and a context menu.
 - **States:**
