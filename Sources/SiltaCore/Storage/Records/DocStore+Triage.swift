@@ -34,12 +34,12 @@ extension DocStore {
     try replaceAttachments(metadata.targets, doc: document, stamp: stamp)
     try db.execute(
       sql: """
-        UPDATE doc SET title=CAST(? AS TEXT),kind=?,current_rev=?,verified_at=?,archived=0,
-        updated_at=?
+        UPDATE doc SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),current_rev=?,
+        verified_at=?,archived=0,updated_at=?
         WHERE id=?
         """,
       arguments: [
-        Data(metadata.title.utf8), metadata.kind, member.raw["rev"],
+        Data(metadata.title.utf8), Data(metadata.kind.utf8), member.raw["rev"],
         verification.snapshots.count == verification.binding.apps.count ? stamp : nil, stamp,
         document,
       ])

@@ -94,26 +94,7 @@ struct DocTriageAcceptanceTests {
         failure = error
       }
       #expect(runner.isExhausted)
-      if change.hasSuffix("-kept") {
-        #expect(failure == nil)
-        #expect(
-          try store.read { try String.fetchOne($0, sql: "SELECT state FROM doc_rev WHERE rev=2") }
-            == "accepted")
-      } else {
-        let truth = try DocVerificationPreparationTests.truth(store)
-        let value = try store.read {
-          try Data.fetchOne($0, sql: "SELECT CAST(\(field) AS BLOB) FROM doc WHERE slug='rules'")
-        }
-        withKnownIssue {
-          #expect(failure?.code == .conflict)
-          #expect(truth == expected.withLock { $0 })
-          if change.hasSuffix("-nul") {
-            #expect(value == Data("Rules\u{0}changed".utf8))
-          }
-        } when: {
-          change.hasSuffix("-nul")
-        }
-      }
+      try Self.check(change, failure, store, expected.withLock { $0 })
     }
   }
 
@@ -154,6 +135,28 @@ struct DocTriageAcceptanceTests {
             reject: fault == "overlap" ? [] : [second]))
       }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  private static func check(
+    _ change: String, _ failure: (any CodedError)?, _ store: DatabaseStore, _ expected: [[String]]?
+  ) throws {
+    let field = change.contains("-kind-") ? "kind" : "title"
+    if change.hasSuffix("-kept") {
+      #expect(failure == nil)
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT state FROM doc_rev WHERE rev=2") }
+          == "accepted")
+    } else {
+      let truth = try DocVerificationPreparationTests.truth(store)
+      let value = try store.read {
+        try Data.fetchOne($0, sql: "SELECT CAST(\(field) AS BLOB) FROM doc WHERE slug='rules'")
+      }
+      #expect(failure?.code == .conflict)
+      #expect(truth == expected)
+      if change.hasSuffix("-nul") {
+        #expect(value == Data("Rules\u{0}changed".utf8))
+      }
     }
   }
 

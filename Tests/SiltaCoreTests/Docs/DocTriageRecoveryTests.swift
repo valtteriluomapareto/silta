@@ -34,34 +34,16 @@ struct DocTriageRecoveryTests {
         })
       var env = try DocTriageServiceTests.environment(home, seed, git: runner)
       let ref = try DocTriageServiceTests.propose(env, about: "edge:api/service:push/sdk")
-      let scope =
-        mode.hasPrefix("unicode-")
-        ? "café" : mode == "unsafe-scope" ? String(repeating: "a", count: 52) : "acme"
-      if mode.hasPrefix("unicode-") {
-        try seed.write {
-          try $0.database.execute(
-            sql:
-              "UPDATE workspace SET slug=? WHERE slug='acme'; UPDATE workspace SET slug=? WHERE slug='beta'; UPDATE meta SET value=? WHERE key='current_workspace'",
-            arguments: [scope, "cafe\u{301}", scope])
-        }
-      }
+      let scope = try Self.prepare(mode, seed)
       if mode == "prepared" { env.workspaceSelection = .success("acme") }
-      if ["initial-uid", "unsafe-scope"].contains(mode) { try Self.mutate(mode, seed) }
       if mode.hasPrefix("busy-") {
-        let retryStore = DatabaseStore(
-          home: URL(filePath: seed.path).deletingLastPathComponent(),
-          clock: env.clock,
-          jitter: {
-            do {
-              try Self.mutate("implicit", seed)
-              let truth = try DocVerificationPreparationTests.truth(seed)
-              expected.withLock { $0 = truth }
-            } catch { Issue.record(error) }
-            return 0
-          })
-        env = SiltaEnvironment(
-          clock: env.clock, ids: BusyOnceProposalIDs(), git: runner,
-          home: env.home, db: retryStore, log: env.log, actor: env.actor)
+        env = Self.retry(env, store: seed) {
+          do {
+            try Self.mutate("implicit", seed)
+            let truth = try DocVerificationPreparationTests.truth(seed)
+            expected.withLock { $0 = truth }
+          } catch { Issue.record(error) }
+        }
       }
       let before = try DocVerificationPreparationTests.truth(seed)
       let explicit = [
@@ -75,12 +57,42 @@ struct DocTriageRecoveryTests {
           approved: "Review Acme rules"
         ).triage(DocTriage(accept: [ref], reject: []))
       } catch let error as any CodedError { failure = error }
-      try withKnownIssue {
-        try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before, ref)
-      } when: {
-        mode == "unicode-implicit"
+      try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before, ref)
+    }
+  }
+
+  private static func prepare(_ mode: String, _ seed: DatabaseStore) throws -> String {
+    let scope =
+      mode.hasPrefix("unicode-")
+      ? "café" : mode == "unsafe-scope" ? String(repeating: "a", count: 52) : "acme"
+    if mode.hasPrefix("unicode-") {
+      try seed.write {
+        try $0.database.execute(
+          sql: """
+            UPDATE workspace SET slug=? WHERE slug='acme';
+            UPDATE workspace SET slug=? WHERE slug='beta';
+            UPDATE meta SET value=? WHERE key='current_workspace'
+            """,
+          arguments: [scope, "cafe\u{301}", scope])
       }
     }
+    if ["initial-uid", "unsafe-scope"].contains(mode) { try mutate(mode, seed) }
+    return scope
+  }
+
+  private static func retry(
+    _ env: SiltaEnvironment, store seed: DatabaseStore,
+    changing selection: @escaping @Sendable () -> Void
+  ) -> SiltaEnvironment {
+    let store = DatabaseStore(
+      home: URL(filePath: seed.path).deletingLastPathComponent(), clock: env.clock,
+      jitter: {
+        selection()
+        return 0
+      })
+    return SiltaEnvironment(
+      clock: env.clock, ids: BusyOnceProposalIDs(), git: env.git,
+      home: env.home, db: store, log: env.log, actor: env.actor)
   }
 
   private static func setup(_ home: URL) throws -> (DatabaseStore, URL) {

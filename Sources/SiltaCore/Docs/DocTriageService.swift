@@ -180,7 +180,8 @@ extension DocTriageService {
         guard
           try WorkspaceSelection.resolve(
             originalWorkspace, in: tx.database,
-            prepared: environment.workspaceSelection) == workspace
+            prepared: environment.workspaceSelection
+          ).utf8.elementsEqual(workspace.utf8)
         else {
           throw DocError.changed(workspace: workspace)
         }

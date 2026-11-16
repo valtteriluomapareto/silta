@@ -27,11 +27,7 @@ struct DocTriageLegacyTitleTests {
       try store.read { (db: Database) throws in
         #expect(try Data.fetchOne(db, sql: "SELECT CAST(\(field) AS BLOB) FROM doc_rev") == bytes)
         let current = try Data.fetchOne(db, sql: "SELECT CAST(\(field) AS BLOB) FROM doc")
-        withKnownIssue {
-          #expect(current == bytes)
-        } when: {
-          field == "kind" && embeddedNul
-        }
+        #expect(current == bytes)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev") == 1)
       }
     }
