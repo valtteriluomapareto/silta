@@ -12,10 +12,7 @@ struct DocTriageServiceTests {
     _ home: URL, _ store: DatabaseStore, git: any GitRunner = ScriptedGitRunner(script: []),
     human: Bool = false
   ) throws -> SiltaEnvironment {
-    let base = try DocWritePolicyTests.service(home, store, human: human, approved: nil).environment
-    return SiltaEnvironment(
-      clock: base.clock, ids: base.ids, git: git, home: base.home,
-      db: store, log: base.log, actor: base.actor, human: base.human)
+    try DocWritePolicyTests.service(home, store, human: human, approved: nil, git: git).environment
   }
 
   static func propose(_ env: SiltaEnvironment, about: String, slug: String = "rules") throws

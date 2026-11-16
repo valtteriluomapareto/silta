@@ -14,16 +14,8 @@ struct DocTriageRecoveryTests {
   ])
   func selectionAndDiagnosticsSurvivePreparationAndRetry(mode: String) async throws {
     try await withScratchDirectory { home in
-      let (seed, repo) = try DocVerificationPreparationTests.setup(home)
+      let (seed, repo) = try Self.setup(home)
       let expected = Mutex<[[String]]?>(nil)
-      try seed.write {
-        try $0.database.execute(
-          sql: """
-            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
-            INSERT INTO meta(key,value) VALUES('current_workspace','acme')
-            ON CONFLICT(key) DO UPDATE SET value='acme';
-            """)
-      }
       let runner = ScriptedGitRunner(
         script: [
           (
@@ -69,14 +61,21 @@ struct DocTriageRecoveryTests {
           approved: "Review Acme rules"
         ).triage(DocTriage(accept: [ref], reject: []))
       } catch let error as any CodedError { failure = error }
-      if ["implicit", "initial-uid", "raced-uid", "busy-implicit", "unsafe-scope"].contains(mode) {
-        withKnownIssue("Triage preserves selection and diagnostic policy") {
-          try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before, ref)
-        }
-      } else {
-        try Self.check(mode, failure, seed, before, ref)
-      }
+      try Self.check(mode, failure, seed, expected.withLock { $0 } ?? before, ref)
     }
+  }
+
+  private static func setup(_ home: URL) throws -> (DatabaseStore, URL) {
+    let (seed, repo) = try DocVerificationPreparationTests.setup(home)
+    try seed.write {
+      try $0.database.execute(
+        sql: """
+          INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
+          INSERT INTO meta(key,value) VALUES('current_workspace','acme')
+          ON CONFLICT(key) DO UPDATE SET value='acme';
+          """)
+    }
+    return (seed, repo)
   }
 
   private static func mutate(_ mode: String, _ store: DatabaseStore) throws {

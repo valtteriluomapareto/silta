@@ -213,11 +213,7 @@ struct DocEditCommandTests {
   }
   @Test(arguments: ["edit", "archive", "triage"])
   func implicitWriteGatePrecedesRealLocationGit(command: String) throws {
-    if command == "triage" {
-      try Self.checkImplicitWriteGate(command: command)
-    } else {
-      try Self.checkImplicitWriteGate(command: command)
-    }
+    try Self.checkImplicitWriteGate(command: command)
   }
 
   private static func checkInvalidBatchGate(_ scratch: URL, _ repo: URL, _ trace: URL) throws {
@@ -231,9 +227,7 @@ struct DocEditCommandTests {
         ["doc", "triage"] + selectors + ["--approved", "Review Acme docs", "--json"],
         in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
       #expect(try Self.error(result)["code"] as? String == "invalid")
-      withKnownIssue("Approved invalid batches refuse before location Git") {
-        #expect(try Data(contentsOf: trace).isEmpty)
-      }
+      #expect(try Data(contentsOf: trace).isEmpty)
     }
   }
 

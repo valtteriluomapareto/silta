@@ -53,9 +53,7 @@ struct DocTriageCommandTests {
         in: scratch, environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(2))
       let error = try DocEditCommandTests.error(result)
-      withKnownIssue("Missing workspace recovery preserves discovery") {
-        #expect(error["next"] as? [String] == ["silta ws ls"])
-      }
+      #expect(error["next"] as? [String] == ["silta ws ls"])
     }
   }
 

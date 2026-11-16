@@ -14,9 +14,10 @@ package struct DocTriageService {
   }
 
   package func authorize(_ batch: DocTriage) throws -> HumanApproval? {
+    let approval: HumanApproval?
     do {
-      return try environment.actor.requireHuman(command: command(batch), approved: approved)
-    } catch let error as any CodedError {
+      approval = try environment.actor.requireHuman(command: command(batch), approved: approved)
+    } catch let error as ActorError {
       let safe =
         batch.accept.allSatisfy(DocService.safeReference)
         && batch.reject.allSatisfy(DocService.safeReference)
@@ -26,17 +27,22 @@ package struct DocTriageService {
         next: safe ? [command(batch) + " --approved \"<the human's words>\""] : [hub],
         nextBy: safe ? .human : .agent)
     }
-  }
-
-  package func triage(_ batch: DocTriage) async throws -> DocTriageResult {
-    _ = try authorize(batch)
-    var selected = self
     do {
       let refs = batch.accept + batch.reject
       guard !refs.isEmpty, Set(refs).count == refs.count else {
         throw DocError.invalid("Choose each proposal exactly once with --accept or --reject.")
       }
       for ref in refs { _ = try DocTriageMember.selection(ref) }
+    } catch let error as DocError {
+      throw CommandFailure(error: error, next: ["silta doc triage --help"], nextBy: .agent)
+    }
+    return approval
+  }
+
+  package func triage(_ batch: DocTriage) async throws -> DocTriageResult {
+    _ = try authorize(batch)
+    var selected = self
+    do {
       selected.workspace = try WorkspaceSelection.resolve(
         workspace, in: environment.db,
         prepared: environment.workspaceSelection)
@@ -52,9 +58,17 @@ package struct DocTriageService {
           evidence.append(try await DocVerification.prepare(binding, environment: environment))
         }
       }
-      return try selected.commit(batch, captured: captured, evidence: evidence)
+      return try selected.commit(
+        batch, captured: captured, evidence: evidence, originalWorkspace: workspace)
     } catch let error as any CodedError {
-      if error is StorageError { throw error }
+      if [.env, .busy].contains(error.code) { throw error }
+      if let selection = error as? WorkspaceError {
+        let safe = selection.next.allSatisfy(DocService.safeReference)
+        throw CommandFailure(
+          error: selection, next: safe ? selection.next : ["silta ws ls"],
+          nextBy: safe ? selection.nextBy : .agent, message: SecretGuard.redacted(selection.message)
+        )
+      }
       var next = [selected.hub]
       if let workspace = selected.workspace {
         let read = DocService(workspace: workspace, store: environment.db)
@@ -93,7 +107,10 @@ package struct DocTriageService {
     }
   }
 
-  private func commit(_ batch: DocTriage, captured: [DocTriageMember]?, evidence: [DocVerification])
+  private func commit(
+    _ batch: DocTriage, captured: [DocTriageMember]?, evidence: [DocVerification],
+    originalWorkspace: String?
+  )
     throws -> DocTriageResult
   {
     guard let workspace else { throw StorageError.internalMisuse }
@@ -101,7 +118,18 @@ package struct DocTriageService {
     return try environment.db.write { tx in
       let approval = try authorize(batch)
       let members: [DocTriageMember]
-      do { members = try read(batch, in: tx.database) } catch  where captured != nil {
+      do {
+        guard
+          try WorkspaceSelection.resolve(
+            originalWorkspace, in: tx.database,
+            prepared: environment.workspaceSelection) == workspace
+        else {
+          throw DocError.changed(workspace: workspace)
+        }
+        members = try read(batch, in: tx.database)
+      } catch let error as any CodedError
+        where captured != nil && ![.env, .busy].contains(error.code)
+      {
         throw DocError.changed(workspace: workspace)
       }
       if let captured {
@@ -118,8 +146,8 @@ package struct DocTriageService {
         try store.decide(member, verification: index < evidence.count ? evidence[index] : nil)
       }
       try approval?.record(
-        command: command(batch), workspace: workspace,
-        identity: (environment.ids, at), in: tx)
+        command: SecretGuard.redacted(workspaceCommand(batch.command, workspace: workspace)),
+        workspace: workspace, identity: (environment.ids, at), in: tx)
       return DocTriageResult(
         docs: members.map {
           DocDecision(
