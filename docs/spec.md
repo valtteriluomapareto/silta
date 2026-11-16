@@ -1055,7 +1055,9 @@ of reading input; it is exclusive with `-F`. An archived accepted body is eligib
 but reactivation needs replacement about refs after its live links are removed.
 Retained bodies are not rescanned or retroactively capped; existing NUL bytes stay literal.
 Each save creates one
-accepted revision. Concurrent changes to the owned baseline or prepared target
+accepted revision and captures its known attachment kind/UID pairs, as proposals do.
+Historical NULL target snapshots remain unknown and are not inferred from current names.
+Concurrent changes to the owned baseline or prepared target
 bindings refuse atomically. Used agent approval is recorded in the same transaction.
 Acceptance records an observation row with actor, message, time and the SHAs actually
 read for configured apps, including both ends of an app edge. Missing clones or
