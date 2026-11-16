@@ -48,7 +48,9 @@ struct DocEditCommand: OutputCommand {
   }
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
-    let input: (() throws -> String)? = file.map { file in { try read(file) } }
+    let input: (() throws -> String)? = file.map { file in
+      { try DocInputFile.read(file, command: "silta doc edit") }
+    }
     let result = try await service(context).edit(request, input: input)
     return CommandOutput(
       text: result.ref + " accepted", quiet: result.ref, data: result,
@@ -56,14 +58,4 @@ struct DocEditCommand: OutputCommand {
     ).reporting(result.workspace)
   }
 
-  private func read(_ file: String) throws -> String {
-    do {
-      let handle =
-        try file == "-" ? FileHandle.standardInput : FileHandle(forReadingFrom: URL(filePath: file))
-      defer { if file != "-" { try? handle.close() } }  // best-effort close cannot invalidate input
-      return try DocInput.read { try handle.read(upToCount: $0) }
-    } catch let error as any CodedError { throw error } catch {
-      throw UsageError.invalid(message: "Cannot read doc input.", command: "silta doc edit")
-    }
-  }
 }

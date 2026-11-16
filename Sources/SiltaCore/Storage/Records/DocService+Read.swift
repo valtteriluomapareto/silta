@@ -46,8 +46,9 @@ extension DocService {
     }
     return try store.read { db in
       let workspaceID = try TaskService.workspaceID(workspace, in: db)
-      let metadata = try db.columns(in: "doc_rev").contains { $0.name == "about_refs" }
-      let snapshotRefs = metadata ? "doc_rev.about_refs" : "NULL"
+      let available = try db.columns(in: "doc_rev").map(\.name)
+      let metadata = available.contains("about_refs")
+      let snapshotTargets = available.contains("about_targets") ? "doc_rev.about_targets" : "NULL"
       let columns = ["title", "kind", "about_refs"].map {
         metadata ? "CAST(doc_rev.\($0) AS BLOB) AS \($0)" : "NULL AS \($0)"
       }.joined(separator: ",")
@@ -58,13 +59,19 @@ extension DocService {
       var arguments: StatementArguments = [workspaceID, archived]
       if let about {
         let target = try attachment(about, workspace: workspaceID, in: db)
+        guard let targetID = target.id,
+          let uid = try StoredUID.fetch(
+            db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [targetID])
+        else { throw StorageError.corrupt }
         predicate += """
-           AND (EXISTS(SELECT 1 FROM link WHERE link.workspace_id=doc.workspace_id
-             AND from_kind='doc' AND from_id=doc.id AND rel='about' AND to_kind=? AND to_id=?)
+           AND ((doc_rev.state='accepted' AND EXISTS(SELECT 1 FROM link
+             WHERE link.workspace_id=doc.workspace_id
+             AND from_kind='doc' AND from_id=doc.id AND rel='about' AND to_kind=? AND to_id=?))
              OR (doc_rev.state='proposed' AND EXISTS(
-               SELECT 1 FROM json_each(\(snapshotRefs)) WHERE value=?)))
+               SELECT 1 FROM json_each(\(snapshotTargets)) WHERE json_extract(value,'$.kind')=?
+               AND json_extract(value,'$.uid')=?)))
           """
-        arguments += [target.kind, target.id, about]
+        arguments += [target.kind, targetID, target.kind, uid]
       }
       let join = " FROM doc JOIN doc_rev ON doc_rev.doc_id=doc.id WHERE " + predicate
       let total = try Int.fetchOne(db, sql: "SELECT count(*)" + join, arguments: arguments) ?? 0

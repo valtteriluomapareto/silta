@@ -4,7 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct GitRunnerTests {
   @Test func standardInputIsClosed() async throws {
     try await withScratchDirectory { scratch in

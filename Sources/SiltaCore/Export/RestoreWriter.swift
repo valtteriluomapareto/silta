@@ -12,8 +12,8 @@ struct RestoreWriter {
   var reposWithoutPath: [String] = []
   var workspace: Int64?
   var current: ExportSnapshot?
-  var ids: [String: [Data: Int64]] = [:]
-  var revisions: [Data: Int64] = [:]
+  var ids: [String: [String: Int64]] = [:]
+  var revisions: [String: Int64] = [:]
   var documentRevisionAllocations: [ExportRow] = []
 
   init(tx: StorageTransaction, tree: ExportSnapshot, slug: String) {
@@ -160,7 +160,7 @@ struct RestoreWriter {
     documentRevisionAllocations = try restoreDocumentCounters(
       tree.documents,
       retaining: current?.documents
-        ?? ExportDocumentSnapshot(documents: [], revisionAllocations: [], commentSequences: []),
+        ?? ExportDocumentSnapshot(documents: [], revisionAllocations: []),
       workspace: id)
     try restore(kept)
     try tx.recordChange(kind: "workspace", rowID: id)

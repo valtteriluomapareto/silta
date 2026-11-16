@@ -55,18 +55,25 @@ package enum WorkspaceSelection {
     }
     let missing = slug.map(WorkspaceError.unknown) ?? .notFound
     guard FileManager.default.fileExists(atPath: store.path) else { throw missing }
-    return try store.read { db in
-      let selected =
-        try slug ?? String.fetchOne(db, sql: "SELECT value FROM meta WHERE key='current_workspace'")
-      guard let selected,
-        try Bool.fetchOne(
-          db, sql: "SELECT EXISTS(SELECT 1 FROM workspace WHERE slug=?)", arguments: [selected])
-          == true
-      else {
-        throw missing
-      }
-      return selected
+    return try store.read { try resolve(slug, in: $0) }
+  }
+
+  /// Resolves the prepared selection using the caller's current transaction.
+  static func resolve(
+    _ slug: String? = nil, in db: Database, prepared: Result<String?, any Error>? = nil
+  ) throws -> String {
+    if slug == nil, let prepared {
+      guard let selected = try prepared.get() else { throw WorkspaceError.notFound }
+      return try resolve(selected, in: db)
     }
+    let selected =
+      try slug ?? String.fetchOne(db, sql: "SELECT value FROM meta WHERE key='current_workspace'")
+    guard let selected,
+      try Bool.fetchOne(
+        db, sql: "SELECT EXISTS(SELECT 1 FROM workspace WHERE slug=?)", arguments: [selected])
+        == true
+    else { throw slug.map(WorkspaceError.unknown) ?? .notFound }
+    return selected
   }
 
   /// Reads an existing app identity for diagnostics without initializing storage.

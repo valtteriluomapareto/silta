@@ -24,8 +24,9 @@ enum RestoreDocumentGraphFixture {
         ("created_by", "human:acme"), ("created_at", "2023-11-14T22:13:00.000Z"),
         ("updated_at", "2023-11-14T22:13:00.000Z"),
       ]), records: [])
-    let documents = try ExportDocumentSnapshot.parse(
+    var documents = try ExportDocumentSnapshot.parse(
       ExportDocumentSnapshotTests.golden(), workspace: "acme")
+    documents.legacyCommentSequences = nil
     let tree = ExportSnapshot(
       schema: "v7",
       workspace: legacy.workspace.replacing(
@@ -96,8 +97,7 @@ enum RestoreDocumentGraphFixture {
     docs.documents.append(ExportDocument(slug: "other-rules", row: row, records: [revision]))
     docs.revisionAllocations.append(
       ExportDocumentTests.row([("slug", "other-rules"), ("next", "2")]))
-    docs.commentSequences.append(
-      ExportDocumentTests.row([("doc_rev", "other-revision"), ("next", "1")]))
+
   }
 
   static func record(

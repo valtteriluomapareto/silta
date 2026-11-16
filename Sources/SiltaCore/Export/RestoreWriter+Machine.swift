@@ -18,9 +18,9 @@ extension RestoreWriter {
   }
 
   struct MachineRows {
-    var repoPaths: [Data: (path: String, fetched: String?)] = [:]
+    var repoPaths: [String: (path: String, fetched: String?)] = [:]
     var overrides: [MachineOverride] = []
-    var worktrees: [Data: MachineWorktree] = [:]
+    var worktrees: [String: MachineWorktree] = [:]
   }
 
   func machineRows() throws -> MachineRows {
@@ -34,7 +34,7 @@ extension RestoreWriter {
         """,
       arguments: [workspace])
     {
-      kept.repoPaths[Data((row["uid"] as String).utf8)] = (row["path"], row["fetched_at"])
+      kept.repoPaths[(row["uid"] as String)] = (row["path"], row["fetched_at"])
     }
     for row in try Row.fetchAll(
       db,
@@ -54,7 +54,7 @@ extension RestoreWriter {
         """,
       arguments: [workspace])
     {
-      kept.worktrees[Data((row["uid"] as String).utf8)] = .init(
+      kept.worktrees[(row["uid"] as String)] = .init(
         path: row["worktree"], claimedBy: row["claimed_by"], branch: row["branch"])
     }
     return kept
@@ -70,21 +70,21 @@ extension RestoreWriter {
         arguments: [repo, path.path, path.fetched])
     }
     for override in kept.overrides {
-      guard let app = ids["app"]?[Data(override.app.utf8)] else { continue }
+      guard let app = ids["app"]?[override.app] else { continue }
       try db.execute(
         sql: "INSERT INTO worktree_override(path,app_id,set_by) VALUES(?,?,?)",
         arguments: [override.path, app, override.setBy])
     }
     for task in tree.tasks {
-      guard let uid = task.row.value("uid"), let kept = kept.worktrees[Data(uid.utf8)],
+      guard let uid = task.row.value("uid"), let kept = kept.worktrees[uid],
         kept.claimedBy == task.row.value("claimed_by"), kept.branch == task.row.value("branch"),
-        let id = ids["task"]?[Data(uid.utf8)]
+        let id = ids["task"]?[uid]
       else { continue }
       try db.execute(sql: "UPDATE task SET worktree=? WHERE id=?", arguments: [kept.path, id])
     }
     let section = zip(tree.sections, ExportFormat.sections).first { $0.1.table == "repo" }?.0
     reposWithoutPath = (section?.rows ?? []).compactMap { row in
-      kept.repoPaths[Data((row.value("uid") ?? "").utf8)] == nil ? row.value("slug") : nil
+      kept.repoPaths[(row.value("uid") ?? "")] == nil ? row.value("slug") : nil
     }
   }
 
@@ -98,6 +98,7 @@ extension RestoreWriter {
       keys: ExportFormat.workspaceKeys)
     expected.approvals = after.approvals
     expected.documents.revisionAllocations = revisionAllocations
+    expected.documents.legacyCommentSequences = nil
     let want = try expected.files()
     let got = try after.files()
     if let path = Set(want.keys).union(got.keys).filter({ want[$0] != got[$0] }).min(

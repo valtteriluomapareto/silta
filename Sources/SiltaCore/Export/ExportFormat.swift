@@ -3,7 +3,7 @@ import Foundation
 
 /// Canonical keys and layout (spec §15), shared by rendering and the reader.
 enum ExportFormat {
-  static let version = "2"
+  static let version = "4"
 
   static let workspaceKeys = ["uid", "slug", "name", "task_prefix", "settings", "next_task_seq"]
 

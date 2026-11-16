@@ -12,7 +12,7 @@ struct GuideRecipeTests {
       let guide = try fixture.run(["guide"]).stdout
       let all = Self.blocks(guide)
       let docs = Self.blocks(try fixture.run(["guide", "docs"]).stdout)
-      try #require(all.count == 10 && docs.count == 3)
+      try #require(all.count == 11 && docs.count == 4)
       let blocks = all.filter { !docs.contains($0) }
       try #require(blocks.count == 7)
       #expect(blocks[2].contains("silta --ws acme task submit AC-12"))

@@ -11,8 +11,8 @@ struct RestoreSnapshotReadbackTests {
       let store = try ExportFixture.make(home)
       let incoming = try ExportTree.parse(ExportVersionTests.frozen())
       var after = incoming
-      after.format = "2"
-      after.schema = "v7"
+      after.format = "4"
+      after.schema = "v8"
       try store.write(rollingBack: true) { tx in
         let writer = RestoreWriter(tx: tx, tree: incoming, slug: "acme")
         try writer.check(after, revisionAllocations: [])
@@ -26,7 +26,8 @@ struct RestoreSnapshotReadbackTests {
       var graph = try RestoreDocumentGraphFixture.graph()
       graph.tree.documents = graph.documents
       var after = graph.tree
-      after.schema = "v7"
+      after.schema = "v8"
+      after.documents.legacyCommentSequences = nil
       after.workspace = after.workspace.replacing(
         "next_task_seq", with: "900", keys: ExportFormat.workspaceKeys)
       after.approvals.append(
@@ -42,17 +43,12 @@ struct RestoreSnapshotReadbackTests {
         let writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
         try writer.check(after, revisionAllocations: floors)
       }
-      for key in ["comment-counter", "unknown-title", "triaged_by", "app_shas", "body_md"] {
+      for key in ["unknown-title", "triaged_by", "app_shas", "body_md", "about_targets"] {
         var damaged = after
-        if key == "comment-counter" {
-          damaged.documents.commentSequences[1] = damaged.documents.commentSequences[1].replacing(
-            "next", with: "99", keys: ["doc_rev", "next"])
-        } else {
-          let index = key == "app_shas" ? 5 : (key == "unknown-title" ? 0 : 1)
-          RestoreDocumentGraphFixture.record(
-            &damaged.documents, index, key == "unknown-title" ? "title" : key,
-            key == "app_shas" ? "[]" : "Invented value")
-        }
+        let index = key == "app_shas" ? 5 : (key == "unknown-title" ? 0 : 1)
+        RestoreDocumentGraphFixture.record(
+          &damaged.documents, index, key == "unknown-title" ? "title" : key,
+          key == "app_shas" ? "[]" : "Invented value")
         try store.write(rollingBack: true) { tx in
           let writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
           #expect(throws: ExportError.self) {

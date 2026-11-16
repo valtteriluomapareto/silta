@@ -14,11 +14,8 @@ extension ExportDocumentSnapshot {
     return number
   }
 
-  func minimumFloors(workspace: String? = nil) throws
-    -> (revisions: [String: Int64], comments: [Data: (uid: String, next: Int64)])
-  {
+  func minimumRevisionFloors(workspace: String? = nil) throws -> [String: Int64] {
     var revisions: [String: Int64] = [:]
-    var comments: [Data: (uid: String, next: Int64)] = [:]
     for document in documents {
       guard WorkspaceConfig.isValidIdentifier(document.slug), revisions[document.slug] == nil else {
         throw ExportTree.invalid("document slugs must be unique identifiers", workspace: workspace)
@@ -26,45 +23,16 @@ extension ExportDocumentSnapshot {
       var highest: Int64 = 0
       for record in document.records where record.value("table") == "doc_rev" {
         highest = max(highest, try Self.positive(record.value("rev"), workspace: workspace))
-        guard let uid = record.value("uid"), !uid.isEmpty, comments[Data(uid.utf8)] == nil else {
-          throw ExportTree.invalid("revision UIDs must be present and unique", workspace: workspace)
-        }
-        comments[Data(uid.utf8)] = (uid, 1)
       }
       revisions[document.slug] = Self.nextFloor(after: highest)
     }
-    for record in documents.flatMap(\.records) where record.value("table") == "comment" {
-      guard let owner = record.value("doc_rev"), let floor = comments[Data(owner.utf8)] else {
-        throw ExportTree.invalid("a comment has no retained revision owner", workspace: workspace)
-      }
-      let sequence = try Self.positive(record.value("seq"), workspace: workspace)
-      comments[Data(owner.utf8)] = (owner, max(floor.next, Self.nextFloor(after: sequence)))
-    }
-    return (revisions, comments)
+    return revisions
   }
 
   func validateCounters(workspace: String) throws {
-    let floors = try minimumFloors(workspace: workspace)
     try Self.validate(
-      revisionAllocations, minimums: floors.revisions, workspace: workspace)
-    var values: [Data: Int64] = [:]
-    for row in commentSequences {
-      guard let owner = row.value("doc_rev"), floors.comments[Data(owner.utf8)] != nil else {
-        throw ExportTree.invalid("an allocation has no valid owner", workspace: workspace)
-      }
-      let next = try Self.positive(row.value("next"), workspace: workspace)
-      guard values.updateValue(next, forKey: Data(owner.utf8)) == nil else {
-        throw ExportTree.invalid("allocation owners must be unique", workspace: workspace)
-      }
-    }
-    guard
-      floors.comments.allSatisfy({ minimum in
-        values[minimum.key].map { $0 >= minimum.value.next } ?? false
-      })
-    else {
-      throw ExportTree.invalid(
-        "an allocation is missing or collides with retained history", workspace: workspace)
-    }
+      revisionAllocations, minimums: minimumRevisionFloors(workspace: workspace),
+      workspace: workspace)
   }
 
   private static func validate(
@@ -87,13 +55,6 @@ extension ExportDocumentSnapshot {
     else {
       throw ExportTree.invalid(
         "an allocation is missing or collides with retained history", workspace: workspace)
-    }
-  }
-
-  /// UID keys are made from UTF-8 strings and retain their literal spelling.
-  static func commentFloorRows(_ values: [Data: (uid: String, next: Int64)]) -> [ExportRow] {
-    values.values.sorted { ExportSnapshot.byteOrder($0.uid, $1.uid) }.map {
-      ExportRow(keys: ["doc_rev", "next"], values: ["doc_rev": $0.uid, "next": String($0.next)])
     }
   }
 

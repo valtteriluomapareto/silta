@@ -35,10 +35,10 @@ struct RestoreRefusalTests {
   static let damages: [Damage] = [
     .init("flipped byte", .invalid, "tasks/AC-2.md", "Waiting.", "Waiting!", rehash: false),
     .init(
-      "future format", .env, "manifest.json", #""format": "2""#, #""format": "3""#,
+      "future format", .env, "manifest.json", #""format": "4""#, #""format": "5""#,
       rehash: false),
     .init(
-      "newer schema", .env, "manifest.json", #""schema": "v7""#, #""schema": "v99""#,
+      "newer schema", .env, "manifest.json", #""schema": "v8""#, #""schema": "v99""#,
       rehash: false),
     .init(
       "dangling parent", .invalid, "tasks/AC-10.md", #"parent: "\#(task2)""#,

@@ -363,6 +363,7 @@ CREATE TABLE doc_rev (id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
   base_rev INTEGER,                           -- the revision this proposal was written against
   body_md TEXT NOT NULL,
   title TEXT, kind TEXT, about_refs TEXT,      -- revision metadata; NULL when legacy history is unknown
+  about_targets TEXT,                        -- kind/UID snapshots; NULL when identity is unknown
   source_task_id INTEGER REFERENCES task(id),
   triaged_at TEXT, triaged_by TEXT,            -- both NULL: direct edit or unknown decision
   state TEXT NOT NULL,                        -- proposed | accepted | rejected | superseded
@@ -933,12 +934,10 @@ object, separate from `tasks`: `ref`, eligible `total`, at most two `members`,
 `omitted`, and an optional `next` global-list continuation. Each member has bounded
 `ref`, `title`, `kind`, `why`, `source_task`, a factual `summary`, and a complete
 `read` command. The summary compares body bytes and metadata without loading bodies.
-Unknown historical metadata stays unknown. Mask complete fields before flattening
-line breaks and limiting each display to 120 characters and 512 UTF-8 bytes,
-including omission markers. Fields larger than 65,536 bytes report their omitted
-byte count instead of returning a partial value. Commands are complete and at most
-512 bytes; unusable refs recover through the existing protected archived list or
-workspace list.
+Unknown historical metadata stays unknown. Secret-bearing values stay masked in
+bounded, single-line previews. Omitted values carry explicit size or truncation
+markers. Read commands are complete; unusable refs recover through the existing
+protected archived list or workspace list.
 
 Apply the strict 14-day cutoff before grouping by stored document UID; archive
 status does not hide pending proposals. Members sort newest first, then descending
@@ -1000,13 +999,12 @@ before indentation and the existing rendered-line bounds, without a preview limi
 `doc ls [--about <canonical-map-ref>] [--archived] [--offset N] [--limit N]`
 lists current accepted and individual pending revisions, ordered by slug then revision.
 The default page has 20 entries, with a maximum of 100. Accepted entries match current
-live attachments; pending entries match either the current attachment or their stored
-proposal snapshot. Archived documents require `--archived` in lists, but explicit reads
+live attachments; pending entries match only their stored target kind and UID. Archived documents require `--archived` in lists, but explicit reads
 remain available. Unknown snapshot attachments stay unknown.
 
 Reads mask secrets before rendering, clipping or line selection. Show defaults to at
 most 400 rendered lines including its continuation. List title and metadata previews
-are at most 120 characters each, with omitted-character counts and a pinned show
+are bounded, with omitted-character counts and a pinned show
 command. Complete continuation commands preserve the workspace, selected revision and
 list filters. JSON show data is `{ref,output}`; list data is
 `{entries:[{ref,state,output}],total,offset,limit,next?}`. JSON carries the same bounded
@@ -1035,17 +1033,17 @@ copied comment ref, including a tombstone for a deleted post. Thread, attributio
 resolution and accepted-answer metadata remain visible. Diff and comment-page flags
 are mutually exclusive; pagination options require the comment-page view. The same
 `--lines` bound applies, with continuations pinned to the revision, view and page.
-Lists preview at most two comments per revision, each at most 120 masked characters,
+Lists preview at most two bounded, masked comments per revision,
 with character/record omission counts and a complete comment-page continuation.
 
 `doc edit <slug|doc:slug> -F <file|->` accepts complete UTF-8 Markdown without NUL bytes. It is
 human-only: an agent supplies the human's exact approval words with `--approved`.
 There is no editor or message-body option. New documents require `--title` and at
 least one `--about`; omitted metadata on an accepted document stays unchanged.
-Supplied about refs replace the complete live set. Title is one line of at most
-120 characters; kind is inferred initially and stays fixed unless `--kind` is
-explicit (`contract`, `flow`, `runbook`, `reference`). Supplied input is at most
-65536 UTF-8 bytes before and after secret redaction. NUL bytes refuse even with
+Supplied about refs replace the complete live set. Title is a bounded single line;
+kind is inferred initially and stays fixed unless `--kind` is
+explicit (`contract`, `flow`, `runbook`, `reference`). Supplied input is bounded
+before and after secret redaction. NUL bytes refuse even with
 `--allow-secret` or when resupplying an unchanged accepted body. Humans refuse new secret
 text; approved agents redact it unless explicitly using `--allow-secret`.
 New or changed identities refuse detected secrets without rewriting identifier
@@ -1085,14 +1083,23 @@ Owned bodies remain literal even if their original file is gone or secret-bearin
 Unsafe identities/scopes/retained refs use agent-owned inspection fallbacks without
 write flags. Legacy encoded ref diagnostics are inspected decoded once for masking.
 
-The following document proposal and review workflow is planned. This build only
-registers `doc show`, `doc ls`, `doc edit` and `doc archive`. Restored pending
-revisions and their inbox groups are readable, but cannot be submitted or decided
-through public commands yet. Doc-specific review measurements wait for that workflow.
+Pending revisions with known attachment identities match item filters by stored target
+kind and UID. Renaming a target preserves that match; replacing it under the same
+spelling does not. Legacy NULL identities remain broadly readable but absent from
+item-filtered pending results. Accepted rows use live attachments independently.
+Target snapshots preserve historical display refs and may name removed targets.
+
+Document submission is available through `doc propose`, alongside `doc show`,
+`doc ls`, `doc edit` and `doc archive`. Submissions remain pending, including
+from a human or with approval words. Human inbox groups expose read commands;
+this build cannot decide proposals yet. The triage workflow below remains planned,
+and doc-specific review measurements wait for that command.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
-  omitted accepted metadata stays. Source defaults to the session's claimed task.
+  omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
+  database-dependent selection, defaults and validation; insertion uses one write
+  and never runs Git.
   A submission stays proposed, including from a human or with `--approved`.
 - **Review:** the agent reads pinned proposal diffs, checks the code and prepares
   existing proposal refs with accept/reject recommendations in one chat message.
@@ -1510,13 +1517,12 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    an earlier item printed is not repeated. When the caller has any item, `more:`
    adds `silta --ws acme inbox`, which no trim removes.
    Document proposal items use the same bounded evidence and complete read commands
-   as the inbox, with at most two members. Their groups are atomic under the budget:
-   a conservative reservation may omit a group even when its current shorter preview
-   would fit. The header still counts every eligible group and the complete inbox
-   recovery remains. Count, ordering, trimming and preview hydration share one read
-   snapshot; only groups retained by the budget load preview fields. Text and JSON
-   contain no reservations or internal grouping IDs. Repeated protected document
-   recovery commands appear once while every retained member's evidence remains.
+   as the inbox, with at most two members. Evidence may be shortened with an explicit
+   marker; recovery commands stay complete. Rendered groups fit the optional budget
+   without displacing current-task context. The header still counts every eligible
+   group and the complete inbox recovery remains. Selection, rendering and trimming
+   share one read snapshot. Text and JSON carry the same sections. Repeated protected
+   document recovery commands appear once.
 4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
    the resolved worktree's repo root with its on-disk casing, including for subpath apps,
    only when that file exists.
@@ -1549,7 +1555,7 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    service. Docs about the selected task's topics and explicit `--topic` selections
    appear before the glossary. Full mode shows at most two slug/kind/summary rows
    per item, ranking matching task/selected topics then slug. The summary is the
-   first nonempty nonheading line, at most 120 characters; masking precedes selection
+   first nonempty nonheading line, bounded; masking precedes selection
    and clipping. Remaining docs have a count and scoped `doc ls --about` command.
    Short/hook mode shows counts only and does not read revision bodies. Explicit
    `--short` keeps these semantics even with a larger `--budget`.
@@ -1671,30 +1677,38 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     workspace.yaml       # settings, repos (slug, remote), apps, envs, services, edges, topics+aliases, sources
     tasks/AC-12.md       # frontmatter + Description / Plan / Acceptance / Result
     tasks/AC-12.jsonl    # events, plan revisions, comments, review requests
-    docs/<slug>.md, docs/<slug>.jsonl   # (M2)
+    docs/<slug>.md, docs/<slug>.jsonl
     links.jsonl, alias_decisions.jsonl, approvals.jsonl
   ```
 
-  **Formats 1 and 2** (the contracts restore reads):
-  - New exports use format 2. The reader preserves the exact canonical format-1
-    representation, including the schema named by an older tree. Format 2 always
+  **Formats 1, 2, 3 and 4** (the contracts restore reads):
+  - New exports use format 4, which adds nullable proposal target snapshots to format 3.
+    Format 3 omits per-revision comment reservations and
+    their manifest count. The reader preserves exact canonical format-1, format-2 and format-3
+    representations, including the schema named by an older tree. Format 2 always
     includes `doc_revision_allocations.jsonl` and `doc_comment_sequences.jsonl`,
     even when empty. Their record counts and the doc/revision/verification counts
     are present in the manifest; format 1 does not add these files or count keys.
     Format 2 includes documents, their immutable history and independent revision
-    reservations. Format 1 cannot contain these document files or streams.
+    reservations. Format 3 retains the document revision allocation stream and
+    refuses the obsolete comment stream. Format 1 cannot contain document files or streams.
   - **Values.** Every value is a double-quoted string, integers in decimal; a NULL
     column is left out. Only `"`, `\`, controls (U+0000–U+001F, U+007F–U+009F),
     U+2028, U+2029, U+FEFF, U+FFFE and U+FFFF are escaped: `\"`, `\\`, `\n`, `\r`,
     `\t`, else `\uXXXX` with uppercase hex. So a row is at once a JSON object and a
     YAML flow mapping, `{"key": "value", …}` with `", "` and `": "` separators.
     JSON-array columns and `settings` are written as their stored text. SQLite text
-    as Silta reads it ends at U+0000, so values never hold it.
+    as Silta reads it ends at U+0000; owned document bodies instead retain complete
+    UTF-8 bytes, including existing NUL bytes.
   - **Keys and references.** Keys are the column names, in schema order, `uid`
     first. A foreign key is written as its target's `uid` under the column name
     without `_id` (`repo`, `app`, `parent`, `thread`, `topic`, `from_app`, `to_app`,
     `to_service`). Integer ids and `workspace_id` are never written; the file implies
-    the workspace or the task.
+    the workspace or the task. Imported row UIDs and UID references must be nonempty
+    ASCII without NUL; no other opaque-ID grammar is imposed. Restore checks this
+    before building identity maps. Export, destination and document-write capture
+    inspect complete stored UID bytes too. Unsupported stored IDs refuse without changes (`env`),
+    with human-owned `silta backup` recovery for inspection rather than renaming IDs.
   - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), and
     tasks by `seq`, so the bytes don't depend on integer ids. Files in byte order of
     their path. Every listed file is always present; a file with no rows is empty, and
@@ -1715,14 +1729,20 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     revision in increasing number order under `## Revision <number>`. Bodies use
     the same literal fenced representation as task bodies, including empty bodies.
     **`docs/<slug>.jsonl`** holds revision metadata without the body, followed by
-    verification and revision-owned comment rows. Nullable historical metadata
+    verification and revision-owned comment rows. Format 4 adds nullable
+    `about_targets`: an array of `{kind,uid}` identities. Known snapshots
+    are nonempty, unique, use fixed map kinds and admitted UIDs, and match their
+    display refs in count and outer kind. They may name removed targets; validation
+    never resolves historical spelling through today's map. Formats 1–3 keep their
+    original key sets and unknown identities. Nullable historical metadata
     stays absent; original about refs and verification evidence stay literal even
     when their map targets have been removed. Restore requires current title and kind
     to match their accepted revision, and an unarchived accepted doc needs live attachments.
   - **Document allocation streams:** `doc_revision_allocations.jsonl` holds each
     reserved `slug` and its next revision number, including names without a doc.
-    `doc_comment_sequences.jsonl` holds each revision UID (`doc_rev`) and its next
-    comment number. Both streams use positive decimal integers and byte-sorted keys.
+    Its positive decimal floors have byte-sorted keys. Format 2 additionally holds
+    `doc_comment_sequences.jsonl`; the reader retains its canonical string rows
+    only to check historical bytes. Those reservations do not control restored allocation.
   - **`links.jsonl`:** `from` and `to` are the uids of the linked rows; a link to a
     plan revision names the task's uid in `to` and the revision in `to_rev`, the key
     right after `to`.
@@ -1740,7 +1760,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     byte; restore checks the references.
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq` and the
-    two document allocation streams.
+    document revision allocation stream.
   - **Refusals, with nothing written:** a database with migrations this binary
     doesn't know; unknown link kinds.
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
@@ -1807,10 +1827,12 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     changed. Before committing, the workspace is read back and must render as the tree
     does. Document revision reservations retain the larger current or incoming
     floor, including names whose docs the tree removes, so restoring older history
-    cannot reuse a revision ref. Revision-owned comment reservations come from the
-    incoming tree exactly, remapped through stable revision UIDs. The self-check
-    permits these merged revision floors while keeping incoming history and comment
-    floors exact (D47).
+    cannot reuse a revision ref. Revision-owned comment counters are rebuilt as
+    one past the highest retained comment number, including deleted comments; no
+    comments means 1. Exhausted numbers remain exhausted. Incoming legacy reservation
+    gaps and current gaps are ignored, as D47 permits reuse after discarded history.
+    The self-check permits merged revision floors and the explicit format/legacy-counter
+    normalization while keeping document, revision, comment, body and link truth exact.
   - Repo paths and worktree overrides stay for repos and apps the tree keeps, and a
     task's worktree while its claim and branch are unchanged. Other repo paths are
     re-resolved with `silta init --scan`.
@@ -2051,6 +2073,7 @@ silta doc ls
 silta doc show
 silta doc edit
 silta doc archive
+silta doc propose
 
 # maintenance
 silta export

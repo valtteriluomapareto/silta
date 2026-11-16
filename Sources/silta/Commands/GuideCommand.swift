@@ -127,7 +127,11 @@ extension GuideCommand {
         complete continuations for bounded reads. Historical unknown metadata stays unknown;
         do not replace it with today's map or treat it as a verification claim.
 
-        Restored pending revisions are read-only here: this build cannot submit or decide them.
+        Submit lasting knowledge with doc propose; submissions remain pending, even from a human.
+        Usually propose nothing; never more than two task and document proposals per session.
+        Read the returned immutable ref and its recorded-base diff before handing it off.
+        This build cannot decide proposals yet; the human inbox shows read commands only.
+        Use the existing approved edit flow when the human needs an accepted revision.
         With no human present, record map gaps as `Map gap:` in your handoff or result;
         never create a task or file for a map gap.
 
@@ -182,6 +186,18 @@ extension GuideCommand {
         leaves an unused approval unused. Explicit archived/history reads remain available;
         --archived includes archived docs in lists. For unsafe refs/scopes, follow the protected
         read command Silta prints instead of adding write flags to it.
+
+        Submit a separate candidate without changing accepted revisions:
+        ```sh
+        silta --ws acme doc propose delivery -F - -m "Share delivery rules" \
+        --title Delivery --about topic:messaging <<'DOC'
+        # Delivery fallback
+        Keep $DELIVERY_MODE unchanged when retrying an unconfirmed delivery.
+        Implementation: [[platform-api:src/Auth.swift]].
+        DOC
+        silta --ws acme doc show doc:delivery@1 --diff
+        silta --ws acme inbox --for me
+        ```
         """# + "\n"),
     Section(
       topic: "human",

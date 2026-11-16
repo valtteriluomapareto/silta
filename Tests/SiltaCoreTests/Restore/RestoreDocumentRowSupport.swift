@@ -50,7 +50,7 @@ enum RestoreDocumentRowSupport {
         for row in try Row.fetchAll(
           tx.database, sql: "SELECT id,uid FROM \(table) WHERE workspace_id=17")
         {
-          writer.ids[table, default: [:]][Data((row["uid"] as String).utf8)] = row["id"]
+          writer.ids[table, default: [:]][row["uid"] as String] = row["id"]
         }
       }
       try writer.insertDocuments(incoming, workspace: 17)
@@ -58,6 +58,7 @@ enum RestoreDocumentRowSupport {
       try writer.insertLinks(workspace: 17)
       var expected = incoming
       expected.revisionAllocations = floors
+      expected.legacyCommentSequences = nil
       return expected
     }
   }

@@ -1,6 +1,4 @@
 extension DocProposalPreviewGroup {
-  static let reservation = 4096
-
   var commands: [String] {
     var emitted: Set<String> = []
     return (members.map(\.read) + [next].compactMap { $0 }).filter { emitted.insert($0).inserted }
@@ -8,7 +6,13 @@ extension DocProposalPreviewGroup {
 
   /// Renders complete evidence with the caller's selected, deduplicated read commands.
   package func render(next: [String]) -> String {
-    var lines = ["doc proposal \(ref) (\(total) pending)"]
+    heading + evidence + next.map { "next: " + $0 + "\n" }.joined()
+  }
+
+  var heading: String { "doc proposal \(ref) (\(total) pending)\n" }
+
+  var evidence: String {
+    var lines: [String] = []
     for member in members {
       lines += [
         "> ref: " + member.ref, "> title: " + member.title, "> kind: " + member.kind,
@@ -18,7 +22,6 @@ extension DocProposalPreviewGroup {
     if omitted > 0 {
       lines.append("(\(omitted) more proposed \(omitted == 1 ? "revision" : "revisions"))")
     }
-    lines += next.map { "next: " + $0 }
     return lines.joined(separator: "\n") + "\n"
   }
 }

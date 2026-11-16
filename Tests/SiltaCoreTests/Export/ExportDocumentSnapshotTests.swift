@@ -9,6 +9,10 @@ import Testing
 struct ExportDocumentSnapshotTests {
   static func golden() throws -> [String: Data] { try ExportTreeTests.golden("doc-snapshot") }
 
+  static func currentGolden() throws -> [String: Data] {
+    try golden().filter { $0.key != ExportFormat.docCommentSequencesFile }
+  }
+
   static func read(_ store: DatabaseStore, workspace: Int64 = 17) throws
     -> ExportDocumentSnapshot
   {
@@ -42,8 +46,10 @@ struct ExportDocumentSnapshotTests {
       let before = try RestoreSupport.dump(store)
       let snapshot = try Self.read(store)
       #expect(snapshot.documents == [Self.document])
-      ExportTreeTests.expectSame(try snapshot.files(), try Self.golden())
-      let parsed = try ExportDocumentSnapshot.parse(Self.golden(), workspace: "acme")
+      ExportTreeTests.expectSame(try snapshot.files(), try Self.currentGolden())
+      var parsed = try ExportDocumentSnapshot.parse(Self.golden(), workspace: "acme")
+      ExportTreeTests.expectSame(try parsed.files(), try Self.golden())
+      parsed.legacyCommentSequences = nil
       #expect(parsed == snapshot)
       #expect(try RestoreSupport.dump(store) == before)
       #expect(
@@ -75,11 +81,7 @@ struct ExportDocumentSnapshotTests {
       let before = try RestoreSupport.dump(store)
       let snapshot = try Self.read(store)
       #expect(snapshot.revisionAllocations.last?.value("next") == "8")
-      let comments = snapshot.commentSequences.first {
-        $0.value("doc_rev") == ExportDocumentTests.uid("003")
-      }
-      #expect(comments?.value("next") == "8")
-      #expect(snapshot.commentSequences.count == 5)
+      #expect(snapshot.legacyCommentSequences == nil)
       #expect(try RestoreSupport.dump(store) == before)
       #expect(try ExportDocumentSnapshot.parse(snapshot.files(), workspace: "acme") == snapshot)
     }
@@ -97,10 +99,7 @@ struct ExportDocumentSnapshotTests {
       let before = try RestoreSupport.dump(store)
       let snapshot = try Self.read(store)
       #expect(snapshot.revisionAllocations.last?.value("next") == String(Int64.max))
-      let comments = snapshot.commentSequences.first {
-        $0.value("doc_rev") == ExportDocumentTests.uid("003")
-      }
-      #expect(comments?.value("next") == String(Int64.max))
+      #expect(snapshot.legacyCommentSequences == nil)
       #expect(try ExportDocumentSnapshot.parse(snapshot.files(), workspace: "acme") == snapshot)
       #expect(try RestoreSupport.dump(store) == before)
     }
@@ -120,7 +119,7 @@ struct ExportDocumentSnapshotTests {
             """)
       }
       let snapshot = try Self.read(store)
-      #expect(snapshot.documents.isEmpty && snapshot.commentSequences.isEmpty)
+      #expect(snapshot.documents.isEmpty && snapshot.legacyCommentSequences == nil)
       #expect(
         snapshot.revisionAllocations.map { $0.value("slug") } == ["gone-rules", "push-rules"])
       #expect(snapshot.revisionAllocations.map { $0.value("next") } == ["71", "20"])
@@ -138,9 +137,9 @@ struct ExportDocumentSnapshotTests {
           sql: "UPDATE seq_counter SET next=99 WHERE scope='comment:doc_rev:901'")
       }
       let newer = try Self.read(store)
-      #expect(newer.commentSequences[1].value("next") == "99")
+      #expect(newer.legacyCommentSequences == nil)
       let incoming = try ExportDocumentSnapshot.parse(Self.golden(), workspace: "acme")
-      #expect(incoming.commentSequences[1].value("next") == "9")
+      #expect(incoming.legacyCommentSequences?[1].value("next") == "9")
       ExportTreeTests.expectSame(try incoming.files(), try Self.golden())
     }
   }

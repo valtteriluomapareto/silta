@@ -117,8 +117,9 @@ struct DocAuditMigrationTests {
     let binary = try #require(ProcessInfo.processInfo.environment["SILTA_V6_BINARY"])
     try withScratchDirectory { home in
       let store = try Self.copy(Self.fixture, to: home)
-      try store.initialize()
-      try Self.seedDecision(store)
+      let queue = try DatabaseQueue(path: store.path)
+      try StorageSchema.migrator.migrate(queue, upTo: "v7")
+      try queue.write { try Self.seedDecision(in: $0) }
       let before = try Self.auditRows(store)
       let result = try SiltaBinary.runProcess(
         URL(filePath: binary),
@@ -141,14 +142,35 @@ struct DocAuditMigrationTests {
     }
   }
 
-  static func seedDecision(_ store: DatabaseStore) throws {
-    try store.write {
-      try $0.database.execute(
-        sql:
-          "UPDATE doc_rev SET triaged_at=?,triaged_by=? WHERE id=14",
-        arguments: ["2023-11-14T22:14:00.000Z", "human:acme"]
-      )
+  @Test(.tags(.slow), .enabled(if: slowTestsEnabled()))
+  func actualV6WriterRefusesTargetSnapshotFloorWithoutMutation() throws {
+    let binary = try #require(ProcessInfo.processInfo.environment["SILTA_V6_BINARY"])
+    try withScratchDirectory { home in
+      let store = try Self.copy(Self.fixture, to: home)
+      try store.initialize()
+      try Self.seedDecision(store)
+      let before = try DocVerificationPreparationTests.truth(store)
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: binary),
+        ["--json", "--ws", "acme", "task", "add", "Refuse the older writer"], in: home,
+        environment: [
+          "SILTA_HOME": home.path, "SILTA_ACTOR": "agent:codex:acme",
+          "SILTA_NOW": "2023-11-14T22:13:21.000Z", "SILTA_ID_SEED": "72",
+        ])
+      #expect(result.termination == .exit(9))
+      #expect(result.stdout.contains("Database requires a newer version of silta."))
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
+  }
+
+  static func seedDecision(_ store: DatabaseStore) throws {
+    try store.write { try seedDecision(in: $0.database) }
+  }
+
+  static func seedDecision(in db: Database) throws {
+    try db.execute(
+      sql: "UPDATE doc_rev SET triaged_at=?,triaged_by=? WHERE id=14",
+      arguments: ["2023-11-14T22:14:00.000Z", "human:acme"])
   }
 
   static func auditRows(_ store: DatabaseStore) throws -> [String] {

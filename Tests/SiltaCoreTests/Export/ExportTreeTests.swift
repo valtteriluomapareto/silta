@@ -123,12 +123,7 @@ struct ExportTreeTests {
     UNION SELECT substr(scope,length('doc_rev:1:')+1)
     FROM seq_counter WHERE scope GLOB 'doc_rev:1:*')
     """,
-    "doc_comment_sequence":
-      """
-    SELECT count(*) FROM seq_counter c
-    JOIN doc_rev r ON c.scope='comment:doc_rev:'||r.id
-    JOIN doc d ON d.id=r.doc_id WHERE d.workspace_id=1
-    """,
+
   ]
 
   @Test func manifestListsEveryFileWithItsHashAndCountsMatchTheDatabase() throws {
@@ -292,7 +287,7 @@ struct TreeDamage: Sendable, CustomTestStringConvertible {
     edit("crlf", "tasks/AC-10.jsonl", "\n", "\r\n"),
     edit("wrong ref", "tasks/AC-2.md", #"ref: "AC-2""#, #"ref: "AC-3""#),
     edit("unquoted frontmatter", "tasks/AC-10.md", #"type: "chore""#, "type: chore"),
-    edit("future format", "manifest.json", #""format": "2""#, #""format": "3""#, rehash: false),
+    edit("future format", "manifest.json", #""format": "4""#, #""format": "5""#, rehash: false),
     edit("escaped slash", "workspace.yaml", "src/Portal", #"src\/Portal"#),
     edit("wider fence", "tasks/AC-2.md", "~~~\nWaiting.\n~~~", "~~~~\nWaiting.\n~~~~"),
     Self(testDescription: "record groups out of order") { files in

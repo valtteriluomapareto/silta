@@ -29,7 +29,8 @@ struct RestoreDocumentCounterIntegrationTests {
       let target = try RestoreDocumentRowSupport.make(home)
       _ = try RestoreSupport.restore(directory, into: target, home: home)
       let snapshot = try ExportTree.parse(ExportTreeTests.render(target))
-      #expect(snapshot.documents.documents.isEmpty && snapshot.documents.commentSequences.isEmpty)
+      #expect(
+        snapshot.documents.documents.isEmpty && snapshot.documents.legacyCommentSequences == nil)
       let floors = Dictionary(
         uniqueKeysWithValues: snapshot.documents.revisionAllocations.map {
           ($0.value("slug") ?? "", $0.value("next") ?? "")

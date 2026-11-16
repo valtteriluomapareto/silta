@@ -1,5 +1,5 @@
 /// Supplied content and optional baseline/source selections for a pending revision.
-struct DocProposalRequest: Sendable {
+package struct DocProposalRequest: Sendable {
   var slug: String
   var title: String?
   var about: [String]?
@@ -7,7 +7,8 @@ struct DocProposalRequest: Sendable {
   var task: String?
   var why: String?
 
-  init(
+  /// Names supplied content, optional metadata and its source task.
+  package init(
     slug: String, title: String? = nil, about: [String]? = nil, base: String? = nil,
     task: String? = nil, why: String? = nil
   ) {

@@ -330,6 +330,9 @@ extension DogfoodLogTests {
             VALUES('acme-messaging',1,'messaging','Messaging');
           """)
     }
+    let input = URL(filePath: store.path).deletingLastPathComponent().appending(
+      path: "candidate.md")
+    try "Candidate knowledge.".write(to: input, atomically: true, encoding: .utf8)
     return [
       (["--ws", "acme", "doc", "ls"], "acme"),
       (["--ws", "acme", "doc", "show", "rules"], "acme"),
@@ -340,6 +343,12 @@ extension DogfoodLogTests {
         ], "acme"
       ),
       (["--ws", "acme", "doc", "archive", "rules", "--approved", "Archive Acme rules"], "acme"),
+      (
+        [
+          "--ws", "acme", "doc", "propose", "delivery", "-F", input.path, "-m", "Record candidate",
+          "--title", "Delivery", "--about", "topic:messaging", "--task", "AC-1",
+        ], "acme"
+      ),
     ]
   }
 
