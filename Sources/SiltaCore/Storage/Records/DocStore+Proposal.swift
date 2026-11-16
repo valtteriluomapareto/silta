@@ -13,7 +13,7 @@ extension DocStore {
       else { throw StorageError.corrupt }
       return DocTargetIdentity(kind: target.kind, uid: uid)
     }
-    let snapshot = try WorkspaceConfig.json(targets.map { ["kind": $0.kind, "uid": $0.uid] })
+    let snapshot = try DocTargetIdentity.encoded(targets)
     let stamp = utcTimestamp(at)
     let id = try docID(draft.slug, metadata: metadata, old: find(draft.slug), stamp: stamp)
     let revision = try nextRevision(id, slug: draft.slug)

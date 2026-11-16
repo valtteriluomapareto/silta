@@ -48,12 +48,14 @@ struct DocProposalInbox {
 
   func previews(_ groups: [DocProposalGroup]) throws -> [DocProposalPreviewGroup] {
     guard !groups.isEmpty else { return [] }
-    let metadata = try db.columns(in: "doc_rev").contains { $0.name == "source_task_id" }
+    let columns = try db.columns(in: "doc_rev").map(\.name)
+    let metadata = columns.contains("source_task_id")
+    let targets = columns.contains("about_targets")
     var selected: [Row] = []
     for start in stride(from: 0, to: groups.count, by: 64) {
       let ids = groups[start..<min(start + 64, groups.count)].map(\.id)
       selected += try Row.fetchAll(
-        db, sql: memberSQL(ids: ids, metadata: metadata),
+        db, sql: memberSQL(ids: ids, metadata: metadata, targets: targets),
         arguments: arguments + StatementArguments(ids))
     }
     let rows = Dictionary(grouping: selected) { $0["doc_id"] as Int64 }
@@ -69,7 +71,7 @@ struct DocProposalInbox {
     }
   }
 
-  private func memberSQL(ids: [Int64], metadata: Bool) -> String {
+  private func memberSQL(ids: [Int64], metadata: Bool, targets: Bool) -> String {
     let title = metadata ? "r.title" : "NULL"
     let kind = metadata ? "r.kind" : "NULL"
     let about = metadata ? "r.about_refs" : "NULL"
@@ -89,7 +91,7 @@ struct DocProposalInbox {
       """,
       Self.change(title, metadata ? "b.title" : "NULL", "title"),
       Self.change(kind, metadata ? "b.kind" : "NULL", "kind"),
-      Self.change(about, metadata ? "b.about_refs" : "NULL", "about"),
+      Self.aboutChange(about, metadata ? "b.about_refs" : "NULL", targets: targets),
     ].joined(separator: ",\n")
     return """
       WITH eligible AS (
@@ -103,6 +105,24 @@ struct DocProposalInbox {
       LEFT JOIN task s ON s.id=\(source) AND s.workspace_id=d.workspace_id
       LEFT JOIN workspace w ON w.id=s.workspace_id
       WHERE e.position<=2 ORDER BY d.id,e.position
+      """
+  }
+
+  private static func aboutChange(_ value: String, _ base: String, targets: Bool) -> String {
+    guard targets else { return change(value, base, "about") }
+    return """
+      CASE WHEN \(value) IS NULL OR \(base) IS NULL THEN NULL
+      ELSE CAST(\(value) AS BLOB) IS NOT CAST(\(base) AS BLOB)
+        OR (r.about_targets IS NOT NULL AND b.about_targets IS NOT NULL AND (
+          EXISTS(SELECT json_extract(value,'$.kind'),json_extract(value,'$.uid')
+            FROM json_each(r.about_targets)
+            EXCEPT SELECT json_extract(value,'$.kind'),json_extract(value,'$.uid')
+            FROM json_each(b.about_targets))
+          OR EXISTS(SELECT json_extract(value,'$.kind'),json_extract(value,'$.uid')
+            FROM json_each(b.about_targets)
+            EXCEPT SELECT json_extract(value,'$.kind'),json_extract(value,'$.uid')
+            FROM json_each(r.about_targets))
+        )) END AS about_change
       """
   }
 
