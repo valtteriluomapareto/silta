@@ -77,13 +77,12 @@ package struct DocService {
   }
 
   func showCommand(_ ref: String, flags: String = "", lines: String? = nil) -> String {
-    guard scopeIsSafe, Self.referenceIsSafe(ref) else { return listCommand }
-    do {
-      let parsed = try DocReadView.parse(ref, diff: false, comments: false, offset: nil, limit: nil)
-      _ = try Self.selection(parsed.ref, revision: nil)
-    } catch {
-      return listPageCommand(about: nil, archived: true, offset: 0, limit: 20)
+    guard scopeIsSafe else { return listCommand }
+    guard let slug = Self.documentSlug(ref) else {
+      return Self.recoveryIsSafe(ref)
+        ? listPageCommand(about: nil, archived: true, offset: 0, limit: 20) : listCommand
     }
+    guard Self.identifierIsSafe(slug) else { return listCommand }
     return workspaceCommand("silta doc show " + shellWord(ref), workspace: workspace) + flags
       + (lines.map { " --lines " + $0 } ?? "")
   }
@@ -99,7 +98,7 @@ package struct DocService {
   }
 
   static func referenceIsSafe(_ ref: String) -> Bool {
-    if ref.hasPrefix("doc:") { return validDocumentReference(ref) }
+    if ref.hasPrefix("doc:") { return documentSlug(ref).map(identifierIsSafe) ?? false }
     do {
       let parts = try TaskLinkTarget.mapNames(ref)
       return parts.identifiers.allSatisfy(identifierIsSafe)
@@ -117,12 +116,11 @@ package struct DocService {
     SecretGuard.matches(in: command).isEmpty
   }
 
-  private static func validDocumentReference(_ ref: String) -> Bool {
+  private static func documentSlug(_ ref: String) -> String? {
     do {
       let parsed = try DocReadView.parse(ref, diff: false, comments: false, offset: nil, limit: nil)
-      let selected = try selection(parsed.ref, revision: nil)
-      return identifierIsSafe(selected.slug)
-    } catch { return false }
+      return try selection(parsed.ref, revision: nil).slug
+    } catch { return nil }
   }
 
   static func preview(_ raw: String) -> String {

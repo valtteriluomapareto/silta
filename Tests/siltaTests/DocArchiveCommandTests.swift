@@ -43,11 +43,12 @@ struct DocArchiveCommandTests {
         in: scratch, environment: TaskCommandTests.actor)
       #expect(result.termination == .exit(3))
       let error = try DocEditCommandTests.error(result)
-      #expect(error["next_by"] as? String == (scope == "acme" ? "human" : "agent"))
-      if scope == "acme" {
+      let trusted = scope == "acme" || scope == String(repeating: "a", count: 52)
+      #expect(error["next_by"] as? String == (trusted ? "human" : "agent"))
+      if trusted {
         #expect(result.stdout.contains("doc:" + ref) && !result.stdout.contains("[REDACTED:"))
       }
-      if scope != "acme" {
+      if !trusted {
         #expect(!result.stdout.contains(scope))
         #expect(error["next"] as? [String] == ["silta ws ls"])
       }

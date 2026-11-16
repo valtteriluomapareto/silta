@@ -28,12 +28,12 @@ enum DocTrustedIdentityFixture {
       try tx.database.execute(
         sql: """
           INSERT INTO comment(uid,doc_rev_id,seq,kind,body_md,actor,created_at)
-          SELECT 'trusted-comment-'||n,r.id,n,'comment','Acme comment','human:acme',''
+          SELECT 'trusted-comment-'||n,r.id,n,'comment',?,'human:acme',''
           FROM doc_rev r JOIN doc d ON d.id=r.doc_id CROSS JOIN (SELECT 1 AS n UNION ALL SELECT 2)
           WHERE d.slug=?;
           INSERT INTO topic(uid,workspace_id,slug,name)
           SELECT 'replacement-topic',id,'replacement','Replacement' FROM workspace;
-          """, arguments: [doc])
+          """, arguments: ["sensitive=" + workspace, doc])
     }
     return store
   }

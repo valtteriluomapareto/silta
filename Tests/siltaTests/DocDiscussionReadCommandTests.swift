@@ -298,6 +298,7 @@ extension DocDiscussionReadCommandTests {
             UPDATE meta SET value='beta' WHERE key='current_workspace';
             """)
       }
+      let trusted = scope == "acme" || scope == String(repeating: "a", count: 52)
       let ref = "doc:rules@3"
       for args in [
         ["show", ref, "--diff"], ["show", ref, "--diff", "--lines", "9999"],
@@ -310,8 +311,8 @@ extension DocDiscussionReadCommandTests {
           ["--ws", scope, "doc"] + args + (json ? ["--json"] : []), in: scratch)
         #expect(result.termination == .exit(args[1].hasSuffix("/99") ? 2 : 0))
         let report = result.stdout + result.stderr
-        if scope == "acme" {
-          #expect(report.contains("silta --ws 'acme'"))
+        if trusted {
+          #expect(report.contains("silta --ws '" + scope + "'"))
         } else {
           #expect(!report.contains(scope))
           #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))
@@ -322,7 +323,7 @@ extension DocDiscussionReadCommandTests {
       let missing = try SiltaBinary.run(
         ["--ws", scope, "doc", "show", ref, "--diff"] + (json ? ["--json"] : []), in: scratch)
       #expect(missing.termination == .exit(2))
-      if scope != "acme" {
+      if !trusted {
         #expect(!(missing.stdout + missing.stderr).contains(scope))
         #expect((missing.stdout + missing.stderr).contains("silta ws ls"))
       }

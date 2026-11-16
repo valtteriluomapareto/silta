@@ -191,9 +191,17 @@ struct DocEditCommandTests {
         }
         let result = try Self.run(
           ["rules", "--keep-body"], scratch, approved: false, workspace: scope)
-        #expect(result.termination == .exit(3) && !result.stdout.contains(scope))
-        #expect(try Self.error(result)["next"] as? [String] == ["silta ws ls"])
-        #expect(try Self.error(result)["next_by"] as? String == "agent")
+        #expect(result.termination == .exit(3))
+        if scope == slug {
+          #expect(result.stdout.contains("--ws '" + scope + "'"))
+          #expect(try Self.error(result)["next_by"] as? String == "human")
+          let next = try #require(try Self.error(result)["next"] as? [String])
+          #expect(next.first?.contains("--keep-body --approved") == true)
+        } else {
+          #expect(!result.stdout.contains(scope))
+          #expect(try Self.error(result)["next"] as? [String] == ["silta ws ls"])
+          #expect(try Self.error(result)["next_by"] as? String == "agent")
+        }
       }
     }
   }
