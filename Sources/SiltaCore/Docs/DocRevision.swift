@@ -7,6 +7,7 @@ struct DocRevision: Sendable {
   let title: String?
   let kind: String?
   let about: [String]?
+  let aboutTargets: [DocTargetIdentity]?
   let state: String
   let actor: String
   let message: String?
