@@ -1,0 +1,2 @@
+error: Use an identifier for the doc slug. [invalid]
+next: silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --title <title> --about <ref>
