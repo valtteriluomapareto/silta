@@ -38,7 +38,8 @@ verbose output.
 |---|---|
 | Markdown only | `scripts/run-guards.sh` (link check, plans board) |
 | Swift code | `scripts/verify.sh quick` (guards, lint, build with warnings as errors, tests) |
-| Storage, concurrency, location, agent-facing output | `scripts/verify.sh full` (adds stress and scenario tiers, then the wall-clock deadline tier alone) |
+| Storage, concurrency, location, agent-facing output | `scripts/verify.sh full` (adds stress, scenario and compatibility tiers, the wall-clock deadline tier alone, then the eval replays) |
+| `Evals/` (offline eval tooling) | `scripts/verify.sh evals` (builds the CLI, then the eval replay tests) |
 | A guard script | `python3 -B -m unittest discover -s scripts/tests` (self-tests) |
 
 Before saying something works, state which step you ran and what it doesn't prove.

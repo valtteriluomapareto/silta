@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # The verify ladder (AGENTS.md).
-#   quick  guards, lint, build with warnings as errors, tests (a run with zero tests fails)
-#   full   quick plus stress/scenarios, then the wall-clock deadline tier alone and serially
+#   quick       guards, lint, build with warnings as errors, tests (a run with zero tests fails)
+#   full        full-swift, then evals: everything CI runs
+#   full-swift  quick plus the slow tiers (stress, scenarios, prior-writer compatibility),
+#               then the wall-clock deadline tier alone and serially
+#   evals       build the CLI, then the offline agent eval replays, one process per module
+# CI runs full-swift and evals as parallel jobs; full runs the same two pieces in sequence.
 # Tests always run against a temporary SILTA_HOME, never the real ~/.silta.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 mode="${1:-quick}"
 case "$mode" in
-  quick|full) ;;
-  *) echo "usage: scripts/verify.sh [quick|full]" >&2; exit 64 ;;
+  quick|full|full-swift|evals) ;;
+  *) echo "usage: scripts/verify.sh [quick|full|full-swift|evals]" >&2; exit 64 ;;
 esac
 
 step() { echo; echo "=== $* ==="; }
@@ -18,12 +22,6 @@ if [[ -n "${CI:-}" && -n "${SILTA_UPDATE_GOLDENS:-}" ]]; then
   echo "verify: SILTA_UPDATE_GOLDENS is set in CI; goldens are only regenerated locally, on purpose" >&2
   exit 1
 fi
-
-step "guards"
-scripts/run-guards.sh
-
-step "lint"
-scripts/lint-check.sh
 
 SILTA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/silta-verify.XXXXXX")"
 export SILTA_HOME
@@ -37,18 +35,19 @@ if [[ -n "${CODEX_SANDBOX:-}" ]]; then
   swiftpm=(--disable-sandbox)
 fi
 
-if [[ "$mode" == full ]]; then
-  step "build prior writer (isolated compatibility test)"
-  export SILTA_PRIOR_BINARY="$SILTA_HOME/prior/silta"
-  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior"
-  export SILTA_V6_BINARY="$SILTA_HOME/prior-v6/silta"
-  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v6" b65eab8994b7ada9f54495f9c050ebe5a3090d74
-fi
+guards_and_lint() {
+  step "guards"
+  scripts/run-guards.sh
+  step "lint"
+  scripts/lint-check.sh
+}
 
-step "build (warnings as errors)"
 # Dependencies come only from Package.resolved (D18): fail instead of re-resolving.
-swift build ${swiftpm[@]+"${swiftpm[@]}"} --build-tests --only-use-versions-from-resolved-file \
-  -Xswiftc -warnings-as-errors
+build() {
+  step "build (warnings as errors)"
+  swift build ${swiftpm[@]+"${swiftpm[@]}"} --only-use-versions-from-resolved-file \
+    -Xswiftc -warnings-as-errors "$@"
+}
 
 run_tests() {
   local test_log
@@ -71,12 +70,38 @@ run_tests() {
   last_test_log="$test_log"
 }
 
-step "test"
-if [[ "$mode" == full ]]; then
+# Skipped tests still count as run, so a gate that stopped enabling a test would otherwise
+# pass silently. Fails unless each named test passed in the last run.
+require_passed() {
+  local name
+  for name in "$@"; do
+    if ! grep -q "Test ${name}() passed" "$last_test_log"; then
+      echo "verify ${mode}: ${name} did not run and pass" >&2
+      exit 1
+    fi
+  done
+}
+
+full_swift() {
+  guards_and_lint
+  step "build prior writers (isolated compatibility test)"
+  export SILTA_PRIOR_BINARY="$SILTA_HOME/prior/silta"
+  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior" prior
+  export SILTA_V6_BINARY="$SILTA_HOME/prior-v6/silta"
+  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v6" v6
+  build --build-tests
+
+  step "test (with slow tiers)"
   export SILTA_SLOW_TESTS=1
   SILTA_DEADLINE_TESTS='' run_tests
-  step "offline agent eval replays (no models)"
-  python3 -B -m unittest discover -s Evals/tests
+  # The stress test and every test that drives a prior-writer binary.
+  require_passed twentyProcessesAddFiveHundredTasksWithoutSequenceGaps \
+    actualPriorWriterRefusesUpgradedDatabaseWithoutChangingIt \
+    actualMetadataWriterCannotWriteAfterNamespaceUpgrade \
+    actualV6WriterKeepsPopulatedAuditFields \
+    actualV6WriterRefusesTargetSnapshotFloorWithoutMutation \
+    actualV6ExporterRefusesUnknownCounterOnlySchema
+
   # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
   # parallel suite skips them; they run here alone and one at a time.
   step "wall-clock deadlines (isolated, serial)"
@@ -86,7 +111,6 @@ if [[ "$mode" == full ]]; then
     step "wall-clock deadlines (second attempt after a failure)"
     SILTA_DEADLINE_TESTS=1 run_tests --no-parallel --filter 'WallClock'
   fi
-  # Skipped tests still count as run, so a broken gate would otherwise pass silently.
   if grep -q ' skipped' "$last_test_log"; then
     echo "verify ${mode}: a wall-clock deadline test was skipped" >&2
     exit 1
@@ -97,9 +121,35 @@ if [[ "$mode" == full ]]; then
       exit 1
     fi
   done
-else
-  SILTA_DEADLINE_TESTS='' run_tests
-fi
+}
+
+# The replays drive .build/debug/silta, so this builds at least that product.
+evals() {
+  step "offline agent eval replays (no models)"
+  python3 -B scripts/run-eval-tests.py
+}
+
+case "$mode" in
+  quick)
+    guards_and_lint
+    build --build-tests
+    step "test"
+    SILTA_DEADLINE_TESTS='' run_tests
+    ;;
+  full-swift)
+    full_swift
+    ;;
+  evals)
+    build --product silta
+    evals
+    ;;
+  full)
+    # Evals run after the wall-clock tier so their processes can't load the machine
+    # during it.
+    full_swift
+    evals
+    ;;
+esac
 
 echo
 echo "verify ${mode}: passed"
