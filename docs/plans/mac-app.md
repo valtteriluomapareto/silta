@@ -1,6 +1,6 @@
 # Silta for Mac: a read-only viewer
 
-Status: proposed
+Status: active
 
 ## Goal
 
