@@ -61,7 +61,9 @@ execution, CI screenshot approval, and changes to Paper or Poimi.
   cannot reference an absent seed. Test support may depend on app support; app support
   never depends on test support. This is the narrow D23 update recorded with this
   plan: DEBUG fixture clock/ID adapters may live beside that seed. General-purpose
-  fakes stay in test support; no package guard is relaxed.
+  fakes stay in test support; no package guard is relaxed. The minimal whole-file
+  DEBUG guard and its Python self-tests ship with A1's first fixture sources; C1a
+  extends coverage to App control files and Release launch behavior.
 - Seed ordinary fixtures through core service APIs before opening the read-only
   app connection. `missing-store` creates no database. `newer-schema` starts from
   a valid seed and adds an unknown migration marker through a fixture-only helper;
@@ -170,7 +172,7 @@ accepts action JSON rather than introducing an action-specific argument parser.
 
 | Slice | Scope | Depends on | Verify with |
 |---|---|---|---|
-| C1a / SI-146 / #178 | Shared named fixtures, launch and My work route, atomic snapshot, release guard | A2; reuse A1 seed | SwiftPM fixture tests, Xcode launch/snapshot tests, Python guard self-tests, Debug and Release builds |
+| C1a / SI-146 / #178 | Shared named fixtures, launch and My work route, atomic snapshot, extend A1 release guard | A2; reuse A1 seed | SwiftPM fixture tests, Xcode launch/snapshot tests, Python guard self-tests, Debug and Release builds |
 | C1b / SI-146 / #178 | `launch/state/wait/shot`, process ownership, AGENTS.md onboarding | C1a | Python script/wait tests; Debug fixture launch and inspected light/dark window screenshots |
 | C2 / SI-147 / #179 | Mailbox, dispatch to shared handlers, sequence barriers, copy and fixture-write refresh | C1 | Strict-decoding and action tests; isolated CLI write changes read-model counts on the existing reader; real UI wiring check |
 
