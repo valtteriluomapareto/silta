@@ -33,7 +33,8 @@
       try db.execute(
         sql: """
           INSERT INTO task(uid,workspace_id,seq,title,status,app_id,plan_md,plan_rev,
-            claimed_by,claimed_at,branch,created_by,created_at,updated_at,closed_at,result_md,done_sha)
+            claimed_by,claimed_at,branch,created_by,created_at,updated_at,
+            closed_at,result_md,done_sha)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           """,
         arguments: [

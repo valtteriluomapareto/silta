@@ -116,9 +116,10 @@ the same control surface. Each slice targets one PR of about 800 lines.
   under `/bin/sh -c`, and must exit 0 with the expected state change. Unfilled
   placeholders must fail with no write and never wait for input.
 - **CI** (A2 adds it with the Xcode project; the runner already has the pinned Xcode):
-  - `SiltaAppSupportTests` run in the existing `swift` job. They stay in-process; only the
-    command-template tests start processes. That job is CPU-bound and the slowest one,
-    so A1 and each later slice report how much test time they add.
+  - `SiltaAppSupportTests` run in the existing `swift` job. Read-model tests stay
+    in-process except the required CLI parity check; command-template tests also start
+    processes. That job is CPU-bound and the slowest one, so A1 and each later slice
+    report how much test time they add.
   - A third job, `app`, runs `scripts/verify.sh app` beside `swift` and `evals`, and the
     `verify` gate requires it. `full` includes `app`, and AGENTS.md gains an `App/` rung.
   - `verify.sh app` runs `xcodebuild test` for `SiltaAppTests` (Debug), then

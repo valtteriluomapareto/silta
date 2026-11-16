@@ -200,6 +200,9 @@
       }
     }
 
+  }
+
+  extension AppReaderTests {
     @Test func missingAndNewerStoresFailWithoutInitializationOrMigration() throws {
       try withScratchDirectory { scratch in
         let reader = try Self.reader(scratch)

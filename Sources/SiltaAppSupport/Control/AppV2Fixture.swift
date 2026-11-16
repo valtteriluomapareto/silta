@@ -39,23 +39,25 @@
     }
 
     private static var tasks: [DebugTaskFixture] {
-      let rows: [(Int64, String, String, String)] = [
-        (6, "Order list skeleton", "acme-mobile", "done"),
-        (7, "Push token refresh", "acme-mobile", "done"),
-        (8, "Order totals in cents", "acme-backend", "done"),
-        (9, "Backend push retries", "acme-backend", "review"),
-        (12, "Parse push categories", "acme-mobile", "doing"),
-        (14, "Retry push registrations", "acme-mobile", "doing"),
-        (15, "Order history page", "acme-web", "todo"),
-        (16, "Paginate the orders endpoint", "acme-backend", "todo"),
-        (17, "Offline banner", "acme-mobile", "todo"),
-        (18, "Error code cleanup", "acme-backend", "todo"),
-        (21, "Rate-limit push sends", "acme-backend", "proposed"),
-        (22, "Cache the order list", "acme-mobile", "proposed"),
-        (23, "Drop the legacy v1 client", "acme-web", "proposed"),
+      let rows = [
+        DebugTaskFixture(6, "Order list skeleton", app: "acme-mobile", status: "done"),
+        DebugTaskFixture(7, "Push token refresh", app: "acme-mobile", status: "done"),
+        DebugTaskFixture(8, "Order totals in cents", app: "acme-backend", status: "done"),
+        DebugTaskFixture(9, "Backend push retries", app: "acme-backend", status: "review"),
+        DebugTaskFixture(12, "Parse push categories", app: "acme-mobile", status: "doing"),
+        DebugTaskFixture(14, "Retry push registrations", app: "acme-mobile", status: "doing"),
+        DebugTaskFixture(15, "Order history page", app: "acme-web", status: "todo"),
+        DebugTaskFixture(16, "Paginate the orders endpoint", app: "acme-backend", status: "todo"),
+        DebugTaskFixture(17, "Offline banner", app: "acme-mobile", status: "todo"),
+        DebugTaskFixture(18, "Error code cleanup", app: "acme-backend", status: "todo"),
+        DebugTaskFixture(21, "Rate-limit push sends", app: "acme-backend", status: "proposed"),
+        DebugTaskFixture(22, "Cache the order list", app: "acme-mobile", status: "proposed"),
+        DebugTaskFixture(23, "Drop the legacy v1 client", app: "acme-web", status: "proposed"),
       ]
-      return rows.map { sequence, title, app, status in
-        var task = DebugTaskFixture(sequence, title, app: app, status: status)
+      return rows.map { row in
+        var task = row
+        let sequence = task.sequence
+        let status = task.status
         if sequence == 22 { task.creator = "agent:claude:fixture" }
         if status == "doing" {
           task.claimant = sequence == 12 ? "agent:claude:fixture" : "agent:codex:fixture"
