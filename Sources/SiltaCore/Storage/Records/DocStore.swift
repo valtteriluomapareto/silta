@@ -75,10 +75,14 @@ struct DocStore {
 
   func archive(_ slug: String) throws -> Bool {
     guard let doc = try find(slug) else { throw DocError.notFound(slug) }
-    guard doc["current_rev"] as Int? != nil else {
+    let id: Int64 = doc["id"]
+    guard
+      try String.fetchOne(
+        db, sql: "SELECT state FROM doc_rev WHERE doc_id=? AND rev=?",
+        arguments: [id, doc["current_rev"] as Int?]) == "accepted"
+    else {
       throw DocError.invalid("Only a doc with an accepted current revision can be archived.")
     }
-    let id: Int64 = doc["id"]
     let archived: Bool = doc["archived"]
     if archived, try attachments(id).isEmpty { return false }
     try db.execute(

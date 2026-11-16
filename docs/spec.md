@@ -941,8 +941,8 @@ protected archived list or workspace list.
 Default document attention excludes archived docs, matching default document lists;
 `inbox --all` includes archived pending history, as `doc ls --archived` does.
 
-Apply the strict 14-day cutoff before grouping by stored document UID; archive
-status does not hide pending proposals. Members sort newest first, then descending
+Apply the strict 14-day cutoff before grouping by stored document UID, unless
+`--all` is requested. Members sort newest first, then descending
 revision and binary UID. Groups share the task-proposal category, newest first;
 tasks precede documents on a cross-kind time tie, preserving existing task ties and
 binary document UID ties. The shared cap and `remaining` count groups rather than
