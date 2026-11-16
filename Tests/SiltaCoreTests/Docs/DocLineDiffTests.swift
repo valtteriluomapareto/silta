@@ -19,11 +19,10 @@ struct DocLineDiffTests {
       let output = try DocService(workspace: "acme", store: store).show("doc:rules@2", diff: true)
         .output
       #expect(output.contains("why:"))
-      withKnownIssue("Metadata changes expand an otherwise small body edit") {
-        #expect(output.components(separatedBy: "\n").count < 60)
-        #expect(output.contains(append ? "@@ -1498,3 +1498,4 @@" : "@@ -747,7 +747,7 @@"))
-        #expect(!output.contains("-# Acme rules") && !output.contains("+# Acme rules"))
-      }
+      #expect(output.contains(append ? "+New tail\n" : "-Line 750\n+Changed middle\n"))
+      #expect(output.components(separatedBy: "\n").count < 60)
+      #expect(output.contains(append ? "@@ -1498,3 +1498,4 @@" : "@@ -747,7 +747,7 @@"))
+      #expect(!output.contains("-# Acme rules") && !output.contains("+# Acme rules"))
     }
   }
 
@@ -38,12 +37,11 @@ struct DocLineDiffTests {
         home, old: old.joined(separator: "\n"), new: new.joined(separator: "\n"))
       let output = try DocService(workspace: "acme", store: store).show("doc:rules@2", diff: true)
         .output
-      withKnownIssue("A replacement span includes all lines between distant edits") {
-        #expect(output.components(separatedBy: "\n").count < 80)
-        #expect(
-          output.components(separatedBy: "\n").filter { $0.hasPrefix("@@ ") }.count
-            == (distant ? 2 : 1))
-      }
+      #expect(output.contains("+First change\n") && output.contains("+Second change\n"))
+      #expect(output.components(separatedBy: "\n").count < 80)
+      #expect(
+        output.components(separatedBy: "\n").filter { $0.hasPrefix("@@ ") }.count
+          == (distant ? 2 : 1))
     }
   }
 
@@ -67,9 +65,7 @@ struct DocLineDiffTests {
       let store = try await fixture(home, old: change.old, new: change.new)
       let output = try DocService(workspace: "acme", store: store).show("doc:rules@2", diff: true)
         .output
-      withKnownIssue("Metadata occupies body diff coordinates") {
-        #expect(output.contains(change.hunk))
-      }
+      #expect(output.contains(change.hunk))
     }
   }
 
@@ -81,9 +77,7 @@ struct DocLineDiffTests {
       #expect(
         output.contains("Review.") && !output.contains("-Same body")
           && !output.contains("+Same body"))
-      withKnownIssue("Metadata-only changes are rendered as a body patch") {
-        #expect(!output.contains("@@ "))
-      }
+      #expect(!output.contains("@@ "))
     }
   }
 
@@ -124,10 +118,8 @@ struct DocLineDiffTests {
       let output = try DocService(workspace: "acme", store: store).show("doc:rules@2", diff: true)
         .output
       if mode == "rebound" {
-        withKnownIssue("Identity-only changes are omitted from revision diffs") {
-          #expect(output.contains("attachment identities: changed"))
-          #expect(!output.contains("no visible changes"))
-        }
+        #expect(output.contains("attachment identities: changed"))
+        #expect(!output.contains("no visible changes"))
       } else {
         #expect(!output.contains("attachment identities: changed"))
       }
@@ -167,6 +159,17 @@ struct DocLineDiffTests {
         #expect(output.contains(" Prefix 6\n Prefix 7\n Prefix 8\n"))
         #expect(output.contains(" Suffix 1\n Suffix 2\n Suffix 3\n"))
       }
+    }
+  }
+
+  @Test func mixedEditsKeepLiteralContextAndChanges() async throws {
+    try await withScratchDirectory { home in
+      let store = try await fixture(
+        home, old: "A\nsame1\nsame2\nB", new: "Changed A\nsame1\nAdded\nsame2\nChanged B")
+      let output = try DocService(workspace: "acme", store: store).show("doc:rules@2", diff: true)
+        .output
+      #expect(output.contains("@@ -1,4 +1,5 @@"))
+      #expect(output.contains("-A\n+Changed A\n same1\n+Added\n same2\n-B\n+Changed B\n"))
     }
   }
 
