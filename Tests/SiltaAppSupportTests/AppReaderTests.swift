@@ -237,6 +237,36 @@ struct AppReaderTests {
     }
   }
 
+  @Test func oldSchemaIsReportedWithoutRunningMigrations() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "silta-home")
+      try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+      let queue = try DatabaseQueue(path: home.appending(path: "silta.db").path)
+      try StorageSchema.migrator.migrate(queue, upTo: "v1")
+      let reader = try Self.reader(scratch)
+      withKnownIssue("Known migration preflight is not implemented yet.") {
+        var failure: AppReadError?
+        do { _ = try reader.workspaces() } catch let error as AppReadError { failure = error }
+        #expect(failure?.kind == .migrationRequired)
+      }
+      #expect(try queue.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") } == ["v1"])
+    }
+  }
+
+  @Test func writerFloorDoesNotBecomeAReadGate() throws {
+    try withScratchDirectory { scratch in
+      try AppFixtures.seed(in: scratch)
+      let reader = try Self.reader(scratch)
+      try reader.environment.db.write { tx in
+        try tx.database.execute(sql: "UPDATE meta SET value='999' WHERE key='min_writer_version'")
+      }
+      withKnownIssue("Read projection is not implemented yet.") {
+        let snapshot = try reader.snapshot(workspace: "acme")
+        #expect(snapshot.work.waitingCount == 5)
+      }
+    }
+  }
+
   private static func asker(_ env: SiltaEnvironment) -> TaskService {
     TaskService(environment: SiltaEnvironment(
       clock: env.clock, ids: SeededIDGenerator(seed: 951), git: env.git, home: env.home,

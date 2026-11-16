@@ -8,6 +8,8 @@ public struct AppReadError: Error, Sendable {
     case unavailableStore
     /// A newer schema requires an updated app.
     case newerSchema
+    /// Known migrations must be applied by the CLI before the viewer can read.
+    case migrationRequired
     /// Other failures retain the core's explanation and recovery.
     case other
   }
