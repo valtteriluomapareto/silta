@@ -69,7 +69,7 @@ struct DocTriageCommandTests {
             #expect(ShapeCheck.violations(of: try GuideContractTests.data(result),
               against: try #require(commands.first?["data"])).isEmpty)
           }
-          try store.read { db in
+          try store.read { (db: Database) throws in
             #expect(try Int.fetchOne(db, sql: "SELECT current_rev FROM doc") == 5)
             #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev") == 5)
             #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev WHERE state='rejected'") == 2)
