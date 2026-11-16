@@ -115,8 +115,35 @@ the same control surface. Each slice targets one PR of about 800 lines.
 - Each command template runs in a fixture workspace with its placeholders filled,
   under `/bin/sh -c`, and must exit 0 with the expected state change. Unfilled
   placeholders must fail with no write and never wait for input.
-- **CI:** an `xcodebuild build` step runs the app build when the runner has Xcode 26.
-  Until then the app target is built locally only, and this is listed as unverified.
+- **CI** (A2 adds it with the Xcode project; the runner already has the pinned Xcode):
+  - `SiltaAppSupportTests` run in the existing `swift` job. They stay in-process; only the
+    command-template tests start processes. That job is CPU-bound and the slowest one,
+    so A1 and each later slice report how much test time they add.
+  - A third job, `app`, runs `scripts/verify.sh app` beside `swift` and `evals`, and the
+    `verify` gate requires it. `full` includes `app`, and AGENTS.md gains an `App/` rung.
+  - `verify.sh app` runs `xcodebuild test` for `SiltaAppTests` (Debug), then
+    `xcodebuild build` (Release). Release on every PR proves the DEBUG-only control code
+    compiles out. Both runs:
+    - use `-derivedDataPath .build/app-control-tests` and `-clonedSourcePackagesDirPath`;
+    - use `-onlyUsePackageVersionsFromResolvedFile`, with MarkdownUI pinned in the
+      project's own `Package.resolved` (D18);
+    - set `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the project, so local builds match;
+    - sign with "Sign to Run Locally", so hosted tests need no certificate.
+  - A test run proves nothing unless tests ran. `verify.sh app` fails when the result
+    bundle reports zero tests, any skipped test or a missing named suite, the way
+    `full-swift` checks its slow tests by name.
+  - A guard with self-tests checks that every package pinned in both the project's and
+    the root `Package.resolved` has the same pin, so the app never builds against a
+    different GRDB than the `swift` job tested (D18).
+  - Budget: the `app` job must finish before the slowest other job. If it doesn't,
+    measure first, then move the Release build to the weekly run, which gives up the
+    per-PR proof that DEBUG-only code compiles out. Path gating comes last: the filter
+    must cover everything the project compiles or imports, including
+    `Sources/SiltaCore/**` and `Sources/SiltaTestSupport/**` unless a guard proves `App/`
+    imports neither, so it would skip few PRs. The weekly and manual runs always run
+    the app.
+  - Not in CI: XCUITest and screenshot approval. Signing and notarization (M5) belong to
+    a separate tag-triggered release workflow.
 - **Not verified until DF3:** whether the human uses the app daily.
 
 ## Risks
