@@ -1,3 +1,2 @@
-doc:rules@5
 doc:rules@2
 doc:rules@3

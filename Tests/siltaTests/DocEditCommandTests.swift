@@ -246,7 +246,7 @@ struct DocEditCommandTests {
       try #require(allowed.termination == .exit(0))
       try #require(!(try Data(contentsOf: trace)).isEmpty)
       try Data().write(to: trace)
-      let selector = command == "triage" ? ["--accept", "doc:rules@1"] : ["rules"]
+      let selector = command == "triage" ? ["--reject", "doc:rules@1"] : ["rules"]
       let arguments = ["doc", command] + selector + (command == "edit" ? ["-F", "absent.md"] : [])
       for approval in [String?.none, "<the human's words>"] {
         let refused = try SiltaBinary.run(
