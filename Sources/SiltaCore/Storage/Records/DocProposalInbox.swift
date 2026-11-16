@@ -17,11 +17,11 @@ struct DocProposalInbox {
   }
 
   var eligibility: String {
-    "d.workspace_id=? AND r.state='proposed' AND (? OR r.created_at>?)"
+    "d.workspace_id=? AND (? OR d.archived=0) AND r.state='proposed' AND (? OR r.created_at>?)"
   }
 
   var arguments: StatementArguments {
-    [workspaceID, all, utcTimestamp(at.addingTimeInterval(-14 * 86400))]
+    [workspaceID, all, all, utcTimestamp(at.addingTimeInterval(-14 * 86400))]
   }
 
   func count() throws -> Int {

@@ -36,19 +36,24 @@ struct DocStore {
         INSERT INTO doc_rev(
           uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,
           title,kind,about_refs,about_targets)
-        VALUES(?,?,?,?,CAST(? AS TEXT),'accepted',?,?,?,?,?,?,?)
+        VALUES(?,?,?,?,CAST(? AS TEXT),'accepted',?,?,?,CAST(? AS TEXT),CAST(? AS TEXT),?,?)
         """,
       arguments: [
         try ids.next(at: at), id, number, base, Data(draft.body.utf8),
-        actor.description, draft.message, stamp, metadata.title, metadata.kind,
+        actor.description, draft.message, stamp, Data(metadata.title.utf8),
+        Data(metadata.kind.utf8),
         try WorkspaceConfig.json(metadata.refs), targets,
       ])
     let revisionID = db.lastInsertedRowID
     try replaceAttachments(metadata.targets, doc: id, stamp: stamp)
     try db.execute(
       sql: """
-        UPDATE doc SET title=?,kind=?,current_rev=?,verified_at=?,archived=0,updated_at=? WHERE id=?
-        """, arguments: [metadata.title, metadata.kind, number, verifiedAt, stamp, id])
+        UPDATE doc SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),current_rev=?,verified_at=?,
+          archived=0,updated_at=? WHERE id=?
+        """,
+      arguments: [
+        Data(metadata.title.utf8), Data(metadata.kind.utf8), number, verifiedAt, stamp, id,
+      ])
     try db.execute(
       sql: """
         INSERT INTO doc_verification(uid,doc_rev_id,actor,message,app_shas,created_at)
@@ -64,6 +69,9 @@ struct DocStore {
 
   func archive(_ slug: String) throws -> Bool {
     guard let doc = try find(slug) else { throw DocError.notFound(slug) }
+    guard doc["current_rev"] as Int? != nil else {
+      throw DocError.invalid("Only a doc with an accepted current revision can be archived.")
+    }
     let id: Int64 = doc["id"]
     let archived: Bool = doc["archived"]
     if archived, try attachments(id).isEmpty { return false }

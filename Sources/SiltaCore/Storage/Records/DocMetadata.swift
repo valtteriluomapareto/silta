@@ -68,14 +68,17 @@ struct DocMetadata {
     let old = try Row.fetchOne(
       db,
       sql: """
-        SELECT d.*,r.state AS revision_state FROM doc d
+        SELECT d.*,CAST(d.title AS BLOB) AS title_bytes,CAST(d.kind AS BLOB) AS kind_bytes,
+          r.state AS revision_state FROM doc d
         LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
         WHERE d.workspace_id=? AND d.slug=?
         """, arguments: [workspace, slug])
     guard let old, (old["current_rev"] as Int?) != nil else { return nil }
     guard old["revision_state"] as String? == "accepted" else { throw StorageError.corrupt }
+    guard let title = try old.strictText("title_bytes"), let kind = try old.strictText("kind_bytes")
+    else { throw StorageError.corrupt }
     return Accepted(
-      title: old["title"], kind: old["kind"],
+      title: title, kind: kind,
       refs: try DocStore.attachments(old["id"], workspace: workspace, in: db).map {
         try TaskLinkTarget.render($0, in: db)
       })

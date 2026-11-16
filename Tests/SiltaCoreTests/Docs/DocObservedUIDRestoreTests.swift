@@ -30,22 +30,20 @@ struct DocObservedUIDRestoreTests {
 
   @Test(arguments: ["empty", "unicode", "nul", "number", "array"])
   func suppliedEvidenceUIDMustBeAnAdmittedStringBeforeRestore(mode: String) throws {
-    withKnownIssue("SI-126/38: supplied evidence UID must be admitted before restore") {
-      try withScratchDirectory { home in
-        let (source, _) = try Self.source(home, mode: mode)
-        let directory = try RestoreSupport.exportTree(source, to: home.appending(path: "export"))
-        let destinationHome = home.appending(path: "destination")
-        let destination = ExportFixture.store(destinationHome)
-        try destination.initialize()
-        let before = try RestoreSupport.dump(destination)
-        var failure: (any CodedError)?
-        do {
-          _ = try RestoreSupport.restore(directory, into: destination, home: destinationHome)
-        } catch let error as any CodedError { failure = error }
-        #expect(failure?.code == .invalid)
-        #expect(try RestoreSupport.dump(destination) == before)
-        #expect(!(failure?.message.contains("K\u{0}tail") ?? false))
-      }
+    try withScratchDirectory { home in
+      let (source, _) = try Self.source(home, mode: mode)
+      let directory = try RestoreSupport.exportTree(source, to: home.appending(path: "export"))
+      let destinationHome = home.appending(path: "destination")
+      let destination = ExportFixture.store(destinationHome)
+      try destination.initialize()
+      let before = try RestoreSupport.dump(destination)
+      var failure: (any CodedError)?
+      do {
+        _ = try RestoreSupport.restore(directory, into: destination, home: destinationHome)
+      } catch let error as any CodedError { failure = error }
+      #expect(failure?.code == .invalid)
+      #expect(try RestoreSupport.dump(destination) == before)
+      #expect(!(failure?.message.contains("K\u{0}tail") ?? false))
     }
   }
 
