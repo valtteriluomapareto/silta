@@ -19,7 +19,8 @@ struct DocTargetSnapshotTests {
       let raw = try Self.snapshot(store, revision: 1)
       withKnownIssue("Direct accepted revisions retain their known target identities") {
         #expect(raw != nil)
-        if let raw {
+      }
+      if let raw {
           let actual = try JSONDecoder().decode([DocTargetIdentity].self, from: Data(raw.utf8))
           let uid = try #require(try store.read { try String.fetchOne($0, sql: "SELECT uid FROM \(kind) LIMIT 1") })
           #expect(actual == [DocTargetIdentity(kind: kind, uid: uid)])
@@ -30,7 +31,6 @@ struct DocTargetSnapshotTests {
           _ = try await service.edit(DocEditRequest(slug: "rules"), input: { "Another body." })
           #expect(try Self.snapshot(store, revision: 1) == raw)
           #expect(try Self.snapshot(store, revision: 2) == raw)
-        }
       }
     }
   }
@@ -50,7 +50,8 @@ struct DocTargetSnapshotTests {
       }
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-      let imported = try #require(String(data: encoder.encode(known), encoding: .utf8))
+      let importedBytes = try encoder.encode(known)
+      let imported = try #require(String(data: importedBytes, encoding: .utf8))
       try store.write {
         try $0.database.execute(sql: "UPDATE doc_rev SET about_targets=?",
           arguments: [mode == "unknown" ? nil : imported])
@@ -61,7 +62,8 @@ struct DocTargetSnapshotTests {
       _ = try DocProposalService(environment: service.environment, workspace: "acme").propose(
         DocProposalRequest(slug: "rules", why: "Share."), input: { "Body." })
       if mode == "reordered" {
-        let reversed = try #require(String(data: encoder.encode(known.reversed()), encoding: .utf8))
+        let reversedBytes = try encoder.encode(Array(known.reversed()))
+        let reversed = try #require(String(data: reversedBytes, encoding: .utf8))
         try store.write {
           try $0.database.execute(
             sql: "UPDATE doc_rev SET about_targets=? WHERE rev=2", arguments: [reversed])
