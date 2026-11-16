@@ -211,8 +211,18 @@ struct DocEditCommandTests {
       #expect(recipes.stdout.contains("silta guide docs"))
     }
   }
-  @Test(arguments: ["edit", "archive"])
+  @Test(arguments: ["edit", "archive", "triage"])
   func implicitWriteGatePrecedesRealLocationGit(command: String) throws {
+    if command == "triage" {
+      withKnownIssue("Triage must authorize before implicit location Git") {
+        try Self.checkImplicitWriteGate(command: command)
+      }
+    } else {
+      try Self.checkImplicitWriteGate(command: command)
+    }
+  }
+
+  private static func checkImplicitWriteGate(command: String) throws {
     try withScratchDirectory { scratch in
       let repo = try CodeCommandTests().setup(scratch)
       let trace = scratch.appending(path: "git-trace.jsonl")
@@ -227,12 +237,19 @@ struct DocEditCommandTests {
       try #require(allowed.termination == .exit(0))
       try #require(!(try Data(contentsOf: trace)).isEmpty)
       try Data().write(to: trace)
-      let refused = try SiltaBinary.run(
-        ["doc", command, "rules"] + (command == "edit" ? ["-F", "absent.md"] : []) + ["--json"],
+      let selector = command == "triage" ? ["--accept", "doc:rules@1"] : ["rules"]
+      let arguments = ["doc", command] + selector + (command == "edit" ? ["-F", "absent.md"] : [])
+      for approval in [String?.none, "<the human's words>"] {
+        let refused = try SiltaBinary.run(
+          arguments + (approval.map { ["--approved", $0] } ?? []) + ["--json"],
+          in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
+        #expect(refused.termination == .exit(approval == nil ? 3 : 1))
+        #expect(try Self.error(refused)["code"] as? String == (approval == nil ? "human_only" : "invalid"))
+        #expect(try Data(contentsOf: trace).isEmpty)
+      }
+      _ = try SiltaBinary.run(arguments + ["--approved", "Review Acme docs", "--json"],
         in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
-      #expect(refused.termination == .exit(3))
-      #expect(try Self.error(refused)["code"] as? String == "human_only")
-      #expect(try Data(contentsOf: trace).isEmpty)
+      #expect(!(try Data(contentsOf: trace)).isEmpty)
     }
   }
 

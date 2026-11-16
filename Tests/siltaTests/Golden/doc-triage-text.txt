@@ -1,0 +1,3 @@
+doc:rules@5 accepted
+doc:rules@2 rejected
+doc:rules@3 rejected
