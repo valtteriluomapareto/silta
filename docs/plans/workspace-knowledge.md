@@ -176,9 +176,10 @@ mechanism for it:
   4. The human answers once. The agent runs `silta doc triage --accept <refs>
      --reject <refs> --approved "<words>"`, one transactional command, like
      `task triage --accept/--drop`.
-- **Batch semantics:** every proposal's base is checked against the state before the
-  batch. Two proposals in one batch that change the same doc are refused with the
-  overlap named; nothing is written. Then the batch applies all or nothing.
+- **Batch semantics:** acceptance bases are checked against the state before the
+  batch, with at most one acceptance per doc. Rejections can be stale and multiple
+  rejections for one doc may accompany an accepted replacement. Every member must
+  be a distinct owned pending revision; the whole batch applies or writes nothing.
 - **Stale base:** `stale_rev` names the proposal, and `next` is `doc show` and a
   rebased propose with `-F`. No `$EDITOR` step.
 

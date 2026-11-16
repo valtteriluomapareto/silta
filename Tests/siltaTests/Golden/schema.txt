@@ -31,6 +31,7 @@ silta doc ls  List current documents and pending revisions.
 silta doc edit  Accept a complete document revision (human-only).
 silta doc archive  Archive a document and remove its live attachments (human-only).
 silta doc propose  Submit a complete document proposal.
+silta doc triage  Accept or reject document proposals atomically (human-only).
 silta where  Resolve the workspace, repository and app for a local path.
 silta doctor  Diagnose database, git and data across all workspaces without repairs.
 silta comment  Post task discussion; a claimer's handoff releases its claim.

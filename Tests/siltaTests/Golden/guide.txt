@@ -51,8 +51,10 @@ do not replace it with today's map or treat it as a verification claim.
 Submit lasting knowledge with doc propose; submissions remain pending, even from a human.
 Usually propose nothing; never more than two task and document proposals per session.
 Read the returned immutable ref and its recorded-base diff before handing it off.
-This build cannot decide proposals yet; the human inbox shows read commands only.
-Use the existing approved edit flow when the human needs an accepted revision.
+Read pinned diffs, recommend existing refs and ask for one approval before running
+doc triage --accept <refs> --reject <refs>. The whole batch succeeds or writes nothing.
+Rejections can be stale; acceptances require current bases and one per doc.
+The human inbox currently shows read commands; name decisions explicitly in chat.
 With no human present, record map gaps as `Map gap:` in your handoff or result;
 never create a task or file for a map gap.
 

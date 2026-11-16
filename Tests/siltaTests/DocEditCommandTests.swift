@@ -214,9 +214,7 @@ struct DocEditCommandTests {
   @Test(arguments: ["edit", "archive", "triage"])
   func implicitWriteGatePrecedesRealLocationGit(command: String) throws {
     if command == "triage" {
-      withKnownIssue("Triage must authorize before implicit location Git") {
-        try Self.checkImplicitWriteGate(command: command)
-      }
+      try Self.checkImplicitWriteGate(command: command)
     } else {
       try Self.checkImplicitWriteGate(command: command)
     }
@@ -244,10 +242,13 @@ struct DocEditCommandTests {
           arguments + (approval.map { ["--approved", $0] } ?? []) + ["--json"],
           in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
         #expect(refused.termination == .exit(approval == nil ? 3 : 1))
-        #expect(try Self.error(refused)["code"] as? String == (approval == nil ? "human_only" : "invalid"))
+        #expect(
+          try Self.error(refused)["code"] as? String == (approval == nil ? "human_only" : "invalid")
+        )
         #expect(try Data(contentsOf: trace).isEmpty)
       }
-      _ = try SiltaBinary.run(arguments + ["--approved", "Review Acme docs", "--json"],
+      _ = try SiltaBinary.run(
+        arguments + ["--approved", "Review Acme docs", "--json"],
         in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
       #expect(!(try Data(contentsOf: trace)).isEmpty)
     }

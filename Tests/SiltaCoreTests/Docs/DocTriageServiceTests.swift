@@ -41,7 +41,8 @@ struct DocTriageServiceTests {
           sql: """
             INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
             UPDATE task SET workspace_id=2;
-            UPDATE doc_rev SET title=NULL,kind=NULL,about_refs=NULL,about_targets=NULL,body_md=CAST(? AS TEXT)
+            UPDATE doc_rev SET title=NULL,kind=NULL,about_refs=NULL,about_targets=NULL,
+            body_md=CAST(? AS TEXT)
             """, arguments: [body])
       }
       try AcmeDocAttachments.apply(AcmeDocAttachments.yaml(removing: "service"), to: store)
@@ -110,11 +111,12 @@ struct DocTriageServiceTests {
   @Test(arguments: [
     "body", "unicode-body", "reject-body", "revision", "state", "source",
     "app", "edge", "service", "repo", "path", "ref", "workspace",
+    "accepted-body", "accepted-title", "accepted-pointer",
   ])
   func everyMemberAndAcceptanceBindingIsRecheckedBeforeWriting(change: String) async throws {
     try await withScratchDirectory { home in
       let (store, repo) = try DocVerificationPreparationTests.setup(home)
-      let expected = Mutex<[[Row]]?>(nil)
+      let expected = Mutex<[[String]]?>(nil)
       let runner = ScriptedGitRunner(
         script: [
           (
@@ -128,6 +130,9 @@ struct DocTriageServiceTests {
           expected.withLock { $0 = truth }
         })
       let env = try Self.environment(home, store, git: runner)
+      if change.hasPrefix("accepted-") {
+        try DocWritePolicyTests.seed(store, body: "Shared café.", seed: 95)
+      }
       try DocProposalServiceTests.task(store, seq: 80, actor: env.actor.description)
       let accept = try Self.propose(env, about: "edge:api/service:push/sdk")
       let reject = try Self.propose(env, about: "topic:messaging", slug: "obsolete")
@@ -161,29 +166,7 @@ struct DocTriageServiceTests {
             DocEditRequest(slug: "rules", title: "Rules", about: ["service:push"]),
             input: { "Updated." })
       }
-      try store.write { tx in
-        let sql = [
-          "unknown": "UPDATE doc_rev SET about_targets=NULL WHERE rev=1",
-          "source": "DELETE FROM task",
-          "decided": "UPDATE doc_rev SET state='rejected' WHERE rev=1",
-          "foreign": "UPDATE doc SET workspace_id=99",
-        ][fault]
-        if let sql {
-          if fault == "foreign" {
-            try tx.database.execute(
-              sql:
-                "INSERT INTO workspace(id,uid,slug,name,task_prefix) VALUES(99,'beta','beta','Beta','BE')"
-            )
-          }
-          try tx.database.execute(sql: sql)
-        }
-        if ["doc_verification", "approval"].contains(fault) {
-          try tx.database.execute(
-            sql:
-              "CREATE TRIGGER fail_decision BEFORE INSERT ON \(fault) BEGIN SELECT RAISE(ABORT,'decision fault'); END"
-          )
-        }
-      }
+      try Self.install(fault, in: store)
       let before = try DocVerificationPreparationTests.truth(store)
       let expected: ErrorCode =
         fault == "stale"
@@ -206,13 +189,52 @@ struct DocTriageServiceTests {
     }
   }
 
+  private static func install(_ fault: String, in store: DatabaseStore) throws {
+    try store.write { tx in
+      let sql = [
+        "unknown": "UPDATE doc_rev SET about_targets=NULL WHERE rev=1",
+        "source": "UPDATE task SET workspace_id=99",
+        "decided": "UPDATE doc_rev SET state='rejected' WHERE rev=1",
+        "foreign": "UPDATE doc SET workspace_id=99",
+      ][fault]
+      if let sql {
+        if ["foreign", "source"].contains(fault) {
+          try tx.database.execute(
+            sql: """
+              INSERT INTO workspace(id,uid,slug,name,task_prefix)
+              VALUES(99,'beta','beta','Beta','BE')
+              """
+          )
+        }
+        try tx.database.execute(sql: sql)
+      }
+      if ["doc_verification", "approval"].contains(fault) {
+        try tx.database.execute(
+          sql:
+            "CREATE TRIGGER fail_decision BEFORE INSERT ON \(fault) BEGIN SELECT RAISE(ABORT,'decision fault'); END"
+        )
+      }
+    }
+  }
+
   private static func mutate(_ change: String, store: DatabaseStore) throws {
+    let rules = "(SELECT id FROM doc WHERE slug='rules')"
+    let obsolete = "(SELECT id FROM doc WHERE slug='obsolete')"
     let statements = [
-      "body": "UPDATE doc_rev SET body_md='changed' WHERE rev=1 AND doc_id=1",
-      "unicode-body": "UPDATE doc_rev SET body_md='Shared cafe\u{301}.' WHERE doc_id=1",
-      "reject-body": "UPDATE doc_rev SET body_md='changed reject' WHERE doc_id=2",
-      "revision": "UPDATE doc_rev SET uid='replacement-revision' WHERE doc_id=1",
-      "state": "UPDATE doc_rev SET state='rejected' WHERE doc_id=1",
+      "accepted-body":
+        "UPDATE doc_rev SET body_md='Shared cafe\u{301}.' WHERE rev=1 AND doc_id=\(rules)",
+      "accepted-title": "UPDATE doc SET title='Changed' WHERE slug='rules'",
+      "accepted-pointer": "UPDATE doc SET current_rev=NULL WHERE slug='rules'",
+      "body":
+        "UPDATE doc_rev SET body_md='changed' WHERE rev=1 AND doc_id=\(rules)",
+      "unicode-body":
+        "UPDATE doc_rev SET body_md='Shared cafe\u{301}.' WHERE doc_id=\(rules)",
+      "reject-body":
+        "UPDATE doc_rev SET body_md='changed reject' WHERE doc_id=\(obsolete)",
+      "revision":
+        "UPDATE doc_rev SET uid='replacement-revision' WHERE doc_id=\(rules)",
+      "state":
+        "UPDATE doc_rev SET state='rejected' WHERE doc_id=\(rules)",
       "source": "UPDATE task SET uid='replacement-source' WHERE seq=80",
       "app": "UPDATE app SET uid='replacement-app' WHERE slug='api'",
       "edge": "UPDATE edge SET uid='replacement-edge' WHERE kind='sdk'",

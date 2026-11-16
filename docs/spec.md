@@ -1097,10 +1097,10 @@ item-filtered pending results. Accepted rows use live attachments independently.
 Target snapshots preserve historical display refs and may name removed targets.
 
 Document submission is available through `doc propose`, alongside `doc show`,
-`doc ls`, `doc edit` and `doc archive`. Submissions remain pending, including
-from a human or with approval words. Human inbox groups expose read commands;
-this build cannot decide proposals yet. The triage workflow below remains planned,
-and doc-specific review measurements wait for that command.
+`doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
+pending, including from a human or with approval words. Human inbox groups expose
+read commands; decisions name explicit immutable proposal refs. Doc-specific review
+measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
@@ -1113,8 +1113,19 @@ and doc-specific review measurements wait for that command.
   Only then does it run `doc triage --accept <refs> --reject <refs>` with the
   human's exact approval. One transaction records every decision or writes nothing;
   original proposer, creation time and revision content remain immutable.
-- **Concurrency and recovery:** the proposed batch base/overlap rules and complete
-  workflow live in the [workspace-knowledge plan](plans/workspace-knowledge.md#reviewing-one-batch-one-answer).
+- **Concurrency and recovery:** only acceptances require the pre-batch current base
+  and at most one acceptance per doc. Rejections may be stale and several may concern
+  the same doc, including beside an accepted replacement. Duplicate, opposite,
+  nonpending or unowned refs refuse the whole batch. Acceptance follows recorded
+  target UIDs through renames and refuses replaced or unknown identities. Git runs
+  outside the write; all selected immutable members, accepted baselines, sources and
+  bindings are rechecked before any write. Reject-only batches need no clones, live
+  targets, source or content admission. Decision evidence is paired (D46); one used
+  approval, current projections and verification evidence commit atomically without
+  allocating revisions or changing original proposal content.
+  JSON data is `{docs:[{ref,state}]}`; text prints refs and states, quiet only refs.
+  Selectors are repeated `--accept`/`--reject` options with one or more
+  `doc:slug@revision` refs; malformed or empty batches refuse.
   A stale proposal is inspected and reproposed with supplied text and an explicit
   base. There is no accept/reject subcommand, rebase flag or editor merge flow.
 - **Map gaps:** with no human present, record `Map gap:` in a handoff or result,
@@ -1223,7 +1234,7 @@ silta code ls   <app>[@<ref>] [<dir>]
   `ws edit`, `restore` except `--dry-run` (§15), and an agent's `task unblock` of a block
   that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
-  Planned `doc triage` follows the same human gate (§9).
+  `doc triage` follows the same human gate (§9).
   - A `human:*` actor (a TTY, or the app) runs them directly; `--approved` from a
     human is ignored.
   - An agent runs them with `--approved "<the human's words>"`: what the human wrote
@@ -2081,6 +2092,7 @@ silta doc show
 silta doc edit
 silta doc archive
 silta doc propose
+silta doc triage
 
 # maintenance
 silta export

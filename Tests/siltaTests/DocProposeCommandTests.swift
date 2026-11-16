@@ -54,12 +54,12 @@ struct DocProposeCommandTests {
     }
   }
 
-  @Test func availabilityNamesSubmissionAndDefersDecisions() throws {
+  @Test func availabilityNamesSubmissionAndHumanDecisions() throws {
     do {
       try withScratchDirectory { scratch in
         let guide = try SiltaBinary.run(["guide", "docs"], in: scratch)
         #expect(guide.stdout.contains("doc propose"))
-        #expect(guide.stdout.contains("cannot decide"))
+        #expect(guide.stdout.contains("doc triage --accept"))
         #expect(!guide.stdout.contains("cannot submit"))
         let schema = try GuideContractTests.data(
           SiltaBinary.run(["schema", "doc", "--json"], in: scratch))
