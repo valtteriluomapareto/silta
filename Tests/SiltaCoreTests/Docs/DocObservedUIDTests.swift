@@ -5,7 +5,7 @@ import Testing
 
 @testable import SiltaCore
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocObservedUIDTests {
   @Test(arguments: ["app:api", "edge:mobile/api/http-api"])
   func newObservationsRecordPreparedStableAppIdentities(about: String) async throws {
@@ -45,7 +45,7 @@ struct DocObservedUIDTests {
   func preparedEvidenceChecksKnownUIDAndKeepsLegacyAbsence(mode: String) throws {
     let check = { () throws in
       try withScratchDirectory { home in
-        let (store, _) = try DocVerificationPreparationTests.setup(home)
+        let store = try AcmeDocAttachments.make(in: home)
         try store.write { try $0.database.execute(sql: "UPDATE app SET uid='K' WHERE slug='api'") }
         let draft = DocVerificationPreparationTests.draft(["app:api"])
         let binding = try store.read {
@@ -53,7 +53,7 @@ struct DocObservedUIDTests {
             DocMetadata.resolve(draft, workspace: 1, in: $0), workspace: 1, in: $0)
         }
         var fields = [
-          "app": "api", "ref": "origin/api", "sha": DocVerificationPreparationTests.apiSHA,
+          "app": "api", "ref": "main", "sha": DocVerificationPreparationTests.apiSHA,
         ]
         if mode != "absent" {
           fields["uid"] =
