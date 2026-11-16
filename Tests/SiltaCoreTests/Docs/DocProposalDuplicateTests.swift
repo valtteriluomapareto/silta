@@ -46,8 +46,8 @@ struct DocProposalDuplicateTests {
         ? "Changed knowledge."
         : change == "unicode-body"
           ? "Shared cafe\u{301}." : "Shared café."
-      let result = try service.propose(request, input: { body })
-      #expect(result.ref == (change == "slug" ? "doc:other@1" : "doc:rules@2"))
+      let result = Self.attempt(service, request: request, body: body)
+      #expect(result?.ref == (change == "slug" ? "doc:other@1" : "doc:rules@2"))
     }
   }
 
@@ -88,9 +88,9 @@ struct DocProposalDuplicateTests {
       try store.write {
         try $0.database.execute(sql: "UPDATE doc_rev SET state=?", arguments: [state])
       }
-      let result = try service.propose(
-        DocProposalServiceTests.request(), input: { "Shared knowledge." })
-      #expect(result.ref == "doc:rules@2")
+      let result = Self.attempt(
+        service, request: DocProposalServiceTests.request(), body: "Shared knowledge.")
+      #expect(result?.ref == "doc:rules@2")
     }
   }
 
@@ -106,10 +106,25 @@ struct DocProposalDuplicateTests {
       current.kind = "flow"
       current.about = ["app:api"]
       _ = try DocStoreTests.accept(current, in: store, ids: SeededIDGenerator(seed: 83))
-      let result = try service.propose(
-        DocProposalRequest(slug: "rules", base: "1", why: "Revisit history."),
-        input: { "Original" })
-      #expect(result.ref == "doc:rules@3")
+      let result = Self.attempt(
+        service, request: DocProposalRequest(slug: "rules", base: "1", why: "Revisit history."),
+        body: "Original")
+      #expect(result?.ref == "doc:rules@3")
+    }
+  }
+
+  @Test func changedKindIsMeaningfulAgainstHistoricalBase() throws {
+    try withScratchDirectory { home in
+      let (store, service) = try Self.setup(home, accepted: true)
+      var current = DocDraft(slug: "rules", body: "Current knowledge.")
+      current.title = "Rules"
+      current.kind = "flow"
+      current.about = ["service:push"]
+      _ = try DocStoreTests.accept(current, in: store, ids: SeededIDGenerator(seed: 83))
+      let result = Self.attempt(
+        service, request: DocProposalRequest(slug: "rules", base: "1", why: "Update kind."),
+        body: "Original")
+      #expect(result?.ref == "doc:rules@3")
     }
   }
 
@@ -122,7 +137,8 @@ struct DocProposalDuplicateTests {
       changed.title = "Rules"
       changed.about = ["service:push"]
       _ = try DocStoreTests.accept(changed, in: store, ids: SeededIDGenerator(seed: 83))
-      let replacement = try service.propose(request, input: { "Shared knowledge." }).ref
+      let replacement = try #require(
+        Self.attempt(service, request: request, body: "Shared knowledge.")?.ref)
       try Self.refuse(service, body: "Shared knowledge.", existing: replacement)
       let result = try await DocTriageService(
         environment: service.environment, workspace: "acme", approved: "Review Acme knowledge"
@@ -151,7 +167,7 @@ struct DocProposalDuplicateTests {
       let matching = try other.propose(
         DocProposalServiceTests.request(), input: { "Shared knowledge." }
       ).ref
-      try Self.copyHistoricalDuplicate(in: store)
+      try AcmeDocAttachments.copyLatestRulesProposal(in: store)
       try Self.refuse(service, body: "Shared knowledge.", existing: matching)
     }
   }
@@ -164,25 +180,21 @@ struct DocProposalDuplicateTests {
     return (store, try DocProposalServiceTests.service(home, store))
   }
 
+  private static func attempt(
+    _ service: DocProposalService, request: DocProposalRequest, body: String
+  ) -> DocProposalResult? {
+    do { return try service.propose(request, input: { body }) } catch {
+      Issue.record("Expected a valid proposal: \(error)")
+      return nil
+    }
+  }
+
   private static func otherActor(_ service: DocProposalService) -> DocProposalService {
     let base = service.environment
     return DocProposalService(
       environment: SiltaEnvironment(
         clock: base.clock, ids: base.ids, git: base.git, home: base.home, db: base.db,
         log: base.log, actor: .agent(tool: "codex", session: "other")), workspace: "acme")
-  }
-
-  private static func copyHistoricalDuplicate(in store: DatabaseStore) throws {
-    try store.write {
-      try $0.database.execute(
-        sql: """
-          INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,
-            title,kind,about_refs,about_targets)
-          SELECT 'historical-copy',doc_id,rev+1,base_rev,body_md,state,actor,message,created_at,
-            title,kind,about_refs,about_targets FROM doc_rev ORDER BY rev DESC LIMIT 1;
-          UPDATE seq_counter SET next=next+1 WHERE scope='doc_rev:1:rules';
-          """)
-    }
   }
 
   private static func refuse(

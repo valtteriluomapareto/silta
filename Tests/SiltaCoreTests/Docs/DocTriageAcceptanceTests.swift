@@ -108,7 +108,8 @@ struct DocTriageAcceptanceTests {
       let env = try DocTriageServiceTests.environment(home, store)
       try DocProposalServiceTests.task(store, seq: 1, actor: env.actor.description)
       let first = try DocTriageServiceTests.propose(env, about: "service:push")
-      let second = try DocTriageServiceTests.propose(env, about: "service:push")
+      let second = try DocTriageServiceTests.propose(
+        env, about: "service:push", body: "Another shared rule.")
       if fault == "stale" {
         _ = try await DocWriteService(environment: env, workspace: "acme", approved: "Update rules")
           .edit(
