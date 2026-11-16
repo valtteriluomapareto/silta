@@ -144,8 +144,8 @@ OPTIONS:
                           new doc.
   --about <about>         Canonical map ref; repeat to replace the complete
                           set; required for a new doc.
-  --base <base>           Accepted owned revision used as the proposal's
-                          baseline.
+  --base <base>           Accepted baseline revision number or
+                          doc:slug@revision for this doc.
   --task <task>           Owned source task; otherwise use the session's sole
                           live claim.
   --version               Show the version.
