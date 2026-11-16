@@ -97,9 +97,10 @@ jobs:
           [[ "$SWIFT" == success && "$EVALS" == success ]]
 
   # PRs can read caches saved on main but not each other's, so main keeps the shared
-  # prior-writer cache filled. On a hit this only looks the key up.
+  # prior-writer cache filled: after each merge, and weekly so a runner-image toolchain
+  # change refills it before the next merge. On a hit this only looks the key up.
   warm-caches:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:

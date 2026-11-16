@@ -122,14 +122,18 @@ A3 and A4 can run in parallel after A2. Each slice targets one PR of about 800 l
     - set `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the project, so local builds match;
     - sign with "Sign to Run Locally", so hosted tests need no certificate.
   - A test run proves nothing unless tests ran. `verify.sh app` fails when the result
-    bundle reports zero tests or a named suite is missing, the way `full-swift` checks
-    its slow tests by name.
-  - Budget: the `app` job must finish before the slowest other job. If it doesn't, measure
-    first. Only then gate it by path. The filter must cover everything the Xcode
-    project compiles or imports: `App/**`, `Sources/SiltaAppSupport/**`, and
+    bundle reports zero tests, any skipped test or a missing named suite, the way
+    `full-swift` checks its slow tests by name.
+  - A guard with self-tests checks that every package pinned in both the project's and
+    the root `Package.resolved` has the same pin, so the app never builds against a
+    different GRDB than the `swift` job tested (D18).
+  - Budget: the `app` job must finish before the slowest other job. If it doesn't,
+    measure first, then move the Release build to the weekly run, which gives up the
+    per-PR proof that DEBUG-only code compiles out. Path gating comes last: the filter
+    must cover everything the project compiles or imports, including
     `Sources/SiltaCore/**` and `Sources/SiltaTestSupport/**` unless a guard proves `App/`
-    imports neither. It also covers the package files, `.xcode-version`, `verify.sh` and
-    the workflow. The weekly and manual runs always run the app.
+    imports neither, so it would skip few PRs. The weekly and manual runs always run
+    the app.
   - Not in CI: XCUITest and screenshot approval. Signing and notarization (M5) belong to
     a separate tag-triggered release workflow.
 - **Not verified until DF3:** whether the human uses the app daily.
