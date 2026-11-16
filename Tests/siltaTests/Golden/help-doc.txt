@@ -23,7 +23,8 @@ SUBCOMMANDS:
   archive                 Archive a document and remove its live attachments
                           (human-only).
   propose                 Submit a complete document proposal.
-  triage                  Reject document proposals atomically (human-only).
+  triage                  Accept or reject document proposals atomically
+                          (human-only).
 
   See 'silta help doc <subcommand>' for detailed help.
 
@@ -183,13 +184,13 @@ OPTIONS:
 
 ### silta doc triage
 
-OVERVIEW: Reject document proposals atomically (human-only).
+OVERVIEW: Accept or reject document proposals atomically (human-only).
 
-Read each pinned proposal before asking for one approval.
-Rejections can be stale or concern removed targets.
-Example: silta doc triage --reject doc:rules@2 doc:rules@3
+Read each pinned proposal and diff before asking for one approval.
+Stale proposals can be rejected; only acceptances need current bases.
+Example: silta doc triage --accept doc:rules@2 --reject doc:rules@1
 
-USAGE: silta doc triage [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--reject <reject> ...]
+USAGE: silta doc triage [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--accept <accept> ...] [--reject <reject> ...]
 
 GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
@@ -200,6 +201,8 @@ GLOBAL OPTIONS:
   --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
+  --accept <accept>       Immutable proposal refs to accept; repeat or list
+                          several.
   --reject <reject>       Immutable proposal refs to reject; repeat or list
                           several.
   --version               Show the version.

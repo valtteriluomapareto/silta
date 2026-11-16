@@ -3,6 +3,8 @@ enum DocError: CodedError {
   case missing([String])
   case invalid(String)
   case notFound(String)
+  case stale(String)
+  case overlap([String])
   case changed(workspace: String)
 
   var code: ErrorCode {
@@ -10,7 +12,8 @@ enum DocError: CodedError {
     case .missing: .usage
     case .invalid: .invalid
     case .notFound: .notFound
-    case .changed: .conflict
+    case .stale: .staleRev
+    case .overlap, .changed: .conflict
     }
   }
 
@@ -20,6 +23,10 @@ enum DocError: CodedError {
       "Missing required doc fields: " + fields.joined(separator: ", ") + "."
     case .invalid(let reason): reason
     case .notFound(let ref): "Doc " + TaskError.shown(ref) + " not found."
+    case .stale(let ref):
+      "Proposal " + TaskError.shown(ref) + " has a stale base; inspect and repropose."
+    case .overlap(let refs):
+      "Accept at most one proposal per doc: " + refs.map(TaskError.shown).joined(separator: ", ")
     case .changed: "Document metadata or app configuration changed; prepare the write again."
     }
   }
