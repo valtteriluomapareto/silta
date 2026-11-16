@@ -40,6 +40,10 @@ struct DocTopicAliasTests {
       var proposal = DocProposalRequest(slug: "rules", about: refs, why: "Clarify fallback.")
       let writer = try DocProposalServiceTests.service(home, store)
       let proposed = try writer.propose(proposal, input: { "Use the Acme fallback safely." })
+      let page = try service.list(about: "topic:CHECKOUT", limit: 1)
+      #expect(page.total == 2)
+      #expect(
+        page.next == "silta --ws 'acme' doc ls --about 'topic:messaging' --offset 1 --limit 1")
       let before = try DocVerificationPreparationTests.truth(store)
       proposal.about = ["topic:messaging"]
       _ = DocProposalServiceTests.refusal(.conflict) {
@@ -80,7 +84,8 @@ struct DocTopicAliasTests {
       try AcmeDocAttachments.apply(
         AcmeDocAttachments.yaml().replacingOccurrences(
           of: "{slug: messaging}",
-          with: "{slug: messaging, aliases: [checkout]}, {slug: billing}"), to: store)
+          with: "{slug: messaging, aliases: [checkout]}, {slug: billing, aliases: [invoice]}"),
+        to: store)
       try store.write {
         try $0.database.execute(
           sql: """
@@ -90,7 +95,7 @@ struct DocTopicAliasTests {
       }
       var draft = DocDraft(slug: "rules", body: "Keep distinct Acme topics.")
       draft.title = "Rules"
-      draft.about = ["topic:messaging", "topic:checkout", "topic:billing"]
+      draft.about = ["topic:messaging", "topic:checkout", "topic:billing", "topic:INVOICE"]
       let metadata = try store.read { try DocMetadata.resolve(draft, workspace: 1, in: $0) }
       #expect(metadata.refs == ["topic:billing", "topic:checkout", "topic:messaging"])
       #expect(Set(metadata.targets.compactMap(\.id)).count == 3)
