@@ -8,9 +8,7 @@ struct DocProposeCommand: OutputCommand {
       + "New docs need --title and --about; accepted metadata otherwise stays.\n"
       + "Submissions remain pending. Read with doc show or the human inbox.\n"
       + "Read editing rules with silta guide docs.\n"
-      + "Example:\n"
-      + "  silta doc propose rules --title Rules --about app:api -m Share -F - <<'DOC'\n"
-      + "  Keep the Acme rule.\n  DOC")
+      + "Bodies must contain non-whitespace text.")
   static let dataShape = Shape.object(["ref": .string])
   static let workspaceSource = WorkspaceSource.option
 
