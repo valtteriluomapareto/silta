@@ -1,0 +1,59 @@
+#if DEBUG
+package import Foundation
+import GRDB
+
+/// A synthetic task inserted without requiring a physical Git worktree.
+package struct DebugTaskFixture {
+  package let sequence: Int64
+  package let title: String
+  package let app: String
+  package let status: String
+  package var claimant: String?
+  package var plan = ""
+
+  package init(_ sequence: Int64, _ title: String, app: String, status: String) {
+    self.sequence = sequence
+    self.title = title
+    self.app = app
+    self.status = status
+  }
+
+  /// Seeds complete owned rows in the caller's isolated fixture transaction.
+  package func insert(in tx: StorageTransaction, ids: any IDGenerator, at: Date) throws {
+    let db = tx.database
+    guard let workspace = try Int64.fetchOne(db, sql: "SELECT id FROM workspace WHERE slug='acme'"),
+      let appID = try Int64.fetchOne(
+        db, sql: "SELECT id FROM app WHERE workspace_id=? AND slug=?", arguments: [workspace, app])
+    else { throw StorageError.corrupt }
+    let stamp = TaskService.timestamp(at)
+    let author = claimant ?? "agent:codex:fixture"
+    try db.execute(
+      sql: """
+        INSERT INTO task(uid,workspace_id,seq,title,status,app_id,plan_md,plan_rev,
+          claimed_by,claimed_at,branch,created_by,created_at,updated_at,closed_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+      arguments: [
+        try ids.next(at: at), workspace, sequence, title, status, appID, plan,
+        plan.isEmpty ? 0 : 1, claimant, claimant == nil ? nil : stamp,
+        claimant == nil ? nil : "feature/push", author, stamp, stamp,
+        status == "done" ? stamp : nil,
+      ])
+    let id = db.lastInsertedRowID
+    if !plan.isEmpty {
+      try db.execute(
+        sql: "INSERT INTO task_plan_rev(task_id,rev,body_md,actor,created_at) VALUES(?,1,?,?,?)",
+        arguments: [id, plan, author, stamp])
+    }
+    try db.execute(
+      sql: "INSERT INTO task_event(task_id,actor,kind,body,created_at) VALUES(?,?,'created',?,?)",
+      arguments: [id, author, status, stamp])
+    try db.execute(
+      sql: """
+        INSERT INTO seq_counter(scope,next) VALUES(?,?)
+        ON CONFLICT(scope) DO UPDATE SET next=max(next,excluded.next)
+        """, arguments: ["task:\(workspace)", sequence + 1])
+    try tx.recordChange(kind: "task", rowID: id)
+  }
+}
+#endif
