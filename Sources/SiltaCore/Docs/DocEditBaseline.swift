@@ -37,7 +37,8 @@ struct DocEditBaseline: Equatable {
     let cursor = try Row.fetchCursor(
       db,
       sql: """
-        SELECT d.id,d.uid,d.current_rev,d.archived,d.title,d.kind,r.uid AS revision_uid,
+        SELECT d.id,d.uid,d.current_rev,d.archived,CAST(d.title AS BLOB) AS title,
+          CAST(d.kind AS BLOB) AS kind,r.uid AS revision_uid,
           r.rev,r.state,CASE WHEN ? OR length(CAST(r.body_md AS BLOB))<=?
             THEN CAST(r.body_md AS BLOB) END AS body
         FROM doc d LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
@@ -54,14 +55,13 @@ struct DocEditBaseline: Equatable {
     let revision: Int? = row["rev"]
     let archived: Bool = row["archived"]
     let bodyBytes: Data? = row["body"]
-    let body = try bodyBytes.map { bytes in
-      guard let text = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
-      return text
-    }
+    let body = try bodyBytes.map(text)
     let state: String? = row["state"]
-    let title: String = row["title"]
-    let kind: String = row["kind"]
-    var literalFields: [Data] = [Data(title.utf8), Data(kind.utf8)]
+    let titleBytes: Data = row["title"]
+    let kindBytes: Data = row["kind"]
+    let title = try text(titleBytes)
+    let kind = try text(kindBytes)
+    var literalFields = [titleBytes, kindBytes]
     var identities = [
       workspaceUID, try StoredUID.read(from: row), try StoredUID.read("revision_uid", from: row),
     ]
@@ -80,4 +80,10 @@ struct DocEditBaseline: Equatable {
       rowRevision: revision, state: state, documentExists: true, accepted: state == "accepted",
       body: body, title: title, kind: kind, revision: pointer, refs: refs)
   }
+
+  private static func text(_ bytes: Data) throws -> String {
+    guard let value = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
+    return value
+  }
+
 }
