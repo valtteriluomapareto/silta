@@ -40,6 +40,14 @@ class ControlReleaseTests(unittest.TestCase):
     def test_release_elseif_is_rejected(self):
         self.assertTrue(self.check_source("#if DEBUG\nlet fixture = 1\n#elseif os(macOS)\nlet leak = 2\n#endif\n"))
 
+    @unittest.expectedFailure
+    def test_tabbed_release_elseif_is_rejected(self):
+        self.assertTrue(self.check_source("#if DEBUG\nlet fixture = 1\n#elseif\tos(macOS)\nlet leak = 2\n#endif\n"))
+
+    @unittest.expectedFailure
+    def test_conditional_directives_accept_tabs(self):
+        self.assertEqual(self.check_source("#if\tDEBUG\n#if\tos(macOS)\nlet fixture = 1\n#endif\n#endif\n"), [])
+
     def test_empty_control_file_is_rejected(self):
         self.assertTrue(self.check_source(""))
 
