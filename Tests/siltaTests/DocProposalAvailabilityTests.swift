@@ -14,7 +14,7 @@ struct DocProposalAvailabilityTests {
         let text =
           args.contains("--json")
           ? try #require(try GuideContractTests.data(result)["text"] as? String) : result.stdout
-        #expect(text.contains("doc triage --accept"))
+        #expect(text.contains("doc triage --reject"))
         #expect(!text.contains("cannot decide proposals yet"))
         #expect(text.contains("Map gap:"))
         #expect(text.contains("never create a task or file for a map gap"))

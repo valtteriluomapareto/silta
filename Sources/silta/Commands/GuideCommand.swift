@@ -130,10 +130,10 @@ extension GuideCommand {
         Submit lasting knowledge with doc propose; submissions remain pending, even from a human.
         Usually propose nothing; never more than two task and document proposals per session.
         Read the returned immutable ref and its recorded-base diff before handing it off.
-        Read pinned diffs, recommend existing refs and ask for one approval before running
-        doc triage --accept <refs> --reject <refs>. The whole batch succeeds or writes nothing.
-        Rejections can be stale; acceptances require current bases and one per doc.
-        The human inbox currently shows read commands; name decisions explicitly in chat.
+        Read pinned proposals and ask for one approval before running
+        doc triage --reject <refs>. The whole batch succeeds or writes nothing.
+        Reject stale or orphaned proposals; use approved doc edit for accepted knowledge.
+        The human inbox currently shows read commands; name rejections explicitly in chat.
         With no human present, record map gaps as `Map gap:` in your handoff or result;
         never create a task or file for a map gap.
 
@@ -224,7 +224,7 @@ extension GuideCommand {
         this chat, never use --approved. Name the commands in a question for @me and leave a \
         handoff instead. Never invent approval words.
         Human-only gates: `task promote`; task edit except your claimed task; effective \
-        `where --set/--unset` changes; task triage; --steal \
+        `where --set/--unset` changes; task triage; doc triage; --steal \
         over another session's fresh claim; --force past an unmet review gate; --allow-secret; \
         ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task \
         writes under `proposals: ask`. Before `restore`, run --dry-run and show the human its \
