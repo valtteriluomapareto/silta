@@ -54,6 +54,12 @@ class Hanging(unittest.TestCase):
         subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         time.sleep(60)
 """
+LEAKING = """
+import subprocess, sys, unittest
+class Leaking(unittest.TestCase):
+    def test_leaks_a_child_holding_stdout(self):
+        subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+"""
 HELPER = "ACME_VALUE = 7\n"
 USES_HELPER = """
 import unittest
@@ -125,6 +131,14 @@ class RunEvalTestsTests(unittest.TestCase):
         self.assertIn("timed out after", out)
         self.assertIn("acme partial", out)
         self.assertIn("ok   test_a: 2 tests", out)
+
+    def test_module_that_exits_but_leaks_a_child_is_reported_not_crashed(self) -> None:
+        started = time.monotonic()
+        code, out = self.run_dir({"test_leak": LEAKING}, timeout=2)
+        self.assertLess(time.monotonic() - started, 30)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL test_leak", out)
+        self.assertIn("timed out after", out)
 
     def test_module_imports_a_sibling_helper(self) -> None:
         code, out = self.run_dir({"acme_helper": HELPER, "test_uses": USES_HELPER})

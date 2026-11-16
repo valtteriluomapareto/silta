@@ -94,9 +94,13 @@ full_swift() {
   step "test (with slow tiers)"
   export SILTA_SLOW_TESTS=1
   SILTA_DEADLINE_TESTS='' run_tests
+  # The stress test and every test that drives a prior-writer binary.
   require_passed twentyProcessesAddFiveHundredTasksWithoutSequenceGaps \
     actualPriorWriterRefusesUpgradedDatabaseWithoutChangingIt \
-    actualV6WriterRefusesTargetSnapshotFloorWithoutMutation
+    actualMetadataWriterCannotWriteAfterNamespaceUpgrade \
+    actualV6WriterKeepsPopulatedAuditFields \
+    actualV6WriterRefusesTargetSnapshotFloorWithoutMutation \
+    actualV6ExporterRefusesUnknownCounterOnlySchema
 
   # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
   # parallel suite skips them; they run here alone and one at a time.

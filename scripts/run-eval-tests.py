@@ -62,7 +62,11 @@ def run_module(tests_dir: Path, name: str, timeout: float) -> ModuleResult:
         output, _ = child.communicate(timeout=timeout)
         exit_code: int | None = child.returncode
     except subprocess.TimeoutExpired:
-        os.killpg(child.pid, signal.SIGKILL)
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            # macOS refuses killpg once an unreaped leader has exited; kill what we can.
+            child.kill()
         exit_code = None
         try:
             output, _ = child.communicate(timeout=10)

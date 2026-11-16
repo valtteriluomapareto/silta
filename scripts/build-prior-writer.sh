@@ -20,7 +20,7 @@ esac
 out="$1"
 mkdir -p "$out"
 
-toolchain="$(swift --version 2>/dev/null | head -1)"
+toolchain="$(swift --version 2>/dev/null | sed -n 1p)"
 stamp_for() { printf 'commit=%s\nswift=%s\nsha256=%s\n' "$prior_commit" "$toolchain" "$1"; }
 sha_of() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
@@ -32,7 +32,8 @@ if [[ -n "$entry" && -f "$entry/silta" && -f "$entry/stamp" ]]; then
     echo "build-prior-writer: reused cached ${prior_commit} ($toolchain)" >&2
     exit 0
   fi
-  echo "build-prior-writer: cached ${prior_commit} does not match its stamp; rebuilding" >&2
+  # A ::warning:: shows in the CI summary, since an exact cache hit is not saved again.
+  echo "::warning::build-prior-writer: cached ${prior_commit} does not match its stamp; rebuilding" >&2
 fi
 
 mkdir -p "$out/source"

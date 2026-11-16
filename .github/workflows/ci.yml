@@ -33,7 +33,8 @@ jobs:
         run: bash scripts/ci/install-swift-tools.sh
 
       # build-prior-writer.sh pins the commits and checks each cached binary's stamp
-      # (commit, Swift toolchain, SHA-256). The weekly run builds them from source.
+      # (commit, Swift toolchain, SHA-256). A bad entry is rebuilt but not saved again until
+      # the key changes. The weekly run builds them from source.
       - name: Name the toolchain for the prior-writer cache
         if: github.event_name != 'schedule'
         id: toolchain
