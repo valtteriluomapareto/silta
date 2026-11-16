@@ -9,10 +9,10 @@ do not replace it with today's map or treat it as a verification claim.
 Submit lasting knowledge with doc propose; submissions remain pending, even from a human.
 Usually propose nothing; never more than two task and document proposals per session.
 Read the returned immutable ref and its recorded-base diff before handing it off.
-Read pinned diffs, recommend existing refs and ask for one approval before running
-doc triage --accept <refs> --reject <refs>. The whole batch succeeds or writes nothing.
-Rejections can be stale; acceptances require current bases and one per doc.
-The human inbox currently shows read commands; name decisions explicitly in chat.
+Read pinned proposals and ask for one approval before running
+doc triage --reject <refs>. The whole batch succeeds or writes nothing.
+Reject stale or orphaned proposals; use approved doc edit for accepted knowledge.
+The human inbox currently shows read commands; name rejections explicitly in chat.
 With no human present, record map gaps as `Map gap:` in your handoff or result;
 never create a task or file for a map gap.
 

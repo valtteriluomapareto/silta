@@ -218,7 +218,7 @@ struct DocEditCommandTests {
 
   private static func checkInvalidBatchGate(_ scratch: URL, _ repo: URL, _ trace: URL) throws {
     for selectors in [
-      [], ["--accept", "rules"],
+      [], ["--reject", "rules"],
       ["--reject", "doc:rules@1", "doc:rules@1"],
       ["--accept", "doc:rules@1", "--reject", "doc:rules@1"],
     ] {
@@ -226,7 +226,9 @@ struct DocEditCommandTests {
       let result = try SiltaBinary.run(
         ["doc", "triage"] + selectors + ["--approved", "Review Acme docs", "--json"],
         in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
-      #expect(try Self.error(result)["code"] as? String == "invalid")
+      #expect(
+        try Self.error(result)["code"] as? String
+          == (selectors.contains("--accept") ? "usage" : "invalid"))
       #expect(try Data(contentsOf: trace).isEmpty)
     }
   }

@@ -9,25 +9,10 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocTriageRejectionRetryTests {
   @Test(arguments: ["current", "explicit", "prepared", "uid"])
-  func retryNeverRetargetsTheSameRefInAnotherWorkspace(mode: String) async throws {
-    try await withScratchDirectory { home in
-      let seed = try AcmeDocAttachments.make(in: home)
-      try seed.write {
-        try $0.database.execute(
-          sql: """
-            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
-            INSERT INTO service(uid,workspace_id,slug,name) VALUES('beta-push',2,'push','Push');
-            INSERT INTO meta(key,value) VALUES('current_workspace','acme')
-            ON CONFLICT(key) DO UPDATE SET value='acme';
-            """)
-      }
-      let base = try DocTriageServiceTests.environment(home, seed)
-      let ref = try DocTriageServiceTests.propose(base, about: "service:push")
-      #expect(
-        try DocProposalService(environment: base, workspace: "beta").propose(
-          DocProposalRequest(slug: "rules", title: "Rules", about: ["service:push"], why: "Share."),
-          input: { "Beta rules." }
-        ).ref == ref)
+  func retryNeverRetargetsTheSameRefInAnotherWorkspace(mode: String) throws {
+    try withScratchDirectory { home in
+      let (base, ref) = try Self.mirror(home)
+      let seed = base.db
       let expected = Mutex<[[String]]?>(nil)
       let retries = Mutex(0)
       let store = DatabaseStore(
@@ -53,11 +38,11 @@ struct DocTriageRejectionRetryTests {
       if mode == "prepared" { env.workspaceSelection = .success("acme") }
       var failure: (any CodedError)?
       do {
-        _ = try await DocTriageService(
+        _ = try DocTriageService(
           environment: env,
           workspace: mode == "explicit" || mode == "uid" ? "acme" : nil, approved: "Reject rules"
         )
-        .triage(DocTriage(accept: [], reject: [ref]))
+        .triage(DocTriage(reject: [ref]))
       } catch let error as any CodedError { failure = error }
       #expect(retries.withLock { $0 } == 1)
       if ["current", "uid"].contains(mode) {
@@ -65,20 +50,46 @@ struct DocTriageRejectionRetryTests {
         #expect(try DocVerificationPreparationTests.truth(seed) == expected.withLock { $0 })
       } else {
         #expect(failure == nil)
-        #expect(
-          try seed.read {
-            try String.fetchAll(
-              $0,
-              sql:
-                "SELECT r.state FROM doc_rev r JOIN doc d ON d.id=r.doc_id ORDER BY d.workspace_id")
-          } == ["rejected", "proposed"])
       }
+      try Self.expectStates(seed, refused: ["current", "uid"].contains(mode))
     }
   }
 
+  private static func expectStates(_ store: DatabaseStore, refused: Bool) throws {
+    let states = try store.read {
+      try String.fetchAll(
+        $0,
+        sql: """
+          SELECT r.state FROM doc_rev r JOIN doc d ON d.id=r.doc_id ORDER BY d.workspace_id
+          """)
+    }
+    #expect(states == (refused ? ["proposed", "proposed"] : ["rejected", "proposed"]))
+  }
+
+  private static func mirror(_ home: URL) throws -> (SiltaEnvironment, String) {
+    let seed = try AcmeDocAttachments.make(in: home)
+    try seed.write {
+      try $0.database.execute(
+        sql: """
+          INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('beta','beta','Beta','BE');
+          INSERT INTO service(uid,workspace_id,slug,name) VALUES('beta-push',2,'push','Push');
+          INSERT INTO meta(key,value) VALUES('current_workspace','acme')
+          ON CONFLICT(key) DO UPDATE SET value='acme';
+          """)
+    }
+    let base = try DocTriageServiceTests.environment(home, seed)
+    let ref = try DocTriageServiceTests.propose(base, about: "service:push")
+    #expect(
+      try DocProposalService(environment: base, workspace: "beta").propose(
+        DocProposalRequest(slug: "rules", title: "Rules", about: ["service:push"], why: "Share."),
+        input: { "Beta rules." }
+      ).ref == ref)
+    return (base, ref)
+  }
+
   @Test(arguments: ["unsafe-scope", "initial-uid", "approval", "change_log"])
-  func auditDiagnosticsAndLateFailureKeepTheirContracts(mode: String) async throws {
-    try await withScratchDirectory { home in
+  func auditDiagnosticsAndLateFailureKeepTheirContracts(mode: String) throws {
+    try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let env = try DocTriageServiceTests.environment(home, store)
       let ref = try DocTriageServiceTests.propose(env, about: "service:push")
@@ -98,8 +109,8 @@ struct DocTriageRejectionRetryTests {
       let before = try DocVerificationPreparationTests.truth(store)
       var failure: (any CodedError)?
       do {
-        _ = try await DocTriageService(environment: env, workspace: scope, approved: "Reject rules")
-          .triage(DocTriage(accept: [], reject: [ref]))
+        _ = try DocTriageService(environment: env, workspace: scope, approved: "Reject rules")
+          .triage(DocTriage(reject: [ref]))
       } catch let error as any CodedError { failure = error }
       if mode == "unsafe-scope" {
         #expect(failure == nil)

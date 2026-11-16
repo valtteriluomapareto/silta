@@ -24,8 +24,8 @@ struct DocTriageServiceTests {
   }
 
   @Test(arguments: [false, true])
-  func rejectedHistoryNeedsNoLiveMetadataSourceTargetOrBodyAdmission(human: Bool) async throws {
-    try await withScratchDirectory { home in
+  func rejectedHistoryNeedsNoLiveMetadataSourceTargetOrBodyAdmission(human: Bool) throws {
+    try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let env = try Self.environment(home, store, human: human)
       try DocProposalServiceTests.task(store, seq: 1, actor: env.actor.description)
@@ -43,9 +43,9 @@ struct DocTriageServiceTests {
       }
       try AcmeDocAttachments.apply(AcmeDocAttachments.yaml(removing: "service"), to: store)
       let before = try store.read { try Row.fetchAll($0, sql: "SELECT * FROM seq_counter") }
-      let result = try await DocTriageService(
+      let result = try DocTriageService(
         environment: env, workspace: "acme", approved: human ? nil : "Reject obsolete Acme rules"
-      ).triage(DocTriage(accept: [], reject: [ref]))
+      ).triage(DocTriage(reject: [ref]))
       #expect(result.docs.map(\.state) == ["rejected"])
       try store.read { (db: Database) throws in
         #expect(try Data.fetchOne(db, sql: "SELECT CAST(body_md AS BLOB) FROM doc_rev") == body)

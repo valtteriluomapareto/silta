@@ -48,9 +48,7 @@ struct DocTriageCommandTests {
       for args in [["doc", "triage", "--help"], ["schema", "doc", "triage"]] {
         let result = try SiltaBinary.run(args, in: scratch)
         #expect(result.termination == .exit(0) && result.stdout.contains("--reject"))
-        withKnownIssue("Only active rejection grammar is published") {
-          #expect(!result.stdout.contains("--accept"))
-        }
+        #expect(!result.stdout.contains("--accept"))
       }
     }
   }
@@ -141,9 +139,12 @@ struct DocTriageCommandTests {
       let before = try Self.truth(store)
       let result = try Self.run(args + ["--json"], scratch)
       #expect(result.termination == .exit(args.last == "doc:missing@1" ? 2 : 1))
-      #expect(
-        try DocEditCommandTests.error(result)["code"] as? String
-          == (args.last == "doc:missing@1" ? "not_found" : "invalid"))
+      if result.termination != .exit(0) {
+        #expect(
+          try DocEditCommandTests.error(result)["code"] as? String
+            == (args.contains("--accept")
+              ? "usage" : args.last == "doc:missing@1" ? "not_found" : "invalid"))
+      }
       #expect(try Self.truth(store) == before)
     }
   }

@@ -1099,7 +1099,7 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-read commands; decisions name explicit immutable proposal refs. Doc-specific review
+read commands; rejections name explicit immutable proposal refs. Acceptance and mixed batches\nremain planned. Doc-specific review
 measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
@@ -1109,23 +1109,28 @@ measurements remain deferred.
   and never runs Git.
   A submission stays proposed, including from a human or with `--approved`.
 - **Review:** the agent reads pinned proposal diffs, checks the code and prepares
-  existing proposal refs with accept/reject recommendations in one chat message.
-  Only then does it run `doc triage --accept <refs> --reject <refs>` with the
-  human's exact approval. One transaction records every decision or writes nothing;
-  original proposer, creation time and revision content remain immutable.
-- **Concurrency and recovery:** only acceptances require the pre-batch current base
-  and at most one acceptance per doc. Rejections may be stale and several may concern
-  the same doc, including beside an accepted replacement. Duplicate, opposite,
-  nonpending or unowned refs refuse the whole batch. Acceptance follows recorded
-  target UIDs through renames and refuses replaced or unknown identities. Git runs
-  outside the write; all selected immutable members, accepted baselines, sources and
-  bindings are rechecked before any write. Reject-only batches need no clones, live
-  targets, source or content admission. Decision evidence is paired (D46); one used
-  approval, current projections and verification evidence commit atomically without
-  allocating revisions or changing original proposal content.
-  JSON data is `{docs:[{ref,state}]}`; text prints refs and states, quiet only refs.
-  Selectors are repeated `--accept`/`--reject` options with one or more
-  `doc:slug@revision` refs; malformed or empty batches refuse.
+  existing proposal refs with recommendations in one chat message. Rejection is
+  available through human-owned §9 command
+  `doc triage --reject <doc:slug@revision>…`. Repeated/listed refs form one batch;
+  empty, malformed, duplicate, nonpending or unowned members refuse. Authorization
+  precedes location Git, then selector validation runs before location selection.
+  The rejection transaction checks every owned pending member before any mutation.
+  Stale bases, removed targets, unknown metadata and retained bodies do not block
+  cleanup; rejection runs no verification Git or new-content admission. It changes
+  only state and paired D46 decision evidence, preserving original proposer,
+  creation time, content, accepted projection, attachments and allocations.
+  One used approval commits atomically and audits the masked actual rejection action.
+  Raw-busy retries retain first-attempt workspace identity; an implicit current
+  change cannot retarget the same ref. Explicit/prepared choices remain authoritative.
+  JSON data is `{docs:[{ref,state}]}` with state `rejected`; text prints refs and
+  states, quiet only refs. Operational backup and workspace discovery retain their
+  safe recovery and ownership.
+- **Planned acceptance and mixed review:** acceptances require the pre-batch current
+  base and at most one acceptance per doc. Rejections may be stale and several may
+  accompany an accepted replacement. Acceptance follows recorded target UIDs through
+  renames and refuses replaced or unknown identities. Git runs outside the write;
+  all immutable members, accepted baselines, sources and bindings are rechecked before
+  any write. Decisions reuse existing revisions without changing original content.
   A stale proposal is inspected and reproposed with supplied text and an explicit
   base. There is no accept/reject subcommand, rebase flag or editor merge flow.
 - **Map gaps:** with no human present, record `Map gap:` in a handoff or result,
