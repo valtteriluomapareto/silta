@@ -7,41 +7,35 @@ struct DocMetadata {
   let refs: [String]
   let targets: [TaskLinkTarget]
 
-  static func resolve(_ draft: DocDraft, workspace: Int64, in db: Database) throws -> Self {
-    let old = try Row.fetchOne(
-      db, sql: "SELECT * FROM doc WHERE workspace_id=? AND slug=?",
-      arguments: [workspace, draft.slug])
+  static func resolve(
+    _ draft: DocDraft, baseline: DocEditBaseline? = nil, workspace: Int64, in db: Database
+  ) throws -> Self {
+    let previous = try accepted(draft.slug, baseline: baseline, workspace: workspace, in: db)
     guard WorkspaceConfig.isValidIdentifier(draft.slug) else {
       throw DocError.invalid("Use an identifier for the doc slug.")
     }
-    let accepted = try hasAcceptedRevision(old, in: db)
-    if !accepted {
+    if previous == nil {
       var missing: [String] = []
       if draft.title == nil { missing.append("--title") }
       if draft.about == nil { missing.append("--about") }
       if !missing.isEmpty { throw DocError.missing(missing) }
     }
-    let previousTitle: String? = old?["title"]
-    let title = draft.title ?? previousTitle ?? ""
-    try checkTitle(title)
+    let title = draft.title ?? previous?.title ?? ""
+    if previous.map({ title.utf8.elementsEqual($0.title.utf8) }) != true {
+      try checkTitle(title)
+    }
     if let kind = draft.kind, !["contract", "flow", "runbook", "reference"].contains(kind) {
       throw DocError.invalid("Use contract, flow, runbook or reference for --kind.")
     }
-    let previous =
-      try old.map {
-        try DocStore.attachments($0["id"], workspace: workspace, in: db).map {
-          try TaskLinkTarget.render($0, in: db)
-        }
-      } ?? []
-    let refs = Array(Set(draft.about ?? previous)).sorted()
+    let refs = Array(Set(draft.about ?? previous?.refs ?? [])).sorted()
     guard !refs.isEmpty else {
       if draft.about == nil { throw DocError.missing(["--about"]) }
       throw DocError.invalid("A doc needs at least one --about map item.")
     }
     let targets = try refs.map { try TaskLinkTarget.map($0, workspace: workspace, in: db) }
-    let previousKind: String? = accepted ? old?["kind"] : nil
     return Self(
-      title: title, kind: draft.kind ?? previousKind ?? Self.inferredKind(targets),
+      title: title,
+      kind: draft.kind ?? previous?.kind ?? Self.inferredKind(targets),
       refs: refs, targets: targets)
   }
 
@@ -55,38 +49,36 @@ struct DocMetadata {
     }
   }
 
-  static func proposal(
-    _ request: DocProposalRequest, baseline: DocEditBaseline, workspace: Int64, in db: Database
-  ) throws -> Self {
-    guard WorkspaceConfig.isValidIdentifier(request.slug) else {
-      throw DocError.invalid("Use an identifier for the doc slug.")
-    }
-    let title = request.title ?? baseline.title ?? ""
-    if !baseline.accepted || !title.utf8.elementsEqual((baseline.title ?? "").utf8) {
-      try checkTitle(title)
-    }
-    let refs = Array(Set(request.about ?? baseline.refs)).sorted()
-    guard !refs.isEmpty else {
-      if request.about == nil { throw DocError.missing(["--about"]) }
-      throw DocError.invalid("A doc needs at least one --about map item.")
-    }
-    let targets = try refs.map { try TaskLinkTarget.map($0, workspace: workspace, in: db) }
-    guard let kind = baseline.accepted ? baseline.kind : Self.inferredKind(targets) else {
-      throw StorageError.corrupt
-    }
-    return Self(title: title, kind: kind, refs: refs, targets: targets)
+  private struct Accepted {
+    let title: String
+    let kind: String
+    let refs: [String]
   }
 
-  private static func hasAcceptedRevision(_ old: Row?, in db: Database) throws -> Bool {
-    guard let old, let revision: Int = old["current_rev"] else { return false }
-    guard
-      try Bool.fetchOne(
-        db,
-        sql: """
-          SELECT EXISTS(SELECT 1 FROM doc_rev WHERE doc_id=? AND rev=? AND state='accepted')
-          """, arguments: [old["id"], revision]) == true
-    else { throw StorageError.corrupt }
-    return true
+  private static func accepted(
+    _ slug: String, baseline: DocEditBaseline?, workspace: Int64, in db: Database
+  ) throws -> Accepted? {
+    if let baseline {
+      guard baseline.revision != nil else { return nil }
+      guard baseline.accepted, let title = baseline.title, let kind = baseline.kind else {
+        throw StorageError.corrupt
+      }
+      return Accepted(title: title, kind: kind, refs: baseline.refs)
+    }
+    let old = try Row.fetchOne(
+      db,
+      sql: """
+        SELECT d.*,r.state AS revision_state FROM doc d
+        LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
+        WHERE d.workspace_id=? AND d.slug=?
+        """, arguments: [workspace, slug])
+    guard let old, (old["current_rev"] as Int?) != nil else { return nil }
+    guard old["revision_state"] as String? == "accepted" else { throw StorageError.corrupt }
+    return Accepted(
+      title: old["title"], kind: old["kind"],
+      refs: try DocStore.attachments(old["id"], workspace: workspace, in: db).map {
+        try TaskLinkTarget.render($0, in: db)
+      })
   }
 
   private static func inferredKind(_ targets: [TaskLinkTarget]) -> String {

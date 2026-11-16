@@ -36,7 +36,7 @@ package struct DocProposalService {
         let at = environment.clock.now()
         let prepared = try selected.capture(
           request, workspace: workspace, at: at, in: tx.database)
-        let body = try selected.checked(supplied, keeping: prepared.baseline.body)
+        let body = try selected.policy.checked(supplied, keeping: prepared.baseline.body)
         try DocInput.check(body.0)
         var draft = DocDraft(slug: request.slug, body: body.0)
         draft.message = prepared.why
@@ -71,25 +71,26 @@ package struct DocProposalService {
     let baseline = try DocEditBaseline.read(request.slug, workspace: id, keepBody: false, in: db)
     if baseline.revision != nil && !baseline.accepted { throw StorageError.corrupt }
     let why = try requiredWhy(request, accepted: baseline.accepted)
-    if !baseline.accepted { try identityCheck("doc:" + request.slug) }
+    if !baseline.accepted { try policy.identity("doc:" + request.slug) }
     for ref in request.about ?? []
     where !baseline.accepted
       || !baseline.refs.contains(where: { $0.utf8.elementsEqual(ref.utf8) })
     {
-      try identityCheck(ref.removingPercentEncoding ?? ref)
+      try policy.identity(ref.removingPercentEncoding ?? ref)
     }
     var safe = request
     var redacted = false
-    if let title = request.title,
-      !baseline.accepted || !title.utf8.elementsEqual((baseline.title ?? "").utf8)
-    {
-      try DocMetadata.checkTitle(title)
-      let value = try checked(title)
+    if let title = request.title {
+      let value = try policy.title(title, keeping: baseline.accepted ? baseline.title : nil)
       safe.title = value.0
       redacted = value.1
     }
-    let metadata = try DocMetadata.proposal(safe, baseline: baseline, workspace: id, in: db)
-    let reason = try checked(why)
+    var draft = DocDraft(slug: safe.slug, body: "")
+    draft.title = safe.title
+    draft.about = safe.about
+    let metadata = try DocMetadata.resolve(
+      draft, baseline: baseline, workspace: id, in: db)
+    let reason = try policy.checked(why)
     let base: Int?
     if let supplied = request.base {
       guard let number = Int(supplied), number > 0 else {
@@ -131,20 +132,7 @@ package struct DocProposalService {
     return why
   }
 
-  private func checked(_ text: String, keeping old: String? = nil) throws -> (String, Bool) {
-    if old.map({ text.utf8.elementsEqual($0.utf8) }) == true
-      || SecretGuard.matches(in: text).isEmpty
-    {
-      return (text, false)
-    }
-    if environment.actor.isHuman { throw SecretError(command: "silta doc propose", text: text) }
-    return (SecretGuard.redacted(text), true)
+  private var policy: DocInputPolicy {
+    DocInputPolicy(actor: environment.actor, allowSecret: false, command: "silta doc propose")
   }
-
-  private func identityCheck(_ text: String) throws {
-    if !SecretGuard.matches(in: text).isEmpty {
-      throw SecretError(command: "silta doc propose", text: text)
-    }
-  }
-
 }
