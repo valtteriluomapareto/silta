@@ -36,7 +36,8 @@ extension DocEvidenceReadCommandTests {
       }
       let before = try truth(store)
       let result = try run(["--diff"], scratch)
-      #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+      #expect(result.termination == .exit(0))
+      #expect(result.stderr.isEmpty)
       #expect(result.stdout.split(separator: "\n").count <= 400)
       let next =
         result.stdout.components(separatedBy: "\n").first {
