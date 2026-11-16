@@ -105,7 +105,7 @@ struct DocProposalSelectionTests {
 
 }
 
-private final class BusyOnceProposalIDs: IDGenerator {
+final class BusyOnceProposalIDs: IDGenerator {
   private let calls = Mutex(0)
   private let base = SeededIDGenerator(seed: 94)
 

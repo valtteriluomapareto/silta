@@ -349,6 +349,12 @@ extension DogfoodLogTests {
           "--title", "Delivery", "--about", "topic:messaging", "--task", "AC-1",
         ], "acme"
       ),
+      (
+        [
+          "--ws", "acme", "doc", "triage", "--reject", "doc:delivery@1",
+          "--approved", "Reject Acme candidate",
+        ], "acme"
+      ),
     ]
   }
 
