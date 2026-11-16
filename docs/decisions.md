@@ -176,6 +176,15 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - Naming: `System…`, `Fake…`, `Scripted…`.
   - Fakes live in a `SiltaTestSupport` target.
   - A conformance suite for every seam.
+  - ↳ update (2026-11-16): the Mac app's shared development seed and canonical
+    fixed fixture/test clock belong in whole-file DEBUG `SiltaAppSupport/Control/`.
+    SiltaTestSupport reuses them through aliases or forwarding wrappers, without
+    another implementation. Core's seeded ID generator remains the single
+    algorithm used by the CLI; DEBUG Control and test support share access to that
+    same generator. Existing clock/ID conformance suites cover the shared types.
+    Gate test-support helpers that require DEBUG types accordingly, and verify a
+    Release product build. The app never links test support; the release guard and
+    package graph boundary stay intact. Other fakes remain in SiltaTestSupport.
 - **D24: Access control.**
   - `public` only for the app-facing façade.
   - `package` for the CLI and test support.
