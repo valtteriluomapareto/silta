@@ -4,6 +4,8 @@ public struct AppAttention: Equatable, Sendable {
   public let kind: String
   /// Canonical item reference, when present.
   public let ref: String?
+  /// Display refs for a grouped action, or its containing task/item.
+  public let refs: [String]
   /// Containing task reference, when present.
   public let task: String?
   /// Proposal task title, when present.

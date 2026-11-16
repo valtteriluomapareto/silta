@@ -5,6 +5,7 @@ import GRDB
 import SiltaTestSupport
 import Testing
 
+@Suite(.blockingTestWork)
 struct AppReaderTests {
   static func reader(_ scratch: URL) throws -> AppReader {
     try AppReader(home: scratch.appending(path: "silta-home"), user: "acme", now: { AppV2Fixture.now })
@@ -160,6 +161,79 @@ struct AppReaderTests {
         #expect(snapshot.work.items.compactMap(\.ref) == items.compactMap { $0["ref"] as? String })
       }
       #expect(try Data(contentsOf: scratch.appending(path: "silta-home/silta.db")) == before)
+    }
+  }
+
+  @Test func blockedTasksStayVisibleInTodo() throws {
+    try withScratchDirectory { scratch in
+      try AppFixtures.seed(in: scratch)
+      let reader = try Self.reader(scratch)
+      var block = TaskBlock(why: "Needs the Acme API cleanup.")
+      block.on = ["AC-18"]
+      _ = try TaskService(environment: reader.environment, workspace: "acme").block("AC-17", block)
+      withKnownIssue("Blocked task projection is not implemented yet.") {
+        let board = try reader.snapshot(workspace: "acme").board
+        #expect(board.todo.count == 4)
+        #expect(board.todo.first { $0.ref == "AC-17" }?.status == "blocked")
+        #expect(board.appOpenCounts["acme-mobile"] == 3)
+      }
+    }
+  }
+
+  @Test func groupedAttentionPreservesEveryDisplayRef() throws {
+    try withScratchDirectory { scratch in
+      try AppFixtures.seed(in: scratch)
+      let reader = try Self.reader(scratch)
+      let service = TaskService(environment: reader.environment, workspace: "acme")
+      var block = TaskBlock(why: "Acme must confirm the API.")
+      block.on = ["ext:acme-team"]
+      block.followUp = "0d"
+      for ref in ["AC-15", "AC-17"] { _ = try service.block(ref, block) }
+      let expected = ["AC-15", "AC-17"]
+      #expect(try service.inbox(for: "me").items.first { $0.kind == "due" }?.tasks?.map(\.ref) == expected)
+      withKnownIssue("Grouped attention projection is not implemented yet.") {
+        let work = try reader.snapshot(workspace: "acme").work
+        let due = try #require(work.items.first { $0.kind == "due" })
+        #expect(due.refs == expected)
+      }
+    }
+  }
+
+  @Test func missingAndNewerStoresFailWithoutInitializationOrMigration() throws {
+    try withScratchDirectory { scratch in
+      let reader = try Self.reader(scratch)
+      withKnownIssue("Reader schema preflight is not implemented yet.") {
+        var failure: AppReadError?
+        do { _ = try reader.workspaces() } catch let error as AppReadError { failure = error }
+        #expect(failure?.kind == .unavailableStore)
+      }
+      #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home").path))
+      try AppFixtures.seed(in: scratch)
+      try reader.environment.db.write { tx in
+        try tx.database.execute(sql: "INSERT INTO grdb_migrations VALUES('future-app-schema')")
+      }
+      let before = try Data(contentsOf: scratch.appending(path: "silta-home/silta.db"))
+      withKnownIssue("Reader schema preflight is not implemented yet.") {
+        var failure: AppReadError?
+        do { _ = try reader.snapshot(workspace: "acme") } catch let error as AppReadError { failure = error }
+        #expect(failure?.kind == .newerSchema)
+      }
+      #expect(try Data(contentsOf: scratch.appending(path: "silta-home/silta.db")) == before)
+    }
+  }
+
+  @Test func seedIsRepeatableAndRefusesExistingData() throws {
+    try withScratchDirectory { scratch in
+      try AppFixtures.seed(in: scratch)
+      let second = scratch.appending(path: "second")
+      try AppFixtures.seed(in: second)
+      func values(_ base: URL) throws -> [String] {
+        try Self.reader(base).environment.db.read {
+          try String.fetchAll($0, sql: "SELECT uid || ':' || title || ':' || created_at FROM task ORDER BY seq")
+        }
+      }
+      #expect(try values(scratch) == values(second))
+      #expect(throws: WorkspaceError.self) { try AppFixtures.seed(in: scratch) }
     }
   }
 
