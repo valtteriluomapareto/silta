@@ -101,7 +101,10 @@ struct DocTriageServiceTests {
           try String.fetchOne(
             $0,
             sql:
-              "SELECT r.state FROM doc_rev r JOIN doc d ON d.id=r.doc_id WHERE d.slug='rules' AND r.rev=1"
+              """
+              SELECT r.state FROM doc_rev r JOIN doc d ON d.id=r.doc_id
+              WHERE d.slug='rules' AND r.rev=1
+              """
           )
         } == "proposed")
     }

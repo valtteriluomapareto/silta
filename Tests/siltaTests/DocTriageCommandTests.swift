@@ -25,6 +25,14 @@ struct DocTriageCommandTests {
       in: scratch, environment: TaskCommandTests.fixed)
   }
 
+  static func currentProjection(_ store: DatabaseStore) throws -> [[Row]] {
+    try store.read { db in
+      try ["doc", "link", "doc_verification", "seq_counter"].map {
+        try Row.fetchAll(db, sql: "SELECT * FROM \($0) ORDER BY rowid")
+      }
+    }
+  }
+
   static func truth(_ store: DatabaseStore) throws -> [[Row]] {
     try store.read { db in
       try ["doc", "doc_rev", "link", "doc_verification", "approval", "seq_counter", "change_log"]
@@ -64,11 +72,9 @@ struct DocTriageCommandTests {
       #expect(result.termination == .exit(2))
       let error = try DocEditCommandTests.error(result)
       #expect(error["next"] as? [String] == ["silta ws ls"])
-      withKnownIssue("Approved missing-workspace rejection does not initialize storage") {
-        #expect(
-          !FileManager.default.fileExists(
-            atPath: scratch.appending(path: "silta-home/silta.db").path))
-      }
+      #expect(
+        !FileManager.default.fileExists(
+          atPath: scratch.appending(path: "silta-home/silta.db").path))
     }
   }
 
@@ -99,10 +105,12 @@ struct DocTriageCommandTests {
           ["rules", "-F", file.path], scratch
         ).termination == .exit(0))
       try store.write { try $0.database.execute(sql: "DELETE FROM approval") }
+      let projection = try Self.currentProjection(store)
       let result = try Self.run(
         ["--reject", "doc:rules@2", "doc:rules@3"]
           + (mode == "text" ? [] : ["--" + mode]), scratch)
       #expect(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
+      #expect(try Self.currentProjection(store) == projection)
       if result.termination == .exit(0) {
         Golden.forTests().check(
           result.stdout, "doc-triage-" + mode + (mode == "json" ? ".json" : ".txt"))

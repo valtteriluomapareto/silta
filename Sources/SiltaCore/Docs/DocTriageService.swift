@@ -39,6 +39,11 @@ package struct DocTriageService {
 
   package func triage(_ batch: DocTriage) throws -> DocTriageResult {
     let approval = try authorize(batch)
+    if !FileManager.default.fileExists(atPath: environment.db.path) {
+      _ = try WorkspaceSelection.resolve(
+        workspace, in: environment.db,
+        prepared: environment.workspaceSelection)
+    }
     var first: (slug: String, uid: String)?
     do {
       return try environment.db.write { tx in

@@ -1099,7 +1099,8 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-read commands; rejections name explicit immutable proposal refs. Acceptance and mixed batches\nremain planned. Doc-specific review
+read commands; rejections name explicit immutable proposal refs. Acceptance and mixed batches
+remain planned. Doc-specific review
 measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
