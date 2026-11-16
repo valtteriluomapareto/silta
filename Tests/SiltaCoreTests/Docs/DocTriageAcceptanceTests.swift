@@ -54,7 +54,8 @@ struct DocTriageAcceptanceTests {
   @Test(arguments: [
     "body", "unicode-body", "reject-body", "revision", "state", "source",
     "app", "edge", "service", "repo", "path", "ref", "workspace",
-    "accepted-body", "accepted-title", "accepted-pointer",
+    "accepted-body", "accepted-title", "accepted-pointer", "accepted-title-nul",
+    "accepted-title-kept",
   ])
   func everyMemberAndAcceptanceBindingIsRecheckedBeforeWriting(change: String) async throws {
     try await withScratchDirectory { home in
@@ -80,16 +81,38 @@ struct DocTriageAcceptanceTests {
       let accept = try DocTriageServiceTests.propose(env, about: "edge:api/service:push/sdk")
       let reject = try DocTriageServiceTests.propose(
         env, about: "topic:messaging", slug: "obsolete")
+      if change == "accepted-title-nul" || change == "accepted-title-kept" {
+        try Self.title("Rules\u{0}original", in: store)
+      }
+      var failure: (any CodedError)?
       do {
         _ = try await DocTriageService(
           environment: env, workspace: "acme", approved: "Review Acme rules"
         ).triage(DocTriage(accept: [accept], reject: [reject]))
-        Issue.record("Changed batch was decided")
       } catch let error as any CodedError {
-        #expect(error.code == .conflict)
+        failure = error
       }
       #expect(runner.isExhausted)
-      #expect(try DocVerificationPreparationTests.truth(store) == expected.withLock { $0 })
+      if change == "accepted-title-kept" {
+        #expect(failure == nil)
+        #expect(
+          try store.read { try String.fetchOne($0, sql: "SELECT state FROM doc_rev WHERE rev=2") }
+            == "accepted")
+      } else {
+        let truth = try DocVerificationPreparationTests.truth(store)
+        let title = try store.read {
+          try Data.fetchOne($0, sql: "SELECT CAST(title AS BLOB) FROM doc WHERE slug='rules'")
+        }
+        withKnownIssue {
+          #expect(failure?.code == .conflict)
+          #expect(truth == expected.withLock { $0 })
+          if change == "accepted-title-nul" {
+            #expect(title == Data("Rules\u{0}changed".utf8))
+          }
+        } when: {
+          change == "accepted-title-nul"
+        }
+      }
     }
   }
 
@@ -162,6 +185,8 @@ struct DocTriageAcceptanceTests {
   }
 
   private static func mutate(_ change: String, store: DatabaseStore) throws {
+    if change == "accepted-title-nul" { return try title("Rules\u{0}changed", in: store) }
+    if change == "accepted-title-kept" { return }
     let rules = "(SELECT id FROM doc WHERE slug='rules')"
     let obsolete = "(SELECT id FROM doc WHERE slug='obsolete')"
     let statements = [
@@ -190,5 +215,13 @@ struct DocTriageAcceptanceTests {
     ]
     let sql = try #require(statements[change])
     try store.write { try $0.database.execute(sql: sql) }
+  }
+
+  private static func title(_ value: String, in store: DatabaseStore) throws {
+    try store.write {
+      try $0.database.execute(
+        sql: "UPDATE doc SET title=CAST(? AS TEXT) WHERE slug='rules'",
+        arguments: [Data(value.utf8)])
+    }
   }
 }
