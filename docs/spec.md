@@ -1097,10 +1097,11 @@ item-filtered pending results. Accepted rows use live attachments independently.
 Target snapshots preserve historical display refs and may name removed targets.
 
 Document submission is available through `doc propose`, alongside `doc show`,
-`doc ls`, `doc edit` and `doc archive`. Submissions remain pending, including
-from a human or with approval words. Human inbox groups expose read commands;
-this build cannot decide proposals yet. The triage workflow below remains planned,
-and doc-specific review measurements wait for that command.
+`doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
+pending, including from a human or with approval words. Human inbox groups expose
+read commands; rejections name explicit immutable proposal refs. Acceptance and mixed batches
+remain planned. Doc-specific review
+measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
@@ -1109,12 +1110,28 @@ and doc-specific review measurements wait for that command.
   and never runs Git.
   A submission stays proposed, including from a human or with `--approved`.
 - **Review:** the agent reads pinned proposal diffs, checks the code and prepares
-  existing proposal refs with accept/reject recommendations in one chat message.
-  Only then does it run `doc triage --accept <refs> --reject <refs>` with the
-  human's exact approval. One transaction records every decision or writes nothing;
-  original proposer, creation time and revision content remain immutable.
-- **Concurrency and recovery:** the proposed batch base/overlap rules and complete
-  workflow live in the [workspace-knowledge plan](plans/workspace-knowledge.md#reviewing-one-batch-one-answer).
+  existing proposal refs with recommendations in one chat message. Rejection is
+  available through human-owned §9 command
+  `doc triage --reject <doc:slug@revision>…`. Repeated/listed refs form one batch;
+  empty, malformed, duplicate, nonpending or unowned members refuse. Authorization
+  precedes location Git, then selector validation runs before location selection.
+  The rejection transaction checks every owned pending member before any mutation.
+  Stale bases, removed targets, unknown metadata and retained bodies do not block
+  cleanup; rejection runs no verification Git or new-content admission. It changes
+  only state and paired D46 decision evidence, preserving original proposer,
+  creation time, content, accepted projection, attachments and allocations.
+  One used approval commits atomically and audits the masked actual rejection action.
+  Raw-busy retries retain first-attempt workspace identity; an implicit current
+  change cannot retarget the same ref. Explicit/prepared choices remain authoritative.
+  JSON data is `{docs:[{ref,state}]}` with state `rejected`; text prints refs and
+  states, quiet only refs. Operational backup and workspace discovery retain their
+  safe recovery and ownership.
+- **Planned acceptance and mixed review:** acceptances require the pre-batch current
+  base and at most one acceptance per doc. Rejections may be stale and several may
+  accompany an accepted replacement. Acceptance follows recorded target UIDs through
+  renames and refuses replaced or unknown identities. Git runs outside the write;
+  all immutable members, accepted baselines, sources and bindings are rechecked before
+  any write. Decisions reuse existing revisions without changing original content.
   A stale proposal is inspected and reproposed with supplied text and an explicit
   base. There is no accept/reject subcommand, rebase flag or editor merge flow.
 - **Map gaps:** with no human present, record `Map gap:` in a handoff or result,
@@ -1223,7 +1240,7 @@ silta code ls   <app>[@<ref>] [<dir>]
   `ws edit`, `restore` except `--dry-run` (§15), and an agent's `task unblock` of a block
   that isn't ready (D40); and, with
   `proposals: ask` (D39), any agent write that would create a `proposed` task (§8).
-  Planned `doc triage` follows the same human gate (§9).
+  `doc triage` follows the same human gate (§9).
   - A `human:*` actor (a TTY, or the app) runs them directly; `--approved` from a
     human is ignored.
   - An agent runs them with `--approved "<the human's words>"`: what the human wrote
@@ -2081,6 +2098,7 @@ silta doc show
 silta doc edit
 silta doc archive
 silta doc propose
+silta doc triage
 
 # maintenance
 silta export

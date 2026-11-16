@@ -730,6 +730,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   user comments establish that evidence. Both NULL means unknown/not triaged;
   restore rejects a half-populated pair. The maintainer accepted this on 2026-11-13.
   The additive migration retains writer floor 6 (D32).
+  On 2026-11-16 the maintainer clarified that current-base and same-doc overlap
+  checks apply only to acceptances. Stale or multiple rejections can accompany
+  one accepted replacement; membership and atomicity checks apply to every decision.
 
 - **D47: Doc revision allocations survive older restores.** The maintainer accepted
   non-rewinding public doc revision numbers on 2026-11-13. Restore preserves the
