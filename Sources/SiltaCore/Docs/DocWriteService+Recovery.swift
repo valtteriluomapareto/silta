@@ -10,7 +10,7 @@ extension DocWriteService {
         error: error, next: [readCommand(workspace: workspace)], nextBy: .agent, message: message)
     }
     if error is RepoError || error is CodeError {
-      let safe = error.next.allSatisfy(DocService.safeReference)
+      let safe = error.next.allSatisfy(DocService.recoveryIsSafe)
       return CommandFailure(
         error: error,
         next: safe

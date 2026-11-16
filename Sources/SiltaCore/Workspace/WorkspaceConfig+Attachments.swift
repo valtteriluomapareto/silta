@@ -22,7 +22,7 @@ extension WorkspaceConfig {
           Row(["to_kind": table, "to_id": id, "to_ext": nil, "anchor": nil]), in: db),
         docs: docs.map { "doc:" + ($0["slug"] as String) },
         commands: recovery.map(\.command) + [
-          SecretGuard.matches(in: slug).isEmpty
+          DocService.identifierIsSafe(slug)
             ? workspaceCommand("silta ws show", workspace: slug) : "silta ws ls"
         ], nextBy: recovery.contains { $0.owner == .human } ? .human : .agent)
     }
@@ -37,14 +37,14 @@ extension WorkspaceConfig {
     _ doc: Row, removing kind: String, id: Int64, workspace: Int64,
     in db: Database
   ) throws -> (command: String, owner: NextBy) {
-    guard SecretGuard.matches(in: slug).isEmpty else { return ("silta ws ls", .agent) }
+    guard DocService.identifierIsSafe(slug) else { return ("silta ws ls", .agent) }
     let fallback = workspaceCommand("silta doc ls", workspace: slug)
     let ref = "doc:" + (doc["slug"] as String)
-    guard DocService.safeReference(ref) else { return (fallback, .agent) }
+    guard DocService.referenceIsSafe(ref) else { return (fallback, .agent) }
     let remaining = try DocStore.attachments(doc["id"], workspace: workspace, in: db)
       .filter { ($0["to_kind"] as String) != kind || ($0["to_id"] as Int64?) != id }
       .map { try TaskLinkTarget.render($0, in: db) }.sorted()
-    guard remaining.allSatisfy(DocService.safeReference) else { return (fallback, .agent) }
+    guard remaining.allSatisfy(DocService.referenceIsSafe) else { return (fallback, .agent) }
     let command =
       workspaceCommand("silta doc edit " + shellWord(ref) + " --keep-body", workspace: slug)
       + remaining.map { " --about " + shellWord($0) }.joined()

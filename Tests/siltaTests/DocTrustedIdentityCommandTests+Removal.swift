@@ -24,7 +24,7 @@ extension DocTrustedIdentityCommandTests {
       let error = try DocEditCommandTests.error(refusal)
       let commands = try #require(error["next"] as? [String])
       let recipe = commands.first ?? ""
-      withKnownIssue("SI-135: map-removal recovery scans a validated workspace identity") {
+      do {
         #expect(error["next_by"] as? String == "human")
         #expect(
           recipe.contains("--ws '" + scope + "' doc edit 'doc:" + DocTrustedIdentityFixture.doc))

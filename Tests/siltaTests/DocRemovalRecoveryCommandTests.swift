@@ -124,13 +124,19 @@ struct DocRemovalRecoveryCommandTests {
         in: scratch, environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(6))
       let error = try DocEditCommandTests.error(result)
-      #expect(error["next_by"] as? String == "agent")
       let next = try #require(error["next"] as? [String])
-      #expect(next.first == (scope == "acme" ? "silta --ws 'acme' doc ls" : "silta ws ls"))
-      #expect(
-        !next.contains {
-          $0.contains("--keep-body") || $0.contains("--about") || $0.contains("--approved")
-        })
+      if variant == "workspace52" {
+        #expect(error["next_by"] as? String == "human")
+        #expect(next.first?.contains("silta --ws '" + scope + "' doc edit") == true)
+        #expect(next.first?.contains("--keep-body") == true)
+      } else {
+        #expect(error["next_by"] as? String == "agent")
+        #expect(next.first == (scope == "acme" ? "silta --ws 'acme' doc ls" : "silta ws ls"))
+        #expect(
+          !next.contains {
+            $0.contains("--keep-body") || $0.contains("--about") || $0.contains("--approved")
+          })
+      }
       #expect(!result.stdout.contains(sensitive) && !result.stdout.contains("private123"))
     }
   }

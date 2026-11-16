@@ -6,12 +6,18 @@ import Testing
 @testable import SiltaCore
 
 struct BriefDocProposalTests {
-  @Test func shortProposalUsesItsActualBudget() throws {
+  @Test(arguments: ["acme", String(repeating: "a", count: 52)])
+  func shortProposalUsesItsActualBudget(scope: String) throws {
     try withScratchDirectory { home in
       let (store, service) = try DocInboxIntegrationTests().fixture(home, groups: 1)
+      try store.write {
+        try $0.database.execute(sql: "UPDATE workspace SET slug=?", arguments: [scope])
+      }
       let before = try DocVerificationPreparationTests.truth(store)
-      let preview = try #require(try DocProposalInboxTests().preview(store).first)
-      let report = try store.read { try makeReport(service, budget: 1024, in: $0) }
+      let preview = try #require(try DocProposalInboxTests().preview(store, workspace: scope).first)
+      let report = try store.read {
+        try makeReport(service, budget: 1024, workspace: scope, in: $0)
+      }
       let sections = report.sections.filter { $0.text.hasPrefix("doc proposal ") }
       do {
         #expect(sections.count == 1)
@@ -22,7 +28,7 @@ struct BriefDocProposalTests {
         }
       }
       #expect(report.text.count <= 1024 * 4)
-      #expect(report.text.contains("more: silta --ws 'acme' inbox\n"))
+      #expect(report.text.contains("more: silta --ws '" + scope + "' inbox\n"))
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
@@ -211,12 +217,13 @@ struct BriefDocProposalTests {
   }
 
   func makeReport(
-    _ service: TaskService, budget: Int, current: TaskDetails? = nil, in db: Database
+    _ service: TaskService, budget: Int, current: TaskDetails? = nil, workspace: String = "acme",
+    in db: Database
   ) throws
     -> BriefReport
   {
     var location = LocationResult(
-      path: "/acme", worktree: "/acme", workspace: "acme", repo: "platform", branch: "main",
+      path: "/acme", worktree: "/acme", workspace: workspace, repo: "platform", branch: "main",
       head: "a", confidence: "high", reason: "single", candidates: [])
     location.currentTask = current
     return try BriefService(environment: service.environment).report(

@@ -29,9 +29,10 @@ extension DocService {
         arguments: [id])
       return DocReadResult(
         ref: "doc:" + slug,
-        output: "No accepted revision for doc:\(slug).\nPending revisions (\(total)):\n"
-          + pending.map { "doc:\(slug)@\($0)\n" }.joined()
-          + (total > pending.count && scopeIsSafe && Self.safeReference("doc:" + slug)
+        output: SecretGuard.redacted(
+          "No accepted revision for doc:\(slug).\nPending revisions (\(total)):\n"
+            + pending.map { "doc:\(slug)@\($0)\n" }.joined())
+          + (total > pending.count && scopeIsSafe && Self.referenceIsSafe("doc:" + slug)
             ? "next: " + listCommand + "\n" : ""))
     }
   }
@@ -97,7 +98,7 @@ extension DocService {
     do {
       return try TaskLinkTarget.map(ref, workspace: workspaceID, in: db)
     } catch let error as any CodedError {
-      if error.code == .notFound && !Self.safeReference(ref) {
+      if error.code == .notFound && !Self.referenceIsSafe(ref) {
         throw CommandFailure(
           error: TaskError.notFound("attachment " + (ref.removingPercentEncoding ?? ref)),
           next: [configurationCommand])
@@ -123,11 +124,13 @@ extension DocService {
     } catch { throw StorageError.corrupt }
     let title = try text("title")
     let kind = try text("kind")
-    let rendered = DocReadResult(
-      masking: ref,
-      output: "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
+    let prefix = SecretGuard.redacted(
+      "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
         + "  kind: \(Self.preview(kind ?? "(unknown)")); about: \(Self.preview(Self.about(refs)))\n"
-        + "  show: " + showCommand(ref) + "\n"
+    )
+    let rendered = DocReadResult(
+      ref: SecretGuard.redacted(ref),
+      output: prefix + "  show: " + showCommand(ref) + "\n"
         + (try commentPreviews(row["id"], ref: ref, in: db)))
     return DocListResult.Entry(ref: rendered.ref, state: state, output: rendered.output)
   }

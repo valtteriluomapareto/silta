@@ -189,8 +189,8 @@ package struct DocWriteService {
   }
 
   func safeScopeAndIdentity(_ request: DocEditRequest, workspace: String?) -> Bool {
-    (workspace.map { SecretGuard.matches(in: $0).isEmpty } ?? true)
-      && DocService.safeReference("doc:" + request.slug)
+    (workspace.map(DocService.identifierIsSafe) ?? true)
+      && DocService.referenceIsSafe("doc:" + request.slug)
   }
 
   func readCommand(workspace: String?) -> String {
@@ -199,8 +199,9 @@ package struct DocWriteService {
   }
 
   private func auditCommand(_ request: DocEditRequest, workspace: String) -> String {
-    SecretGuard.redacted(
-      workspaceCommand("silta doc edit " + shellWord("doc:" + request.slug), workspace: workspace))
+    let base = workspaceCommand(
+      "silta doc edit " + shellWord("doc:" + request.slug), workspace: workspace)
+    return (safeScopeAndIdentity(request, workspace: workspace) ? base : SecretGuard.redacted(base))
       + (request.keepBody ? " --keep-body" : " -F <file>")
       + (request.title == nil ? "" : " --title <title>")
       + (request.kind == nil ? "" : " --kind <kind>")

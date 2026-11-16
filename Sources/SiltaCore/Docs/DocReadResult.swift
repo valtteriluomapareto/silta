@@ -5,10 +5,3 @@ package struct DocReadResult: Encodable, Sendable {
   /// Rendered metadata and content, with complete continuations when clipped.
   package let output: String
 }
-
-extension DocReadResult {
-  init(masking ref: String, output: String) {
-    self.ref = SecretGuard.redacted(ref)
-    self.output = SecretGuard.redacted(output)
-  }
-}

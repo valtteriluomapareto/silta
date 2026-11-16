@@ -7,9 +7,11 @@ struct DocProposalInbox {
   let at: Date
   let all: Bool
   let db: Database
+  let scopeIsSafe: Bool
 
   init(workspace: String, at: Date, all: Bool = false, in db: Database) throws {
     self.workspace = workspace
+    scopeIsSafe = DocService.identifierIsSafe(workspace)
     workspaceID = try TaskService.workspaceID(workspace, in: db)
     self.at = at
     self.all = all

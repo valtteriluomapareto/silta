@@ -358,8 +358,8 @@ extension DocReadCommandTests {
         #expect(result.termination == .exit(status))
         let report = result.stdout + result.stderr
         #expect(!report.contains("private123"))
-        if scope == "acme" {
-          #expect(report.contains("silta --ws 'acme'"))
+        if scope == "acme" || scope == String(repeating: "a", count: 52) {
+          #expect(report.contains("silta --ws '" + scope + "'"))
         } else {
           #expect(!report.contains(scope))
           #expect(report.contains("silta ws ls") && !report.contains("silta ws ls --"))

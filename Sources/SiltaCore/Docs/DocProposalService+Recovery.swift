@@ -4,7 +4,7 @@ extension DocProposalService {
     if error.code == .env, error.next == ["silta backup"] { return error }
     let message = SecretGuard.redacted(error.message)
     if let selection = error as? WorkspaceError {
-      let safe = selection.next.allSatisfy(DocService.safeReference)
+      let safe = selection.next.allSatisfy(DocService.recoveryIsSafe)
       return CommandFailure(
         error: selection, next: safe ? selection.next : ["silta ws ls"],
         nextBy: safe ? selection.nextBy : .agent, message: message)
@@ -12,8 +12,8 @@ extension DocProposalService {
     let hub =
       workspace.map { DocService(workspace: $0, store: environment.db).listCommand }
       ?? "silta ws ls"
-    guard let workspace, SecretGuard.matches(in: workspace).isEmpty,
-      DocService.safeReference("doc:" + request.slug)
+    guard let workspace, DocService.identifierIsSafe(workspace),
+      DocService.referenceIsSafe("doc:" + request.slug)
     else {
       return CommandFailure(error: error, next: [hub], nextBy: .agent, message: message)
     }
@@ -29,9 +29,8 @@ extension DocProposalService {
     let next: [String]
     let owner: NextBy
     if let preparation = error as? CommandFailure {
-      let safe = preparation.next.allSatisfy(DocService.safeReference)
-      next = safe ? preparation.next + [scopedRetry] : [hub]
-      owner = safe ? preparation.nextBy : .agent
+      next = preparation.next + [scopedRetry]
+      owner = preparation.nextBy
     } else {
       next =
         error.code == .notFound || error.code == .conflict || request.base != nil

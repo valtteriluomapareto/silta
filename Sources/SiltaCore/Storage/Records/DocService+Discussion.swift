@@ -14,7 +14,9 @@ extension DocService {
   ) throws -> DocReadResult {
     let ref = "doc:\(snapshot.slug)@\(snapshot.revision)"
     switch view {
-    case .body: return DocReadResult(ref: ref, output: body(snapshot, archived: archived))
+    case .body:
+      return DocReadResult(
+        ref: ref, output: SecretGuard.redacted(body(snapshot, archived: archived)))
     case .diff:
       let base: DocRevision?
       do {
@@ -27,7 +29,8 @@ extension DocService {
             "recorded base doc:\(snapshot.slug)@\(snapshot.baseRevision ?? 0)"),
           next: [showCommand(ref)])
       }
-      return DocReadResult(ref: ref, output: DocDiff.render(snapshot, base: base))
+      return DocReadResult(
+        ref: ref, output: SecretGuard.redacted(DocDiff.render(snapshot, base: base)))
     case .comments, .comment:
       guard
         let id = try Int64.fetchOne(
@@ -52,16 +55,17 @@ extension DocService {
           next: [showCommand(ref, flags: " --comments")])
       }
       let post = CommentDetails(row: row, task: ref)
-      return DocReadResult(ref: post.ref, output: DocComments.render(post))
+      return DocReadResult(ref: post.ref, output: SecretGuard.redacted(DocComments.render(post)))
     }
     guard case .comments(let offset, let limit) = view else { throw StorageError.internalMisuse }
     let total = try commentCount(id, in: db)
     let rows = try Row.fetchAll(
       db, sql: query + " ORDER BY c.seq LIMIT ? OFFSET ?", arguments: [id, limit, offset])
     var output =
-      "\(ref) comments (offset \(offset), limit \(limit), total \(total))\n"
-      + rows.map { DocComments.render(CommentDetails(row: $0, task: ref)) }.joined(separator: "\n")
-    if offset < total && rows.count < total - offset && scopeIsSafe && Self.safeReference(ref) {
+      SecretGuard.redacted("\(ref) comments (offset \(offset), limit \(limit), total \(total))\n")
+      + rows.map { SecretGuard.redacted(DocComments.render(CommentDetails(row: $0, task: ref))) }
+      .joined(separator: "\n")
+    if offset < total && rows.count < total - offset && scopeIsSafe && Self.referenceIsSafe(ref) {
       output +=
         "next: "
         + showCommand(
@@ -77,7 +81,7 @@ extension DocService {
       db, sql: Self.commentQuery + " WHERE c.doc_rev_id=? ORDER BY c.seq LIMIT 2", arguments: [id])
     return rows.map {
       let post = CommentDetails(row: $0, task: ref)
-      return "  \(post.ref): \(Self.preview(post.body))\n"
+      return SecretGuard.redacted("  \(post.ref): \(Self.preview(post.body))\n")
     }.joined() + "  \(total) comments; \(total - rows.count) omitted; show: "
       + showCommand(ref, flags: " --comments --offset 0 --limit 20") + "\n"
   }

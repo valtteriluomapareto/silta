@@ -4,11 +4,13 @@ import Foundation
 package struct DocService {
   let workspace: String
   let store: DatabaseStore
+  let scopeIsSafe: Bool
 
   /// Uses one explicit workspace and command-scoped storage.
   package init(workspace: String, store: DatabaseStore) {
     self.workspace = workspace
     self.store = store
+    scopeIsSafe = Self.identifierIsSafe(workspace)
   }
 
   /// Reads a stored body, recorded-base diff or comments, masking before line selection.
@@ -23,9 +25,9 @@ package struct DocService {
     do {
       let result = try read(selection.slug, revision: selection.revision, view: request.view)
       return DocReadResult(
-        masking: result.ref,
+        ref: SecretGuard.redacted(result.ref),
         output: bounded(
-          SecretGuard.redacted(result.output),
+          result.output,
           ref: result.ref, flags: request.view.flags,
           range: range))
     } catch let error as DocError {
@@ -58,8 +60,6 @@ package struct DocService {
       + "triaged_at: \(snapshot.triagedAt ?? "(not recorded)")\n" + why
   }
 
-  var scopeIsSafe: Bool { SecretGuard.matches(in: workspace).isEmpty }
-
   var listCommand: String {
     scopeIsSafe ? workspaceCommand("silta doc ls", workspace: workspace) : "silta ws ls"
   }
@@ -69,7 +69,7 @@ package struct DocService {
   }
 
   func listPageCommand(about: String?, archived: Bool, offset: Int, limit: Int) -> String {
-    guard scopeIsSafe, about.map(Self.safeReference) ?? true else { return listCommand }
+    guard scopeIsSafe, about.map(Self.referenceIsSafe) ?? true else { return listCommand }
     var command = listCommand
     if let about { command += " --about " + shellWord(about) }
     if archived { command += " --archived" }
@@ -77,7 +77,7 @@ package struct DocService {
   }
 
   func showCommand(_ ref: String, flags: String = "", lines: String? = nil) -> String {
-    guard scopeIsSafe, Self.safeReference(ref) else { return listCommand }
+    guard scopeIsSafe, Self.referenceIsSafe(ref) else { return listCommand }
     do {
       let parsed = try DocReadView.parse(ref, diff: false, comments: false, offset: nil, limit: nil)
       _ = try Self.selection(parsed.ref, revision: nil)
@@ -93,13 +93,36 @@ package struct DocService {
       $0.isEmpty
         ? "(none)"
         : $0.map { ref in
-          safeReference(ref) ? ref : SecretGuard.redacted(ref.removingPercentEncoding ?? ref)
+          referenceIsSafe(ref) ? ref : SecretGuard.redacted(ref.removingPercentEncoding ?? ref)
         }.joined(separator: ", ")
     } ?? "(unknown)"
   }
 
-  static func safeReference(_ ref: String) -> Bool {
-    SecretGuard.matches(in: ref.removingPercentEncoding ?? ref).isEmpty
+  static func referenceIsSafe(_ ref: String) -> Bool {
+    if ref.hasPrefix("doc:") { return validDocumentReference(ref) }
+    do {
+      let parts = try TaskLinkTarget.mapNames(ref)
+      return parts.identifiers.allSatisfy(identifierIsSafe)
+        && parts.legacy.allSatisfy { SecretGuard.matches(in: $0).isEmpty }
+    } catch { return false }
+  }
+
+  /// Uses the existing typed-identifier exemption without exempting explicit credentials.
+  static func identifierIsSafe(_ value: String) -> Bool {
+    WorkspaceConfig.isValidIdentifier(value)
+      && SecretGuard.matches(in: "doc:" + value).isEmpty
+  }
+
+  static func recoveryIsSafe(_ command: String) -> Bool {
+    SecretGuard.matches(in: command).isEmpty
+  }
+
+  private static func validDocumentReference(_ ref: String) -> Bool {
+    do {
+      let parsed = try DocReadView.parse(ref, diff: false, comments: false, offset: nil, limit: nil)
+      let selected = try selection(parsed.ref, revision: nil)
+      return identifierIsSafe(selected.slug)
+    } catch { return false }
   }
 
   static func preview(_ raw: String) -> String {
@@ -120,7 +143,7 @@ package struct DocService {
         + "next: " + showCommand(ref, flags: flags) + "\n"
     }
     let count = last - first + 1
-    let unsafe = !scopeIsSafe || !Self.safeReference(ref)
+    let unsafe = !scopeIsSafe || !Self.referenceIsSafe(ref)
     let shown = min(count, count > 400 || unsafe ? 399 : 400)
     let output = lines.dropFirst(first - 1).prefix(shown).joined(separator: "\n") + "\n"
     guard shown < count else {

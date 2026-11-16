@@ -11,14 +11,8 @@ extension TaskLinkTarget {
       throw WorkspaceError.notFound
     }
     do {
-      let parts = raw.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-      guard parts.count == 2 else { throw TaskError.invalid("Use a typed map reference.") }
-      let kind = String(parts[0])
-      let value = String(parts[1])
+      let (kind, value) = try mapParts(raw)
       if kind == "edge" { return try edge(value, workspace: workspace, in: db) }
-      guard ["app", "service", "topic"].contains(kind) else {
-        throw TaskError.invalid("Use app:, edge:, service: or topic: attachment references.")
-      }
       let name = kind == "service" ? try decodeComponent(value) : try identifier(value)
       return Self(
         kind: kind, id: try TaskService.entity(kind, slug: name, workspace: workspace, in: db))
@@ -28,11 +22,7 @@ extension TaskLinkTarget {
   }
 
   private static func edge(_ raw: String, workspace: Int64, in db: Database) throws -> Self {
-    let pieces = raw.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-    guard pieces.count == 3 else {
-      throw TaskError.invalid(
-        "Use edge:<from>/<to>/<kind>, retaining service: for a service target.")
-    }
+    let pieces = try edgePieces(raw)
     let source = try TaskService.entity(
       "app", slug: identifier(pieces[0]), workspace: workspace, in: db)
     let service = pieces[1].hasPrefix("service:")
@@ -52,6 +42,44 @@ extension TaskLinkTarget {
       throw TaskError.notFound("edge " + raw)
     }
     return Self(kind: "edge", id: id)
+  }
+
+  /// Separates identifier admission from full scans of decoded legacy names.
+  static func mapNames(_ raw: String) throws -> (identifiers: [String], legacy: [String]) {
+    let (kind, value) = try mapParts(raw)
+    if kind == "service" { return ([], [try decodeComponent(value)]) }
+    guard kind == "edge" else {
+      return ([try identifier(value)], [])
+    }
+    let pieces = try edgePieces(value)
+    let source = try identifier(pieces[0])
+    let service = pieces[1].hasPrefix("service:")
+    let name =
+      service
+      ? try decodeComponent(String(pieces[1].dropFirst(8))) : try identifier(pieces[1])
+    return (
+      service ? [source] : [source, name],
+      (service ? [name] : []) + [try decodeComponent(pieces[2])]
+    )
+  }
+
+  private static func mapParts(_ raw: String) throws -> (String, String) {
+    let parts = raw.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    guard parts.count == 2 else { throw TaskError.invalid("Use a typed map reference.") }
+    let kind = String(parts[0])
+    guard ["app", "service", "topic", "edge"].contains(kind) else {
+      throw TaskError.invalid("Use app:, edge:, service: or topic: attachment references.")
+    }
+    return (kind, String(parts[1]))
+  }
+
+  private static func edgePieces(_ raw: String) throws -> [String] {
+    let pieces = raw.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+    guard pieces.count == 3 else {
+      throw TaskError.invalid(
+        "Use edge:<from>/<to>/<kind>, retaining service: for a service target.")
+    }
+    return pieces
   }
 
   private static func identifier(_ value: String) throws -> String {

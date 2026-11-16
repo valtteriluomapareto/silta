@@ -69,7 +69,7 @@ extension DocProposalInbox {
   }
 
   private var hub: String {
-    guard WorkspaceConfig.isValidIdentifier(workspace), SecretGuard.matches(in: workspace).isEmpty
+    guard scopeIsSafe
     else { return "silta ws ls" }
     let command = workspaceCommand("silta doc ls --archived", workspace: workspace)
     return command.utf8.count <= 512 ? command : "silta ws ls"
@@ -77,7 +77,7 @@ extension DocProposalInbox {
 
   private func safe(_ slug: String?) -> String? {
     guard hub != "silta ws ls", let slug, WorkspaceConfig.isValidIdentifier(slug),
-      DocService.safeReference("doc:" + slug)
+      DocService.referenceIsSafe("doc:" + slug)
     else { return nil }
     return slug
   }

@@ -710,6 +710,13 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   without rewriting storage. The explicit-prefix requirement applies to generic
   reference input.
 
+  **2026-11-16 clarification:** Document commands classify stored identifiers at
+  admission and reuse that safety result when composing recovery. Valid syntax
+  alone does not exempt credential-shaped names. The existing typed-reference
+  rule permits generic 52-character identifiers in identity positions; explicit
+  credential forms remain protected. Bodies and decoded legacy service names or
+  edge kinds retain full content scanning.
+
 - **D46: Keep explicit doc proposal decision evidence.** Nullable `triaged_at` and
   `triaged_by` distinguish a known proposal decision from a direct accepted edit
   or unknown history. Triage writes both with the terminal state; the proposer and
