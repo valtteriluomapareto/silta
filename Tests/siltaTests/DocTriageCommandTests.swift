@@ -61,8 +61,10 @@ struct DocTriageCommandTests {
     }
   }
 
-  @Test func missingWorkspaceKeepsUsableDiscoveryRecovery() throws {
+  @Test(arguments: [false, true])
+  func missingWorkspaceKeepsUsableDiscoveryRecovery(existing: Bool) throws {
     try withScratchDirectory { scratch in
+      if existing { _ = try AcmeDocAttachments.make(in: scratch) }
       let result = try SiltaBinary.run(
         [
           "--ws", "missing", "doc", "triage", "--reject", "doc:rules@1",
@@ -73,8 +75,8 @@ struct DocTriageCommandTests {
       let error = try DocEditCommandTests.error(result)
       #expect(error["next"] as? [String] == ["silta ws ls"])
       #expect(
-        !FileManager.default.fileExists(
-          atPath: scratch.appending(path: "silta-home/silta.db").path))
+        FileManager.default.fileExists(
+          atPath: scratch.appending(path: "silta-home/silta.db").path) == existing)
     }
   }
 
