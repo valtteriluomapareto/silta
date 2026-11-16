@@ -9,8 +9,7 @@ import Testing
 struct DocProposalInboxTests {
   @Test func hundredsOfMembersFetchTwoAndCountOneGroup() throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(200, in: store)
+      let store = try fixture(home, pending: 200)
       let before = try DocVerificationPreparationTests.truth(store)
       let result = try preview(store)
       #expect(result.count == 1)
@@ -100,8 +99,7 @@ struct DocProposalInboxTests {
   @Test(arguments: ["missing", "foreign"])
   func recordedSourcesRetainWorkspaceOwnership(failure: String) throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(1, in: store)
+      let store = try fixture(home, pending: 1)
       var configuration = Configuration()
       configuration.foreignKeysEnabled = false
       let queue = try DatabaseQueue(path: store.path, configuration: configuration)
@@ -150,8 +148,7 @@ struct DocProposalInboxTests {
   @Test(arguments: ["unicode", "same-length", "nul"])
   func byteComparisonsDoNotUseCharacterOrLengthEquality(mode: String) throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(1, in: store)
+      let store = try fixture(home, pending: 1)
       let base = mode == "unicode" ? "e\u{301}" : mode == "nul" ? "x\u{0}a" : "one"
       let next = mode == "unicode" ? "é" : mode == "nul" ? "x\u{0}b" : "two"
       try store.write {
@@ -178,6 +175,13 @@ struct DocProposalInboxTests {
   @Test func allGroupsCrossQueryBatchesWithoutLosingMembers() throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO doc(id,uid,workspace_id,slug,title,kind,created_at,updated_at)
+            VALUES(9007199254740993,'large-id',1,'large-id','Large','reference','','')
+            """)
+      }
       let names = (0..<65).map { String(format: "doc-%02d", $0) }
       for name in names { try AcmeDocAttachments.attach(name, to: "app", in: store) }
       for name in names { try add(2, doc: name, in: store) }
@@ -189,8 +193,7 @@ struct DocProposalInboxTests {
 
   @Test func workspaceAndStateSelectionIncludesArchivedPendingWithoutWriting() throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(3, in: store)
+      let store = try fixture(home, pending: 3)
       try store.write {
         try $0.database.execute(
           sql: """
@@ -214,7 +217,7 @@ struct DocProposalInboxTests {
     }
   }
 
-  func fixture(_ home: URL) throws -> DatabaseStore {
+  func fixture(_ home: URL, pending: Int = 0) throws -> DatabaseStore {
     let store = try AcmeDocAttachments.make(in: home)
     try AcmeDocAttachments.attach("rules", to: "app", in: store)
     try store.write {
@@ -226,6 +229,7 @@ struct DocProposalInboxTests {
           """
       )
     }
+    if pending > 0 { try add(pending, in: store) }
     return store
   }
 

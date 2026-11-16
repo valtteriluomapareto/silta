@@ -9,8 +9,7 @@ extension DocProposalInboxTests {
   @Test(arguments: ["key", "key-nul", "unicode", "linebreaks", "oversize"])
   func fullFieldsAreMaskedBeforeCharacterAndByteBounds(value: String) throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(1, in: store)
+      let store = try fixture(home, pending: 1)
       let family = "👨‍👩‍👧‍👦"
       let text =
         (value == "key" || value == "key-nul")
@@ -52,8 +51,7 @@ extension DocProposalInboxTests {
   @Test(arguments: [65_536, 65_537])
   func wholeFieldLoadBoundaryIsInclusive(bytes: Int) throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(1, in: store)
+      let store = try fixture(home, pending: 1)
       let head = "-----BEGIN PRIVATE KEY-----\n"
       let tail = "\n-----END PRIVATE KEY-----"
       let value =
@@ -71,8 +69,7 @@ extension DocProposalInboxTests {
   ])
   func commandsAreCompleteBoundedAndUseProtectedHubs(scope: String) throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(3, in: store)
+      let store = try fixture(home, pending: 3)
       try store.write {
         try $0.database.execute(sql: "UPDATE workspace SET slug=?", arguments: [scope])
         try $0.database.execute(
@@ -180,8 +177,7 @@ extension DocProposalInboxTests {
 
   @Test func storedNULIdentityUsesTheListHubWithoutRetargeting() throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(3, in: store)
+      let store = try fixture(home, pending: 3)
       let slug = "rules\u{0}tail"
       try store.write {
         try $0.database.execute(
@@ -197,8 +193,7 @@ extension DocProposalInboxTests {
   @Test(arguments: [512, 513])
   func readCommandByteLimitIncludesTheCompleteCommand(bytes: Int) throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(3, in: store)
+      let store = try fixture(home, pending: 3)
       let fixed = "silta --ws 'acme' doc show 'doc:@4' --diff"
       let slug = String(repeating: "r", count: bytes - fixed.utf8.count)
       try store.write {
@@ -215,8 +210,7 @@ extension DocProposalInboxTests {
   @Test(arguments: ["long", "secret"])
   func archivedPendingMembersAreReachableThroughProtectedListHubs(identity: String) throws {
     try withScratchDirectory { home in
-      let store = try fixture(home)
-      try add(3, in: store)
+      let store = try fixture(home, pending: 3)
       let slug =
         identity == "long"
         ? String(repeating: "r", count: 600)
