@@ -6,9 +6,8 @@ import Testing
 struct BriefDocsLogTests {
   @Test func countsOnlyDocumentPreviewsRetainedByTheBrief() throws {
     try withScratchDirectory { scratch in
-      let fixture = WhereCommandTests()
-      let repo = try fixture.setup(scratch)
-      try fixture.git(["checkout", "-q", "api"], repo, scratch)
+      let repo = try WhereCommandTests().setup(scratch)
+      try WhereCommandTests().git(["checkout", "-q", "api"], repo, scratch)
       func run(_ args: [String]) throws -> CLIResult {
         try SiltaBinary.run(
           ["--ws", "acme"] + args, in: scratch, cwd: repo,
