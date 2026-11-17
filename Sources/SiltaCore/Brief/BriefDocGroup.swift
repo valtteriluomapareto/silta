@@ -7,7 +7,7 @@ struct BriefDocGroup: Equatable, Sendable {
   let total: Int
   let rows: [String]
 
-  var choices: [(text: String, truncated: Bool, shown: Int)] {
+  var choices: [(text: String, shown: Int)] {
     let command: String
     if SecretGuard.matches(in: workspace).isEmpty {
       command =
@@ -17,15 +17,15 @@ struct BriefDocGroup: Equatable, Sendable {
       command = "silta ws ls"
     }
     let count = "docs: \(total) (\(command))\n"
-    guard !rows.isEmpty else { return [(count, false, 0)] }
+    guard !rows.isEmpty else { return [(count, 0)] }
     return stride(from: rows.count, through: 1, by: -1).map { shown in
       let remaining = total - shown
       let more = remaining > 0 ? "  docs: \(remaining) more (\(command))\n" : ""
       return (
         "docs about " + Self.shown(ref) + ":\n" + rows.prefix(shown).joined() + more,
-        remaining > 0, shown
+        shown
       )
-    } + [(count, true, 0)]
+    } + [(count, 0)]
   }
 
   static func shown(_ ref: String) -> String {

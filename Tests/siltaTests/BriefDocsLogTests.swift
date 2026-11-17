@@ -14,14 +14,8 @@ struct BriefDocsLogTests {
           ["--ws", "acme"] + args, in: scratch, cwd: repo,
           environment: ["SILTA_ACTOR": "agent:codex:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
       }
-      func lastLog() throws -> [String: Any] {
-        let log = try String(
-          contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)
-        let line = try #require(log.split(separator: "\n").last)
-        return try #require(JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
-      }
       #expect(try run(["brief"]).termination == .exit(0))
-      let emptyLog = try lastLog()
+      let emptyLog = try lastLog(scratch)
       #expect(emptyLog["docs_shown"] as? Int == 0)
       let config = scratch.appending(path: "workspace.yaml")
       try """
@@ -45,7 +39,7 @@ struct BriefDocsLogTests {
       }
       let full = try run(["brief"])
       #expect(full.stdout.contains("doc:app-rules") && full.stdout.contains("doc:interface"))
-      let fullLog = try lastLog()
+      let fullLog = try lastLog(scratch)
       #expect(fullLog["docs_shown"] as? Int == 2)
       let contract = fullLog.filter { ["command", "docs_shown", "workspace"].contains($0.key) }
       let encoded = try JSONSerialization.data(withJSONObject: contract, options: [.sortedKeys])
@@ -56,11 +50,18 @@ struct BriefDocsLogTests {
         #expect(result.termination == .exit(0))
         #expect(
           !result.stdout.contains("doc:app-rules") && !result.stdout.contains("doc:interface"))
-        let entry = try lastLog()
+        let entry = try lastLog(scratch)
         #expect(entry["docs_shown"] as? Int == 0)
       }
       #expect(try run(["brief", "--task", "AC-999"]).termination == .exit(2))
-      #expect(try lastLog()["docs_shown"] == nil)
+      #expect(try lastLog(scratch)["docs_shown"] == nil)
     }
+  }
+
+  private func lastLog(_ scratch: URL) throws -> [String: Any] {
+    let log = try String(
+      contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)
+    let line = try #require(log.split(separator: "\n").last)
+    return try #require(JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
   }
 }

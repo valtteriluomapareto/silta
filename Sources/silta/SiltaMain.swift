@@ -53,11 +53,10 @@ enum SiltaMain {
         arguments, parseResult: parseResult,
         context: CommandContext(mode: mode, environment: environment))
       let rendered = execution.rendered
-      let milliseconds = elapsedMilliseconds(started.duration(to: timer.now))
       var entry = LogEntry(
         timestamp: timestamp, command: execution.command ?? commandPath(arguments),
         actor: environment.actor.description, exitCode: hookDeadline == nil ? rendered.exitCode : 0,
-        milliseconds: milliseconds)
+        milliseconds: elapsedMilliseconds(started.duration(to: timer.now)))
       entry.workspace = execution.scope.workspace
       entry.app = execution.scope.app
       entry.docsShown = rendered.errorCode == nil ? execution.docsShown : nil

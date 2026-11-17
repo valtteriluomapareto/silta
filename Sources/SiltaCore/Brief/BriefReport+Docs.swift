@@ -11,7 +11,7 @@ extension BriefReport {
           annotated.append(BriefSection(id: "docs", text: choice.text))
           docsShown += choice.shown
           remaining -= choice.text.count
-          truncated = truncated || choice.truncated
+          truncated = truncated || (!group.rows.isEmpty && choice.shown < group.total)
         } else {
           truncated = true
         }
