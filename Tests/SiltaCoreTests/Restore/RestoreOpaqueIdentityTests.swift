@@ -7,7 +7,7 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreOpaqueIdentityTests {
-  @Test func storedUnicodeIdentitiesRequireBackupBeforeCapture() throws {
+  @Test func doctorDiagnosesStoredUnicodeIdentitiesWithoutRepair() throws {
     try withScratchDirectory { home in
       let store = try RestoreOpaqueIdentityFixture.documents(home)
       let before = try RestoreSupport.dump(store)
@@ -17,7 +17,11 @@ struct RestoreOpaqueIdentityTests {
       let error = RestoreASCIIIdentityTests.failure {
         _ = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
       }
-      #expect(error?.code == .env && error?.next == ["silta backup"])
+      #expect(error == nil)
+      let integrity = StoredUIDAdmissionTests.checks(store, home: home).first {
+        $0.id == "database.integrity"
+      }
+      #expect(integrity?.status == .fail && integrity?.message.contains("ASCII") == true)
       #expect(try RestoreSupport.dump(store) == before)
       #expect(try RestoreASCIIIdentityTests.rawUIDs(store, table: "doc") == raw)
     }

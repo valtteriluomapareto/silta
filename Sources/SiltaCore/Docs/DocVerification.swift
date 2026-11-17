@@ -102,7 +102,7 @@ struct DocVerification: Sendable {
       let snapshot = snapshots[index]
       if Self.legacyNameEqual(snapshot.app, app.app)
         && Data(snapshot.ref.utf8) == Data(app.ref.utf8)
-        && (snapshot.uid.map { $0 == app.uid } ?? true)
+        && (snapshot.uid.map { StoredUID.valid(Data($0.utf8)) && $0 == app.uid } ?? true)
       {
         index += 1
       }

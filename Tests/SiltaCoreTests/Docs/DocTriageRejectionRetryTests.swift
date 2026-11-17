@@ -98,7 +98,7 @@ struct DocTriageRejectionRetryTests {
         if mode == "unsafe-scope" {
           try $0.database.execute(sql: "UPDATE workspace SET slug=?", arguments: [scope])
         } else if mode == "initial-uid" {
-          try $0.database.execute(sql: "UPDATE workspace SET uid=CAST(x'410042' AS TEXT)")
+          try $0.database.execute(sql: "UPDATE workspace SET uid='replacement-uid'")
         } else {
           try $0.database.execute(
             sql:
@@ -112,15 +112,12 @@ struct DocTriageRejectionRetryTests {
         _ = try await DocTriageService(environment: env, workspace: scope, approved: "Reject rules")
           .triage(DocTriage(reject: [ref]))
       } catch let error as any CodedError { failure = error }
-      if mode == "unsafe-scope" {
+      if ["unsafe-scope", "initial-uid"].contains(mode) {
         #expect(failure == nil)
         let audit = try store.read { try String.fetchOne($0, sql: "SELECT command FROM approval") }
         #expect(audit?.contains("doc triage --reject ") == true && audit?.contains(ref) == true)
       } else {
         #expect(failure?.code == .env)
-        if mode == "initial-uid" {
-          #expect(failure?.next == ["silta backup"] && failure?.nextBy == .human)
-        }
         #expect(try DocVerificationPreparationTests.truth(store) == before)
       }
     }

@@ -88,8 +88,11 @@ struct StoredUIDAdmissionTests {
       #expect(RestoreASCIIIdentityTests.failure { try store.initialize() }?.code == .env)
       try Self.replace(try #require(original.first), table: "service", store: store)
       let repaired = try DocVerificationPreparationTests.truth(store)
-      try store.initialize()
-      #expect(try DocVerificationPreparationTests.truth(store) == repaired)
+      let retry = DatabaseStore(
+        home: home, clock: FakeClock(now: AcmeDocAttachments.instant.addingTimeInterval(1)),
+        jitter: { 0 })
+      try retry.initialize()
+      #expect(try DocVerificationPreparationTests.truth(retry) == repaired)
       #expect(
         try store.read {
           try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid")

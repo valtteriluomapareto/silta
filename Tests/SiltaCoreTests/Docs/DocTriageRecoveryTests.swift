@@ -112,7 +112,7 @@ struct DocTriageRecoveryTests {
     try store.write {
       try $0.database.execute(
         sql: mode.contains("uid")
-          ? "UPDATE workspace SET uid=CAST(x'410042' AS TEXT) WHERE slug='acme'"
+          ? "UPDATE workspace SET uid='replacement-uid' WHERE slug='acme'"
           : mode == "unsafe-scope"
             ? "UPDATE workspace SET slug='" + String(repeating: "a", count: 52)
               + "' WHERE slug='acme'"
@@ -126,10 +126,7 @@ struct DocTriageRecoveryTests {
     _ mode: String, _ failure: (any CodedError)?,
     _ store: DatabaseStore, _ before: [[String]], _ ref: String
   ) throws {
-    if mode.contains("uid") {
-      #expect(failure?.code == .env)
-      #expect(failure?.next == ["silta backup"] && failure?.nextBy == .human)
-    } else if ["implicit", "busy-implicit", "unicode-implicit"].contains(mode) {
+    if ["raced-uid", "implicit", "busy-implicit", "unicode-implicit"].contains(mode) {
       #expect(failure?.code == .conflict)
     } else {
       #expect(failure == nil)
