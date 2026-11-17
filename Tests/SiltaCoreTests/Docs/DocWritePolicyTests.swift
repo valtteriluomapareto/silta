@@ -6,7 +6,7 @@ import Testing
 
 @testable import SiltaCore
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocWritePolicyTests {
   static let secret = "Password=private123"
   static let credential = "AKIA" + String(repeating: "A", count: 16)
