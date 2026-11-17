@@ -1,5 +1,6 @@
 #if DEBUG
   import Foundation
+  import GRDB
   @testable import SiltaAppSupport
   import SiltaCore
   import SiltaTestSupport
@@ -31,6 +32,34 @@
         #expect(
           comments.entries.count == 1 && comments.entries.first?.body.contains("Confirmed") == true)
         #expect(try probe.version() == before)
+      }
+    }
+
+    @Test func encodedAttachmentSecretsAreMaskedInEveryTypedRead() throws {
+      try withScratchDirectory { scratch in
+        try AppDocsFixture.seed(home: scratch.appending(path: "silta-home"))
+        let reader = try AppReaderTests.reader(scratch)
+        let refs = [
+          "edge:api/service:push/Password%3Dprivate123", "edge:api/service:push/HTTP%20API",
+        ]
+        let encoded = String(decoding: try JSONEncoder().encode(refs), as: UTF8.self)
+        try reader.environment.db.write {
+          try $0.database.execute(sql: "UPDATE doc_rev SET about_refs=?", arguments: [encoded])
+        }
+        let list = try reader.documents(workspace: "acme").entries
+        let history = try reader.documentVersions("order-contract", workspace: "acme").entries
+        let body = try #require(
+          try reader.document("doc:order-contract@2", workspace: "acme").document)
+        let diff = try #require(
+          try reader.document("doc:order-contract@3", workspace: "acme", view: .changes).document)
+        for entry in list + history + [body, diff] {
+          let about = try #require(entry.about)
+          #expect(about.contains(refs[1]))
+          withKnownIssue("Typed attachment metadata must use Core's decoded redaction policy") {
+            #expect(!about.joined().contains("private123"))
+            #expect(about.joined().contains("[REDACTED:password]"))
+          }
+        }
       }
     }
 
