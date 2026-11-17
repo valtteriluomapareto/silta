@@ -279,8 +279,9 @@ and a recorded review entry per variant.
 to decision and approvals per batch.
 
 **Unverified until DF3:** whether agents in a real workspace propose docs worth
-keeping, and whether the human keeps reviewing them. DF3's decision rules gain one
-for this, and E5 counts `Map gap:` lines to decide on map proposals.
+keeping, and whether the human keeps reviewing them. DF3's E6 rows decide this
+(misleading docs, doc use, proposal review), and E5 counts `Map gap:` lines to decide
+on map proposals.
 
 ## Risks
 
