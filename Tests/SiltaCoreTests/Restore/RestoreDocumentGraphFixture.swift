@@ -13,7 +13,7 @@ enum RestoreDocumentGraphFixture {
       "links.jsonl", keys: ExportFormat.linkKeys)
   }
 
-  static func graph() throws -> (tree: ExportSnapshot, documents: ExportDocumentSnapshot) {
+  static func graph() throws -> ExportSnapshot {
     let legacy = try ExportTree.parse(ExportVersionTests.frozen())
     let source = ExportTask(
       ref: "AC-2",
@@ -27,14 +27,13 @@ enum RestoreDocumentGraphFixture {
     var documents = try ExportDocumentSnapshot.parse(
       ExportDocumentSnapshotTests.golden(), workspace: "acme")
     documents.legacyCommentSequences = nil
-    let tree = ExportSnapshot(
+    return ExportSnapshot(
       schema: "v7",
       workspace: legacy.workspace.replacing(
         "next_task_seq", with: "3", keys: ExportFormat.workspaceKeys),
       sections: legacy.sections, tasks: legacy.tasks + [source], documents: documents,
       links: try links(),
       aliasDecisions: legacy.aliasDecisions, approvals: legacy.approvals)
-    return (tree, documents)
   }
 
   static func source(_ home: URL) throws -> DatabaseStore {

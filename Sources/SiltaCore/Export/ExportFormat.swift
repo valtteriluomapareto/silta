@@ -123,7 +123,8 @@ enum ExportFormat {
   /// Link kinds whose ends are owned rows named by uid, and the table each names.
   static let linkTables = [
     "task": "task", "comment": "comment", "app": "app", "topic": "topic",
-    "task_plan_rev": "task_plan_rev",
+    "task_plan_rev": "task_plan_rev", "doc": "doc", "doc_rev": "doc_rev",
+    "edge": "edge", "service": "service",
   ]
 
   static let docAllocationsFile = "doc_revision_allocations.jsonl"

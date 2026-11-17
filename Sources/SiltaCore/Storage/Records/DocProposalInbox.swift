@@ -63,7 +63,7 @@ struct DocProposalInbox {
       return DocProposalPreviewGroup(
         id: group.id, ref: try text(first, "doc_ref", reference: true), total: group.total,
         members: previews,
-        next: group.total > previews.count ? try page(value(first, "slug")) : nil)
+        next: group.total > previews.count ? try page(first.strictText("slug")) : nil)
     }
   }
 

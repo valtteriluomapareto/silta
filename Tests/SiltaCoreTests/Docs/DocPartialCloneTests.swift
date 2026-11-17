@@ -86,7 +86,7 @@ struct DocPartialCloneTests {
       var prepared: DocVerification?
       do {
         prepared = try await DocVerification.prepare(
-          draft, workspace: 1,
+          DocStoreTests.binding(draft, store: store),
           environment: DocVerificationPreparationTests.environment(home, store: store, git: git))
       } catch let error as any CodedError { #expect(error.code == .env) }
       var accepted: DocRevision?

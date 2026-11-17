@@ -37,7 +37,9 @@ enum RestoreDocumentRowSupport {
     _ store: DatabaseStore, tree: ExportSnapshot, incoming: ExportDocumentSnapshot,
     rollingBack: Bool = false
   ) throws -> ExportDocumentSnapshot {
-    try RestoreDocumentGraph(tree: tree, documents: incoming, slug: "acme").run()
+    var tree = tree
+    tree.documents = incoming
+    try RestoreDocumentGraph(tree: tree, slug: "acme").run()
     return try store.write(rollingBack: rollingBack) { tx in
       let current = try ExportDocumentSnapshot.read(tx.database, workspace: 17)
       var writer = RestoreWriter(tx: tx, tree: tree, slug: "acme")
@@ -86,7 +88,7 @@ enum RestoreDocumentRowSupport {
     var draft = DocDraft(slug: slug, body: "A rule after restoring history.")
     draft.title = "Restored policy"
     draft.about = ["service:push%20service"]
-    let binding = try DocVerification.readBinding(draft, workspace: 17, store: store)
+    let binding = try DocStoreTests.binding(draft, workspace: 17, store: store)
     return try store.write { tx in
       try DocStore(
         workspace: 17, transaction: tx, actor: DocStoreTests.actor,
