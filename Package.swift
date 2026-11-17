@@ -18,6 +18,7 @@ let package = Package(
   products: [
     .executable(name: "silta", targets: ["silta"]),
     .library(name: "SiltaCore", targets: ["SiltaCore"]),
+    .library(name: "SiltaAppSupport", targets: ["SiltaAppSupport"]),
   ],
   dependencies: [
     .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.11.1"),
@@ -33,6 +34,7 @@ let package = Package(
       ],
       swiftSettings: swiftSettings
     ),
+    .target(name: "SiltaAppSupport", dependencies: ["SiltaCore"], swiftSettings: swiftSettings),
     .executableTarget(
       name: "silta",
       dependencies: [
@@ -43,13 +45,14 @@ let package = Package(
     ),
     .target(
       name: "SiltaTestSupport",
-      dependencies: ["SiltaCore", .product(name: "GRDB", package: "GRDB.swift")],
+      dependencies: ["SiltaCore", "SiltaAppSupport", .product(name: "GRDB", package: "GRDB.swift")],
       swiftSettings: swiftSettings
     ),
+    .testTarget(name: "SiltaAppSupportTests", dependencies: ["SiltaAppSupport", "SiltaCore", "SiltaTestSupport", .product(name: "GRDB", package: "GRDB.swift")], swiftSettings: swiftSettings),
     .testTarget(
       name: "SiltaCoreTests",
       dependencies: [
-        "SiltaCore", "SiltaTestSupport",
+        "SiltaCore", "SiltaAppSupport", "SiltaTestSupport",
         .product(name: "GRDB", package: "GRDB.swift"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],

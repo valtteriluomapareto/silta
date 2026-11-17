@@ -1,0 +1,189 @@
+import Foundation
+import GRDB
+import SiltaTestSupport
+import Testing
+
+@testable import SiltaCore
+
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
+struct DocProposalAttentionTests {
+  @Test func documentFilterUsesTheSharedCanonicalGrammar() throws {
+    #expect(try DocService.documentFilter(nil) == nil)
+    #expect(try DocService.documentFilter("rules") == "rules")
+    #expect(try DocService.documentFilter("doc:rules") == "rules")
+  }
+
+  @Test func scopedPageBoundsKeepArchivedProtectedRecovery() {
+    let command = DocService.listPageCommand(
+      workspace: String(repeating: "w", count: 220),
+      about: nil, archived: true, offset: 0, limit: 20, document: String(repeating: "d", count: 300)
+    )
+    #expect(command.utf8.count <= 512 && command.hasSuffix("doc ls --archived"))
+    #expect(!command.contains("--doc"))
+    #expect(
+      DocService.listPageCommand(
+        workspace: String(repeating: "w", count: 600),
+        about: nil, archived: true, offset: 0, limit: 20, document: "rules") == "silta ws ls")
+  }
+
+  @Test(arguments: ["rules@1", "doc:rules@1", "bad ref"])
+  func coreDocumentFilterRefusesBeforeOpeningStorage(ref: String) throws {
+    try withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      let error = RestoreASCIIIdentityTests.failure {
+        _ = try DocService(workspace: "acme", store: store).list(document: ref)
+      }
+      #expect(error?.code == .invalid)
+      #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+  }
+
+  @Test(arguments: [false, true], [false, true])
+  func staleEvidenceAndGuidanceUseTheSnapshotAndActualCaller(human: Bool, advanced: Bool) throws {
+    try withScratchDirectory { home in
+      let (service, (older, latest)) = try fixture(home, human: human, advanced: advanced)
+      let store = service.environment.db
+      let before = try DocVerificationPreparationTests.truth(store)
+      let inbox = try service.inbox(for: "human:acme")
+      let item = try #require(inbox.items.first)
+      let group = try payload(inbox)
+      let members = try #require(group["members"] as? [[String: Any]])
+      #expect(members.count == 2)
+      for member in members {
+        let ref = try #require(member["ref"] as? String)
+        let stale = advanced && ref == older
+        #expect(member["stale_base"] as? Bool == stale)
+        #expect((member["summary"] as? String ?? "").contains("stale base") == stale)
+        #expect(item.next.contains { $0.contains("doc triage --reject " + shellWord(ref)) })
+        #expect(
+          item.next.contains { $0.contains("doc triage --accept " + shellWord(ref)) } == !stale)
+      }
+      let actions = item.next.filter { $0.contains("doc triage") }
+      #expect(actions.count == (human ? (advanced ? 3 : 4) : 2))
+      #expect(actions.allSatisfy { $0.utf8.count <= 512 })
+      if human {
+        #expect(actions.allSatisfy { !$0.contains("ask human:") && !$0.contains("--approved") })
+        let report = try store.read {
+          try BriefDocProposalTests().makeReport(service, budget: 1024, in: $0)
+        }
+        #expect(report.text.contains("doc triage --accept " + shellWord(latest)))
+        #expect(report.text.contains("more: silta --ws 'acme' inbox\n"))
+        #expect(report.text.count <= 4096)
+      } else {
+        #expect(actions.allSatisfy { $0.hasPrefix("ask human:") })
+        #expect(actions.allSatisfy { $0.contains("--approved \"<the human's words>\"") })
+      }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  @Test func nilAndUnavailableBasesKeepDistinctDecisionRecovery() throws {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let env = try DocTriageServiceTests.environment(home, store, human: true)
+      let fresh = try DocTriageServiceTests.propose(env, about: "topic:messaging")
+      let service = TaskService(environment: env, workspace: "acme")
+      let first = try service.inbox()
+      let group = try payload(first)
+      let member = try #require((group["members"] as? [[String: Any]])?.first)
+      #expect(member["stale_base"] as? Bool == false)
+      #expect(
+        first.items[0].next.contains { $0.contains("doc triage --accept " + shellWord(fresh)) })
+      var accepted = DocDraft(slug: "rules", body: "Accepted after the Acme proposal.")
+      accepted.title = "Rules"
+      accepted.about = ["topic:messaging"]
+      _ = try DocStoreTests.accept(accepted, in: store, ids: env.ids)
+      let advanced = try service.inbox()
+      let advancedMember = try #require(
+        (try payload(advanced)["members"] as? [[String: Any]])?.first)
+      #expect(advancedMember["stale_base"] as? Bool == true)
+      #expect(!advanced.items[0].next.contains { $0.contains("doc triage --accept ") })
+      #expect(advanced.items[0].next.contains { $0.contains("doc triage --reject ") })
+      let (otherService, (older, _)) = try fixture(
+        home.appending(path: "missing"), human: true, advanced: true)
+      let other = otherService.environment.db
+      try other.write {
+        try $0.database.execute(sql: "UPDATE doc_rev SET base_rev=99 WHERE rev=2")
+      }
+      let before = try DocVerificationPreparationTests.truth(other)
+      let missing = try otherService.inbox()
+      let missingGroup = try payload(missing)
+      let row = try #require(
+        (missingGroup["members"] as? [[String: Any]])?.first {
+          $0["ref"] as? String == older
+        })
+      #expect(row["stale_base"] as? Bool == true)
+      #expect((row["summary"] as? String ?? "").contains("recorded base unavailable"))
+      #expect((row["read"] as? String)?.hasSuffix(" --diff") == false)
+      #expect(
+        !missing.items[0].next.contains { $0.contains("doc triage --accept " + shellWord(older)) })
+      #expect(
+        missing.items[0].next.contains { $0.contains("doc triage --reject " + shellWord(older)) })
+      #expect(try DocVerificationPreparationTests.truth(other) == before)
+    }
+  }
+
+  @Test(arguments: [false, true], [false, true])
+  func wholeGuidanceBoundsPreserveHumanCommandsAndAgentReadRecovery(human: Bool, maximum: Bool)
+    throws
+  {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let env = try DocTriageServiceTests.environment(home, store, human: human)
+      let fixed = "silta --ws 'acme' doc show 'doc:@1' --diff"
+      let length = maximum ? 512 - fixed.utf8.count : 220
+      let ref = try DocTriageServiceTests.propose(
+        env, about: "topic:messaging", slug: String(repeating: "r", count: length))
+      let before = try DocVerificationPreparationTests.truth(store)
+      let inbox = try TaskService(environment: env, workspace: "acme").inbox(for: "human:acme")
+      let next = try #require(inbox.items.first?.next)
+      #expect(next.allSatisfy { $0.utf8.count <= 512 })
+      #expect(next.contains { $0.contains("doc show " + shellWord(ref)) })
+      #expect(next.filter { $0.contains("doc triage") }.count == (human && !maximum ? 2 : 0))
+      if !human || maximum { #expect(next.contains("silta --ws 'acme' doc ls --archived")) }
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  @Test func unsafeIdentitiesKeepProtectedReadHubs() throws {
+    try withScratchDirectory { home in
+      let (service, _) = try fixture(home, human: false, advanced: false)
+      let store = service.environment.db
+      let secret = "AKIA" + String(repeating: "A", count: 16)
+      try store.write {
+        try $0.database.execute(sql: "UPDATE doc SET slug=?", arguments: [secret])
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let inbox = try service.inbox(for: "human:acme")
+      #expect(inbox.items[0].next == ["silta --ws 'acme' doc ls --archived"])
+      let json = try #require(String(data: try JSONEncoder().encode(inbox), encoding: .utf8))
+      #expect(!json.contains(secret))
+      #expect(try DocVerificationPreparationTests.truth(store) == before)
+    }
+  }
+
+  private func fixture(_ home: URL, human: Bool, advanced: Bool) throws
+    -> (TaskService, (String, String))
+  {
+    let store = try AcmeDocAttachments.make(in: home)
+    let env = try DocTriageServiceTests.environment(home, store, human: human)
+    var draft = DocDraft(slug: "rules", body: "Accepted Acme knowledge.")
+    draft.title = "Rules"
+    draft.about = ["topic:messaging"]
+    _ = try DocStoreTests.accept(draft, in: store, ids: env.ids)
+    let older = try DocTriageServiceTests.propose(
+      env, about: "topic:messaging", body: "First proposed Acme knowledge.")
+    if advanced {
+      _ = try DocStoreTests.accept(
+        DocDraft(slug: "rules", body: "Updated accepted Acme knowledge."), in: store, ids: env.ids)
+    }
+    let latest = try DocTriageServiceTests.propose(
+      env, about: "topic:messaging", body: "Latest proposed Acme knowledge.")
+    return (TaskService(environment: env, workspace: "acme"), (older, latest))
+  }
+
+  private func payload(_ result: InboxResult) throws -> [String: Any] {
+    try #require(
+      try DocInboxIntegrationTests().items(result).first?["doc_proposal"] as? [String: Any])
+  }
+}

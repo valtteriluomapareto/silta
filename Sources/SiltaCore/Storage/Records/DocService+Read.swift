@@ -41,18 +41,24 @@ extension DocService {
         output: "No accepted revision for doc:\(slug).\nPending revisions (\(total)):\n"
           + pending.map { "doc:\(slug)@\($0)\n" }.joined()
           + (total > pending.count && scopeIsSafe && Self.safeReference("doc:" + slug)
-            ? "next: " + listCommand + "\n" : ""))
+            ? "next: "
+              + listPageCommand(
+                about: nil, archived: archived, offset: 0, limit: 20, document: slug) + "\n" : ""))
     }
   }
 
   /// Lists accepted live attachments and proposed snapshots as separate pageable entries.
-  package func list(about: String? = nil, archived: Bool = false, offset: Int = 0, limit: Int = 20)
+  package func list(
+    about: String? = nil, archived: Bool = false, offset: Int = 0, limit: Int = 20,
+    document: String? = nil
+  )
     throws -> DocListResult
   {
     guard offset >= 0, (1...100).contains(limit) else {
       throw UsageError.usage(
         message: "Use --offset >= 0 and --limit from 1 to 100.", command: "silta doc ls")
     }
+    let document = try Self.documentFilter(document)
     return try store.read { db in
       let workspaceID = try TaskService.workspaceID(workspace, in: db)
       let available = try db.columns(in: "doc_rev").map(\.name)
@@ -66,21 +72,15 @@ extension DocService {
         + " AND ((doc_rev.rev=doc.current_rev AND doc_rev.state='accepted')"
         + " OR doc_rev.state='proposed')"
       var arguments: StatementArguments = [workspaceID, archived]
-      if let about {
-        let target = try attachment(about, workspace: workspaceID, in: db)
-        guard let targetID = target.id,
-          let uid = try String.fetchOne(
-            db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [targetID])
-        else { throw StorageError.corrupt }
-        predicate += """
-           AND ((doc_rev.state='accepted' AND EXISTS(SELECT 1 FROM link
-             WHERE link.workspace_id=doc.workspace_id
-             AND from_kind='doc' AND from_id=doc.id AND rel='about' AND to_kind=? AND to_id=?))
-             OR (doc_rev.state='proposed' AND EXISTS(
-               SELECT 1 FROM json_each(\(snapshotTargets)) WHERE json_extract(value,'$.kind')=?
-               AND json_extract(value,'$.uid')=?)))
-          """
-        arguments += [target.kind, targetID, target.kind, uid]
+      if let document {
+        predicate += " AND doc.slug=?"
+        arguments += [document]
+      }
+      let target = try about.map { try attachment($0, workspace: workspaceID, in: db) }
+      if let target {
+        let filter = try listAttachmentFilter(target, snapshots: snapshotTargets, in: db)
+        predicate += filter.sql
+        arguments += filter.arguments
       }
       let join = " FROM doc JOIN doc_rev ON doc_rev.doc_id=doc.id WHERE " + predicate
       let total = try Int.fetchOne(db, sql: "SELECT count(*)" + join, arguments: arguments) ?? 0
@@ -94,10 +94,32 @@ extension DocService {
       let next =
         offset < total && entries.count < total - offset
         ? listPageCommand(
-          about: about, archived: archived, offset: offset + entries.count, limit: limit)
+          about: try target.map { try $0.rendered(in: db) }, archived: archived,
+          offset: offset + entries.count, limit: limit, document: document)
         : nil
       return DocListResult(entries: entries, total: total, offset: offset, limit: limit, next: next)
     }
+  }
+
+  private func listAttachmentFilter(_ target: TaskLinkTarget, snapshots: String, in db: Database)
+    throws
+    -> (sql: String, arguments: StatementArguments)
+  {
+    guard let targetID = target.id,
+      let uid = try String.fetchOne(
+        db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [targetID])
+    else { throw StorageError.corrupt }
+    return (
+      """
+       AND ((doc_rev.state='accepted' AND EXISTS(SELECT 1 FROM link
+         WHERE link.workspace_id=doc.workspace_id
+         AND from_kind='doc' AND from_id=doc.id AND rel='about' AND to_kind=? AND to_id=?))
+         OR (doc_rev.state='proposed' AND EXISTS(
+           SELECT 1 FROM json_each(\(snapshots)) WHERE json_extract(value,'$.kind')=?
+           AND json_extract(value,'$.uid')=?)))
+      """,
+      [target.kind, targetID, target.kind, uid]
+    )
   }
 
   private func attachment(_ ref: String, workspace workspaceID: Int64, in db: Database) throws

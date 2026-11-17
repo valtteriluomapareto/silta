@@ -101,7 +101,9 @@ struct DocPartialCloneTests {
         bothMissing
         ? []
         : [
-          .init(app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA)
+          .init(
+            app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA,
+            uid: "01HF7YAT01MMY3DNVCXJCY0XC5")
         ]
       let observed = try state.evidence.map {
         try JSONDecoder().decode([DocVerification.Snapshot].self, from: Data($0.utf8))

@@ -200,7 +200,10 @@ struct RestoreDocumentGraph {
     guard
       let snapshots = try? JSONDecoder().decode(  // refused below
         [DocVerification.Snapshot].self, from: Data(text.utf8)),
-      snapshots.allSatisfy({ [40, 64].contains($0.sha.count) && $0.sha.allSatisfy(\.isHexDigit) })
+      snapshots.allSatisfy({
+        [40, 64].contains($0.sha.count) && $0.sha.allSatisfy(\.isHexDigit)
+          && ($0.uid.map { StoredUID.valid(Data($0.utf8)) } ?? true)
+      })
     else { throw invalid("verification evidence is not an app/ref/SHA array") }
   }
 }

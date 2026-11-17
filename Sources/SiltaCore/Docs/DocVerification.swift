@@ -6,6 +6,14 @@ struct DocVerification: Sendable {
     let app: String
     let ref: String
     let sha: String
+    let uid: String?
+
+    init(app: String, ref: String, sha: String, uid: String? = nil) {
+      self.app = app
+      self.ref = ref
+      self.sha = sha
+      self.uid = uid
+    }
   }
 
   struct TargetBinding: Equatable, Sendable {
@@ -70,7 +78,7 @@ struct DocVerification: Sendable {
       do {
         let sha = try await code.resolveCommit(
           app: app.app, ref: app.ref, repo: app.repo, path: path)
-        snapshots.append(Snapshot(app: app.app, ref: app.ref, sha: sha))
+        snapshots.append(Snapshot(app: app.app, ref: app.ref, sha: sha, uid: app.uid))
       } catch let error as CodeError {
         guard !Task.isCancelled else { throw error }
         switch error {
@@ -94,6 +102,7 @@ struct DocVerification: Sendable {
       let snapshot = snapshots[index]
       if Self.legacyNameEqual(snapshot.app, app.app)
         && Data(snapshot.ref.utf8) == Data(app.ref.utf8)
+        && (snapshot.uid.map { $0 == app.uid } ?? true)
       {
         index += 1
       }
