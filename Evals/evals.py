@@ -356,7 +356,8 @@ def doc_fixture(seed):
 
 
 def valid_doc_fixture(e):
-    fixture = e.get('controls', {}).get('doc_fixture')
+    controls = e.get('controls')
+    fixture = controls.get('doc_fixture') if isinstance(controls, dict) else None
     if not isinstance(fixture, dict):
         return False
     seed = fixture.get('seed')

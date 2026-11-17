@@ -351,7 +351,6 @@ class DocContext(unittest.TestCase):
         with patch.object(sys, 'argv', argv), patch.object(evals, 'run_trial', return_value=trial):
             return evals.main()
 
-    @unittest.expectedFailure
     def test_review_regrades_diagnostic_without_hiding_invalid_evidence(self):
         result, original = self.trial('codex', 'doc-context-no-doc')
         folder = self.root / 'regrade'
@@ -387,7 +386,6 @@ class DocContext(unittest.TestCase):
                 if damage == 'controls':
                     self.assertIs(updated['trials'][0]['checks']['doc_fixture'], False)
 
-    @unittest.expectedFailure
     def test_malformed_controls_have_a_structured_mandatory_failure(self):
         result, original = self.trial('codex', 'doc-context-no-doc')
         for scenario in ['doc-context', 'doc-context-no-doc']:

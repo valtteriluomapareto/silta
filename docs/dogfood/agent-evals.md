@@ -111,8 +111,8 @@ Evals/run.sh --silta .build/debug/silta --live --harness codex \
 
 JSON-subset YAML in [matrix.yaml](../../Evals/matrix.yaml) records the default
 repeat count and harness inventory; select model names explicitly for live runs.
-The commands above run the four core scenarios three times, with **two sign-ins
-in total**: one Claude login, then one Codex login. Use `--scenario <id>` for a
+The commands above run the four core scenarios and the document diagnostic three
+times, with **two sign-ins in total**: one Claude login, then one Codex login. Use `--scenario <id>` for a
 smaller run, or omit `--core` to include the policy scenarios.
 
 For each default-provider invocation, the runner prints one login-only command
