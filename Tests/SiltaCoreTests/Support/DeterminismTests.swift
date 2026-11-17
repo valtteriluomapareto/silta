@@ -63,7 +63,7 @@ struct DeterminismTests {
       for path in [nil, realHome.path, alias.path] {
         var environment = ["SILTA_NOW": "bad", "SILTA_ID_SEED": "bad"]
         environment["SILTA_HOME"] = path
-        let env = try await SiltaEnvironment.system(
+        let env = try await makeEnvironment(
           environment: environment, userHome: user, temporaryRoots: [scratch])
         #expect(env.clock is SystemClock)
         #expect(env.ids is SystemIDGenerator)
@@ -79,7 +79,7 @@ struct DeterminismTests {
         "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "18446744073709551615",
       ]
       func make() async throws -> SiltaEnvironment {
-        try await SiltaEnvironment.system(
+        try await makeEnvironment(
           environment: environment, userHome: scratch.appending(path: "user"),
           temporaryRoots: [scratch])
       }
@@ -106,7 +106,7 @@ struct DeterminismTests {
       for path in [
         root, outside, scratch.appending(path: "temp-sibling"), alias.appending(path: "new"),
       ] {
-        let env = try await SiltaEnvironment.system(
+        let env = try await makeEnvironment(
           environment: ["SILTA_HOME": path.path, "SILTA_NOW": "bad", "SILTA_ID_SEED": "bad"],
           userHome: scratch.appending(path: "user"), temporaryRoots: [root])
         #expect(env.clock is SystemClock)
@@ -120,12 +120,12 @@ struct DeterminismTests {
     try await withScratchDirectory { scratch in
       for bad in ["", "bad", "-1", "18446744073709551616"] {
         await #expect(throws: (any Error).self) {
-          try await SiltaEnvironment.system(
+          try await makeEnvironment(
             environment: [key: bad, "SILTA_HOME": scratch.appending(path: "data").path],
             userHome: scratch, temporaryRoots: [], deterministic: true)
         }
       }
-      let env = try await SiltaEnvironment.system(
+      let env = try await makeEnvironment(
         environment: [
           "SILTA_HOME": scratch.appending(path: "data").path,
           "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0",
@@ -150,7 +150,7 @@ struct DeterminismTests {
       }
       for raw in ["2023-11-14T22:13:20Zjunk", "2023-02-30T22:13:20Z", "2023-11-14"] {
         await #expect(throws: (any Error).self) {
-          try await SiltaEnvironment.system(
+          try await makeEnvironment(
             environment: ["SILTA_HOME": scratch.appending(path: "data").path, "SILTA_NOW": raw],
             userHome: scratch, temporaryRoots: [], deterministic: true)
         }
@@ -214,7 +214,7 @@ struct DeterminismTests {
         for path in [nil, real.path, alias.path] {
           var values = ["SILTA_NOW": "2023-11-14T22:13:20.123Z", "SILTA_ID_SEED": "0"]
           values["SILTA_HOME"] = path
-          let env = try await SiltaEnvironment.system(
+          let env = try await makeEnvironment(
             environment: values, userHome: user, temporaryRoots: [],
             deterministic: true)
           #expect(env.clock is SystemClock)
@@ -228,7 +228,7 @@ struct DeterminismTests {
     try await withScratchDirectory { scratch in
       let home = scratch.appending(path: "isolated")
       let user = scratch.appending(path: "user")
-      let env = try await SiltaEnvironment.system(
+      let env = try await makeEnvironment(
         environment: [
           "SILTA_HOME": home.path,
           "SILTA_NOW": "2023-11-14T22:13:20.123Z",
@@ -240,7 +240,7 @@ struct DeterminismTests {
       let root = FileManager.default.temporaryDirectory
       let sibling = root.deletingLastPathComponent().appending(
         path: root.lastPathComponent + "-sibling")
-      let other = try await SiltaEnvironment.system(
+      let other = try await makeEnvironment(
         environment: [
           "SILTA_HOME": sibling.path,
           "SILTA_NOW": "2023-11-14T22:13:20.123Z",
@@ -257,7 +257,7 @@ struct DeterminismTests {
           "2023-11-14T22:13:20.123+00:00", "2023-11-14T22:13:20.1234Z",
         ] {
           await #expect(throws: (any Error).self) {
-            try await SiltaEnvironment.system(
+            try await makeEnvironment(
               environment: [
                 "SILTA_HOME": scratch.appending(path: "data").path,
                 "SILTA_NOW": raw,
@@ -272,12 +272,10 @@ struct DeterminismTests {
 
 extension DeterminismTests {
   @Test func environmentFixtureDoesNotRequestGitAttribution() async throws {
-    await withKnownIssue {
-      try await withScratchDirectory { scratch in
-        _ = try await makeEnvironment(
-          environment: ["SILTA_HOME": scratch.appending(path: "data").path],
-          userHome: scratch)
-      }
+    try await withScratchDirectory { scratch in
+      _ = try await makeEnvironment(
+        environment: ["SILTA_HOME": scratch.appending(path: "data").path],
+        userHome: scratch)
     }
   }
 
@@ -285,17 +283,19 @@ extension DeterminismTests {
     environment values: [String: String], userHome: URL,
     temporaryRoots: [URL]? = nil, deterministic: Bool = false
   ) async throws -> SiltaEnvironment {
+    var inputs = values
+    inputs["SILTA_ACTOR"] = "agent:codex:determinism"
     let git = ScriptedGitRunner(script: [])
     defer { #expect(git.requests.isEmpty) }
     return try await SiltaEnvironment.system(
-      environment: values, userHome: userHome, temporaryRoots: temporaryRoots,
+      environment: inputs, userHome: userHome, temporaryRoots: temporaryRoots,
       deterministic: deterministic, git: git)
   }
 
   @Test(arguments: ["2023-11-14T22:13:20.859Z", "2023-11-14T22:13:20.426Z"])
   func canonicalMillisecondNowIsAccepted(raw: String) async throws {
     try await withScratchDirectory { scratch in
-      let env = try await SiltaEnvironment.system(
+      let env = try await makeEnvironment(
         environment: [
           "SILTA_HOME": scratch.appending(path: "data").path,
           "SILTA_NOW": raw,
