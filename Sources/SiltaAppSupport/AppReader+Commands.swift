@@ -4,7 +4,9 @@ import SiltaCore
 extension AppReader {
   /// Offers safe templates for an inbox entry without executing them.
   public func commands(for item: AppAttention, workspace: String) -> [AppCommand] {
-    let reads = item.refs.map { taskCommand($0, workspace: workspace) }
+    let taskGroups = ["proposal", "due", "ready", "replan", "promoted"]
+    let refs = taskGroups.contains(item.kind) ? item.refs : item.task.map { [$0] } ?? []
+    let reads = refs.map { taskCommand($0, workspace: workspace) }
     if item.kind == "question", let task = item.task, let ref = item.ref {
       return [
         command(
