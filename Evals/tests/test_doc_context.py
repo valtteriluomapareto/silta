@@ -351,11 +351,12 @@ class DocContext(unittest.TestCase):
         with patch.object(sys, 'argv', argv), patch.object(evals, 'run_trial', return_value=trial):
             return evals.main()
 
+    @unittest.expectedFailure
     def test_review_regrades_diagnostic_without_hiding_invalid_evidence(self):
         result, original = self.trial('codex', 'doc-context-no-doc')
         folder = self.root / 'regrade'
         folder.mkdir()
-        for damage in ['none', 'token', 'stream', 'unbound']:
+        for damage in ['none', 'token', 'stream', 'controls', 'unbound']:
             evidence = copy.deepcopy(original)
             evidence['provenance'] = 'live'
             evidence['review'] = None
@@ -363,6 +364,8 @@ class DocContext(unittest.TestCase):
                 evidence['controls'].pop('doc_fixture', None)
             if damage == 'stream':
                 evidence['phases'][0]['complete'] = False
+            if damage == 'controls':
+                evidence['controls'] = None
             verdict = {'digest': evals.review_digest(evidence), 'reviewer': 'fixture-maintainer',
                        'checks': ['tool-audit'], 'citations': ['phase-0.jsonl: recorded commands']}
             if damage == 'unbound':
@@ -381,3 +384,25 @@ class DocContext(unittest.TestCase):
                 self.assertFalse(updated['trials'][0]['passed'])
                 self.assertEqual(updated['groups'][0]['pass_rate'], 0)
                 self.assertIs(updated['groups'][0].get('diagnostic'), True)
+                if damage == 'controls':
+                    self.assertIs(updated['trials'][0]['checks']['doc_fixture'], False)
+
+    @unittest.expectedFailure
+    def test_malformed_controls_have_a_structured_mandatory_failure(self):
+        result, original = self.trial('codex', 'doc-context-no-doc')
+        for scenario in ['doc-context', 'doc-context-no-doc']:
+            for container in [None, [], 'unrecorded']:
+                with self.subTest(scenario=scenario, container=container):
+                    evidence = copy.deepcopy(original)
+                    evidence['scenario'] = scenario
+                    evidence['controls'] = container
+                    graded, failure = None, None
+                    try:
+                        graded = evals.grade(evidence)
+                    except (AttributeError, TypeError) as error:
+                        failure = str(error)
+                    self.assertIsNone(failure, 'Malformed fixture evidence must produce a grade')
+                    self.assertIs(graded['checks']['doc_fixture'], False)
+                    self.assertFalse(graded['passed'])
+                    name = scenario + type(container).__name__
+                    self.assertEqual(self.diagnostic_exit(dict(result, scenario=scenario, **graded), name), 1)
