@@ -241,6 +241,7 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   "", "## Agent sessions", "",
   "\($sessions|length) sessions; \(stats($sessions|map(length); "calls"))" + ".",
   "Observed brief document exposure: \($briefs|group_by(.actor)|map(select(any(.[]; (.docs_shown // 0) > 0)))|length) agent sessions; \($briefs|map(.docs_shown // 0)|add // 0) previews.",
+  "Observed brief document pointers: \($briefs|map(.docs_counted // 0)|add // 0) counted documents.",
   "Legacy brief exposure unknown: \($briefs|map(select(.docs_shown == null))|length) calls.",
   "", "## Warnings", "",
   table(["Code","Calls"]; [$logs[] | .warnings | unique[]] | group_by(.) | map([.[0],length])),
