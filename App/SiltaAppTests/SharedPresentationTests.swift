@@ -39,12 +39,12 @@
         map: try reader.workspaceMap(workspace: "acme"), version: 1, checkedAt: AppV2Fixture.now)
       let model = AppModel(reader: reader, load: { _, _, _ in data })
       await model.refresh().value
-      #expect(model.screenSummary == "7 waiting on you · 2 tasks claimed by agents")
+      #expect(model.screenSummary == "7 waiting on you · 2 tasks claimed")
       model.inspect(task: "AC-12")
       #expect(model.screenSummary == "7 open · 3 proposed · 3 done this week")
       #expect(model.boardSelection?.taskRef == "AC-12" && model.boardInspectorPresented)
       model.navigate(to: .mywork)
-      #expect(model.screenSummary == "7 waiting on you · 2 tasks claimed by agents")
+      #expect(model.screenSummary == "7 waiting on you · 2 tasks claimed")
     }
   }
 #endif

@@ -230,7 +230,7 @@ extension AppModel {
     }
     let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
     return
-      "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed by agents"
+      "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed"
   }
 
 }
