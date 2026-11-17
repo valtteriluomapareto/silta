@@ -62,6 +62,40 @@
       }
     }
 
+    @Test func fixtureLaunchAcceptsOnlyItsNamedDebugOption() throws {
+      #expect(try FixtureLaunch.parse(["SiltaApp", "-SiltaFixture", "v2"]))
+      #expect(
+        try !FixtureLaunch.parse([
+          "SiltaApp", "-NSDocumentRevisionsDebugMode", "YES", "-ApplePersistenceIgnoreState", "YES",
+          "-AppleLanguages", "(en)", "unrelated",
+        ]))
+      for arguments in [
+        ["-SiltaUnknown"], ["-SiltaFixture"], ["-SiltaFixture", "other"],
+        ["-SiltaFixture", "v2", "-SiltaOther"],
+      ] {
+        #expect(throws: AppLoadFailure.self) { try FixtureLaunch.parse(arguments) }
+      }
+    }
+
+    @Test func fixtureLaunchCreatesFreshPrivateHomes() throws {
+      let first = try FixtureLaunch.prepare()
+      defer {
+        try? FileManager.default.removeItem(at: first.home.deletingLastPathComponent())  // cleanup
+      }
+      let second = try FixtureLaunch.prepare()
+      defer {
+        try? FileManager.default.removeItem(at: second.home.deletingLastPathComponent())  // cleanup
+      }
+      #expect(first.home != second.home)
+      #expect(first.now == AppV2Fixture.now && first.user == "acme")
+      let reader = try AppReader(home: first.home, user: first.user, now: { AppV2Fixture.now })
+      #expect(try reader.snapshot(workspace: "acme").work.waitingCount == 5)
+      let permissions =
+        try FileManager.default.attributesOfItem(
+          atPath: first.home.deletingLastPathComponent().path)[.posixPermissions] as? Int
+      #expect(permissions == 0o700)
+    }
+
     @Test func ordinaryLaunchDoesNotRequireTestSettings() throws {
       try TestLaunchPolicy.validate(
         environment: [:], temporaryRoots: [],

@@ -1,13 +1,13 @@
 import Foundation
 import Observation
+import SiltaAppSupport
 
 @MainActor @Observable
 final class AppModel {
   typealias Loader = @Sendable (AppLoadedData?, String?, Bool) async throws -> AppLoadedData?
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
-  private(set) var screen: AppScreen = .mywork
-  private(set) var appFilter: String?
+  let reader: AppReader?
   var search = ""
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
@@ -18,9 +18,17 @@ final class AppModel {
   @ObservationIgnored private var queuedForce = false
   @ObservationIgnored private var generation = 0
 
-  init(load: @escaping Loader, now: @escaping @Sendable () -> Date = { Date() }) {
+  init(
+    reader: AppReader? = nil, load: @escaping Loader,
+    now: @escaping @Sendable () -> Date = { Date() }
+  ) {
+    self.reader = reader
     self.load = load
     self.now = now
+  }
+
+  func matches(_ values: [String]) -> Bool {
+    search.isEmpty || values.contains { $0.localizedCaseInsensitiveContains(search) }
   }
 
   var visibleData: AppLoadedData? { data?.workspace == workspace ? data : nil }
@@ -69,19 +77,10 @@ final class AppModel {
     if workspace != slug {
       generation += 1
       workspace = slug
-      appFilter = nil
     }
     return refresh(force: true)
   }
 
-  func navigate(_ screen: AppScreen) {
-    self.screen = screen
-    appFilter = nil
-  }
-  func selectApp(_ slug: String) {
-    screen = .board
-    appFilter = slug
-  }
   @discardableResult func focused() -> Task<Void, Never> { refresh() }
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
     frontmost ? refresh() : nil

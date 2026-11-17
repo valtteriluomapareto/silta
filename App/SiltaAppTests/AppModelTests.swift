@@ -89,6 +89,17 @@
       }
     }
 
+    @Test func searchMatchesReferencesAndFullBodiesWithoutCaseSensitivity() {
+      let model = makeModel(ControlledLoads())
+      #expect(model.matches(["AC-12", "Full question body"]))
+      model.search = "ac-12"
+      #expect(model.matches(["AC-12", "Full question body"]))
+      model.search = "QUESTION"
+      #expect(model.matches(["AC-12", "Full question body"]))
+      model.search = "unrelated"
+      #expect(!model.matches(["AC-12", "Full question body"]))
+    }
+
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
       AppModel(
         load: { previous, workspace, force in

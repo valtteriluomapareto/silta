@@ -104,3 +104,9 @@ existing temporary directory containing a `user/` directory, and
 `SILTA_APP_TEST_CLI` to the same checkout’s built `.build/debug/silta`. Missing or unexpanded
 settings refuse startup before a reader can be constructed. App and root shared
 package pins must match; the app never links test support.
+
+To open the Debug Mac app against a fresh private Acme fixture, run
+`scripts/run-mac-fixture.sh` (or `--no-build` after a successful Debug build).
+The app seeds an absent temporary data home and freezes the fixture clock.
+Closing the app leaves that temporary fixture available for copied CLI commands.
+No product view executes those commands.

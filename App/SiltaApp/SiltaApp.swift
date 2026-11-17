@@ -1,9 +1,12 @@
 import Darwin
 import Foundation
 import SwiftUI
+import SiltaAppSupport
 
 @main
 struct SiltaApp: App {
+  @State private var model: AppModel
+
   init() {
     #if DEBUG
       do {
@@ -17,11 +20,68 @@ struct SiltaApp: App {
         exit(64)
       }
     #endif
+    _model = State(initialValue: Self.makeModel())
+  }
+
+  private static func makeModel() -> AppModel {
+    let arguments = ProcessInfo.processInfo.arguments
+    #if DEBUG
+      do {
+        if try FixtureLaunch.parse(arguments) {
+          let fixture = try FixtureLaunch.prepare()
+          return makeReaderModel(home: fixture.home, user: fixture.user, now: { fixture.now })
+        }
+      } catch {
+        FileHandle.standardError.write(Data("Silta fixture launch refused: \(error)\n".utf8))
+        exit(64)
+      }
+    #else
+      if arguments.contains(where: { $0.hasPrefix("-Silta") }) {
+        FileHandle.standardError.write(Data("Silta development arguments require Debug.\n".utf8))
+        exit(64)
+      }
+    #endif
+    let environment = ProcessInfo.processInfo.environment
+    let path =
+      environment["SILTA_HOME"]
+      ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: ".silta").path
+    guard path.hasPrefix("/") else {
+      return AppModel(load: { _, _, _ in
+        throw AppLoadFailure(
+          message: "SILTA_HOME must be an absolute path.", commands: ["unset SILTA_HOME"])
+      })
+    }
+    return makeReaderModel(
+      home: URL(filePath: path), user: environment["USER"] ?? NSUserName(), now: { Date() })
+  }
+
+  private static func makeReaderModel(
+    home: URL, user: String, now: @escaping @Sendable () -> Date
+  ) -> AppModel {
+    do {
+      let reader = try AppReader(home: home, user: user, now: now)
+      let session = AppReadSession(reader: reader, now: now)
+      return AppModel(
+        reader: reader,
+        load: { previous, workspace, force in
+          try await Task.detached {
+            try session.load(previous: previous, workspace: workspace, force: force)
+          }.value
+        }, now: now)
+    } catch {
+      let failure = AppLoadFailure(error)
+      return AppModel(load: { _, _, _ in throw failure })
+    }
   }
 
   var body: some Scene {
     Window("Silta", id: "main") {
-      Text("Silta").font(.largeTitle).frame(minWidth: 900, minHeight: 600)
+      AppShellView(model: model)
     }.defaultSize(width: 1280, height: 840)
+      .commands {
+        CommandGroup(after: .sidebar) {
+          Button("Refresh") { model.refresh(force: true) }.keyboardShortcut("r")
+        }
+      }
   }
 }
