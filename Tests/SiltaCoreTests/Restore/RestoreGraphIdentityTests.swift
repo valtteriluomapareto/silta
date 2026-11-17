@@ -14,7 +14,7 @@ struct RestoreGraphIdentityTests {
     let files = try graph.documents.files()
     graph.documents = try ExportDocumentSnapshot.parse(files, workspace: "acme")
     do {
-      try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: graph, slug: "acme").run()
       Issue.record("Accepted inconsistent current document metadata")
     } catch let error as ExportError {
       #expect(
@@ -27,11 +27,11 @@ struct RestoreGraphIdentityTests {
       Golden.forTests().check(text.stderr + json.stdout, "restore-doc-current-metadata.txt")
     }
     RestoreDocumentGraphFixture.record(&graph.documents, 1, key, nil)
-    try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
+    try RestoreDocumentGraph(tree: graph, slug: "acme").run()
     let legacy = key == "title" ? "Legacy\n" + String(repeating: "x", count: 121) : "design"
     RestoreDocumentGraphFixture.document(&graph.documents, key, legacy)
     RestoreDocumentGraphFixture.record(&graph.documents, 1, key, legacy)
-    try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
+    try RestoreDocumentGraph(tree: graph, slug: "acme").run()
   }
 
   @Test func byteDistinctLinksFromTheShippedWriterRemainDistinct() async throws {
@@ -44,16 +44,16 @@ struct RestoreGraphIdentityTests {
       for target in targets { _ = try service.link("AC-1", target: "note:" + target) }
       let store = service.environment.db
       let before = try RestoreSupport.dump(store)
-      let tree = try store.read { try ExportSnapshot.read($0, workspace: "acme") }
+      var tree = try store.read { try ExportSnapshot.read($0, workspace: "acme") }
       let captured = tree.links.filter { $0.value("to_kind") == "note" }
       let raw = try store.read {
         try String.fetchAll($0, sql: "SELECT to_ext FROM link WHERE to_kind='note' ORDER BY id")
       }
       #expect(raw.map { Data($0.utf8) } == targets.map { Data($0.utf8) })
       #expect(Set(captured.compactMap { $0.value("to_ext").map { Data($0.utf8) } }).count == 2)
-      let documents = ExportDocumentSnapshot(
+      tree.documents = ExportDocumentSnapshot(
         documents: [], revisionAllocations: [])
-      try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
       #expect(try RestoreSupport.dump(store) == before)
     }
   }

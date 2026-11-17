@@ -26,9 +26,7 @@ extension ExportSnapshot {
     guard try migrator.hasCompletedMigrations(db), let schema = migrator.migrations.last else {
       throw StorageError.internalMisuse
     }
-    let cursor = try Row.fetchCursor(db, sql: Query.workspace, arguments: [slug])
-    defer { withExtendedLifetime(cursor) {} }
-    guard let found = try cursor.next() else {
+    guard let found = try Row.fetchOne(db, sql: Query.workspace, arguments: [slug]) else {
       throw WorkspaceError.unknown(slug)
     }
     let id: Int64 = found["id"]

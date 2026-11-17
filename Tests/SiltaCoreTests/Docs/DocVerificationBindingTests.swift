@@ -133,7 +133,7 @@ struct DocVerificationBindingTests {
     }
     let git = ScriptedGitRunner(script: script)
     let prepared = try await DocVerification.prepare(
-      draft, workspace: 1,
+      DocStoreTests.binding(draft, store: store),
       environment: DocVerificationPreparationTests.environment(home, store: store, git: git))
     #expect(git.isExhausted)
     return prepared

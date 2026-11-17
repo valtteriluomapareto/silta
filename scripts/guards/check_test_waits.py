@@ -1,6 +1,6 @@
 """Tests never wait on the wall clock (AGENTS.md invariant 3).
 
-Covers the test targets and SiltaTestSupport, whose fakes and runners tests call.
+Covers Tests/, App/SiltaAppTests and SiltaTestSupport, whose fakes and runners tests call.
 
 Advance the fake clock instead. A justified exception carries the marker
 `guard:allow-wait` on the same line.
@@ -25,7 +25,7 @@ PATTERNS = {
 
 def check(root: Path) -> list[str]:
     errors = []
-    for path in swift_files(root, "Tests", "Sources/SiltaTestSupport"):
+    for path in swift_files(root, "Tests", "Sources/SiltaTestSupport", "App/SiltaAppTests"):
         raw_lines = path.read_text(encoding="utf-8").split("\n")
         code, _ = split_swift("\n".join(raw_lines))
         for number, code_line in enumerate(code.split("\n"), start=1):

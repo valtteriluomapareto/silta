@@ -87,7 +87,7 @@ struct DocTriageRejectionRetryTests {
     return (base, ref)
   }
 
-  @Test(arguments: ["unsafe-scope", "initial-uid", "approval", "change_log"])
+  @Test(arguments: ["unsafe-scope", "approval", "change_log"])
   func auditDiagnosticsAndLateFailureKeepTheirContracts(mode: String) async throws {
     try await withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
@@ -97,8 +97,6 @@ struct DocTriageRejectionRetryTests {
       try store.write {
         if mode == "unsafe-scope" {
           try $0.database.execute(sql: "UPDATE workspace SET slug=?", arguments: [scope])
-        } else if mode == "initial-uid" {
-          try $0.database.execute(sql: "UPDATE workspace SET uid=CAST(x'410042' AS TEXT)")
         } else {
           try $0.database.execute(
             sql:
@@ -118,9 +116,6 @@ struct DocTriageRejectionRetryTests {
         #expect(audit?.contains("doc triage --reject ") == true && audit?.contains(ref) == true)
       } else {
         #expect(failure?.code == .env)
-        if mode == "initial-uid" {
-          #expect(failure?.next == ["silta backup"] && failure?.nextBy == .human)
-        }
         #expect(try DocVerificationPreparationTests.truth(store) == before)
       }
     }

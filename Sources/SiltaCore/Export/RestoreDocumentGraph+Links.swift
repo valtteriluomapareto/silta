@@ -8,7 +8,7 @@ extension RestoreDocumentGraph {
         let kind = link.value("to_kind"), link.value("uid") != nil,
         link.value("rel") != nil, link.value("created_by") != nil, link.value("created_at") != nil
       else { throw invalid("a link has an unknown source kind or missing metadata") }
-      if ExportLinks.tables[kind] != nil {
+      if ExportFormat.linkTables[kind] != nil {
         guard link.value("to") != nil, link.value("to_ext") == nil else {
           throw invalid("an owned link target is not a UID")
         }

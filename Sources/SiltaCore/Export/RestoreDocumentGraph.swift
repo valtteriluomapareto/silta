@@ -3,7 +3,7 @@ import Foundation
 /// Document graph validation before any restore mutation.
 struct RestoreDocumentGraph {
   let tree: ExportSnapshot
-  let documents: ExportDocumentSnapshot
+  var documents: ExportDocumentSnapshot { tree.documents }
   let slug: String
 
   func invalid(_ reason: String) -> ExportError {
@@ -26,7 +26,7 @@ struct RestoreDocumentGraph {
         try add(record, table: table, required: required, uids: &uids)
       }
     }
-    try base.links(uids, tables: ExportLinks.tables)
+    try base.links(uids)
     try links()
     for document in documents.documents { try validate(document, tasks: uids["task"] ?? []) }
     for task in tree.tasks {

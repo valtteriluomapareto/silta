@@ -11,7 +11,7 @@ struct RestoreDocumentReportTests {
   }
 
   @Test func reportsActualDocumentAndCombinedRecordCounts() throws {
-    let tree = try RestoreDocumentGraphFixture.graph().tree
+    let tree = try RestoreDocumentGraphFixture.graph()
     let result = Self.report(nil, tree)
     #expect(result.docs == RestoreReport.Counts(before: 0, after: 1))
     #expect(result.changedDocs.isEmpty && result.removedDocs.isEmpty)
@@ -28,7 +28,7 @@ struct RestoreDocumentReportTests {
   }
 
   @Test func changedRemovedAndRenamedUseStableUIDAndPublicRefs() throws {
-    let original = try RestoreDocumentGraphFixture.graph().tree
+    let original = try RestoreDocumentGraphFixture.graph()
     #expect(Self.report(original, original).changedDocs.isEmpty)
     var renamed = original
     renamed.documents.documents[0].slug = "delivery-rules"
@@ -57,7 +57,7 @@ struct RestoreDocumentReportTests {
 
   @Test(arguments: ["body_md", "title", "about_refs", "app_shas", "triaged_by", "comment"])
   func completeLiteralMetadataChangesAreReported(_ key: String) throws {
-    var before = try RestoreDocumentGraphFixture.graph().tree
+    var before = try RestoreDocumentGraphFixture.graph()
     let index = key == "app_shas" ? 5 : (key == "comment" ? 6 : 1)
     let field = key == "comment" ? "body_md" : key
     func value(_ ref: String) -> String {
@@ -80,7 +80,7 @@ struct RestoreDocumentReportTests {
 
   @Test(arguments: ["title", "kind", "owner"])
   func documentProjectionChangesCompareLiteralBytes(_ key: String) throws {
-    var before = try RestoreDocumentGraphFixture.graph().tree
+    var before = try RestoreDocumentGraphFixture.graph()
     if key != "owner" {
       RestoreDocumentGraphFixture.record(&before.documents, 1, key, nil)
     }
@@ -95,13 +95,13 @@ struct RestoreDocumentReportTests {
   }
 
   @Test func admittedDifferentASCIIUIDsRemainDifferentIdentities() throws {
-    var before = try RestoreDocumentGraphFixture.graph().tree
+    var before = try RestoreDocumentGraphFixture.graph()
     let uid = try #require(before.documents.documents.first?.row.value("uid"))
     RestoreOpaqueIdentityFixture.rename(&before, from: uid, to: "doc-before")
     var after = before
     RestoreOpaqueIdentityFixture.rename(&after, from: "doc-before", to: "doc-after")
     for tree in [before, after] {
-      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
     }
     let result = Self.report(before, after)
     #expect(result.removedDocs == ["doc:push-rules"])
@@ -109,7 +109,7 @@ struct RestoreDocumentReportTests {
   }
 
   @Test func presentationMasksCredentialIdentitiesWithoutChangingLiteralData() throws {
-    let tree = try RestoreDocumentGraphFixture.graph().tree
+    let tree = try RestoreDocumentGraphFixture.graph()
     var raw = Self.report(tree, tree)
     let credential = "ghp_" + String(repeating: "x", count: 36)
     let doc52 = "doc:" + String(repeating: "a", count: 52)
