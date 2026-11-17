@@ -107,6 +107,14 @@ They're summarised here so every decision has one index.
     - A bug's reproduction is committed first, wrapped in `withKnownIssue`, and the fix
       removes the wrapper.
     - Features start from failing acceptance tests.
+  - **↳ update 2026-11-17:** reviews scale with the change, to keep slices moving.
+    - Small changes get one reviewer; most get Architect and Tester. Pragmatism joins
+      for diffs over about 500 lines or new abstractions; Agent experience for
+      agent-facing output.
+    - Plans are reviewed before coding only for new targets or dependencies, storage,
+      migrations, concurrency, agent-facing output, or a mechanism other code builds
+      on.
+    - Follow-up reviews check only blocker and major fixes.
     - Goldens are written from the spec.
     - PRs give "Test-first evidence".
     - CI requires a test change on PRs labelled `bug`.
