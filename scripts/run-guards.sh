@@ -30,6 +30,7 @@ run_guard try-optional python3 -B scripts/guards/check_try_optional.py
 run_guard coded-errors python3 -B scripts/guards/check_coded_errors.py
 run_guard package-features python3 -B scripts/guards/check_package_features.py
 run_guard control-release python3 -B scripts/guards/check_control_release.py
+run_guard app-pins python3 -B scripts/guards/check_app_pins.py
 run_guard package-graph python3 -B scripts/guards/check_package_graph.py
 run_guard docs-links python3 -B scripts/guards/check_docs_links.py
 run_guard plans-board python3 -B scripts/guards/check_plans_board.py

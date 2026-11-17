@@ -74,14 +74,11 @@ class AppSourceGuardsTests(unittest.TestCase):
             target.write_text(source)
             return checker.check(root)
 
-    @unittest.expectedFailure
     def test_app_tests_reject_wall_clock_sleeps(self):
         self.assertTrue(self.check_source("App/SiltaAppTests/Probe.swift", "try await Task.sleep(for: .seconds(1))", check_test_waits))
 
-    @unittest.expectedFailure
     def test_app_comments_reject_plan_refs(self):
         self.assertTrue(self.check_source("App/SiltaApp/Probe.swift", "// phase 2", check_no_plan_refs))
 
-    @unittest.expectedFailure
     def test_app_optional_errors_require_reasons(self):
         self.assertTrue(self.check_source("App/SiltaApp/Probe.swift", "try? load()", check_try_optional))

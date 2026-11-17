@@ -7,11 +7,13 @@ struct SiltaApp: App {
   init() {
     #if DEBUG
       do {
-        try TestLaunchPolicy.validate(environment: ProcessInfo.processInfo.environment,
+        try TestLaunchPolicy.validate(
+          environment: ProcessInfo.processInfo.environment,
           temporaryRoots: [FileManager.default.temporaryDirectory, URL(filePath: "/private/tmp")],
           forbiddenHome: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".silta"))
       } catch {
-        FileHandle.standardError.write(Data("Silta test launch refused: invalid isolated home.\n".utf8))
+        FileHandle.standardError.write(
+          Data("Silta test launch refused: invalid isolated home.\n".utf8))
         exit(64)
       }
     #endif

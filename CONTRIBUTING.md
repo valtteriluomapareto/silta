@@ -32,13 +32,14 @@ export PATH="$(paste -sd: "$silta_tools/path"):$PATH"
 | `scripts/lint-check.sh` | swift-format and SwiftLint in `--strict` mode, no changes | Behaviour |
 | `scripts/lint-fix.sh` | Apply swift-format and SwiftLint fixes | — |
 | `scripts/verify.sh quick` | Guards, lint, `swift build` with warnings as errors, `swift test` (a run with zero tests fails) | Concurrency under load, wall-clock deadlines, real agent use |
-| `scripts/verify.sh full` | `full-swift`, then `evals`: everything CI runs | Real agent use (spec §21 evals) |
+| `scripts/verify.sh full` | `full-swift`, `evals`, then `app`: everything CI runs | Real agent use (spec §21 evals) |
 | `scripts/verify.sh full-swift` | `quick` plus stress/scenarios and the prior-writer compatibility tests (`SILTA_SLOW_TESTS=1`), then the wall-clock deadline tier (`SILTA_DEADLINE_TESTS=1`, the `WallClock…` suites: hook, Git and `where` lock deadlines) alone and serially | The offline eval replays |
+| `scripts/verify.sh app` | Guards/lint, isolated hosted Debug app tests, nonempty/no-skip required-suite xcresult checks, then native Release build | Visual appearance, interaction and Screen Recording permission |
 | `scripts/verify.sh evals` | Builds the CLI, then the offline agent eval replays (`scripts/run-eval-tests.py`: one process per `Evals/tests` module, in parallel) | Swift tests, real agent use |
 
-CI runs `full-swift` and `evals` as two parallel jobs on the `xcode-27` runner, and a
-`verify` job, the required check, passes only when both succeed. Two macOS jobs per run
-also means two chances to wait for a preview runner. The `swift` job reuses the prior-writer
+CI runs `full-swift`, `evals` and `app` as three parallel jobs on the `xcode-27` runner, and a
+`verify` job, the required check, passes only when all succeed. Three macOS jobs per run
+also means three chances to wait for a preview runner. The `swift` job reuses the prior-writer
 binaries from the Actions cache, keyed by `scripts/ci/prior-writer-cache-key.sh` on the
 Swift toolchain and `scripts/build-prior-writer.sh`; the weekly scheduled run builds them
 from source. A push to `main` runs only `warm-caches`, which fills that cache in `main`'s
@@ -95,3 +96,10 @@ in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
 - [ ] Spec, decisions and plan board are updated when behaviour or scope changed.
 - [ ] Agent-facing changes have updated goldens and an agent-experience review.
 - [ ] The PR says what remains unverified.
+
+Native app tests require an isolated temporary home before the host starts. Use
+`scripts/verify.sh app`; it supplies `SILTA_APP_TEST_HOME` and keeps xcresult evidence
+under `.build/app/`. For manual Xcode tests, configure `SILTA_APP_TEST_HOME` to an
+existing temporary directory containing a `user/` directory. Missing or unexpanded
+settings refuse startup before a reader can be constructed. App and root shared
+package pins must match; the app never links test support.

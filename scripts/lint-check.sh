@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-paths=(Sources Tests)
+paths=(Sources Tests App)
 
 for tool in swift-format swiftlint; do
   command -v "$tool" >/dev/null || { echo "lint: $tool not found (brew install $tool)" >&2; exit 1; }

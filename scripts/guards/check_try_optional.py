@@ -18,7 +18,7 @@ TRY_OPTIONAL = re.compile(r"\btry\?")
 
 def check(root: Path) -> list[str]:
     errors = []
-    for path in swift_files(root, "Sources"):
+    for path in swift_files(root, "Sources", "App"):
         code, comments = split_swift(path.read_text(encoding="utf-8"))
         commented = {line for line, text in comments if text.strip()}
         for number, line in enumerate(code.split("\n"), start=1):

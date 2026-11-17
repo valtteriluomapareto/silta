@@ -15,7 +15,7 @@ concurrency:
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# PRs, the weekly run and manual runs: `scripts/verify.sh full` split in two parallel jobs,
+# PRs, the weekly run and manual runs: `scripts/verify.sh full` split in three parallel jobs,
 # with `verify` as the required check. A push to main only refills the shared caches: with
 # squash merges and the up-to-date rule its tree is the one its PR just verified (D19).
 jobs:
@@ -79,22 +79,44 @@ jobs:
       - name: Verify (offline agent eval replays)
         run: scripts/verify.sh evals
 
+  app:
+    if: github.event_name != 'push'
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: bash scripts/ci/select-xcode.sh
+      - name: Install pinned Swift tools
+        run: bash scripts/ci/install-swift-tools.sh
+      - name: Verify native app
+        run: scripts/verify.sh app
+      - name: Upload app evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: app-test-evidence
+          path: .build/app/run.*/Test.xcresult
+          if-no-files-found: ignore
+
   # A job whose needs failed is skipped, and a skipped required check counts as passing,
-  # so this always runs (except on push, which verifies nothing) and accepts only two
+  # so this always runs (except on push, which verifies nothing) and accepts only three
   # successes.
   verify:
-    needs: [swift, evals]
+    needs: [swift, evals, app]
     if: always() && github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require both jobs to succeed
+      - name: Require all jobs to succeed
         env:
           SWIFT: ${{ needs.swift.result }}
           EVALS: ${{ needs.evals.result }}
+          APP: ${{ needs.app.result }}
         run: |
-          echo "swift: $SWIFT, evals: $EVALS"
-          [[ "$SWIFT" == success && "$EVALS" == success ]]
+          echo "swift: $SWIFT, evals: $EVALS, app: $APP"
+          [[ "$SWIFT" == success && "$EVALS" == success && "$APP" == success ]]
 
   # PRs can read caches saved on main but not each other's, so main keeps the shared
   # prior-writer cache filled: after each merge, and weekly so a runner-image toolchain

@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 # The verify ladder (AGENTS.md).
 #   quick       guards, lint, build with warnings as errors, tests (a run with zero tests fails)
-#   full        full-swift, then evals: everything CI runs
+#   full        full-swift, evals and app: everything CI runs
+#   app         guards, lint, native Debug tests and Release build
 #   full-swift  quick plus the slow tiers (stress, scenarios, prior-writer compatibility),
 #               then the wall-clock deadline tier alone and serially
 #   evals       build the CLI, then the offline agent eval replays, one process per module
-# CI runs full-swift and evals as parallel jobs; full runs the same two pieces in sequence.
+# CI runs full-swift, evals and app in parallel; full runs them in sequence.
 # Tests always run against a temporary SILTA_HOME, never the real ~/.silta.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 mode="${1:-quick}"
 case "$mode" in
-  quick|full|full-swift|evals) ;;
-  *) echo "usage: scripts/verify.sh [quick|full|full-swift|evals]" >&2; exit 64 ;;
+  quick|full|full-swift|evals|app) ;;
+  *) echo "usage: scripts/verify.sh [quick|full|full-swift|evals|app]" >&2; exit 64 ;;
 esac
 
 step() { echo; echo "=== $* ==="; }
@@ -143,11 +144,16 @@ case "$mode" in
     build --product silta
     evals
     ;;
+  app)
+    guards_and_lint
+    scripts/verify-app.sh
+    ;;
   full)
     # Evals run after the wall-clock tier so their processes can't load the machine
     # during it.
     full_swift
     evals
+    scripts/verify-app.sh
     ;;
 esac
 
