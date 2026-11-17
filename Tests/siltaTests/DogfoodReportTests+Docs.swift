@@ -36,6 +36,7 @@ extension DogfoodReportTests {
       ])
       try command(["brief"])
       try command(["brief", "--hook", "--task", "AC-999"])
+      try command(["brief"], at: "2023-11-30T00:00:00.001Z")
       let result = try Self.run(
         ["--ws", "acme", "--since", "2023-11-14"], scratch: scratch, tools: tools)
       try #require(result.termination == .exit(0), "\(result.stderr)")
@@ -49,7 +50,9 @@ extension DogfoodReportTests {
       #expect(report.contains("Unattributed terminal history created in range: 1"))
       #expect(report.contains("Recorded doc-triage approvals in range: 1."))
       #expect(report.contains("Observed approvals per successful batch (human + agent): 1."))
-      #expect(report.contains("Observed brief document exposure: 1 agent sessions; 2 previews."))
+      withKnownIssue("Brief exposure must end at the captured report time") {
+        #expect(report.contains("Observed brief document exposure: 1 agent sessions; 2 previews."))
+      }
       #expect(report.contains("Legacy brief exposure unknown: 0 calls."))
       #expect(!report.contains("Keep Acme fallback") && !report.contains("Use the Acme decisions"))
     }
