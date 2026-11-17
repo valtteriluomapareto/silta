@@ -44,7 +44,8 @@ package struct TaskDetails: Encodable, Sendable {
   /// Computed only while the task is blocked.
   package var waiting: TaskWaiting?
 
-  let closedAt: String?
+  /// Recorded close time, independent of later task updates.
+  package let closedAt: String?
 
   /// The current markdown checklist.
   package let plan: String

@@ -1,7 +1,8 @@
 extension DocProposalPreviewGroup {
   var commands: [String] {
     var emitted: Set<String> = []
-    return (members.map(\.read) + [next].compactMap { $0 }).filter { emitted.insert($0).inserted }
+    return (members.flatMap { [$0.read] + $0.decisions } + [next].compactMap { $0 })
+      .filter { emitted.insert($0).inserted }
   }
 
   /// Renders complete evidence with the caller's selected, deduplicated read commands.

@@ -60,9 +60,13 @@ package enum SecretGuard {
 
   /// Replaces every covered span without changing surrounding Unicode text.
   package static func redacted(_ text: String) -> String {
+    redacted(text, matches: matches(in: text))
+  }
+
+  static func redacted(_ text: String, matches: [SecretMatch]) -> String {
     var output = text
-    for match in matches(in: text).reversed() {
-      output.replaceSubrange(match.range, with: "[REDACTED:\(match.rule)]")
+    for match in matches.reversed() {
+      output.replaceSubrange(match.range, with: match.replacement)
     }
     return output
   }

@@ -1,4 +1,3 @@
-import Foundation
 import GRDB
 
 extension DocStore {
@@ -31,18 +30,10 @@ extension DocStore {
     guard let metadata = member.metadata else { throw StorageError.internalMisuse }
     let stamp = utcTimestamp(at)
     let document: Int64 = member.raw["doc_id"]
-    try replaceAttachments(metadata.targets, doc: document, stamp: stamp)
-    try db.execute(
-      sql: """
-        UPDATE doc SET title=CAST(? AS TEXT),kind=CAST(? AS TEXT),current_rev=?,
-        verified_at=?,archived=0,updated_at=?
-        WHERE id=?
-        """,
-      arguments: [
-        Data(metadata.title.utf8), Data(metadata.kind.utf8), member.raw["rev"],
-        verification.snapshots.count == verification.binding.apps.count ? stamp : nil, stamp,
-        document,
-      ])
+    try updateCurrent(
+      metadata, doc: document, revision: member.raw["rev"],
+      verifiedAt: verification.snapshots.count == verification.binding.apps.count ? stamp : nil,
+      stamp: stamp)
     try db.execute(
       sql: """
         INSERT INTO doc_verification(uid,doc_rev_id,actor,message,app_shas,created_at)
