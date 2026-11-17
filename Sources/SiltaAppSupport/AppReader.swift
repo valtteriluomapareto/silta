@@ -62,7 +62,7 @@ public struct AppReader: Sendable {
         board: AppBoard(
           todo: tasks.filter { ["todo", "blocked"].contains($0.status) },
           doing: tasks.filter { $0.status == "doing" }, review: reviews,
-          doneThisWeek: completed, proposedCount: tasks.filter { $0.status == "proposed" }.count,
+          doneThisWeek: completed, proposals: tasks.filter { $0.status == "proposed" },
           appOpenCounts: counts),
         work: AppWork(
           items: inbox.items.map(AppAttention.init), remaining: inbox.remaining,

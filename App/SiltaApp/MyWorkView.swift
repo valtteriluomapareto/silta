@@ -110,18 +110,9 @@ struct MyWorkView: View {
   }
 
   private func commands(_ values: [AppCommand]) -> some View {
-    ForEach(values, id: \.text) { command in
-      HStack(alignment: .top, spacing: 12) {
-        VStack(alignment: .leading, spacing: 6) {
-          Text(command.title).font(.caption).foregroundStyle(.secondary)
-          Text(command.text).font(.system(.callout, design: .monospaced))
-            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-        }
-        Spacer(minLength: 0)
-        CopyValue(value: command.text, title: "Copy command", compact: true)
-      }.padding(12).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-    }
+    ForEach(values, id: \.text) { command in CommandBlock(command: command) }
   }
+
 }
 
 struct CopyValue: View {

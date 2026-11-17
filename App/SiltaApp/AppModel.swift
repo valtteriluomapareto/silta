@@ -9,6 +9,10 @@ final class AppModel {
   private(set) var workspace: String?
   let reader: AppReader?
   var search = ""
+  var route: AppRoute = .mywork
+  var appFilter: String?
+  var selectedTask: String?
+  var inspectorPresented = false
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
   private(set) var lastCheckedAt: Date?
@@ -89,8 +93,21 @@ final class AppModel {
     if workspace != slug {
       generation += 1
       workspace = slug
+      selectedTask = nil
+      appFilter = nil
     }
     return refresh(force: true)
+  }
+
+  func inspect(_ ref: String) {
+    selectedTask = ref
+    route = .board
+    inspectorPresented = true
+  }
+
+  func showApp(_ slug: String) {
+    appFilter = slug
+    route = .board
   }
 
   @discardableResult func focused() -> Task<Void, Never> { refresh() }

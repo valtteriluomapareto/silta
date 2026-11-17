@@ -20,38 +20,54 @@ struct AppSidebar: View {
       .disabled(model.data?.workspaces.isEmpty != false)
       List {
         Section {
-          HStack {
-            Label("My work", systemImage: "tray")
-            Spacer()
-            Text(model.visibleData?.snapshot?.work.waitingCount ?? 0, format: .number)
-              .font(.caption.monospacedDigit())
-          }.foregroundStyle(Color.accentColor)
+          ForEach(AppRoute.allCases) { route in
+            Button {
+              model.route = route
+            } label: {
+              HStack {
+                Label(route.title, systemImage: route.symbol)
+                Spacer()
+                Text(count(route), format: .number).font(.caption.monospacedDigit())
+              }
+            }.buttonStyle(.plain)
+              .foregroundStyle(model.route == route ? Color.accentColor : .primary)
+          }
         }
 
         Section("Apps") {
           ForEach(model.visibleData?.map?.apps ?? [], id: \.slug) { app in
-            HStack {
-              Label(app.slug, systemImage: "square.fill").lineLimit(1)
-              Spacer()
-              Text(model.visibleData?.snapshot?.board.appOpenCounts[app.slug] ?? 0, format: .number)
+            Button {
+              model.showApp(app.slug)
+            } label: {
+              HStack {
+                Label(app.slug, systemImage: "square.fill").lineLimit(1)
+                Spacer()
+                Text(
+                  model.visibleData?.snapshot?.board.appOpenCounts[app.slug] ?? 0, format: .number
+                )
                 .font(.caption.monospacedDigit())
-            }
+              }
+            }.buttonStyle(.plain)
           }
         }
         Section("Claimed now") {
           ForEach(claimed, id: \.ref) { task in
-            Label {
-              VStack(alignment: .leading, spacing: 3) {
-                Text(task.ref).font(.caption.monospaced())
-                if !task.steps.isEmpty {
-                  Text("Step \(task.steps.filter(\.done).count) of \(task.steps.count)")
-                    .font(.caption)
+            Button {
+              model.inspect(task.ref)
+            } label: {
+              Label {
+                VStack(alignment: .leading, spacing: 3) {
+                  Text(task.ref).font(.caption.monospaced())
+                  if !task.steps.isEmpty {
+                    Text("Step \(task.steps.filter(\.done).count) of \(task.steps.count)")
+                      .font(.caption)
+                  }
+                  Text(task.claimedBy ?? "").font(.caption2).lineLimit(1)
                 }
-                Text(task.claimedBy ?? "").font(.caption2).lineLimit(1)
+              } icon: {
+                Image(systemName: "terminal").frame(width: 16)
               }
-            } icon: {
-              Image(systemName: "terminal").frame(width: 16)
-            }
+            }.buttonStyle(.plain)
           }
         }
       }.listStyle(.sidebar)
@@ -73,6 +89,15 @@ struct AppSidebar: View {
 
   private var claimed: [AppTask] {
     model.visibleData?.snapshot?.board.doing.filter { $0.claimedBy != nil } ?? []
+  }
+
+  private func count(_ route: AppRoute) -> Int {
+    guard let snapshot = model.visibleData?.snapshot else { return 0 }
+    switch route {
+    case .mywork: return snapshot.work.waitingCount
+    case .board:
+      return snapshot.board.todo.count + snapshot.board.doing.count + snapshot.board.review.count
+    }
   }
 
 }
