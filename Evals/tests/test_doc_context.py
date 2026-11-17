@@ -1,6 +1,7 @@
 """Document outcomes use real CLI state and authored native evidence, never a model."""
 from contextlib import closing
 import copy
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -239,6 +240,7 @@ class DocContext(unittest.TestCase):
         self.assertTrue(any('acme-other-rule' in c and 'doc show' in c for c in e['phases'][0]['commands']))
         self.assertFalse(any(TOKEN in row['body_md'] for row in plans))
 
+    @unittest.expectedFailure
     def test_explicit_control_has_raw_failure_full_reports_and_no_infrastructure_error(self):
         for harness in ['claude', 'codex']:
             for recording in ['pass', 'fail']:
@@ -248,7 +250,7 @@ class DocContext(unittest.TestCase):
                                           '--stub', str(STUB), '--harness', harness, '--scenario',
                                           'doc-context-no-doc', '--recording', recording, '--repeats', '3',
                                           '--output', str(output)], text=True, capture_output=True)
-                    self.assertEqual(run.returncode, 1, run.stderr)
+                    self.assertEqual(run.returncode, 0, run.stderr)
                     report = json.loads((output / 'report.json').read_text())
                     self.assertTrue((output / 'report.html').exists())
                     self.assertEqual(len(report['trials']), 3)
@@ -269,11 +271,14 @@ class DocContext(unittest.TestCase):
                     self.assertEqual(report['groups'][0]['repeats'], 3)
                     self.assertEqual(report['groups'][0]['pass_rate'], 0)
                     self.assertFalse(report['groups'][0]['all_repeats_pass'])
+                    self.assertIs(report['groups'][0].get('diagnostic'), True)
+                    self.assertIn('Diagnostic', (output / 'report.html').read_text())
 
+    @unittest.expectedFailure
     def test_default_core_and_explicit_control_selection(self):
-        for selection, expected in [([], set(evals.SCENARIOS) - {'doc-context-no-doc'}),
+        for selection, expected in [([], set(evals.SCENARIOS)),
                                     (['--core'], {'start-cross-repo', 'plan-not-file',
-                                                  'handoff-resume', 'done-with-result'}),
+                                                  'handoff-resume', 'done-with-result', 'doc-context-no-doc'}),
                                     (['--scenario', 'doc-context-no-doc'], {'doc-context-no-doc'})]:
             calls = []
             def observe(*args, **kwargs):
@@ -286,3 +291,97 @@ class DocContext(unittest.TestCase):
                 self.assertEqual(evals.main(), 1)
             self.assertEqual(set(calls), {(adapter, scenario) for adapter in ['claude', 'codex']
                                          for scenario in expected})
+
+    @unittest.expectedFailure
+    def test_trial_token_is_seeded_in_evidence_and_only_below_summary(self):
+        self.prepare()
+        fixture = self.e['controls'].get('doc_fixture')
+        self.assertIsInstance(fixture, dict)
+        seed, token = fixture.get('seed'), fixture.get('token')
+        self.assertIsInstance(seed, str)
+        self.assertEqual(token, 'UNSORTED_' + hashlib.sha256(seed.encode()).hexdigest()[:16].upper())
+        with closing(sqlite3.connect(self.root / 'data/silta.db')) as db:
+            body = db.execute('SELECT body_md FROM doc_rev').fetchone()[0]
+        summary = next(line.strip() for line in body.splitlines()
+                       if line.strip() and not line.lstrip().startswith('#'))
+        self.assertNotIn(token, summary)
+        self.assertIn(token, body)
+        other = self.root / 'same-seed'
+        other.mkdir()
+        _, _, _, controls = evals.prepare(other, BINARY, 'codex', 'doc-context', 'default', seed=seed)
+        self.assertEqual(controls['doc_fixture'], fixture)
+        fresh = self.root / 'fresh-seed'
+        fresh.mkdir()
+        _, _, _, changed = evals.prepare(fresh, BINARY, 'codex', 'doc-context', 'default')
+        self.assertNotEqual(changed['doc_fixture']['seed'], seed)
+        self.assertNotEqual(changed['doc_fixture']['token'], token)
+
+    @unittest.expectedFailure
+    def test_control_requires_valid_token_evidence_and_all_global_checks(self):
+        result, evidence = self.trial('codex', 'doc-context-no-doc')
+        self.assertIs(result['checks'].get('doc_fixture'), True)
+        for damage in ['missing', 'seed', 'token', 'type']:
+            changed = copy.deepcopy(evidence)
+            fixture = changed['controls']['doc_fixture']
+            if damage == 'missing':
+                del changed['controls']['doc_fixture']
+            elif damage == 'type':
+                fixture['seed'] = 42
+            else:
+                fixture[damage] += 'ALTERED'
+            grade = evals.grade(changed)
+            self.assertIs(grade['checks']['doc_fixture'], False)
+            self.assertFalse(grade['passed'])
+            self.assertEqual(self.diagnostic_exit(dict(result, **grade), damage), 1)
+        self.assertEqual(self.diagnostic_exit(result, 'valid'), 0)
+        for name in result['checks']:
+            if name == 'doc_context':
+                continue
+            for value in [False, None, 'missing']:
+                changed = copy.deepcopy(result)
+                if value == 'missing':
+                    del changed['checks'][name]
+                else:
+                    changed['checks'][name] = value
+                self.assertEqual(self.diagnostic_exit(changed, name + str(value)), 1)
+        primary = dict(result, scenario='doc-context')
+        self.assertEqual(self.diagnostic_exit(primary, 'primary'), 1)
+
+    def diagnostic_exit(self, trial, name):
+        output = self.root / ('exit-' + name)
+        argv = ['evals', '--silta', str(BINARY), '--stub', str(STUB), '--harness', 'codex',
+                '--scenario', trial['scenario'], '--repeats', '1', '--output', str(output)]
+        with patch.object(sys, 'argv', argv), patch.object(evals, 'run_trial', return_value=trial):
+            return evals.main()
+
+    @unittest.expectedFailure
+    def test_review_regrades_diagnostic_without_hiding_invalid_evidence(self):
+        result, original = self.trial('codex', 'doc-context-no-doc')
+        folder = self.root / 'regrade'
+        folder.mkdir()
+        for damage in ['none', 'token', 'stream', 'unbound']:
+            evidence = copy.deepcopy(original)
+            evidence['provenance'] = 'live'
+            evidence['review'] = None
+            if damage == 'token':
+                evidence['controls'].pop('doc_fixture', None)
+            if damage == 'stream':
+                evidence['phases'][0]['complete'] = False
+            verdict = {'digest': evals.review_digest(evidence), 'reviewer': 'fixture-maintainer',
+                       'checks': ['tool-audit'], 'citations': ['phase-0.jsonl: recorded commands']}
+            if damage == 'unbound':
+                verdict['digest'] = 'unbound'
+            row = dict(result, evidence='evidence.json')
+            report = evals.aggregate([row], 'live')
+            report.update(commit='fixture', dirty=False, binary_sha256='fixture')
+            evals.write_json(folder / 'evidence.json', evidence)
+            evals.write_json(folder / 'report.json', report)
+            evals.write_json(folder / 'verdicts.json', {evidence['id']: verdict})
+            run = subprocess.run([sys.executable, '-B', str(ROOT / 'review.py'), str(folder),
+                                  str(folder / 'verdicts.json')], capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0 if damage == 'none' else 1, run.stderr)
+            if damage != 'unbound':
+                updated = json.loads((folder / 'report.json').read_text())
+                self.assertFalse(updated['trials'][0]['passed'])
+                self.assertEqual(updated['groups'][0]['pass_rate'], 0)
+                self.assertIs(updated['groups'][0].get('diagnostic'), True)
