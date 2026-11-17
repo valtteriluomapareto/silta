@@ -1,0 +1,1 @@
+{"id":"database.integrity","message":"Stored IDs must be nonempty ASCII text without NUL; inspect backups and read-only evidence. Restore is the human's decision.","next_by":"agent","status":"fail"}

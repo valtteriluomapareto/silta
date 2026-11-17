@@ -764,3 +764,12 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   secrets that masked reads cannot reconstruct. Private Core policy establishes
   this boundary; the CLI command, help and removal recovery ship together with
   their public contract updates.
+
+- **D49: Admit stored UIDs once, with read-only doctor diagnosis.** On 2026-11-17
+  the maintainer chose migration-time admission instead of per-read UID scans.
+  Migration v9 checks nonempty ASCII/TEXT identities without NUL, including saved
+  doc attachment and verification identities. Doctor reports violations without
+  migrating or repairing. Reads remain available before admission and after direct
+  database corruption; the maintainer accepted that later corruption can alias
+  identities. Incoming restore admission, ownership checks and literal body/map
+  handling remain required. This changes no writer floor or shipped migration.

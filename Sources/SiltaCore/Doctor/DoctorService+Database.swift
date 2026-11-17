@@ -104,7 +104,7 @@ extension DoctorService {
     }
   }
 
-  /// Persisted rows the read and write paths refuse to interpret as valid Silta state.
+  /// Persisted data that fails admission or normal interpretation.
   private static func storedDataProblems(_ db: Database) throws -> [String] {
     guard try db.tableExists("meta"), try db.tableExists("task") else { return [] }
     var problems: [String] = []

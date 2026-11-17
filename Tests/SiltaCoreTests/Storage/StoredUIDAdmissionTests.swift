@@ -58,7 +58,9 @@ struct StoredUIDAdmissionTests {
       try Self.replace(bytes, table: table, store: store, text: example != 4)
       let before = try DocVerificationPreparationTests.truth(store)
       let checks = Self.checks(store, home: home)
-      #expect(checks.first { $0.id == "database.integrity" }?.status == .fail)
+      let integrity = try #require(checks.first { $0.id == "database.integrity" })
+      #expect(integrity.status == .fail)
+      #expect(integrity.message.contains("Stored IDs must be nonempty ASCII text without NUL"))
       #expect(
         checks.allSatisfy {
           !$0.next.contains("silta init") && !$0.message.contains("private-suffix")
@@ -145,7 +147,11 @@ struct StoredUIDAdmissionTests {
       _ = Self.checks(store, home: home)
       #expect(try DocVerificationPreparationTests.truth(store) == before)
       #expect(!FileManager.default.fileExists(atPath: home.appending(path: "backups").path))
-      let healthy = try Self.legacy(home.appending(path: "healthy"))
+      let healthyHome = home.appending(path: "healthy")
+      let healthy = try Self.legacy(healthyHome)
+      #expect(
+        Self.checks(healthy, home: healthyHome).first { $0.id == "database.schema" }?
+          .next.contains("silta init") == true)
       #expect(
         RestoreASCIIIdentityTests.failure {
           _ = try healthy.read { try ExportSnapshot.read($0, workspace: "acme") }

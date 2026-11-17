@@ -109,31 +109,31 @@ struct DocProposalIdentityTests {
   }
 
   @Test(arguments: [false, true])
-  func invalidTargetUIDRaceKeepsHumanBackupRecovery(nul: Bool) throws {
-    do {
-      try withScratchDirectory { home in
-        let store = try AcmeDocAttachments.make(in: home)
-        let uid = try #require(
-          store.read { try String.fetchOne($0, sql: "SELECT uid FROM service") })
-        var committed: [[String]] = []
-        var failure: (any CodedError)?
-        do {
-          _ = try DocProposalServiceTests.service(home, store).propose(
-            DocProposalServiceTests.request()
-          ) {
-            try store.write {
-              try $0.database.execute(
-                sql: "UPDATE service SET uid=CAST(? AS TEXT)",
-                arguments: [Data((nul ? uid + "\u{0}suffix" : "\u{212a}").utf8)])
-            }
-            committed = try DocVerificationPreparationTests.truth(store)
-            return "Body"
-          }
-        } catch let error as any CodedError { failure = error }
-        DocStoredIdentityTests.expectBackup(failure)
-        #expect(!committed.isEmpty)
-        #expect(try DocVerificationPreparationTests.truth(store) == committed)
+  func inputUIDChangeCapturesTheCurrentTarget(alternate: Bool) throws {
+    try withScratchDirectory { home in
+      let store = try AcmeDocAttachments.make(in: home)
+      let uid = try #require(
+        store.read { try String.fetchOne($0, sql: "SELECT uid FROM service") })
+      let changed = alternate ? uid + "-replacement" : "replacement-target"
+      let result = try DocProposalServiceTests.service(home, store).propose(
+        DocProposalServiceTests.request()
+      ) {
+        try store.write {
+          try $0.database.execute(sql: "UPDATE service SET uid=?", arguments: [changed])
+        }
+        return "Body"
       }
+      let snapshot = try store.read {
+        try DocStore.revision("rules", revision: 1, workspace: 1, in: $0)
+      }
+      #expect(snapshot.aboutTargets?.map(\.uid) == [changed])
+      #expect(snapshot.state == "proposed" && snapshot.body == "Body")
+      #expect(
+        try store.read { try Data.fetchOne($0, sql: "SELECT CAST(uid AS BLOB) FROM service") }
+          == Data(changed.utf8))
+      #expect(
+        try DocService(workspace: "acme", store: store).list(about: "service:push")
+          .entries.map(\.ref) == [result.ref])
     }
   }
 }
