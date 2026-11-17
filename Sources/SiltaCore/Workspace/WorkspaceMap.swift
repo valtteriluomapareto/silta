@@ -78,12 +78,14 @@ package struct WorkspaceMap: Sendable {
     try Row.fetchAll(
       db,
       sql: """
-        SELECT app.*,repo.slug AS repo_slug FROM app JOIN repo ON repo.id=app.repo_id
+        SELECT app.*,CAST(app.slug AS BLOB) AS slug_bytes,repo.slug AS repo_slug
+        FROM app JOIN repo ON repo.id=app.repo_id
         WHERE app.workspace_id=? ORDER BY app.slug
         """, arguments: [workspace]
     ).map { row in
-      App(
-        slug: row["slug"], name: row["name"], repo: row["repo_slug"], ref: row["ref"],
+      guard let slug = try row.strictText("slug_bytes") else { throw StorageError.corrupt }
+      return App(
+        slug: slug, name: row["name"], repo: row["repo_slug"], ref: row["ref"],
         productionRef: row["prod_ref"], subpath: row["subpath"], summary: row["summary"],
         lifecycle: row["lifecycle"])
     }
@@ -108,23 +110,24 @@ package struct WorkspaceMap: Sendable {
     try Row.fetchAll(
       db,
       sql: """
-        SELECT a.slug AS source,b.slug AS app,CAST(s.slug AS BLOB) AS service,
-          CAST(edge.kind AS BLOB) AS kind,edge.summary,edge.code_refs,
+        SELECT CAST(a.slug AS BLOB) AS source,CAST(b.slug AS BLOB) AS app,
+          CAST(s.slug AS BLOB) AS service,CAST(edge.kind AS BLOB) AS kind,
+          edge.summary,CAST(edge.code_refs AS BLOB) AS code_refs,
           COALESCE(b.slug,'service:'||s.slug) AS target
         FROM edge JOIN app a ON a.id=edge.from_app_id
         LEFT JOIN app b ON b.id=edge.to_app_id LEFT JOIN service s ON s.id=edge.to_service_id
         WHERE edge.workspace_id=? ORDER BY source,target,edge.kind
         """, arguments: [workspace]
     ).map { row in
-      guard let kind = try row.strictText("kind") else { throw StorageError.corrupt }
-      let source: String = row["source"]
+      guard let kind = try row.strictText("kind"), let source = try row.strictText("source"),
+        let code = try row.strictText("code_refs")
+      else { throw StorageError.corrupt }
       let service = try row.strictText("service")
-      let app: String? = row["app"]
+      let app = try row.strictText("app")
       guard let target = service.map({ "service:" + $0 }) ?? app,
         let encodedTarget = service.map({ "service:" + TaskLinkTarget.encodeComponent($0) })
           ?? app
       else { throw StorageError.corrupt }
-      let code: String = row["code_refs"]
       let references: [String]
       do { references = try JSONDecoder().decode([String].self, from: Data(code.utf8)) } catch {
         throw StorageError.corrupt
