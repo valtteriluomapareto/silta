@@ -48,6 +48,28 @@ struct DocFinalRecoveryTests {
     }
   }
 
+  @Test func diffMasksWholeMetadataBeforeOmittingUnchangedFields() throws {
+    try fixture { scratch, repo, file in
+      try #require(
+        run(
+          [
+            "edit", "rules", "--title", "-----BEGIN PRIVATE KEY-----", "--keep-body",
+            "--approved", "Retitle Acme",
+          ], scratch, repo
+        ).termination == .exit(0))
+      try "Proposed Acme rule.\n".write(to: file, atomically: true, encoding: .utf8)
+      let proposed = try run(
+        [
+          "propose", "rules", "-F", file.path, "-m",
+          "private Acme material\n-----END PRIVATE KEY-----",
+        ], scratch, repo)
+      try #require(proposed.termination == .exit(0))
+      let diff = try run(["show", "doc:rules@3", "--diff"], scratch, repo)
+      #expect(diff.termination == .exit(0))
+      withKnownIssue { #expect(!diff.stdout.contains("private Acme material")) }
+    }
+  }
+
   private func fixture(_ body: (URL, URL, URL) throws -> Void) throws {
     try withScratchDirectory { scratch in
       let repo = try WhereCommandTests().setup(scratch)
