@@ -171,10 +171,11 @@ struct StoredUIDAdmissionTests {
       let before = try DocVerificationPreparationTests.truth(store)
       let integrity = Self.checks(store, home: home).first { $0.id == "database.integrity" }
       let failure = RestoreASCIIIdentityTests.failure { try store.initialize() }
+      let after = try DocVerificationPreparationTests.truth(store)
       withKnownIssue("Container-valued snapshot UIDs must fail admission and doctor diagnosis") {
         #expect(integrity?.status == .fail && integrity?.message.contains("ASCII") == true)
         #expect(failure?.code == .env && failure?.next == ["silta doctor"])
-        #expect(try DocVerificationPreparationTests.truth(store) == before)
+        #expect(after == before)
       }
     }
   }
