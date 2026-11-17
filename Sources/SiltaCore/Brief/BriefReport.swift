@@ -15,6 +15,9 @@ package struct BriefReport: Encodable, Sendable {
   /// Location diagnostics rendered by the command envelope and recorded in the log.
   package let warnings: [OutputWarning]
 
+  /// Document preview rows actually retained; command-log metadata only.
+  package var docsShown = 0
+
   enum CodingKeys: String, CodingKey {
     case location, settings, sections, more, truncated
     case currentTask = "current_task"

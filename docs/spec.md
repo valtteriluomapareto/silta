@@ -2298,6 +2298,10 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     `SILTA_SESSION` equals the resolved actor's session. This boolean carries no
     environment values; hooks omit it because they synthesize the session.
     Legacy lines omit it and cannot prove propagation.
+  - `docs_shown` on successful `brief` and SessionStart calls counts document preview
+    rows retained after budgeting, including zero. Count-only and recovery lines
+    contribute zero; repeated displayed previews count separately. Failure and timeout
+    lines omit it. No document names, titles or refs are logged.
   - Early hook failures, including input decoding and environment assembly, append
     one body-free `env` / `hook_failed` attempt through the same exclusive completion
     owner as successful hooks and timeouts. They retain quiet exit 0 and record elapsed
@@ -2307,7 +2311,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     receive a record; diagnostics remain best effort rather than choosing another home.
 
   `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
-  `inbox`, `export`, `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`,
+  `doc *`, `inbox`, `export`, `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`,
   `status` (logged as
   `silta status` also when bare `silta` runs it), and a successful `init --scan`.
   - A successful command logs the workspace it resolved and acted on (`--ws`, its
