@@ -20,6 +20,7 @@
       <EnvironmentVariable key="SILTA_APP_TESTING" value="1" isEnabled="YES" />
       <EnvironmentVariable key="SILTA_HOME" value="$(SILTA_APP_TEST_HOME)" isEnabled="YES" />
       <EnvironmentVariable key="SILTA_APP_TEST_HOME" value="$(SILTA_APP_TEST_HOME)" isEnabled="YES" />
+      <EnvironmentVariable key="SILTA_APP_TEST_CLI" value="$(SILTA_APP_TEST_CLI)" isEnabled="YES" />
       <EnvironmentVariable key="USER" value="acme" isEnabled="YES" />
       <EnvironmentVariable key="HOME" value="$(SILTA_APP_TEST_HOME)/user" isEnabled="YES" />
       <EnvironmentVariable key="CFFIXED_USER_HOME" value="$(SILTA_APP_TEST_HOME)/user" isEnabled="YES" />

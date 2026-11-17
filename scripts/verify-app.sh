@@ -9,7 +9,11 @@ app_run="$(mktemp -d "$app_build/run.XXXXXX")"
 app_home="$(mktemp -d "${TMPDIR:-/tmp}/silta-app-test.XXXXXX")"
 mkdir -p "$app_home/user"
 trap 'rm -rf "$app_home"' EXIT
-common=(-project App/SiltaApp.xcodeproj -scheme SiltaApp -destination 'platform=macOS'
+swiftpm=()
+if [[ -n "${CODEX_SANDBOX:-}" ]]; then swiftpm=(--disable-sandbox); fi
+swift build ${swiftpm[@]+"${swiftpm[@]}"} --only-use-versions-from-resolved-file \
+  --product silta -Xswiftc -warnings-as-errors
+common=("SILTA_APP_TEST_CLI=$PWD/.build/debug/silta" -project App/SiltaApp.xcodeproj -scheme SiltaApp -destination 'platform=macOS'
   -derivedDataPath "$app_build/DerivedData" -clonedSourcePackagesDirPath "$app_build/SourcePackages"
   -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile)
 xcodebuild "${common[@]}" -configuration Debug -resultBundlePath "$app_run/Test.xcresult" \
