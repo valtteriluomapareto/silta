@@ -47,6 +47,51 @@
       #expect(!docs.showingSource && docs.lines == nil)
     }
 
+    @Test func rejectedAttributionAndEmptySourceRemainTruthful() {
+      let doc = AppDocument(
+        ref: "doc:contract@3", slug: "contract", revision: 3, title: "Contract",
+        kind: "contract", about: [], state: "rejected", archived: false,
+        actor: "agent:codex:test", triagedBy: "human:acme")
+      withKnownIssue("Rejected triage is labeled accepted") {
+        #expect(DocsContent.attribution(doc, now: AppV2Fixture.now).hasPrefix("Rejected by acme"))
+      }
+      withKnownIssue("Empty body is replaced with CLI metadata") {
+        #expect(DocsContent.readerText(doc, body: "", diagnostic: "CLI metadata").isEmpty)
+      }
+      #expect(
+        DocsContent.readerText(nil, body: "", diagnostic: "No accepted revision")
+          == "No accepted revision")
+    }
+
+    @Test func docsHeaderHandlesNoSelectionAndPartialHistory() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let history = try reader.documentVersions("order-contract", workspace: "acme")
+      let partial = AppDocumentList(
+        entries: Array(history.entries.prefix(1)), total: 3, nextOffset: 1)
+      let docs = DocsModel(readVersions: { _, _, _, _ in partial })
+      let model = AppModel(
+        reader: reader, documents: docs,
+        load: { _, _, _ in
+          AppLoadedData(
+            workspaces: [], workspace: "acme", snapshot: nil, map: nil,
+            version: 1, checkedAt: AppV2Fixture.now)
+        })
+      await model.refresh().value
+      model.navigate(to: .docs)
+      withKnownIssue("No-selection Docs falls through to My work summary") {
+        #expect(model.screenSummary == "Workspace documents")
+      }
+      model.select(document: "doc:order-contract@2")
+      await docs.show(reader, workspace: "acme")
+      withKnownIssue("Partial history count is presented as complete") {
+        #expect(model.screenSummary.contains("loaded history"))
+      }
+    }
+
     @Test func markdownTablesAndDiffRemainReadable() {
       let table = "| Name | Value |\n| --- | ---: |\n| amount | 42 |"
       let content = MarkdownContent("# Contract\n\n" + table, title: "Contract")

@@ -42,6 +42,10 @@ import SiltaAppSupport
       + (document.archived ? ["archived"] : [])).joined(separator: " · ")
   }
 
+  static func readerText(_ document: AppDocument?, body: String, diagnostic: String) -> String {
+    body.isEmpty ? diagnostic : body
+  }
+
   static func proposal(in revisions: [AppDocument]) -> AppDocument? {
     revisions.filter { $0.state == "proposed" }.max { $0.revision < $1.revision }
   }

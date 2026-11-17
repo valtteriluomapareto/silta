@@ -66,12 +66,13 @@ struct DocsView: View {
               diff
             } else if docs.showingSource {
               ScrollView(.horizontal) {
-                Text(docs.body.isEmpty ? docs.text : docs.body)
+                Text(DocsContent.readerText(docs.document, body: docs.body, diagnostic: docs.text))
                   .font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
               }
             } else {
               DocumentMarkdown(
-                docs.body.isEmpty ? docs.text : docs.body, title: docs.document?.title)
+                DocsContent.readerText(docs.document, body: docs.body, diagnostic: docs.text),
+                title: docs.document?.title)
             }
             if docs.nextLine != nil, docs.view != .comments {
               Button("Load more") { Task { await show(append: true) } }.disabled(docs.loading)
