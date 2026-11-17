@@ -933,8 +933,15 @@ Document proposals use `kind: "doc_proposal"` and a concrete `doc_proposal`
 object, separate from `tasks`: `ref`, eligible `total`, at most two `members`,
 `omitted`, and an optional `next` global-list continuation. Each member has bounded
 `ref`, `title`, `kind`, `why`, `source_task`, a factual `summary`, and a complete
-`read` command. The summary compares body bytes and metadata without loading bodies.
-Unknown historical metadata stays unknown. Secret-bearing values stay masked in
+`read` command, plus a `stale_base` boolean. Staleness compares the recorded base
+with the current accepted revision in the same snapshot; two absent pointers match.
+The text summary marks a stale base separately from an unavailable recorded base,
+and compares body bytes and metadata without loading bodies. Unknown historical
+metadata stays unknown. Each displayed member offers immutable accept/reject guidance;
+stale or unavailable bases offer rejection and inspection. Actual human callers get
+direct decision commands. Agents, including those querying human attention, get an
+ask-human instruction with approval placeholders. Targeting human attention never
+grants human caller privileges. Secret-bearing values stay masked in
 bounded, single-line previews. Omitted values carry explicit size or truncation
 markers. Read commands are complete; unusable refs recover through the existing
 protected archived list or workspace list.
@@ -1122,7 +1129,7 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-read commands; decisions name explicit immutable proposal refs. Doc-specific review
+inspection and decision guidance; decisions name explicit immutable proposal refs. Doc-specific review
 measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
@@ -1584,8 +1591,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    quoted `<ref>: <title>` lines. Every item ends with its `next:` lines; a command
    an earlier item printed is not repeated. When the caller has any item, `more:`
    adds `silta --ws acme inbox`, which no trim removes.
-   Document proposal items use the same bounded evidence and complete read commands
-   as the inbox, with at most two members. Evidence may be shortened with an explicit
+   Document proposal items use the same bounded evidence and complete inspection
+   and decision guidance as the inbox, with at most two members. Evidence may be shortened with an explicit
    marker; recovery commands stay complete. Rendered groups fit the optional budget
    without displacing current-task context. The header still counts every eligible
    group and the complete inbox recovery remains. Selection, rendering and trimming

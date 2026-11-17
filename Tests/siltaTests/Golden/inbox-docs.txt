@@ -15,5 +15,7 @@ doc proposal doc:rules (3 pending)
 > body changed (9→8 bytes)
 (1 more proposed revision)
 next: silta --ws 'acme' doc show 'doc:rules@4' --diff
+next: ask human: Accept or reject doc:rules@4? After approval: silta --ws 'acme' doc triage --accept 'doc:rules@4' --approved "<the human's words>"; or silta --ws 'acme' doc triage --reject 'doc:rules@4' --approved "<the human's words>"
 next: silta --ws 'acme' doc show 'doc:rules@3' --diff
+next: ask human: Accept or reject doc:rules@3? After approval: silta --ws 'acme' doc triage --accept 'doc:rules@3' --approved "<the human's words>"; or silta --ws 'acme' doc triage --reject 'doc:rules@3' --approved "<the human's words>"
 next: silta --ws 'acme' doc ls --archived --offset 0 --limit 20

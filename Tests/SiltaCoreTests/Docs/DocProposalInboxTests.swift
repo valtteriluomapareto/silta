@@ -58,7 +58,7 @@ struct DocProposalInboxTests {
         #expect(try reader.count() == 2)
         let groups = try reader.groups(limit: 1)
         #expect(groups.count == 1 && groups.first?.total == 3)
-        #expect(try reader.previews(groups).count == 1)
+        #expect(try reader.previews(groups, caller: .human(name: "acme")).count == 1)
       }
     }
   }
@@ -112,7 +112,7 @@ struct DocProposalInboxTests {
       #expect(group.next == "silta --ws 'acme' doc ls --archived --offset 4 --limit 20")
       let member = try #require(group.members.first)
       #expect(member.read.hasSuffix(missing ? "'doc:rules@4'" : "'doc:rules@4' --diff"))
-      if missing { #expect(member.summary == "recorded base unavailable") }
+      if missing { #expect(member.summary == "recorded base unavailable; stale base") }
       for command in [member.read, try #require(group.next)] {
         let result = try replay(command, home)
         #expect(result.termination == .exit(0), "\(result.stderr)")
@@ -236,7 +236,7 @@ struct DocProposalInboxTests {
     try store.read { db in
       let reader = try DocProposalInbox(
         workspace: workspace, at: AcmeDocAttachments.instant, all: all, in: db)
-      return try reader.previews(reader.groups())
+      return try reader.previews(reader.groups(), caller: .human(name: "acme"))
     }
   }
 

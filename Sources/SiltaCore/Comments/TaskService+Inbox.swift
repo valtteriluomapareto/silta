@@ -31,7 +31,8 @@ extension TaskService {
       for: actor, workspace: workspace, all: all, at: at, limit: all ? nil : 12, in: db)
     let selected = all ? attention.items : Array(attention.items.prefix(12))
     let reader = try DocProposalInbox(workspace: workspace, at: at, all: all, in: db)
-    let groups = try reader.previews(selected.compactMap(\.proposalGroup))
+    let groups = try reader.previews(
+      selected.compactMap(\.proposalGroup), caller: environment.actor)
     let previews = Dictionary(groups.map { ($0.id, $0) }) { first, _ in first }
     let items = try selected.map { item in
       guard let group = item.proposalGroup else { return item }
@@ -71,7 +72,8 @@ extension TaskService {
       InboxItem(kind: "doc_proposal", createdAt: $0.newestAt, next: [], proposalGroup: $0)
     }
     let merged = (proposals + documents).enumerated().sorted { left, right in
-      let lhs = left.element.createdAt ?? "", rhs = right.element.createdAt ?? ""
+      let lhs = left.element.createdAt ?? ""
+      let rhs = right.element.createdAt ?? ""
       if lhs != rhs { return lhs > rhs }
       let leftDoc = left.element.proposalGroup != nil
       let rightDoc = right.element.proposalGroup != nil
