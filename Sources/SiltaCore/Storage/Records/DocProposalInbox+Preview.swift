@@ -16,7 +16,8 @@ extension DocProposalInbox {
       summary: summary(row) + (stale ? "; stale base" : ""), staleBase: stale,
       read: read(try row.strictText("slug"), revision: row["rev"], missing: missing),
       decisions: decisions(
-        try row.strictText("slug"), revision: row["rev"], rejectOnly: stale || missing, caller: caller))
+        try row.strictText("slug"), revision: row["rev"], rejectOnly: stale || missing,
+        caller: caller))
   }
 
   func text(_ row: Row, _ name: String, missing: String = "(unknown)", reference: Bool = false)
