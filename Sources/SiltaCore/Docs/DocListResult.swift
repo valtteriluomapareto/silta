@@ -8,6 +8,15 @@ package struct DocListResult: Encodable, Sendable {
     package let state: String
     /// Bounded metadata and a complete show command.
     package let output: String
+    /// Typed presentation metadata; the CLI encoding stays unchanged.
+    package let metadata: DocDisplayMetadata
+
+    package func encode(to encoder: any Encoder) throws {
+      var container = encoder.container(keyedBy: DocListEntryKeys.self)
+      try container.encode(ref, forKey: .ref)
+      try container.encode(state, forKey: .state)
+      try container.encode(output, forKey: .output)
+    }
   }
 
   /// Entries selected for this page.
@@ -28,3 +37,5 @@ package struct DocListResult: Encodable, Sendable {
       + (next.map { "next: " + $0 + "\n" } ?? "")
   }
 }
+
+private enum DocListEntryKeys: String, CodingKey { case ref, state, output }

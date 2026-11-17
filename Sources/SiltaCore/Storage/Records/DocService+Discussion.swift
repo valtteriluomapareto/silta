@@ -28,7 +28,9 @@ extension DocService {
             "recorded base doc:\(snapshot.slug)@\(snapshot.baseRevision ?? 0)"),
           next: [showCommand(ref)])
       }
-      return DocReadResult(ref: ref, output: DocDiff.render(snapshot, base: base))
+      var result = DocReadResult(ref: ref, output: DocDiff.render(snapshot, base: base))
+      result.metadata = Self.displayMetadata(snapshot, archived: archived)
+      return result
     case .comments, .comment:
       guard
         let id = try Int64.fetchOne(
@@ -38,7 +40,35 @@ extension DocService {
             + "WHERE doc_id=(SELECT id FROM doc WHERE workspace_id=? AND slug=?) AND rev=?",
           arguments: [workspaceID, snapshot.slug, snapshot.revision])
       else { throw StorageError.corrupt }
-      return try comments(id, ref: ref, view: view, in: db)
+      var result = try comments(id, ref: ref, view: view, in: db)
+      result.metadata = Self.displayMetadata(snapshot, archived: archived)
+      return result
+    }
+  }
+
+  /// Reads a bounded page of discussion for an immutable revision.
+  package func commentPage(_ ref: String, offset: Int = 0, limit: Int = 20) throws -> DocCommentPage
+  {
+    let selection = try Self.selection(ref, revision: nil)
+    guard let revision = selection.revision, offset >= 0, (1...100).contains(limit) else {
+      throw DocError.invalid("Use a pinned document ref and valid pagination.")
+    }
+    return try store.read { db in
+      let workspaceID = try TaskService.workspaceID(workspace, in: db)
+      guard
+        let id = try Int64.fetchOne(
+          db,
+          sql: "SELECT doc_rev.id FROM doc JOIN doc_rev ON doc_rev.doc_id=doc.id "
+            + "WHERE doc.workspace_id=? AND doc.slug=? AND doc_rev.rev=?",
+          arguments: [workspaceID, selection.slug, revision])
+      else { throw DocError.notFound(ref) }
+      let total = try commentCount(id, in: db)
+      let rows = try Row.fetchAll(
+        db, sql: Self.commentQuery + " WHERE c.doc_rev_id=? ORDER BY c.seq LIMIT ? OFFSET ?",
+        arguments: [id, limit, offset])
+      return DocCommentPage(
+        posts: rows.map { CommentDetails(row: $0, task: ref) },
+        total: total, offset: offset)
     }
   }
 

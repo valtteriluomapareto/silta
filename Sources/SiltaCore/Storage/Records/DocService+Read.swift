@@ -87,7 +87,8 @@ extension DocService {
       let rows = try Row.fetchAll(
         db,
         sql:
-          "SELECT CAST(doc.slug AS BLOB) AS slug,doc_rev.id,doc_rev.rev,doc_rev.state," + columns
+          "SELECT CAST(doc.slug AS BLOB) AS slug,doc_rev.id,doc_rev.rev,doc_rev.state,doc.archived,"
+          + columns
           + join + " ORDER BY doc.slug,doc_rev.rev LIMIT ? OFFSET ?",
         arguments: arguments + [limit, offset])
       let entries = try rows.map { try entry($0, in: db) }
@@ -98,6 +99,34 @@ extension DocService {
           offset: offset + entries.count, limit: limit, document: document)
         : nil
       return DocListResult(entries: entries, total: total, offset: offset, limit: limit, next: next)
+    }
+  }
+
+  /// Pages all stored states of one document, including superseded revisions.
+  package func revisions(_ ref: String, offset: Int = 0, limit: Int = 20) throws -> DocListResult {
+    guard offset >= 0, (1...100).contains(limit) else {
+      throw DocError.invalid("Use a nonnegative offset and a limit from 1 to 100.")
+    }
+    let slug = try Self.selection(ref, revision: nil).slug
+    return try store.read { db in
+      let workspaceID = try TaskService.workspaceID(workspace, in: db)
+      let columns = try db.columns(in: "doc_rev").map(\.name)
+      let metadata = ["title", "kind", "about_refs"].map {
+        columns.contains($0) ? "CAST(doc_rev.\($0) AS BLOB) AS \($0)" : "NULL AS \($0)"
+      }.joined(separator: ",")
+      let join =
+        " FROM doc JOIN doc_rev ON doc_rev.doc_id=doc.id WHERE doc.workspace_id=? AND doc.slug=?"
+      let args: StatementArguments = [workspaceID, slug]
+      let total = try Int.fetchOne(db, sql: "SELECT count(*)" + join, arguments: args) ?? 0
+      let rows = try Row.fetchAll(
+        db,
+        sql:
+          "SELECT CAST(doc.slug AS BLOB) AS slug,doc_rev.id,doc_rev.rev,doc_rev.state,doc.archived,"
+          + metadata + join + " ORDER BY doc_rev.rev DESC LIMIT ? OFFSET ?",
+        arguments: args + [limit, offset])
+      return DocListResult(
+        entries: try rows.map { try entry($0, in: db) }, total: total,
+        offset: offset, limit: limit, next: nil)
     }
   }
 
@@ -154,13 +183,18 @@ extension DocService {
     } catch { throw StorageError.corrupt }
     let title = try text("title")
     let kind = try text("kind")
+    let metadata = DocDisplayMetadata(
+      ref: ref, slug: slug, revision: row["rev"], title: title,
+      kind: kind, about: refs, state: state, archived: row["archived"]
+    ).masked
     let rendered = DocReadResult(
       masking: ref,
-      output: "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
-        + "  kind: \(Self.preview(kind ?? "(unknown)")); about: \(Self.preview(Self.about(refs)))\n"
+      output: "\(ref) [\(state)] \(metadata.title ?? "(unknown)")\n"
+        + "  kind: \(metadata.kind ?? "(unknown)"); about: \(Self.preview(Self.about(refs)))\n"
         + "  show: " + showCommand(ref) + "\n"
         + (try commentPreviews(row["id"], ref: ref, in: db)))
-    return DocListResult.Entry(ref: rendered.ref, state: state, output: rendered.output)
+    return DocListResult.Entry(
+      ref: rendered.ref, state: state, output: rendered.output, metadata: metadata)
   }
 
 }
