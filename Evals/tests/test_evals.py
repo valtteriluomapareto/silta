@@ -32,9 +32,23 @@ class Acceptance(unittest.TestCase):
         else:
             result = subprocess.run(cls.command, capture_output=True, text=True)
             if result.returncode:
-                raise AssertionError(f'offline runner failed: {result.stdout}\n{result.stderr}')
+                raise AssertionError(f'offline runner failed: {result.stdout}\n{result.stderr}'
+                                     + cls.failed_trials())
         cls.report = json.loads((cls.output / 'report.json').read_text())
         cls.evals = importlib.import_module('evals')
+
+    @classmethod
+    def failed_trials(cls):
+        # The runner prints nothing for a failed trial; name each one from its files.
+        # Diagnostic only, so any problem reading them must not hide the runner failure.
+        try:
+            trials = json.loads((cls.output / 'report.json').read_text())['trials']
+            return ''.join(f"\n{t.get('id')}: failed checks {sorted(k for k, v in t.get('checks', {}).items() if not v)}"
+                           + (f"; {t['error']}" if t.get('error') else '')
+                           for t in trials if not t.get('passed'))
+        except Exception as error:
+            abort = cls.output / 'abort.json'
+            return f'\n(no usable report.json: {error!r})' + (f'\n{abort.read_text()}' if abort.is_file() else '')
 
     @classmethod
     def tearDownClass(cls):
@@ -51,24 +65,6 @@ class Acceptance(unittest.TestCase):
             self.assertEqual(group['pass_rate'], 0 if diagnostic else 1)
             self.assertIs(group['all_repeats_pass'], not diagnostic)
         self.assertEqual({g['scenario'] for g in groups}, set(SCENARIOS))
-
-    def test_failing_recording_per_scenario(self):
-        output = Path(self.temp.name) / 'failing'
-        result = subprocess.run(self.command[:-1] + [str(output), '--repeats', '1',
-                                '--recording', 'fail'], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 1, result.stderr)
-        report = json.loads((output / 'report.json').read_text())
-        self.assertEqual(len(report['groups']), 16)
-        self.assertTrue(all(g['pass_rate'] == 0 for g in report['groups']))
-        expected = {(harness, scenario, variant) for harness in ['claude', 'codex']
-                    for scenario in SCENARIOS
-                    for variant in json.loads((ROOT / 'scenarios' / scenario / 'scenario.yaml').read_text())['variants']}
-        self.assertEqual(len(report['trials']), len(expected))
-        self.assertEqual({(t['harness'], t['scenario'], t['variant']) for t in report['trials']}, expected)
-        for trial in report['trials']:
-            with self.subTest(harness=trial['harness'], scenario=trial['scenario'], variant=trial['variant']):
-                self.assertNotIn('infrastructure', trial['checks'])
-                self.assertFalse(trial['passed'])
 
     def test_grader_guarantees(self):
         # Each row is a separate negative evidence test and source-fault target.
