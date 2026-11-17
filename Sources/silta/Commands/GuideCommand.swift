@@ -131,6 +131,7 @@ extension GuideCommand {
         # Workspace docs
         Read the docs beside your work in the brief. Follow printed doc ls and doc show refs.
         Before proposing, run doc ls --about <ref> and revise an existing doc when it fits.
+        Use doc ls --doc <slug> to list one document’s current and pending revisions.
         Check whether another app would rediscover the knowledge from its about items.
         Usually propose nothing; never exceed two task and document proposals per session.
         Keep repository instructions in their repo and link code rather than copying it.
