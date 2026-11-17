@@ -27,20 +27,20 @@ struct DocEditBaseline: Equatable {
 
   static func read(_ slug: String, workspace: Int64, keepBody: Bool, in db: Database) throws -> Self
   {
-    let workspaceUID = try StoredUID.fetch(
+    let workspaceUID = try String.fetchOne(
       db, sql: "SELECT uid FROM workspace WHERE id=?", arguments: [workspace])
-    let cursor = try Row.fetchCursor(
-      db,
-      sql: """
-        SELECT d.id,d.uid,d.current_rev,d.archived,CAST(d.title AS BLOB) AS title,
-          CAST(d.kind AS BLOB) AS kind,r.uid AS revision_uid,
-          r.state,CASE WHEN ? OR length(CAST(r.body_md AS BLOB))<=?
-            THEN CAST(r.body_md AS BLOB) END AS body
-        FROM doc d LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
-        WHERE d.workspace_id=? AND d.slug=?
-        """, arguments: [keepBody, DocInput.maximumBytes, workspace, slug])
-    defer { withExtendedLifetime(cursor) {} }
-    guard let row = try cursor.next() else {
+    guard
+      let row = try Row.fetchOne(
+        db,
+        sql: """
+          SELECT d.id,d.uid,d.current_rev,d.archived,CAST(d.title AS BLOB) AS title,
+            CAST(d.kind AS BLOB) AS kind,r.uid AS revision_uid,
+            r.state,CASE WHEN ? OR length(CAST(r.body_md AS BLOB))<=?
+              THEN CAST(r.body_md AS BLOB) END AS body
+          FROM doc d LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
+          WHERE d.workspace_id=? AND d.slug=?
+          """, arguments: [keepBody, DocInput.maximumBytes, workspace, slug])
+    else {
       return Self(
         literalFields: [], identities: [workspaceUID], archived: false,
         state: nil, accepted: false, body: nil, title: nil, kind: nil,
@@ -57,13 +57,13 @@ struct DocEditBaseline: Equatable {
     let kind = try text(kindBytes)
     var literalFields = [titleBytes, kindBytes]
     var identities = [
-      workspaceUID, try StoredUID.read(from: row), try StoredUID.read("revision_uid", from: row),
+      workspaceUID, (row["uid"] as String?), (row["revision_uid"] as String?),
     ]
     var refs: [String] = []
     for link in try DocStore.attachments(row["id"], workspace: workspace, in: db) {
       let ref = try TaskLinkTarget.render(link, in: db)
       let target = try TaskLinkTarget.map(ref, workspace: workspace, in: db)
-      let uid = try StoredUID.fetch(
+      let uid = try String.fetchOne(
         db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [target.id])
       literalFields.append(Data(ref.utf8))
       identities.append(uid)

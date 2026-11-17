@@ -69,7 +69,7 @@ extension DocService {
       if let about {
         let target = try attachment(about, workspace: workspaceID, in: db)
         guard let targetID = target.id,
-          let uid = try StoredUID.fetch(
+          let uid = try String.fetchOne(
             db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [targetID])
         else { throw StorageError.corrupt }
         predicate += """

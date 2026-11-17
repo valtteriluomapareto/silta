@@ -5,7 +5,7 @@ extension DocStore {
   func targetIdentities(_ targets: [TaskLinkTarget]) throws -> [DocTargetIdentity] {
     try targets.map { target in
       guard let id = target.id,
-        let uid = try StoredUID.fetch(
+        let uid = try String.fetchOne(
           db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [id])
       else { throw StorageError.corrupt }
       return DocTargetIdentity(kind: target.kind, uid: uid)
@@ -76,8 +76,7 @@ extension DocStore {
     guard let bytes else { return nil }
     do {
       let targets = try JSONDecoder().decode([DocTargetIdentity].self, from: bytes)
-      guard !targets.isEmpty, Set(targets).count == targets.count,
-        targets.allSatisfy({ StoredUID.valid(Data($0.uid.utf8)) })
+      guard !targets.isEmpty, Set(targets).count == targets.count
       else { throw StorageError.corrupt }
       return targets
     } catch { throw StorageError.corrupt }

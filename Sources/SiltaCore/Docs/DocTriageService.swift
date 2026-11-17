@@ -52,7 +52,7 @@ package struct DocTriageService {
           prepared: environment.workspaceSelection)
         let id = try TaskService.workspaceID(slug, in: tx.database)
         guard
-          let uid = try StoredUID.fetch(
+          let uid = try String.fetchOne(
             tx.database,
             sql: "SELECT uid FROM workspace WHERE id=?", arguments: [id])
         else { throw StorageError.corrupt }
