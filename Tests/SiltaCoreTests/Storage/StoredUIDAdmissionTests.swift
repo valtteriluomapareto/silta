@@ -155,8 +155,8 @@ struct StoredUIDAdmissionTests {
     }
   }
 
-  @Test(arguments: [false, true], ["[]", "{}"])
-  func nestedUIDContainersRefuseAdmissionAndDoctorDiagnosesThem(
+  @Test(arguments: [false, true], ["[]", "{}", "\"[]\"", "\"{}\""])
+  func nestedUIDContainersRequireStringEncoding(
     verification: Bool, value: String
   ) throws {
     try withScratchDirectory { home in
@@ -172,8 +172,11 @@ struct StoredUIDAdmissionTests {
       let integrity = Self.checks(store, home: home).first { $0.id == "database.integrity" }
       let failure = RestoreASCIIIdentityTests.failure { try store.initialize() }
       let after = try DocVerificationPreparationTests.truth(store)
-      withKnownIssue("Container-valued snapshot UIDs must fail admission and doctor diagnosis") {
-        #expect(integrity?.status == .fail && integrity?.message.contains("ASCII") == true)
+      let valid = value.hasPrefix("\"")
+      #expect((integrity?.status == .pass) == valid)
+      #expect((failure == nil) == valid)
+      if !valid {
+        #expect(integrity?.message.contains("ASCII") == true)
         #expect(failure?.code == .env && failure?.next == ["silta doctor"])
         #expect(after == before)
       }

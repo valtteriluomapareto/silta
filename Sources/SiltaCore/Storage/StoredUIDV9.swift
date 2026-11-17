@@ -27,6 +27,7 @@ enum StoredUIDV9 {
             CASE WHEN e.type<>'object' THEN 1
               WHEN json_type(e.value,'$.uid') IS NULL OR json_type(e.value,'$.uid')='null'
                 THEN \(required ? 1 : 0)
+              WHEN json_type(e.value,'$.uid')<>'text' THEN 1
               ELSE \(invalid("json_extract(e.value,'$.uid')")) END) END
         """
       if try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM \(table) WHERE \(bad))") == true {
