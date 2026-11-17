@@ -6,6 +6,7 @@ import SiltaAppSupport
 
 struct AppShellView: View {
   @Bindable var model: AppModel
+  @FocusState private var searchFocused: Bool
   @Environment(\.scenePhase) private var phase
 
   var body: some View {
@@ -23,7 +24,12 @@ struct AppShellView: View {
     }
     .navigationTitle(model.route.title)
     .navigationSubtitle(subtitle)
-    .searchable(text: $model.search, placement: .toolbar, prompt: "Search")
+    .searchable(
+      text: $model.search, placement: .toolbar,
+      prompt: model.route == .docs ? "Search loaded documents" : "Search"
+    )
+    .searchFocused($searchFocused)
+    .focusedSceneValue(\.findAction, { searchFocused = true })
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button("Refresh", systemImage: "arrow.clockwise") { model.refresh(force: true) }
@@ -64,12 +70,14 @@ struct AppShellView: View {
       case .mywork: MyWorkView(model: model)
       case .board: BoardView(model: model)
       case .workspace: WorkspaceView(model: model)
+      case .docs: DocsView(model: model)
       }
     }
   }
 
   private var subtitle: String {
     guard let data = model.visibleData else { return "" }
+    if model.route == .docs { return "Workspace documents" }
     if model.route == .workspace, let map = data.map {
       return
         "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"

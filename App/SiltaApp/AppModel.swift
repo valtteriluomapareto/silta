@@ -9,6 +9,8 @@ final class AppModel {
   private(set) var workspace: String?
   let reader: AppReader?
   var search = ""
+  var docsAbout: String?
+  var docsRequestedRef: String?
   var route: AppRoute = .mywork
   var appFilter: String?
   var selectedTask: String?
@@ -94,9 +96,22 @@ final class AppModel {
       generation += 1
       workspace = slug
       selectedTask = nil
+      docsAbout = nil
+      docsRequestedRef = nil
       appFilter = nil
     }
     return refresh(force: true)
+  }
+
+  func openDocument(_ ref: String) {
+    docsAbout = nil
+    docsRequestedRef = ref
+    route = .docs
+  }
+  func openDocuments(about: String) {
+    docsAbout = about
+    docsRequestedRef = nil
+    route = .docs
   }
 
   func inspect(_ ref: String) {

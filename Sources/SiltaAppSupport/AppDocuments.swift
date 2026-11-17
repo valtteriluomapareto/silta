@@ -29,7 +29,9 @@ public struct AppDocumentList: Equatable, Sendable {
 }
 
 /// Document presentation selected by the reader.
-public enum AppDocumentView: String, CaseIterable, Sendable { case document, changes, comments }
+public enum AppDocumentView: String, CaseIterable, Hashable, Sendable {
+  case document, changes, comments
+}
 
 /// A masked body/diff window with authoritative continuation metadata.
 public struct AppDocumentPage: Equatable, Sendable {

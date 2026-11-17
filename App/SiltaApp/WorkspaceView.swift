@@ -67,8 +67,10 @@ struct WorkspaceView: View {
             }
           }.padding(28)
         }.inspector(isPresented: $model.inspectorPresented) {
-          ConnectionInspector(connection: content.connection(selected))
-            .inspectorColumnWidth(min: 300, ideal: 360, max: 500)
+          ConnectionInspector(
+            connection: content.connection(selected), openDocs: model.openDocuments
+          )
+          .inspectorColumnWidth(min: 300, ideal: 360, max: 500)
         }
       } else {
         ContentUnavailableView("No workspace map", systemImage: "network")
@@ -79,6 +81,7 @@ struct WorkspaceView: View {
 
 private struct ConnectionInspector: View {
   let connection: AppConnection?
+  let openDocs: (String) -> Void
 
   var body: some View {
     ScrollView {
@@ -86,6 +89,7 @@ private struct ConnectionInspector: View {
         if let connection {
           Text(connection.source + " → " + connection.target).font(.title3.weight(.semibold))
           CopyValue(value: connection.attachment, title: "Copy connection reference")
+          Button("Open related Docs") { openDocs(connection.attachment) }
           LabeledContent("Kind", value: connection.kind)
           Text(connection.summary).textSelection(.enabled)
           Text("Code references").font(.headline)

@@ -133,6 +133,30 @@
       }
     }
 
+    @Test func documentTriageTemplateRefusesUnfilledRefsAndAcceptsAChosenRevision() throws {
+      try withScratchDirectory { scratch in
+        try AppDocsFixture.seed(home: scratch.appending(path: "silta-home"))
+        let reader = try AppReaderTests.reader(scratch)
+        let proposal = try #require(
+          try reader.documents(workspace: "acme").entries.first {
+            $0.ref == "doc:push-categories@1"
+          })
+        let commands = reader.commands(forDocument: proposal, workspace: "acme", view: .changes)
+        let accept = try #require(commands.first { $0.title == "Accept revisions" }).text
+        let observer = try DatabaseQueue(path: reader.environment.db.path)
+        let before = try version(observer)
+        let refused = try run(accept, scratch)
+        #expect(refused.stdout.contains("Use an immutable doc:slug@revision reference."))
+        #expect(try version(observer) == before)
+        let accepted = try run(
+          accept.replacingOccurrences(of: "REFS", with: "doc:push-categories@1"), scratch)
+        #expect(accepted.termination == .exit(0), "\(accepted)")
+        #expect(
+          try reader.document("doc:push-categories@1", workspace: "acme").document?.state
+            == "accepted")
+      }
+    }
+
     private func item(kind: String, refs: [String] = ["AC-12"], commands: [String]) -> AppAttention
     {
       AppAttention(

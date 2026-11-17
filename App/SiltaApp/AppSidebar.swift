@@ -97,7 +97,7 @@ struct AppSidebar: View {
     guard let snapshot = model.visibleData?.snapshot else { return nil }
     switch route {
     case .mywork: return snapshot.work.waitingCount
-    case .workspace: return nil
+    case .workspace, .docs: return nil
     case .board:
       return snapshot.board.todo.count + snapshot.board.doing.count + snapshot.board.review.count
     }

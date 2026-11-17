@@ -74,6 +74,9 @@ struct MyWorkView: View {
   private func attention(_ item: AppAttention) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       heading(title(item), ref: item.ref ?? item.task)
+      if item.kind == "doc_proposal", let ref = item.refs.first {
+        Button("Open in Docs") { model.openDocument(ref) }
+      }
       if let title = item.title { Text(title).font(.title3.weight(.semibold)) }
       if let body = item.body { Text(body).font(.body).textSelection(.enabled) }
       if let author = item.author {

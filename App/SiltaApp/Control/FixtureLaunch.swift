@@ -27,7 +27,7 @@
       try FileManager.default.createDirectory(
         at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
       let home = root.appending(path: "data")
-      try AppV2Fixture.seed(home: home)
+      try AppDocsFixture.seed(home: home)
       return Configuration(home: home, user: AppV2Fixture.user, now: AppV2Fixture.now)
     }
   }

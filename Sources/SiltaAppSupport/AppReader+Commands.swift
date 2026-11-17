@@ -44,6 +44,20 @@ extension AppReader {
     command("Read full inbox", suffix: "inbox --for me --all", workspace: workspace)
   }
 
+  /// Offers a scoped document read and safe, unfilled proposal-triage templates.
+  public func commands(forDocument document: AppDocument, workspace: String, view: AppDocumentView)
+    -> [AppCommand]
+  {
+    let flags = view == .changes ? " --diff" : view == .comments ? " --comments" : ""
+    let read = command(
+      "Read document", suffix: "doc show " + shellWord(document.ref) + flags, workspace: workspace)
+    guard document.state == "proposed", view == .changes else { return [read] }
+    return [
+      read, command("Accept revisions", suffix: "doc triage --accept REFS", workspace: workspace),
+      command("Read triage help", suffix: "doc triage --help", workspace: workspace),
+    ]
+  }
+
   private func taskCommand(_ ref: String, workspace: String) -> AppCommand {
     command(
       "Read task", suffix: "task show " + shellWord(ref) + " --timeline", workspace: workspace)

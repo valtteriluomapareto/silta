@@ -75,8 +75,9 @@ the human copies.
     `SiltaTestSupport` wrapper (D23); the app never links test support. SiltaCore's
     services are `package`-scoped, so this target must live in the root package.
   - **Thin Xcode project `App/SiltaApp.xcodeproj`** (target `SiltaApp`). It holds the
-    SwiftUI views and the asset catalog, links `SiltaAppSupport`, and pins MarkdownUI
-    (D18) only there.
+    SwiftUI views and the asset catalog and links `SiltaAppSupport`. Native views
+    import only that facade and Apple frameworks; document formatting uses
+    Foundation's Markdown parser and SwiftUI.
   - **Guard:** SiltaCore stays free of UI code.
 - **Store and actor:**
   - The app opens `SILTA_HOME` (default `~/.silta`) through SiltaCore's store and
@@ -141,8 +142,8 @@ the task and report which tasks the maintainer can close; do not mark them done.
     `xcodebuild build` (Release). Release on every PR proves the DEBUG-only control code
     compiles out. Both runs:
     - use `-derivedDataPath .build/app-control-tests` and `-clonedSourcePackagesDirPath`;
-    - use `-onlyUsePackageVersionsFromResolvedFile`, with MarkdownUI pinned in the
-      project's own `Package.resolved` (D18);
+    - use `-onlyUsePackageVersionsFromResolvedFile` and the project's own
+      `Package.resolved` for the root package dependencies (D18);
     - set `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the project, so local builds match;
     - sign with "Sign to Run Locally", so hosted tests need no certificate.
   - A test run proves nothing unless tests ran. `verify.sh app` fails when the result
