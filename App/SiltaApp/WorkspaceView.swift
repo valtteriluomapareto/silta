@@ -17,6 +17,7 @@ struct WorkspaceView: View {
                     Text(group.app.name).font(.headline)
                     Text(group.app.ref).font(.system(.caption, design: .monospaced))
                     if let summary = group.app.summary { Text(summary).foregroundStyle(.secondary) }
+                    Button("Open related Docs") { model.openDocuments(about: group.app.attachment) }
                   }
                   Spacer()
                   Text(
