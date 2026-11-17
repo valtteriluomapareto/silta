@@ -13,7 +13,7 @@
         let docs = WorkspaceDocumentsModel(read: { _, _, refs in
           flags.calls += 1
           let value =
-            partial
+            flags.partial
             ? AppDocumentList(
               entries: Array(page.entries.prefix(1)), total: page.total, nextOffset: 1) : page
           return Dictionary(uniqueKeysWithValues: refs.map { ($0, value) })
@@ -53,22 +53,30 @@
       }
     }
 
-    @Test func overlappingReadersJoinTheSameFlight() async throws {
+    @Test(arguments: [false, true]) func overlappingReadersJoinTheSameFlight(force: Bool)
+      async throws
+    {
       try await fixture { reader in
         let gate = PausedWorkspaceRead()
         let flags = WorkspaceReadFlags()
         let docs = WorkspaceDocumentsModel(read: { _, _, _ in
           flags.calls += 1
-          await gate.pause()
+          if !force || flags.calls > 1 { await gate.pause() }
           return [:]
         })
+        if force { await docs.refresh(reader, workspace: "acme", version: 1, connections: []) }
         let first = Task {
-          await docs.refresh(reader, workspace: "acme", version: 1, connections: [])
+          await docs.refresh(reader, workspace: "acme", version: 1, connections: [], force: force)
         }
         await gate.started()
         let release = Task { gate.resume() }
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [])
-        #expect(flags.calls == 1 && !docs.loading)
+        #expect(flags.calls == (force ? 2 : 1))
+        if force {
+          withKnownIssue("Cached readers bypass an active forced reload") { #expect(!docs.loading) }
+        } else {
+          #expect(!docs.loading)
+        }
         await first.value
         await release.value
       }
