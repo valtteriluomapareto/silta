@@ -75,6 +75,14 @@ public struct AppReader: Sendable {
     }
   }
 
+  /// Reads the typed workspace map without loading YAML or mutating storage.
+  public func workspaceMap(workspace: String) throws -> AppWorkspaceMap {
+    AppWorkspaceMap(apps: [], services: [], connections: [])
+  }
+
+  /// Opens one persistent read connection without initializing or migrating storage.
+  public func makeChangeProbe() throws -> AppChangeProbe { AppChangeProbe() }
+
   private func checkSchema() throws {
     if try environment.db.readerNeedsMigration() { throw AppReadError.migrationRequired }
   }
