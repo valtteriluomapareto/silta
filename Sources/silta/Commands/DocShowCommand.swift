@@ -4,7 +4,10 @@ import SiltaCore
 struct DocShowCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "show", abstract: "Read stored revisions, diffs or paged comments.")
-  static let dataShape = Shape.object(["ref": .string, "output": .string])
+  static let dataShape = Shape.object([
+    "ref": .string, "output": .string, "body": .optional(.string),
+    "title": .optional(.string), "about": .optional(.array(.string)), "state": .optional(.string),
+  ])
   static let workspaceSource = WorkspaceSource.option
 
   @OptionGroup(title: "Global Options") var global: GlobalOptions
