@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 BINARY = ROOT.parent / '.build/debug/silta'
 STUB = Path(__file__).with_name('stub_harness.py')
 SCENARIOS = ['start-cross-repo', 'plan-not-file', 'handoff-resume',
-             'done-with-result', 'proposals-ask', 'ask-short', 'doc-context']
+             'done-with-result', 'proposals-ask', 'ask-short', 'doc-context', 'doc-context-no-doc']
 
 
 class Acceptance(unittest.TestCase):
@@ -43,11 +43,13 @@ class Acceptance(unittest.TestCase):
     def test_both_adapters_all_scenarios_three_repeats(self):
         self.assertEqual(self.report['provenance'], 'stub')
         groups = self.report['groups']
-        self.assertEqual(len(groups), 14)
+        self.assertEqual(len(groups), 16)
         for group in groups:
             self.assertEqual(group['repeats'], 3)
-            self.assertEqual(group['pass_rate'], 1)
-            self.assertTrue(group['all_repeats_pass'])
+            diagnostic = group['scenario'] == 'doc-context-no-doc'
+            self.assertIs(group['diagnostic'], diagnostic)
+            self.assertEqual(group['pass_rate'], 0 if diagnostic else 1)
+            self.assertIs(group['all_repeats_pass'], not diagnostic)
         self.assertEqual({g['scenario'] for g in groups}, set(SCENARIOS))
 
     def test_failing_recording_per_scenario(self):
@@ -56,7 +58,7 @@ class Acceptance(unittest.TestCase):
                                 '--recording', 'fail'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stderr)
         report = json.loads((output / 'report.json').read_text())
-        self.assertEqual(len(report['groups']), 14)
+        self.assertEqual(len(report['groups']), 16)
         self.assertTrue(all(g['pass_rate'] == 0 for g in report['groups']))
         expected = {(harness, scenario, variant) for harness in ['claude', 'codex']
                     for scenario in SCENARIOS
