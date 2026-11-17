@@ -8,6 +8,13 @@ struct DocsView: View {
   var body: some View {
     HSplitView {
       VStack(alignment: .leading, spacing: 12) {
+        Picker(
+          "Documents",
+          selection: Binding(get: { docs.proposedOnly }, set: { docs.proposedOnly = $0 })
+        ) {
+          Text("All").tag(false)
+          Text("Proposed").tag(true)
+        }.pickerStyle(.segmented).padding(.horizontal)
         Toggle("Include archived", isOn: $model.includeArchivedDocuments).toggleStyle(.checkbox)
           .padding(.horizontal)
         if let about = model.docsAbout {

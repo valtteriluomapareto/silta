@@ -110,10 +110,11 @@ import SiltaAppSupport
 
   func groups(search: String) -> [Group] {
     let matching = entries.filter { entry in
-      AppSearch.matches(
-        search,
-        values: [entry.ref, entry.title ?? "", entry.kind ?? ""]
-          + (entry.about ?? []))
+      (!proposedOnly || entry.state == "proposed")
+        && AppSearch.matches(
+          search,
+          values: [entry.ref, entry.title ?? "", entry.kind ?? ""]
+            + (entry.about ?? []))
     }
     return Dictionary(grouping: matching, by: \.slug).map { Group(id: $0.key, entries: $0.value) }
       .sorted { $0.id < $1.id }

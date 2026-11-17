@@ -120,10 +120,8 @@
       let docs = DocsModel()
       await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
       docs.proposedOnly = true
-      withKnownIssue("The proposed filter must exclude accepted revisions.") {
-        #expect(docs.groups(search: "").flatMap(\.entries).allSatisfy { $0.state == "proposed" })
-        #expect(docs.groups(search: "order").first?.preferred?.ref == "doc:order-contract@3")
-      }
+      #expect(docs.groups(search: "").flatMap(\.entries).allSatisfy { $0.state == "proposed" })
+      #expect(docs.groups(search: "order").first?.preferred?.ref == "doc:order-contract@3")
       #expect(docs.groups(search: "push").first?.preferred?.ref == "doc:push-categories@1")
       docs.proposedOnly = false
       #expect(docs.groups(search: "order").first?.preferred?.ref == "doc:order-contract@2")
