@@ -931,7 +931,7 @@ only that displayed proposal's accept/drop commands and approval placeholder.
 
 Document proposals use `kind: "doc_proposal"` and a concrete `doc_proposal`
 object, separate from `tasks`: `ref`, eligible `total`, at most two `members`,
-`omitted`, and an optional `next` global-list continuation. Each member has bounded
+`omitted`, and an optional `next` document-scoped list continuation. Each member has bounded
 `ref`, `title`, `kind`, `why`, `source_task`, a factual `summary`, and a complete
 `read` command, plus a `stale_base` boolean. Staleness compares the recorded base
 with the current accepted revision in the same snapshot; two absent pointers match.
@@ -955,7 +955,7 @@ tasks precede documents on a cross-kind time tie, preserving existing task ties 
 binary document UID ties. The shared cap and `remaining` count groups rather than
 members; `--all` includes older groups but still previews at most two members each.
 Only retained inbox groups load preview fields. Omitted members are reachable with
-existing pinned reads and archived global-list pagination.
+existing pinned reads and archived document-scoped list pagination.
 
 Within each discussion category, stored post id breaks time ties. Each live post
 appears once, with question/answer attention taking precedence over claimed-task
