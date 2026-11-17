@@ -66,7 +66,8 @@ struct DocFinalRecoveryTests {
       try #require(proposed.termination == .exit(0))
       let diff = try run(["show", "doc:rules@3", "--diff"], scratch, repo)
       #expect(diff.termination == .exit(0))
-      withKnownIssue { #expect(!diff.stdout.contains("private Acme material")) }
+      #expect(!diff.stdout.contains("private Acme material"))
+      #expect(diff.stdout.contains("[REDACTED:private_key]"))
     }
   }
 

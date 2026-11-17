@@ -40,19 +40,17 @@ enum DocDiff {
   }
 
   private static func metadata(_ revision: DocRevision) -> [String] {
-    let fields =
-      [
-        "title: \(revision.title ?? "(unknown)")",
-        "kind: \(revision.kind ?? "(unknown)")",
-        "about: \(DocService.about(revision.about))",
-      ]
-      + DocService.evidence(revision).split(
-        separator: "\n", maxSplits: 3, omittingEmptySubsequences: false
-      ).map(String.init)
-    return fields.map {
-      SecretGuard.redacted($0).trimmingCharacters(in: .newlines)
-        .components(separatedBy: "\n").map { "  " + $0 + "\n" }.joined()
+    let text =
+      "title: \(revision.title ?? "(unknown)")\nkind: \(revision.kind ?? "(unknown)")\n"
+      + "about: \(DocService.about(revision.about))\n" + DocService.evidence(revision)
+    var fields: [String: String] = [:]
+    var field = ""
+    for line in SecretGuard.redacted(text).components(separatedBy: "\n").dropLast() {
+      if !line.hasPrefix("  ") { field = String(line.prefix { $0 != ":" }) }
+      fields[field, default: ""] += "  " + line + "\n"
     }
+    return ["title", "kind", "about", "source_task", "triaged_by", "triaged_at", "why"]
+      .map { fields[$0] ?? "" }
   }
 
   private static func lines(_ body: String) -> [String] {
