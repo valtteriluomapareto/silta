@@ -281,6 +281,7 @@ extension SiltaMain {
   private static func prepareWorkspace(
     _ command: inout any OutputCommand, context: inout CommandContext
   ) async throws {
+    if let list = command as? DocListCommand { _ = try DocService.documentFilter(list.doc) }
     let source = type(of: command).workspaceSource
     guard source == .option || source == .argument,
       command.global.ws == nil,

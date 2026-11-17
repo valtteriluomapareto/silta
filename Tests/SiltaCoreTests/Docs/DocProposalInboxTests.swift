@@ -17,7 +17,8 @@ struct DocProposalInboxTests {
       #expect(group.total == 200 && group.omitted == 198)
       #expect(group.members.map(\.ref) == ["doc:rules@201", "doc:rules@200"])
       #expect(group.members.first?.read == "silta --ws 'acme' doc show 'doc:rules@201' --diff")
-      #expect(group.next == "silta --ws 'acme' doc ls --archived --offset 0 --limit 20")
+      #expect(
+        group.next == "silta --ws 'acme' doc ls --doc 'rules' --archived --offset 0 --limit 20")
       let data = try JSONEncoder().encode(group)
       let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
       #expect(Set(object.keys) == ["ref", "total", "omitted", "members", "next"])
@@ -58,7 +59,7 @@ struct DocProposalInboxTests {
         #expect(try reader.count() == 2)
         let groups = try reader.groups(limit: 1)
         #expect(groups.count == 1 && groups.first?.total == 3)
-        #expect(try reader.previews(groups).count == 1)
+        #expect(try reader.previews(groups, caller: .human(name: "acme")).count == 1)
       }
     }
   }
@@ -97,7 +98,7 @@ struct DocProposalInboxTests {
   }
 
   @Test(arguments: [false, true])
-  func recordedBaseAndGlobalPageCommandsAreReplayable(missing: Bool) throws {
+  func recordedBaseAndScopedPageCommandsAreReplayable(missing: Bool) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try AcmeDocAttachments.attach("Rules", to: "app", in: store)
@@ -109,10 +110,11 @@ struct DocProposalInboxTests {
         }
       }
       let group = try #require(try preview(store).first)
-      #expect(group.next == "silta --ws 'acme' doc ls --archived --offset 4 --limit 20")
+      #expect(
+        group.next == "silta --ws 'acme' doc ls --doc 'rules' --archived --offset 0 --limit 20")
       let member = try #require(group.members.first)
       #expect(member.read.hasSuffix(missing ? "'doc:rules@4'" : "'doc:rules@4' --diff"))
-      if missing { #expect(member.summary == "recorded base unavailable") }
+      if missing { #expect(member.summary == "recorded base unavailable; stale base") }
       for command in [member.read, try #require(group.next)] {
         let result = try replay(command, home)
         #expect(result.termination == .exit(0), "\(result.stderr)")
@@ -236,7 +238,7 @@ struct DocProposalInboxTests {
     try store.read { db in
       let reader = try DocProposalInbox(
         workspace: workspace, at: AcmeDocAttachments.instant, all: all, in: db)
-      return try reader.previews(reader.groups())
+      return try reader.previews(reader.groups(), caller: .human(name: "acme"))
     }
   }
 

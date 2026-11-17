@@ -129,7 +129,7 @@ extension DocProposalInboxTests {
         defer { db.trace(nil) }
         let reader = try DocProposalInbox(workspace: "acme", at: AcmeDocAttachments.instant, in: db)
         let selected = try reader.groups(limit: 1)
-        let result = try reader.previews(selected)
+        let result = try reader.previews(selected, caller: .human(name: "acme"))
         db.trace(nil)
         #expect(result.count == 1 && result.first?.members.count == 2)
         let windows = statements.filter { $0.uppercased().contains("ROW_NUMBER") }

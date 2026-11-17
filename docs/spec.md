@@ -931,10 +931,17 @@ only that displayed proposal's accept/drop commands and approval placeholder.
 
 Document proposals use `kind: "doc_proposal"` and a concrete `doc_proposal`
 object, separate from `tasks`: `ref`, eligible `total`, at most two `members`,
-`omitted`, and an optional `next` global-list continuation. Each member has bounded
+`omitted`, and an optional `next` document-scoped list continuation. Each member has bounded
 `ref`, `title`, `kind`, `why`, `source_task`, a factual `summary`, and a complete
-`read` command. The summary compares body bytes and metadata without loading bodies.
-Unknown historical metadata stays unknown. Secret-bearing values stay masked in
+`read` command, plus a `stale_base` boolean. Staleness compares the recorded base
+with the current accepted revision in the same snapshot; two absent pointers match.
+The text summary marks a stale base separately from an unavailable recorded base,
+and compares body bytes and metadata without loading bodies. Unknown historical
+metadata stays unknown. Each displayed member offers immutable accept/reject guidance;
+stale or unavailable bases offer rejection and inspection. Actual human callers get
+direct decision commands. Agents, including those querying human attention, get an
+ask-human instruction with approval placeholders. Targeting human attention never
+grants human caller privileges. Secret-bearing values stay masked in
 bounded, single-line previews. Omitted values carry explicit size or truncation
 markers. Read commands are complete; unusable refs recover through the existing
 protected archived list or workspace list.
@@ -948,7 +955,7 @@ tasks precede documents on a cross-kind time tie, preserving existing task ties 
 binary document UID ties. The shared cap and `remaining` count groups rather than
 members; `--all` includes older groups but still previews at most two members each.
 Only retained inbox groups load preview fields. Omitted members are reachable with
-existing pinned reads and archived global-list pagination.
+existing pinned reads and archived document-scoped list pagination.
 
 Within each discussion category, stored post id breaks time ties. Each live post
 appears once, with question/answer attention taking precedence over claimed-task
@@ -984,7 +991,7 @@ It lists:
 
 `doc show <slug|doc:slug|doc:slug@N> [--rev N] [--lines N|A-B]` reads
 stored revision metadata and markdown. The default is the current accepted revision;
-without one it lists up to 20 pending revision refs and points to `doc ls` for more.
+without one it lists up to 20 pending revision refs and points to `doc ls --doc <slug>` for more.
 An unpinned accepted-body read includes its pending count and a safe scoped list
 command on the existing header line. Pinned line coordinates and continuation refs
 remain unchanged; archived recovery includes archived entries. Explicit revisions,
@@ -1002,8 +1009,12 @@ source, or a half-recorded decision pair, is corrupt. These reads do not infer a
 from current claims or invoke Git, verification or writes. Complete why text is masked
 before indentation and the existing rendered-line bounds, without a preview limit.
 
-`doc ls [--about <map-ref>] [--archived] [--offset N] [--limit N]`
+`doc ls [--doc <slug|doc:slug>] [--about <map-ref>] [--archived] [--offset N] [--limit N]`
 lists current accepted and individual pending revisions, ordered by slug then revision.
+The optional document filter takes an unpinned slug or canonical document ref; pinned
+selectors are invalid. Unknown documents have zero entries. It combines with attachment,
+archive and page filters, which every continuation preserves. Inbox “more” commands and
+both unpinned pending-read hints list that document’s entries from offset zero.
 The default page has 20 entries, with a maximum of 100. Accepted entries match current
 live attachments; pending entries match only their stored target kind and UID. Archived documents require `--archived` in lists, but explicit reads
 remain available. Unknown snapshot attachments stay unknown.
@@ -1122,7 +1133,7 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-read commands; decisions name explicit immutable proposal refs. Doc-specific review
+inspection and decision guidance; decisions name explicit immutable proposal refs. Doc-specific review
 measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
@@ -1584,8 +1595,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    quoted `<ref>: <title>` lines. Every item ends with its `next:` lines; a command
    an earlier item printed is not repeated. When the caller has any item, `more:`
    adds `silta --ws acme inbox`, which no trim removes.
-   Document proposal items use the same bounded evidence and complete read commands
-   as the inbox, with at most two members. Evidence may be shortened with an explicit
+   Document proposal items use the same bounded evidence and complete inspection
+   and decision guidance as the inbox, with at most two members. Evidence may be shortened with an explicit
    marker; recovery commands stay complete. Rendered groups fit the optional budget
    without displacing current-task context. The header still counts every eligible
    group and the complete inbox recovery remains. Selection, rendering and trimming
