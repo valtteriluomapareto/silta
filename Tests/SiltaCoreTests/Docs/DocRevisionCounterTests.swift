@@ -25,7 +25,7 @@ struct DocRevisionCounterTests {
       draft.slug = "other"
       #expect(try DocStoreTests.accept(draft, in: store, ids: ids).revision == 1)
       draft.slug = "rules"
-      let binding = try DocVerification.readBinding(draft, workspace: 2, store: store)
+      let binding = try DocStoreTests.binding(draft, workspace: 2, store: store)
       let verification = DocVerification(binding: binding, snapshots: [])
       let beta = try store.write {
         try DocStore(

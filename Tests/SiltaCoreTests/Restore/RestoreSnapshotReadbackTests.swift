@@ -23,9 +23,8 @@ struct RestoreSnapshotReadbackTests {
   @Test func readbackAllowsOnlyExplicitRestoreNormalizations() throws {
     try withScratchDirectory { home in
       let store = try ExportFixture.make(home)
-      var graph = try RestoreDocumentGraphFixture.graph()
-      graph.tree.documents = graph.documents
-      var after = graph.tree
+      let graph = try RestoreDocumentGraphFixture.graph()
+      var after = graph
       after.schema = "v8"
       after.documents.legacyCommentSequences = nil
       after.workspace = after.workspace.replacing(
@@ -40,7 +39,7 @@ struct RestoreSnapshotReadbackTests {
       floors.append(ExportDocumentTests.row([("slug", "absent-name"), ("next", "333")]))
       after.documents.revisionAllocations = floors
       try store.write(rollingBack: true) { tx in
-        let writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
+        let writer = RestoreWriter(tx: tx, tree: graph, slug: "acme")
         try writer.check(after, revisionAllocations: floors)
       }
       for key in ["unknown-title", "triaged_by", "app_shas", "body_md", "about_targets"] {
@@ -50,14 +49,14 @@ struct RestoreSnapshotReadbackTests {
           &damaged.documents, index, key == "unknown-title" ? "title" : key,
           key == "app_shas" ? "[]" : "Invented value")
         try store.write(rollingBack: true) { tx in
-          let writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
+          let writer = RestoreWriter(tx: tx, tree: graph, slug: "acme")
           #expect(throws: ExportError.self) {
             try writer.check(damaged, revisionAllocations: floors)
           }
         }
       }
       try store.write(rollingBack: true) { tx in
-        let writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
+        let writer = RestoreWriter(tx: tx, tree: graph, slug: "acme")
         #expect(throws: ExportError.self) {
           try writer.check(after, revisionAllocations: graph.documents.revisionAllocations)
         }

@@ -9,7 +9,7 @@ extension RestoreASCIIIdentityTests {
   @Test(arguments: [false, true])
   func invalidIncomingIdentityDoesNotInitializeDestination(dryRun: Bool) throws {
     try withScratchDirectory { scratch in
-      var tree = try RestoreDocumentGraphFixture.graph().tree
+      var tree = try RestoreDocumentGraphFixture.graph()
       RestoreDocumentGraphFixture.record(&tree.documents, 1, "source_task", "K")
       let directory = try RestoreSupport.write(
         tree.files(), to: scratch.appending(path: "out/acme"))
@@ -25,7 +25,7 @@ extension RestoreASCIIIdentityTests {
 
   @Test(arguments: ["from", "to", "thread", "doc_rev", "repo"], [0, 1])
   func referenceFieldsRequireASCII(field: String, example: Int) throws {
-    var tree = try RestoreDocumentGraphFixture.graph().tree
+    var tree = try RestoreDocumentGraphFixture.graph()
     let value = ["K", "K\u{0}tail"][example]
     if ["from", "to"].contains(field) {
       RestoreDocumentGraphFixture.link(&tree, 0, field, value)
@@ -37,7 +37,7 @@ extension RestoreASCIIIdentityTests {
       RestoreDocumentGraphFixture.record(&tree.documents, field == "thread" ? 6 : 5, field, value)
     }
     let error = Self.failure {
-      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
     }
     #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
     #expect(error?.message.contains("tail") == false)
@@ -62,7 +62,7 @@ extension RestoreASCIIIdentityTests {
 
   @Test(arguments: ["workspace", "task", "approval", "link", "doc_rev", "comment"], [0, 1, 2])
   func everyPrimaryIdentityIsAdmitted(table: String, example: Int) throws {
-    var tree = try RestoreDocumentGraphFixture.graph().tree
+    var tree = try RestoreDocumentGraphFixture.graph()
     let value: String? = [nil, "K", "K\u{0}tail"][example]
     func changed(_ row: ExportRow) -> ExportRow {
       row.replacing("uid", with: value, keys: row.fields.map(\.key))
@@ -79,7 +79,7 @@ extension RestoreASCIIIdentityTests {
         tree.documents.documents[0].records[index])
     }
     let error = Self.failure {
-      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
     }
     do {
       #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)

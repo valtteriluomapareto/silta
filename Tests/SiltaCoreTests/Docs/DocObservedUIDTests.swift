@@ -12,10 +12,7 @@ struct DocObservedUIDTests {
     try await withScratchDirectory { home in
       let (store, repo) = try DocVerificationPreparationTests.setup(home)
       let draft = DocVerificationPreparationTests.draft([about])
-      let binding = try store.read {
-        try DocVerification.binding(
-          DocMetadata.resolve(draft, workspace: 1, in: $0), workspace: 1, in: $0)
-      }
+      let binding = try DocStoreTests.binding(draft, store: store)
       let git = ScriptedGitRunner(
         script: binding.apps.map {
           (
@@ -45,10 +42,7 @@ struct DocObservedUIDTests {
       let store = try AcmeDocAttachments.make(in: home)
       try store.write { try $0.database.execute(sql: "UPDATE app SET uid='K' WHERE slug='api'") }
       let draft = DocVerificationPreparationTests.draft(["app:api"])
-      let binding = try store.read {
-        try DocVerification.binding(
-          DocMetadata.resolve(draft, workspace: 1, in: $0), workspace: 1, in: $0)
-      }
+      let binding = try DocStoreTests.binding(draft, store: store)
       var fields = [
         "app": "api", "ref": "main", "sha": DocVerificationPreparationTests.apiSHA,
       ]
