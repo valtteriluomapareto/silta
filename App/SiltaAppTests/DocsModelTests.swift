@@ -111,6 +111,24 @@
       #expect(docs.failure == nil)
     }
 
+    @Test func proposedFilterKeepsPendingOnlyAndUsesThePendingRevision() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let docs = DocsModel()
+      await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
+      docs.proposedOnly = true
+      withKnownIssue("The proposed filter must exclude accepted revisions.") {
+        #expect(docs.groups(search: "").flatMap(\.entries).allSatisfy { $0.state == "proposed" })
+        #expect(docs.groups(search: "order").first?.preferred?.ref == "doc:order-contract@3")
+      }
+      #expect(docs.groups(search: "push").first?.preferred?.ref == "doc:push-categories@1")
+      docs.proposedOnly = false
+      #expect(docs.groups(search: "order").first?.preferred?.ref == "doc:order-contract@2")
+    }
+
     @Test func groupsPreferAcceptedAndReaderAppendsAllBodyPages() async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup

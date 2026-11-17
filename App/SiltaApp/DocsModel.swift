@@ -46,6 +46,7 @@ import SiltaAppSupport
   var view: AppDocumentView = .document {
     didSet { if oldValue != view { resetContent() } }
   }
+  var proposedOnly = false
   private(set) var entries: [AppDocument] = []
   private(set) var nextList: Int?
   private(set) var document: AppDocument?
