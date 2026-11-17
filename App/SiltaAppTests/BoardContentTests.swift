@@ -75,12 +75,21 @@
         #expect(TaskPresentation.claimant(question.claimedBy) == "Claude · session fixture")
         #expect(TaskPresentation.claimant("human:acme") == "acme")
         #expect(TaskPresentation.claimant(nil) == "—")
+        #expect(TaskPresentation.claimant("agent:other:session") == "agent:other:session")
         #expect(
-          TaskPresentation.cardMetadata(question, asked: true, now: AppV2Fixture.now)
+          TaskPresentation.cardMetadata(question, asked: true, now: AppV2Fixture.now) == "Asked you"
+        )
+        #expect(
+          TaskPresentation.cardMetadata(
+            question, asked: true, questionAuthor: "human:reviewer", now: AppV2Fixture.now)
+            == "reviewer · asked you")
+        #expect(
+          TaskPresentation.cardMetadata(
+            question, asked: true, questionAuthor: "agent:claude:fixture", now: AppV2Fixture.now)
             == "Claude · asked you")
         #expect(
           TaskPresentation.cardMetadata(other, asked: false, now: AppV2Fixture.now)
-            == "Codex · updated 3 min ago")
+            == "Codex · updated 1 h ago")
         #expect(
           TaskPresentation.cardMetadata(review, asked: false, now: AppV2Fixture.now)
             == "Codex · waiting for your review")
