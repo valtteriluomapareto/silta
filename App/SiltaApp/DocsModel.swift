@@ -222,6 +222,9 @@ import SiltaAppSupport
     failure = nil
   }
 
+}
+
+extension DocsModel {
   func moreVersions(_ reader: AppReader, workspace: String) async {
     guard !loading, let requested = ref, let offset = nextVersions else { return }
     let token = generation
