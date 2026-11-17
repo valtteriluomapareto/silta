@@ -110,18 +110,11 @@ extension DocProposalInbox {
     return instruction.utf8.count <= 512 ? [instruction] : [hub]
   }
 
-  func page(_ slug: String?) throws -> String {
+  func page(_ slug: String?) -> String {
     guard let slug = safe(slug) else { return hub }
-    let offset =
-      try Int.fetchOne(
-        db,
-        sql: """
-          SELECT count(*) FROM doc d JOIN doc_rev r ON r.doc_id=d.id
-          WHERE d.workspace_id=? AND d.slug COLLATE BINARY<? COLLATE BINARY
-            AND ((r.rev=d.current_rev AND r.state='accepted') OR r.state='proposed')
-          """, arguments: [workspaceID, slug]) ?? 0
-    let command = workspaceCommand(
-      "silta doc ls --archived --offset \(offset) --limit 20", workspace: workspace)
+    let command = DocService.listPageCommand(
+      workspace: workspace, about: nil,
+      archived: true, offset: 0, limit: 20, document: slug)
     return command.utf8.count <= 512 ? command : hub
   }
 }

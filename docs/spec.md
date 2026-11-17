@@ -991,7 +991,7 @@ It lists:
 
 `doc show <slug|doc:slug|doc:slug@N> [--rev N] [--lines N|A-B]` reads
 stored revision metadata and markdown. The default is the current accepted revision;
-without one it lists up to 20 pending revision refs and points to `doc ls` for more.
+without one it lists up to 20 pending revision refs and points to `doc ls --doc <slug>` for more.
 An unpinned accepted-body read includes its pending count and a safe scoped list
 command on the existing header line. Pinned line coordinates and continuation refs
 remain unchanged; archived recovery includes archived entries. Explicit revisions,
@@ -1009,8 +1009,12 @@ source, or a half-recorded decision pair, is corrupt. These reads do not infer a
 from current claims or invoke Git, verification or writes. Complete why text is masked
 before indentation and the existing rendered-line bounds, without a preview limit.
 
-`doc ls [--about <map-ref>] [--archived] [--offset N] [--limit N]`
+`doc ls [--doc <slug|doc:slug>] [--about <map-ref>] [--archived] [--offset N] [--limit N]`
 lists current accepted and individual pending revisions, ordered by slug then revision.
+The optional document filter takes an unpinned slug or canonical document ref; pinned
+selectors are invalid. Unknown documents have zero entries. It combines with attachment,
+archive and page filters, which every continuation preserves. Inbox “more” commands and
+both unpinned pending-read hints list that document’s entries from offset zero.
 The default page has 20 entries, with a maximum of 100. Accepted entries match current
 live attachments; pending entries match only their stored target kind and UID. Archived documents require `--archived` in lists, but explicit reads
 remain available. Unknown snapshot attachments stay unknown.

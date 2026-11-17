@@ -7,6 +7,37 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocProposalAttentionTests {
+  @Test func documentFilterUsesTheSharedCanonicalGrammar() throws {
+    #expect(try DocService.documentFilter(nil) == nil)
+    #expect(try DocService.documentFilter("rules") == "rules")
+    #expect(try DocService.documentFilter("doc:rules") == "rules")
+  }
+
+  @Test func scopedPageBoundsKeepArchivedProtectedRecovery() {
+    let command = DocService.listPageCommand(
+      workspace: String(repeating: "w", count: 220),
+      about: nil, archived: true, offset: 0, limit: 20, document: String(repeating: "d", count: 300)
+    )
+    #expect(command.utf8.count <= 512 && command.hasSuffix("doc ls --archived"))
+    #expect(!command.contains("--doc"))
+    #expect(
+      DocService.listPageCommand(
+        workspace: String(repeating: "w", count: 600),
+        about: nil, archived: true, offset: 0, limit: 20, document: "rules") == "silta ws ls")
+  }
+
+  @Test(arguments: ["rules@1", "doc:rules@1", "bad ref"])
+  func coreDocumentFilterRefusesBeforeOpeningStorage(ref: String) throws {
+    try withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      let error = RestoreASCIIIdentityTests.failure {
+        _ = try DocService(workspace: "acme", store: store).list(document: ref)
+      }
+      #expect(error?.code == .invalid)
+      #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+  }
+
   @Test(arguments: [false, true], [false, true])
   func staleEvidenceAndGuidanceUseTheSnapshotAndActualCaller(human: Bool, advanced: Bool) throws {
     try withScratchDirectory { home in

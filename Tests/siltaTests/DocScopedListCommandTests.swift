@@ -31,6 +31,22 @@ struct DocScopedListCommandTests {
     try #require(data["entries"] as? [[String: Any]]).map { try #require($0["ref"] as? String) }
   }
 
+  @Test func helpAndSchemaDescribeTheScopedFilter() throws {
+    try withScratchDirectory { home in
+      let help = try SiltaBinary.run(["doc", "ls", "--help"], in: home)
+      #expect(help.termination == .exit(0))
+      Golden.forTests().check(help.stdout, "help-doc-ls.txt")
+      let data = try GuideContractTests.data(
+        SiltaBinary.run(["schema", "doc", "ls", "--json"], in: home))
+      let commands = try #require(data["commands"] as? [[String: Any]])
+      let arguments = try #require(commands.first?["arguments"] as? [[String: Any]])
+      let option = try #require(arguments.first { $0["names"] as? [String] == ["--doc"] })
+      let json = try JSONSerialization.data(withJSONObject: option, options: [.sortedKeys])
+      Golden.forTests().check(
+        try #require(String(data: json, encoding: .utf8)) + "\n", "schema-doc-filter.json")
+    }
+  }
+
   @Test func documentFilterComposesAndPagesWithoutChangingTruth() throws {
     try withScratchDirectory { home in
       let store = try DocReadCommandTests().fixture(home)

@@ -17,7 +17,8 @@ struct DocProposalInboxTests {
       #expect(group.total == 200 && group.omitted == 198)
       #expect(group.members.map(\.ref) == ["doc:rules@201", "doc:rules@200"])
       #expect(group.members.first?.read == "silta --ws 'acme' doc show 'doc:rules@201' --diff")
-      #expect(group.next == "silta --ws 'acme' doc ls --archived --offset 0 --limit 20")
+      #expect(
+        group.next == "silta --ws 'acme' doc ls --doc 'rules' --archived --offset 0 --limit 20")
       let data = try JSONEncoder().encode(group)
       let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
       #expect(Set(object.keys) == ["ref", "total", "omitted", "members", "next"])
@@ -97,7 +98,7 @@ struct DocProposalInboxTests {
   }
 
   @Test(arguments: [false, true])
-  func recordedBaseAndGlobalPageCommandsAreReplayable(missing: Bool) throws {
+  func recordedBaseAndScopedPageCommandsAreReplayable(missing: Bool) throws {
     try withScratchDirectory { home in
       let store = try fixture(home)
       try AcmeDocAttachments.attach("Rules", to: "app", in: store)
@@ -109,7 +110,8 @@ struct DocProposalInboxTests {
         }
       }
       let group = try #require(try preview(store).first)
-      #expect(group.next == "silta --ws 'acme' doc ls --archived --offset 4 --limit 20")
+      #expect(
+        group.next == "silta --ws 'acme' doc ls --doc 'rules' --archived --offset 0 --limit 20")
       let member = try #require(group.members.first)
       #expect(member.read.hasSuffix(missing ? "'doc:rules@4'" : "'doc:rules@4' --diff"))
       if missing { #expect(member.summary == "recorded base unavailable; stale base") }
