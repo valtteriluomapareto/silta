@@ -34,7 +34,7 @@ struct DocStoredIdentityCommandTests {
         let contract = integrity.filter { ["id", "status", "message", "next_by"].contains($0.key) }
         let data = try JSONSerialization.data(withJSONObject: contract, options: [.sortedKeys])
         Golden.forTests().check(
-          String(decoding: data, as: UTF8.self) + "\n", "stored-uid-doctor.json")
+          try #require(String(data: data, encoding: .utf8)) + "\n", "stored-uid-doctor.json")
       }
       #expect(try RestoreDocumentCommandFixture.dump(queue) == before)
       #expect(

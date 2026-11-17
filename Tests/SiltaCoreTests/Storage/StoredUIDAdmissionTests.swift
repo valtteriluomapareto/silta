@@ -80,6 +80,23 @@ struct StoredUIDAdmissionTests {
     }
   }
 
+  @Test func explicitFixtureRepairAllowsRetryWithoutChangingOtherRows() throws {
+    try withScratchDirectory { home in
+      let store = try Self.legacy(home)
+      let original = try RestoreASCIIIdentityTests.rawUIDs(store, table: "service")
+      try Self.replace(Data("K\u{0}tail".utf8), table: "service", store: store)
+      #expect(RestoreASCIIIdentityTests.failure { try store.initialize() }?.code == .env)
+      try Self.replace(try #require(original.first), table: "service", store: store)
+      let repaired = try DocVerificationPreparationTests.truth(store)
+      try store.initialize()
+      #expect(try DocVerificationPreparationTests.truth(store) == repaired)
+      #expect(
+        try store.read {
+          try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid")
+        }.last == "v9")
+    }
+  }
+
   @Test(arguments: 0...255)
   func linkedEnginePreservesTheCompleteBytePolicy(byte: Int) throws {
     try withScratchDirectory { home in
