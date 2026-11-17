@@ -4,7 +4,9 @@ extension AppDocument {
   init(_ value: DocDisplayMetadata) {
     self.init(
       ref: value.ref, slug: value.slug, revision: value.revision, title: value.title,
-      kind: value.kind, about: value.about, state: value.state, archived: value.archived)
+      kind: value.kind, about: value.about, state: value.state, archived: value.archived,
+      actor: value.actor, createdAt: value.createdAt, sourceTask: value.sourceTask,
+      message: value.message, triagedBy: value.triagedBy, triagedAt: value.triagedAt)
   }
 }
 
@@ -44,7 +46,9 @@ extension AppReader {
         comments: view == .comments)
       return AppDocumentPage(
         document: value.metadata.map(AppDocument.init), body: value.body,
-        text: value.rendered ?? value.output, nextLine: value.nextLine)
+        text: value.rendered ?? value.output, nextLine: value.nextLine,
+        lines: value.lines.map { AppDocumentLines(first: $0.first, last: $0.last, total: $0.total) }
+      )
     }
   }
 

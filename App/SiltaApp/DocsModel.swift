@@ -62,6 +62,8 @@ import SiltaAppSupport
   var view: AppDocumentView = .document {
     didSet { if oldValue != view { resetContent() } }
   }
+  var showingSource = false
+  private(set) var lines: AppDocumentLines?
   var proposedOnly = false
   private(set) var entries: [AppDocument] = []
   private(set) var nextList: Int?
@@ -102,6 +104,8 @@ import SiltaAppSupport
     generation += 1
     loadedKey = nil
     loading = false
+    showingSource = false
+    lines = nil
     body = ""
     text = ""
     comments = []
@@ -239,6 +243,11 @@ import SiltaAppSupport
     if !preserveBody {
       body = (append ? body : "") + (result.page.body ?? "")
       text = (append ? text : "") + result.page.text
+      if append, let previous = lines, let next = result.page.lines {
+        lines = previous.appending(next)
+      } else {
+        lines = result.page.lines
+      }
       nextLine = result.page.nextLine
     }
     if !append {

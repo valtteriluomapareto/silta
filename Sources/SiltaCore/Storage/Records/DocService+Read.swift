@@ -88,7 +88,7 @@ extension DocService {
         db,
         sql:
           "SELECT CAST(doc.slug AS BLOB) AS slug,doc_rev.id,doc_rev.rev,doc_rev.state,doc.archived,"
-          + columns
+          + columns + "," + attributionColumns(available)
           + join + " ORDER BY doc.slug,doc_rev.rev LIMIT ? OFFSET ?",
         arguments: arguments + [limit, offset])
       let entries = try rows.map { try entry($0, in: db) }
@@ -122,7 +122,8 @@ extension DocService {
         db,
         sql:
           "SELECT CAST(doc.slug AS BLOB) AS slug,doc_rev.id,doc_rev.rev,doc_rev.state,doc.archived,"
-          + metadata + join + " ORDER BY doc_rev.rev DESC LIMIT ? OFFSET ?",
+          + metadata + "," + attributionColumns(columns) + join
+          + " ORDER BY doc_rev.rev DESC LIMIT ? OFFSET ?",
         arguments: args + [limit, offset])
       return DocListResult(
         entries: try rows.map { try entry($0, in: db) }, total: total,
@@ -167,6 +168,25 @@ extension DocService {
     }
   }
 
+  private func attributionColumns(_ available: [String]) -> String {
+    let fields = [
+      ("actor", "actor"), ("created_at", "createdAt"), ("message", "message"),
+      ("triaged_by", "triagedBy"), ("triaged_at", "triagedAt"),
+    ]
+    let columns = fields.map { column, alias in
+      available.contains(column)
+        ? "CAST(doc_rev.\(column) AS BLOB) AS \(alias)" : "NULL AS \(alias)"
+    }
+    let source =
+      available.contains("source_task_id")
+      ? """
+      CAST((SELECT workspace.task_prefix||'-'||task.seq FROM task
+      JOIN workspace ON workspace.id=task.workspace_id
+      WHERE task.id=doc_rev.source_task_id AND task.workspace_id=doc.workspace_id) AS BLOB)
+      """ : "NULL"
+    return (columns + [source + " AS sourceTask"]).joined(separator: ",")
+  }
+
   private func entry(_ row: Row, in db: Database) throws -> DocListResult.Entry {
     guard let slug = try row.strictText("slug") else { throw StorageError.corrupt }
     let ref = "doc:\(slug)@\(row["rev"] as Int)"
@@ -180,7 +200,10 @@ extension DocService {
     let kind = try row.strictText("kind")
     let metadata = DocDisplayMetadata(
       ref: ref, slug: slug, revision: row["rev"], title: title,
-      kind: kind, about: refs, state: state, archived: row["archived"]
+      kind: kind, about: refs, state: state, archived: row["archived"],
+      actor: try row.strictText("actor"), createdAt: try row.strictText("createdAt"),
+      sourceTask: try row.strictText("sourceTask"), message: try row.strictText("message"),
+      triagedBy: try row.strictText("triagedBy"), triagedAt: try row.strictText("triagedAt")
     ).masked
     let rendered = DocReadResult(
       masking: ref,

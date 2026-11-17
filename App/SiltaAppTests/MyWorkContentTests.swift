@@ -46,14 +46,14 @@
         now.addingTimeInterval(-seconds).ISO8601Format(
           Date.ISO8601FormatStyle(includingFractionalSeconds: true))
       }
-      #expect(MyWorkContent.age(stamp(30), now: now) == "just now")
-      #expect(MyWorkContent.age(stamp(360), now: now) == "6 min ago")
-      #expect(MyWorkContent.age(stamp(359.999), now: now) == "6 min ago")
-      #expect(MyWorkContent.age(stamp(7200), now: now) == "2 h ago")
-      #expect(MyWorkContent.age(stamp(259200), now: now) == "3 d ago")
-      #expect(MyWorkContent.age(stamp(-60), now: now) == "just now")
+      #expect(RelativeAge.text(stamp(30), now: now) == "just now")
+      #expect(RelativeAge.text(stamp(360), now: now) == "6 min ago")
+      #expect(RelativeAge.text(stamp(359.999), now: now) == "6 min ago")
+      #expect(RelativeAge.text(stamp(7200), now: now) == "2 h ago")
+      #expect(RelativeAge.text(stamp(259200), now: now) == "3 d ago")
+      #expect(RelativeAge.text(stamp(-60), now: now) == "just now")
       #expect(
-        MyWorkContent.age(nil, now: now) == nil && MyWorkContent.age("unknown", now: now) == nil)
+        RelativeAge.text(nil, now: now) == nil && RelativeAge.text("unknown", now: now) == nil)
     }
 
     @Test func pullRequestLinksStayExplicitAndSafe() {

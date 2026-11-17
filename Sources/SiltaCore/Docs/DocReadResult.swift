@@ -14,6 +14,7 @@ package struct DocReadResult: Encodable, Sendable {
   package var metadata: DocDisplayMetadata?
   package var rendered: String?
   package var nextLine: Int?
+  package var lines: DocLineWindow?
   var bodyLayout: DocBodyLayout?
 
   private enum CodingKeys: String, CodingKey {
@@ -26,4 +27,11 @@ extension DocReadResult {
     self.ref = SecretGuard.redacted(ref)
     self.output = SecretGuard.redacted(output)
   }
+}
+
+/// Line numbers in the masked body, independently of CLI metadata and continuation text.
+package struct DocLineWindow: Sendable {
+  package let first: Int
+  package let last: Int
+  package let total: Int
 }

@@ -74,7 +74,8 @@ nonisolated struct MyWorkContent {
     let actor = item.author.map { ActorPresentation($0).name } ?? "Someone"
     let title = task?.title ?? item.task
     let metadata =
-      ([actor + " asks you"] + [title, age(item.createdAt, now: now)].compactMap { $0 })
+      ([actor + " asks you"]
+      + [title, RelativeAge.text(item.createdAt, now: now)].compactMap { $0 })
       .joined(separator: " · ")
     return Question(item: item, metadata: metadata)
   }
@@ -83,7 +84,7 @@ nonisolated struct MyWorkContent {
     let link = pullRequest(task.links)
     var metadata = ["Waiting for your review"]
     if let submission = task.submission {
-      let elapsed = age(submission.at, now: now).map { " " + $0 } ?? ""
+      let elapsed = RelativeAge.text(submission.at, now: now).map { " " + $0 } ?? ""
       metadata.append(ActorPresentation(submission.actor).name + " submitted it" + elapsed)
     }
     if !task.steps.isEmpty {
@@ -111,22 +112,6 @@ nonisolated struct MyWorkContent {
       item: item, title: item.title ?? task?.title ?? "Task proposal",
       metadata: [task?.app, author].compactMap { $0 }.joined(separator: " · "),
       ref: item.refs.first ?? item.ref ?? "")
-  }
-
-  static func age(_ timestamp: String?, now: Date) -> String? {
-    guard let timestamp else { return nil }
-    let date: Date
-    do {
-      date = try Date(
-        timestamp, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
-    } catch {
-      return nil
-    }
-    let seconds = max(0, Int(now.timeIntervalSince(date).rounded()))
-    if seconds < 60 { return "just now" }
-    if seconds < 3600 { return "\(seconds / 60) min ago" }
-    if seconds < 86400 { return "\(seconds / 3600) h ago" }
-    return "\(seconds / 86400) d ago"
   }
 
   static func pullRequest(_ targets: [String]) -> URL? {

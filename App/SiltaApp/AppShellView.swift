@@ -22,7 +22,7 @@ struct AppShellView: View {
         content.frame(maxWidth: .infinity, maxHeight: .infinity)
       }.background(Color("Canvas"))
     }
-    .navigationTitle(model.route.title)
+    .navigationTitle(model.screenTitle)
     .searchable(
       text: $model.search, placement: .toolbar,
       prompt: model.route == .docs ? "Search loaded documents" : "Search"
@@ -32,7 +32,7 @@ struct AppShellView: View {
     .toolbar {
       ToolbarItem(placement: .principal) {
         VStack(alignment: .leading, spacing: 1) {
-          Text(model.route.title).font(.system(size: 15, weight: .bold))
+          Text(model.screenTitle).font(.system(size: 15, weight: .bold))
           Text(model.screenSummary).font(.system(size: 11))
             .foregroundStyle(Color("SecondaryInk"))
         }

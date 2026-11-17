@@ -35,6 +35,34 @@
       }
     }
 
+    @Test func revisionAttributionIsRecordedMaskedAndReadOnly() throws {
+      try withScratchDirectory { scratch in
+        try AppDocsFixture.seed(home: scratch.appending(path: "silta-home"))
+        let reader = try AppReaderTests.reader(scratch)
+        try reader.environment.db.write {
+          try $0.database.execute(
+            sql: "UPDATE doc_rev SET message='Password=private123'")
+        }
+        let probe = try reader.makeChangeProbe()
+        let before = try probe.version()
+        let list = try reader.documents(workspace: "acme").entries
+        let history = try reader.documentVersions("order-contract", workspace: "acme").entries
+        let body = try #require(
+          try reader.document("doc:order-contract@3", workspace: "acme").document)
+        let diff = try #require(
+          try reader.document("doc:order-contract@3", workspace: "acme", view: .changes).document)
+        for doc in list + history + [body, diff] {
+          #expect(doc.actor != nil && doc.createdAt != nil)
+          #expect(doc.message?.contains("private123") == false)
+          #expect(doc.message?.contains("[REDACTED:password]") == true)
+          if doc.ref == "doc:order-contract@3" {
+            #expect(doc.actor == "agent:codex:fixture" && doc.sourceTask == "AC-9")
+          }
+        }
+        #expect(try probe.version() == before)
+      }
+    }
+
     @Test func encodedAttachmentSecretsAreMaskedInEveryTypedRead() throws {
       try withScratchDirectory { scratch in
         try AppDocsFixture.seed(home: scratch.appending(path: "silta-home"))
@@ -72,6 +100,12 @@
         let steps = body.components(separatedBy: "\n").filter { $0.hasPrefix("Operational step ") }
         #expect(steps.count == 500 && Set(steps).count == 500 && second.nextLine == nil)
         #expect(body.contains("Operational step 500."))
+        let start = try #require(first.lines)
+        let end = try #require(second.lines)
+        #expect(start.first == 1 && start.total == 502 && start.last < start.total)
+        #expect(end.first == start.last + 1 && end.last == 502 && end.total == 502)
+        let empty = try reader.document("doc:operations@1", workspace: "acme", fromLine: 9999)
+        #expect(empty.lines?.first == 0 && empty.lines?.last == 0 && empty.lines?.total == 502)
         let core = DocService(workspace: "acme", store: reader.environment.db)
         let json =
           try JSONSerialization.jsonObject(with: JSONEncoder().encode(core.list()))
@@ -81,7 +115,9 @@
         let show =
           try JSONSerialization.jsonObject(
             with: JSONEncoder().encode(core.show("doc:operations@1"))) as? [String: Any]
-        #expect(show?["metadata"] == nil && show?["rendered"] == nil && show?["nextLine"] == nil)
+        #expect(
+          show?["metadata"] == nil && show?["rendered"] == nil && show?["nextLine"] == nil
+            && show?["lines"] == nil)
       }
     }
   }
