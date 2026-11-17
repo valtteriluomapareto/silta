@@ -75,18 +75,29 @@
       } else {
         counts = Counts(lanes: nil, sidebar: nil)
       }
+      let readiness = Self.readiness(model)
+      refresh = Refresh(phase: readiness.phase, dataVersion: model.visibleData?.version)
+      idle = readiness.idle
+    }
+
+    @MainActor private static func readiness(_ model: AppModel) -> (phase: String, idle: Bool) {
       let documentPhase =
         model.route == .docs
         ? model.documents.phase(
           workspace: model.workspace, about: model.docsAbout,
           archived: model.includeArchivedDocuments, version: model.visibleData?.version) : nil
+      let workspacePhase =
+        model.route == .workspace && model.visibleData?.map != nil
+        ? model.workspaceDocuments.phase(
+          workspace: model.workspace, version: model.visibleData?.version,
+          connections: model.visibleData?.map?.connections.map(\.attachment) ?? []) : nil
       let phase =
         model.isLoading
         ? "loading"
         : model.failure != nil
           ? "failed"
-          : documentPhase?.rawValue ?? (model.data != nil ? "ready" : "starting")
-      refresh = Refresh(phase: phase, dataVersion: model.visibleData?.version)
+          : workspacePhase?.rawValue ?? documentPhase?.rawValue
+            ?? (model.data != nil ? "ready" : "starting")
       let taskSettled =
         model.route != .board || !model.boardInspectorPresented
         || model.boardSelection == nil
@@ -95,9 +106,14 @@
       let documentSettled =
         documentPhase == nil || model.failure != nil
         || documentPhase == .ready || documentPhase == .failed
-      idle =
-        documentSettled && !model.isLoading && !model.taskDetail.isLoading && taskSettled
+      let workspaceSettled =
+        workspacePhase == nil || model.failure != nil
+        || workspacePhase == .ready || workspacePhase == .failed
+      let idle =
+        workspaceSettled && documentSettled && !model.isLoading && !model.taskDetail.isLoading
+        && taskSettled
         && (model.data != nil || model.failure != nil)
+      return (phase, idle)
     }
 
     @MainActor private static func navigation(_ model: AppModel)

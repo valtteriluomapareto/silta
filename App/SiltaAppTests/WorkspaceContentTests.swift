@@ -5,15 +5,14 @@
   import Testing
 
   @MainActor struct WorkspaceContentTests {
-    @Test func groupsRetainEveryConnectionAndFilterServices() throws {
+    @Test func groupsRetainEveryConnectionIncludingServiceTargets() throws {
       try fixture { map in
         let all = WorkspaceContent(map: map, search: "")
-        #expect(all.groups.count == 3 && all.services.count == 2)
+        #expect(all.groups.count == 3)
         #expect(all.groups.flatMap(\.connections).count == 4)
         let filtered = WorkspaceContent(map: map, search: "PAYMENTS")
         #expect(filtered.groups.map { $0.app.slug } == ["acme-backend"])
         #expect(filtered.groups.flatMap(\.connections).map(\.target) == ["service:payments"])
-        #expect(filtered.services.map(\.slug) == ["payments"])
       }
     }
 

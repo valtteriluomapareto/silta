@@ -10,6 +10,7 @@ final class AppModel {
   let reader: AppReader?
   let taskDetail = TaskDetailModel()
   let documents: DocsModel
+  let workspaceDocuments: WorkspaceDocumentsModel
   var docsAbout: String?
   var includeArchivedDocuments = false
   var documentSelection: DocumentSelection? {
@@ -31,10 +32,12 @@ final class AppModel {
   @ObservationIgnored private var generation = 0
 
   init(
-    reader: AppReader? = nil, documents: DocsModel = DocsModel(), load: @escaping Loader
+    reader: AppReader? = nil, documents: DocsModel = DocsModel(),
+    workspaceDocuments: WorkspaceDocumentsModel = WorkspaceDocumentsModel(), load: @escaping Loader
   ) {
     self.reader = reader
     self.documents = documents
+    self.workspaceDocuments = workspaceDocuments
     self.load = load
   }
 
@@ -67,6 +70,7 @@ final class AppModel {
           }
           failure = nil
           if route == .docs { await loadDocuments(force: forced) }
+          if route == .workspace { await loadWorkspaceDocuments(force: forced) }
         }
       } catch {
         if token == generation {
@@ -84,6 +88,7 @@ final class AppModel {
       generation += 1
       workspace = slug
       documents.clear()
+      workspaceDocuments.clear()
       docsAbout = nil
       taskDetail.clear()
       boardSelection = nil
@@ -93,6 +98,13 @@ final class AppModel {
       appFilter = nil
     }
     return refresh(force: true)
+  }
+
+  func loadWorkspaceDocuments(force: Bool = false) async {
+    guard let reader, let workspace, let map = visibleData?.map else { return }
+    await workspaceDocuments.refresh(
+      reader, workspace: workspace, version: visibleData?.version,
+      connections: map.connections.map(\.attachment), force: force)
   }
 
   func loadDocuments(force: Bool = false, append: Bool = false) async {
@@ -123,9 +135,9 @@ final class AppModel {
     documents.view = view
   }
 
-  func openDocument(_ ref: String) {
+  func openDocument(_ ref: String, view: AppDocumentView = .changes) {
     docsAbout = nil
-    documents.view = .changes
+    documents.view = view
     select(document: ref)
   }
 

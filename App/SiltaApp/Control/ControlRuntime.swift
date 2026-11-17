@@ -32,6 +32,7 @@
         try options.route.apply(to: model)
         if model.boardSelection != nil { await model.loadTaskDetail() }
         if model.route == .docs { await model.loadDocuments() }
+        if model.route == .workspace { await model.loadWorkspaceDocuments() }
         if let output = options.snapshot {
           try await snapshot(model: model, to: output)
           try publish()
@@ -82,7 +83,7 @@
         let connection = WorkspaceContent(map: map, search: model.search)
           .connection(model.workspaceSelection?.connectionRef)
         try await capture(
-          ConnectionInspector(connection: connection, openDocs: model.openDocuments),
+          ConnectionInspector(connection: connection, model: model),
           size: NSSize(width: 360, height: size.height),
           to: directory.appending(path: "inspector.png"))
       }
@@ -113,6 +114,7 @@
         await model.refresh().value
         if model.boardSelection != nil { await model.loadTaskDetail() }
         if model.route == .docs { await model.loadDocuments() }
+        if model.route == .workspace { await model.loadWorkspaceDocuments() }
       }
       await withCheckedContinuation { continuation in
         DispatchQueue.main.async { continuation.resume() }

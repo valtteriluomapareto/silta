@@ -8,7 +8,6 @@ nonisolated struct WorkspaceContent {
     var id: String { app.slug }
   }
   let groups: [Group]
-  let services: [AppMapService]
   private let connections: [AppConnection]
 
   init(map: AppWorkspaceMap, search: String) {
@@ -28,7 +27,6 @@ nonisolated struct WorkspaceContent {
       }
       return appMatches || !edges.isEmpty ? Group(app: app, connections: edges) : nil
     }
-    services = map.services.filter { matches([$0.slug, $0.name, $0.summary ?? "", $0.attachment]) }
   }
 
   func connection(_ attachment: String?) -> AppConnection? {
