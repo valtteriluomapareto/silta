@@ -14,12 +14,12 @@ struct RestoreDocumentRowTests {
       graph.documents.documents[0].records.swapAt(6, 7)
       let kept = try RestoreDocumentRowSupport.keptRows(store)
       let expected = try RestoreDocumentRowSupport.replace(
-        store, tree: graph.tree, incoming: graph.documents)
+        store, tree: graph, incoming: graph.documents)
       let after = try store.read { try ExportDocumentSnapshot.read($0, workspace: 17) }
       ExportTreeTests.expectSame(try after.files(), try expected.files())
       Golden.forTests().check(
         ExportFormat.jsonl(after.revisionAllocations), "restore-doc-allocations.jsonl")
-      #expect(try store.read { try ExportLinks.read($0, workspace: 17) } == graph.tree.links)
+      #expect(try store.read { try ExportLinks.read($0, workspace: 17) } == graph.links)
       #expect(try RestoreDocumentRowSupport.keptRows(store) == kept)
       try store.read { (db: Database) throws in
         let doc = try #require(try Row.fetchOne(db, sql: "SELECT * FROM doc WHERE workspace_id=17"))
@@ -48,14 +48,14 @@ struct RestoreDocumentRowTests {
     try withScratchDirectory { home in
       let store = try RestoreDocumentRowSupport.make(home)
       var graph = try RestoreDocumentGraphFixture.graph()
-      graph.tree.links = []
+      graph.links = []
       let incoming = ExportDocumentSnapshot(
         documents: [],
         revisionAllocations: [
           ExportDocumentTests.row([("slug", "incoming-only"), ("next", "400")])
         ])
       let expected = try RestoreDocumentRowSupport.replace(
-        store, tree: graph.tree, incoming: incoming)
+        store, tree: graph, incoming: incoming)
       let after = try store.read { try ExportDocumentSnapshot.read($0, workspace: 17) }
       #expect(after.documents.isEmpty && after.legacyCommentSequences == nil)
       ExportTreeTests.expectSame(try after.files(), try expected.files())
@@ -75,7 +75,7 @@ struct RestoreDocumentRowTests {
       graph.documents.documents[1].records[0] = graph.documents.documents[1].records[0]
         .replacing("uid", with: "owned-legacy-revision", keys: ExportFormat.docRecords[0].keys)
       let expected = try RestoreDocumentRowSupport.replace(
-        store, tree: graph.tree, incoming: graph.documents)
+        store, tree: graph, incoming: graph.documents)
       let after = try store.read { try ExportDocumentSnapshot.read($0, workspace: 17) }
       ExportTreeTests.expectSame(try after.files(), try expected.files())
       let old = try #require(after.documents.first { $0.slug == "other-rules" })
@@ -91,7 +91,7 @@ struct RestoreDocumentRowTests {
       let graph = try RestoreDocumentGraphFixture.graph()
       let before = try RestoreSupport.dump(store)
       let expected = try RestoreDocumentRowSupport.replace(
-        store, tree: graph.tree, incoming: graph.documents, rollingBack: true)
+        store, tree: graph, incoming: graph.documents, rollingBack: true)
       Golden.forTests().check(
         ExportFormat.jsonl(expected.revisionAllocations), "restore-doc-allocations.jsonl")
       #expect(try RestoreSupport.dump(store) == before)
@@ -109,7 +109,7 @@ struct RestoreDocumentRowTests {
       }
       let before = try RestoreSupport.dump(store)
       #expect(throws: StorageError.constraintViolation) {
-        try RestoreDocumentRowSupport.replace(store, tree: graph.tree, incoming: graph.documents)
+        try RestoreDocumentRowSupport.replace(store, tree: graph, incoming: graph.documents)
       }
       #expect(try RestoreSupport.dump(store) == before)
     }
@@ -119,7 +119,7 @@ struct RestoreDocumentRowTests {
     try withScratchDirectory { home in
       let store = try RestoreDocumentRowSupport.make(home)
       let graph = try RestoreDocumentGraphFixture.graph()
-      _ = try RestoreDocumentRowSupport.replace(store, tree: graph.tree, incoming: graph.documents)
+      _ = try RestoreDocumentRowSupport.replace(store, tree: graph, incoming: graph.documents)
       let ids = SeededIDGenerator(seed: 501)
       #expect(
         try RestoreDocumentRowSupport.accept("push-rules", store: store, ids: ids).revision == 151)
@@ -138,7 +138,7 @@ struct RestoreDocumentRowTests {
         try $0.database.execute(
           sql: "UPDATE doc_rev SET rev=? WHERE uid='newer-rejection'", arguments: [Int64.max])
       }
-      _ = try RestoreDocumentRowSupport.replace(store, tree: graph.tree, incoming: graph.documents)
+      _ = try RestoreDocumentRowSupport.replace(store, tree: graph, incoming: graph.documents)
       let before = try RestoreSupport.dump(store)
       #expect(throws: StorageError.resourceExhausted) {
         try RestoreDocumentRowSupport.accept(

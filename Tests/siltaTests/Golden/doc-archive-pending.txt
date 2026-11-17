@@ -1,2 +1,2 @@
 error: Only a doc with an accepted current revision can be archived. [invalid]
-next: silta --ws 'acme' doc ls --archived --offset 0 --limit 20
+next: silta --ws 'acme' doc ls --doc 'rules' --offset 0 --limit 20

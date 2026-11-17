@@ -27,6 +27,12 @@ package struct LogEntry: Encodable, Equatable, Sendable {
   /// Original shell SILTA_SESSION matches the resolved actor; absent on hooks/legacy logs.
   package var sessionMatchesActor: Bool?
 
+  /// Preview rows retained by a successful brief; absent on other commands and failures.
+  package var docsShown: Int?
+
+  /// Document totals in successful brief count-only pointers; absent on other calls.
+  package var docsCounted: Int?
+
   /// Records the command name and safe identifiers, never command argument values.
   package init(timestamp: Date, command: String, actor: String, exitCode: Int32, milliseconds: Int)
   {

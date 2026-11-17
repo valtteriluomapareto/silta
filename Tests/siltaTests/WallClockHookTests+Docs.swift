@@ -5,6 +5,14 @@ import SiltaTestSupport
 import Testing
 
 extension WallClockHookTests {
+  @Test(arguments: [false, true])
+  func acceptedEdgeDocHookProducesOutputWithinTheDeadline(json: Bool) throws {
+    try BriefEmptyTopicDocumentTests.withAcceptedEdgeDocument { repo, scratch in
+      try BriefEmptyTopicDocumentTests.check(["--hook"], json: json, repo: repo, scratch: scratch)
+      #expect(try brief.hookTimeoutCount(scratch) == 0)
+    }
+  }
+
   @Test func docViewsFollowExplicitCompactModeAndShareBoundedJSONText() throws {
     try withScratchDirectory { scratch in
       let repo = try contextFixture(scratch)

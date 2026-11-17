@@ -181,11 +181,7 @@ package struct DocWriteService {
   private func auditCommand(_ request: DocEditRequest, workspace: String) -> String {
     SecretGuard.redacted(
       workspaceCommand("silta doc edit " + shellWord("doc:" + request.slug), workspace: workspace))
-      + (request.keepBody ? " --keep-body" : " -F <file>")
-      + (request.title == nil ? "" : " --title <title>")
-      + (request.kind == nil ? "" : " --kind <kind>")
-      + (request.about == nil ? "" : " --about <ref>")
-      + (request.allowSecret ? " --allow-secret" : "")
+      + flags(request)
   }
 
   func command(_ request: DocEditRequest, workspace: String?) -> String {
@@ -194,11 +190,15 @@ package struct DocWriteService {
     }
     let base =
       "silta doc edit " + shellWord("doc:" + request.slug)
-      + (request.keepBody ? " --keep-body" : " -F <file>")
+      + flags(request)
+    return workspace.map { workspaceCommand(base, workspace: $0) } ?? base
+  }
+  private func flags(_ request: DocEditRequest) -> String {
+    (request.keepBody ? " --keep-body" : " -F <file>")
       + (request.title == nil ? "" : " --title <title>")
       + (request.kind == nil ? "" : " --kind <kind>")
       + (request.about == nil ? "" : " --about <ref>")
       + (request.allowSecret ? " --allow-secret" : "")
-    return workspace.map { workspaceCommand(base, workspace: $0) } ?? base
   }
+
 }

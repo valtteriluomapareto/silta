@@ -59,9 +59,11 @@ struct DocProposalReferenceCommandTests {
           + (mode == "text" ? [] : ["--" + mode]),
         in: scratch, environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(1))
-      Golden.forTests().check(
-        mode == "json" ? result.stdout : result.stderr,
-        "doc-propose-pinned-target" + (mode == "json" ? ".json" : ".txt"))
+      if !metadata {
+        Golden.forTests().check(
+          mode == "json" ? result.stdout : result.stderr,
+          "doc-propose-pinned-target" + (mode == "json" ? ".json" : ".txt"))
+      }
       let next: String
       if mode == "json" {
         next = try #require((try DocEditCommandTests.error(result)["next"] as? [String])?.first)
@@ -72,6 +74,8 @@ struct DocProposalReferenceCommandTests {
         .replacingOccurrences(of: "next: ", with: "")
       }
       #expect(!next.contains("doc:rules@1"))
+      #expect((result.stdout + result.stderr).contains("Proposals target the doc, not a revision"))
+      #expect(metadata || (!next.contains("--title") && !next.contains("--about")))
       let command = next.replacingOccurrences(of: "<file>", with: shellWord(file.path))
         .replacingOccurrences(of: "<why>", with: "Share")
         .replacingOccurrences(of: "<title>", with: "Rules")

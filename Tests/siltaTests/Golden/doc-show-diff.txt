@@ -3,20 +3,10 @@ actor: agent:codex:acme
 created_at: 2023-11-15
 --- metadata doc:rules@1
   title: Base rules
-  kind: contract
   about: app:api
-  source_task: (not recorded)
-  triaged_by: (not recorded)
-  triaged_at: (not recorded)
-  why: (not recorded)
 +++ metadata doc:rules@3
   title: Proposed rules
-  kind: contract
   about: service:push
-  source_task: (not recorded)
-  triaged_by: (not recorded)
-  triaged_at: (not recorded)
-  why: (not recorded)
 --- doc:rules@1
 +++ doc:rules@3
 @@ -1,1 +1,1 @@

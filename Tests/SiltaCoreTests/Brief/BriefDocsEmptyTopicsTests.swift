@@ -1,5 +1,4 @@
 import Foundation
-import GRDB
 import SiltaTestSupport
 import Testing
 
@@ -9,10 +8,7 @@ struct BriefDocsEmptyTopicsTests {
   @Test(arguments: ["app", "edge", "service"], [false, true])
   func emptyTopicsKeepLexicalPreviewsAndCompactCounts(kind: String, selectedTask: Bool) throws {
     try withScratchDirectory { home in
-      let store = try BriefDocsTests.setup(home)
-      try store.write {
-        try $0.database.execute(sql: "DELETE FROM link WHERE from_kind='task' AND rel='about'")
-      }
+      let store = try BriefDocsTests.setup(home, taskTopics: false)
       for slug in ["zeta", "alpha", "beta"] {
         try BriefDocsTests.document(slug, target: kind, body: "Rule " + slug, store: store)
       }
