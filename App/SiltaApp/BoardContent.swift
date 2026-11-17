@@ -33,11 +33,23 @@ nonisolated struct BoardContent {
     attention = board.questions
     questions = Set(board.questions.compactMap(\.task))
   }
-  func commands(for ref: String, reader: AppReader, workspace: String) -> [AppCommand] {
-    var seen = Set<String>()
-    return attention.filter { $0.kind == "question" && $0.task == ref }
-      .flatMap { reader.commands(for: $0, workspace: workspace) }
-      .filter { seen.insert($0.text).inserted }
+  struct Answer: Identifiable {
+    let command: AppCommand
+    let actor: String?
+    var id: String { command.text }
   }
 
+  func questionAuthor(for ref: String) -> String? {
+    attention.first { $0.kind == "question" && $0.task == ref }?.author
+  }
+
+  func answers(for ref: String, reader: AppReader, workspace: String) -> [Answer] {
+    var seen = Set<String>()
+    return attention.filter { $0.kind == "question" && $0.task == ref }.compactMap { item in
+      guard let command = reader.commands(for: item, workspace: workspace).first,
+        seen.insert(command.text).inserted
+      else { return nil }
+      return Answer(command: command, actor: item.author)
+    }
+  }
 }

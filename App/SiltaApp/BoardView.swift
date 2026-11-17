@@ -5,44 +5,56 @@ struct BoardView: View {
   @Bindable var model: AppModel
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      HStack {
-        Picker("App", selection: $model.appFilter) {
-          Text("All apps").tag(String?.none)
-          ForEach(model.visibleData?.map?.apps ?? [], id: \.slug) { app in
-            Text(app.name).tag(Optional(app.slug))
-          }
-        }.frame(maxWidth: 250)
-        Toggle("Show proposed", isOn: $model.showProposed).toggleStyle(.checkbox)
-        Spacer()
-        Button("Inspector", systemImage: "sidebar.right") { model.toggleInspector() }
-          .labelStyle(.iconOnly).help("Toggle inspector (⌥⌘I)")
-      }.padding(.horizontal, 24).padding(.top, 16)
+    Group {
       if let snapshot = model.visibleData?.snapshot {
         let content = BoardContent(
           snapshot: snapshot, app: model.appFilter, search: model.search,
           proposals: model.showProposed)
         ScrollView(.horizontal) {
-          HStack(alignment: .top, spacing: 12) {
+          HStack(alignment: .top, spacing: 10) {
             ForEach(content.lanes) { lane in
               ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                  HStack {
-                    Text(lane.title).font(.headline)
-                    Spacer()
-                    Text(lane.tasks.count, format: .number).foregroundStyle(.secondary)
+                LazyVStack(alignment: .leading, spacing: 8) {
+                  HStack(spacing: 7) {
+                    if lane.title == "Todo" {
+                      Circle().strokeBorder(Color("SecondaryInk"), lineWidth: 1.5).frame(
+                        width: 8, height: 8)
+                    } else {
+                      StatusDot(color: laneColor(lane.title))
+                    }
+                    Text(lane.title).font(.system(size: 13, weight: .semibold))
+                    Spacer(minLength: 0)
+                    Text(lane.tasks.count, format: .number).font(.system(size: 12))
+                      .foregroundStyle(Color("SecondaryInk"))
                   }.padding(.bottom, 4)
                   if lane.tasks.isEmpty {
-                    Text("No tasks").font(.callout).foregroundStyle(.secondary).padding(.vertical)
+                    Text(model.search.isEmpty ? "No tasks" : "No matches")
+                      .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk")).padding(
+                        .vertical)
                   }
                   ForEach(lane.tasks, id: \.ref) { task in
-                    card(task, asked: content.questions.contains(task.ref))
+                    card(task, content: content)
                   }
                 }.padding(.bottom, 24)
-              }.frame(width: 210)
+              }.frame(width: 144)
             }
-          }.padding(.horizontal, 24)
+          }.padding(.horizontal, 24).padding(.top, 16)
         }
+      }
+    }
+    .foregroundStyle(Color("Ink"))
+    .toolbar {
+      ToolbarItemGroup(placement: .primaryAction) {
+        Picker("App", selection: $model.appFilter) {
+          Text("All apps").tag(String?.none)
+          ForEach(model.visibleData?.map?.apps ?? [], id: \.slug) {
+            Text($0.name).tag(Optional($0.slug))
+          }
+        }.labelsHidden().frame(width: 150)
+        Toggle("Show proposed", isOn: $model.showProposed).toggleStyle(.checkbox)
+          .font(.system(size: 12))
+        Button("Inspector", systemImage: "sidebar.right") { model.toggleInspector() }
+          .labelStyle(.iconOnly).help("Toggle inspector (⌥⌘I)")
       }
     }
     .inspector(isPresented: $model.boardInspectorPresented) {
@@ -50,40 +62,77 @@ struct BoardView: View {
     }
   }
 
-  private func card(_ task: AppTask, asked: Bool) -> some View {
-    Button {
+  private func card(_ task: AppTask, content: BoardContent) -> some View {
+    let asked = content.questions.contains(task.ref)
+    let done = task.status == "done"
+    let selected = model.boardSelection?.taskRef == task.ref
+    return Button {
       model.inspect(task: task.ref)
     } label: {
-      VStack(alignment: .leading, spacing: 8) {
-        Text([task.ref, task.app].compactMap { $0 }.joined(separator: " · "))
-          .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
-        Text(task.title).font(.body.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 4) {
+          Text([task.ref, task.app].compactMap { $0 }.joined(separator: " · "))
+            .font(.system(size: 10, design: .monospaced)).lineLimit(1)
+            .foregroundStyle(Color("SecondaryInk"))
+            .help([task.ref, task.app].compactMap { $0 }.joined(separator: " · "))
+          if asked {
+            Circle().fill(Color("AttentionMarker")).frame(width: 7, height: 7).help("Asked you")
+          }
+        }
+        Text(task.title).font(.system(size: 13, weight: selected ? .semibold : .medium))
+          .foregroundStyle(Color(done ? "SecondaryInk" : "Ink"))
+          .lineLimit(3).lineSpacing(2).help(task.title)
         if task.status == "blocked" || task.status == "proposed" {
           Label(
             task.status.capitalized,
             systemImage: task.status == "blocked" ? "pause.circle" : "sparkle"
           )
-          .font(.caption).foregroundStyle(.secondary)
+          .font(.system(size: 11)).foregroundStyle(Color("Warning"))
         }
         if task.status == "doing", !task.steps.isEmpty {
-          ProgressView(
-            value: Double(task.steps.filter(\.done).count), total: Double(task.steps.count))
-          Text("Step \(task.steps.filter(\.done).count) of \(task.steps.count)")
-            .font(.caption).foregroundStyle(.secondary)
+          TaskStepBar(steps: task.steps)
         }
-        if let actor = task.claimedBy { ActorLabel(actor: actor).foregroundStyle(.secondary) }
-        if asked {
-          Label("Asked you", systemImage: "questionmark.circle.fill").font(.caption)
-            .foregroundStyle(.tint)
+        if let now = model.visibleData?.checkedAt,
+          let metadata = TaskPresentation.cardMetadata(
+            task, asked: asked, questionAuthor: content.questionAuthor(for: task.ref), now: now)
+        {
+          Text(metadata).font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+            .lineLimit(2).help(metadata)
         }
-      }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
-        .background(.background, in: RoundedRectangle(cornerRadius: 9))
-        .overlay(
-          RoundedRectangle(cornerRadius: 9).stroke(
-            model.boardSelection?.taskRef == task.ref
-              ? Color.accentColor : Color.secondary.opacity(0.25),
-            lineWidth: model.boardSelection?.taskRef == task.ref ? 2 : 1))
+      }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8).padding(
+        .vertical, 10
+      )
+      .background(Color(done ? "CommandSurface" : "Canvas"), in: .rect(cornerRadius: 10))
+      .overlay(
+        RoundedRectangle(cornerRadius: 10).strokeBorder(
+          selected ? Color("TideText") : Color("Ink").opacity(0.12), lineWidth: selected ? 1.5 : 1
+        ))
     }.buttonStyle(.plain).accessibilityElement(children: .ignore)
-      .accessibilityLabel(task.ref + ": " + task.title + ", " + task.status)
+      .accessibilityLabel(
+        task.ref + ": " + task.title + ", " + task.status
+          + (asked ? ", asked you" : "")
+          + (task.steps.isEmpty
+            ? "" : ", " + TaskPresentation.progress(task.steps, revision: task.planRevision)))
+  }
+
+  private func laneColor(_ title: String) -> Color {
+    switch title {
+    case "Doing": Color("TideText")
+    case "Review": Color("Warning")
+    case "Done this week": Color("DiffAddition")
+    default: Color("SecondaryInk")
+    }
+  }
+}
+
+private struct TaskStepBar: View {
+  let steps: [AppPlanStep]
+  var body: some View {
+    HStack(spacing: 3) {
+      ForEach(steps.indices, id: \.self) { index in
+        RoundedRectangle(cornerRadius: 2)
+          .fill(steps[index].done ? Color("TideText") : Color("Ink").opacity(0.12))
+      }
+    }.frame(height: 3).padding(.vertical, 2).accessibilityHidden(true)
   }
 }
