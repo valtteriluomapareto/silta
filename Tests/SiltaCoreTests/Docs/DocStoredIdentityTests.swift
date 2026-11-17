@@ -49,7 +49,7 @@ struct DocStoredIdentityTests {
       do {
         var failure: (any CodedError)?
         do {
-          _ = try DocVerification.readBinding(draft, workspace: 1, store: store)
+          _ = try DocStoreTests.binding(draft, workspace: 1, store: store)
         } catch let error as any CodedError { failure = error }
         Self.expectBackup(failure)
         #expect(try DocVerificationPreparationTests.truth(store) == before)

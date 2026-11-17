@@ -25,23 +25,23 @@ struct RestorePlanRevisionLinkTests {
       }
       let before = try RestoreSupport.dump(store)
       var graph = try RestoreDocumentGraphFixture.graph()
-      graph.tree.links = try store.read { try ExportLinks.read($0, workspace: 17) }
-      graph.tree.tasks[1].records = [1, 2].map { number in
+      graph.links = try store.read { try ExportLinks.read($0, workspace: 17) }
+      graph.tasks[1].records = [1, 2].map { number in
         ExportDocumentTests.row([
           ("table", "task_plan_rev"), ("rev", String(number)),
           ("body_md", number == 1 ? "First plan" : "Second plan"),
           ("actor", "human:acme"), ("created_at", ""),
         ])
       }
-      graph.tree.tasks[1].row = graph.tree.tasks[1].row
+      graph.tasks[1].row = graph.tasks[1].row
         .replacing("plan_rev", with: "2", keys: ExportFormat.taskKeys)
         .replacing("plan_md", with: "Second plan", keys: ExportFormat.taskKeys)
-      let links = graph.tree.links.filter { $0.value("to_kind") == "task_plan_rev" }
+      let links = graph.links.filter { $0.value("to_kind") == "task_plan_rev" }
       #expect(
         links.compactMap { $0.value("to") }
           == Array(repeating: ExportDocumentTests.uid("010"), count: 2))
       #expect(links.compactMap { $0.value("to_rev") } == ["1", "2"])
-      try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: graph, slug: "acme").run()
       #expect(try RestoreSupport.dump(store) == before)
     }
   }

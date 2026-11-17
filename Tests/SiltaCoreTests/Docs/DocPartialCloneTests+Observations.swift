@@ -152,7 +152,7 @@ extension DocPartialCloneTests {
     try withScratchDirectory { home in
       let (store, _) = try DocVerificationPreparationTests.setup(home)
       let draft = DocVerificationPreparationTests.draft(["edge:mobile/api/http-api"])
-      let binding = try DocVerification.readBinding(draft, workspace: 1, store: store)
+      let binding = try DocStoreTests.binding(draft, workspace: 1, store: store)
       let api = DocVerification.Snapshot(
         app: "api", ref: "origin/api", sha: DocVerificationPreparationTests.apiSHA)
       let mobile = DocVerification.Snapshot(

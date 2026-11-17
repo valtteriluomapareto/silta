@@ -213,9 +213,8 @@ extension RestoreReport {
       })
     return tree.links.filter { link in
       guard let owner = link.value("from") else { return false }
-      let source = owner
-      return (link.value("from_kind") == "doc" && source == uid)
-        || (link.value("from_kind") == "comment" && comments.contains(source))
+      return (link.value("from_kind") == "doc" && owner == uid)
+        || (link.value("from_kind") == "comment" && comments.contains(owner))
     }
   }
 

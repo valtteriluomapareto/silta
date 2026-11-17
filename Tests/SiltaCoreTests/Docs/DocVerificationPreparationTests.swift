@@ -78,9 +78,10 @@ struct DocVerificationPreparationTests {
         (Self.request("origin/mobile", repo: repo), Self.result(Self.mobileSHA)),
       ])
       let prepared = try await DocVerification.prepare(
-        Self.draft([
-          "edge:mobile/api/http-api", "app:mobile", "edge:mobile/api/http-api",
-        ]), workspace: 1, environment: Self.environment(home, store: store, git: git))
+        DocStoreTests.binding(
+          Self.draft([
+            "edge:mobile/api/http-api", "app:mobile", "edge:mobile/api/http-api",
+          ]), store: store), environment: Self.environment(home, store: store, git: git))
       #expect(
         prepared.snapshots == [
           .init(app: "api", ref: "origin/api", sha: Self.apiSHA, uid: "01HF7YAT01MMY3DNVCXJCY0XC5"),
@@ -102,7 +103,7 @@ struct DocVerificationPreparationTests {
         script: edge ? [(Self.request("origin/api", repo: repo), Self.result(Self.apiSHA))] : [])
       let before = try Self.truth(store)
       let prepared = try await DocVerification.prepare(
-        Self.draft([about]), workspace: 1,
+        DocStoreTests.binding(Self.draft([about]), store: store),
         environment: Self.environment(home, store: store, git: git))
       #expect(
         prepared.snapshots
@@ -137,7 +138,7 @@ struct DocVerificationPreparationTests {
           }
         })
       let prepared = try await DocVerification.prepare(
-        Self.draft(["edge:mobile/api/http-api"]), workspace: 1,
+        DocStoreTests.binding(Self.draft(["edge:mobile/api/http-api"]), store: store),
         environment: Self.environment(home, store: store, git: git))
       #expect(prepared.snapshots.map(\.ref) == ["origin/api", "origin/mobile"])
       #expect(git.isExhausted)
@@ -163,7 +164,7 @@ struct DocVerificationPreparationTests {
       ])
       let before = try Self.truth(store)
       let prepared = try await DocVerification.prepare(
-        Self.draft(["app:api"]), workspace: 1,
+        DocStoreTests.binding(Self.draft(["app:api"]), store: store),
         environment: Self.environment(home, store: store, git: git))
       #expect(prepared.snapshots.isEmpty && prepared.binding.apps.map(\.ref) == ["origin/api"])
       #expect(git.isExhausted)
@@ -179,7 +180,7 @@ struct DocVerificationPreparationTests {
       ])
       let before = try Self.truth(store)
       let unavailable = try await DocVerification.prepare(
-        Self.draft(["app:api"]), workspace: 1,
+        DocStoreTests.binding(Self.draft(["app:api"]), store: store),
         environment: Self.environment(home, store: store, git: git))
       #expect(unavailable.snapshots.isEmpty && unavailable.binding.apps.count == 1)
       #expect(try Self.truth(store) == before)
@@ -188,7 +189,7 @@ struct DocVerificationPreparationTests {
       let absent = try Self.truth(store)
       let idle = ScriptedGitRunner(script: [])
       let unregistered = try await DocVerification.prepare(
-        Self.draft(["app:api"]), workspace: 1,
+        DocStoreTests.binding(Self.draft(["app:api"]), store: store),
         environment: Self.environment(home, store: store, git: idle))
       #expect(unregistered.snapshots.isEmpty && unregistered.binding.apps.count == 1)
       #expect(idle.requests.isEmpty)

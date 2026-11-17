@@ -13,10 +13,9 @@ struct RestoreDocumentTamperTests {
   ) throws {
     try withScratchDirectory { scratch in
       var graph = try RestoreDocumentGraphFixture.graph()
-      damage.apply(&graph.tree, &graph.documents)
-      graph.tree.documents = graph.documents
+      damage.apply(&graph)
       let directory = try RestoreSupport.write(
-        graph.tree.files(), to: scratch.appending(path: "tree/acme"))
+        graph.files(), to: scratch.appending(path: "tree/acme"))
       let home = scratch.appending(path: "home")
       let target = try RestoreDocumentRowSupport.make(home)
       try RestoreSupport.settle(target)
@@ -42,9 +41,8 @@ struct RestoreDocumentTamperTests {
       var graph = try RestoreDocumentGraphFixture.graph()
       RestoreDocumentGraphFixture.document(&graph.documents, key, "caf\u{e9}")
       RestoreDocumentGraphFixture.record(&graph.documents, 1, key, "cafe\u{301}")
-      graph.tree.documents = graph.documents
       let directory = try RestoreSupport.write(
-        graph.tree.files(), to: scratch.appending(path: "tree/acme"))
+        graph.files(), to: scratch.appending(path: "tree/acme"))
       let home = scratch.appending(path: "home")
       let target = try RestoreDocumentRowSupport.make(home)
       let before = try RestoreSupport.dump(target)
@@ -64,7 +62,7 @@ struct RestoreDocumentTamperTests {
       let home = scratch.appending(path: "home")
       let target = try RestoreDocumentRowSupport.make(home)
       try RestoreSnapshotPreflightTests.foreignRows(target)
-      var tree = try RestoreDocumentGraphFixture.graph().tree
+      var tree = try RestoreDocumentGraphFixture.graph()
       let old: String
       let new: String
       switch kind {
@@ -86,7 +84,7 @@ struct RestoreDocumentTamperTests {
         new = "foreign-task-comment"
       }
       RestoreOpaqueIdentityFixture.rename(&tree, from: old, to: new)
-      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
       let directory = try RestoreSupport.write(
         tree.files(), to: scratch.appending(path: "tree/acme"))
       let before = try RestoreSupport.dump(target)
@@ -106,7 +104,7 @@ struct RestoreDocumentTamperTests {
   ])
   func damagedDocumentTreesChangeNothing(_ kind: String) throws {
     try withScratchDirectory { scratch in
-      let tree = try RestoreDocumentGraphFixture.graph().tree
+      let tree = try RestoreDocumentGraphFixture.graph()
       var files = try tree.files()
       let path = "docs/push-rules.md"
       switch kind {

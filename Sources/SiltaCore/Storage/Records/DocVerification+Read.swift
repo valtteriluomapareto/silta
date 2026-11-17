@@ -1,15 +1,6 @@
 import GRDB
 
 extension DocVerification {
-  static func readBinding(_ draft: DocDraft, workspace: Int64, store: DatabaseStore) throws
-    -> Binding
-  {
-    try store.read { db in
-      try binding(
-        DocMetadata.resolve(draft, workspace: workspace, in: db), workspace: workspace, in: db)
-    }
-  }
-
   static func binding(_ metadata: DocMetadata, workspace: Int64, in db: Database) throws -> Binding
   {
     let cursor = try Row.fetchCursor(

@@ -13,7 +13,7 @@ extension DocProposalInbox {
       why: try text(row, "why", missing: "(not recorded)"),
       sourceTask: try text(row, "source", missing: "(not recorded)", reference: true),
       summary: summary(row),
-      read: read(try value(row, "slug"), revision: row["rev"], missing: missing))
+      read: read(try row.strictText("slug"), revision: row["rev"], missing: missing))
   }
 
   func text(_ row: Row, _ name: String, missing: String = "(unknown)", reference: Bool = false)
@@ -21,7 +21,7 @@ extension DocProposalInbox {
   {
     let bytes: Int? = row[name + "_bytes"]
     if let bytes, bytes > 65_536 { return "(\(bytes) bytes omitted)" }
-    guard let value = try value(row, name) else { return missing }
+    guard let value = try row.strictText(name) else { return missing }
     let masked = SecretGuard.redacted(reference ? DocService.about([value]) : value)
     let flat = masked.map { character in
       character.unicodeScalars.allSatisfy {
@@ -39,12 +39,6 @@ extension DocProposalInbox {
       shown -= 1
     }
     return "[\(characters.count) characters omitted]"
-  }
-
-  func value(_ row: Row, _ name: String) throws -> String? {
-    guard let bytes: Data = row[name] else { return nil }
-    guard let value = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
-    return value
   }
 
   private func summary(_ row: Row) -> String {
