@@ -1133,8 +1133,8 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-inspection and decision guidance; decisions name explicit immutable proposal refs. Doc-specific review
-measurements remain deferred.
+inspection and decision guidance; decisions name explicit immutable proposal refs.
+See [observability](#19-observability) for document measurements.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
@@ -2514,6 +2514,14 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   A passing diagnostic run does not certify skipped checks. Check warnings live
   in `data.checks`; envelope and command-log warnings describe command/environment
   warnings. Failures before CLI environment setup are not logged.
+
+Dogfood reports derive document submission, decision and pending-age metrics from
+creation and recorded triage metadata. Direct or legacy history without decision
+evidence stays unattributed. Batch and approval summaries describe observed logs;
+incomplete retained coverage leaves their ratio unavailable. Brief exposure sums
+`docs_shown` within the selected workspace/window and counts agent sessions with
+previews; legacy lines without the field cannot establish zero exposure. Reports
+read metadata only and do not log or publish document content.
 
 ## 20. Testing strategy
 
