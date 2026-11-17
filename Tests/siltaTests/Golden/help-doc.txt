@@ -95,7 +95,9 @@ OPTIONS:
 
 OVERVIEW: List current documents and pending revisions.
 
-USAGE: silta doc ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--about <about>] [--archived] [--offset <offset>] [--limit <limit>]
+Example: silta doc ls --doc rules --limit 5
+
+USAGE: silta doc ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--doc <slug>] [--about <about>] [--archived] [--offset <offset>] [--limit <limit>]
 
 GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
@@ -106,6 +108,8 @@ GLOBAL OPTIONS:
   --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
+  --doc <slug>            Filter by one unpinned doc slug or doc:slug; default
+                          is all docs.
   --about <about>         Filter by a canonical app, edge, service or topic ref.
   --archived              Include archived documents.
   --offset <offset>       Number of entries to skip. (default: 0)

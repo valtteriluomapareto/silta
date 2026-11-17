@@ -1,0 +1,23 @@
+OVERVIEW: List current documents and pending revisions.
+
+Example: silta doc ls --doc rules --limit 5
+
+USAGE: silta doc ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--doc <slug>] [--about <about>] [--archived] [--offset <offset>] [--limit <limit>]
+
+GLOBAL OPTIONS:
+  --ws <ws>               Use this workspace; default is inferred or saved.
+  --approved <approved>   The human's words approving this command in chat;
+                          default is none.
+  --json                  Print the JSON envelope on stdout; default is text.
+  --quiet                 Hide success text; warnings and errors still show.
+  --verbose               Mirror command diagnostics to stderr.
+
+OPTIONS:
+  --doc <slug>            Filter by one unpinned doc slug or doc:slug; default
+                          is all docs.
+  --about <about>         Filter by a canonical app, edge, service or topic ref.
+  --archived              Include archived documents.
+  --offset <offset>       Number of entries to skip. (default: 0)
+  --limit <limit>         Number of entries, from 1 to 100. (default: 20)
+  --version               Show the version.
+  -h, --help              Show help information.
