@@ -5,7 +5,7 @@ import Testing
 
 @testable import SiltaCore
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .serialized, .timeLimit(.minutes(1)))
 struct RestoreDocumentTamperTests {
   @Test(arguments: RestoreDocumentGraphTests.damages, [false, true])
   func malformedPublicGraphsRefuseBeforeWriting(

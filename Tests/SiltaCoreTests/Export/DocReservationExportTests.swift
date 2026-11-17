@@ -5,7 +5,7 @@ import Testing
 
 @testable import SiltaCore
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocReservationExportTests {
   static func counterOnly(_ home: URL) throws -> DatabaseStore {
     let store = try DocAuditMigrationTests.copy(DocAuditMigrationTests.fixture, to: home)
