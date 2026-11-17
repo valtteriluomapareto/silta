@@ -67,12 +67,39 @@
 
     private func snapshot(model: AppModel, to output: URL) async throws {
       let size = NSSize(width: options.width, height: options.height)
-      let root = AppShellView(model: model)
+      try await capture(AppShellView(model: model), size: size, to: output)
+      let directory = output.deletingLastPathComponent()
+      try await capture(
+        AppSidebar(model: model), size: NSSize(width: 240, height: size.height),
+        to: directory.appending(path: "sidebar.png"))
+      if model.route == .board, model.boardInspectorPresented {
+        try await capture(
+          TaskInspector(model: model), size: NSSize(width: 360, height: size.height),
+          to: directory.appending(path: "inspector.png"))
+      } else if model.route == .workspace, model.workspaceInspectorPresented,
+        let map = model.visibleData?.map
+      {
+        let connection = WorkspaceContent(map: map, search: model.search)
+          .connection(model.workspaceSelection?.connectionRef)
+        try await capture(
+          ConnectionInspector(connection: connection, openDocs: model.openDocuments),
+          size: NSSize(width: 360, height: size.height),
+          to: directory.appending(path: "inspector.png"))
+      }
+    }
+
+    private func capture<Content: View>(_ content: Content, size: NSSize, to output: URL)
+      async throws
+    {
+      let root =
+        content
         .environment(\.locale, Locale(identifier: "en_US_POSIX"))
         .environment(\.timeZone, .gmt)
         .environment(\.scenePhase, .inactive)
+        .environment(\.appearsActive, true)
         .preferredColorScheme(options.dark ? .dark : .light)
         .frame(width: size.width, height: size.height)
+        .background(Color("Canvas"))
       let hosting = NSHostingView(rootView: root)
       let window = NSWindow(
         contentRect: NSRect(origin: .zero, size: size),
@@ -82,9 +109,11 @@
       window.contentView = hosting
       hosting.frame = NSRect(origin: .zero, size: size)
       hosting.layoutSubtreeIfNeeded()
-      await model.refresh().value
-      if model.boardSelection != nil { await model.loadTaskDetail() }
-      if model.route == .docs { await model.loadDocuments() }
+      if let model {
+        await model.refresh().value
+        if model.boardSelection != nil { await model.loadTaskDetail() }
+        if model.route == .docs { await model.loadDocuments() }
+      }
       await withCheckedContinuation { continuation in
         DispatchQueue.main.async { continuation.resume() }
       }

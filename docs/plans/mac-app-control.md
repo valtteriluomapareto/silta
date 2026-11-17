@@ -38,7 +38,11 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 - Interactive fixture launch prints its state.json path in the private run
   directory. Snapshot launch writes state.json next to the requested PNG, then
   exits. Use a separate output directory for each capture to retain matching
-  state/PNG evidence.
+  state/PNG evidence. Each snapshot also writes `sidebar.png` from the real
+  AppSidebar. With Board or Workspace's inspector open, it writes `inspector.png`
+  from the real task or connection inspector. These filenames are reserved;
+  choose a different name for the root PNG. Parts use the same model and logical
+  height, at 240 and 360 points wide, with active control appearance.
 - Render the real AppShellView in an offscreen NSHostingView, using
   `bitmapImageRepForCachingDisplay` and `cacheDisplay`. Do not use ImageRenderer:
   it cannot draw the native split view, lists or inspectors. This path shows

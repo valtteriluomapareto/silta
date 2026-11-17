@@ -79,7 +79,7 @@ struct WorkspaceView: View {
   }
 }
 
-private struct ConnectionInspector: View {
+struct ConnectionInspector: View {
   let connection: AppConnection?
   let openDocs: (String) -> Void
 

@@ -106,7 +106,9 @@
 
     private static func snapshotURL(_ value: String) throws -> URL {
       let url = URL(filePath: value).standardizedFileURL
-      guard url.pathExtension.lowercased() == "png" else { throw refusal() }
+      guard url.pathExtension.lowercased() == "png",
+        !["sidebar.png", "inspector.png"].contains(url.lastPathComponent.lowercased())
+      else { throw refusal() }
       return url
     }
 
@@ -121,7 +123,8 @@
     private static func refusal() -> AppLoadFailure {
       AppLoadFailure(
         message: "Use -SiltaFixture v2 or -SiltaSnapshot out.png, "
-          + "with optional -SiltaRoute, -SiltaDark and -SiltaSize 1280x800.")
+          + "with optional -SiltaRoute, -SiltaDark and -SiltaSize 1280x800. "
+          + "The names sidebar.png and inspector.png are reserved for snapshot parts.")
     }
   }
 #endif
