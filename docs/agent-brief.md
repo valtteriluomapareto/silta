@@ -18,8 +18,8 @@ Done means: the issue's acceptance items pass as tests. Write only the code thos
 tests and the spec need. When the spec or issue doesn't decide something, pick the
 simplest option and say so in the PR; don't build options for both.
 
-Size: aim for about <500> lines of source and tests. If you'll go past <800>, stop
-and say why before continuing.
+Size: aim for about <500> lines of source and tests. If you'll go past <1,000>, stop
+and say why before continuing. One PR; no nested subtasks.
 
 Style: match <an existing file, e.g. Sources/SiltaCore/Output/OutputRouter.swift>:
 `///` on every package member, no one-line declarations, errors conform to
@@ -33,11 +33,11 @@ What other slices are doing now:
   one you don't own without saying so first.
 
 Steps:
-1. Record your plan where AGENTS.md's current dogfooding stage requires it,
-   including the out-of-scope work, then get it reviewed before coding. Proceed
-   with authorized work; stop and name any decision that needs the maintainer.
-2. Tests first (coding guidelines, "Test-first flow"). For every safety rule in the
-   slice (isolation, limits, refusals), plant a fault once and show its test fails.
+1. Record a short plan where AGENTS.md's current dogfooding stage requires it,
+   including the out-of-scope work. Get it reviewed before coding only if AGENTS.md
+   (Workflow) asks for that. Stop and name any decision that needs the maintainer.
+2. Tests first (coding guidelines, "Test-first flow"). Plant a fault only to show
+   that a guard or safety test (isolation, limits, refusals) isn't vacuous.
    Subprocess and timeout tests get `.timeLimit`.
 3. Branch <agent>/<slice>-<slug>. `scripts/verify.sh quick` (or `full` for storage,
    concurrency, location or agent-facing output) must pass.
@@ -49,5 +49,5 @@ Steps:
    dogfooding stage says. Don't merge it.
 ```
 
-After the plan comes back, review it with the persona review (the Pragmatism persona
-looks for over-engineering first) and reply "go" or with changes.
+If the plan needs a review, run the persona review on it and reply "go" or with
+changes. Otherwise reply "go".

@@ -20,8 +20,8 @@
 
 ## Reviews
 
-- [ ] Plan reviewed by Architect, Tester and Pragmatism (separate subagents)
-- [ ] Implementation reviewed by the same reviewers; every finding fixed or answered
+- [ ] Implementation reviewed by separate subagents, scaled as in `skills/persona-review`; every finding fixed or answered
+- [ ] Plan reviewed (only for targets, dependencies, storage, migrations, concurrency, agent-facing output or shared mechanisms)
 - [ ] Agent-experience review (only for guide text, `--json`, error codes, `brief`)
 
 ## Agent-facing contract
