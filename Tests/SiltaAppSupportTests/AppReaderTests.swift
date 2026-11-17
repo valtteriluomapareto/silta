@@ -41,7 +41,7 @@
         #expect(snapshot.board.doing.count == 2)
         #expect(snapshot.board.review.map(\.ref) == ["AC-9"])
         #expect(snapshot.board.doneThisWeek.count == 3)
-        #expect(snapshot.board.proposedCount == 3)
+        #expect(snapshot.board.proposals.count == 3)
         #expect(
           snapshot.board.appOpenCounts == ["acme-mobile": 3, "acme-backend": 3, "acme-web": 1])
         #expect(
@@ -186,6 +186,22 @@
         #expect(board.todo.count == 4)
         #expect(board.todo.first { $0.ref == "AC-17" }?.status == "blocked")
         #expect(board.appOpenCounts["acme-mobile"] == 3)
+      }
+    }
+
+    @Test func groupedAttentionHasDistinctStableIdentities() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try Self.reader(scratch)
+        let service = TaskService(
+          environment: Self.writerEnvironment(reader.environment), workspace: "acme")
+        var block = TaskBlock(why: "Acme needs two confirmations.")
+        block.on = ["ext:one", "ext:two"]
+        block.followUp = "0d"
+        _ = try service.block("AC-17", block)
+        let due = try reader.snapshot(workspace: "acme").work.items.filter { $0.kind == "due" }
+        #expect(due.count == 2 && due.allSatisfy { $0.refs == ["AC-17"] })
+        #expect(Set(due.map(\.stableID)).count == 2)
       }
     }
 

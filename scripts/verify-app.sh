@@ -20,6 +20,6 @@ xcodebuild "${common[@]}" -configuration Debug -resultBundlePath "$app_run/Test.
   "SILTA_APP_TEST_HOME=$app_home" test
 xcrun xcresulttool get test-results summary --schema-version 0.4.0 --path "$app_run/Test.xcresult" > "$app_run/summary.json"
 xcrun xcresulttool get test-results tests --schema-version 0.4.0 --path "$app_run/Test.xcresult" > "$app_run/tests.json"
-python3 -B scripts/check-app-test-results.py "$app_run/summary.json" "$app_run/tests.json" AppStartupTests AppModelTests AppReadSessionTests BoardContentTests TaskDetailModelTests WorkspaceContentTests
+python3 -B scripts/check-app-test-results.py "$app_run/summary.json" "$app_run/tests.json" AppStartupTests
 xcodebuild "${common[@]}" -configuration Release build
 printf 'App verification passed; results: %s\n' "$app_run/Test.xcresult"

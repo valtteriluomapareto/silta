@@ -12,8 +12,6 @@ public struct AppBoard: Equatable, Sendable {
   public let proposals: [AppTask]
   /// All eligible human questions, independent of My work pagination.
   public let questions: [AppAttention]
-  /// Number of visible proposals.
-  public var proposedCount: Int { proposals.count }
   /// Visible local open counts by associated app, including blocked tasks.
   public let appOpenCounts: [String: Int]
 }

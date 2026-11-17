@@ -58,7 +58,7 @@ through. Fix the change, or propose a decision first.
    `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
    exception with `// guard:allow-nondeterminism <reason>`.
 3. **Tests never wait on the wall clock.** That means no `sleep`, `Task.sleep` or
-   `asyncAfter`; use the fake clock. This covers `Tests/` and `SiltaTestSupport`.
+   `asyncAfter`; use the fake clock. This covers `Tests/`, `App/SiltaAppTests` and `SiltaTestSupport`.
    Enforced by `check_test_waits.py`.
 4. **Code comments don't refer to plans, phases, milestones or review rounds.**
    Enforced by `check_no_plan_refs.py`.
@@ -108,91 +108,119 @@ through. Fix the change, or propose a decision first.
 
 ## Workflow
 
-1. **Pick a slice** from the active plan whose dependencies are done. Each slice is
-   independent enough for its own worktree and branch.
-2. **Plan before coding** for anything beyond a small fix. Where the plan goes
-   depends on the dogfooding stage (see Dogfooding below): on the slice's issue
-   before DF0, in Silta from DF0 on, or in `docs/plans/` if it's larger. Then get it
-   reviewed with `skills/persona-review`.
+1. **Pick a slice** from the active plan whose dependencies are done. One slice is
+   one PR, in its own worktree and branch.
+2. **Plan briefly** in the slice's Silta task (see Dogfooding below), or in
+   `docs/plans/` if the work spans several slices. Get the plan reviewed before
+   coding only when the change adds a target or package dependency, touches storage,
+   migrations or concurrency, changes agent-facing output, or adds a mechanism other
+   code will build on. Anything else goes straight to tests.
 3. **Tests first** ([test-first flow](docs/coding-guidelines.md#test-first-flow)):
    - **A bug fix starts with a reproduction.** Write a test that fails for the
      reported reason and commit it first, wrapped in `withKnownIssue`. Then fix it.
-   - **A feature starts from its acceptance tests**, in red → green → refactor steps.
+   - **A feature starts from its acceptance tests.** It needs no separate red commit;
+     name the tests in the PR.
+   - **SwiftUI views** get view-model tests written with the view. Check the layout by
+     looking at it.
    - **Goldens are written from the spec**, not generated from the code. Help goldens are
      reviewed against the help standard in [coding guidelines](docs/coding-guidelines.md).
-4. **Implement, verify, then get a review again** with the same reviewers.
+4. **Implement, verify, then get one implementation review** (see Reviews below).
 5. **Commit** in imperative sentence case, under ~72 characters, ending with the
    `Co-Authored-By` trailer the harness gives you.
    - Branches are `<agent>/<slice>-<slug>`, e.g. `claude/s4-output-contract`.
    - Every change reaches `main` through a pull request, docs included. `main` is
      protected: squash merges only, and CI must pass on a branch that is up to date.
-6. **Report honestly:** what changed, what you verified, and what remains unverified.
+6. **Report briefly and honestly:** what someone can run now, what changed, what you
+   verified, what remains unverified and what's next.
+
+## Keep it lean
+
+- **Write the smallest change that passes the acceptance tests.** Add options,
+  routes, fields, protocols and edge-case handling when a caller or a test needs
+  them, not for a later slice.
+- **Split only when you must.** A slice that will go past about 1,000 lines may
+  become subtasks, one PR each. Subtasks don't get subtasks.
+- **Plant a fault only to prove a guard or a safety test isn't vacuous** (isolation,
+  limits, refusals), once per rule. Ordinary behaviour doesn't need it.
+- **Merge `main` into your branch only** for a conflict, for something that just
+  landed and that you need, or once before merging.
+- **When stuck, say so.** After about an hour without a commit, stop and tell the
+  maintainer what blocks you, in two lines.
+
+## Reviews
+
+Reviews use independent subagents, scaled to the change: one reviewer for docs and
+small fixes, Architect and Tester for most changes, plus Pragmatism and Agent
+experience where they apply. The table and the rules are in
+[`skills/persona-review`](skills/persona-review/SKILL.md) (D16). Re-review only
+blocker and major findings.
 
 ## Dogfooding
 
-Silta is built with Silta as soon as it can be (spec §22.1, D20). **Current stage:
-DF1** (since 2026-11-05; DF0 began 2026-11-04 after
-[setup with the maintainer](docs/dogfood/README.md)).
-Update this line when a stage starts.
+Silta is built with Silta (spec §22.1, D20). **Current stage: DF1** (since
+2026-11-05; [setup](docs/dogfood/README.md)). Update this line when a stage starts.
+From DF2 the session-start hook runs `silta agents session-start`; until then, start
+with `silta --ws silta task show <ref>`.
 
-| Stage | Plans and steps | Questions and handoffs | Session start |
-|---|---|---|---|
-| Before DF0 | Comment on the slice issue | Comment on the slice issue | Read the issue and the plan |
-| DF0 | One task per slice. Find it by the issue's `url:` link in `silta --ws silta task ls --proposed --promoted --archived --json`, then `silta --ws silta task start <ref>`. Only if no task links the issue: `silta --ws silta task add --start "<slice>: <title>" --app silta`, then `silta --ws silta task link <ref> url:<issue url>`. Plan with `silta --ws silta task plan <ref> -F - <<'EOF'`, tick each step with `task plan <ref> --step N --done` as soon as it's done. Add subtasks before submitting. When the PR is open, end its description with a `## Draft result` section: the result as it should read once merged, ending with the `Friction:` line. Then `task submit <ref>`; never `done` before the merge. Back on a task in `review`, read the latest `Review:` comment (`gh pr view <n> --comments`), fix it on the same PR, update the draft result, and submit again | Comment on the slice issue | `silta --ws silta task show <ref>` |
-| DF1 | as DF0, but review rounds arrive as Silta threads (see **Reviews** below) | `silta --ws silta comment <ref> --kind question --to <actor> -F -` / `--kind handoff -F -`; answer with `--kind answer --reply-to <question ref>`; the asker accepts with `comment accept <answer ref>` | as DF0 |
-| DF2 | as DF0 | as DF1 | The hook runs `silta agents session-start` |
+Every command runs as `silta --ws silta …` with `~/.local/bin/silta`, which
+`scripts/install-dev.sh` builds from `main`. Rerun that script after pulling `main`,
+and never use a binary from your own worktree.
 
-From DF0 on, every command runs as `silta --ws silta …`:
-- **Find the slice's task; never add a second one.** Imported tasks stay `proposed`
-  until the maintainer triages them, plain `task ls` hides other sessions'
-  proposals and tasks promoted to a tracker, and done or dropped tasks are archived
-  after 14 days. So look for the issue's `url:` link in the
-  `--proposed --promoted --archived --json` listing; the text listing shows no links. If the task is `proposed`, name
-  `silta --ws silta task triage --accept <ref> --approved "<the human's words>"` to the
-  maintainer and start it after they say yes. If it is `dropped`, ask the maintainer
-  before doing anything.
-- **Plans and results go through stdin.** Pass them with `-F -` and a quoted
-  heredoc (`<<'EOF'`); never write a plan or result file into the repository.
+- **Find the slice's task; never add a second one.** Look for the issue's `url:`
+  link in `task ls --proposed --promoted --archived --json`. Plain `task ls` hides
+  proposals, promoted and archived tasks, and the text listing shows no links.
+  - Only if no task links the issue: `task add --start "<slice>: <title>" --app silta`,
+    then `task link <ref> url:<issue url>`.
+  - If the task is `proposed`, name
+    `silta --ws silta task triage --accept <ref> --approved "<the human's words>"` to
+    the maintainer and start it after they say yes.
+  - If it is `dropped`, ask the maintainer before doing anything.
+- **Claim, plan, submit.**
+  1. `task start <ref>`.
+  2. Plan with `task plan <ref> -F - <<'EOF'`, and tick each step with
+     `task plan <ref> --step N --done` as soon as it's done. Plans and results always
+     go through stdin with a quoted heredoc; never write a plan or result file into
+     the repository.
+  3. When the PR is open, end its description with `## Draft result`: the result as
+     it should read once merged, ending with the `Friction:` line.
+  4. `task submit <ref>`. Never `task done` before the merge.
+- **Questions and handoffs:** `comment <ref> --kind question --to <actor> -F -` and
+  `--kind handoff -F -`. Answer with `--kind answer --reply-to <question ref>`; the
+  asker accepts with `comment accept <answer ref>`. Ask a human who is in the chat
+  there, not as a Silta question.
 - **A claimed slice.** If `task start` answers `claimed`, another session holds the
   task. The claim belongs to the whole actor, `agent:<tool>:<session>`, and the
   session comes from the worktree. So continue in the claiming worktree
-  (`silta --ws silta task show <ref> --json` names it as `worktree`) with the same
-  tool, or name
+  (`task show <ref> --json` names it as `worktree`) with the same tool, or name
   `silta --ws silta task start <ref> --steal --approved "<the human's words>"` to the
-  maintainer. Tell the other session with a `silta --ws silta comment` on the task.
+  maintainer. Tell the other session with a comment on the task.
 - **Work for the human.** Follow `silta guide human`
-  ([spec §11](docs/spec.md#silta-guide)). Put everything you need from the maintainer in one chat
-  message. For a human-only command, name the exact command, wait for their yes,
-  and run it with `--approved "<their exact words>"`. Never write those words
-  yourself. A run started by another agent
+  ([spec §11](docs/spec.md#silta-guide)). Put everything you need from the maintainer
+  in one chat message. For a human-only command, name the exact command, wait for
+  their yes, and run it with `--approved "<their exact words>"`. Never write those
+  words yourself. A run started by another agent
   ([dogfood README](docs/dogfood/README.md#drive-codex-from-another-agent)) has no
   chat with the maintainer: it never runs human-only commands, and names them in its
   last message instead.
-- **Use the dogfood binary.** Always use `~/.local/bin/silta`, built from `main` by
-  `scripts/install-dev.sh`; rerun it after pulling `main`. Never use a binary from
-  your own worktree.
-- **Record friction.** End every `done` result in the `silta` workspace with one line:
-  `Friction: none`, or `Friction: <what was awkward>`. Friction that needs its own
-  fix, or that comes up outside a task, also gets
-  `silta --ws silta task add "<what was awkward>" --topic dogfood`. That task is a
-  proposal, so it counts toward the two proposals per session
-  ([spec §11](docs/spec.md#silta-guide)); put anything
-  beyond that in the `Friction:` line.
-- **Reviews run as Silta threads.** The reviewer posts each finding as its own root
-  comment (`silta --ws silta comment <ref> -F -`), never as a reply to a handoff, and
-  one PR comment `Review: changes (round N)` that points to
-  `silta --ws silta task show <ref>`. Changes go back to the author, who runs
-  `task start <ref>` again (D41) and answers every open thread with one reply
-  (`--reply-to <root ref>`): what changed and the name of the test that proves it,
-  not a commit hash. The author never resolves review threads; the reviewer resolves
-  them (`comment resolve <ref>… -m`) once the follow-up review confirms the fix.
-  Approval stays a PR comment starting `Review: approve`; then the merger finishes.
-  Questions for a human who is in the chat are asked there, not as Silta questions.
-- **Finish after the merge.** `task submit` releases the claim. Whoever merges the
-  slice's PR pulls `main`, then runs `scripts/dogfood-finish.sh <ref> <pr>` and
-  `scripts/install-dev.sh` from the main checkout. The script runs `task done` with
-  the merge commit and the PR's draft result, posts the result on the slice issue and
-  closes it.
+- **Record friction.** End every `done` result in the `silta` workspace with
+  `Friction: none` or `Friction: <what was awkward>`. Friction that needs its own fix
+  also gets `task add "<what was awkward>" --topic dogfood`. That is a proposal, and
+  a session gets two ([spec §11](docs/spec.md#silta-guide)); put anything beyond that
+  in the `Friction:` line.
+- **Reviews run as Silta threads.** The reviewer posts each blocker or major finding
+  as its own root comment (`comment <ref> -F -`), never as a reply to a handoff, and
+  lists minor findings in one more comment. On the PR, one comment
+  `Review: changes (round N)` points to `task show <ref>`. The author runs
+  `task start <ref>` again (D41), fixes on the same PR, and answers each thread with
+  one reply (`--reply-to <root ref>`): what changed and the test that proves it, not
+  a commit hash. Then the author updates the draft result and submits again. Only the
+  reviewer resolves threads (`comment resolve <ref>… -m`), once the follow-up review
+  confirms the fix. Approval is a PR comment starting `Review: approve`.
+- **Finish after the merge.** Whoever merges the PR pulls `main`, then runs
+  `scripts/dogfood-finish.sh <ref> <pr>` and `scripts/install-dev.sh` from the main
+  checkout. The script runs `task done` with the merge commit and the PR's draft
+  result, posts the result on the slice issue and closes it. So a PR that only plans
+  work gets its own subtask; finishing it must not close the work it plans.
 
 ## Parallel agents and worktrees
 

@@ -3,7 +3,6 @@ import SwiftUI
 
 struct WorkspaceView: View {
   @Bindable var model: AppModel
-  @State private var selected: String?
 
   var body: some View {
     Group {
@@ -28,8 +27,7 @@ struct WorkspaceView: View {
                 }
                 ForEach(group.connections, id: \.attachment) { connection in
                   Button {
-                    selected = connection.attachment
-                    model.inspectorPresented = true
+                    model.select(connection: connection.attachment)
                   } label: {
                     HStack(alignment: .top, spacing: 12) {
                       Image(systemName: "arrow.right")
@@ -41,7 +39,7 @@ struct WorkspaceView: View {
                       Text(connection.kind).font(.system(.caption, design: .monospaced))
                     }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
                       .background(
-                        selected == connection.attachment
+                        model.workspaceSelection?.connectionRef == connection.attachment
                           ? Color.accentColor.opacity(0.15) : .clear,
                         in: RoundedRectangle(cornerRadius: 7))
                   }.buttonStyle(.plain)
@@ -66,14 +64,16 @@ struct WorkspaceView: View {
               ContentUnavailableView("No matching apps or services", systemImage: "network")
             }
           }.padding(28)
-        }.inspector(isPresented: $model.inspectorPresented) {
-          ConnectionInspector(connection: content.connection(selected))
-            .inspectorColumnWidth(min: 300, ideal: 360, max: 500)
+        }.inspector(isPresented: $model.workspaceInspectorPresented) {
+          ConnectionInspector(
+            connection: content.connection(model.workspaceSelection?.connectionRef)
+          )
+          .inspectorColumnWidth(min: 300, ideal: 360, max: 500)
         }
       } else {
         ContentUnavailableView("No workspace map", systemImage: "network")
       }
-    }.onChange(of: model.workspace) { selected = nil }
+    }
   }
 }
 

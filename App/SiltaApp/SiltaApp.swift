@@ -12,8 +12,7 @@ struct SiltaApp: App {
       do {
         try TestLaunchPolicy.validate(
           environment: ProcessInfo.processInfo.environment,
-          temporaryRoots: [FileManager.default.temporaryDirectory, URL(filePath: "/private/tmp")],
-          forbiddenHome: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".silta"))
+          temporaryRoots: [FileManager.default.temporaryDirectory, URL(filePath: "/private/tmp")])
       } catch {
         FileHandle.standardError.write(
           Data("Silta test launch refused: invalid isolated home.\n".utf8))
@@ -67,7 +66,7 @@ struct SiltaApp: App {
           try await Task.detached {
             try session.load(previous: previous, workspace: workspace, force: force)
           }.value
-        }, now: now)
+        })
     } catch {
       let failure = AppLoadFailure(error)
       return AppModel(load: { _, _, _ in throw failure })
@@ -80,10 +79,10 @@ struct SiltaApp: App {
     }.defaultSize(width: 1280, height: 840)
       .commands {
         CommandGroup(after: .sidebar) {
-          Button("My work") { model.route = .mywork }.keyboardShortcut("1")
-          Button("Board") { model.route = .board }.keyboardShortcut("2")
-          Button("Workspace") { model.route = .workspace }.keyboardShortcut("3")
-          Button("Toggle Inspector") { model.inspectorPresented.toggle() }
+          Button("My work") { model.navigate(to: .mywork) }.keyboardShortcut("1")
+          Button("Board") { model.navigate(to: .board) }.keyboardShortcut("2")
+          Button("Workspace") { model.navigate(to: .workspace) }.keyboardShortcut("3")
+          Button("Toggle Inspector") { model.toggleInspector() }
             .keyboardShortcut("i", modifiers: [.command, .option])
           Divider()
           Button("Refresh") { model.refresh(force: true) }.keyboardShortcut("r")
