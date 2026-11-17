@@ -454,33 +454,52 @@ extension DocWritePolicyTests {
     }
   }
 
-  @Test(
-    arguments: [false, true].flatMap { proposal in [false, true].map { (proposal, $0) } },
-    [false, true])
-  func suppliedNulRefusesBeforeGitOrMutation(caller: (Bool, Bool), unchanged: Bool) async throws {
-    let (proposal, human) = caller
-    try await withScratchDirectory { home in
-      let (store, repo) = try DocVerificationPreparationTests.setup(home)
-      let body = "Acme\u{0}private-tail"
-      if unchanged { try Self.seed(store, body: body) }
-      let before = try DocVerificationPreparationTests.truth(store)
-      let git = ScriptedGitRunner(script: [
-        (
-          DocVerificationPreparationTests.request("origin/api", repo: repo),
-          DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
-        )
-      ])
-      let service = try Self.service(home, store, human: human, git: git)
-      var request = Self.request()
-      request.about = ["app:api"]
-      request.allowSecret = true
-      var failure: (any CodedError)?
-      do {
-        _ = try await Self.write(proposal, service: service, request: request, body: body)
-      } catch let error as any CodedError { failure = error }
-      #expect(failure?.code == .invalid && failure?.message == DocInputTests.refusal)
-      #expect(git.requests.isEmpty)
-      #expect(try DocVerificationPreparationTests.truth(store) == before)
+  @Test func suppliedNulRefusesBeforeGitOrMutation() async throws {
+    for body in [
+      "\u{0}tail", "Acme\u{0}tail", "é\u{0}", String(repeating: "a", count: 65_535) + "\u{0}",
+    ] {
+      var bytes = Data(body.utf8)
+      let read = DocProposalServiceTests.refusal(.invalid) {
+        _ = try DocInput.read { maximum in
+          let chunk = bytes.prefix(min(maximum, 7))
+          bytes.removeFirst(chunk.count)
+          return Data(chunk)
+        }
+      }
+      let direct = DocProposalServiceTests.refusal(.invalid) { try DocInput.check(body) }
+      #expect(read?.code == .invalid && read?.message == DocInputTests.refusal)
+      #expect(direct?.code == .invalid && direct?.message == DocInputTests.refusal)
+    }
+    let callers = [false, true].flatMap { proposal in [false, true].map { (proposal, $0) } }
+    for caller in callers {
+      for unchanged in [false, true] {
+        let (proposal, human) = caller
+        try await withScratchDirectory { home in
+          let (store, repo) = try DocVerificationPreparationTests.setup(home)
+          let body = "Acme\u{0}private-tail"
+          if unchanged { try Self.seed(store, body: body) }
+          let before = try DocVerificationPreparationTests.truth(store)
+          let git = ScriptedGitRunner(script: [
+            (
+              DocVerificationPreparationTests.request("origin/api", repo: repo),
+              DocVerificationPreparationTests.result(DocVerificationPreparationTests.apiSHA)
+            )
+          ])
+          let service = try Self.service(home, store, human: human, git: git)
+          var request = Self.request()
+          request.about = ["app:api"]
+          request.allowSecret = true
+          var failure: (any CodedError)?
+          do {
+            _ = try await Self.write(proposal, service: service, request: request, body: body)
+          } catch let error as any CodedError { failure = error }
+          #expect(
+            failure?.code == .invalid && failure?.message == DocInputTests.refusal,
+            "caller: \(caller), unchanged: \(unchanged)")
+          #expect(git.requests.isEmpty)
+          #expect(try DocVerificationPreparationTests.truth(store) == before)
+        }
+      }
     }
   }
 }
