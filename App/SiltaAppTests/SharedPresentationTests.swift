@@ -8,7 +8,7 @@
     @Test func actorsHaveDistinctLabelsWithoutInventingIdentities() {
       #expect(ActorPresentation("agent:claude:fixture").name == "Claude")
       #expect(ActorPresentation("agent:codex:fixture").name == "Codex")
-      #expect(ActorPresentation("human:acme").name == "You")
+      #expect(ActorPresentation("human:acme").name == "acme")
       #expect(
         ActorPresentation("agent:claude:fixture").symbol
           != ActorPresentation("agent:codex:fixture").symbol)
@@ -42,7 +42,7 @@
       #expect(model.screenSummary == "7 waiting on you · 2 tasks claimed by agents")
       model.inspect(task: "AC-12")
       #expect(model.screenSummary == "7 open · 3 proposed · 3 done this week")
-      #expect(model.boardSelection?.ref == "AC-12" && model.boardInspectorPresented)
+      #expect(model.boardSelection?.taskRef == "AC-12" && model.boardInspectorPresented)
       model.navigate(to: .mywork)
       #expect(model.screenSummary == "7 waiting on you · 2 tasks claimed by agents")
     }

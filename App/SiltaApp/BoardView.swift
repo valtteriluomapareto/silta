@@ -71,7 +71,7 @@ struct BoardView: View {
           Text("Step \(task.steps.filter(\.done).count) of \(task.steps.count)")
             .font(.caption).foregroundStyle(.secondary)
         }
-        if let actor = task.claimedBy { Text(actor).font(.caption).foregroundStyle(.secondary) }
+        if let actor = task.claimedBy { ActorLabel(actor: actor).foregroundStyle(.secondary) }
         if asked {
           Label("Asked you", systemImage: "questionmark.circle.fill").font(.caption)
             .foregroundStyle(.tint)

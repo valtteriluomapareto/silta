@@ -135,6 +135,8 @@ They're summarised here so every decision has one index.
   - **↳ update 2026-11-02:** Swift package dependencies are pinned with `exact:`, and
     `Package.resolved` is committed. `scripts/verify.sh` builds only from the resolved
     file, so a manifest change without a matching resolve fails.
+  - **↳ update 2026-11-17:** The Mac document reader uses Foundation's Markdown
+    parser and SwiftUI text. MarkdownUI is not used or added as a package dependency.
 - **D19: Branch and merge flow.**
   - Branches are `<agent>/<slice>-<slug>`, squash-merged on green CI.
   - Until the first code lands, documentation changes may be committed directly to

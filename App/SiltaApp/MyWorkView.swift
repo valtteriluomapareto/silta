@@ -31,7 +31,7 @@ struct MyWorkView: View {
               VStack(alignment: .leading, spacing: 12) {
                 heading("Ready for review", ref: task.ref)
                 Text(task.title).font(.title3.weight(.semibold))
-                Text(task.claimedBy ?? task.createdBy).font(.callout).foregroundStyle(.secondary)
+                ActorLabel(actor: task.claimedBy ?? task.createdBy).foregroundStyle(.secondary)
                 commands(model.reader?.commands(forReview: task, workspace: workspace) ?? [])
               }
               Divider().padding(.vertical, 24)
@@ -46,7 +46,7 @@ struct MyWorkView: View {
                   VStack(alignment: .leading, spacing: 4) {
                     Text(item.title ?? "Proposed task").font(.body.weight(.medium))
                     if let author = item.author {
-                      Text(author).font(.caption).foregroundStyle(.secondary)
+                      ActorLabel(actor: author).foregroundStyle(.secondary)
                     }
                   }
                   Spacer()
@@ -85,7 +85,7 @@ struct MyWorkView: View {
       if let title = item.title { Text(title).font(.title3.weight(.semibold)) }
       if let body = item.body { Text(body).font(.body).textSelection(.enabled) }
       if let author = item.author {
-        Text(author).font(.callout).foregroundStyle(.secondary)
+        ActorLabel(actor: author).foregroundStyle(.secondary)
       }
       if item.refs.count > 1 {
         HStack { ForEach(item.refs, id: \.self) { ref in reference(ref) } }
@@ -119,40 +119,6 @@ struct MyWorkView: View {
 
   private func commands(_ values: [AppCommand]) -> some View {
     ForEach(values, id: \.text) { command in CommandBlock(command: command) }
-  }
-
-}
-
-struct CopyValue: View {
-  let value: String
-  let title: String
-  var compact = false
-  @State private var copied = false
-
-  var body: some View {
-    Button {
-      copy()
-    } label: {
-      Label(
-        compact ? (copied ? "Copied" : title) : value,
-        systemImage: copied ? "checkmark" : "doc.on.doc"
-      )
-      .font(.system(.caption, design: .monospaced))
-    }.buttonStyle(.bordered).labelStyle(.titleAndIcon)
-      .help(title).accessibilityLabel(title + ": " + value)
-      .contextMenu { Button(title) { copy() } }
-      .onCopyCommand { [NSItemProvider(object: value as NSString)] }
-      .onChange(of: value) { copied = false }
-      .task(id: copied) {
-        guard copied else { return }
-        do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
-        copied = false
-      }
-  }
-
-  private func copy() {
-    NSPasteboard.general.clearContents()
-    copied = NSPasteboard.general.setString(value, forType: .string)
   }
 
 }

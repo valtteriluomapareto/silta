@@ -215,3 +215,22 @@ nonisolated struct DocumentSelection: Equatable {
   let ref: String
   let view: AppDocumentView
 }
+
+extension AppModel {
+  var screenSummary: String {
+    guard let data = visibleData else { return "" }
+    if route == .docs { return "Workspace documents" }
+    if route == .workspace, let map = data.map {
+      return
+        "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"
+    }
+    if route == .board, let board = data.snapshot?.board {
+      return "\(board.todo.count + board.doing.count + board.review.count) open · "
+        + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
+    }
+    let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
+    return
+      "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed by agents"
+  }
+
+}

@@ -1,8 +1,8 @@
 import AppKit
 import Combine
 import Foundation
-import SwiftUI
 import SiltaAppSupport
+import SwiftUI
 
 struct AppShellView: View {
   @Bindable var model: AppModel
@@ -14,28 +14,33 @@ struct AppShellView: View {
       AppSidebar(model: model)
     } detail: {
       VStack(spacing: 0) {
+        HStack(spacing: 10) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text(model.route.title).font(.system(size: 15, weight: .bold))
+            Text(model.screenSummary).font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+          }.frame(maxWidth: .infinity, alignment: .leading)
+          HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass").font(.system(size: 12))
+            TextField(
+              model.route == .docs ? "Search loaded documents" : "Search", text: $model.search
+            )
+            .textFieldStyle(.plain).font(.system(size: 13)).focused($searchFocused)
+            .accessibilityLabel("Search")
+          }.padding(.horizontal, 12).frame(width: 220, height: 32)
+            .background(Color.primary.opacity(0.05), in: Capsule())
+          Button("Refresh", systemImage: "arrow.clockwise") { model.refresh(force: true) }
+            .labelStyle(.iconOnly).buttonStyle(.plain).help("Refresh (⌘R)")
+        }.frame(height: 56).padding(.horizontal, 16)
         if let failure = model.failure, model.visibleData != nil {
           Label(failure.message, systemImage: "exclamationmark.triangle")
             .font(.callout).frame(maxWidth: .infinity, alignment: .leading).padding(12)
           Divider()
         }
         content.frame(maxWidth: .infinity, maxHeight: .infinity)
-      }.background(Color(nsColor: .textBackgroundColor))
+      }.background(Color("Canvas"))
     }
-    .navigationTitle(model.route.title)
-    .navigationSubtitle(subtitle)
-    .searchable(
-      text: $model.search, placement: .toolbar,
-      prompt: model.route == .docs ? "Search loaded documents" : "Search"
-    )
-    .searchFocused($searchFocused)
+    .navigationTitle("Silta")
     .focusedSceneValue(\.findAction, { searchFocused = true })
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button("Refresh", systemImage: "arrow.clockwise") { model.refresh(force: true) }
-          .labelStyle(.iconOnly).help("Refresh (⌘R)")
-      }
-    }
     .frame(minWidth: 1000, minHeight: 700)
     .task { await model.refresh().value }
     .task(id: phase) { await foregroundChecks() }
@@ -73,21 +78,6 @@ struct AppShellView: View {
       case .docs: DocsView(model: model)
       }
     }
-  }
-
-  private var subtitle: String {
-    guard let data = model.visibleData else { return "" }
-    if model.route == .docs { return "Workspace documents" }
-    if model.route == .workspace, let map = data.map {
-      return
-        "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"
-    }
-    if model.route == .board, let board = data.snapshot?.board {
-      return "\(board.todo.count + board.doing.count + board.review.count) open · "
-        + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
-    }
-    let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
-    return "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed"
   }
 
   private func foregroundChecks() async {

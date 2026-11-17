@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
-import SwiftUI
 import SiltaAppSupport
+import SwiftUI
 
 @main
 struct SiltaApp: App {
