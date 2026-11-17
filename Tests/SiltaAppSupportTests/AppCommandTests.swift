@@ -9,7 +9,7 @@
   @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
   struct AppCommandTests {
     @Test func templatesKeepChoicesAndBodiesUnfilled() throws {
-      withKnownIssue("Viewer command templates are not implemented") { () throws in
+      do {
         try withScratchDirectory { scratch in
           try AppFixtures.seed(in: scratch)
           let reader = try AppReaderTests.reader(scratch)
@@ -36,7 +36,7 @@
     }
 
     @Test func answerEligibilityAndGroupedRefsStayExplicit() throws {
-      withKnownIssue("Kind-specific command eligibility is not implemented") { () throws in
+      do {
         try withScratchDirectory { scratch in
           let reader = try AppReaderTests.reader(scratch)
           let accept = "silta --ws 'acme' comment accept 'AC-12/2'"
@@ -64,7 +64,7 @@
     }
 
     @Test func realHumanCommandsRefuseUnfilledInputsAndAcceptFilledOnes() throws {
-      withKnownIssue("Executable safe command templates are not implemented") { () throws in
+      do {
         try withScratchDirectory { scratch in
           try AppFixtures.seed(in: scratch)
           let reader = try AppReaderTests.reader(scratch)
@@ -74,7 +74,8 @@
           let question = try #require(snapshot.work.items.first { $0.kind == "question" })
           let answer = try #require(reader.commands(for: question, workspace: "acme").first).text
           let refused = try run(answer, scratch)
-          #expect(refused.stdout.contains("Comment body required; use -m or -F. [invalid]"), "\(refused)")
+          #expect(
+            refused.stdout.contains("Comment body required; use -m or -F. [invalid]"), "\(refused)")
           #expect(try version(observer) == before)
           let proposal = try #require(snapshot.work.items.first { $0.kind == "proposal" })
           let accept = try #require(reader.commands(for: proposal, workspace: "acme").first).text
@@ -97,7 +98,7 @@
     }
 
     @Test func shellUsesLiteralSelectedHomeAndLeavesDefaultAlone() throws {
-      withKnownIssue("Selected-home command scoping is not implemented") { () throws in
+      do {
         try withScratchDirectory { scratch in
           try AppFixtures.seed(in: scratch)
           let selected = scratch.appending(path: "Acme's $(touch escaped); home")
