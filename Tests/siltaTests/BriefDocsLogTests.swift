@@ -22,9 +22,7 @@ struct BriefDocsLogTests {
       }
       #expect(try run(["brief"]).termination == .exit(0))
       let emptyLog = try lastLog()
-      withKnownIssue("Successful briefs must record their rendered document count") {
-        #expect(emptyLog["docs_shown"] as? Int == 0)
-      }
+      #expect(emptyLog["docs_shown"] as? Int == 0)
       let config = scratch.appending(path: "workspace.yaml")
       try """
       workspace: {slug: acme, name: Acme, task_prefix: AC}
@@ -48,20 +46,20 @@ struct BriefDocsLogTests {
       let full = try run(["brief"])
       #expect(full.stdout.contains("doc:app-rules") && full.stdout.contains("doc:interface"))
       let fullLog = try lastLog()
-      withKnownIssue("Successful briefs must record their rendered document count") {
-        #expect(fullLog["docs_shown"] as? Int == 2)
-      }
+      #expect(fullLog["docs_shown"] as? Int == 2)
+      let contract = fullLog.filter { ["command", "docs_shown", "workspace"].contains($0.key) }
+      let encoded = try JSONSerialization.data(withJSONObject: contract, options: [.sortedKeys])
+      Golden.forTests().check(
+        try #require(String(data: encoded, encoding: .utf8)) + "\n", "brief-docs-log.json")
       for flags in [["--budget", "1"], ["--hook"]] {
         let result = try run(["brief"] + flags)
         #expect(result.termination == .exit(0))
         #expect(
           !result.stdout.contains("doc:app-rules") && !result.stdout.contains("doc:interface"))
         let entry = try lastLog()
-        withKnownIssue("Successful briefs must record their rendered document count") {
-          #expect(entry["docs_shown"] as? Int == 0)
-        }
+        #expect(entry["docs_shown"] as? Int == 0)
       }
-      _ = try run(["brief", "--task", "AC-999"])
+      #expect(try run(["brief", "--task", "AC-999"]).termination == .exit(2))
       #expect(try lastLog()["docs_shown"] == nil)
     }
   }

@@ -9,6 +9,7 @@ extension BriefReport {
       for group in section.documents {
         if let choice = group.choices.first(where: { $0.text.count <= remaining }) {
           annotated.append(BriefSection(id: "docs", text: choice.text))
+          docsShown += choice.shown
           remaining -= choice.text.count
           truncated = truncated || choice.truncated
         } else {
