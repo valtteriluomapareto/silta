@@ -17,9 +17,7 @@ struct InboxTests {
         .filter { $0.kind == "question" }.compactMap(\.ref)
       #expect(expected.count == 13)
       let actual = try service.questionInbox().compactMap(\.ref)
-      withKnownIssue("App question read selects the caller instead of the captured human") {
-        #expect(actual == expected)
-      }
+      #expect(actual == expected)
     }
   }
 

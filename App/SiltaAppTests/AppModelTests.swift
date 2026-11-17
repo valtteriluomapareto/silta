@@ -100,6 +100,22 @@
       #expect(!model.matches(["AC-12", "Full question body"]))
     }
 
+    @Test func boardNavigationRetainsSelectionFiltersAndInspector() async {
+      let model = makeModel(ControlledLoads())
+      model.showProposed = true
+      model.showApp("acme-mobile")
+      model.inspect(task: "AC-12")
+      #expect(model.route == .board && model.boardInspectorPresented)
+      model.navigate(to: .mywork)
+      model.toggleInspector()
+      model.navigate(to: .board)
+      #expect(model.boardSelection == BoardSelection(taskRef: "AC-12"))
+      #expect(model.boardInspectorPresented && model.showProposed)
+      #expect(model.appFilter == "acme-mobile")
+      model.toggleInspector()
+      #expect(!model.boardInspectorPresented)
+    }
+
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
       AppModel(
         load: { previous, workspace, force in

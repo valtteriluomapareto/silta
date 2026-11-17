@@ -71,7 +71,7 @@ struct AppShellView: View {
     guard let data = model.visibleData else { return "" }
     if model.route == .board, let board = data.snapshot?.board {
       return "\(board.todo.count + board.doing.count + board.review.count) open · "
-        + "\(board.proposedCount) proposed · \(board.doneThisWeek.count) done this week"
+        + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
     }
     let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
     return "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed"

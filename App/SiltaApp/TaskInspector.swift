@@ -50,6 +50,11 @@ struct TaskInspector: View {
               Text(comment.body).textSelection(.enabled)
             }
           }
+          if let failure = detail.failure {
+            Label(failure, systemImage: "exclamationmark.triangle")
+              .font(.callout).foregroundStyle(.secondary)
+            Button("Retry") { Task { await load() } }
+          }
           if let reader = model.reader, let workspace = model.workspace {
             let questions = questionCommands(reader, workspace: workspace, ref: task.ref)
             ForEach(questions, id: \.text) { command in CommandBlock(command: command) }
@@ -73,7 +78,7 @@ struct TaskInspector: View {
           } actions: {
             Button("Retry") { Task { await load() } }
           }
-        } else if model.selectedTask != nil {
+        } else if model.boardSelection?.taskRef != nil {
           ProgressView("Loading task…")
         } else {
           ContentUnavailableView("Select a task", systemImage: "sidebar.right")
@@ -83,18 +88,21 @@ struct TaskInspector: View {
   }
 
   private var selection: String {
-    [model.workspace ?? "", model.selectedTask ?? "", String(model.visibleData?.version ?? 0)]
-      .joined(separator: ":")
+    [
+      model.workspace ?? "", model.boardSelection?.taskRef ?? "",
+      String(model.visibleData?.version ?? 0),
+    ]
+    .joined(separator: ":")
   }
 
   private func load() async {
     guard let reader = model.reader, let workspace = model.workspace,
-      let ref = model.selectedTask
+      let ref = model.boardSelection?.taskRef
     else {
       detail.clear()
       return
     }
-    await detail.load {
+    await detail.load(workspace: workspace, ref: ref) {
       try await Task.detached { try reader.task(ref, workspace: workspace) }.value
     }
   }

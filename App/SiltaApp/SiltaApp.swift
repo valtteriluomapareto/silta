@@ -80,9 +80,9 @@ struct SiltaApp: App {
     }.defaultSize(width: 1280, height: 840)
       .commands {
         CommandGroup(after: .sidebar) {
-          Button("My work") { model.route = .mywork }.keyboardShortcut("1")
-          Button("Board") { model.route = .board }.keyboardShortcut("2")
-          Button("Toggle Inspector") { model.inspectorPresented.toggle() }
+          Button("My work") { model.navigate(to: .mywork) }.keyboardShortcut("1")
+          Button("Board") { model.navigate(to: .board) }.keyboardShortcut("2")
+          Button("Toggle Inspector") { model.toggleInspector() }
             .keyboardShortcut("i", modifiers: [.command, .option])
           Divider()
           Button("Refresh") { model.refresh(force: true) }.keyboardShortcut("r")

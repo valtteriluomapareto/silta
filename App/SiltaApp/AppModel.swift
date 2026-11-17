@@ -9,10 +9,11 @@ final class AppModel {
   private(set) var workspace: String?
   let reader: AppReader?
   var search = ""
-  var route: AppRoute = .mywork
+  private(set) var route: AppRoute = .mywork
   var appFilter: String?
-  var selectedTask: String?
-  var inspectorPresented = false
+  private(set) var boardSelection: BoardSelection?
+  var boardInspectorPresented = false
+  var showProposed = false
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
   private(set) var lastCheckedAt: Date?
@@ -93,25 +94,38 @@ final class AppModel {
     if workspace != slug {
       generation += 1
       workspace = slug
-      selectedTask = nil
+      boardSelection = nil
+      boardInspectorPresented = false
       appFilter = nil
     }
     return refresh(force: true)
   }
 
-  func inspect(_ ref: String) {
-    selectedTask = ref
-    route = .board
-    inspectorPresented = true
+  func navigate(to route: AppRoute) {
+    self.route = route
+  }
+
+  func inspect(task ref: String) {
+    boardSelection = BoardSelection(taskRef: ref)
+    navigate(to: .board)
+    boardInspectorPresented = true
+  }
+
+  func toggleInspector() {
+    if route == .board { boardInspectorPresented.toggle() }
   }
 
   func showApp(_ slug: String) {
     appFilter = slug
-    route = .board
+    navigate(to: .board)
   }
 
   @discardableResult func focused() -> Task<Void, Never> { refresh() }
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
     frontmost ? refresh() : nil
   }
+}
+
+nonisolated struct BoardSelection: Equatable {
+  let taskRef: String
 }
