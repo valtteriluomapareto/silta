@@ -1,4 +1,5 @@
 import Foundation
+import SiltaAppSupport
 import Testing
 
 @testable import SiltaCore
@@ -278,7 +279,7 @@ struct ErrorReachabilityTests {
     ScanError.self, CommentError.self, DocError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,
-    ExportError.self, ExportFailure.self, ExportGitFailure.self,
+    ExportError.self, ExportFailure.self, ExportGitFailure.self, AppReadError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.
