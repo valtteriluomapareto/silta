@@ -166,25 +166,29 @@ import SiltaAppSupport
       guard token == generation, requested == ref, selectedView == view, !Task.isCancelled else {
         return
       }
-      document = result.page.document
-      if !preserveBody {
-        body = (append ? body : "") + (result.page.body ?? "")
-        text = (append ? text : "") + result.page.text
-        nextLine = result.page.nextLine
-      }
-      if !append {
-        versions = result.versions.entries
-        nextVersions = result.versions.nextOffset
-      }
-      comments = result.comments?.entries ?? []
-      nextComments = result.comments?.nextOffset
-      failure = nil
+      apply(result, append: append, preserveBody: preserveBody)
       loadedKey = key
     } catch {
       if token == generation, requested == ref, !Task.isCancelled {
         failure = AppLoadFailure(error).message
       }
     }
+  }
+
+  private func apply(_ result: Read, append: Bool, preserveBody: Bool) {
+    document = result.page.document
+    if !preserveBody {
+      body = (append ? body : "") + (result.page.body ?? "")
+      text = (append ? text : "") + result.page.text
+      nextLine = result.page.nextLine
+    }
+    if !append {
+      versions = result.versions.entries
+      nextVersions = result.versions.nextOffset
+    }
+    comments = result.comments?.entries ?? []
+    nextComments = result.comments?.nextOffset
+    failure = nil
   }
 
   func moreVersions(_ reader: AppReader, workspace: String) async {

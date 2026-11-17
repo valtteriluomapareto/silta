@@ -153,6 +153,15 @@
       #expect(model.documentSelection == nil && model.docsAbout == "app:acme-mobile")
     }
 
+    @Test func searchMatchesPinnedDocumentReferencesExactly() {
+      let model = AppModel(load: { _, _, _ in nil })
+      model.search = "doc:order-contract@1"
+      #expect(model.matches(["doc:order-contract@1"]))
+      withKnownIssue("A pinned revision must not match another revision's numeric prefix") {
+        #expect(!model.matches(["doc:order-contract@10"]))
+      }
+    }
+
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
       AppModel(
         load: { previous, workspace, force in

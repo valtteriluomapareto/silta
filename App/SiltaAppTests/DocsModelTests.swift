@@ -30,6 +30,28 @@
       #expect(docs.document == original && docs.body == body)
     }
 
+    @Test func pendingOnlyArchivedAndLegacyDocumentsRemainReadable() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let docs = DocsModel()
+      await docs.refresh(reader, workspace: "acme", about: nil, archived: true)
+      let archived = try #require(docs.entries.first { $0.archived })
+      docs.ref = "doc:push-categories@1"
+      docs.view = .changes
+      await docs.show(reader, workspace: "acme")
+      #expect(docs.document?.state == "proposed" && !docs.text.isEmpty && docs.failure == nil)
+      docs.ref = "doc:legacy-notes@1"
+      docs.view = .document
+      await docs.show(reader, workspace: "acme")
+      #expect(docs.document?.title == nil && docs.document?.about == nil && !docs.body.isEmpty)
+      docs.ref = archived.ref
+      await docs.show(reader, workspace: "acme")
+      #expect(docs.document?.archived == true && !docs.body.isEmpty && docs.failure == nil)
+    }
+
     @Test func groupsPreferAcceptedAndReaderAppendsAllBodyPages() async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
@@ -45,6 +67,8 @@
       await docs.show(reader, workspace: "acme")
       #expect(docs.nextLine != nil)
       await docs.show(reader, workspace: "acme", append: true)
+      #expect(docs.body.contains("Operational step 500.") && docs.nextLine == nil)
+      await docs.show(reader, workspace: "acme", version: 2)
       #expect(docs.body.contains("Operational step 500.") && docs.nextLine == nil)
       docs.ref = "doc:order-contract@2"
       docs.view = .comments

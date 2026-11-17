@@ -142,6 +142,7 @@ struct CopyValue: View {
       .help(title).accessibilityLabel(title + ": " + value)
       .contextMenu { Button(title) { copy() } }
       .onCopyCommand { [NSItemProvider(object: value as NSString)] }
+      .onChange(of: value) { copied = false }
       .task(id: copied) {
         guard copied else { return }
         do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
