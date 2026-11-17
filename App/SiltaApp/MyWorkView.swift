@@ -36,7 +36,7 @@ struct MyWorkView: View {
                 HStack(spacing: 10) {
                   proposalTitle(row).frame(maxWidth: .infinity, alignment: .leading)
                   Button("Show changes") { model.openDocument(row.ref) }
-                    .controlSize(.small)
+                    .buttonStyle(CompactActionStyle())
                   CopyValue(value: row.ref, title: "Copy document reference")
                     .lineLimit(1).truncationMode(.middle).frame(width: 196, alignment: .trailing)
                 }.padding(.leading, 28).frame(minHeight: 30)
@@ -113,7 +113,7 @@ struct MyWorkView: View {
           Text(review.metadata).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
         }.frame(maxWidth: .infinity, alignment: .leading)
         if let url = review.pullRequest {
-          Link("Open PR", destination: url).buttonStyle(.bordered).controlSize(.small)
+          Link("Open PR", destination: url).buttonStyle(CompactActionStyle())
         }
         CopyValue(value: review.task.ref, title: "Copy task reference")
       }
