@@ -107,8 +107,8 @@ struct TaskInspector: View {
 
   private func questionCommands(_ reader: AppReader, workspace: String, ref: String) -> [AppCommand]
   {
-    (model.visibleData?.snapshot?.work.items ?? [])
-      .filter { $0.kind == "question" && $0.task == ref }
-      .flatMap { reader.commands(for: $0, workspace: workspace) }
+    guard let snapshot = model.visibleData?.snapshot else { return [] }
+    return BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+      .commands(for: ref, reader: reader, workspace: workspace)
   }
 }
