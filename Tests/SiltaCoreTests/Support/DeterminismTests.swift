@@ -271,6 +271,27 @@ struct DeterminismTests {
 }
 
 extension DeterminismTests {
+  @Test func environmentFixtureDoesNotRequestGitAttribution() async throws {
+    await withKnownIssue {
+      try await withScratchDirectory { scratch in
+        _ = try await makeEnvironment(
+          environment: ["SILTA_HOME": scratch.appending(path: "data").path],
+          userHome: scratch)
+      }
+    }
+  }
+
+  private func makeEnvironment(
+    environment values: [String: String], userHome: URL,
+    temporaryRoots: [URL]? = nil, deterministic: Bool = false
+  ) async throws -> SiltaEnvironment {
+    let git = ScriptedGitRunner(script: [])
+    defer { #expect(git.requests.isEmpty) }
+    return try await SiltaEnvironment.system(
+      environment: values, userHome: userHome, temporaryRoots: temporaryRoots,
+      deterministic: deterministic, git: git)
+  }
+
   @Test(arguments: ["2023-11-14T22:13:20.859Z", "2023-11-14T22:13:20.426Z"])
   func canonicalMillisecondNowIsAccepted(raw: String) async throws {
     try await withScratchDirectory { scratch in
