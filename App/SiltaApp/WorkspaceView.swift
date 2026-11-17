@@ -156,7 +156,8 @@ struct ConnectionInspector: View {
                 Text(DocsContent.row(group)).font(.system(size: 11)).foregroundStyle(
                   Color("TideText"))
               }.frame(maxWidth: .infinity, alignment: .leading)
-            }.padding(10).background(Color("Canvas"), in: .rect(cornerRadius: 8))
+            }.padding(.horizontal, 10).padding(.vertical, 6)
+              .background(Color("Canvas"), in: .rect(cornerRadius: 8))
               .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color("Ink").opacity(0.1)))
           }.buttonStyle(.plain)
         }
