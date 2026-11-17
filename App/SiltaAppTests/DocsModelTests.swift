@@ -52,6 +52,43 @@
       #expect(docs.document?.archived == true && !docs.body.isEmpty && docs.failure == nil)
     }
 
+    @Test func oldListCompletionCannotLoadThePreviousWorkspaceIntoTheCurrentReader() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let page = try reader.documents(workspace: "acme")
+      let gate = PausedDocumentList()
+      var firstAcme = true
+      let docs = DocsModel(readList: { _, workspace, _, _, _ in
+        if workspace == "acme", firstAcme {
+          firstAcme = false
+          await gate.pause()
+        }
+        return page
+      })
+      let model = AppModel(
+        reader: reader, documents: docs,
+        load: { _, workspace, _ in
+          AppLoadedData(
+            workspaces: [], workspace: workspace ?? "acme", snapshot: nil,
+            map: nil, version: 1, checkedAt: AppV2Fixture.now)
+        })
+      await model.refresh().value
+      model.navigate(to: .docs)
+      let old = Task { await model.loadDocuments() }
+      await gate.started()
+      await model.selectWorkspace("beta").value
+      let betaFailure = try #require(docs.failure)
+      #expect(model.workspace == "beta" && docs.document == nil)
+      gate.resume()
+      await old.value
+      withKnownIssue("A stale list caller must stop before loading its captured workspace") {
+        #expect(docs.document == nil && docs.body.isEmpty && docs.failure == betaFailure)
+      }
+    }
+
     @Test func groupsPreferAcceptedAndReaderAppendsAllBodyPages() async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
@@ -76,6 +113,29 @@
       #expect(docs.comments.count == 1 && docs.versions.count == 3 && docs.failure == nil)
       await docs.refresh(reader, workspace: "acme", about: "service:missing", archived: false)
       #expect(docs.entries.isEmpty && docs.listFailure != nil)
+    }
+  }
+
+  @MainActor private final class PausedDocumentList {
+    private var hasStarted = false
+    private var ready: CheckedContinuation<Void, Never>?
+    private var paused: CheckedContinuation<Void, Never>?
+
+    func pause() async {
+      await withCheckedContinuation { continuation in
+        paused = continuation
+        hasStarted = true
+        ready?.resume()
+        ready = nil
+      }
+    }
+    func started() async {
+      if hasStarted { return }
+      await withCheckedContinuation { ready = $0 }
+    }
+    func resume() {
+      paused?.resume()
+      paused = nil
     }
   }
 #endif

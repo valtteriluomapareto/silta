@@ -8,7 +8,7 @@ final class AppModel {
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
   let reader: AppReader?
-  let documents = DocsModel()
+  let documents: DocsModel
   var docsAbout: String?
   var includeArchivedDocuments = false
   var documentSelection: DocumentSelection? {
@@ -30,9 +30,10 @@ final class AppModel {
   @ObservationIgnored private var generation = 0
 
   init(
-    reader: AppReader? = nil, load: @escaping Loader
+    reader: AppReader? = nil, documents: DocsModel = DocsModel(), load: @escaping Loader
   ) {
     self.reader = reader
+    self.documents = documents
     self.load = load
   }
 

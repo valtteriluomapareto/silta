@@ -3,6 +3,20 @@ import Observation
 import SiltaAppSupport
 
 @MainActor @Observable final class DocsModel {
+  typealias ListLoader = @MainActor (AppReader, String, String?, Bool, Int) async throws ->
+    AppDocumentList
+  private let readList: ListLoader
+
+  init(
+    readList: @escaping ListLoader = { reader, workspace, about, archived, offset in
+      try await Task.detached {
+        try reader.documents(workspace: workspace, about: about, archived: archived, offset: offset)
+      }.value
+    }
+  ) {
+    self.readList = readList
+  }
+
   struct Group: Identifiable {
     let id: String
     let entries: [AppDocument]
@@ -116,9 +130,7 @@ import SiltaAppSupport
     listLoading = true
     defer { if token == listGeneration { listLoading = false } }
     do {
-      let result = try await Task.detached {
-        try reader.documents(workspace: workspace, about: about, archived: archived, offset: offset)
-      }.value
+      let result = try await readList(reader, workspace, about, archived, offset)
       guard token == listGeneration, !Task.isCancelled else { return }
       entries = append ? entries + result.entries : result.entries
       nextList = result.nextOffset
