@@ -5,6 +5,27 @@
   import Testing
 
   @MainActor struct TaskDetailModelTests {
+    @Test func reloadKeepsPreviousValueDuringReadAndFailure() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppV2Fixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let detail = TaskDetailModel()
+      let original = try reader.task("AC-12", workspace: "acme")
+      await detail.load { original }
+      await detail.load {
+        withKnownIssue("Reload clears the last successful task before reading") {
+          #expect(detail.value == original && detail.isLoading)
+        }
+        throw AppLoadFailure(message: "Acme reload unavailable")
+      }
+      withKnownIssue("A failed reload loses the last successful task") {
+        #expect(detail.value == original)
+      }
+      #expect(detail.failure == "Acme reload unavailable" && !detail.isLoading)
+    }
+
     @Test func retryRecoversDetailWithoutADatabaseCommit() async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
