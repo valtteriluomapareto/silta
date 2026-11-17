@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 BINARY = ROOT.parent / '.build/debug/silta'
 STUB = Path(__file__).with_name('stub_harness.py')
 SCENARIOS = ['start-cross-repo', 'plan-not-file', 'handoff-resume',
-             'done-with-result', 'proposals-ask', 'ask-short', 'doc-context']
+             'done-with-result', 'proposals-ask', 'ask-short', 'doc-context', 'doc-context-no-doc']
 
 
 class Acceptance(unittest.TestCase):
@@ -57,11 +57,13 @@ class Acceptance(unittest.TestCase):
     def test_both_adapters_all_scenarios_three_repeats(self):
         self.assertEqual(self.report['provenance'], 'stub')
         groups = self.report['groups']
-        self.assertEqual(len(groups), 14)
+        self.assertEqual(len(groups), 16)
         for group in groups:
             self.assertEqual(group['repeats'], 3)
-            self.assertEqual(group['pass_rate'], 1)
-            self.assertTrue(group['all_repeats_pass'])
+            diagnostic = group['scenario'] == 'doc-context-no-doc'
+            self.assertIs(group['diagnostic'], diagnostic)
+            self.assertEqual(group['pass_rate'], 0 if diagnostic else 1)
+            self.assertIs(group['all_repeats_pass'], not diagnostic)
         self.assertEqual({g['scenario'] for g in groups}, set(SCENARIOS))
 
     def test_grader_guarantees(self):

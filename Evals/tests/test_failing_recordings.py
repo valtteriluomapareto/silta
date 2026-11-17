@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BINARY = ROOT.parent / '.build/debug/silta'
 STUB = Path(__file__).with_name('stub_harness.py')
 SCENARIOS = ['start-cross-repo', 'plan-not-file', 'handoff-resume',
-             'done-with-result', 'proposals-ask', 'ask-short', 'doc-context']
+             'done-with-result', 'proposals-ask', 'ask-short', 'doc-context', 'doc-context-no-doc']
 
 
 class FailingRecordings(unittest.TestCase):
@@ -24,7 +24,7 @@ class FailingRecordings(unittest.TestCase):
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stderr)
             report = json.loads((output / 'report.json').read_text())
-        self.assertEqual(len(report['groups']), 14)
+        self.assertEqual(len(report['groups']), 16)
         self.assertTrue(all(g['pass_rate'] == 0 for g in report['groups']))
         expected = {(harness, scenario, variant) for harness in ['claude', 'codex']
                     for scenario in SCENARIOS

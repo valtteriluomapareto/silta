@@ -16,7 +16,7 @@ struct BriefDocsTests {
     return location
   }
 
-  static func setup(_ home: URL) throws -> DatabaseStore {
+  static func setup(_ home: URL, taskTopics: Bool = true) throws -> DatabaseStore {
     let store = try AcmeDocAttachments.make(in: home)
     try store.write { tx in
       try tx.database.execute(
@@ -26,8 +26,9 @@ struct BriefDocsTests {
           VALUES(1,'task',1,1,'Handle push','doing',1,'human:acme','','');
           INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
             created_by,created_at)
-          VALUES('task-topic',1,'task',1,'about','topic',1,'human:acme','');
-          """)
+          SELECT 'task-topic',1,'task',1,'about','topic',1,'human:acme','' WHERE ?;
+          """, arguments: [taskTopics])
+      #expect(tx.database.changesCount == (taskTopics ? 1 : 0))
     }
     return store
   }
