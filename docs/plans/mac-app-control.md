@@ -23,9 +23,11 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 ```
 
 - Snapshot mode implies the isolated v2 fixture. Routes available with these
-  screens are `mywork`, `board[:task-ref]`, and `workspace[:edge-ref]`. Apply them
-  through the same AppModel handlers as clicks; validate selected refs against
-  loaded fixture data. Add Docs only with its screen.
+  screens are `mywork`, `board[:task-ref]`, `workspace[:edge-ref]` and
+  `docs[:doc-ref[:view]]`. Document views are `document` (default), `changes` and
+  `comments`. Apply routes through AppModel handlers and validate selected refs
+  against fixture data. The native launch adds Docs examples through
+  `AppDocsFixture`; shared task data stays in `AppV2Fixture`.
 - Unknown `-Silta*`, duplicate flags, missing values, unsupported routes and invalid
   sizes fail before fixture storage opens. Non-Silta arguments belong to macOS
   and Xcode and are left alone. Sizes are logical points, from 1000×700 (the root
@@ -53,13 +55,13 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | `snapshotVersion` | Schema version, currently 1 |
 | `run`, `revision` | Unique launch identity and increasing publication number |
 | `fixture`, `appearance` | `v2` and `light`/`dark` |
-| `screen`, `route` | Current screen and canonical route including selected ref |
-| `selection` | Null, or typed `{kind: task/connection, ref: ...}` |
+| `screen`, `route` | Current screen and canonical route including selected ref and document view |
+| `selection` | Null, typed `{kind: task/connection, ref: ...}`, or `{kind: document, ref: ..., view: ...}` |
 | `inspectorOpen` | Flag belonging to the current route |
 | `counts.lanes` | Visible Board lane counts, including current filters/proposals; null until loaded |
 | `counts.sidebar` | Actionable waiting, claimed tasks and app open-count badges; null until loaded |
 | `refresh` | `starting`, `loading`, `ready` or `failed`, plus the observed dataVersion |
-| `idle` | Initial loading, selected task loading and current refresh have settled |
+| `idle` | Initial loading, selected task/document content and current scope/version refresh have settled |
 
 Lane keys use their displayed names: Todo, Doing, Review, Done this week. Failed
 loads may be idle; also check refresh.phase. Idle does not prove painted pixels.
@@ -83,8 +85,9 @@ There is no pending field or mailbox state in this slice.
   shortcuts, clipboard or glass checks go under **Pending unlocked check**. Land
   on tests, state/PNG evidence and green CI; do one short real UI pass later when
   unlocked and file discovered problems as follow-up fixes.
-- Prove once that SwiftPM and hosted xcodebuild tests pass while locked. The
-  maintainer has deferred that proof; record it as pending without holding a PR.
+- SwiftPM and hosted xcodebuild tests must work while locked. The one-time proof
+  is recorded in [#217](https://github.com/valtteriluomapareto/silta/pull/217);
+  pending real UI checks never hold a PR.
 - Stop owned fixture builds when testing ends. Do not terminate unrelated apps.
 
 ## Deferred slices

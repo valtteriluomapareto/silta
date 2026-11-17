@@ -36,13 +36,12 @@ import SiltaAppSupport
       return .loading
     }
     if listLoading || loading { return .loading }
-    if listFailure != nil || failure != nil { return .failed }
+    if listFailure != nil { return listFailureVersion == version ? .failed : .loading }
     guard listLoaded, listVersion == version else { return .loading }
-    if let ref, loadedKey != DetailKey(workspace: workspace, ref: ref, view: view, version: version)
-    {
-      return .loading
-    }
-    return .ready
+    guard let ref else { return .ready }
+    let key = DetailKey(workspace: workspace, ref: ref, view: view, version: version)
+    if failure != nil { return failureKey == key ? .failed : .loading }
+    return loadedKey == key ? .ready : .loading
   }
 
   struct Group: Identifiable {
@@ -80,7 +79,9 @@ import SiltaAppSupport
   private(set) var listLoading = false
   private var detailWorkspace: String?
   private var loadedKey: DetailKey?
+  private var failureKey: DetailKey?
   private var listVersion: Int?
+  private var listFailureVersion: Int?
   private var listLoaded = false
   private struct DetailKey: Equatable {
     let workspace: String
@@ -107,6 +108,7 @@ import SiltaAppSupport
     nextComments = nil
     nextLine = nil
     failure = nil
+    failureKey = nil
   }
 
   func clear() {
@@ -119,6 +121,7 @@ import SiltaAppSupport
     entries = []
     nextList = nil
     listFailure = nil
+    listFailureVersion = nil
     listLoading = false
     listLoaded = false
     scope = nil
@@ -153,6 +156,7 @@ import SiltaAppSupport
       entries = []
       nextList = nil
       listFailure = nil
+      listFailureVersion = nil
       scope = requestedScope
     }
     listGeneration += 1
@@ -166,12 +170,14 @@ import SiltaAppSupport
       entries = append ? entries + result.entries : result.entries
       nextList = result.nextOffset
       listFailure = nil
+      listFailureVersion = nil
       listLoaded = true
       listVersion = version
       return token
     } catch {
       if token == listGeneration, !Task.isCancelled {
         listFailure = AppLoadFailure(error).message
+        listFailureVersion = version
         return token
       }
     }
@@ -223,6 +229,7 @@ import SiltaAppSupport
     } catch {
       if token == generation, requested == ref, !Task.isCancelled {
         failure = AppLoadFailure(error).message
+        failureKey = key
       }
     }
   }
@@ -241,6 +248,7 @@ import SiltaAppSupport
     comments = result.comments?.entries ?? []
     nextComments = result.comments?.nextOffset
     failure = nil
+    failureKey = nil
   }
 
 }
@@ -257,9 +265,11 @@ extension DocsModel {
       versions += result.entries
       nextVersions = result.nextOffset
       failure = nil
+      failureKey = nil
     } catch {
       if token == generation, requested == ref, !Task.isCancelled {
         failure = AppLoadFailure(error).message
+        failureKey = loadedKey
       }
     }
   }
@@ -279,9 +289,11 @@ extension DocsModel {
       comments += result.entries
       nextComments = result.nextOffset
       failure = nil
+      failureKey = nil
     } catch {
       if token == generation, requested == ref, !Task.isCancelled {
         failure = AppLoadFailure(error).message
+        failureKey = loadedKey
       }
     }
   }

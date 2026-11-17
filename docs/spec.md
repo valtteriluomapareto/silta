@@ -2232,6 +2232,14 @@ Rust would win only if:
 [coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). The repository also contains `Evals/`, the agent evaluation suite (§21, S16),
 and the native `App/SiltaApp.xcodeproj` viewer with `SiltaAppSupport` and its tests.
 
+**Native viewer.** The app owns its route, typed task/connection/document selection
+and each route's inspector flag. Its Docs reader has a separate loader keyed on
+workspace, attachment/archive scope, data version, immutable revision and view.
+Lists, history, bodies and comments page explicitly. Reload failures retain the
+last displayed value, and an older failure cannot settle a newer read. Native
+views import only `SiltaAppSupport` and Apple frameworks; document formatting uses
+Foundation Markdown and SwiftUI. These projections do not change CLI JSON.
+
 **Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
 

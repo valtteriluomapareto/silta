@@ -122,15 +122,16 @@
       docs.ref = "doc:missing@1"
       await docs.show(reader, workspace: "acme", version: 1)
       #expect(docs.phase(workspace: "acme", about: nil, archived: false, version: 1) == .failed)
-      withKnownIssue("An old detail failure cannot settle a newer version.") {
-        #expect(docs.phase(workspace: "acme", about: nil, archived: false, version: 2) == .loading)
-      }
+      #expect(docs.phase(workspace: "acme", about: nil, archived: false, version: 2) == .loading)
+      await docs.refresh(reader, workspace: "acme", about: nil, archived: false, version: 2)
+      #expect(docs.failure != nil)
+      #expect(docs.phase(workspace: "acme", about: nil, archived: false, version: 2) == .loading)
+      await docs.show(reader, workspace: "acme", version: 2)
+      #expect(docs.phase(workspace: "acme", about: nil, archived: false, version: 2) == .failed)
       await docs.refresh(reader, workspace: "missing", about: nil, archived: false, version: 1)
       #expect(docs.phase(workspace: "missing", about: nil, archived: false, version: 1) == .failed)
-      withKnownIssue("An old list failure cannot settle a newer version.") {
-        #expect(
-          docs.phase(workspace: "missing", about: nil, archived: false, version: 2) == .loading)
-      }
+      #expect(
+        docs.phase(workspace: "missing", about: nil, archived: false, version: 2) == .loading)
     }
 
     @Test func phaseTracksCurrentScopeVersionAndSelectedView() async throws {
