@@ -85,6 +85,8 @@
       #expect(model.proposals.isEmpty)
       model.search = "AC-22"
       #expect(model.proposals.count == 1 && model.proposals.first?.refs == ["AC-22"])
+      model.search = "agent:codex"
+      #expect(model.proposals.count == 2)
       let question = try #require(model.data?.snapshot?.work.items.first { $0.kind == "question" })
       model.search = try #require(question.ref)
       #expect(model.matches(question))

@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import SiltaAppSupport
 import SwiftUI
 
@@ -36,17 +37,15 @@ struct MyWorkView: View {
             VStack(alignment: .leading, spacing: 16) {
               Text("Proposed tasks · \(proposals.count)").font(.headline)
               ForEach(Array(proposals.enumerated()), id: \.offset) { _, item in
-                if matches([item.title ?? "", item.body ?? ""] + item.refs) {
-                  HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                      Text(item.title ?? "Proposed task").font(.body.weight(.medium))
-                      if let author = item.author {
-                        Text(author).font(.caption).foregroundStyle(.secondary)
-                      }
+                HStack {
+                  VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title ?? "Proposed task").font(.body.weight(.medium))
+                    if let author = item.author {
+                      Text(author).font(.caption).foregroundStyle(.secondary)
                     }
-                    Spacer()
-                    ForEach(item.refs, id: \.self) { ref in reference(ref) }
                   }
+                  Spacer()
+                  ForEach(item.refs, id: \.self) { ref in reference(ref) }
                 }
               }
               if let first = proposals.first {
@@ -133,8 +132,7 @@ struct CopyValue: View {
 
   var body: some View {
     Button {
-      NSPasteboard.general.clearContents()
-      copied = NSPasteboard.general.setString(value, forType: .string)
+      copy()
     } label: {
       Label(
         compact ? (copied ? "Copied" : title) : value,
@@ -143,10 +141,18 @@ struct CopyValue: View {
       .font(.system(.caption, design: .monospaced))
     }.buttonStyle(.bordered).labelStyle(.titleAndIcon)
       .help(title).accessibilityLabel(title + ": " + value)
+      .contextMenu { Button(title) { copy() } }
+      .onCopyCommand { [NSItemProvider(object: value as NSString)] }
       .task(id: copied) {
         guard copied else { return }
         do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
         copied = false
       }
   }
+
+  private func copy() {
+    NSPasteboard.general.clearContents()
+    copied = NSPasteboard.general.setString(value, forType: .string)
+  }
+
 }
