@@ -67,7 +67,8 @@ struct DocTargetSnapshotTests {
         }
       }
       _ = try DocProposalService(environment: service.environment, workspace: "acme").propose(
-        DocProposalRequest(slug: "rules", why: "Share."), input: { "Body." })
+        DocProposalRequest(slug: "rules", title: "Proposed rules", why: "Share."),
+        input: { "Body." })
       if mode == "reordered" {
         let reversedBytes = try encoder.encode(Array(known.reversed()))
         let reversed = try #require(String(data: reversedBytes, encoding: .utf8))

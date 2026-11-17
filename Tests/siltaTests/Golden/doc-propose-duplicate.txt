@@ -1,0 +1,2 @@
+error: Document body and metadata already match doc:rules@1. [conflict]
+next: silta --ws 'acme' doc show 'doc:rules@1'

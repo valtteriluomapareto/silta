@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"--base must name an accepted revision of this doc.","next":["silta --ws 'acme' doc show 'doc:rules'","silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --base <rev>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

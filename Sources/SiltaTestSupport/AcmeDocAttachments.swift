@@ -66,4 +66,22 @@ package enum AcmeDocAttachments {
         ])
     }
   }
+
+  /// Retains identical Acme rules proposals for history and cleanup controls.
+  package static func copyLatestRulesProposal(in store: DatabaseStore) throws {
+    try store.write {
+      try $0.database.execute(
+        sql: """
+          INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,message,created_at,
+            title,kind,about_refs,about_targets,source_task_id)
+          SELECT uid||'-history',doc_id,rev+1,base_rev,body_md,state,actor,message,created_at,
+            title,kind,about_refs,about_targets,source_task_id FROM doc_rev
+          WHERE state='proposed' AND doc_id=(
+            SELECT id FROM doc WHERE workspace_id=1 AND slug='rules')
+          ORDER BY rev DESC LIMIT 1;
+          UPDATE seq_counter SET next=next+1 WHERE scope='doc_rev:1:rules';
+          """)
+    }
+  }
+
 }

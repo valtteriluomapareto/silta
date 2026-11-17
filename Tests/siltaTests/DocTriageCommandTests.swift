@@ -7,7 +7,8 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocTriageCommandTests {
   static func propose(_ scratch: URL) throws -> String {
-    let file = try DocEditCommandTests.input(scratch, "Shared proposal.")
+    let file = scratch.appending(path: "proposal.md")
+    try "Shared proposal.".write(to: file, atomically: true, encoding: .utf8)
     let result = try SiltaBinary.run(
       [
         "--ws", "acme", "doc", "propose", "rules", "-F", file.path, "-m", "Share.",
@@ -101,7 +102,7 @@ struct DocTriageCommandTests {
           ["rules"] + DocEditCommandTests.creation + ["-F", file.path], scratch
         ).termination == .exit(0))
       #expect(try Self.propose(scratch) == "doc:rules@2")
-      #expect(try Self.propose(scratch) == "doc:rules@3")
+      try AcmeDocAttachments.copyLatestRulesProposal(in: store)
       try #require(
         try DocEditCommandTests.run(
           ["rules", "-F", file.path], scratch

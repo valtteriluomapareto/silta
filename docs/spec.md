@@ -983,6 +983,10 @@ It lists:
 `doc show <slug|doc:slug|doc:slug@N> [--rev N] [--lines N|A-B]` reads
 stored revision metadata and markdown. The default is the current accepted revision;
 without one it lists up to 20 pending revision refs and points to `doc ls` for more.
+An unpinned accepted-body read includes its pending count and a safe scoped list
+command on the existing header line. Pinned line coordinates and continuation refs
+remain unchanged; archived recovery includes archived entries. Explicit revisions,
+diffs, comments and pending-only reads retain their own views.
 An explicit revision can be proposed, rejected, superseded or archived. Historical
 NULL metadata is shown as unknown, without resolving historical map targets or
 substituting current metadata. Stores that predate snapshot evidence columns remain
@@ -1104,9 +1108,23 @@ measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
-  omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
+  the target is a bare slug or `doc:slug`, without a revision. A well-formed pinned
+  target refuses with a corrected unpinned retry; malformed targets use discovery.
+  `--base` accepts a positive revision number or canonical `doc:slug@revision`
+  naming an accepted revision of this same owned doc in the selected workspace.
+  Omission selects the current accepted revision; older accepted bases remain valid.
+  Omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
   database-dependent selection, defaults and validation; insertion uses one write
   and never runs Git.
+  Final body and metadata identical to the selected accepted base, or to a pending
+  revision with the same base, refuse with `conflict` and a read of the existing
+  immutable ref before any allocation or change. Attachment equality uses UID sets;
+  renames preserve identity and replacements differ. The search covers all pending
+  revisions of the doc, across actors and attention windows. Changing the base may
+  create a replacement for stale knowledge; why/source changes alone do not evade
+  duplicate refusal. Unknown historical metadata is never inferred from current names.
+  Before proposing, list docs about the target and revise existing knowledge when it
+  fits; check whether another app's agent would rediscover it from the map.
   A submission stays proposed, including from a human or with `--approved`.
 - **Review:** the agent reads pinned proposal diffs, checks the code and prepares
   existing proposal refs with recommendations in one chat message. Rejection is

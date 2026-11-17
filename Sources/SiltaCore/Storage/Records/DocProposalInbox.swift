@@ -51,13 +51,9 @@ struct DocProposalInbox {
     let columns = try db.columns(in: "doc_rev").map(\.name)
     let metadata = columns.contains("source_task_id")
     let targets = columns.contains("about_targets")
-    var selected: [Row] = []
-    for start in stride(from: 0, to: groups.count, by: 64) {
-      let ids = groups[start..<min(start + 64, groups.count)].map(\.id)
-      selected += try Row.fetchAll(
-        db, sql: memberSQL(ids: ids, metadata: metadata, targets: targets),
-        arguments: arguments + StatementArguments(ids))
-    }
+    let selected = try Row.fetchAll(
+      db, sql: memberSQL(metadata: metadata, targets: targets),
+      arguments: arguments + [try WorkspaceConfig.json(groups.map(\.id))])
     let rows = Dictionary(grouping: selected) { $0["doc_id"] as Int64 }
     return try groups.map { group in
       guard let members = rows[group.id], let first = members.first else {
@@ -71,7 +67,7 @@ struct DocProposalInbox {
     }
   }
 
-  private func memberSQL(ids: [Int64], metadata: Bool, targets: Bool) -> String {
+  private func memberSQL(metadata: Bool, targets: Bool) -> String {
     let title = metadata ? "r.title" : "NULL"
     let kind = metadata ? "r.kind" : "NULL"
     let about = metadata ? "r.about_refs" : "NULL"
@@ -98,7 +94,7 @@ struct DocProposalInbox {
         SELECT r.id,ROW_NUMBER() OVER(PARTITION BY r.doc_id
           ORDER BY r.created_at DESC,r.rev DESC,r.uid COLLATE BINARY) AS position
         FROM doc_rev r JOIN doc d ON d.id=r.doc_id
-        WHERE \(eligibility) AND d.id IN (\(ids.map { _ in "?" }.joined(separator: ",")))
+        WHERE \(eligibility) AND d.id IN (SELECT value FROM json_each(?))
       )
       SELECT \(fields) FROM eligible e JOIN doc_rev r ON r.id=e.id JOIN doc d ON d.id=r.doc_id
       LEFT JOIN doc_rev b ON b.doc_id=d.id AND b.rev=r.base_rev
