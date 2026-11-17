@@ -1,6 +1,7 @@
 #if DEBUG
   import Darwin
   import Foundation
+  import SiltaAppSupport
   @testable import SiltaApp
   import Testing
 
@@ -8,6 +9,7 @@
   @MainActor
   struct AppStartupTests {
     @Test func actualHostHasAnIsolatedHomeBeforeStartup() throws {
+      #expect(AppV2Fixture.user == "acme")
       let environment = ProcessInfo.processInfo.environment
       #expect(environment["SILTA_APP_TESTING"] == "1")
       let path = try #require(environment["SILTA_HOME"])
