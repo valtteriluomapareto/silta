@@ -21,8 +21,9 @@ struct BriefDocsLogTests {
         return try #require(JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
       }
       #expect(try run(["brief"]).termination == .exit(0))
+      let emptyLog = try lastLog()
       withKnownIssue("Successful briefs must record their rendered document count") {
-        #expect(try lastLog()["docs_shown"] as? Int == 0)
+        #expect(emptyLog["docs_shown"] as? Int == 0)
       }
       let config = scratch.appending(path: "workspace.yaml")
       try """
