@@ -11,7 +11,7 @@ struct RestoreDocumentFixtureTests {
       let source = try RestoreDocumentFixture.source(scratch.appending(path: "source"))
       let before = try RestoreSupport.dump(source)
       let captured = try source.read { try ExportSnapshot.capture($0, workspace: "acme") }
-      try RestoreDocumentGraph(tree: captured, documents: captured.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: captured, slug: "acme").run()
       #expect(
         captured.links.filter { $0.value("to_kind") == "note" }
           .compactMap { $0.value("to_ext").map { Data($0.utf8) } }
@@ -22,7 +22,7 @@ struct RestoreDocumentFixtureTests {
       #expect(try RestoreSupport.dump(source) == before)
       let target = try RestoreDocumentRowSupport.make(scratch.appending(path: "target"))
       let retained = try RestoreDocumentFixture.retained(target)
-      let tree = try RestoreDocumentGraphFixture.graph().tree
+      let tree = try RestoreDocumentGraphFixture.graph()
       let expected = try RestoreDocumentRowSupport.replace(
         target, tree: tree, incoming: captured.documents)
       let after = try ExportDocumentSnapshotTests.read(target)

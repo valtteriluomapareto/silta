@@ -764,3 +764,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   secrets that masked reads cannot reconstruct. Private Core policy establishes
   this boundary; the CLI command, help and removal recovery ship together with
   their public contract updates.
+
+- **D49: Read command-produced identities directly.** On 2026-11-17 the maintainer
+  chose to remove repeated UID read checks without a new admission migration or
+  doctor framework. Existing restore validation and real binding comparisons stay.
+  Corrupt-data handling waits for observed DF3 cases; schema and writer floors stay.

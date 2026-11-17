@@ -16,11 +16,11 @@ struct RestoreASCIIIdentityTests {
 
   @Test(arguments: 0..<3)
   func incomingDocumentUIDsRequireASCII(example: Int) throws {
-    var tree = try RestoreDocumentGraphFixture.graph().tree
+    var tree = try RestoreDocumentGraphFixture.graph()
     let uid = try #require(tree.documents.documents.first?.row.value("uid"))
     RestoreOpaqueIdentityFixture.rename(&tree, from: uid, to: ["", "K", "K\u{0}tail"][example])
     let error = Self.failure {
-      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
     }
     do {
       #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
@@ -29,12 +29,11 @@ struct RestoreASCIIIdentityTests {
 
   @Test(arguments: ["uid", "source_task", "doc_rev"], [0, 1])
   func separateDocumentBundleIsAdmitted(field: String, example: Int) throws {
-    let tree = try RestoreDocumentGraphFixture.graph().tree
-    var documents = tree.documents
+    var tree = try RestoreDocumentGraphFixture.graph()
     let value = ["K", "K\u{0}tail"][example]
-    RestoreDocumentGraphFixture.record(&documents, field == "doc_rev" ? 5 : 1, field, value)
+    RestoreDocumentGraphFixture.record(&tree.documents, field == "doc_rev" ? 5 : 1, field, value)
     let error = Self.failure {
-      try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
     }
     do {
       #expect(error?.code == .invalid && error?.message.contains("ASCII") == true)
@@ -42,72 +41,13 @@ struct RestoreASCIIIdentityTests {
   }
 
   @Test func differingASCIIBundleAndOpaquePunctuationRemainValid() throws {
-    let tree = try RestoreDocumentGraphFixture.graph().tree
+    var tree = try RestoreDocumentGraphFixture.graph()
     var incoming = tree
     let uid = try #require(incoming.documents.documents.first?.row.value("uid"))
     RestoreOpaqueIdentityFixture.rename(&incoming, from: uid, to: "allowed ASCII /:@._-~")
-    try RestoreDocumentGraph(tree: incoming, documents: incoming.documents, slug: "acme").run()
-    var documents = tree.documents
-    RestoreDocumentGraphFixture.otherDocument(&documents)
-    try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
-  }
-
-  @Test(arguments: ["repo", "app", "task"], [0, 1])
-  func storedLookalikesRefuseBeforeMachineStateOrReports(kind: String, example: Int) throws {
-    try withScratchDirectory { scratch in
-      let sourceHome = scratch.appending(path: "source")
-      let source = try RestoreDocumentFixture.source(sourceHome)
-      let home = scratch.appending(path: "target")
-      let target = try RestoreDocumentRowSupport.make(home)
-      let id: Int64 = kind == "repo" ? 1100 : kind == "app" ? 1102 : 700
-      try source.write {
-        try $0.database.execute(sql: "UPDATE \(kind) SET uid='K' WHERE id=?", arguments: [id])
-      }
-      let directory = try RestoreDocumentIntegrationTests.publish(
-        source, home: sourceHome, to: scratch.appending(path: "out"))
-      let legacy = Data(["K\u{0}tail", "K"][example].utf8)
-      try target.write {
-        try $0.database.execute(
-          sql: "UPDATE \(kind) SET uid=CAST(? AS TEXT) WHERE id=?", arguments: [legacy, id])
-      }
-      let before = try RestoreSupport.dump(target)
-      let raw = try Self.rawUIDs(target, table: kind)
-      let machine = try RestoreOpaqueIdentityFixture.machineRows(target)
-      var report: RestoreReport?
-      let error = Self.failure {
-        report = try RestoreSupport.restore(directory, into: target, home: home)
-      }
-      let after = try RestoreSupport.dump(target)
-      let afterUIDs = try Self.rawUIDs(target, table: kind)
-      let afterMachine = try RestoreOpaqueIdentityFixture.machineRows(target)
-      do {
-        #expect(error?.code == .env && error?.next == ["silta backup"])
-        #expect(error?.message.contains("ASCII") == true && error?.nextBy == .human)
-        #expect(report == nil && after == before && afterUIDs == raw && afterMachine == machine)
-      }
-    }
-  }
-
-  @Test(arguments: 0..<3)
-  func captureRefusesCompleteUnsupportedUIDBytes(example: Int) throws {
-    try withScratchDirectory { home in
-      let store = try RestoreDocumentGraphFixture.source(home)
-      let bytes = Data(["", "K", "K\u{0}tail"][example].utf8)
-      try store.write {
-        try $0.database.execute(
-          sql: "UPDATE doc SET uid=CAST(? AS TEXT) WHERE id=91", arguments: [bytes])
-      }
-      let before = try RestoreSupport.dump(store)
-      let raw = try Self.rawUIDs(store, table: "doc")
-      let error = Self.failure {
-        _ = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
-      }
-      do {
-        #expect(error?.code == .env && error?.next == ["silta backup"])
-      }
-      #expect(try RestoreSupport.dump(store) == before)
-      #expect(try Self.rawUIDs(store, table: "doc") == raw)
-    }
+    try RestoreDocumentGraph(tree: incoming, slug: "acme").run()
+    RestoreDocumentGraphFixture.otherDocument(&tree.documents)
+    try RestoreDocumentGraph(tree: tree, slug: "acme").run()
   }
 
   static func rawUIDs(_ store: DatabaseStore, table: String) throws -> [Data] {

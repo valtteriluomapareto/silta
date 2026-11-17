@@ -20,9 +20,9 @@ struct RestorePublicOpaqueIdentityTests {
       try target.write {
         try $0.database.execute(sql: "UPDATE doc SET uid=? WHERE id=92", arguments: [uid])
       }
-      var tree = try RestoreDocumentGraphFixture.graph().tree
+      var tree = try RestoreDocumentGraphFixture.graph()
       RestoreOpaqueIdentityFixture.rename(&tree, from: ExportDocumentTests.uid("001"), to: uid)
-      try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: tree, slug: "acme").run()
       let files = try tree.files()
       #expect(try #require(files["docs/push-rules.md"]).range(of: Data(uid.utf8)) != nil)
       let directory = try RestoreSupport.write(files, to: scratch.appending(path: "tree/acme"))

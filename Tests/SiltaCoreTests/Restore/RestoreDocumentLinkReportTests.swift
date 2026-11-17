@@ -11,12 +11,12 @@ struct RestoreDocumentLinkReportTests {
   }
 
   static func validate(_ tree: ExportSnapshot) throws {
-    try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: "acme").run()
+    try RestoreDocumentGraph(tree: tree, slug: "acme").run()
   }
 
   @Test(arguments: ["code", "about", "doc-comment", "literal-bytes"])
   func retainedDocumentLinksAreIncludedInChanges(_ kind: String) throws {
-    var before = try RestoreDocumentGraphFixture.graph().tree
+    var before = try RestoreDocumentGraphFixture.graph()
     if kind == "about" {
       before.documents.documents[0].row = before.documents.documents[0].row.replacing(
         "archived", with: "0", keys: ExportFormat.docKeys)
@@ -49,7 +49,7 @@ struct RestoreDocumentLinkReportTests {
   }
 
   @Test func taskAndTaskCommentLinksDoNotBelongToTheDocument() throws {
-    var before = try RestoreDocumentGraphFixture.graph().tree
+    var before = try RestoreDocumentGraphFixture.graph()
     let taskComment = try #require(
       before.tasks[0].records.first {
         $0.value("table") == "comment"
@@ -71,7 +71,7 @@ struct RestoreDocumentLinkReportTests {
   }
 
   @Test func presentedSnapshotMasksCredentialPathWhileRawReportStaysLiteral() throws {
-    let tree = try RestoreDocumentGraphFixture.graph().tree
+    let tree = try RestoreDocumentGraphFixture.graph()
     var raw = Self.report(tree, tree)
     #expect(raw.presented.snapshot == nil)
     let ordinary = "/private/acme/backups/before-restore.db"

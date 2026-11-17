@@ -1785,9 +1785,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     `to_service`). Integer ids and `workspace_id` are never written; the file implies
     the workspace or the task. Imported row UIDs and UID references must be nonempty
     ASCII without NUL; no other opaque-ID grammar is imposed. Restore checks this
-    before building identity maps. Export, destination and document-write capture
-    inspect complete stored UID bytes too. Unsupported stored IDs refuse without changes (`env`),
-    with human-owned `silta backup` recovery for inspection rather than renaming IDs.
+    before building identity maps. Ordinary document and export reads use stored
+    identities directly. Export still requires completed migrations.
   - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), and
     tasks by `seq`, so the bytes don't depend on integer ids. Files in byte order of
     their path. Every listed file is always present; a file with no rows is empty, and
@@ -2299,6 +2298,10 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     `SILTA_SESSION` equals the resolved actor's session. This boolean carries no
     environment values; hooks omit it because they synthesize the session.
     Legacy lines omit it and cannot prove propagation.
+  - `docs_shown` on successful `brief` and SessionStart calls counts document preview
+    rows retained after budgeting, including zero. Count-only and recovery lines
+    contribute zero; repeated displayed previews count separately. Failure and timeout
+    lines omit it. No document names, titles or refs are logged.
   - Early hook failures, including input decoding and environment assembly, append
     one body-free `env` / `hook_failed` attempt through the same exclusive completion
     owner as successful hooks and timeouts. They retain quiet exit 0 and record elapsed
@@ -2308,7 +2311,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     receive a record; diagnostics remain best effort rather than choosing another home.
 
   `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
-  `inbox`, `export`, `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`,
+  `doc *`, `inbox`, `export`, `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`,
   `status` (logged as
   `silta status` also when bare `silta` runs it), and a successful `init --scan`.
   - A successful command logs the workspace it resolved and acted on (`--ws`, its
