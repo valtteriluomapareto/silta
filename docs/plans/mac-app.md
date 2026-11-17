@@ -44,9 +44,12 @@ the human copies.
   menu and paging.
 - **Copy:**
   - a ref chip on every item;
-  - command blocks whose placeholders fail safe if left unfilled: refs and shas are
-    words Silta rejects (`REFS`, `MERGE_SHA`), and message text is `-m ""`, which
-    Silta refuses as an empty body;
+  - command blocks whose placeholders fail safe if left unfilled: proposal refs use
+    `REFS`, and question answers use `-m ""`, which Silta refuses as an empty body;
+  - review items offer task-reading commands. Human completion permits an empty
+    result, so a completion template cannot promise the same empty-message refusal.
+    The maintainer chose to preserve CLI behavior on 2026-11-17; completion commands
+    remain outside this viewer;
   - a Copied state;
   - ⌘C and a context menu.
 - **States:**
