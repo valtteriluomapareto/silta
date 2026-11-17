@@ -108,6 +108,7 @@ struct CommandExecution {
   /// The command name the log line uses, when it differs from the parsed path.
   var command: String?
   var docsShown: Int?
+  var docsCounted: Int?
 }
 
 /// Reads known options while ArgumentParser retains the malformed command remainder.
@@ -117,4 +118,14 @@ private struct UsageArguments: ParsableArguments {
   @OptionGroup var body: TaskBody
 
   @Argument(parsing: .allUnrecognized) var remainder: [String] = []
+}
+
+extension SiltaMain {
+  static func logFlags(_ flags: Set<String>) -> [String] {
+    return [
+      "--approved", "--json", "--quiet", "--deterministic", "--verbose",
+    ]
+    .filter { flags.contains($0) }
+  }
+
 }
