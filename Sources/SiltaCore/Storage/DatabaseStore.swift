@@ -149,6 +149,18 @@ package final class DatabaseStore: Sendable {
   /// Missing/unreadable files and attempts to mutate in the closure are coded failures.
   package func read<T>(_ body: (Database) throws -> T) throws -> T {
     do {
+      let queue = try openReader()
+      return try queue.read(body)
+    } catch let error as any CodedError {
+      throw error
+    } catch {
+      throw StorageError.mapped(error, at: path)
+    }
+  }
+
+  /// Opens an existing store with the same read-only WAL recovery policy as ordinary reads.
+  func openReader() throws -> DatabaseQueue {
+    do {
       var config = Configuration()
       config.prepareDatabase { TaskVisibility.register(in: $0) }
       config.readonly = true
@@ -167,11 +179,10 @@ package final class DatabaseStore: Sendable {
         config.readonly = false
         queue = try DatabaseQueue(path: path, configuration: config)
       }
-      return try queue.read(body)
-    } catch let error as any CodedError {
-      throw error
+      return queue
     } catch {
       throw StorageError.mapped(error, at: path)
     }
   }
+
 }
