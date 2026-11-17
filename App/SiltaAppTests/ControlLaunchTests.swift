@@ -16,6 +16,13 @@
       #expect(options.route.screen == .board && options.route.ref == "AC-12")
       #expect(options.dark && options.width == 1280 && options.height == 800)
     }
+    @Test(arguments: ["sidebar.png", "inspector.png", "SIDEBAR.PNG"])
+    func sidecarNamesCannotReplaceTheRequestedRoot(_ name: String) {
+      #expect(throws: AppLoadFailure.self) {
+        try ControlLaunch.parse(["SiltaApp", "-SiltaSnapshot", "/private/tmp/" + name])
+      }
+    }
+
     @Test(arguments: [
       ["-SiltaRoute", "board"], ["-SiltaSnapshot"],
       ["-SiltaSnapshot", "acme.txt"], ["-SiltaFixture", "v2", "-SiltaUnknown"],
