@@ -38,10 +38,6 @@ final class AppModel {
     self.load = load
   }
 
-  func matches(_ values: [String]) -> Bool {
-    AppSearch.matches(search, values: values)
-  }
-
   var visibleData: AppLoadedData? { data?.workspace == workspace ? data : nil }
 
   @discardableResult func refresh(force: Bool = false) -> Task<Void, Never> {

@@ -91,16 +91,16 @@
 
     @Test func searchMatchesReferencesAndFullBodiesWithoutCaseSensitivity() {
       let model = makeModel(ControlledLoads())
-      #expect(model.matches(["AC-12", "Full question body"]))
+      #expect(AppSearch.matches(model.search, values: ["AC-12", "Full question body"]))
       model.search = "ac-12"
-      #expect(model.matches(["AC-12", "Full question body"]))
+      #expect(AppSearch.matches(model.search, values: ["AC-12", "Full question body"]))
       model.search = "QUESTION"
-      #expect(model.matches(["AC-12", "Full question body"]))
+      #expect(AppSearch.matches(model.search, values: ["AC-12", "Full question body"]))
       model.search = "AC-1"
-      #expect(!model.matches(["AC-10", "AC-12", "AC-19"]))
-      #expect(model.matches(["AC-1", "Read task AC-1."]))
+      #expect(!AppSearch.matches(model.search, values: ["AC-10", "AC-12", "AC-19"]))
+      #expect(AppSearch.matches(model.search, values: ["AC-1", "Read task AC-1."]))
       model.search = "unrelated"
-      #expect(!model.matches(["AC-12", "Full question body"]))
+      #expect(!AppSearch.matches(model.search, values: ["AC-12", "Full question body"]))
     }
 
     @Test func boardNavigationRetainsSelectionFiltersAndInspector() async {
@@ -156,10 +156,10 @@
     @Test func searchMatchesPinnedDocumentReferencesExactly() {
       let model = AppModel(load: { _, _, _ in nil })
       model.search = "doc:order-contract@1"
-      #expect(model.matches(["doc:order-contract@1"]))
-      #expect(!model.matches(["doc:order-contract@10"]))
+      #expect(AppSearch.matches(model.search, values: ["doc:order-contract@1"]))
+      #expect(!AppSearch.matches(model.search, values: ["doc:order-contract@10"]))
       model.search = "doc:order.contract@1"
-      #expect(model.matches(["Read doc:order.contract@1."]))
+      #expect(AppSearch.matches(model.search, values: ["Read doc:order.contract@1."]))
     }
 
     @Test func selectingAnotherTaskClearsAnObsoleteDetailFailure() async {

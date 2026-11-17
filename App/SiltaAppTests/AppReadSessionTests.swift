@@ -96,16 +96,23 @@
           try session.load(previous: previous, workspace: workspace, force: force)
         })
       await model.refresh().value
-      #expect(model.proposals.count == 3)
+      let data = try #require(model.visibleData)
+      let snapshot = try #require(data.snapshot)
+      func content() -> MyWorkContent {
+        MyWorkContent(snapshot: snapshot, search: model.search, now: data.checkedAt)
+      }
+      #expect(content().tasks.count == 3)
       model.search = "unrelated search"
-      #expect(model.proposals.isEmpty && !model.hasWorkMatches)
+      #expect(content().tasks.isEmpty && !content().hasMatches)
       model.search = "AC-22"
-      #expect(model.proposals.count == 1 && model.proposals.first?.refs == ["AC-22"])
+      #expect(content().tasks.count == 1 && content().tasks.first?.ref == "AC-22")
       model.search = "agent:codex"
-      #expect(model.proposals.count == 2)
-      let question = try #require(model.data?.snapshot?.work.items.first { $0.kind == "question" })
+      #expect(content().tasks.count == 2)
+      let questionItem = snapshot.work.items.first { $0.kind == "question" }
+      let question = try #require(questionItem)
       model.search = try #require(question.ref)
-      #expect(model.matches(question))
+      #expect(content().questions.count == 1 && content().questions.first?.item.ref == question.ref)
+
     }
 
     @Test func missingAndEmptyStoresHaveDifferentOutcomes() throws {
