@@ -1017,9 +1017,17 @@ Reads mask secrets before rendering, clipping or line selection. Show defaults t
 most 400 rendered lines including its continuation. List title and metadata previews
 are bounded, with omitted-character counts and a pinned show
 command. Complete continuation commands preserve the workspace, selected revision and
-list filters. JSON show data is `{ref,output}`; list data is
-`{entries:[{ref,state,output}],total,offset,limit,next?}`. JSON carries the same bounded
-masked view as text, without hidden body or metadata fields.
+list filters. JSON show data has `ref` and `output`. Stored-revision body views also
+include `body`: the masked Markdown within the selected rendered-line window, without
+header labels or continuation text, preserving its source line ending. It can be empty
+for header-only or past-end selections. Optional `title`, `about` (a ref array), and
+`state` expose complete known metadata fields only when visible in that window.
+Unknown metadata remains absent; known empty titles and attachment arrays stay empty.
+`state` is the stored revision state. Secrets spanning field boundaries cannot reappear
+in structured fields; an affected metadata field is omitted. Diff, comment and
+pending-only views retain `{ref,output}`. List data is
+`{entries:[{ref,state,output}],total,offset,limit,next?}`. All JSON fields follow the same
+bounded masked view as text, without hidden body or metadata.
 Document identities are masked in both text and JSON. Safe canonical refs remain
 copyable, including identifier exemptions from the secret scanner. Unsafe refs use a
 scoped `doc ls` recovery, without show-only flags or redacted nonfunctional commands.
