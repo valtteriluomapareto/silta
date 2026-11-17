@@ -92,20 +92,24 @@ struct DocProposalAttentionTests {
     }
   }
 
-  @Test(arguments: [false, true])
-  func wholeGuidanceBoundsPreserveHumanCommandsAndAgentReadRecovery(human: Bool) throws {
+  @Test(arguments: [false, true], [false, true])
+  func wholeGuidanceBoundsPreserveHumanCommandsAndAgentReadRecovery(human: Bool, maximum: Bool)
+    throws
+  {
     try withScratchDirectory { home in
       let store = try AcmeDocAttachments.make(in: home)
       let env = try DocTriageServiceTests.environment(home, store, human: human)
+      let fixed = "silta --ws 'acme' doc show 'doc:@1' --diff"
+      let length = maximum ? 512 - fixed.utf8.count : 220
       let ref = try DocTriageServiceTests.propose(
-        env, about: "topic:messaging", slug: String(repeating: "r", count: 220))
+        env, about: "topic:messaging", slug: String(repeating: "r", count: length))
       let before = try DocVerificationPreparationTests.truth(store)
       let inbox = try TaskService(environment: env, workspace: "acme").inbox(for: "human:acme")
       let next = try #require(inbox.items.first?.next)
       #expect(next.allSatisfy { $0.utf8.count <= 512 })
       #expect(next.contains { $0.contains("doc show " + shellWord(ref)) })
-      #expect(next.filter { $0.contains("doc triage") }.count == (human ? 2 : 0))
-      if !human { #expect(next.contains("silta --ws 'acme' doc ls --archived")) }
+      #expect(next.filter { $0.contains("doc triage") }.count == (human && !maximum ? 2 : 0))
+      if !human || maximum { #expect(next.contains("silta --ws 'acme' doc ls --archived")) }
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
