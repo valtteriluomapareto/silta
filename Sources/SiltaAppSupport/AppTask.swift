@@ -1,3 +1,4 @@
+import Foundation
 import SiltaCore
 
 /// Task values shared by board cards, review attention and the inspector.
@@ -36,12 +37,16 @@ public struct AppTask: Equatable, Sendable {
   public let updatedAt: String
   /// UTC completion timestamp, independent of subsequent edits.
   public let closedAt: String?
+  /// Most recent recorded submission; nil means no submission event was recorded.
+  public let submission: AppSubmission?
+  /// Masked typed task-link targets, including explicitly linked pull requests.
+  public let links: [String]
   /// Discussion included when reading task detail.
   public let comments: [AppComment]
 }
 
 extension AppTask {
-  init(_ task: TaskDetails) {
+  init(_ task: TaskDetails, submission: TaskEvent? = nil) {
     self.init(
       ref: task.ref, title: task.title, status: task.status, app: task.app,
       priority: task.priority, description: task.description, plan: task.plan,
@@ -50,6 +55,14 @@ extension AppTask {
       claimedBy: task.claimedBy, claimedAt: task.claimedAt, branch: task.branch,
       worktree: task.worktree, createdBy: task.createdBy, createdAt: task.createdAt,
       updatedAt: task.updatedAt, closedAt: task.closedAt,
+      submission: submission.map {
+        AppSubmission(actor: SecretGuard.redacted($0.actor), at: SecretGuard.redacted($0.at))
+      },
+      links: task.links.map {
+        let decoded = $0.target.removingPercentEncoding ?? $0.target
+        return SecretGuard.matches(in: decoded).isEmpty
+          ? SecretGuard.redacted($0.target) : SecretGuard.redacted(decoded)
+      },
       comments: (task.comments ?? []).map {
         AppComment(
           ref: $0.ref, kind: $0.kind, actor: $0.actor, body: $0.body,

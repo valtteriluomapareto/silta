@@ -24,6 +24,10 @@ public struct AppAttention: Equatable, Sendable {
   public let body: String?
   /// UTC creation timestamp.
   public let createdAt: String?
+  /// Immutable revision of the newest document proposal, if applicable.
+  public let documentRevision: Int?
+  /// Recorded source task for that document proposal, if known.
+  public let sourceTask: String?
   /// Human-form core next commands; copy templates are a separate presentation concern.
   public let commands: [String]
 }
@@ -35,7 +39,9 @@ extension AppAttention {
       refs: item.docProposal?.documentReferences ?? item.tasks?.map(\.ref) ?? item.task.map { [$0] }
         ?? item.ref.map { [$0] } ?? [],
       task: item.task, title: item.docProposal?.displayTitle ?? item.tasks?.first?.title,
-      author: item.author,
-      body: item.body ?? item.tasks?.first?.why, createdAt: item.createdAt, commands: item.next)
+      author: item.author ?? item.docProposal?.author,
+      body: item.body ?? item.tasks?.first?.why, createdAt: item.createdAt,
+      documentRevision: item.docProposal?.revision, sourceTask: item.docProposal?.sourceTask,
+      commands: item.next)
   }
 }

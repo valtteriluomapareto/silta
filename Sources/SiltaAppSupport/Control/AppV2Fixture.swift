@@ -35,7 +35,9 @@
         body: "The backend sends categories the app doesn't know yet. Should unknown values be "
           + "dropped, or shown under Other?", kind: "question")
       question.recipients = ["human:\(user)"]
-      _ = try TaskService(environment: environment, workspace: "acme").comment("AC-12", question)
+      let service = TaskService(environment: environment, workspace: "acme")
+      _ = try service.comment("AC-12", question)
+      _ = try service.link("AC-9", target: "url:https://github.com/acme/example/pull/41")
     }
 
     private static var tasks: [DebugTaskFixture] {
@@ -61,10 +63,13 @@
         if sequence == 22 { task.creator = "agent:claude:fixture" }
         if status == "doing" {
           task.claimant = sequence == 12 ? "agent:claude:fixture" : "agent:codex:fixture"
+        }
+        if status == "doing" || status == "review" {
           task.plan =
             "- [x] Read the contract\n- [x] Model the values\n"
-            + (sequence == 14 ? "- [x] Parse and test\n" : "- [ ] Parse and test\n")
-            + "- [ ] Commit and submit\n"
+            + (sequence == 14 || status == "review"
+              ? "- [x] Parse and test\n" : "- [ ] Parse and test\n")
+            + (status == "review" ? "- [x] Commit and submit\n" : "- [ ] Commit and submit\n")
         }
         return task
       }

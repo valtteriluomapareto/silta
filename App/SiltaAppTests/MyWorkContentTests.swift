@@ -16,13 +16,13 @@
         #expect(
           content.questions.first?.metadata.contains(
             "Claude asks you · Parse push categories · 6 min ago") == true)
-        #expect(
-          content.questions.first?.headline
-            == snapshot.work.items.first { $0.kind == "question" }?.body)
+        let question = snapshot.work.items.first { $0.kind == "question" }
+        #expect(content.questions.first?.headline == question?.body)
+        let command = content.questions.first?.command(reader: reader, workspace: "acme")
+        #expect(command?.text.hasSuffix("-m \"\"") == true)
         #expect(content.reviews.first?.metadata.contains("step 4 of 4 · PR #41") == true)
-        #expect(
-          content.documents.first { $0.ref == "doc:order-contract@3" }?.metadata.contains(
-            "from AC-9") == true)
+        let order = content.documents.first { $0.ref == "doc:order-contract@3" }
+        #expect(order?.metadata.contains("from AC-9") == true)
         #expect(content.hasMatches && content.remaining == 0 && snapshot.work.waitingCount == 7)
       }
     }

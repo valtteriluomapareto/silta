@@ -1,5 +1,7 @@
 struct DocProposalPreview: Encodable, Sendable {
   let ref: String
+  let author: String
+  let revision: Int
   let title: String
   let kind: String
   let why: String

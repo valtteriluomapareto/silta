@@ -44,6 +44,11 @@ extension AppReader {
     command("Read full inbox", suffix: "inbox --for me --all", workspace: workspace)
   }
 
+  /// Offers one unfilled document-proposal triage command without choosing revisions.
+  public func documentTriageCommand(workspace: String) -> AppCommand {
+    command("Accept revisions", suffix: "doc triage --accept REFS", workspace: workspace)
+  }
+
   /// Offers a scoped document read and safe, unfilled proposal-triage templates.
   public func commands(forDocument document: AppDocument, workspace: String, view: AppDocumentView)
     -> [AppCommand]
@@ -53,7 +58,7 @@ extension AppReader {
       "Read document", suffix: "doc show " + shellWord(document.ref) + flags, workspace: workspace)
     guard document.state == "proposed", view == .changes else { return [read] }
     return [
-      read, command("Accept revisions", suffix: "doc triage --accept REFS", workspace: workspace),
+      read, documentTriageCommand(workspace: workspace),
       command("Read triage help", suffix: "doc triage --help", workspace: workspace),
     ]
   }

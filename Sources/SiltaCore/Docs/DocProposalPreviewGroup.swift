@@ -11,6 +11,16 @@ package struct DocProposalPreviewGroup: Encodable, Sendable {
   /// Masked display title of this document group.
   package var displayTitle: String? { members.first?.title }
 
+  /// Masked author of the newest proposed revision.
+  package var author: String? { members.first?.author }
+  /// Immutable revision number of the newest proposal.
+  package var revision: Int? { members.first?.revision }
+  /// Recorded source task, when one was retained.
+  package var sourceTask: String? {
+    guard let ref = members.first?.sourceTask, ref != "(not recorded)" else { return nil }
+    return ref
+  }
+
   init(id: Int64, ref: String, total: Int, members: [DocProposalPreview], next: String?) {
     self.id = id
     self.ref = ref

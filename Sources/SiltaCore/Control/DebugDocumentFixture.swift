@@ -69,7 +69,9 @@
           workspace: workspace, transaction: tx, actor: .agent(tool: "codex", session: "fixture"),
           ids: ids, at: at
         )
-        .propose(proposed, metadata: metadata, base: 2, source: nil)
+        .propose(
+          proposed, metadata: metadata, base: 2,
+          source: try TaskService.lookup("AC-9", workspace: "acme", in: tx.database).id)
         let push = draft(
           "push-categories", "Push categories",
           "# Push categories\n\nShow unknown categories under **Other**.\n", about: edge)
@@ -80,7 +82,7 @@
         .propose(
           push, metadata: DocMetadata.resolve(push, workspace: workspace, in: tx.database),
           base: nil,
-          source: nil)
+          source: try TaskService.lookup("AC-12", workspace: "acme", in: tx.database).id)
       }
       func references() throws {
         try accept(

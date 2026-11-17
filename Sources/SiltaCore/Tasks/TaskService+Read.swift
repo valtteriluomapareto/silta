@@ -101,6 +101,23 @@ extension TaskService {
     }
   }
 
+  /// Reads the latest actual submission for a task currently awaiting review.
+  package func reviewSubmission(_ ref: String) throws -> TaskEvent? {
+    let workspace = try selected()
+    return try environment.db.read { db in
+      let task = try Self.lookup(ref, workspace: workspace, in: db)
+      guard task.status == "review",
+        let row = try Row.fetchOne(
+          db,
+          sql: """
+            SELECT kind,actor,body,created_at FROM task_event
+            WHERE task_id=? AND kind='status' AND body='review' ORDER BY id DESC LIMIT 1
+            """, arguments: [task.id])
+      else { return nil }
+      return try Self.safeEvent(row, in: db)
+    }
+  }
+
   private static func hiddenResolvedThreads(
     _ task: TaskDetails, displayed comments: [CommentDetails], in db: Database
   ) throws -> Int {

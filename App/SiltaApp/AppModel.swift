@@ -42,24 +42,6 @@ final class AppModel {
     AppSearch.matches(search, values: values)
   }
 
-  func matches(_ item: AppAttention) -> Bool {
-    matches(
-      [
-        item.kind, item.ref ?? "", item.task ?? "", item.title ?? "", item.body ?? "",
-        item.author ?? "",
-      ] + item.refs)
-  }
-
-  var proposals: [AppAttention] {
-    visibleData?.snapshot?.work.items.filter { $0.kind == "proposal" && matches($0) } ?? []
-  }
-
-  var hasWorkMatches: Bool {
-    guard let work = visibleData?.snapshot?.work else { return false }
-    return work.items.contains(where: matches)
-      || work.reviews.contains { matches([$0.ref, $0.title, $0.description]) }
-  }
-
   var visibleData: AppLoadedData? { data?.workspace == workspace ? data : nil }
 
   @discardableResult func refresh(force: Bool = false) -> Task<Void, Never> {

@@ -15,10 +15,12 @@
         let before = try observer.read { try Int.fetchOne($0, sql: "PRAGMA data_version") }
         let snapshot = try reader.snapshot(workspace: "acme")
         let docs = snapshot.work.items.filter { $0.kind == "doc_proposal" }
-        let order = try #require(docs.first { $0.refs.first == "doc:order-contract@3" })
+        let orderItem = docs.first { $0.refs.first == "doc:order-contract@3" }
+        let order = try #require(orderItem)
         #expect(order.author == "agent:codex:fixture" && order.documentRevision == 3)
         #expect(order.sourceTask == "AC-9")
-        let push = try #require(docs.first { $0.refs.first == "doc:push-categories@1" })
+        let pushItem = docs.first { $0.refs.first == "doc:push-categories@1" }
+        let push = try #require(pushItem)
         #expect(push.author == "agent:claude:fixture" && push.sourceTask == "AC-12")
         let review = try #require(snapshot.work.reviews.first)
         #expect(review.submission?.actor == "agent:codex:fixture")
@@ -67,15 +69,22 @@
         try reader.environment.db.write { tx in
           try tx.database.execute(
             sql:
-              "UPDATE task_event SET actor='Password=private123' WHERE task_id=(SELECT id FROM task WHERE seq=24) AND kind='status'"
+              """
+              UPDATE task_event SET actor='Password=private123'
+              WHERE task_id=(SELECT id FROM task WHERE seq=24) AND kind='status'
+              """
           )
           try tx.database.execute(
             sql:
-              "INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,created_by,created_at) SELECT 'acme-link',workspace_id,'task',id,'cites','url','https://github.com/acme/example/pull/41?Password%3Dprivate123','human:acme',created_at FROM task WHERE seq=24"
+              """
+              UPDATE link SET to_ext='https://github.com/acme/example/pull/41?Password%3Dprivate123'
+              WHERE from_kind='task' AND from_id=(SELECT id FROM task WHERE seq=24)
+              """
           )
         }
         let masked = try reader.task(ref, workspace: "acme")
-        #expect(!(masked.submission?.actor ?? "").contains("private123"))
+        let actor = masked.submission?.actor ?? ""
+        #expect(!actor.contains("private123"))
         #expect(!masked.links.joined().contains("private123"))
       }
     }
