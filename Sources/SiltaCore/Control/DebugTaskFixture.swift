@@ -51,9 +51,13 @@
           sql: "INSERT INTO task_plan_rev(task_id,rev,body_md,actor,created_at) VALUES(?,1,?,?,?)",
           arguments: [id, plan, author, stamp])
       }
-      try db.execute(
-        sql: "INSERT INTO task_event(task_id,actor,kind,body,created_at) VALUES(?,?,'created',?,?)",
-        arguments: [id, author, status, stamp])
+      let events = status == "review" ? ["created", "status"] : ["created"]
+      for kind in events {
+        try db.execute(
+          sql: """
+            INSERT INTO task_event(task_id,actor,kind,body,created_at) VALUES(?,?,?,?,?)
+            """, arguments: [id, author, kind, status, stamp])
+      }
       try db.execute(
         sql: """
           INSERT INTO seq_counter(scope,next) VALUES(?,?)

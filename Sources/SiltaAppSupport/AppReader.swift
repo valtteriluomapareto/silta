@@ -43,7 +43,9 @@ public struct AppReader: Sendable {
       let service = TaskService(environment: environment, workspace: workspace)
       var filter = TaskFilter()
       filter.proposed = true
-      let tasks = try service.list(filter).map(AppTask.init)
+      let tasks = try service.list(filter).map {
+        AppTask($0, submission: $0.status == "review" ? try service.reviewSubmission($0.ref) : nil)
+      }
       let at = environment.clock.now()
       var calendar = Calendar(identifier: .iso8601)
       calendar.timeZone = .gmt
@@ -79,7 +81,10 @@ public struct AppReader: Sendable {
   public func task(_ ref: String, workspace: String) throws -> AppTask {
     try Self.checked(home: environment.home.url) {
       try checkSchema()
-      return AppTask(try TaskService(environment: environment, workspace: workspace).show(ref))
+      let service = TaskService(environment: environment, workspace: workspace)
+      let task = try service.show(ref)
+      return AppTask(
+        task, submission: task.status == "review" ? try service.reviewSubmission(ref) : nil)
     }
   }
 

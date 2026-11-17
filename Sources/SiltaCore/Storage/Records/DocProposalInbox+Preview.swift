@@ -9,7 +9,8 @@ extension DocProposalInbox {
     let missing = (row["base_rev"] as Int?) != nil && (row["base_id"] as Int64?) == nil
     let stale: Bool = row["stale_base"]
     return DocProposalPreview(
-      ref: try text(row, "ref", reference: true), title: try text(row, "title"),
+      ref: try text(row, "ref", reference: true), author: try text(row, "author"),
+      revision: row["rev"], title: try text(row, "title"),
       kind: try text(row, "kind"),
       why: try text(row, "why", missing: "(not recorded)"),
       sourceTask: try text(row, "source", missing: "(not recorded)", reference: true),

@@ -140,7 +140,7 @@
       let document = AppAttention(
         kind: "doc_proposal", target: nil, ref: "doc:rules@2", refs: ["doc:rules@2"],
         task: nil, title: nil, author: nil, body: nil, createdAt: nil,
-        commands: ["silta doc diff 'doc:rules@2'"])
+        documentRevision: nil, sourceTask: nil, commands: ["silta doc diff 'doc:rules@2'"])
       do {
         #expect(reader.commands(for: document, workspace: "acme").isEmpty)
       }
@@ -174,7 +174,8 @@
     {
       AppAttention(
         kind: kind, target: nil, ref: "AC-12/2", refs: refs, task: refs.first,
-        title: nil, author: nil, body: nil, createdAt: nil, commands: commands)
+        title: nil, author: nil, body: nil, createdAt: nil, documentRevision: nil, sourceTask: nil,
+        commands: commands)
     }
 
     private func run(_ command: String, _ scratch: URL) throws -> CLIResult {

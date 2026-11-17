@@ -78,6 +78,7 @@ struct DocProposalInbox {
       Self.bounded("'doc:'||d.slug", "doc_ref"),
       Self.bounded("'doc:'||d.slug||'@'||r.rev", "ref"),
       "CASE WHEN length(CAST(d.slug AS BLOB))<=512 THEN CAST(d.slug AS BLOB) END AS slug",
+      Self.bounded("r.actor", "author"),
       Self.bounded(title, "title"), Self.bounded(kind, "kind"), Self.bounded("r.message", "why"),
       Self.bounded("w.task_prefix||'-'||s.seq", "source"),
       "length(CAST(r.body_md AS BLOB)) AS new_bytes",
