@@ -139,6 +139,29 @@
       #expect(!model.boardInspectorPresented && !model.workspaceInspectorPresented)
     }
 
+    @Test func documentNavigationRetainsTypedSelectionAcrossRoutes() {
+      let model = AppModel(load: { _, _, _ in nil })
+      model.openDocument("doc:order-contract@3")
+      #expect(
+        model.documentSelection == DocumentSelection(ref: "doc:order-contract@3", view: .changes))
+      model.navigate(to: .board)
+      model.navigate(to: .docs)
+      #expect(model.documentSelection?.ref == "doc:order-contract@3")
+      model.select(documentView: .comments)
+      #expect(model.documentSelection?.view == .comments)
+      model.openDocuments(about: "app:acme-mobile")
+      #expect(model.documentSelection == nil && model.docsAbout == "app:acme-mobile")
+    }
+
+    @Test func searchMatchesPinnedDocumentReferencesExactly() {
+      let model = AppModel(load: { _, _, _ in nil })
+      model.search = "doc:order-contract@1"
+      #expect(model.matches(["doc:order-contract@1"]))
+      #expect(!model.matches(["doc:order-contract@10"]))
+      model.search = "doc:order.contract@1"
+      #expect(model.matches(["Read doc:order.contract@1."]))
+    }
+
     @Test func selectingAnotherTaskClearsAnObsoleteDetailFailure() async {
       let model = AppModel(load: { _, _, _ in nil })
       model.inspect(task: "AC-12")

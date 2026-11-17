@@ -75,8 +75,9 @@ the human copies.
     `SiltaTestSupport` wrapper (D23); the app never links test support. SiltaCore's
     services are `package`-scoped, so this target must live in the root package.
   - **Thin Xcode project `App/SiltaApp.xcodeproj`** (target `SiltaApp`). It holds the
-    SwiftUI views and the asset catalog, links `SiltaAppSupport`, and pins MarkdownUI
-    (D18) only there.
+    SwiftUI views and the asset catalog and links `SiltaAppSupport`. Native views
+    import only that facade and Apple frameworks; document formatting uses
+    Foundation's Markdown parser and SwiftUI.
   - **Guard:** SiltaCore stays free of UI code.
 - **Store and actor:**
   - The app opens `SILTA_HOME` (default `~/.silta`) through SiltaCore's store and
@@ -107,23 +108,31 @@ the human copies.
 |---|---|---|---|
 | A1a (SI-154) | `SiltaAppSupport`: workspace list, human inbox and review tasks, board and task detail; shared v2 seed in DEBUG `SiltaAppSupport/Control/` with a `SiltaTestSupport` wrapper and release-isolation guard | — | `swift test` on the seed: task counts reconcile; models match `task ls`/`task show`/`inbox --for me`; Release package build excludes fixtures |
 | A1b (SI-155) | Typed workspace-map read models and persistent `data_version` probe | A1a | Map counts and edges match the seed; probe sees an external CLI write and stays unchanged by reads |
-| A2 (SI-145) | Running Debug app: sidebar, My work, copyable refs/commands, isolated fixture launch, store states and refresh; folds SI-175, SI-176 and A2c into one screen PR. SI-173 commands can land separately | A1a, A1b | Native view-model tests, Debug/Release builds and a real fixture click/keyboard pass |
-| A3 | Board and task inspector | A2 | View-model tests on the seed; manual pass |
-| A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed; manual pass |
-| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; manual pass |
+| A2 (SI-145) | Running Debug app: sidebar, My work, copyable refs/commands, isolated fixture launch, store states and refresh; folds SI-175, SI-176 and A2c into one screen PR. SI-173 commands can land separately | A1a, A1b | Native view-model tests, Debug/Release builds, state and PNG checks; unlocked interaction follow-up |
+| A3 | Board and task inspector | A2 | View-model tests on the seed, state and PNG checks; unlocked interaction follow-up |
+| A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed, state and PNG checks; unlocked interaction follow-up |
+| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; state and PNG checks; unlocked interaction follow-up |
 
 Delivery order is My work, Board, Workspace, then Docs: one screen per PR.
 Use a short `task plan` and one independent combined Architect/Tester implementation
 review. Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
 No planted faults except for guard tests. Split only when a diff substantially
 exceeds about 1,000 lines. Add navigation, observable state and development hooks
-only when a screen needs them. The minimal state.json/offscreen PNG portion of
-[the control plan](mac-app-control.md) follows Workspace as its own PR. Remaining
-control work is deferred and does not block these screens.
+only when a screen needs them. The minimal [control support](mac-app-control.md)
+provides isolated fixtures, versioned model state and offscreen root PNGs in its own
+PR. Real-window capture, wait and live actions remain separate follow-ups.
 Merge main only for a conflict or a needed landed change. After merging, submit
 the task and report which tasks the maintainer can close; do not mark them done.
 
 ## Validation
+
+Computer use never blocks a PR. Each PR records checks from tests, versioned
+`state.json`, inspected snapshot PNGs and any real UI pass. Missing real UI checks
+belong under **Pending unlocked check** and run later, without waiting or retrying
+computer use. SwiftPM and hosted tests must run with a locked console; record the
+one-time proof in the PR. Offscreen PNGs use the real root in `NSHostingView` with
+`bitmapImageRepForCachingDisplay`/`cacheDisplay`; glass and vibrancy need the later
+unlocked pass. Rendering limitations are disclosed and tracked separately.
 
 - Read models are tested in-process on fixture stores with an injected clock and ids.
   That is deterministic and covered by the existing `swift test` in `verify.sh` and CI.
@@ -135,19 +144,20 @@ the task and report which tasks the maintainer can close; do not mark them done.
     in-process except CLI parity and recovery replay checks; command-template tests
     also start processes. That job is CPU-bound and the slowest one, so A1 and each
     later slice report how much test time they add.
-  - A third job, `app`, runs `scripts/verify.sh app` beside `swift` and `evals`, and the
-    `verify` gate requires it. `full` includes `app`, and AGENTS.md gains an `App/` rung.
+  - The `app` job runs `scripts/verify-app.sh` beside `swift` and `evals`; `verify`
+    requires all three. Guards, lint and tool installation stay in `swift`. Locally,
+    `scripts/verify.sh app` adds guards/lint; `full` includes native app verification.
   - `verify.sh app` runs `xcodebuild test` for `SiltaAppTests` (Debug), then
     `xcodebuild build` (Release). Release on every PR proves the DEBUG-only control code
     compiles out. Both runs:
     - use `-derivedDataPath .build/app/DerivedData` and `-clonedSourcePackagesDirPath`;
-    - use `-onlyUsePackageVersionsFromResolvedFile`, with MarkdownUI pinned in the
-      project's own `Package.resolved` (D18);
+    - use `-onlyUsePackageVersionsFromResolvedFile` and the project's own
+      `Package.resolved` for the root package dependencies (D18);
     - set `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the project, so local builds match;
     - sign with "Sign to Run Locally", so hosted tests need no certificate.
   - A test run proves nothing unless tests ran. `verify.sh app` fails when the result
-    bundle reports zero tests, any skipped test or a missing named suite, the way
-    `full-swift` checks its slow tests by name.
+    bundle reports zero tests, any skipped test or a missing `AppStartupTests` suite.
+    Other suites rely on the nonzero-test and no-skip checks.
   - A guard with self-tests checks that every package pinned in both the project's and
     the root `Package.resolved` has the same pin, so the app never builds against a
     different GRDB than the `swift` job tested (D18).

@@ -112,11 +112,11 @@ public struct AppReader: Sendable {
     }
   }
 
-  private func checkSchema() throws {
+  func checkSchema() throws {
     if try environment.db.readerNeedsMigration() { throw AppReadError.migrationRequired }
   }
 
-  private static func checked<Value>(home: URL, _ body: () throws -> Value) throws -> Value {
+  static func checked<Value>(home: URL, _ body: () throws -> Value) throws -> Value {
     do { return try body() } catch { throw AppReadError(error).scoped(to: home) }
   }
 }

@@ -26,6 +26,14 @@ package struct DocService {
       let masked = SecretGuard.redacted(result.output, matches: matches)
       let window = bounded(masked, ref: result.ref, flags: request.view.flags, range: range)
       var selected = DocReadResult(ref: SecretGuard.redacted(result.ref), output: window.output)
+      selected.metadata = result.metadata
+      guard
+        let rendered = String(
+          bytes: masked.utf8.dropFirst(window.visible.lowerBound).prefix(window.visible.count),
+          encoding: .utf8)
+      else { throw StorageError.internalMisuse }
+      selected.rendered = rendered
+      selected.nextLine = window.nextLine
       result.bodyLayout?.project(
         matches: matches, masked: masked, visible: window.visible, into: &selected)
       return selected
@@ -69,7 +77,9 @@ package struct DocService {
     layout.append("\nactor: \(snapshot.actor)\ncreated_at: \(snapshot.createdAt)\n")
     layout.append(Self.evidence(snapshot) + "\n")
     layout.body = layout.field(snapshot.body)
-    return DocReadResult(ref: pinned, output: layout.output, bodyLayout: layout)
+    var result = DocReadResult(ref: pinned, output: layout.output, bodyLayout: layout)
+    result.metadata = Self.displayMetadata(snapshot, archived: archived)
+    return result
   }
 
   static func evidence(_ snapshot: DocRevision) -> String {
@@ -154,10 +164,12 @@ package struct DocService {
     refs.map {
       $0.isEmpty
         ? "(none)"
-        : $0.map { ref in
-          safeReference(ref) ? ref : SecretGuard.redacted(ref.removingPercentEncoding ?? ref)
-        }.joined(separator: ", ")
+        : $0.map(displayReference).joined(separator: ", ")
     } ?? "(unknown)"
+  }
+
+  static func displayReference(_ ref: String) -> String {
+    safeReference(ref) ? ref : SecretGuard.redacted(ref.removingPercentEncoding ?? ref)
   }
 
   static func safeReference(_ ref: String) -> Bool {
@@ -172,15 +184,16 @@ package struct DocService {
 
   private func bounded(
     _ text: String, ref: String, flags: String, range: ClosedRange<Int>?
-  ) -> (output: String, visible: Range<Int>) {
+  ) -> DocReadWindow {
     var lines = text.components(separatedBy: "\n")
     if lines.last == "" { lines.removeLast() }
     let first = range?.lowerBound ?? 1
     let last = min(range?.upperBound ?? lines.count, lines.count)
     guard first <= last else {
-      return (
-        "Document has \(lines.count) rendered lines; selection is past the end.\n"
-          + "next: " + showCommand(ref, flags: flags) + "\n", 0..<0
+      return DocReadWindow(
+        output:
+          "Document has \(lines.count) rendered lines; selection is past the end.\n"
+          + "next: " + showCommand(ref, flags: flags) + "\n", visible: 0..<0, nextLine: nil
       )
     }
     let count = last - first + 1
@@ -190,11 +203,16 @@ package struct DocService {
     let start = lines.prefix(first - 1).reduce(0) { $0 + $1.utf8.count + 1 }
     let visible = start..<min(text.utf8.count, start + output.utf8.count)
     guard shown < count else {
-      return (output + (unsafe ? "next: " + listCommand + "\n" : ""), visible)
+      return DocReadWindow(
+        output: output + (unsafe ? "next: " + listCommand + "\n" : ""), visible: visible,
+        nextLine: nil)
     }
-    return (
-      output + "\(count - shown) lines omitted; next: "
-        + showCommand(ref, flags: flags, lines: "\(first + shown)-\(last)") + "\n", visible
+    return DocReadWindow(
+      output:
+        output + "\(count - shown) lines omitted; next: "
+        + showCommand(ref, flags: flags, lines: "\(first + shown)-\(last)") + "\n",
+      visible: visible,
+      nextLine: first + shown
     )
   }
 
@@ -213,7 +231,7 @@ package struct DocService {
     return start...end
   }
 
-  private static func selection(_ raw: String, revision: Int?) throws
+  static func selection(_ raw: String, revision: Int?) throws
     -> (slug: String, revision: Int?)
   {
     let value = raw.hasPrefix("doc:") ? String(raw.dropFirst(4)) : raw
@@ -237,4 +255,10 @@ package struct DocService {
     }
     return (String(slug), selected)
   }
+}
+
+private struct DocReadWindow {
+  let output: String
+  let visible: Range<Int>
+  let nextLine: Int?
 }

@@ -9,6 +9,12 @@ final class AppModel {
   private(set) var workspace: String?
   let reader: AppReader?
   let taskDetail = TaskDetailModel()
+  let documents: DocsModel
+  var docsAbout: String?
+  var includeArchivedDocuments = false
+  var documentSelection: DocumentSelection? {
+    documents.ref.map { DocumentSelection(ref: $0, view: documents.view) }
+  }
   var search = ""
   private(set) var route: AppRoute = .mywork
   var appFilter: String?
@@ -25,9 +31,10 @@ final class AppModel {
   @ObservationIgnored private var generation = 0
 
   init(
-    reader: AppReader? = nil, load: @escaping Loader
+    reader: AppReader? = nil, documents: DocsModel = DocsModel(), load: @escaping Loader
   ) {
     self.reader = reader
+    self.documents = documents
     self.load = load
   }
 
@@ -81,6 +88,7 @@ final class AppModel {
             if workspace == nil { workspace = result.workspace }
           }
           failure = nil
+          if route == .docs { await loadDocuments(force: forced) }
         }
       } catch {
         if token == generation {
@@ -97,6 +105,8 @@ final class AppModel {
     if workspace != slug {
       generation += 1
       workspace = slug
+      documents.clear()
+      docsAbout = nil
       taskDetail.clear()
       boardSelection = nil
       boardInspectorPresented = false
@@ -105,6 +115,47 @@ final class AppModel {
       appFilter = nil
     }
     return refresh(force: true)
+  }
+
+  func loadDocuments(force: Bool = false, append: Bool = false) async {
+    guard let reader, let workspace else { return }
+    let token = generation
+    let about = docsAbout
+    let archived = includeArchivedDocuments
+    let version = visibleData?.version
+    let request = await documents.refresh(
+      reader, workspace: workspace, about: about,
+      archived: archived, version: version, force: force, append: append)
+    guard !Task.isCancelled, token == generation, self.workspace == workspace,
+      docsAbout == about, includeArchivedDocuments == archived, visibleData?.version == version,
+      let request, documents.isCurrentList(request)
+    else { return }
+    if documents.ref == nil {
+      documents.ref = documents.groups(search: "").first?.preferred?.ref
+    }
+    await documents.show(reader, workspace: workspace, version: version, force: force)
+  }
+
+  func select(document ref: String?) {
+    documents.ref = ref
+    navigate(to: .docs)
+  }
+
+  func select(documentView view: AppDocumentView) {
+    documents.view = view
+  }
+
+  func openDocument(_ ref: String) {
+    docsAbout = nil
+    documents.view = .changes
+    select(document: ref)
+  }
+
+  func openDocuments(about: String) {
+    docsAbout = about
+    documents.ref = nil
+    documents.view = .document
+    navigate(to: .docs)
   }
 
   func loadTaskDetail() async {
@@ -138,7 +189,7 @@ final class AppModel {
     switch route {
     case .board: boardInspectorPresented.toggle()
     case .workspace: workspaceInspectorPresented.toggle()
-    case .mywork: break
+    case .mywork, .docs: break
     }
   }
 
@@ -158,4 +209,9 @@ nonisolated struct BoardSelection: Equatable {
 
 nonisolated struct ConnectionSelection: Equatable {
   let connectionRef: String
+}
+
+nonisolated struct DocumentSelection: Equatable {
+  let ref: String
+  let view: AppDocumentView
 }

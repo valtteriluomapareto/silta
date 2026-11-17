@@ -22,7 +22,7 @@
       ["-SiltaFixture", "v2", "-SiltaDark", "-SiltaDark"],
       ["-SiltaSnapshot", "acme.png", "-SiltaSize", "0x800"],
       ["-SiltaSnapshot", "acme.png", "-SiltaSize", "1280x-1"],
-      ["-SiltaSnapshot", "acme.png", "-SiltaRoute", "docs"],
+      ["-SiltaSnapshot", "acme.png", "-SiltaRoute", "missing-screen"],
       ["-SiltaSnapshot", "acme.png", "-SiltaRoute", "mywork:AC-12"],
     ]) func invalidControlOptionsRefuseBeforeSeeding(_ arguments: [String]) {
       #expect(throws: AppLoadFailure.self) { try ControlLaunch.parse(arguments) }

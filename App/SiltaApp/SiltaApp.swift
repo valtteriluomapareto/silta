@@ -97,10 +97,12 @@ struct SiltaApp: App {
       AppShellView(model: model)
     }.defaultSize(width: 1280, height: 840)
       .commands {
+        FindCommands()
         CommandGroup(after: .sidebar) {
           Button("My work") { model.navigate(to: .mywork) }.keyboardShortcut("1")
           Button("Board") { model.navigate(to: .board) }.keyboardShortcut("2")
           Button("Workspace") { model.navigate(to: .workspace) }.keyboardShortcut("3")
+          Button("Docs") { model.navigate(to: .docs) }.keyboardShortcut("4")
           Button("Toggle Inspector") { model.toggleInspector() }
             .keyboardShortcut("i", modifiers: [.command, .option])
           Divider()

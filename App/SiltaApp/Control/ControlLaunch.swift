@@ -14,16 +14,28 @@
     struct Route {
       let screen: AppRoute
       let ref: String?
+      let documentView: AppDocumentView
 
       init(_ value: String) throws {
         let parts = value.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
         guard let prefix = parts.first, let screen = AppRoute(rawValue: String(prefix)),
           parts.count == 1 || (screen != .mywork && !parts[1].isEmpty)
         else {
-          throw AppLoadFailure(message: "Use mywork, board[:task-ref] or workspace[:edge-ref].")
+          throw AppLoadFailure(
+            message: "Use mywork, board[:task-ref], workspace[:edge-ref] or docs[:doc-ref[:view]].")
         }
         self.screen = screen
-        ref = parts.count == 2 ? String(parts[1]) : nil
+        var selectedRef = parts.count == 2 ? String(parts[1]) : nil
+        var documentView: AppDocumentView = .document
+        if screen == .docs, let value = selectedRef, let split = value.lastIndex(of: ":"),
+          let view = AppDocumentView(rawValue: String(value[value.index(after: split)...]))
+        {
+          selectedRef = String(value[..<split])
+          documentView = view
+        }
+        guard selectedRef?.isEmpty != true else { throw ControlLaunch.refusal() }
+        ref = selectedRef
+        self.documentView = documentView
       }
 
       @MainActor func apply(to model: AppModel) throws {
@@ -43,6 +55,14 @@
               throw AppLoadFailure(message: "The fixture has no matching connection.")
             }
             model.select(connection: connection.attachment)
+          case .docs:
+            guard let reader = model.reader, let workspace = model.workspace,
+              let document = try reader.document(ref, workspace: workspace).document
+            else { throw AppLoadFailure(message: "Choose a fixture document revision.") }
+            model.docsAbout = nil
+            if document.archived { model.includeArchivedDocuments = true }
+            model.select(document: document.ref)
+            model.select(documentView: documentView)
           case .mywork: break
           }
         } else {

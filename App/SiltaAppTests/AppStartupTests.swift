@@ -78,7 +78,7 @@
       #expect(first.home != second.home)
       #expect(first.now == AppV2Fixture.now && first.user == "acme")
       let reader = try AppReader(home: first.home, user: first.user, now: { AppV2Fixture.now })
-      #expect(try reader.snapshot(workspace: "acme").work.waitingCount == 5)
+      #expect(try reader.snapshot(workspace: "acme").work.waitingCount == 7)
       let permissions =
         try FileManager.default.attributesOfItem(
           atPath: first.home.deletingLastPathComponent().path)[.posixPermissions] as? Int

@@ -10,6 +10,10 @@ package struct DocReadResult: Encodable, Sendable {
   package var title: String?
   package var about: [String]?
   package var state: String?
+  /// Typed viewer projection; omitted from the CLI JSON contract.
+  package var metadata: DocDisplayMetadata?
+  package var rendered: String?
+  package var nextLine: Int?
   var bodyLayout: DocBodyLayout?
 
   private enum CodingKeys: String, CodingKey {

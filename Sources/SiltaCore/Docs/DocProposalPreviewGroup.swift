@@ -6,6 +6,10 @@ package struct DocProposalPreviewGroup: Encodable, Sendable {
   let omitted: Int
   let members: [DocProposalPreview]
   let next: String?
+  /// Bounded pinned members for direct document navigation.
+  package var documentReferences: [String] { members.map(\.ref) }
+  /// Masked display title of this document group.
+  package var displayTitle: String? { members.first?.title }
 
   init(id: Int64, ref: String, total: Int, members: [DocProposalPreview], next: String?) {
     self.id = id

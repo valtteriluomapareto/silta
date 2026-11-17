@@ -32,8 +32,10 @@ extension AppAttention {
   init(_ item: InboxItem) {
     self.init(
       kind: item.kind, target: item.target, ref: item.ref,
-      refs: item.tasks?.map(\.ref) ?? item.task.map { [$0] } ?? item.ref.map { [$0] } ?? [],
-      task: item.task, title: item.tasks?.first?.title, author: item.author,
+      refs: item.docProposal?.documentReferences ?? item.tasks?.map(\.ref) ?? item.task.map { [$0] }
+        ?? item.ref.map { [$0] } ?? [],
+      task: item.task, title: item.docProposal?.displayTitle ?? item.tasks?.first?.title,
+      author: item.author,
       body: item.body ?? item.tasks?.first?.why, createdAt: item.createdAt, commands: item.next)
   }
 }

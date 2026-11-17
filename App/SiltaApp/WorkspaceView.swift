@@ -17,6 +17,7 @@ struct WorkspaceView: View {
                     Text(group.app.name).font(.headline)
                     Text(group.app.ref).font(.system(.caption, design: .monospaced))
                     if let summary = group.app.summary { Text(summary).foregroundStyle(.secondary) }
+                    Button("Open related Docs") { model.openDocuments(about: group.app.attachment) }
                   }
                   Spacer()
                   Text(
@@ -66,7 +67,8 @@ struct WorkspaceView: View {
           }.padding(28)
         }.inspector(isPresented: $model.workspaceInspectorPresented) {
           ConnectionInspector(
-            connection: content.connection(model.workspaceSelection?.connectionRef)
+            connection: content.connection(model.workspaceSelection?.connectionRef),
+            openDocs: model.openDocuments
           )
           .inspectorColumnWidth(min: 300, ideal: 360, max: 500)
         }
@@ -79,6 +81,7 @@ struct WorkspaceView: View {
 
 private struct ConnectionInspector: View {
   let connection: AppConnection?
+  let openDocs: (String) -> Void
 
   var body: some View {
     ScrollView {
@@ -86,6 +89,7 @@ private struct ConnectionInspector: View {
         if let connection {
           Text(connection.source + " → " + connection.target).font(.title3.weight(.semibold))
           CopyValue(value: connection.attachment, title: "Copy connection reference")
+          Button("Open related Docs") { openDocs(connection.attachment) }
           LabeledContent("Kind", value: connection.kind)
           Text(connection.summary).textSelection(.enabled)
           Text("Code references").font(.headline)
