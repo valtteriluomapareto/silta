@@ -87,12 +87,12 @@ struct StoredUIDAdmissionTests {
       try Self.replace(Data("K\u{0}tail".utf8), table: "service", store: store)
       #expect(RestoreASCIIIdentityTests.failure { try store.initialize() }?.code == .env)
       try Self.replace(try #require(original.first), table: "service", store: store)
-      let repaired = try DocVerificationPreparationTests.truth(store)
+      let repaired = try RestoreSupport.dump(store).filter { $0.key != "grdb_migrations" }
       let retry = DatabaseStore(
         home: home, clock: FakeClock(now: AcmeDocAttachments.instant.addingTimeInterval(1)),
         jitter: { 0 })
       try retry.initialize()
-      #expect(try DocVerificationPreparationTests.truth(retry) == repaired)
+      #expect(try RestoreSupport.dump(retry).filter { $0.key != "grdb_migrations" } == repaired)
       #expect(
         try store.read {
           try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid")
