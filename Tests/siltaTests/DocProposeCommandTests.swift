@@ -48,7 +48,11 @@ struct DocProposeCommandTests {
             ["--ws", "acme", "inbox", "--for", "me", "--all", "--json"], in: scratch,
             environment: TaskCommandTests.fixed)
           #expect(inbox.termination == .exit(0) && inbox.stdout.contains("doc_proposal"))
-          #expect(!inbox.stdout.contains("doc triage"))
+          let items = try #require(try GuideContractTests.data(inbox)["items"] as? [[String: Any]])
+          let actions = items.flatMap { $0["next"] as? [String] ?? [] }
+            .filter { $0.contains("doc triage") }
+          #expect(actions.count == 1)
+          #expect(actions.allSatisfy { $0.hasPrefix("ask human:") && $0.contains("--approved") })
         }
       }
     }

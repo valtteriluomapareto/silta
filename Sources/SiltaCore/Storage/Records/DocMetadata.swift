@@ -32,11 +32,27 @@ struct DocMetadata {
       if draft.about == nil { throw DocError.missing(["--about"]) }
       throw DocError.invalid("A doc needs at least one --about map item.")
     }
-    let targets = try refs.map { try TaskLinkTarget.map($0, workspace: workspace, in: db) }
+    let selected = try attachments(refs, workspace: workspace, in: db)
     return Self(
       title: title,
-      kind: draft.kind ?? previous?.kind ?? Self.inferredKind(targets),
-      refs: refs, targets: targets)
+      kind: draft.kind ?? previous?.kind ?? Self.inferredKind(selected.targets),
+      refs: selected.refs, targets: selected.targets)
+  }
+
+  private static func attachments(_ refs: [String], workspace: Int64, in db: Database) throws
+    -> (refs: [String], targets: [TaskLinkTarget])
+  {
+    var seen: [String: Set<Int64>] = [:]
+    var selected: [(ref: String, target: TaskLinkTarget)] = []
+    for ref in refs {
+      let target = try TaskLinkTarget.map(ref, workspace: workspace, in: db)
+      guard let id = target.id else { throw StorageError.corrupt }
+      if seen[target.kind, default: []].insert(id).inserted {
+        selected.append((try target.rendered(in: db), target))
+      }
+    }
+    selected.sort { $0.ref < $1.ref }
+    return (selected.map(\.ref), selected.map(\.target))
   }
 
   static func checkTitle(_ title: String) throws {

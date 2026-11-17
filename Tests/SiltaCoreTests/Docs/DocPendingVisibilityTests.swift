@@ -38,7 +38,8 @@ struct DocPendingVisibilityTests {
       let comments = try read.show("rules", comments: true).output
       let suffix = archived ? " --archived" : ""
       let command =
-        protected ? "silta ws ls" : "silta --ws 'acme' doc ls\(suffix) --offset 0 --limit 20"
+        protected
+        ? "silta ws ls" : "silta --ws 'acme' doc ls --doc 'rules'\(suffix) --offset 0 --limit 20"
       if protected { #expect(!unpinned.contains(workspace)) }
 
       #expect(unpinned.components(separatedBy: "\n")[0].contains("2 pending: " + command))

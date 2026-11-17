@@ -46,7 +46,7 @@ struct DocProposalInbox {
     }
   }
 
-  func previews(_ groups: [DocProposalGroup]) throws -> [DocProposalPreviewGroup] {
+  func previews(_ groups: [DocProposalGroup], caller: ActorID) throws -> [DocProposalPreviewGroup] {
     guard !groups.isEmpty else { return [] }
     let columns = try db.columns(in: "doc_rev").map(\.name)
     let metadata = columns.contains("source_task_id")
@@ -59,7 +59,7 @@ struct DocProposalInbox {
       guard let members = rows[group.id], let first = members.first else {
         throw StorageError.corrupt
       }
-      let previews = try members.map(member)
+      let previews = try members.map { try member($0, caller: caller) }
       return DocProposalPreviewGroup(
         id: group.id, ref: try text(first, "doc_ref", reference: true), total: group.total,
         members: previews,
@@ -73,7 +73,8 @@ struct DocProposalInbox {
     let about = metadata ? "r.about_refs" : "NULL"
     let source = metadata ? "r.source_task_id" : "NULL"
     let fields = [
-      "d.id AS doc_id,r.rev,r.base_rev,b.id AS base_id,\(source) AS source_id,s.id AS source_owner",
+      "d.id AS doc_id,r.rev,r.base_rev,r.base_rev IS NOT d.current_rev AS stale_base,"
+        + "b.id AS base_id,\(source) AS source_id,s.id AS source_owner",
       Self.bounded("'doc:'||d.slug", "doc_ref"),
       Self.bounded("'doc:'||d.slug||'@'||r.rev", "ref"),
       "CASE WHEN length(CAST(d.slug AS BLOB))<=512 THEN CAST(d.slug AS BLOB) END AS slug",

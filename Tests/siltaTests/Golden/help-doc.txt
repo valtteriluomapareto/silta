@@ -62,7 +62,6 @@ Use -F for complete UTF-8 Markdown, or --keep-body to retain it.
 New docs need --title and --about. About refs replace the whole set.
 Input: at most 65536 bytes. Kind stays fixed unless --kind is explicit.
 Read editing rules with silta guide docs.
-Create (human): silta doc edit api -F api.md --title API --about app:api
 Preserve (human): silta doc edit api --keep-body --about app:api
 
 USAGE: silta doc edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <slug> [-F <file>] [--keep-body] [--title <title>] [--kind <kind>] [--about <about> ...] [--allow-secret]
@@ -96,7 +95,9 @@ OPTIONS:
 
 OVERVIEW: List current documents and pending revisions.
 
-USAGE: silta doc ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--about <about>] [--archived] [--offset <offset>] [--limit <limit>]
+Example: silta doc ls --doc rules --limit 5
+
+USAGE: silta doc ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--doc <slug>] [--about <about>] [--archived] [--offset <offset>] [--limit <limit>]
 
 GLOBAL OPTIONS:
   --ws <ws>               Use this workspace; default is inferred or saved.
@@ -107,6 +108,8 @@ GLOBAL OPTIONS:
   --verbose               Mirror command diagnostics to stderr.
 
 OPTIONS:
+  --doc <slug>            Filter by one unpinned doc slug or doc:slug; default
+                          is all docs.
   --about <about>         Filter by a canonical app, edge, service or topic ref.
   --archived              Include archived documents.
   --offset <offset>       Number of entries to skip. (default: 0)
@@ -122,7 +125,7 @@ Use -F for complete UTF-8 Markdown and -m to explain the proposal.
 New docs need --title and --about; accepted metadata otherwise stays.
 Submissions remain pending. Read with doc show or the human inbox.
 Read editing rules with silta guide docs.
-Example: silta doc propose api -F api.md -m Clarify --title API --about app:api
+Bodies must contain non-whitespace text.
 
 USAGE: silta doc propose [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <slug> [-F <file>] [-m <why>] [--title <title>] [--about <about> ...] [--base <base>] [--task <task>]
 

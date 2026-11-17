@@ -183,7 +183,7 @@ struct DocDiscussionReadCommandTests {
     try SiltaBinary.run(["--ws", "acme", "doc"] + args + (json ? ["--json"] : []), in: scratch)
   }
 
-  private func fixture(_ scratch: URL) throws -> DatabaseStore {
+  func fixture(_ scratch: URL) throws -> DatabaseStore {
     let store = try AcmeDocAttachments.make(in: scratch)
     try AcmeDocAttachments.attach("rules", to: "app", in: store)
     try store.write {

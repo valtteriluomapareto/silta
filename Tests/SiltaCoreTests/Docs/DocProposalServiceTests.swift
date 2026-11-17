@@ -139,7 +139,7 @@ struct DocProposalServiceTests {
         .enumerated()
       {
         service.approved = approval
-        let body = index == 0 ? "" : "Shared é body"
+        let body = index == 0 ? "Shared Acme body" : "Shared é body"
         let result = try service.propose(Self.request("rules-\(index)"), input: { body })
         #expect(try Self.row(store, revision: 1)["body_md"] as String == body)
         #expect(result.warnings.map(\.code) == (approval == nil ? [] : ["approval_unused"]))

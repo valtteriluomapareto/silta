@@ -1,4 +1,4 @@
-doc:rules@2 [accepted]; 1 pending: silta --ws 'acme' doc ls --offset 0 --limit 20
+doc:rules@2 [accepted]; 1 pending: silta --ws 'acme' doc ls --doc 'rules' --offset 0 --limit 20
 title: Push rules
 kind: contract
 about: app:api

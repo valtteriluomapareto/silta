@@ -22,7 +22,11 @@ struct DocLegacyRemovalCommandTests {
       let yaml = try desiredMap(kind: kind, chosen: chosen)
       let shown = try SiltaBinary.run(["--ws", "acme", "ws", "show", "--json"], in: scratch)
       #expect(shown.termination == .exit(0))
-      #expect(shown.stdout.contains("\\\\u0000tail"))
+      let data = try #require(GuideContractTests.object(shown.stdout)["data"] as? [String: Any])
+      let view = try #require(data["yaml"] as? String)
+      let section = view.components(separatedBy: kind == "service" ? "services:\n" : "edges:\n")
+        .last?.components(separatedBy: kind == "service" ? "edges:\n" : "topics:\n").first
+      #expect(section?.contains("\\u0000tail") == true)
       let file = scratch.appending(path: "map.yml")
       try yaml.write(to: file, atomically: true, encoding: .utf8)
       let args = [
