@@ -126,13 +126,6 @@ enum SiltaMain {
     return Int(elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000)
   }
 
-  private static func logFlags(_ flags: Set<String>) -> [String] {
-    return [
-      "--approved", "--json", "--quiet", "--deterministic", "--verbose",
-    ]
-    .filter { flags.contains($0) }
-  }
-
   /// Executes the parse result using the environment assembled by the command boundary.
   static func execute(
     _ arguments: [String], parseResult: Result<any ParsableCommand, any Error>,

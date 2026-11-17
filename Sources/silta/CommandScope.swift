@@ -119,3 +119,13 @@ private struct UsageArguments: ParsableArguments {
 
   @Argument(parsing: .allUnrecognized) var remainder: [String] = []
 }
+
+extension SiltaMain {
+  static func logFlags(_ flags: Set<String>) -> [String] {
+    return [
+      "--approved", "--json", "--quiet", "--deterministic", "--verbose",
+    ]
+    .filter { flags.contains($0) }
+  }
+
+}

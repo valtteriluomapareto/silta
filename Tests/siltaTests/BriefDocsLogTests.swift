@@ -19,37 +19,13 @@ struct BriefDocsLogTests {
       let emptyLog = try lastLog(scratch)
       #expect(emptyLog["docs_shown"] as? Int == 0)
       #expect(emptyLog["docs_counted"] as? Int == 0)
-      let config = scratch.appending(path: "workspace.yaml")
-      try """
-      workspace: {slug: acme, name: Acme, task_prefix: AC}
-      repos: [{slug: platform}]
-      apps:
-        - {slug: api, repo: platform, ref: origin/api}
-        - {slug: portal, repo: platform, ref: origin/portal}
-      edges: [{from: api, to: portal, kind: http, summary: Acme interface}]
-      """.write(to: config, atomically: true, encoding: .utf8)
-      let updated = try run(["ws", "edit", "-F", config.path, "--approved", "Set up Acme map"])
-      try #require(updated.termination == .exit(0), "\(updated.stderr)")
-      let body = scratch.appending(path: "body.md")
-      try "Keep the Acme fallback explicit.\n".write(to: body, atomically: true, encoding: .utf8)
-      for (slug, about) in [("app-rules", "app:api"), ("interface", "edge:api/portal/http")] {
-        try #require(
-          run([
-            "doc", "edit", slug, "--title", "Acme rules", "--about", about,
-            "-F", body.path, "--approved", "Share the Acme rule",
-          ]).termination == .exit(0))
-      }
+      try seedDocuments(in: scratch, using: run)
       let full = try run(["brief"])
       #expect(full.stdout.contains("doc:app-rules") && full.stdout.contains("doc:interface"))
       let fullLog = try lastLog(scratch)
       #expect(fullLog["docs_shown"] as? Int == 2)
       #expect(fullLog["docs_counted"] as? Int == 0)
-      let contract = fullLog.filter {
-        ["command", "docs_shown", "docs_counted", "workspace"].contains($0.key)
-      }
-      let encoded = try JSONSerialization.data(withJSONObject: contract, options: [.sortedKeys])
-      Golden.forTests().check(
-        try #require(String(data: encoded, encoding: .utf8)) + "\n", "brief-docs-log.json")
+      try checkLogContract(fullLog)
       for flags in [["--budget", "1"], ["--short"], ["--hook"]] {
         let result = try run(["brief"] + flags)
         #expect(result.termination == .exit(0))
@@ -79,6 +55,38 @@ struct BriefDocsLogTests {
       #expect(try run(["brief", "--task", "AC-999"]).termination == .exit(2))
       #expect(try lastLog(scratch)["docs_shown"] == nil)
       #expect(try lastLog(scratch)["docs_counted"] == nil)
+    }
+  }
+
+  private func checkLogContract(_ entry: [String: Any]) throws {
+    let contract = entry.filter {
+      ["command", "docs_shown", "docs_counted", "workspace"].contains($0.key)
+    }
+    let encoded = try JSONSerialization.data(withJSONObject: contract, options: [.sortedKeys])
+    Golden.forTests().check(
+      try #require(String(data: encoded, encoding: .utf8)) + "\n", "brief-docs-log.json")
+  }
+
+  private func seedDocuments(in scratch: URL, using run: ([String]) throws -> CLIResult) throws {
+    let config = scratch.appending(path: "workspace.yaml")
+    try """
+    workspace: {slug: acme, name: Acme, task_prefix: AC}
+    repos: [{slug: platform}]
+    apps:
+      - {slug: api, repo: platform, ref: origin/api}
+      - {slug: portal, repo: platform, ref: origin/portal}
+    edges: [{from: api, to: portal, kind: http, summary: Acme interface}]
+    """.write(to: config, atomically: true, encoding: .utf8)
+    let updated = try run(["ws", "edit", "-F", config.path, "--approved", "Set up Acme map"])
+    try #require(updated.termination == .exit(0), "\(updated.stderr)")
+    let body = scratch.appending(path: "body.md")
+    try "Keep the Acme fallback explicit.\n".write(to: body, atomically: true, encoding: .utf8)
+    for (slug, about) in [("app-rules", "app:api"), ("interface", "edge:api/portal/http")] {
+      try #require(
+        run([
+          "doc", "edit", slug, "--title", "Acme rules", "--about", about,
+          "-F", body.path, "--approved", "Share the Acme rule",
+        ]).termination == .exit(0))
     }
   }
 
