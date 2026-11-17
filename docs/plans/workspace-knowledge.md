@@ -251,8 +251,8 @@ K2, K3 and K4 run in parallel after K1. Each slice must fit one reviewable PR (a
 self-checks that each grading token appears only where the scenario puts it.
 
 - **`doc-context` (R1):** the mobile agent must handle unknown push categories. The
-  rule is an unguessable token (fall back to `UNSORTED_Q7`) in the body of a doc
-  attached to `edge:acme-mobile/acme-backend/http-api`, below the summary line, so
+  rule is a token derived from a fresh per-trial seed recorded in fixture evidence,
+  in the body of a doc attached to `edge:acme-mobile/acme-backend/http-api`, below the summary line, so
   `doc show` is needed. Pass: the recorded plan or result names the token. **Control:**
   the same task without the doc must fail in the stub; the live control pass rate is
   reported as a diagnostic.
@@ -279,8 +279,9 @@ and a recorded review entry per variant.
 to decision and approvals per batch.
 
 **Unverified until DF3:** whether agents in a real workspace propose docs worth
-keeping, and whether the human keeps reviewing them. DF3's decision rules gain one
-for this, and E5 counts `Map gap:` lines to decide on map proposals.
+keeping, and whether the human keeps reviewing them. DF3's E6 and E7 rows decide
+this: whether docs help or mislead, and whether proposals are worth the review. E5
+counts `Map gap:` lines to decide on map proposals.
 
 ## Risks
 
@@ -297,9 +298,10 @@ for this, and E5 counts `Map gap:` lines to decide on map proposals.
 
 ## Done when
 
-- Per release, its evals pass live for Claude Code and Codex: `all_repeats_pass` over
-  three repeats plus human `evidence_review`, with the controls and negative variants
-  listed above.
+- Per release, its positive evals pass live for Claude Code and Codex:
+  `all_repeats_pass` over three repeats plus human `evidence_review`. The controls
+  retain their raw outcomes and diagnostic rates; negative variants fail as specified
+  above. A diagnostic context failure cannot hide failed infrastructure or evidence checks.
 - Every command and refusal shipped in the release has goldens; `silta schema`
   matches §16; export round-trips docs in R1 and proposals from R2.
 - From R2, the dogfood report shows doc proposals and decisions.

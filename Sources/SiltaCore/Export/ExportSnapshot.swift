@@ -40,10 +40,6 @@ package struct ExportRow: Equatable, Sendable {
   init(keys: [String], row: Row) throws {
     var values: [String: String] = [:]
     for key in keys {
-      if ExportIdentity.keys.contains(key) {
-        if let uid = try StoredUID.read(key, from: row) { values[key] = uid }
-        continue
-      }
       let value: DatabaseValue = row[key]
       switch value.storage {
       case .null: continue

@@ -128,8 +128,12 @@ struct DocEvidenceReadCommandTests {
       for flags in [[], ["--diff"]] {
         let result = try run(flags, scratch)
         #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("triaged_by: (not recorded)\n"))
-        #expect(result.stdout.contains("triaged_at: (not recorded)\n"))
+        if flags.isEmpty {
+          #expect(result.stdout.contains("triaged_by: (not recorded)\n"))
+          #expect(result.stdout.contains("triaged_at: (not recorded)\n"))
+        } else {
+          #expect(!result.stdout.contains("triaged_by:") && !result.stdout.contains("triaged_at:"))
+        }
       }
       #expect(try truth(store) == before)
       let migrated = try queue.read {

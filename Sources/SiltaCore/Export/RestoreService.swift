@@ -45,7 +45,7 @@ package enum RestoreService {
     if let expected, expected != slug {
       throw ExportError.otherWorkspace(tree: slug, given: expected, directory: directory.path)
     }
-    try RestoreDocumentGraph(tree: tree, documents: tree.documents, slug: slug).run()
+    try RestoreDocumentGraph(tree: tree, slug: slug).run()
     let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
     if let manifest = request.manifest, manifest.isEmpty || !digest.hasPrefix(manifest) {
       throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
@@ -122,14 +122,6 @@ struct RestoreValidation {
   /// A refusal of the tree, naming the workspace to export again on its machine.
   func invalid(_ reason: String) -> ExportError {
     .invalidTree(reason: reason, workspace: slug)
-  }
-
-  func run() throws {
-    let uids = try index(documents: tree.documents)
-    try references(uids)
-    try links(uids)
-    try parents()
-    try naturalKeys()
   }
 
   /// Base rows and their owned identities, independently of polymorphic link ends.
@@ -224,9 +216,7 @@ struct RestoreValidation {
     }
   }
 
-  func links(
-    _ uids: [String: Set<String>], tables: [String: String] = ExportFormat.linkTables
-  ) throws {
+  func links(_ uids: [String: Set<String>]) throws {
     func resolve(_ uid: String?, _ table: String, from: String) throws {
       guard let uid, !uids[table, default: []].contains(uid) else { return }
       throw invalid("\(from) names \(table) \(uid), which the tree doesn't hold")
@@ -242,7 +232,7 @@ struct RestoreValidation {
       guard link.value("from") != nil, (link.value("to") == nil) != (link.value("to_ext") == nil)
       else { throw invalid("link \(link.value("uid") ?? "") has a missing end") }
       try resolve(
-        link.value("from"), tables[link.value("from_kind") ?? ""] ?? "",
+        link.value("from"), ExportFormat.linkTables[link.value("from_kind") ?? ""] ?? "",
         from: "link")
       guard let to = link.value("to") else { continue }
       if link.value("to_kind") == "task_plan_rev" {
@@ -252,7 +242,7 @@ struct RestoreValidation {
             "a link names plan revision \(revision) of \(to), which the tree doesn't hold")
         }
       } else {
-        try resolve(to, tables[link.value("to_kind") ?? ""] ?? "", from: "link")
+        try resolve(to, ExportFormat.linkTables[link.value("to_kind") ?? ""] ?? "", from: "link")
       }
     }
   }

@@ -1051,8 +1051,8 @@ recovery: its continuation restarts the broader scoped list without a filter or 
 
 `doc show <ref> --diff` compares the body with the revision's recorded `base_rev`
 using contextual line hunks whose coordinates refer to the masked body. Separate
-metadata headers show stored title, kind, attachments, why, source task and paired
-decision evidence. Known attachment identities can change even when their displayed
+metadata headers show only changed stored title, kind, attachments, why, source task
+and paired decision evidence fields; an unchanged set says "metadata unchanged". Known attachment identities can change even when their displayed
 refs do not; that change is shown without resolving historical targets or exposing
 their internal ids. Historical unknown identities are not inferred.
 A bounded search may render a broader replacement hunk for complex edits; it
@@ -1133,8 +1133,8 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-inspection and decision guidance; decisions name explicit immutable proposal refs. Doc-specific review
-measurements remain deferred.
+inspection and decision guidance; decisions name explicit immutable proposal refs.
+See [observability](#19-observability) for document measurements.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
   [--about <ref>]… [--title <t>] [--task <ref>]`. A new slug needs title and about;
@@ -1785,9 +1785,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     `to_service`). Integer ids and `workspace_id` are never written; the file implies
     the workspace or the task. Imported row UIDs and UID references must be nonempty
     ASCII without NUL; no other opaque-ID grammar is imposed. Restore checks this
-    before building identity maps. Export, destination and document-write capture
-    inspect complete stored UID bytes too. Unsupported stored IDs refuse without changes (`env`),
-    with human-owned `silta backup` recovery for inspection rather than renaming IDs.
+    before building identity maps. Ordinary document and export reads use stored
+    identities directly. Export still requires completed migrations.
   - **Order.** Rows in id order (rowid for `topic_alias` and `alias_decision`), and
     tasks by `seq`, so the bytes don't depend on integer ids. Files in byte order of
     their path. Every listed file is always present; a file with no rows is empty, and
@@ -2299,6 +2298,10 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     `SILTA_SESSION` equals the resolved actor's session. This boolean carries no
     environment values; hooks omit it because they synthesize the session.
     Legacy lines omit it and cannot prove propagation.
+  - `docs_shown` on successful `brief` and SessionStart calls counts document preview
+    rows retained after budgeting, including zero. Count-only and recovery lines
+    contribute zero; repeated displayed previews count separately. Failure and timeout
+    lines omit it. No document names, titles or refs are logged.
   - Early hook failures, including input decoding and environment assembly, append
     one body-free `env` / `hook_failed` attempt through the same exclusive completion
     owner as successful hooks and timeouts. They retain quiet exit 0 and record elapsed
@@ -2308,7 +2311,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     receive a record; diagnostics remain best effort rather than choosing another home.
 
   `workspace` is set only for commands that act on a workspace: `task *`, `comment`,
-  `inbox`, `export`, `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`,
+  `doc *`, `inbox`, `export`, `ws show|edit|use`, `repo fetch`, `where`, `code *`, `brief`,
   `status` (logged as
   `silta status` also when bare `silta` runs it), and a successful `init --scan`.
   - A successful command logs the workspace it resolved and acted on (`--ws`, its
@@ -2511,6 +2514,14 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   A passing diagnostic run does not certify skipped checks. Check warnings live
   in `data.checks`; envelope and command-log warnings describe command/environment
   warnings. Failures before CLI environment setup are not logged.
+
+Dogfood reports derive document submission, decision and pending-age metrics from
+creation and recorded triage metadata. Direct or legacy history without decision
+evidence stays unattributed. Batch and approval summaries describe observed logs;
+incomplete retained coverage leaves their ratio unavailable. Brief exposure sums
+`docs_shown` within the selected workspace/window and counts agent sessions with
+previews; legacy lines without the field cannot establish zero exposure. Reports
+read metadata only and do not log or publish document content.
 
 ## 20. Testing strategy
 
