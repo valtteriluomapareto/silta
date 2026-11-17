@@ -155,6 +155,30 @@ struct StoredUIDAdmissionTests {
     }
   }
 
+  @Test(arguments: [false, true], ["[]", "{}"])
+  func nestedUIDContainersRefuseAdmissionAndDoctorDiagnosesThem(
+    verification: Bool, value: String
+  ) throws {
+    try withScratchDirectory { home in
+      let store = try Self.legacy(home)
+      let json = "[{\"uid\":\(value)}]"
+      try DatabaseQueue(path: store.path).write {
+        try $0.execute(
+          sql: verification
+            ? "UPDATE doc_verification SET app_shas=?" : "UPDATE doc_rev SET about_targets=?",
+          arguments: [json])
+      }
+      let before = try DocVerificationPreparationTests.truth(store)
+      let integrity = Self.checks(store, home: home).first { $0.id == "database.integrity" }
+      let failure = RestoreASCIIIdentityTests.failure { try store.initialize() }
+      withKnownIssue("Container-valued snapshot UIDs must fail admission and doctor diagnosis") {
+        #expect(integrity?.status == .fail && integrity?.message.contains("ASCII") == true)
+        #expect(failure?.code == .env && failure?.next == ["silta doctor"])
+        #expect(try DocVerificationPreparationTests.truth(store) == before)
+      }
+    }
+  }
+
   @Test func preAdmissionReadsAndDoctorDoNotMigrateOrRepair() throws {
     try withScratchDirectory { home in
       let store = try Self.legacy(home)
