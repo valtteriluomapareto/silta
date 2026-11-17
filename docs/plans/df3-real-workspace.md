@@ -39,8 +39,8 @@ workspace data leaves the machine.
 DF3 starts after S13 (agents install and guide) and SI-15 (inbox) merge, not after all
 of M1. This changes §22.1 and the M1 plan, which said "M1 done". Docs R1 and the
 `doc propose` and `doc triage` commands have shipped too; DF3 doesn't wait for the R2
-guidance, the R2 offline evals or K6 freshness, and the week-2 report needs the
-prerequisites under **Report before week 2**.
+guidance, the R2 offline evals or K6 freshness; SI-172's report counts may land
+during the first two weeks (**Doc numbers at each review**).
 - **Restore:** daily `VACUUM INTO` backups exist, and S14 export and restore has
   shipped. Before real data goes in, the maintainer's agent drills one restore of a
   snapshot into a temporary `SILTA_HOME` and runs `doctor` on it. A restore replaces
@@ -62,14 +62,21 @@ the numbers; the maintainer decides them.
 | E3 | Do agents use Silta correctly without reminders? | Logs: calls per session, `usage` error rate, retry loops | Fix guide text if `usage` errors exceed 10% of calls |
 | E4 | What does it cost? | Logs (hook ms, approvals per week); check-in question 3 | Change whatever the maintainer names twice as nearly making them stop |
 | E5 | Does the workspace data stay current? | Gap list at weeks 0, 2 and 6; `Map gap:` lines agents left while the maintainer was away | Rethink upkeep if gaps grow between reviews; build map proposals ([workspace knowledge](workspace-knowledge.md)) if `Map gap:` lines wait on the maintainer most weeks |
-| E6a | Do docs mislead? | Check-in `Docs:` line; `Miss:` lines; doc lines marked wrong in the brief audit | Any doc that misled an agent moves K6 freshness ahead of other docs work |
-| E6b | Do agents use docs? | Check-in `Docs:` line; logs: sessions with a `doc show` or `doc ls` call | Revisit how the brief shows docs if no check-in names a helpful doc in weeks 1–3 while docs exist for the apps worked on |
-| E6c | Are proposals worth the review? | Report: proposals, acceptance rate, time to decision, approvals per batch, oldest pending | Tighten the proposal rule in `guide docs` if under half are accepted; batch less often if a proposal waits past its age-out; consider `agent_doc_writes: direct` only if over 9 in 10 are accepted and review is named twice as a cost |
+| E6 | Do docs help agents, or mislead them? | Check-in `Helped:` and `Misled:` naming `doc:` refs; `Miss: doc:` lines; doc lines marked in the brief audit; logs as a lower bound | Move K6 freshness ahead of other docs work if two different docs misled an agent; revisit how the brief shows docs if no check-in in weeks 1–3 names a helpful doc |
+| E7 | Do agents propose docs worth the review? | Report: proposals, accepted, rejected, oldest pending; `Miss: doc:<slug> missing` lines | Tighten the proposal rule in `guide docs` if under half are accepted; improve the R2 guidance first if missing-doc lines outnumber proposals |
 
 `code` calls per cross-repo task are counted for §23 Q8, which owns that decision.
-Counts are normalised per agent session and per active day. E6 rows need at least 10
-proposals (E6c) or three answered check-ins (E6a, E6b) before they decide; with
-fewer, the decision says "not enough evidence" and DF3 records the counts.
+Counts are normalised per agent session and per active day.
+
+**Doc evidence.** E6 needs three answered check-ins and E7 at least 10 proposals
+before either decides; with less, the decision says "not enough evidence" and records
+the counts. Few proposals alongside `Miss: doc:… missing` lines says the guidance is
+too timid, not that agents have nothing to share. Seeded docs are approved edits, so
+they never count as proposals. Both rows report week 4, the week without the hook,
+separately. A wrong doc is fixed or archived as soon as it's reported, and the next
+brief audit checks it. The direct-write option the [workspace knowledge](workspace-knowledge.md)
+plan defers becomes a candidate only if nearly all proposals are accepted and the
+maintainer names doc review twice as a cost.
 
 ## Data and privacy
 
@@ -82,22 +89,21 @@ fewer, the decision says "not enough evidence" and DF3 records the counts.
   `silta` workspace keeps today's behaviour.
 - **What may leave the machine:** a summary the agent writes by hand from the report,
   reviewed by the maintainer, containing only Silta's own words: command names, error
-  and warning codes, counts and rates. No actors, sessions, task refs, slugs, app or
-  repo names, dates of individual tasks, or friction text.
+  and warning codes, counts and rates. No actors, sessions, task or doc refs, slugs,
+  doc titles, app or repo names, dates of individual tasks, or friction text.
 - **Check-in.** One task in the workspace, `DF3 check-in`, created during onboarding
   with the maintainer's words (so it is `todo` without triage), then blocked on
   `ext:maintainer` with `--follow-up 7d`, so the inbox shows it when it's due. A blocked task stays out of
-  "work the backlog". Each week the agent asks four questions in one message, posts
+  "work the backlog". Each week the agent asks three questions in one message, posts
   the answers as one comment and blocks the task again:
 
   ```text
   Check-in: week=N binary=<sha7> hook=on|off explained=N corrections=N
-  Helped: <task ref or none>  Misled: <task ref or none>
-  Docs: helped=<doc ref or none> wrong=<doc ref or none>
+  Helped: <task or doc refs, or none>  Misled: <task or doc refs, or none>
   Nearly stopped because: <one line or none>
   ```
 
-  The `Docs:` line names a doc that saved an explanation, and a doc whose content was
+  A `doc:` ref under `Helped:` saved an explanation; under `Misled:` its content was
   wrong or out of date when an agent relied on it. A skipped week stays missing; it is
   never counted as zero. If two check-ins in a row are skipped, shorten the questions.
 - **Misses as they happen (optional).** When the maintainer tells an agent "Silta
@@ -110,15 +116,16 @@ fewer, the decision says "not enough evidence" and DF3 records the counts.
   compares with and without the hook on similar work, without a separate baseline
   period before the start.
 
-**Report before week 2.** The report recomputes from the database and the logs, which
-are kept 90 days (§19), so these can land during the first two weeks without losing
-data:
-- **Doc proposal metrics** for E6c: proposals, acceptance rate, time to decision,
-  approvals per batch and the oldest pending proposal (SI-172).
-- **Inbox size and oldest item** for E4, instead of today's hard-coded "n/a (S11)".
-- **Sessions with a doc read** for E6b, from `doc show` and `doc ls` log lines.
-
-If one is still missing at week 2, the review says so and the row waits for week 6.
+**Doc numbers at each review.** The report's doc proposal counts for E7 arrive with
+SI-172. It recomputes from the database, so SI-172 can merge during the first two
+weeks; if it hasn't by week 2, E7 waits for week 6. Two more numbers need no new code;
+the agent collects them at each review:
+- **Inbox load** for E4: the item count and oldest item from
+  `silta --ws <slug> inbox --for me`. The report's "n/a (S11)" lines are ignored.
+- **Doc reads** for E6: agent sessions with a `doc show` or `doc ls` line in the
+  logs, kept 90 days (§19), leaving out the seeding sitting. Agents mostly read docs
+  in the brief without a doc command, so this is a lower bound and never decides E6
+  alone.
 
 ## Taking it into use
 
@@ -186,10 +193,9 @@ Never put secrets, customer data or credentials into a doc.
 | DF3-a Slug at scan | `init --scan … --slug <slug> --prefix <XX>` for a new workspace; refused on a rescan or with `--ws` | S6 | Goldens: chosen slug and prefix, defaults unchanged, refusal on a rescan, invalid slug |
 | DF3-b Private report | `--ws <slug>` on `dogfood-report.sh`; validated slug; output and `--since` state under `$SILTA_HOME/reports/<slug>/` | — | Existing report tests pass; output lands under `$SILTA_HOME/reports/<slug>/` and never in the repository; canary strings from another workspace never reach the `silta` report; an invalid slug is refused |
 | DF3-c Onboarding run | The restore drill, the steps above, six weeks of use, two report reviews, the decisions | DF3-a, DF3-b, S13, SI-15 | The check-ins and the reports at weeks 0, 2 and 6 |
-| DF3-e Report for docs | The three additions under **Report before week 2** | SI-172 | Report tests with fixture proposals, decisions, inbox items and doc reads; the shareable summary still holds only counts and Silta's own words |
 | DF3-d `silta guide setup` | The setup and seed prompts as they worked in DF3-c | DF3-c | Guide golden |
 
-DF3-a and DF3-b have merged. DF3-e runs during DF3-c's first two weeks. None blocks M1.
+DF3-a and DF3-b have merged. None blocks M1.
 
 ## Validation
 
@@ -200,9 +206,11 @@ DF3-a and DF3-b have merged. DF3-e runs during DF3-c's first two weeks. None blo
   the decision rules, and turn findings into Silta issues through the shareable
   summary only.
 - **Unverified:** one maintainer is a small sample, the tally is self-reported, and
-  the hook-off week is a single week. Seeded docs come from the maintainer, so early
-  E6b evidence says more about the brief than about agent proposals. The decisions
-  say how strong their evidence was.
+  the hook-off week is a single week. Seeded docs come from the maintainer and cover
+  the busiest links, so early E6 evidence says more about the brief than about agent
+  proposals. Without R2 guidance and K6 freshness, E7 measures the R1 guide, and E6
+  counts only the wrong docs the maintainer notices. The decisions say how strong
+  their evidence was.
 
 ## Risks
 
@@ -211,8 +219,8 @@ DF3-a and DF3-b have merged. DF3-e runs during DF3-c's first two weeks. None blo
   own words.
 - **The measurement burden ends the experiment.** One message a week, one brief audit
   every two weeks; skipped check-ins shorten the questions.
-- **Doc review becomes the burden.** Seeding is one sitting, and E6c's age-out rule
-  catches a growing queue.
+- **Doc review becomes the burden.** Seeding is one sitting; doc proposals leave the
+  inbox after 14 days, and E7's oldest pending proposal shows a growing queue.
 - **The hook disturbs work in other repos.** Step 2 checks silence outside
   registered repos, and rollback is one command.
 - **A migration damages real data** while M1 keeps shipping. The restore drill comes
@@ -222,7 +230,7 @@ DF3-a and DF3-b have merged. DF3-e runs during DF3-c's first two weeks. None blo
 
 - Six weeks of use, with the check-ins, the hook-off week and reports at weeks 0, 2
   and 6.
-- A keep, change or cut decision recorded for E1–E6, using the rules set at the start,
+- A keep, change or cut decision recorded for E1–E7, using the rules set at the start,
   and the workspace-knowledge plan's "Unverified until DF3" items answered or moved.
 - The setup prompt lives in `silta guide setup` (DF3-d), the lasting rules are in
   §22.1, and the spec's other DF3 items (meeting-note tasks, secret guard and
