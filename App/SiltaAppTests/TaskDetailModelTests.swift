@@ -50,9 +50,7 @@
       }
       await reload.value
       #expect(detail.value == original)
-      withKnownIssue("A cancelled read must settle the loading flag") {
-        #expect(!detail.isLoading)
-      }
+      #expect(!detail.isLoading)
     }
 
     @Test func retryRecoversDetailWithoutADatabaseCommit() async throws {

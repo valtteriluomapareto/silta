@@ -8,6 +8,7 @@ final class AppModel {
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
   let reader: AppReader?
+  let taskDetail = TaskDetailModel()
   var search = ""
   private(set) var route: AppRoute = .mywork
   var appFilter: String?
@@ -96,6 +97,7 @@ final class AppModel {
     if workspace != slug {
       generation += 1
       workspace = slug
+      taskDetail.clear()
       boardSelection = nil
       boardInspectorPresented = false
       workspaceSelection = nil
@@ -103,6 +105,16 @@ final class AppModel {
       appFilter = nil
     }
     return refresh(force: true)
+  }
+
+  func loadTaskDetail() async {
+    guard let reader, let workspace, let ref = boardSelection?.taskRef else {
+      taskDetail.clear()
+      return
+    }
+    await taskDetail.load(workspace: workspace, ref: ref) {
+      try await Task.detached { try reader.task(ref, workspace: workspace) }.value
+    }
   }
 
   func navigate(to route: AppRoute) {

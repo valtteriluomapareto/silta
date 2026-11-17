@@ -24,9 +24,7 @@
       await model.refresh().value
       try ControlLaunch.Route("board:AC-12").apply(to: model)
       let pending = ControlState(model: model, run: "acme", revision: 2, dark: false)
-      withKnownIssue("A selected task is not idle before its detail has loaded") {
-        #expect(!pending.idle)
-      }
+      #expect(!pending.idle)
       await model.loadTaskDetail()
       let first = ControlState(model: model, run: "acme", revision: 2, dark: false)
       #expect(first.snapshotVersion == 1 && first.screen == "board" && first.route == "board:AC-12")
