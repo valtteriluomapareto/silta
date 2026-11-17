@@ -32,11 +32,10 @@ struct BriefDocsLogTests {
       apps:
         - {slug: api, repo: platform, ref: origin/api}
         - {slug: portal, repo: platform, ref: origin/portal}
-      edges: [{from: api, to: portal, kind: http}]
+      edges: [{from: api, to: portal, kind: http, summary: Acme interface}]
       """.write(to: config, atomically: true, encoding: .utf8)
-      try #require(
-        run(["ws", "edit", "-F", config.path, "--approved", "Set up Acme map"]).termination
-          == .exit(0))
+      let updated = try run(["ws", "edit", "-F", config.path, "--approved", "Set up Acme map"])
+      try #require(updated.termination == .exit(0), "\(updated.stderr)")
       let body = scratch.appending(path: "body.md")
       try "Keep the Acme fallback explicit.\n".write(to: body, atomically: true, encoding: .utf8)
       for (slug, about) in [("app-rules", "app:api"), ("interface", "edge:api/portal/http")] {
