@@ -6,6 +6,12 @@
     struct Selection: Encodable {
       let kind: String
       let ref: String
+      let view: String?
+      init(kind: String, ref: String, view: String? = nil) {
+        self.kind = kind
+        self.ref = ref
+        self.view = view
+      }
     }
     struct Sidebar: Encodable {
       let waiting: Int
@@ -48,20 +54,14 @@
       self.revision = revision
       appearance = dark ? "dark" : "light"
       screen = model.route.rawValue
-      switch model.route {
-      case .mywork, .docs:
-        selection = nil
-        inspectorOpen = false
-      case .board:
-        selection = model.boardSelection.map { Selection(kind: "task", ref: $0.taskRef) }
-        inspectorOpen = model.boardInspectorPresented
-      case .workspace:
-        selection = model.workspaceSelection.map {
-          Selection(kind: "connection", ref: $0.connectionRef)
-        }
-        inspectorOpen = model.workspaceInspectorPresented
-      }
-      route = screen + (selection.map { ":" + $0.ref } ?? "")
+      let navigation = Self.navigation(model)
+      selection = navigation.selection
+      inspectorOpen = navigation.inspectorOpen
+      route =
+        screen
+        + (selection.map { selected in
+          ":" + selected.ref + (selected.view.map { ":" + $0 } ?? "")
+        } ?? "")
       if let snapshot = model.visibleData?.snapshot {
         let content = BoardContent(
           snapshot: snapshot, app: model.appFilter, search: model.search,
@@ -75,18 +75,53 @@
       } else {
         counts = Counts(lanes: nil, sidebar: nil)
       }
+      let documentPhase =
+        model.route == .docs
+        ? model.documents.phase(
+          workspace: model.workspace, about: model.docsAbout,
+          archived: model.includeArchivedDocuments, version: model.visibleData?.version) : nil
       let phase =
         model.isLoading
-        ? "loading" : model.failure != nil ? "failed" : model.data != nil ? "ready" : "starting"
+        ? "loading"
+        : model.failure != nil
+          ? "failed"
+          : documentPhase?.rawValue ?? (model.data != nil ? "ready" : "starting")
       refresh = Refresh(phase: phase, dataVersion: model.visibleData?.version)
       let taskSettled =
         model.route != .board || !model.boardInspectorPresented
         || model.boardSelection == nil
         || (model.taskDetail.value?.ref == model.boardSelection?.taskRef
           || model.taskDetail.failure != nil)
+      let documentSettled =
+        documentPhase == nil || model.failure != nil
+        || documentPhase == .ready || documentPhase == .failed
       idle =
-        !model.isLoading && !model.taskDetail.isLoading && taskSettled
+        documentSettled && !model.isLoading && !model.taskDetail.isLoading && taskSettled
         && (model.data != nil || model.failure != nil)
+    }
+
+    @MainActor private static func navigation(_ model: AppModel)
+      -> (selection: Selection?, inspectorOpen: Bool)
+    {
+      switch model.route {
+      case .mywork: return (nil, false)
+      case .docs:
+        return (
+          model.documentSelection.map {
+            Selection(kind: "document", ref: $0.ref, view: $0.view.rawValue)
+          }, false
+        )
+      case .board:
+        return (
+          model.boardSelection.map { Selection(kind: "task", ref: $0.taskRef) },
+          model.boardInspectorPresented
+        )
+      case .workspace:
+        return (
+          model.workspaceSelection.map { Selection(kind: "connection", ref: $0.connectionRef) },
+          model.workspaceInspectorPresented
+        )
+      }
     }
 
     enum CodingKeys: String, CodingKey {

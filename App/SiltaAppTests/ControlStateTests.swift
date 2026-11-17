@@ -71,35 +71,27 @@
         })
       await model.refresh().value
       try ControlLaunch.Route("docs:doc:order-contract@3:changes").apply(to: model)
-      withKnownIssue("Docs routes must select their immutable revision and view.") {
-        #expect(model.route == .docs && model.documentSelection?.ref == "doc:order-contract@3")
-        #expect(model.documentSelection?.view == .changes)
-        #expect(!ControlState(model: model, run: "acme", revision: 1, dark: false).idle)
-      }
+      #expect(model.route == .docs && model.documentSelection?.ref == "doc:order-contract@3")
+      #expect(model.documentSelection?.view == .changes)
+      #expect(!ControlState(model: model, run: "acme", revision: 1, dark: false).idle)
       await model.loadDocuments()
       let state = ControlState(model: model, run: "acme", revision: 2, dark: false)
       let data = try JSONEncoder().encode(state)
       let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
       let selected = object["selection"] as? [String: String] ?? [:]
-      withKnownIssue("Docs state must project model-owned selection and its current view.") {
-        #expect(state.screen == "docs" && state.route == "docs:doc:order-contract@3:changes")
-        #expect(selected == ["kind": "document", "ref": "doc:order-contract@3", "view": "changes"])
-      }
+      #expect(state.screen == "docs" && state.route == "docs:doc:order-contract@3:changes")
+      #expect(selected == ["kind": "document", "ref": "doc:order-contract@3", "view": "changes"])
       #expect(state.idle && state.refresh.phase == "ready" && !state.inspectorOpen)
       #expect(state.counts.sidebar?.waiting == 7)
       model.select(documentView: .comments)
-      withKnownIssue("A selected Docs view is pending until its content arrives.") {
-        #expect(!ControlState(model: model, run: "acme", revision: 3, dark: false).idle)
-      }
+      #expect(!ControlState(model: model, run: "acme", revision: 3, dark: false).idle)
       await model.loadDocuments()
       #expect(ControlState(model: model, run: "acme", revision: 4, dark: false).idle)
       model.select(document: "doc:missing@1")
       await model.loadDocuments()
       let failed = ControlState(model: model, run: "acme", revision: 5, dark: false)
       #expect(failed.idle)
-      withKnownIssue("Docs read failures must appear in the refresh phase.") {
-        #expect(failed.refresh.phase == "failed")
-      }
+      #expect(failed.refresh.phase == "failed")
     }
 
     @Test func failedRefreshIsIdleWithoutPublishingPrivateErrorText() async {

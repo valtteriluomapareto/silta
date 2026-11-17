@@ -31,6 +31,7 @@
         await model.refresh().value
         try options.route.apply(to: model)
         if model.boardSelection != nil { await model.loadTaskDetail() }
+        if model.route == .docs { await model.loadDocuments() }
         if let output = options.snapshot {
           try await snapshot(model: model, to: output)
           try publish()
@@ -83,6 +84,7 @@
       hosting.layoutSubtreeIfNeeded()
       await model.refresh().value
       if model.boardSelection != nil { await model.loadTaskDetail() }
+      if model.route == .docs { await model.loadDocuments() }
       await withCheckedContinuation { continuation in
         DispatchQueue.main.async { continuation.resume() }
       }
