@@ -15,9 +15,10 @@ struct CopyValue: View {
       HStack(spacing: 5) {
         if !compact { Text(copied ? "Copied" : value).font(.system(size: 12, design: .monospaced)) }
         Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 11))
+          .foregroundStyle(copied ? Color("Success") : compact ? Color("Ink") : Color("TideText"))
       }
       .padding(.horizontal, compact ? 7 : 8).padding(.vertical, compact ? 7 : 3)
-      .foregroundStyle(copied ? Color.green : compact ? Color("Ink") : Color("TideText"))
+      .foregroundStyle(copied || compact ? Color("Ink") : Color("TideText"))
       .background(
         compact ? Color.clear : Color.accentColor.opacity(0.1),
         in: RoundedRectangle(cornerRadius: 6)

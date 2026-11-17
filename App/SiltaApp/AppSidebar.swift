@@ -80,7 +80,7 @@ struct AppSidebar: View {
         if model.isLoading {
           ProgressView().controlSize(.small)
         } else {
-          StatusDot(color: model.failure == nil ? .green : Color("Warning"))
+          StatusDot(color: model.failure == nil ? Color("Success") : Color("Warning"))
         }
         Text(
           model.isLoading ? "Refreshing…" : model.failure == nil ? "Up to date" : "Refresh failed"
