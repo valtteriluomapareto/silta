@@ -28,6 +28,12 @@ import SiltaAppSupport
     self.readVersions = readVersions
   }
 
+  enum Phase: String { case starting, loading, ready, failed }
+
+  func phase(workspace: String?, about: String?, archived: Bool, version: Int?) -> Phase {
+    .ready
+  }
+
   struct Group: Identifiable {
     let id: String
     let entries: [AppDocument]
