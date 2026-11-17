@@ -5,6 +5,33 @@
   import Testing
 
   @MainActor struct DocsModelTests {
+    @Test func failedReloadKeepsTheCurrentDocumentAndBody() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let docs = DocsModel()
+      docs.ref = "doc:operations@1"
+      await docs.show(reader, workspace: "acme")
+      let original = docs.document
+      let body = docs.body
+      #expect(original != nil && !body.isEmpty)
+      let path = home.appending(path: "silta.db").path
+      let files = FileManager.default
+      let mode = try files.attributesOfItem(atPath: path)[.posixPermissions]
+      defer {
+        try? files.setAttributes(  // restore the owned fixture database
+          [.posixPermissions: mode ?? 0o600], ofItemAtPath: path)
+      }
+      try files.setAttributes([.posixPermissions: 0], ofItemAtPath: path)
+      await docs.show(reader, workspace: "acme")
+      #expect(docs.failure != nil && !docs.loading)
+      withKnownIssue("Reload clears the current document before a new value arrives") {
+        #expect(docs.document == original && docs.body == body)
+      }
+    }
+
     @Test func groupsPreferAcceptedAndReaderAppendsAllBodyPages() async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
