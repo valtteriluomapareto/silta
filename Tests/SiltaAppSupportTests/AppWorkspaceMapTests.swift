@@ -89,5 +89,18 @@
         #expect(failure?.message == StorageError.corrupt.message)
       }
     }
+    @Test(arguments: [
+      "UPDATE app SET slug=CAST(x'80' AS TEXT) WHERE slug='acme-mobile'",
+      "UPDATE edge SET code_refs=CAST(x'5b2261636d652d6d6f62696c653a536f75726365732f802e7377696674225d' AS TEXT)",
+    ]) func referenceBytesAreNeverRepaired(_ sql: String) throws {
+      withKnownIssue("Map reference fields repair malformed UTF-8") { () throws in
+        try withScratchDirectory { scratch in
+          try AppFixtures.seed(in: scratch)
+          let reader = try AppReaderTests.reader(scratch)
+          try reader.environment.db.write { try $0.database.execute(sql: sql) }
+          #expect(throws: AppReadError.self) { try reader.workspaceMap(workspace: "acme") }
+        }
+      }
+    }
   }
 #endif
