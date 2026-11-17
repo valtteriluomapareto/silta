@@ -91,7 +91,9 @@
     }
     @Test(arguments: [
       "UPDATE app SET slug=CAST(x'80' AS TEXT) WHERE slug='acme-mobile'",
-      "UPDATE edge SET code_refs=CAST(x'5b2261636d652d6d6f62696c653a536f75726365732f802e7377696674225d' AS TEXT)",
+      "UPDATE edge SET code_refs=CAST(x'"
+        + "5b2261636d652d6d6f62696c653a536f75726365732f802e7377696674225d"
+        + "' AS TEXT)",
     ]) func referenceBytesAreNeverRepaired(_ sql: String) throws {
       do {
         try withScratchDirectory { scratch in
