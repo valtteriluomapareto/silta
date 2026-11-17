@@ -27,7 +27,9 @@ struct AppSidebar: View {
               HStack {
                 Label(route.title, systemImage: route.symbol)
                 Spacer()
-                Text(count(route), format: .number).font(.caption.monospacedDigit())
+                if let count = count(route) {
+                  Text(count, format: .number).font(.caption.monospacedDigit())
+                }
               }
             }.buttonStyle(.plain)
               .foregroundStyle(model.route == route ? Color.accentColor : .primary)
@@ -91,10 +93,11 @@ struct AppSidebar: View {
     model.visibleData?.snapshot?.board.doing.filter { $0.claimedBy != nil } ?? []
   }
 
-  private func count(_ route: AppRoute) -> Int {
-    guard let snapshot = model.visibleData?.snapshot else { return 0 }
+  private func count(_ route: AppRoute) -> Int? {
+    guard let snapshot = model.visibleData?.snapshot else { return nil }
     switch route {
     case .mywork: return snapshot.work.waitingCount
+    case .workspace: return nil
     case .board:
       return snapshot.board.todo.count + snapshot.board.doing.count + snapshot.board.review.count
     }
