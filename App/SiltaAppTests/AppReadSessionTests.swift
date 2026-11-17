@@ -67,6 +67,29 @@
       }
     }
 
+    @Test func searchHidesEmptyProposalGroupsAndFindsCommentReferences() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppV2Fixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let session = AppReadSession(reader: reader, now: { AppV2Fixture.now })
+      let model = AppModel(
+        reader: reader,
+        load: { previous, workspace, force in
+          try session.load(previous: previous, workspace: workspace, force: force)
+        })
+      await model.refresh().value
+      #expect(model.proposals.count == 3)
+      model.search = "unrelated search"
+      #expect(model.proposals.isEmpty)
+      model.search = "AC-22"
+      #expect(model.proposals.count == 1 && model.proposals.first?.refs == ["AC-22"])
+      let question = try #require(model.data?.snapshot?.work.items.first { $0.kind == "question" })
+      model.search = try #require(question.ref)
+      #expect(model.matches(question))
+    }
+
     @Test func missingAndEmptyStoresHaveDifferentOutcomes() throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup

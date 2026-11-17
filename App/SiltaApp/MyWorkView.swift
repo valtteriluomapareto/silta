@@ -15,7 +15,7 @@ struct MyWorkView: View {
           }
           let attentionItems = work.items.filter { $0.kind != "proposal" }
           ForEach(Array(attentionItems.enumerated()), id: \.offset) { _, item in
-            if matches([item.kind, item.title ?? "", item.body ?? ""] + item.refs) {
+            if model.matches(item) {
               attention(item)
               Divider().padding(.vertical, 24)
             }
@@ -31,7 +31,7 @@ struct MyWorkView: View {
               Divider().padding(.vertical, 24)
             }
           }
-          let proposals = work.items.filter { $0.kind == "proposal" }
+          let proposals = model.proposals
           if !proposals.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
               Text("Proposed tasks · \(proposals.count)").font(.headline)
@@ -92,7 +92,7 @@ struct MyWorkView: View {
     case "question": "A question for you"
     case "proposal": "Proposed tasks"
     case "answer": "An answer to accept"
-    case "doc-proposal": "Document proposals"
+    case "doc_proposal": "Document proposals"
     default: item.kind.replacingOccurrences(of: "-", with: " ").capitalized
     }
   }

@@ -31,6 +31,18 @@ final class AppModel {
     search.isEmpty || values.contains { $0.localizedCaseInsensitiveContains(search) }
   }
 
+  func matches(_ item: AppAttention) -> Bool {
+    matches(
+      [
+        item.kind, item.ref ?? "", item.task ?? "", item.title ?? "", item.body ?? "",
+        item.author ?? "",
+      ] + item.refs)
+  }
+
+  var proposals: [AppAttention] {
+    visibleData?.snapshot?.work.items.filter { $0.kind == "proposal" && matches($0) } ?? []
+  }
+
   var visibleData: AppLoadedData? { data?.workspace == workspace ? data : nil }
 
   @discardableResult func refresh(force: Bool = false) -> Task<Void, Never> {
