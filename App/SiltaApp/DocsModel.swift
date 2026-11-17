@@ -3,9 +3,11 @@ import Observation
 import SiltaAppSupport
 
 @MainActor @Observable final class DocsModel {
-  typealias ListLoader = @MainActor (AppReader, String, String?, Bool, Int) async throws ->
+  typealias ListLoader =
+    @MainActor (AppReader, String, String?, Bool, Int) async throws ->
     AppDocumentList
-  typealias VersionsLoader = @MainActor (AppReader, String, String, Int) async throws ->
+  typealias VersionsLoader =
+    @MainActor (AppReader, String, String, Int) async throws ->
     AppDocumentList
   private let readList: ListLoader
   private let readVersions: VersionsLoader
