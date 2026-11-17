@@ -8,20 +8,17 @@
       }
     }
 
-    static func validate(environment: [String: String], temporaryRoots: [URL], forbiddenHome: URL)
+    static func validate(environment: [String: String], temporaryRoots: [URL])
       throws
     {
       guard hosted(environment: environment) || environment["SILTA_APP_TESTING"] != nil else {
         return
       }
       guard environment["SILTA_APP_TESTING"] == "1",
-        let path = environment["SILTA_HOME"], path.hasPrefix("/"),
-        environment["SILTA_APP_TEST_HOME"] == path,
-        !path.contains("$("), !path.contains("${")
+        let path = environment["SILTA_HOME"], path.hasPrefix("/")
       else { throw Refusal.unsafeHome }
       let home = URL(filePath: path).resolvingSymlinksInPath().standardizedFileURL.path
-      let forbidden = forbiddenHome.resolvingSymlinksInPath().standardizedFileURL.path
-      guard home != forbidden, !home.hasPrefix(forbidden + "/"),
+      guard
         temporaryRoots.contains(where: {
           home.hasPrefix($0.resolvingSymlinksInPath().standardizedFileURL.path + "/")
         })

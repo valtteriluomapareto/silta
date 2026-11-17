@@ -88,10 +88,9 @@ the human copies.
     quoting, so a custom app home cannot recover a different default store.
   - Reads aren't logged; §19 logging belongs to the CLI front-end.
 - **Freshness:** check `PRAGMA data_version` when the window gains focus, on ⌘R, and
-  on a 5-second timer while the window is frontmost. Reload when it changed, a task
-  proposal/day/week deadline expires, or a one-minute cache ceiling is reached. The
-  ceiling bounds clock-only document-attention staleness until its exact expiry is
-  available to the viewer; a foreground tick adds at most five seconds. The
+  on a 5-second timer while the window is frontmost. Reload when it changed or a
+  one-minute cache ceiling is reached. The ceiling bounds clock-only staleness;
+  a foreground tick adds at most five seconds. The
   §17 change signal (`notify_post` after each commit) replaces the timer once a slice
   adds it to SiltaCore writes.
 - **Copy text:** runnable templates carry the selected `SILTA_HOME`. Use the inbox's
@@ -111,7 +110,7 @@ the human copies.
 | A2 (SI-145) | Running Debug app: sidebar, My work, copyable refs/commands, isolated fixture launch, store states and refresh; folds SI-175, SI-176 and A2c into one screen PR. SI-173 commands can land separately | A1a, A1b | Native view-model tests, Debug/Release builds and a real fixture click/keyboard pass |
 | A3 | Board and task inspector | A2 | View-model tests on the seed; manual pass |
 | A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed; manual pass |
-| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on fixture docs; manual pass |
+| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; manual pass |
 
 Delivery order is My work, Board, Workspace, then Docs: one screen per PR.
 Use a short `task plan` and one independent combined Architect/Tester implementation
@@ -140,7 +139,7 @@ the task and report which tasks the maintainer can close; do not mark them done.
   - `verify.sh app` runs `xcodebuild test` for `SiltaAppTests` (Debug), then
     `xcodebuild build` (Release). Release on every PR proves the DEBUG-only control code
     compiles out. Both runs:
-    - use `-derivedDataPath .build/app-control-tests` and `-clonedSourcePackagesDirPath`;
+    - use `-derivedDataPath .build/app/DerivedData` and `-clonedSourcePackagesDirPath`;
     - use `-onlyUsePackageVersionsFromResolvedFile`, with MarkdownUI pinned in the
       project's own `Package.resolved` (D18);
     - set `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the project, so local builds match;

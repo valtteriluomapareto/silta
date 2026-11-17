@@ -21,6 +21,7 @@ run_guard() {
 }
 
 run_guard guard-selftests python3 -B -m unittest discover -s scripts/tests -q
+run_guard app-boundary python3 -B scripts/guards/check_app_boundary.py
 run_guard core-boundary python3 -B scripts/guards/check_core_boundary.py
 run_guard core-determinism python3 -B scripts/guards/check_core_determinism.py
 run_guard test-waits python3 -B scripts/guards/check_test_waits.py
