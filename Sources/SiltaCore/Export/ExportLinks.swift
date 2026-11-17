@@ -2,10 +2,6 @@ import GRDB
 
 /// Workspace-owned link rows with typed stable UID ends.
 enum ExportLinks {
-  static let tables = ExportFormat.linkTables.merging([
-    "doc": "doc", "doc_rev": "doc_rev", "edge": "edge", "service": "service",
-  ]) { _, new in new }
-
   static func read(_ db: Database, workspace: Int64) throws -> [ExportRow] {
     try Array(
       Row.fetchCursor(db, sql: query, arguments: [workspace]).map {

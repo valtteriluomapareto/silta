@@ -15,31 +15,30 @@ struct RestoreSnapshotPreflightTests {
       let store = try RestoreDocumentGraphFixture.source(home)
       try Self.foreignRows(store)
       var graph = try RestoreDocumentGraphFixture.graph()
-      graph.tree.documents = graph.documents
       try store.write(rollingBack: true) { tx in
-        var writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
+        var writer = RestoreWriter(tx: tx, tree: graph, slug: "acme")
         writer.workspace = 17
         try writer.checkForeignUIDs()
       }
       switch kind {
       case "doc":
-        graph.tree.documents.documents[0].row = graph.tree.documents.documents[0].row.replacing(
+        graph.documents.documents[0].row = graph.documents.documents[0].row.replacing(
           "uid", with: "other-doc", keys: ExportFormat.docKeys)
       case "doc_rev":
-        RestoreDocumentGraphFixture.record(&graph.tree.documents, 0, "uid", "other-revision")
+        RestoreDocumentGraphFixture.record(&graph.documents, 0, "uid", "other-revision")
       case "doc_verification":
-        RestoreDocumentGraphFixture.record(&graph.tree.documents, 5, "uid", "foreign-verification")
+        RestoreDocumentGraphFixture.record(&graph.documents, 5, "uid", "foreign-verification")
       case "task-comment":
-        var row = try #require(graph.tree.tasks[0].records.first { $0.value("table") == "comment" })
+        var row = try #require(graph.tasks[0].records.first { $0.value("table") == "comment" })
         row = row.replacing("uid", with: "foreign-doc-comment", keys: ExportFormat.records[2].keys)
-        graph.tree.tasks[0].records = [row]
+        graph.tasks[0].records = [row]
       default:
         let uid = kind == "doc-comment" ? "foreign-task-comment" : "foreign-doc-comment"
-        RestoreDocumentGraphFixture.record(&graph.tree.documents, 6, "uid", uid)
+        RestoreDocumentGraphFixture.record(&graph.documents, 6, "uid", uid)
       }
       let before = try RestoreSupport.dump(store)
       try store.write(rollingBack: true) { tx in
-        var writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
+        var writer = RestoreWriter(tx: tx, tree: graph, slug: "acme")
         writer.workspace = 17
         do {
           try writer.checkForeignUIDs()
@@ -60,11 +59,10 @@ struct RestoreSnapshotPreflightTests {
           sql: "UPDATE doc SET uid=? WHERE id=92", arguments: ["cafe\u{301}"])
       }
       var graph = try RestoreDocumentGraphFixture.graph()
-      graph.tree.documents = graph.documents
-      graph.tree.documents.documents[0].row = graph.tree.documents.documents[0].row.replacing(
+      graph.documents.documents[0].row = graph.documents.documents[0].row.replacing(
         "uid", with: "caf\u{e9}", keys: ExportFormat.docKeys)
       try store.write(rollingBack: true) { tx in
-        var writer = RestoreWriter(tx: tx, tree: graph.tree, slug: "acme")
+        var writer = RestoreWriter(tx: tx, tree: graph, slug: "acme")
         writer.workspace = 17
         try writer.checkForeignUIDs()
       }
@@ -82,7 +80,7 @@ struct RestoreSnapshotPreflightTests {
             VALUES(2000,'owned-task-comment',700,1,'comment','','human:acme','')
             """)
       }
-      let tree = try RestoreDocumentGraphFixture.graph().tree
+      let tree = try RestoreDocumentGraphFixture.graph()
       try store.write(rollingBack: true) { tx in
         var writer = RestoreWriter(tx: tx, tree: tree, slug: "acme")
         writer.workspace = 17

@@ -76,7 +76,7 @@ struct DocProposalExportTests {
         "about_targets", with: snapshot, keys: keys)
       #expect(throws: ExportError.self) {
         let parsed = try ExportTree.parse(tree.files())
-        try RestoreDocumentGraph(tree: parsed, documents: parsed.documents, slug: "acme").run()
+        try RestoreDocumentGraph(tree: parsed, slug: "acme").run()
       }
     }
   }

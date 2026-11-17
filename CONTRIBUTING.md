@@ -37,6 +37,10 @@ export PATH="$(paste -sd: "$silta_tools/path"):$PATH"
 | `scripts/verify.sh app` | Guards/lint, isolated hosted Debug app tests, nonempty/no-skip required-suite xcresult checks, then native Release build | Visual appearance, interaction and Screen Recording permission |
 | `scripts/verify.sh evals` | Builds the CLI, then the offline agent eval replays (`scripts/run-eval-tests.py`: one process per `Evals/tests` module, in parallel) | Swift tests, real agent use |
 
+`full-swift` bounds parallel test cases using the pinned Swift Testing runner.
+Concurrency and stress tests still create their own concurrent work; their assertions
+and timeouts are unchanged. The wall-clock tier runs separately and serially.
+
 CI runs `full-swift`, `evals` and `app` as three parallel jobs on the `xcode-27` runner, and a
 `verify` job, the required check, passes only when all succeed. Three macOS jobs per run
 also means three chances to wait for a preview runner. The `swift` job reuses the prior-writer

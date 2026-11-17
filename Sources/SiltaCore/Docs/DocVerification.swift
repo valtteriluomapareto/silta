@@ -61,13 +61,6 @@ struct DocVerification: Sendable {
   let binding: Binding
   let snapshots: [Snapshot]
 
-  static func prepare(_ draft: DocDraft, workspace: Int64, environment: SiltaEnvironment)
-    async throws -> Self
-  {
-    let binding = try readBinding(draft, workspace: workspace, store: environment.db)
-    return try await prepare(binding, environment: environment)
-  }
-
   static func prepare(_ binding: Binding, environment: SiltaEnvironment) async throws -> Self {
     let code = CodeService(
       workspace: binding.workspace, store: environment.db, git: environment.git,

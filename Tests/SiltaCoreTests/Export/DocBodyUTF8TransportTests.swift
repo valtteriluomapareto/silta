@@ -43,10 +43,9 @@ struct DocBodyUTF8TransportTests {
         graph.documents.documents[0].records[index] = graph.documents.documents[0].records[index]
           .replacing("body_md", with: body, keys: ExportFormat.docRecords[0].keys)
       }
-      graph.tree.documents = graph.documents
       let kept = try RestoreDocumentRowSupport.keptRows(store)
       let expected = try RestoreDocumentRowSupport.replace(
-        store, tree: graph.tree, incoming: graph.documents)
+        store, tree: graph, incoming: graph.documents)
       let bytes = try Self.bodies(store)
       let wanted = Array(repeating: Data(body.utf8), count: 5)
       #expect(bytes == wanted)

@@ -1,6 +1,7 @@
 """Document outcomes use real CLI state and authored native evidence, never a model."""
 from contextlib import closing
 import copy
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -18,7 +19,6 @@ import evals
 
 BINARY = ROOT.parent / '.build/debug/silta'
 STUB = ROOT / 'tests/stub_harness.py'
-TOKEN = 'UNSORTED_Q7'
 ACTOR = 'agent:codex:doc-trial'
 FOREIGN = 'agent:codex:other'
 
@@ -38,6 +38,7 @@ class DocContext(unittest.TestCase):
         with patch.object(evals, 'silta', side_effect=seed):
             self.env, self.cwd, sha, controls = evals.prepare(
                 self.root, BINARY, 'codex', 'doc-context', 'default')
+        self.token = controls['doc_fixture']['token']
         self.e = dict(scenario='doc-context', harness='codex', provenance='live', sha=sha,
                       baseline=evals.snapshot(self.root / 'data', self.root / 'repos'),
                       controls=controls, phases=[])
@@ -88,7 +89,7 @@ class DocContext(unittest.TestCase):
 
     def test_plan_outcome_needs_no_doc_read(self):
         self.prepare()
-        self.phase(lambda: self.run_cli(['task', 'plan', 'AC-1', '-F', '-', '--json'], stdin=TOKEN))
+        self.phase(lambda: self.run_cli(['task', 'plan', 'AC-1', '-F', '-', '--json'], stdin=self.token))
         self.assertTrue(self.outcome(), 'a real trial plan is the approved outcome, without doc show')
         for field, value in [('actor', FOREIGN), ('task_id', 999)]:
             e = copy.deepcopy(self.e)
@@ -102,15 +103,15 @@ class DocContext(unittest.TestCase):
         self.prepare()
         if method == 'plan':
             self.phase(lambda: self.run_cli(['task', 'plan', 'AC-1', '-F', '-', '--json'],
-                                           stdin=TOKEN + 'ä'))
+                                           stdin=self.token + 'ä'))
         else:
-            self.phase(lambda: self.edit(result=TOKEN + 'ä'))
+            self.phase(lambda: self.edit(result=self.token + 'ä'))
         self.assertFalse(self.outcome(), method + ' must reject a real Unicode-suffixed outcome')
-        for body, expected in [(TOKEN, True), ('Use ' + TOKEN + '.', True),
-                               ('(' + TOKEN + ')', True), ('NOT_' + TOKEN, False),
-                               (TOKEN + '_EXTRA', False), (TOKEN.lower(), False),
-                               ('é' + TOKEN, False), (TOKEN + 'ä', False),
-                               ('٢' + TOKEN, False), (TOKEN + '٢', False)]:
+        for body, expected in [(self.token, True), ('Use ' + self.token + '.', True),
+                               ('(' + self.token + ')', True), ('NOT_' + self.token, False),
+                               (self.token + '_EXTRA', False), (self.token.lower(), False),
+                               ('é' + self.token, False), (self.token + 'ä', False),
+                               ('٢' + self.token, False), (self.token + '٢', False)]:
             evidence = copy.deepcopy(self.e)
             state = evidence['phases'][-1]['state']
             if method == 'plan':
@@ -136,12 +137,12 @@ class DocContext(unittest.TestCase):
                 def write():
                     if method == 'edit':
                         self.run_cli(['task', 'start', 'AC-1', '--json'])
-                        self.edit(result=TOKEN)
+                        self.edit(result=self.token)
                     elif method == 'triage':
-                        self.run_cli(['task', 'triage', '--drop', 'AC-1', '-m', TOKEN,
+                        self.run_cli(['task', 'triage', '--drop', 'AC-1', '-m', self.token,
                                       '--approved', 'Synthetic Acme attribution test.', '--json'])
                     else:
-                        self.run_cli(['task', method, 'AC-1', '-m', TOKEN,
+                        self.run_cli(['task', method, 'AC-1', '-m', self.token,
                                       *(['--no-sha'] if method == 'done' else []), '--json'])
                 self.phase(write)
                 self.assertTrue(self.outcome(), 'actual ' + method + ' result must count')
@@ -151,28 +152,28 @@ class DocContext(unittest.TestCase):
         self.prepare()
         def write():
             self.run_cli(['task', 'done', 'AC-1', '-m', 'Acme work finished.', '--no-sha', '--json'])
-            self.edit(result=TOKEN, actor=FOREIGN)
+            self.edit(result=self.token, actor=FOREIGN)
             self.edit(title='Acme title changed')
         self.phase(write)
         self.assertFalse(self.outcome())
         self.phase(lambda: self.edit(title='Acme another title'))
         self.assertFalse(self.outcome())
-        self.phase(lambda: self.edit(result='Use ' + TOKEN))
+        self.phase(lambda: self.edit(result='Use ' + self.token))
         self.assertTrue(self.outcome(), 'a later exclusive changed-result interval reestablishes ownership')
         self.phase(lambda: self.edit(title='Acme foreign title', actor=FOREIGN))
         self.assertFalse(self.outcome(), 'foreign title-only candidate is explicitly unproven')
-        self.phase(lambda: self.run_cli(['task', 'plan', 'AC-1', '-F', '-', '--json'], stdin=TOKEN))
+        self.phase(lambda: self.run_cli(['task', 'plan', 'AC-1', '-F', '-', '--json'], stdin=self.token))
         self.assertTrue(self.outcome(), 'the independent plan alternative survives')
 
     def test_result_baseline_identity_history_and_tool_evidence(self):
         self.prepare()
-        self.phase(lambda: self.edit(result=TOKEN))
+        self.phase(lambda: self.edit(result=self.token))
         self.assertTrue(self.outcome())
         for change in ['baseline', 'identity', 'event', 'native', 'logs', 'partial', 'chat']:
             e = copy.deepcopy(self.e)
             state = e['phases'][-1]['state']
             if change == 'baseline':
-                e['baseline']['tasks'][0]['result_md'] = TOKEN
+                e['baseline']['tasks'][0]['result_md'] = self.token
             elif change == 'identity':
                 state['tasks'][0]['uid'] = 'different'
             elif change == 'event':
@@ -182,10 +183,10 @@ class DocContext(unittest.TestCase):
             elif change == 'logs':
                 e['phases'][0]['logs'] = []
             elif change == 'partial':
-                state['tasks'][0]['result_md'] = 'NOT_' + TOKEN
+                state['tasks'][0]['result_md'] = 'NOT_' + self.token
             else:
                 state['tasks'][0]['result_md'] = ''
-                e['phases'][0]['messages'] = [TOKEN]
+                e['phases'][0]['messages'] = [self.token]
             with self.subTest(change=change):
                 self.assertFalse(self.outcome(e))
 
@@ -194,18 +195,19 @@ class DocContext(unittest.TestCase):
         with closing(sqlite3.connect(self.root / 'data/silta.db')) as db:
             rows = db.execute('SELECT d.slug,r.body_md FROM doc d JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev').fetchall()
         self.assertEqual(len(rows), 1, 'the primary fixture must seed an accepted edge doc')
-        self.assertIn(TOKEN, rows[0][1])
+        self.assertIn(self.token, rows[0][1])
         env = dict(self.env, SILTA_ACTOR=ACTOR)
         for args in [['brief', '--json'], ['doc', 'ls', '--about', 'edge:acme-mobile/acme-backend/http-api', '--json']]:
             output = evals.silta(env, self.cwd, args)['stdout']
             self.assertIn('doc:' + rows[0][0], output)
-            self.assertNotIn(TOKEN, output)
+            self.assertNotIn(self.token, output)
         for path in (self.root / 'repos').rglob('*'):
             if path.is_file() and '.git' not in path.parts:
-                self.assertNotIn(TOKEN, path.read_text())
+                self.assertNotIn(self.token, path.read_text())
         spec = (ROOT / 'scenarios/doc-context/scenario.yaml').read_text()
-        self.assertNotIn(TOKEN, spec)
-        self.assertNotIn(TOKEN, rows[0][1].splitlines()[0])
+        self.assertNotIn(self.token, spec)
+        self.assertNotIn(self.token, next(line.strip() for line in rows[0][1].splitlines()
+                                        if line.strip() and not line.lstrip().startswith('#')))
 
     def trial(self, harness, scenario, recording='pass'):
         output = self.root / (harness + '-' + scenario + '-' + recording)
@@ -221,7 +223,8 @@ class DocContext(unittest.TestCase):
                 self.assertTrue(result['checks'].get('doc_context', False))
                 self.assertTrue(result['checks']['stream_complete'])
                 self.assertTrue(any(log['command'] == 'silta doc show' for log in evidence['phases'][0]['logs']))
-                self.assertTrue(any(TOKEN in row['body_md'] for row in evidence['phases'][0]['state']['plans']))
+                self.assertTrue(any(evidence['controls']['doc_fixture']['token'] in row['body_md']
+                                    for row in evidence['phases'][0]['state']['plans']))
                 failed, _ = self.trial(harness, 'doc-context', 'fail')
                 self.assertFalse(failed['checks'].get('doc_context', False))
 
@@ -230,14 +233,14 @@ class DocContext(unittest.TestCase):
         def seed(env, cwd, args, stdin=None, **options):
             if args[:2] == ['doc', 'edit']:
                 args = [*args[:2], 'acme-other-rule', *args[3:]]
-                stdin = stdin.replace(TOKEN, 'ACME_ALTERNATE_42')
+                stdin = re.sub(r'(?<=Fallback category: )[A-Z0-9_]+', 'ACME_ALTERNATE_42', stdin)
             return real(env, cwd, args, stdin, **options)
         with patch.object(evals, 'silta', side_effect=seed):
             _, e = self.trial('codex', 'doc-context')
         plans = e['phases'][0]['state']['plans']
         self.assertTrue(any('ACME_ALTERNATE_42' in row['body_md'] for row in plans))
         self.assertTrue(any('acme-other-rule' in c and 'doc show' in c for c in e['phases'][0]['commands']))
-        self.assertFalse(any(TOKEN in row['body_md'] for row in plans))
+        self.assertFalse(any(e['controls']['doc_fixture']['token'] in row['body_md'] for row in plans))
 
     def test_explicit_control_has_raw_failure_full_reports_and_no_infrastructure_error(self):
         for harness in ['claude', 'codex']:
@@ -248,7 +251,7 @@ class DocContext(unittest.TestCase):
                                           '--stub', str(STUB), '--harness', harness, '--scenario',
                                           'doc-context-no-doc', '--recording', recording, '--repeats', '3',
                                           '--output', str(output)], text=True, capture_output=True)
-                    self.assertEqual(run.returncode, 1, run.stderr)
+                    self.assertEqual(run.returncode, 0, run.stderr)
                     report = json.loads((output / 'report.json').read_text())
                     self.assertTrue((output / 'report.html').exists())
                     self.assertEqual(len(report['trials']), 3)
@@ -269,11 +272,13 @@ class DocContext(unittest.TestCase):
                     self.assertEqual(report['groups'][0]['repeats'], 3)
                     self.assertEqual(report['groups'][0]['pass_rate'], 0)
                     self.assertFalse(report['groups'][0]['all_repeats_pass'])
+                    self.assertIs(report['groups'][0].get('diagnostic'), True)
+                    self.assertIn('Diagnostic', (output / 'report.html').read_text())
 
     def test_default_core_and_explicit_control_selection(self):
-        for selection, expected in [([], set(evals.SCENARIOS) - {'doc-context-no-doc'}),
+        for selection, expected in [([], set(evals.SCENARIOS)),
                                     (['--core'], {'start-cross-repo', 'plan-not-file',
-                                                  'handoff-resume', 'done-with-result'}),
+                                                  'handoff-resume', 'done-with-result', 'doc-context-no-doc'}),
                                     (['--scenario', 'doc-context-no-doc'], {'doc-context-no-doc'})]:
             calls = []
             def observe(*args, **kwargs):
@@ -286,3 +291,116 @@ class DocContext(unittest.TestCase):
                 self.assertEqual(evals.main(), 1)
             self.assertEqual(set(calls), {(adapter, scenario) for adapter in ['claude', 'codex']
                                          for scenario in expected})
+
+    def test_trial_token_is_seeded_in_evidence_and_only_below_summary(self):
+        self.prepare()
+        fixture = self.e['controls'].get('doc_fixture')
+        self.assertIsInstance(fixture, dict)
+        seed, token = fixture.get('seed'), fixture.get('token')
+        self.assertIsInstance(seed, str)
+        self.assertEqual(token, 'UNSORTED_' + hashlib.sha256(seed.encode()).hexdigest()[:16].upper())
+        with closing(sqlite3.connect(self.root / 'data/silta.db')) as db:
+            body = db.execute('SELECT body_md FROM doc_rev').fetchone()[0]
+        summary = next(line.strip() for line in body.splitlines()
+                       if line.strip() and not line.lstrip().startswith('#'))
+        self.assertNotIn(token, summary)
+        self.assertIn(token, body)
+        other = self.root / 'same-seed'
+        other.mkdir()
+        _, _, _, controls = evals.prepare(other, BINARY, 'codex', 'doc-context', 'default', seed=seed)
+        self.assertEqual(controls['doc_fixture'], fixture)
+        fresh = self.root / 'fresh-seed'
+        fresh.mkdir()
+        _, _, _, changed = evals.prepare(fresh, BINARY, 'codex', 'doc-context', 'default')
+        self.assertNotEqual(changed['doc_fixture']['seed'], seed)
+        self.assertNotEqual(changed['doc_fixture']['token'], token)
+
+    def test_control_requires_valid_token_evidence_and_all_global_checks(self):
+        result, evidence = self.trial('codex', 'doc-context-no-doc')
+        self.assertIs(result['checks'].get('doc_fixture'), True)
+        for damage in ['missing', 'seed', 'token', 'type']:
+            changed = copy.deepcopy(evidence)
+            fixture = changed['controls']['doc_fixture']
+            if damage == 'missing':
+                del changed['controls']['doc_fixture']
+            elif damage == 'type':
+                fixture['seed'] = 42
+            else:
+                fixture[damage] += 'ALTERED'
+            grade = evals.grade(changed)
+            self.assertIs(grade['checks']['doc_fixture'], False)
+            self.assertFalse(grade['passed'])
+            self.assertEqual(self.diagnostic_exit(dict(result, **grade), damage), 1)
+        self.assertEqual(self.diagnostic_exit(result, 'valid'), 0)
+        for name in result['checks']:
+            values = [None, 'missing'] if name == 'doc_context' else [False, None, 'missing']
+            for value in values:
+                changed = copy.deepcopy(result)
+                if value == 'missing':
+                    del changed['checks'][name]
+                else:
+                    changed['checks'][name] = value
+                self.assertEqual(self.diagnostic_exit(changed, name + str(value)), 1)
+        primary = dict(result, scenario='doc-context')
+        self.assertEqual(self.diagnostic_exit(primary, 'primary'), 1)
+
+    def diagnostic_exit(self, trial, name):
+        output = self.root / ('exit-' + name)
+        argv = ['evals', '--silta', str(BINARY), '--stub', str(STUB), '--harness', 'codex',
+                '--scenario', trial['scenario'], '--repeats', '1', '--output', str(output)]
+        with patch.object(sys, 'argv', argv), patch.object(evals, 'run_trial', return_value=trial):
+            return evals.main()
+
+    def test_review_regrades_diagnostic_without_hiding_invalid_evidence(self):
+        result, original = self.trial('codex', 'doc-context-no-doc')
+        folder = self.root / 'regrade'
+        folder.mkdir()
+        for damage in ['none', 'token', 'stream', 'controls', 'unbound']:
+            evidence = copy.deepcopy(original)
+            evidence['provenance'] = 'live'
+            evidence['review'] = None
+            if damage == 'token':
+                evidence['controls'].pop('doc_fixture', None)
+            if damage == 'stream':
+                evidence['phases'][0]['complete'] = False
+            if damage == 'controls':
+                evidence['controls'] = None
+            verdict = {'digest': evals.review_digest(evidence), 'reviewer': 'fixture-maintainer',
+                       'checks': ['tool-audit'], 'citations': ['phase-0.jsonl: recorded commands']}
+            if damage == 'unbound':
+                verdict['digest'] = 'unbound'
+            row = dict(result, evidence='evidence.json')
+            report = evals.aggregate([row], 'live')
+            report.update(commit='fixture', dirty=False, binary_sha256='fixture')
+            evals.write_json(folder / 'evidence.json', evidence)
+            evals.write_json(folder / 'report.json', report)
+            evals.write_json(folder / 'verdicts.json', {evidence['id']: verdict})
+            run = subprocess.run([sys.executable, '-B', str(ROOT / 'review.py'), str(folder),
+                                  str(folder / 'verdicts.json')], capture_output=True, text=True)
+            self.assertEqual(run.returncode, 0 if damage == 'none' else 1, run.stderr)
+            if damage != 'unbound':
+                updated = json.loads((folder / 'report.json').read_text())
+                self.assertFalse(updated['trials'][0]['passed'])
+                self.assertEqual(updated['groups'][0]['pass_rate'], 0)
+                self.assertIs(updated['groups'][0].get('diagnostic'), True)
+                if damage == 'controls':
+                    self.assertIs(updated['trials'][0]['checks']['doc_fixture'], False)
+
+    def test_malformed_controls_have_a_structured_mandatory_failure(self):
+        result, original = self.trial('codex', 'doc-context-no-doc')
+        for scenario in ['doc-context', 'doc-context-no-doc']:
+            for container in [None, [], 'unrecorded']:
+                with self.subTest(scenario=scenario, container=container):
+                    evidence = copy.deepcopy(original)
+                    evidence['scenario'] = scenario
+                    evidence['controls'] = container
+                    graded, failure = None, None
+                    try:
+                        graded = evals.grade(evidence)
+                    except (AttributeError, TypeError) as error:
+                        failure = str(error)
+                    self.assertIsNone(failure, 'Malformed fixture evidence must produce a grade')
+                    self.assertIs(graded['checks']['doc_fixture'], False)
+                    self.assertFalse(graded['passed'])
+                    name = scenario + type(container).__name__
+                    self.assertEqual(self.diagnostic_exit(dict(result, scenario=scenario, **graded), name), 1)

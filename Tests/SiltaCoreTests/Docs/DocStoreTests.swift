@@ -11,6 +11,15 @@ struct DocStoreTests {
   static let actor = ActorID.agent(tool: "codex", session: "acme")
   static let instant = AcmeDocAttachments.instant
 
+  static func binding(_ draft: DocDraft, workspace: Int64 = 1, store: DatabaseStore) throws
+    -> DocVerification.Binding
+  {
+    try store.read { db in
+      try DocVerification.binding(
+        DocMetadata.resolve(draft, workspace: workspace, in: db), workspace: workspace, in: db)
+    }
+  }
+
   static func writer(_ tx: StorageTransaction, ids: any IDGenerator) -> DocStore {
     DocStore(workspace: 1, transaction: tx, actor: actor, ids: ids, at: instant)
   }
@@ -18,7 +27,7 @@ struct DocStoreTests {
   static func accept(_ draft: DocDraft, in store: DatabaseStore, ids: any IDGenerator) throws
     -> DocRevision
   {
-    let binding = try DocVerification.readBinding(draft, workspace: 1, store: store)
+    let binding = try DocStoreTests.binding(draft, workspace: 1, store: store)
     let verification = DocVerification(
       binding: binding,
       snapshots: binding.apps.map {

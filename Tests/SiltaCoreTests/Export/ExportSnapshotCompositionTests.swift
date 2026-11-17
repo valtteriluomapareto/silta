@@ -55,12 +55,11 @@ struct ExportSnapshotCompositionTests {
 
   @Test func formatOneCannotHideDocumentsOrStandaloneReservations() throws {
     var graph = try RestoreDocumentGraphFixture.graph()
-    graph.tree.documents = graph.documents
-    graph.tree.format = "1"
-    #expect(throws: ExportError.self) { try graph.tree.files() }
-    graph.tree.documents.documents = []
-    graph.tree.documents.legacyCommentSequences = nil
-    #expect(throws: ExportError.self) { try graph.tree.files() }
+    graph.format = "1"
+    #expect(throws: ExportError.self) { try graph.files() }
+    graph.documents.documents = []
+    graph.documents.legacyCommentSequences = nil
+    #expect(throws: ExportError.self) { try graph.files() }
   }
 
   @Test func rawCaptureCanReadDestinationMetadataThatNeedsRepair() throws {
@@ -74,7 +73,7 @@ struct ExportSnapshotCompositionTests {
       let document = try #require(snapshot.documents.documents.first)
       #expect(document.row.value("title") == "Broken projection")
       #expect(throws: ExportError.self) {
-        try RestoreDocumentGraph(tree: snapshot, documents: snapshot.documents, slug: "acme").run()
+        try RestoreDocumentGraph(tree: snapshot, slug: "acme").run()
       }
       #expect(try RestoreSupport.dump(store) == before)
     }
@@ -89,7 +88,7 @@ struct ExportSnapshotCompositionTests {
     RestoreDocumentGraphFixture.document(&graph.documents, key, composed)
     RestoreDocumentGraphFixture.record(&graph.documents, 1, key, decomposed)
     #expect(throws: ExportError.self) {
-      try RestoreDocumentGraph(tree: graph.tree, documents: graph.documents, slug: "acme").run()
+      try RestoreDocumentGraph(tree: graph, slug: "acme").run()
     }
   }
 }

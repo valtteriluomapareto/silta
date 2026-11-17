@@ -26,6 +26,9 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 ## Agent sessions
 
 2 sessions; median 3.5 calls; maximum 4 calls.
+Observed brief document exposure: 0 agent sessions; 0 previews.
+Observed brief document pointers: 0 counted documents.
+Legacy brief exposure unknown: 0 calls.
 
 ## Warnings
 
@@ -112,3 +115,16 @@ Triage wait: median 20159.5 min; maximum 30240 min.
 Questions to @me: n/a (S11).
 Inbox size and oldest item: n/a (S11).
 Target: under 12 inbox items, none older than one week.
+
+## Document proposals
+
+Known submissions created in range: 0.
+Known decisions in range: 0 accepted; 0 rejected; acceptance rate n/a.
+Decision wait: median n/a; maximum n/a.
+Decision waits unavailable: 0.
+Pending at report time: 0; crossed 14 days in range: 0.
+Unattributed terminal history created in range: 0 (direct or legacy; not known proposal decisions).
+Successful doc-triage batches observed in range: 0 human; 0 agent.
+Recorded doc-triage approvals in range: 0.
+Observed approvals per successful batch (human + agent): n/a.
+Batch coverage: incomplete; absent, rotated, untagged, unreadable or inconsistent evidence prevents a ratio.

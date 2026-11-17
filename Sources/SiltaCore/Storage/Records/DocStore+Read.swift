@@ -13,19 +13,12 @@ extension DocStore {
         """, arguments: [workspace, slug, revision])
     defer { withExtendedLifetime(cursor) {} }
     guard let row = try cursor.next() else { throw DocError.notFound(slug + "@\(revision)") }
-    func text(_ name: String) throws -> String? {
-      try row.withUnsafeData(named: name) { bytes in
-        guard let bytes else { return nil }
-        guard let value = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
-        return value
-      }
-    }
-    guard let storedSlug = try text("slug"), let body = try text("body_md"),
-      let state = try text("state"), let actor = try text("actor"),
-      let createdAt = try text("created_at")
+    guard let storedSlug = try row.strictText("slug"), let body = try row.strictText("body_md"),
+      let state = try row.strictText("state"), let actor = try row.strictText("actor"),
+      let createdAt = try row.strictText("created_at")
     else { throw StorageError.corrupt }
-    let raw = try text("about_refs")
-    let rawTargets = try text("about_targets")
+    let raw = try row.strictText("about_refs")
+    let rawTargets = try row.strictText("about_targets")
     let about: [String]?
     let targets: [DocTargetIdentity]?
     do {
@@ -35,13 +28,14 @@ extension DocStore {
       }
     } catch { throw StorageError.corrupt }
     let source = try sourceTask(row["source_task_id"], workspace: workspace, in: db)
-    let triagedBy = try text("triaged_by")
-    let triagedAt = try text("triaged_at")
+    let triagedBy = try row.strictText("triaged_by")
+    let triagedAt = try row.strictText("triaged_at")
     guard (triagedBy == nil) == (triagedAt == nil) else { throw StorageError.corrupt }
     return try DocRevision(
       slug: storedSlug, revision: row["rev"], baseRevision: row["base_rev"],
-      body: body, title: text("title"), kind: text("kind"), about: about, aboutTargets: targets,
-      state: state, actor: actor, message: text("message"),
+      body: body, title: row.strictText("title"), kind: row.strictText("kind"), about: about,
+      aboutTargets: targets,
+      state: state, actor: actor, message: row.strictText("message"),
       createdAt: createdAt, sourceTask: source, triagedBy: triagedBy, triagedAt: triagedAt)
   }
   private static func sourceTask(_ id: Int64?, workspace: Int64, in db: Database) throws -> String?

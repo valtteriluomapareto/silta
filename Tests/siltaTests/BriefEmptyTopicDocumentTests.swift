@@ -8,6 +8,14 @@ import Testing
 struct BriefEmptyTopicDocumentTests {
   @Test(arguments: [false, true])
   func acceptedEdgeDocWorksInFullTinyAndCompactBriefs(json: Bool) throws {
+    try Self.withAcceptedEdgeDocument { repo, scratch in
+      for flags in [[], ["--budget", "1"], ["--short"]] {
+        try Self.check(flags, json: json, repo: repo, scratch: scratch)
+      }
+    }
+  }
+
+  static func withAcceptedEdgeDocument(_ check: (URL, URL) throws -> Void) throws {
     try withScratchDirectory { scratch in
       let fixture = CodeCommandTests()
       let root = try fixture.setup(scratch)
@@ -36,17 +44,16 @@ struct BriefEmptyTopicDocumentTests {
         ],
         in: scratch, cwd: repo, environment: TaskCommandTests.actor)
       try #require(edit.termination == .exit(0), "\(edit.stdout)\(edit.stderr)")
-      for flags in [[], ["--budget", "1"], ["--short"], ["--hook"]] {
-        try Self.check(flags, json: json, repo: repo, scratch: scratch)
-      }
+      try check(repo, scratch)
     }
   }
 
-  private static func check(_ flags: [String], json: Bool, repo: URL, scratch: URL) throws {
+  static func check(_ flags: [String], json: Bool, repo: URL, scratch: URL) throws {
     let result = try SiltaBinary.run(
       ["--ws", "acme", "brief", "--app", "console"] + flags + (json ? ["--json"] : []),
       in: scratch, cwd: repo, environment: TaskCommandTests.actor)
     try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
+    try #require(!result.stdout.isEmpty, "No output for brief flags: \(flags)")
     if json {
       let root = try #require(
         JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])

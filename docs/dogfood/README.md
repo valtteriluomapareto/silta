@@ -138,14 +138,13 @@ workspace and excludes its own actor's calls and approvals.
   Failures before CLI environment setup are not logged and cannot appear here.
 - **Repeated failures** means adjacent failures within the selected Silta stream for
   one agent actor/session.
-- **Human load.** Approvals per ISO week and command. Proposals are accepted,
+- **Human load.** Approvals per ISO week and command. Task proposals are accepted,
   dropped, or left untriaged past 14 days, each counted once; an agent withdrawing
   its own proposal is not triage and isn't counted; the oldest pending
   proposal shows what still waits. The first report's numbers are mostly the setup
   triage. Questions and inbox measurements are `n/a` until S11.
 
-Document proposal measurements are deferred until public proposal review commands
-are available. The report currently measures task review and recorded approvals.
+The report also measures document proposal decisions and observed brief exposure.
 
 **Private report (DF3).** `scripts/dogfood-report.sh --ws <slug>` reports on any
 workspace, `silta` included, and keeps it on this machine:
@@ -176,6 +175,13 @@ machine is a summary written by hand from it
 
 **The `silta` report.** Without `--ws`, generate into a temporary file **outside**
 the reports directory, so a newly created filename cannot change the default range.
+Document metrics use proposal creation and recorded decision times separately.
+Direct edits and legacy decisions without triage evidence remain unattributed.
+Batch counts and approval ratios describe retained workspace logs, with missing
+coverage shown as unavailable; they do not infer a durable batch/member identity.
+Brief exposure counts observed agent sessions and retained preview occurrences;
+older logs without `docs_shown` leave exposure unknown. No doc content is collected.
+
 Review it with the maintainer, then add it as `docs/dogfood/reports/<Until date>.md`
 through a PR. Decide whether findings need an issue, guide correction or no change.
 Without `--ws` the script neither saves a report nor creates issues.

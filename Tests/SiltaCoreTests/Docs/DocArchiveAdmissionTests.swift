@@ -40,7 +40,7 @@ struct DocArchiveAdmissionTests {
         _ = try DocWritePolicyTests.service(home, store, human: human).archive("rules")
       } catch let error as any CodedError { failure = error }
       #expect(failure?.code == .invalid)
-      #expect(failure?.next == ["silta --ws 'acme' doc ls --archived --offset 0 --limit 20"])
+      #expect(failure?.next == ["silta --ws 'acme' doc ls --doc 'rules' --offset 0 --limit 20"])
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
   }
