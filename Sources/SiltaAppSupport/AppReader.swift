@@ -4,14 +4,20 @@ import SiltaCore
 /// Read-only entry points for the Mac viewer, with an explicit human identity.
 public struct AppReader: Sendable {
   let environment: SiltaEnvironment
+  let defaultHome: URL
 
   /// Configures an existing data home without opening, initializing or migrating it.
-  /// `now` supplies injected time. Configuration and read failures throw `AppReadError`.
-  public init(home: URL, user: String, now: @escaping @Sendable () -> Date = { Date() }) throws {
+  /// `userHome` identifies the default `.silta` location; `now` supplies injected time.
+  /// Configuration and read failures throw `AppReadError`.
+  public init(
+    home: URL, user: String, userHome: URL = FileManager.default.homeDirectoryForCurrentUser,
+    now: @escaping @Sendable () -> Date = { Date() }
+  ) throws {
+    defaultHome = userHome.appending(path: ".silta").resolvingSymlinksInPath().standardizedFileURL
     environment = try Self.checked(home: home) {
       let clock = AppReadClock(provider: now)
       let location = try SiltaHome.resolve(
-        environment: ["SILTA_HOME": home.path], userHome: home.deletingLastPathComponent())
+        environment: ["SILTA_HOME": home.path], userHome: userHome)
       let actor = ActorID.human(user: user)
       return SiltaEnvironment(
         clock: clock, ids: SystemIDGenerator(), git: SystemGitRunner(environment: [:]),

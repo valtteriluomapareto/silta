@@ -8,6 +8,21 @@
 
   @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
   struct AppCommandTests {
+    @Test func defaultHomeCommandsOmitEnvironmentPrefix() throws {
+      try withScratchDirectory { scratch in
+        let userHome = scratch.appending(path: "user")
+        let reader = try AppReader(
+          home: userHome.appending(path: ".silta"), user: "acme", userHome: userHome)
+        withKnownIssue("#219: default-home commands carry an unnecessary environment prefix") {
+          #expect(
+            reader.inboxCommand(workspace: "acme").text == "silta --ws 'acme' inbox --for me --all")
+        }
+        let custom = try AppReader(
+          home: scratch.appending(path: "custom data"), user: "acme", userHome: userHome)
+        #expect(custom.inboxCommand(workspace: "acme").text.hasPrefix("SILTA_HOME="))
+      }
+    }
+
     @Test func templatesKeepChoicesAndBodiesUnfilled() throws {
       do {
         try withScratchDirectory { scratch in
