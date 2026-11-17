@@ -30,7 +30,7 @@ struct DocTriageMember {
       throw DocError.invalid("Only proposed document revisions can be decided.")
     }
     guard
-      let workspaceUID = try StoredUID.fetch(
+      let workspaceUID = try String.fetchOne(
         db, sql: "SELECT uid FROM workspace WHERE id=?",
         arguments: [workspace])
     else { throw StorageError.corrupt }
@@ -45,7 +45,7 @@ struct DocTriageMember {
     let source: Int64? = raw["source_task_id"]
     let sourceUID = try source.map { id in
       guard
-        let uid = try StoredUID.fetch(
+        let uid = try String.fetchOne(
           db, sql: "SELECT uid FROM task WHERE id=? AND workspace_id=?",
           arguments: [id, workspace])
       else { throw DocError.changed(workspace: "") }
@@ -72,7 +72,6 @@ struct DocTriageMember {
       Set(targets).count == targets.count,
       targets.allSatisfy({
         ["app", "edge", "service", "topic"].contains($0.kind)
-          && StoredUID.valid(Data($0.uid.utf8))
       }),
       targets.map(\.kind).sorted()
         == refs.compactMap({ ref in
