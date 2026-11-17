@@ -33,9 +33,10 @@ extension TaskLinkTarget {
 
   private static func slugRef(_ kind: String, id: Int64, in db: Database) throws -> String {
     guard
-      let slug = try String.fetchOne(
-        db, sql: "SELECT slug FROM \(kind) WHERE id=?",
-        arguments: [id])
+      let row = try Row.fetchOne(
+        db, sql: "SELECT CAST(slug AS BLOB) AS slug FROM \(kind) WHERE id=?",
+        arguments: [id]),
+      let slug = try row.strictText("slug")
     else { throw StorageError.corrupt }
     return kind + ":" + (kind == "service" ? encodeComponent(slug) : slug)
   }
@@ -57,19 +58,20 @@ extension TaskLinkTarget {
       let row = try Row.fetchOne(
         db,
         sql: """
-          SELECT source.slug AS source,target.slug AS target,service.slug AS service,edge.kind
+          SELECT source.slug AS source,target.slug AS target,
+            CAST(service.slug AS BLOB) AS service,CAST(edge.kind AS BLOB) AS kind
           FROM edge JOIN app source ON source.id=edge.from_app_id
           LEFT JOIN app target ON target.id=edge.to_app_id
           LEFT JOIN service ON service.id=edge.to_service_id WHERE edge.id=?
           """, arguments: [id])
     else { throw StorageError.corrupt }
-    let service: String? = row["service"]
+    let service = try row.strictText("service")
     let app: String? = row["target"]
     guard let target = service.map({ "service:" + encodeComponent($0) }) ?? app else {
       throw StorageError.corrupt
     }
     let source: String = row["source"]
-    let kind: String = row["kind"]
+    guard let kind = try row.strictText("kind") else { throw StorageError.corrupt }
     return "edge:" + source + "/" + target + "/" + encodeComponent(kind)
   }
 

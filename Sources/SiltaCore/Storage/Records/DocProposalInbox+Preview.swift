@@ -2,18 +2,21 @@ import Foundation
 import GRDB
 
 extension DocProposalInbox {
-  func member(_ row: Row) throws -> DocProposalPreview {
+  func member(_ row: Row, caller: ActorID) throws -> DocProposalPreview {
     let source: Int64? = row["source_id"]
     let owner: Int64? = row["source_owner"]
     guard source == nil || owner != nil else { throw StorageError.corrupt }
     let missing = (row["base_rev"] as Int?) != nil && (row["base_id"] as Int64?) == nil
+    let stale: Bool = row["stale_base"]
     return DocProposalPreview(
       ref: try text(row, "ref", reference: true), title: try text(row, "title"),
       kind: try text(row, "kind"),
       why: try text(row, "why", missing: "(not recorded)"),
       sourceTask: try text(row, "source", missing: "(not recorded)", reference: true),
-      summary: summary(row),
-      read: read(try value(row, "slug"), revision: row["rev"], missing: missing))
+      summary: summary(row) + (stale ? "; stale base" : ""), staleBase: stale,
+      read: read(try value(row, "slug"), revision: row["rev"], missing: missing),
+      decisions: decisions(
+        try value(row, "slug"), revision: row["rev"], rejectOnly: stale || missing, caller: caller))
   }
 
   func text(_ row: Row, _ name: String, missing: String = "(unknown)", reference: Bool = false)
@@ -90,18 +93,28 @@ extension DocProposalInbox {
     return command.utf8.count <= 512 ? command : hub
   }
 
-  func page(_ slug: String?) throws -> String {
+  private func decisions(
+    _ slug: String?, revision: Int, rejectOnly: Bool, caller: ActorID
+  ) -> [String] {
+    guard let slug = safe(slug) else { return [hub] }
+    let ref = "doc:\(slug)@\(revision)"
+    let command = workspaceCommand("silta doc triage", workspace: workspace)
+    let reject = command + " --reject " + shellWord(ref)
+    let actions = rejectOnly ? [reject] : [command + " --accept " + shellWord(ref), reject]
+    guard actions.allSatisfy({ $0.utf8.count <= 512 }) else { return [hub] }
+    if caller.isHuman { return actions }
+    let instruction =
+      "ask human: " + (rejectOnly ? "Reject " : "Accept or reject ") + ref
+      + "? After approval: "
+      + actions.map { $0 + " --approved \"<the human's words>\"" }.joined(separator: "; or ")
+    return instruction.utf8.count <= 512 ? [instruction] : [hub]
+  }
+
+  func page(_ slug: String?) -> String {
     guard let slug = safe(slug) else { return hub }
-    let offset =
-      try Int.fetchOne(
-        db,
-        sql: """
-          SELECT count(*) FROM doc d JOIN doc_rev r ON r.doc_id=d.id
-          WHERE d.workspace_id=? AND d.slug COLLATE BINARY<? COLLATE BINARY
-            AND ((r.rev=d.current_rev AND r.state='accepted') OR r.state='proposed')
-          """, arguments: [workspaceID, slug]) ?? 0
-    let command = workspaceCommand(
-      "silta doc ls --archived --offset \(offset) --limit 20", workspace: workspace)
+    let command = DocService.listPageCommand(
+      workspace: workspace, about: nil,
+      archived: true, offset: 0, limit: 20, document: slug)
     return command.utf8.count <= 512 ? command : hub
   }
 }

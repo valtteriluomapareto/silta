@@ -5,7 +5,8 @@ struct DocArchiveCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "archive",
     abstract: "Archive a document and remove its live attachments (human-only).",
-    discussion: "Keeps revision history, comments and verification evidence.\n"
+    discussion: "Requires an accepted current revision; pending-only docs refuse.\n"
+      + "Keeps revision history, comments and verification evidence.\n"
       + "An already archived doc without live attachments changes nothing.\n"
       + "Archive (human): silta doc archive rules")
   static let dataShape = DocEditCommand.dataShape

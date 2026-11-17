@@ -22,30 +22,54 @@ package struct DocService {
     let range = try Self.lineRange(lines)
     do {
       let result = try read(selection.slug, revision: selection.revision, view: request.view)
-      return DocReadResult(
-        masking: result.ref,
-        output: bounded(
-          SecretGuard.redacted(result.output),
-          ref: result.ref, flags: request.view.flags,
-          range: range))
+      let matches = SecretGuard.matches(in: result.output)
+      let masked = SecretGuard.redacted(result.output, matches: matches)
+      let window = bounded(masked, ref: result.ref, flags: request.view.flags, range: range)
+      var selected = DocReadResult(ref: SecretGuard.redacted(result.ref), output: window.output)
+      result.bodyLayout?.project(
+        matches: matches, masked: masked, visible: window.visible, into: &selected)
+      return selected
     } catch let error as DocError {
-      throw CommandFailure(error: error, next: [listCommand])
+      throw CommandFailure(
+        error: error,
+        next: [listPageCommand(about: nil, archived: true, offset: 0, limit: 20)])
     }
   }
 
   func body(_ snapshot: DocRevision, archived: Bool, pending: Int) -> DocReadResult {
     let pinned = "doc:\(snapshot.slug)@\(snapshot.revision)"
-    let state = snapshot.state + (archived ? ", archived" : "")
     let hint =
       pending > 0
       ? "; \(pending) pending: "
-        + listPageCommand(about: nil, archived: archived, offset: 0, limit: 20) : ""
-    let output =
-      "\(pinned) [\(state)]\(hint)\n"
-      + "title: \(snapshot.title ?? "(unknown)")\nkind: \(snapshot.kind ?? "(unknown)")\n"
-      + "about: \(Self.about(snapshot.about))\nactor: \(snapshot.actor)\n"
-      + "created_at: \(snapshot.createdAt)\n" + Self.evidence(snapshot) + "\n\(snapshot.body)"
-    return DocReadResult(ref: pinned, output: output)
+        + listPageCommand(
+          about: nil, archived: archived, offset: 0, limit: 20, document: snapshot.slug) : ""
+    var layout = DocBodyLayout()
+    layout.append("\(pinned) [")
+    layout.state = layout.field(snapshot.state)
+    layout.append((archived ? ", archived" : "") + "]\(hint)\ntitle: ")
+    let title = layout.field(snapshot.title ?? "(unknown)")
+    layout.title = snapshot.title == nil ? nil : title
+    layout.append("\nkind: \(snapshot.kind ?? "(unknown)")\nabout: ")
+    let aboutStart = layout.output.utf8.count
+    if let refs = snapshot.about {
+      layout.about = []
+      if refs.isEmpty {
+        layout.append("(none)")
+      } else {
+        for (index, ref) in refs.enumerated() {
+          if index > 0 { layout.append(", ") }
+          let field = layout.field(Self.about([ref]))
+          layout.about?.append(field)
+        }
+      }
+    } else {
+      layout.append("(unknown)")
+    }
+    layout.aboutField = aboutStart..<layout.output.utf8.count
+    layout.append("\nactor: \(snapshot.actor)\ncreated_at: \(snapshot.createdAt)\n")
+    layout.append(Self.evidence(snapshot) + "\n")
+    layout.body = layout.field(snapshot.body)
+    return DocReadResult(ref: pinned, output: layout.output, bodyLayout: layout)
   }
 
   static func evidence(_ snapshot: DocRevision) -> String {
@@ -64,6 +88,18 @@ package struct DocService {
       + "triaged_at: \(snapshot.triagedAt ?? "(not recorded)")\n" + why
   }
 
+  package static func documentFilter(_ raw: String?) throws -> String? {
+    guard let raw else { return nil }
+    let selected: (slug: String, revision: Int?)?
+    do { selected = try selection(raw, revision: nil) } catch { selected = nil }
+    guard let selected, selected.revision == nil else {
+      throw CommandFailure(
+        error: DocError.invalid("Use an unpinned doc slug or doc:slug with --doc."),
+        next: ["silta doc ls --help"])
+    }
+    return selected.slug
+  }
+
   var scopeIsSafe: Bool { SecretGuard.matches(in: workspace).isEmpty }
 
   var listCommand: String {
@@ -74,12 +110,32 @@ package struct DocService {
     scopeIsSafe ? workspaceCommand("silta ws show", workspace: workspace) : "silta ws ls"
   }
 
-  func listPageCommand(about: String?, archived: Bool, offset: Int, limit: Int) -> String {
-    guard scopeIsSafe, about.map(Self.safeReference) ?? true else { return listCommand }
-    var command = listCommand
+  func listPageCommand(
+    about: String?, archived: Bool, offset: Int, limit: Int,
+    document: String? = nil
+  ) -> String {
+    Self.listPageCommand(
+      workspace: workspace, about: about, archived: archived,
+      offset: offset, limit: limit, document: document)
+  }
+
+  static func listPageCommand(
+    workspace: String, about: String?, archived: Bool,
+    offset: Int, limit: Int, document: String? = nil
+  ) -> String {
+    let scope = SecretGuard.matches(in: workspace).isEmpty
+    let hub = scope ? workspaceCommand("silta doc ls", workspace: workspace) : "silta ws ls"
+    let fallback = document != nil && archived && scope ? hub + " --archived" : hub
+    let boundedHub = fallback.utf8.count <= 512 ? fallback : "silta ws ls"
+    guard scope, about.map(Self.safeReference) ?? true,
+      document.map({ Self.safeReference("doc:" + $0) }) ?? true
+    else { return document == nil ? hub : boundedHub }
+    var command = hub
+    if let document { command += " --doc " + shellWord(document) }
     if let about { command += " --about " + shellWord(about) }
     if archived { command += " --archived" }
-    return command + " --offset \(offset) --limit \(limit)"
+    command += " --offset \(offset) --limit \(limit)"
+    return document != nil && command.utf8.count > 512 ? boundedHub : command
   }
 
   func showCommand(_ ref: String, flags: String = "", lines: String? = nil) -> String {
@@ -116,24 +172,30 @@ package struct DocService {
 
   private func bounded(
     _ text: String, ref: String, flags: String, range: ClosedRange<Int>?
-  ) -> String {
+  ) -> (output: String, visible: Range<Int>) {
     var lines = text.components(separatedBy: "\n")
     if lines.last == "" { lines.removeLast() }
     let first = range?.lowerBound ?? 1
     let last = min(range?.upperBound ?? lines.count, lines.count)
     guard first <= last else {
-      return "Document has \(lines.count) rendered lines; selection is past the end.\n"
-        + "next: " + showCommand(ref, flags: flags) + "\n"
+      return (
+        "Document has \(lines.count) rendered lines; selection is past the end.\n"
+          + "next: " + showCommand(ref, flags: flags) + "\n", 0..<0
+      )
     }
     let count = last - first + 1
     let unsafe = !scopeIsSafe || !Self.safeReference(ref)
     let shown = min(count, count > 400 || unsafe ? 399 : 400)
     let output = lines.dropFirst(first - 1).prefix(shown).joined(separator: "\n") + "\n"
+    let start = lines.prefix(first - 1).reduce(0) { $0 + $1.utf8.count + 1 }
+    let visible = start..<min(text.utf8.count, start + output.utf8.count)
     guard shown < count else {
-      return output + (unsafe ? "next: " + listCommand + "\n" : "")
+      return (output + (unsafe ? "next: " + listCommand + "\n" : ""), visible)
     }
-    return output + "\(count - shown) lines omitted; next: "
-      + showCommand(ref, flags: flags, lines: "\(first + shown)-\(last)") + "\n"
+    return (
+      output + "\(count - shown) lines omitted; next: "
+        + showCommand(ref, flags: flags, lines: "\(first + shown)-\(last)") + "\n", visible
+    )
   }
 
   private static func lineRange(_ raw: String?) throws -> ClosedRange<Int>? {
