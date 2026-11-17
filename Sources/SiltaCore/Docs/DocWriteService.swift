@@ -106,12 +106,8 @@ package struct DocWriteService {
       if !baseline.accepted {
         try policy.identity("doc:" + request.slug)
       }
-      for ref in request.about ?? []
-      where !baseline.accepted
-        || !baseline.refs.contains(where: { $0.utf8.elementsEqual(ref.utf8) })
-      {
-        try policy.identity(ref.removingPercentEncoding ?? ref)
-      }
+      let retainedRefs = baseline.accepted ? baseline.refs : []
+      try policy.identities(request.about ?? [], keeping: retainedRefs)
       var draft = DocDraft(slug: request.slug, body: "")
       draft.title = request.title
       draft.kind = request.kind
@@ -134,6 +130,7 @@ package struct DocWriteService {
         redacted = checked.1
       }
       let metadata = try DocMetadata.resolve(draft, baseline: baseline, workspace: id, in: db)
+      try policy.identities(metadata.refs, keeping: retainedRefs)
       return CapturedEdit(
         id: id, baseline: baseline, draft: draft,
         binding: try DocVerification.binding(metadata, workspace: id, in: db), redacted: redacted)

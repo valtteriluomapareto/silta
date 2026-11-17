@@ -1,3 +1,5 @@
+import Foundation
+
 struct DocInputPolicy {
   let actor: ActorID
   let allowSecret: Bool
@@ -6,6 +8,12 @@ struct DocInputPolicy {
   func identity(_ text: String) throws {
     if !allowSecret, !SecretGuard.matches(in: text).isEmpty {
       throw SecretError(command: command, text: text)
+    }
+  }
+
+  func identities(_ refs: [String], keeping old: [String]) throws {
+    for ref in refs where !old.contains(where: { $0.utf8.elementsEqual(ref.utf8) }) {
+      try identity(ref.removingPercentEncoding ?? ref)
     }
   }
 

@@ -66,8 +66,8 @@ extension DocService {
         + " AND ((doc_rev.rev=doc.current_rev AND doc_rev.state='accepted')"
         + " OR doc_rev.state='proposed')"
       var arguments: StatementArguments = [workspaceID, archived]
-      if let about {
-        let target = try attachment(about, workspace: workspaceID, in: db)
+      let target = try about.map { try attachment($0, workspace: workspaceID, in: db) }
+      if let target {
         guard let targetID = target.id,
           let uid = try StoredUID.fetch(
             db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [targetID])
@@ -94,7 +94,8 @@ extension DocService {
       let next =
         offset < total && entries.count < total - offset
         ? listPageCommand(
-          about: about, archived: archived, offset: offset + entries.count, limit: limit)
+          about: try target.map { try $0.rendered(in: db) }, archived: archived,
+          offset: offset + entries.count, limit: limit)
         : nil
       return DocListResult(entries: entries, total: total, offset: offset, limit: limit, next: next)
     }

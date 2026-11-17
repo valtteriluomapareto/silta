@@ -29,7 +29,9 @@ package struct DocService {
           ref: result.ref, flags: request.view.flags,
           range: range))
     } catch let error as DocError {
-      throw CommandFailure(error: error, next: [listCommand])
+      throw CommandFailure(
+        error: error,
+        next: [listPageCommand(about: nil, archived: true, offset: 0, limit: 20)])
     }
   }
 
