@@ -12,15 +12,12 @@ struct StorageDeterminismTests {
       var elapsed: [TimeInterval] = []
       for index in 0..<2 {
         let git = ScriptedGitRunner(script: [])
-        defer {
-          withKnownIssue("Storage replay must not request worktree attribution") {
-            #expect(git.requests.isEmpty)
-          }
-        }
+        defer { #expect(git.requests.isEmpty) }
         let environment = try await SiltaEnvironment.system(
           environment: [
             "SILTA_HOME": scratch.appending(path: "data-\(index)").path,
             "SILTA_NOW": "2023-11-14T22:13:20.000Z", "SILTA_ID_SEED": "0",
+            "SILTA_ACTOR": "agent:codex:storage-determinism",
           ], userHome: scratch.appending(path: "user"), temporaryRoots: [scratch], git: git)
         try environment.db.write { try $0.database.execute(sql: "PRAGMA busy_timeout=0") }
         let before = environment.clock.now()
