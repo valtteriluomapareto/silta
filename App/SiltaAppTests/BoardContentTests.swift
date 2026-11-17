@@ -30,7 +30,7 @@
       }
     }
 
-    @Test func omittedQuestionsKeepBoardActionsAndReadCommandsStayUnique() throws {
+    @Test func omittedQuestionsKeepEveryAnswerWithoutExtraReadCommands() throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
       let home = root.appending(path: "data")
@@ -54,12 +54,37 @@
       let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
       #expect(content.questions.contains("AC-14"))
       #expect(
-        content.commands(for: "AC-14", reader: reader, workspace: "acme")
-          .contains { $0.title == "Answer question" })
-      let commands = content.commands(for: "AC-12", reader: reader, workspace: "acme")
+        content.answers(for: "AC-14", reader: reader, workspace: "acme")
+          .contains { $0.command.title == "Answer question" })
+      let actions = content.answers(for: "AC-12", reader: reader, workspace: "acme")
+      let commands = actions.map(\.command)
       #expect(commands.filter { $0.title == "Answer question" }.count == 12)
-      #expect(commands.filter { $0.title == "Read task" }.count == 1)
+      #expect(commands.allSatisfy { $0.title == "Answer question" })
       #expect(Set(commands.map(\.text)).count == commands.count)
+    }
+
+    @Test func taskPresentationUsesRecordedActorsProgressAndRelativeTime() throws {
+      try fixture { snapshot in
+        let question = try #require(snapshot.board.doing.first { $0.ref == "AC-12" })
+        let other = try #require(snapshot.board.doing.first { $0.ref == "AC-14" })
+        let review = try #require(snapshot.board.review.first)
+        #expect(
+          TaskPresentation.progress(question.steps, revision: question.planRevision)
+            == "step 2 of 4 · revision 1")
+        #expect(TaskPresentation.progress([], revision: 3) == "revision 3")
+        #expect(TaskPresentation.claimant(question.claimedBy) == "Claude · session fixture")
+        #expect(TaskPresentation.claimant("human:acme") == "acme")
+        #expect(TaskPresentation.claimant(nil) == "—")
+        #expect(
+          TaskPresentation.cardMetadata(question, asked: true, now: AppV2Fixture.now)
+            == "Claude · asked you")
+        #expect(
+          TaskPresentation.cardMetadata(other, asked: false, now: AppV2Fixture.now)
+            == "Codex · updated 3 min ago")
+        #expect(
+          TaskPresentation.cardMetadata(review, asked: false, now: AppV2Fixture.now)
+            == "Codex · waiting for your review")
+      }
     }
 
     private func fixture(_ body: (AppSnapshot) throws -> Void) throws {
