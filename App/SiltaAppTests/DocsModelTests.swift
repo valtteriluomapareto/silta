@@ -25,11 +25,9 @@
           [.posixPermissions: mode ?? 0o600], ofItemAtPath: path)
       }
       try files.setAttributes([.posixPermissions: 0], ofItemAtPath: path)
-      await docs.show(reader, workspace: "acme")
+      await docs.show(reader, workspace: "acme", force: true)
       #expect(docs.failure != nil && !docs.loading)
-      withKnownIssue("Reload clears the current document before a new value arrives") {
-        #expect(docs.document == original && docs.body == body)
-      }
+      #expect(docs.document == original && docs.body == body)
     }
 
     @Test func groupsPreferAcceptedAndReaderAppendsAllBodyPages() async throws {

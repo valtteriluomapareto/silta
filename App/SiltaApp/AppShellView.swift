@@ -41,7 +41,7 @@ struct AppShellView: View {
     .task(id: phase) { await foregroundChecks() }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
     { _ in
-      model.focused()
+      model.refresh()
     }
   }
 
@@ -84,7 +84,7 @@ struct AppShellView: View {
     }
     if model.route == .board, let board = data.snapshot?.board {
       return "\(board.todo.count + board.doing.count + board.review.count) open · "
-        + "\(board.proposedCount) proposed · \(board.doneThisWeek.count) done this week"
+        + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
     }
     let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
     return "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed"
@@ -92,11 +92,11 @@ struct AppShellView: View {
 
   private func foregroundChecks() async {
     guard phase == .active else { return }
-    await model.focused().value
+    await model.refresh().value
     while !Task.isCancelled {
       do { try await Task.sleep(for: .seconds(5)) } catch { return }
       guard !Task.isCancelled else { return }
-      await model.tick(frontmost: true)?.value
+      await model.tick(frontmost: NSApplication.shared.isActive)?.value
     }
   }
 }

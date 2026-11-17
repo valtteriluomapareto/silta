@@ -65,7 +65,7 @@
         driver.finish(await driver.next(), .failure(AppLoadFailure(message: "unavailable")))
         await failing.value
         #expect(model.data?.version == 1 && model.failure?.message == "unavailable")
-        let retry = model.focused()
+        let retry = model.refresh()
         let request = await driver.next()
         #expect(request.force)
         driver.finish(request, .success(value(1)))
@@ -96,15 +96,68 @@
       #expect(model.matches(["AC-12", "Full question body"]))
       model.search = "QUESTION"
       #expect(model.matches(["AC-12", "Full question body"]))
+      model.search = "AC-1"
+      #expect(!model.matches(["AC-10", "AC-12", "AC-19"]))
+      #expect(model.matches(["AC-1", "Read task AC-1."]))
       model.search = "unrelated"
       #expect(!model.matches(["AC-12", "Full question body"]))
+    }
+
+    @Test func boardNavigationRetainsSelectionFiltersAndInspector() async {
+      let model = makeModel(ControlledLoads())
+      model.showProposed = true
+      model.showApp("acme-mobile")
+      model.inspect(task: "AC-12")
+      #expect(model.route == .board && model.boardInspectorPresented)
+      model.navigate(to: .mywork)
+      model.toggleInspector()
+      model.navigate(to: .board)
+      #expect(model.boardSelection == BoardSelection(taskRef: "AC-12"))
+      #expect(model.boardInspectorPresented && model.showProposed)
+      #expect(model.appFilter == "acme-mobile")
+      model.toggleInspector()
+      #expect(!model.boardInspectorPresented)
+    }
+
+    @Test func routeInspectorsAndTypedSelectionsRemainIndependent() async {
+      let model = AppModel(load: { _, _, _ in nil })
+      model.showProposed = true
+      model.inspect(task: "AC-12")
+      model.navigate(to: .workspace)
+      #expect(!model.workspaceInspectorPresented)
+      model.select(connection: "conn:acme-mobile->acme-backend")
+      #expect(model.workspaceInspectorPresented && model.boardInspectorPresented)
+      model.toggleInspector()
+      model.navigate(to: .board)
+      #expect(model.boardSelection?.taskRef == "AC-12" && model.showProposed)
+      #expect(model.boardInspectorPresented)
+      model.navigate(to: .workspace)
+      #expect(model.workspaceSelection?.connectionRef == "conn:acme-mobile->acme-backend")
+      #expect(!model.workspaceInspectorPresented)
+      await model.selectWorkspace("other").value
+      #expect(model.workspaceSelection == nil && model.boardSelection == nil)
+      #expect(!model.boardInspectorPresented && !model.workspaceInspectorPresented)
+    }
+
+    @Test func documentNavigationRetainsTypedSelectionAcrossRoutes() {
+      let model = AppModel(load: { _, _, _ in nil })
+      model.openDocument("doc:order-contract@3")
+      #expect(
+        model.documentSelection == DocumentSelection(ref: "doc:order-contract@3", view: .changes))
+      model.navigate(to: .board)
+      model.navigate(to: .docs)
+      #expect(model.documentSelection?.ref == "doc:order-contract@3")
+      model.select(documentView: .comments)
+      #expect(model.documentSelection?.view == .comments)
+      model.openDocuments(about: "app:acme-mobile")
+      #expect(model.documentSelection == nil && model.docsAbout == "app:acme-mobile")
     }
 
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
       AppModel(
         load: { previous, workspace, force in
           try await driver.load(previous, workspace, force)
-        }, now: { AppV2Fixture.now })
+        })
     }
 
     private func value(_ version: Int) -> AppLoadedData {

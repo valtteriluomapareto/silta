@@ -48,9 +48,9 @@ extension TaskService {
         ? nil : command + " inbox --for " + shellWord(actor.description) + " --all")
   }
 
-  /// Uncapped eligible questions for the captured actor, without document hydration.
+  /// Uncapped eligible questions for the captured human, without document hydration.
   package func questionInbox() throws -> [InboxItem] {
-    let actor = environment.actor
+    let actor = environment.human
     let slug = try selected()
     let command = "silta --ws " + shellWord(slug)
     return try environment.db.read { db in

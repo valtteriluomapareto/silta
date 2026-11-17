@@ -22,6 +22,8 @@
         let content = BoardContent(snapshot: snapshot, app: nil, search: "ac-12", proposals: true)
         #expect(content.lanes.flatMap(\.tasks).map(\.ref) == ["AC-12"])
         #expect(content.questions == ["AC-12"])
+        let colliding = BoardContent(snapshot: snapshot, app: nil, search: "AC-1", proposals: true)
+        #expect(colliding.lanes.flatMap(\.tasks).isEmpty)
         let title = BoardContent(
           snapshot: snapshot, app: nil, search: "ORDER HISTORY", proposals: false)
         #expect(title.lanes.flatMap(\.tasks).map(\.ref) == ["AC-15"])

@@ -1,6 +1,6 @@
 """Tests never wait on the wall clock (AGENTS.md invariant 3).
 
-Covers the test targets and SiltaTestSupport, whose fakes and runners tests call.
+Covers Tests/, App/SiltaAppTests and SiltaTestSupport, whose fakes and runners tests call.
 
 Advance the fake clock instead. A justified exception carries the marker
 `guard:allow-wait` on the same line.

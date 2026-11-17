@@ -3,7 +3,6 @@ import SwiftUI
 
 struct BoardView: View {
   @Bindable var model: AppModel
-  @State private var showProposals = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -14,14 +13,15 @@ struct BoardView: View {
             Text(app.name).tag(Optional(app.slug))
           }
         }.frame(maxWidth: 250)
-        Toggle("Show proposed", isOn: $showProposals).toggleStyle(.checkbox)
+        Toggle("Show proposed", isOn: $model.showProposed).toggleStyle(.checkbox)
         Spacer()
-        Button("Inspector", systemImage: "sidebar.right") { model.inspectorPresented.toggle() }
+        Button("Inspector", systemImage: "sidebar.right") { model.toggleInspector() }
           .labelStyle(.iconOnly).help("Toggle inspector (⌥⌘I)")
       }.padding(.horizontal, 24).padding(.top, 16)
       if let snapshot = model.visibleData?.snapshot {
         let content = BoardContent(
-          snapshot: snapshot, app: model.appFilter, search: model.search, proposals: showProposals)
+          snapshot: snapshot, app: model.appFilter, search: model.search,
+          proposals: model.showProposed)
         ScrollView(.horizontal) {
           HStack(alignment: .top, spacing: 12) {
             ForEach(content.lanes) { lane in
@@ -45,14 +45,14 @@ struct BoardView: View {
         }
       }
     }
-    .inspector(isPresented: $model.inspectorPresented) {
+    .inspector(isPresented: $model.boardInspectorPresented) {
       TaskInspector(model: model).inspectorColumnWidth(min: 300, ideal: 360, max: 500)
     }
   }
 
   private func card(_ task: AppTask, asked: Bool) -> some View {
     Button {
-      model.inspect(task.ref)
+      model.inspect(task: task.ref)
     } label: {
       VStack(alignment: .leading, spacing: 8) {
         Text([task.ref, task.app].compactMap { $0 }.joined(separator: " · "))
@@ -80,8 +80,9 @@ struct BoardView: View {
         .background(.background, in: RoundedRectangle(cornerRadius: 9))
         .overlay(
           RoundedRectangle(cornerRadius: 9).stroke(
-            model.selectedTask == task.ref ? Color.accentColor : Color.secondary.opacity(0.25),
-            lineWidth: model.selectedTask == task.ref ? 2 : 1))
+            model.boardSelection?.taskRef == task.ref
+              ? Color.accentColor : Color.secondary.opacity(0.25),
+            lineWidth: model.boardSelection?.taskRef == task.ref ? 2 : 1))
     }.buttonStyle(.plain).accessibilityElement(children: .ignore)
       .accessibilityLabel(task.ref + ": " + task.title + ", " + task.status)
   }

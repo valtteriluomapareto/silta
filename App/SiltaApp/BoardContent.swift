@@ -16,12 +16,12 @@ nonisolated struct BoardContent {
     func filtered(_ tasks: [AppTask]) -> [AppTask] {
       tasks.filter { task in
         (app == nil || task.app == app)
-          && (search.isEmpty
-            || [
+          && AppSearch.matches(
+            search,
+            values: [
               task.ref, task.title, task.description, task.app ?? "", task.claimedBy ?? "",
               task.status,
-            ]
-            .contains { $0.localizedCaseInsensitiveContains(search) })
+            ])
       }
     }
     lanes = [

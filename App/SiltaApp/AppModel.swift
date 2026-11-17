@@ -8,33 +8,36 @@ final class AppModel {
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
   let reader: AppReader?
-  var search = ""
+  let documents = DocsModel()
   var docsAbout: String?
-  var docsRequestedRef: String?
-  var route: AppRoute = .mywork
+  var includeArchivedDocuments = false
+  var documentSelection: DocumentSelection? {
+    documents.ref.map { DocumentSelection(ref: $0, view: documents.view) }
+  }
+  var search = ""
+  private(set) var route: AppRoute = .mywork
   var appFilter: String?
-  var selectedTask: String?
-  var inspectorPresented = false
+  private(set) var boardSelection: BoardSelection?
+  var boardInspectorPresented = false
+  var showProposed = false
+  private(set) var workspaceSelection: ConnectionSelection?
+  var workspaceInspectorPresented = false
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
-  private(set) var lastCheckedAt: Date?
   private let load: Loader
-  private let now: @Sendable () -> Date
   @ObservationIgnored private var flight: Task<Void, Never>?
   @ObservationIgnored private var queuedForce = false
   @ObservationIgnored private var generation = 0
 
   init(
-    reader: AppReader? = nil, load: @escaping Loader,
-    now: @escaping @Sendable () -> Date = { Date() }
+    reader: AppReader? = nil, load: @escaping Loader
   ) {
     self.reader = reader
     self.load = load
-    self.now = now
   }
 
   func matches(_ values: [String]) -> Bool {
-    search.isEmpty || values.contains { $0.localizedCaseInsensitiveContains(search) }
+    AppSearch.matches(search, values: values)
   }
 
   func matches(_ item: AppAttention) -> Bool {
@@ -47,6 +50,12 @@ final class AppModel {
 
   var proposals: [AppAttention] {
     visibleData?.snapshot?.work.items.filter { $0.kind == "proposal" && matches($0) } ?? []
+  }
+
+  var hasWorkMatches: Bool {
+    guard let work = visibleData?.snapshot?.work else { return false }
+    return work.items.contains(where: matches)
+      || work.reviews.contains { matches([$0.ref, $0.title, $0.description]) }
   }
 
   var visibleData: AppLoadedData? { data?.workspace == workspace ? data : nil }
@@ -77,12 +86,11 @@ final class AppModel {
             if workspace == nil { workspace = result.workspace }
           }
           failure = nil
-          lastCheckedAt = now()
+          if route == .docs { await loadDocuments(force: forced) }
         }
       } catch {
         if token == generation {
           failure = AppLoadFailure(error)
-          lastCheckedAt = now()
         }
       }
       forceNext = true
@@ -95,38 +103,94 @@ final class AppModel {
     if workspace != slug {
       generation += 1
       workspace = slug
-      selectedTask = nil
+      documents.clear()
       docsAbout = nil
-      docsRequestedRef = nil
+      boardSelection = nil
+      boardInspectorPresented = false
+      workspaceSelection = nil
+      workspaceInspectorPresented = false
       appFilter = nil
     }
     return refresh(force: true)
   }
 
-  func openDocument(_ ref: String) {
-    docsAbout = nil
-    docsRequestedRef = ref
-    route = .docs
-  }
-  func openDocuments(about: String) {
-    docsAbout = about
-    docsRequestedRef = nil
-    route = .docs
+  func loadDocuments(force: Bool = false, append: Bool = false) async {
+    guard let reader, let workspace else { return }
+    await documents.refresh(
+      reader, workspace: workspace, about: docsAbout,
+      archived: includeArchivedDocuments, version: visibleData?.version, force: force,
+      append: append)
+    if documents.ref == nil {
+      documents.ref = documents.groups(search: "").first?.preferred?.ref
+    }
+    await documents.show(reader, workspace: workspace, version: visibleData?.version, force: force)
   }
 
-  func inspect(_ ref: String) {
-    selectedTask = ref
-    route = .board
-    inspectorPresented = true
+  func select(document ref: String?) {
+    documents.ref = ref
+    navigate(to: .docs)
+  }
+
+  func select(documentView view: AppDocumentView) {
+    documents.view = view
+  }
+
+  func openDocument(_ ref: String) {
+    docsAbout = nil
+    documents.view = .changes
+    select(document: ref)
+  }
+
+  func openDocuments(about: String) {
+    docsAbout = about
+    documents.ref = nil
+    documents.view = .document
+    navigate(to: .docs)
+  }
+
+  func navigate(to route: AppRoute) {
+    self.route = route
+  }
+
+  func inspect(task ref: String) {
+    boardSelection = BoardSelection(taskRef: ref)
+    navigate(to: .board)
+    boardInspectorPresented = true
+  }
+
+  func select(connection ref: String) {
+    workspaceSelection = ConnectionSelection(connectionRef: ref)
+    navigate(to: .workspace)
+    workspaceInspectorPresented = true
+  }
+
+  func toggleInspector() {
+    switch route {
+    case .board: boardInspectorPresented.toggle()
+    case .workspace: workspaceInspectorPresented.toggle()
+    case .mywork, .docs: break
+    }
   }
 
   func showApp(_ slug: String) {
     appFilter = slug
-    route = .board
+    navigate(to: .board)
   }
 
-  @discardableResult func focused() -> Task<Void, Never> { refresh() }
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
     frontmost ? refresh() : nil
   }
+}
+
+nonisolated struct BoardSelection: Equatable {
+  let taskRef: String
+}
+
+nonisolated struct ConnectionSelection: Equatable {
+  let connectionRef: String
+}
+
+nonisolated struct DocumentSelection: Equatable {
+  let ref: String
+  let view: AppDocumentView
 }

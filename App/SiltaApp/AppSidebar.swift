@@ -22,7 +22,7 @@ struct AppSidebar: View {
         Section {
           ForEach(AppRoute.allCases) { route in
             Button {
-              model.route = route
+              model.navigate(to: route)
             } label: {
               HStack {
                 Label(route.title, systemImage: route.symbol)
@@ -55,7 +55,7 @@ struct AppSidebar: View {
         Section("Claimed now") {
           ForEach(claimed, id: \.ref) { task in
             Button {
-              model.inspect(task.ref)
+              model.inspect(task: task.ref)
             } label: {
               Label {
                 VStack(alignment: .leading, spacing: 3) {
