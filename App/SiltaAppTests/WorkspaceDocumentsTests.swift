@@ -37,13 +37,23 @@
         let edge = "edge:acme-mobile/acme-backend/http-api"
         let page = try reader.documents(workspace: "acme", about: edge)
         let flags = WorkspaceReadFlags()
+        let gate = PausedWorkspaceRead()
         let docs = WorkspaceDocumentsModel(read: { _, _, _ in
-          if flags.fails { throw AppLoadFailure(message: "Acme read failed") }
+          if flags.fails {
+            await gate.pause()
+            throw AppLoadFailure(message: "Acme read failed")
+          }
           return [edge: page]
         })
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [edge])
         flags.fails = true
-        await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
+        let reload = Task {
+          await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
+        }
+        await gate.started()
+        #expect(docs.loading && docs.countLabel(for: edge) == "3 docs")
+        gate.resume()
+        await reload.value
         #expect(docs.failure != nil && docs.countLabel(for: edge) == "3 docs")
         #expect(docs.phase(workspace: "acme", version: 2, connections: [edge]) == .failed)
         flags.fails = false
@@ -72,11 +82,7 @@
         let release = Task { gate.resume() }
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [])
         #expect(flags.calls == (force ? 2 : 1))
-        if force {
-          withKnownIssue("Cached readers bypass an active forced reload") { #expect(!docs.loading) }
-        } else {
-          #expect(!docs.loading)
-        }
+        #expect(!docs.loading)
         await first.value
         await release.value
       }

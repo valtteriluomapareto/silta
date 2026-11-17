@@ -57,11 +57,11 @@ import SiltaAppSupport
     force: Bool = false
   ) async {
     let key = Key(workspace: workspace, version: version, connections: connections.sorted())
-    if !force, loaded == key, failure == nil { return }
     if requested == key, let flight {
       await flight.value
       return
     }
+    if !force, loaded == key, failure == nil { return }
     if self.workspace != workspace { clear() }
     self.workspace = workspace
     flight?.cancel()

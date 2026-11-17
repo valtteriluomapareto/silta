@@ -30,6 +30,7 @@ struct WorkspaceView: View {
                   CopyValue(value: group.app.attachment, title: "Copy app reference", compact: true)
                 }.padding(.horizontal, 8)
                 ForEach(group.connections, id: \.attachment) { connection in
+                  let selected = model.workspaceSelection?.connectionRef == connection.attachment
                   Button {
                     model.select(connection: connection.attachment)
                   } label: {
@@ -51,11 +52,12 @@ struct WorkspaceView: View {
                               ? "SecondaryInk" : "TideText")
                         )
                         .frame(width: 55, alignment: .trailing)
-                    }.padding(.horizontal, 8).padding(.vertical, 8)
+                    }.foregroundStyle(selected ? Color("TideText") : Color("Ink"))
+                      .padding(.horizontal, 8).padding(.vertical, 8)
                       .frame(maxWidth: .infinity, alignment: .leading)
                       .contentShape(.rect)
                       .background(
-                        model.workspaceSelection?.connectionRef == connection.attachment
+                        selected
                           ? Color("TideText").opacity(0.12) : .clear, in: .rect(cornerRadius: 7))
                   }.buttonStyle(.plain)
                 }
