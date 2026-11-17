@@ -1,7 +1,7 @@
 #if DEBUG
   import Foundation
   @testable import SiltaApp
-  import SiltaAppSupport
+  @testable import SiltaAppSupport
   import Testing
 
   @MainActor struct DocsModelTests {
@@ -84,8 +84,32 @@
       #expect(model.workspace == "beta" && docs.document == nil)
       gate.resume()
       await old.value
-      withKnownIssue("A stale list caller must stop before loading its captured workspace") {
-        #expect(docs.document == nil && docs.body.isEmpty && docs.failure == betaFailure)
+      #expect(docs.document == nil && docs.body.isEmpty && docs.failure == betaFailure)
+    }
+
+    @Test func historyPageRetryKeepsEntriesAndClearsThePreviousFailure() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let full = try reader.documentVersions("order-contract", workspace: "acme")
+      let first = try #require(full.entries.first)
+      var pages = 0
+      let docs = DocsModel(readVersions: { _, _, _, offset in
+        if offset == 0 { return AppDocumentList(entries: [first], total: 3, nextOffset: 1) }
+        pages += 1
+        if pages == 1 { throw AppLoadFailure(message: "Acme history page unavailable") }
+        return AppDocumentList(entries: Array(full.entries.dropFirst()), total: 3, nextOffset: nil)
+      })
+      docs.ref = "doc:order-contract@2"
+      await docs.show(reader, workspace: "acme")
+      await docs.moreVersions(reader, workspace: "acme")
+      #expect(docs.versions == [first] && docs.failure != nil && docs.nextVersions == 1)
+      await docs.moreVersions(reader, workspace: "acme")
+      #expect(docs.versions == full.entries && docs.nextVersions == nil)
+      withKnownIssue("Successful pagination must clear its earlier error") {
+        #expect(docs.failure == nil)
       }
     }
 

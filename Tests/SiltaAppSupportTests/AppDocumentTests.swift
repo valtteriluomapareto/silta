@@ -55,10 +55,8 @@
         for entry in list + history + [body, diff] {
           let about = try #require(entry.about)
           #expect(about.contains(refs[1]))
-          withKnownIssue("Typed attachment metadata must use Core's decoded redaction policy") {
-            #expect(!about.joined().contains("private123"))
-            #expect(about.joined().contains("[REDACTED:password]"))
-          }
+          #expect(!about.joined().contains("private123"))
+          #expect(about.joined().contains("[REDACTED:password]"))
         }
       }
     }

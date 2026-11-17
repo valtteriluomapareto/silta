@@ -164,10 +164,12 @@ package struct DocService {
     refs.map {
       $0.isEmpty
         ? "(none)"
-        : $0.map { ref in
-          safeReference(ref) ? ref : SecretGuard.redacted(ref.removingPercentEncoding ?? ref)
-        }.joined(separator: ", ")
+        : $0.map(displayReference).joined(separator: ", ")
     } ?? "(unknown)"
+  }
+
+  static func displayReference(_ ref: String) -> String {
+    safeReference(ref) ? ref : SecretGuard.redacted(ref.removingPercentEncoding ?? ref)
   }
 
   static func safeReference(_ ref: String) -> Bool {

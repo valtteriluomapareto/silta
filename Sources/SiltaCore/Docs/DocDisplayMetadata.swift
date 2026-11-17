@@ -13,9 +13,10 @@ package struct DocDisplayMetadata: Sendable {
 extension DocDisplayMetadata {
   var masked: Self {
     Self(
-      ref: SecretGuard.redacted(ref), slug: SecretGuard.redacted(slug), revision: revision,
+      ref: DocService.displayReference(ref), slug: DocService.displayReference(slug),
+      revision: revision,
       title: title.map(DocService.preview), kind: kind.map(DocService.preview),
-      about: about?.map { SecretGuard.redacted($0) }, state: state, archived: archived)
+      about: about?.map(DocService.displayReference), state: state, archived: archived)
   }
 }
 

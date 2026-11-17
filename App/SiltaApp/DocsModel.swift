@@ -5,7 +5,10 @@ import SiltaAppSupport
 @MainActor @Observable final class DocsModel {
   typealias ListLoader = @MainActor (AppReader, String, String?, Bool, Int) async throws ->
     AppDocumentList
+  typealias VersionsLoader = @MainActor (AppReader, String, String, Int) async throws ->
+    AppDocumentList
   private let readList: ListLoader
+  private let readVersions: VersionsLoader
 
   init(
     readList: @escaping ListLoader = { reader, workspace, about, archived, offset in
@@ -107,15 +110,16 @@ import SiltaAppSupport
       .sorted { $0.id < $1.id }
   }
 
+  @discardableResult
   func refresh(
     _ reader: AppReader, workspace: String, about: String?, archived: Bool,
     version: Int? = nil, force: Bool = false, append: Bool = false
-  ) async {
+  ) async -> Int? {
     let requestedScope = Scope(workspace: workspace, about: about, archived: archived)
     if !force, !append, listLoaded, listFailure == nil,
       scope == requestedScope, listVersion == version
     {
-      return
+      return listGeneration
     }
     if scope != requestedScope {
       listLoaded = false
@@ -131,16 +135,23 @@ import SiltaAppSupport
     defer { if token == listGeneration { listLoading = false } }
     do {
       let result = try await readList(reader, workspace, about, archived, offset)
-      guard token == listGeneration, !Task.isCancelled else { return }
+      guard token == listGeneration, !Task.isCancelled else { return nil }
       entries = append ? entries + result.entries : result.entries
       nextList = result.nextOffset
       listFailure = nil
       listLoaded = true
       listVersion = version
+      return token
     } catch {
-      if token == listGeneration, !Task.isCancelled { listFailure = AppLoadFailure(error).message }
+      if token == listGeneration, !Task.isCancelled {
+        listFailure = AppLoadFailure(error).message
+        return token
+      }
     }
+    return nil
   }
+
+  func isCurrentList(_ request: Int) -> Bool { request == listGeneration }
 
   func show(
     _ reader: AppReader, workspace: String, version: Int? = nil,
@@ -167,14 +178,16 @@ import SiltaAppSupport
     loading = true
     defer { if token == generation { loading = false } }
     do {
-      let result = try await Task.detached {
-        Read(
-          page: try reader.document(
-            requested, workspace: workspace, view: selectedView, fromLine: line),
-          versions: try reader.documentVersions(requested, workspace: workspace),
-          comments: selectedView == .comments
-            ? try reader.documentComments(requested, workspace: workspace) : nil)
+      let (page, comments) = try await Task.detached {
+        let page = try reader.document(
+          requested, workspace: workspace, view: selectedView, fromLine: line)
+        let comments =
+          selectedView == .comments
+          ? try reader.documentComments(requested, workspace: workspace) : nil
+        return (page, comments)
       }.value
+      let history = try await readVersions(reader, requested, workspace, 0)
+      let result = Read(page: page, versions: history, comments: comments)
       guard token == generation, requested == ref, selectedView == view, !Task.isCancelled else {
         return
       }
@@ -209,9 +222,7 @@ import SiltaAppSupport
     loading = true
     defer { if token == generation { loading = false } }
     do {
-      let result = try await Task.detached {
-        try reader.documentVersions(requested, workspace: workspace, offset: offset)
-      }.value
+      let result = try await readVersions(reader, requested, workspace, offset)
       guard token == generation, requested == ref, !Task.isCancelled else { return }
       versions += result.entries
       nextVersions = result.nextOffset

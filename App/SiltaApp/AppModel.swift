@@ -117,14 +117,21 @@ final class AppModel {
 
   func loadDocuments(force: Bool = false, append: Bool = false) async {
     guard let reader, let workspace else { return }
-    await documents.refresh(
-      reader, workspace: workspace, about: docsAbout,
-      archived: includeArchivedDocuments, version: visibleData?.version, force: force,
-      append: append)
+    let token = generation
+    let about = docsAbout
+    let archived = includeArchivedDocuments
+    let version = visibleData?.version
+    let request = await documents.refresh(
+      reader, workspace: workspace, about: about,
+      archived: archived, version: version, force: force, append: append)
+    guard !Task.isCancelled, token == generation, self.workspace == workspace,
+      docsAbout == about, includeArchivedDocuments == archived, visibleData?.version == version,
+      let request, documents.isCurrentList(request)
+    else { return }
     if documents.ref == nil {
       documents.ref = documents.groups(search: "").first?.preferred?.ref
     }
-    await documents.show(reader, workspace: workspace, version: visibleData?.version, force: force)
+    await documents.show(reader, workspace: workspace, version: version, force: force)
   }
 
   func select(document ref: String?) {
