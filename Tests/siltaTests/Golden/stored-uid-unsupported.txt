@@ -1,2 +1,0 @@
-error: Stored IDs must be nonempty ASCII text without NUL. Nothing was changed. Create a database backup and ask the human to inspect it before repairing IDs. [env]
-ask human: silta backup
