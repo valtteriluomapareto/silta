@@ -374,7 +374,7 @@ CREATE TABLE doc_verification (
   doc_rev_id INTEGER NOT NULL REFERENCES doc_rev(id),
   actor TEXT NOT NULL, message TEXT,
   app_shas TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL);
--- app_shas is an array of {app,ref,sha} snapshots, retaining multiple refs and deleted apps.
+-- app_shas is an array of {app,ref,sha,uid?} snapshots, retaining multiple refs and deleted apps.
 -- Migration fills metadata only for the current accepted revision; it invents no verification.
 
 -- A pending-only document has current_rev NULL. Its row-level title and kind may
@@ -922,7 +922,7 @@ blocks. Ready/re-plan tasks appear only in the first category, ordered by task i
 due groups sort by earliest follow-up, first task id, then stored target. Follow-up
 is due at the start of its UTC day. Ready `next` is `task unblock`; every other block
 uses `task ls --status todo`, just like `task start` (D35), with inspection actions
-for every task. Blocked and proposed attention remains visible despite explicit
+for every task. Blocked and proposed task attention remains visible despite explicit
 archiving. Task proposals appear only while `created_at` is strictly newer than 14 days
 before the read instant, newest first with descending task id breaking ties;
 `--all` includes older proposals without changing their status. Proposal actions
@@ -938,9 +938,11 @@ Unknown historical metadata stays unknown. Secret-bearing values stay masked in
 bounded, single-line previews. Omitted values carry explicit size or truncation
 markers. Read commands are complete; unusable refs recover through the existing
 protected archived list or workspace list.
+Default document attention excludes archived docs, matching default document lists;
+`inbox --all` includes archived pending history, as `doc ls --archived` does.
 
-Apply the strict 14-day cutoff before grouping by stored document UID; archive
-status does not hide pending proposals. Members sort newest first, then descending
+Apply the strict 14-day cutoff before grouping by stored document UID, unless
+`--all` is requested. Members sort newest first, then descending
 revision and binary UID. Groups share the task-proposal category, newest first;
 tasks precede documents on a cross-kind time tie, preserving existing task ties and
 binary document UID ties. The shared cap and `remaining` count groups rather than
@@ -1074,6 +1076,9 @@ unavailable Git evidence leave those apps absent from the array; they do not blo
 edits or reattachment. All attachment and app bindings are still checked at commit.
 Incomplete configured-app evidence clears `verified_at`; it cannot retain an older
 complete stamp. With no required apps, the attachment-only check is complete.
+New observations include the prepared app's stable UID. A present UID in supplied
+prepared evidence must match that captured binding; absent legacy UIDs remain
+unknown. Historical restore preserves optional UIDs without resolving current apps.
 Explicit verification requires all its requested evidence (§14).
 JSON success data is `{ref,archived,changed}`; text says accepted and quiet prints
 the immutable revision ref. Missing creation fields recover together in a body-free
@@ -1081,7 +1086,8 @@ edit retry. Unsafe identities/scopes use the protected read hubs described above
 
 `doc archive <slug|doc:slug>` is human-only, removes live about links and retains
 history, comments, verification evidence and revision allocations. It runs no Git
-and creates no revision. An already archived doc without live links is a true no-op,
+and creates no revision. A doc without an accepted current revision refuses without
+consuming approval. An already archived doc without live links is a true no-op,
 with no doc/approval change and an unused-approval warning when appropriate;
 residual links are a real cleanup mutation. JSON uses `{ref,archived,changed}`.
 Missing docs recover through a protected scoped doc list.
@@ -2171,7 +2177,9 @@ Every CLI call is its own short-lived process, and several agents run at once.
     Initialization is serialized across processes, including database mode setup,
     pending-migration discovery and the pre-migration snapshot. Concurrent openers
     wait, then see the migrated schema.
-  - Each migration sets `meta.min_writer_version`, the one write gate (D32). Every
+  - Migrations raise `meta.min_writer_version` when older writers could misinterpret
+    the changed write semantics (D32); admission or additive metadata alone need not
+    raise it, as v7 demonstrates. Every
     write transaction checks it, not just at open: an older binary, or an older app
     that's still running, gets exit 9 "update silta" and never writes. An older
     binary that meets a newer schema never migrates it, and keeps writing while

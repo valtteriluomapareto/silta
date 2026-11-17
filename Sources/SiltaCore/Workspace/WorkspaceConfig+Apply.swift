@@ -238,8 +238,17 @@ private struct WorkspaceWriter {
     values: [String: DatabaseValue]
   ) throws -> Int64 {
     let keys = identity.keys.sorted()
-    let filter = keys.map { "\($0) IS ?" }.joined(separator: " AND ")
-    let identityArguments = StatementArguments(keys.compactMap { identity[$0] })
+    let legacyKey = table == "service" ? "slug" : table == "edge" ? "kind" : nil
+    let filter = keys.map {
+      "\($0) IS " + ($0 == legacyKey ? "CAST(? AS TEXT)" : "?")
+    }.joined(separator: " AND ")
+    let identityArguments = StatementArguments(
+      keys.compactMap { key -> DatabaseValue? in
+        guard key == legacyKey, let value = identity[key],
+          let text = String.fromDatabaseValue(value)
+        else { return identity[key] }
+        return Data(text.utf8).databaseValue
+      })
     if let id = try Int64.fetchOne(
       db, sql: "SELECT id FROM \(table) WHERE \(filter)", arguments: identityArguments)
     {
@@ -253,6 +262,19 @@ private struct WorkspaceWriter {
       )
       return id
     }
+    try checkNewIdentity(table, identity: identity)
+    var inserted = identity.merging(values) { _, value in value }
+    inserted["uid"] = try ids.next(at: date).databaseValue
+    let columns = inserted.keys.sorted()
+    try db.execute(
+      sql: """
+        INSERT INTO \(table)(\(columns.joined(separator: ",")))
+        VALUES(\(columns.map { _ in "?" }.joined(separator: ",")))
+        """, arguments: StatementArguments(columns.compactMap { inserted[$0] }))
+    return db.lastInsertedRowID
+  }
+
+  private func checkNewIdentity(_ table: String, identity: [String: DatabaseValue]) throws {
     if table == "app", let slug = identity["slug"].flatMap(String.fromDatabaseValue),
       ["doc", "edge", "service"].contains(slug)
     {
@@ -268,15 +290,6 @@ private struct WorkspaceWriter {
         throw WorkspaceError.invalid(["New \(table) \(field) must be an identifier."])
       }
     }
-    var inserted = identity.merging(values) { _, value in value }
-    inserted["uid"] = try ids.next(at: date).databaseValue
-    let columns = inserted.keys.sorted()
-    try db.execute(
-      sql: """
-        INSERT INTO \(table)(\(columns.joined(separator: ",")))
-        VALUES(\(columns.map { _ in "?" }.joined(separator: ",")))
-        """, arguments: StatementArguments(columns.compactMap { inserted[$0] }))
-    return db.lastInsertedRowID
   }
 
 }

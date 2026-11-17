@@ -65,7 +65,14 @@ extension DocWriteService {
       } else {
         shown = error
       }
-      throw CommandFailure(error: shown, next: [readCommand(workspace: slug)], nextBy: .agent)
+      let next: String
+      if case .invalid = error {
+        next = DocService(workspace: slug, store: environment.db)
+          .listPageCommand(about: nil, archived: true, offset: 0, limit: 20)
+      } else {
+        next = readCommand(workspace: slug)
+      }
+      throw CommandFailure(error: shown, next: [next], nextBy: .agent)
     }
   }
 

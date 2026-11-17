@@ -46,8 +46,11 @@ extension TaskLinkTarget {
         db,
         sql: """
           SELECT id FROM edge WHERE workspace_id=? AND from_app_id=?
-            AND to_app_id IS ? AND to_service_id IS ? AND kind=?
-          """, arguments: [workspace, source, service ? nil : target, service ? target : nil, kind])
+            AND to_app_id IS ? AND to_service_id IS ? AND kind=CAST(? AS TEXT)
+          """,
+        arguments: [
+          workspace, source, service ? nil : target, service ? target : nil, Data(kind.utf8),
+        ])
     else {
       throw TaskError.notFound("edge " + raw)
     }

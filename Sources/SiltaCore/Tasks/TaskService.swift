@@ -145,8 +145,8 @@ package struct TaskService: Sendable {
         db,
         sql: """
           SELECT id FROM \(table)
-          WHERE workspace_id=? AND slug=?
-          """, arguments: [workspace, slug])
+          WHERE workspace_id=? AND slug=CAST(? AS TEXT)
+          """, arguments: [workspace, Data(slug.utf8)])
     else { throw TaskError.notFound(table + " " + slug) }
     return id
   }

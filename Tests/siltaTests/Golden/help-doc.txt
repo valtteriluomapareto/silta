@@ -32,6 +32,7 @@ SUBCOMMANDS:
 
 OVERVIEW: Archive a document and remove its live attachments (human-only).
 
+Requires an accepted current revision; pending-only docs refuse.
 Keeps revision history, comments and verification evidence.
 An already archived doc without live attachments changes nothing.
 Archive (human): silta doc archive rules
