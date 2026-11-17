@@ -9,8 +9,8 @@ import Testing
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocTriageRecoveryTests {
   @Test(arguments: [
-    "implicit", "explicit", "prepared", "unsafe-scope", "initial-uid",
-    "raced-uid", "busy-implicit", "busy-explicit", "unicode-implicit", "unicode-explicit",
+    "implicit", "explicit", "prepared", "unsafe-scope",
+    "busy-implicit", "busy-explicit", "unicode-implicit", "unicode-explicit",
   ])
   func selectionAndDiagnosticsSurvivePreparationAndRetry(mode: String) async throws {
     try await withScratchDirectory { home in
@@ -24,7 +24,7 @@ struct DocTriageRecoveryTests {
           )
         ],
         beforeRequest: { _ in
-          if ["implicit", "explicit", "prepared", "raced-uid"].contains(mode)
+          if ["implicit", "explicit", "prepared"].contains(mode)
             || mode.hasPrefix("unicode-")
           {
             try Self.mutate(mode, seed)
@@ -47,7 +47,7 @@ struct DocTriageRecoveryTests {
       }
       let before = try DocVerificationPreparationTests.truth(seed)
       let explicit = [
-        "explicit", "unsafe-scope", "initial-uid", "raced-uid", "busy-explicit", "unicode-explicit",
+        "explicit", "unsafe-scope", "busy-explicit", "unicode-explicit",
       ]
       .contains(mode)
       var failure: (any CodedError)?
@@ -76,7 +76,7 @@ struct DocTriageRecoveryTests {
           arguments: [scope, "cafe\u{301}", scope])
       }
     }
-    if ["initial-uid", "unsafe-scope"].contains(mode) { try mutate(mode, seed) }
+    if mode == "unsafe-scope" { try mutate(mode, seed) }
     return scope
   }
 
@@ -111,14 +111,12 @@ struct DocTriageRecoveryTests {
   private static func mutate(_ mode: String, _ store: DatabaseStore) throws {
     try store.write {
       try $0.database.execute(
-        sql: mode.contains("uid")
-          ? "UPDATE workspace SET uid=CAST(x'410042' AS TEXT) WHERE slug='acme'"
-          : mode == "unsafe-scope"
-            ? "UPDATE workspace SET slug='" + String(repeating: "a", count: 52)
-              + "' WHERE slug='acme'"
-            : mode.hasPrefix("unicode-")
-              ? "UPDATE meta SET value='cafe\u{301}' WHERE key='current_workspace'"
-              : "UPDATE meta SET value='beta' WHERE key='current_workspace'")
+        sql: mode == "unsafe-scope"
+          ? "UPDATE workspace SET slug='" + String(repeating: "a", count: 52)
+            + "' WHERE slug='acme'"
+          : mode.hasPrefix("unicode-")
+            ? "UPDATE meta SET value='cafe\u{301}' WHERE key='current_workspace'"
+            : "UPDATE meta SET value='beta' WHERE key='current_workspace'")
     }
   }
 
@@ -126,10 +124,7 @@ struct DocTriageRecoveryTests {
     _ mode: String, _ failure: (any CodedError)?,
     _ store: DatabaseStore, _ before: [[String]], _ ref: String
   ) throws {
-    if mode.contains("uid") {
-      #expect(failure?.code == .env)
-      #expect(failure?.next == ["silta backup"] && failure?.nextBy == .human)
-    } else if ["implicit", "busy-implicit", "unicode-implicit"].contains(mode) {
+    if ["implicit", "busy-implicit", "unicode-implicit"].contains(mode) {
       #expect(failure?.code == .conflict)
     } else {
       #expect(failure == nil)

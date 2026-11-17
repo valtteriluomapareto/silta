@@ -106,7 +106,7 @@ extension DocService {
     -> (sql: String, arguments: StatementArguments)
   {
     guard let targetID = target.id,
-      let uid = try StoredUID.fetch(
+      let uid = try String.fetchOne(
         db, sql: "SELECT uid FROM \(target.kind) WHERE id=?", arguments: [targetID])
     else { throw StorageError.corrupt }
     return (

@@ -53,13 +53,13 @@ enum SiltaMain {
         arguments, parseResult: parseResult,
         context: CommandContext(mode: mode, environment: environment))
       let rendered = execution.rendered
-      let milliseconds = elapsedMilliseconds(started.duration(to: timer.now))
       var entry = LogEntry(
         timestamp: timestamp, command: execution.command ?? commandPath(arguments),
         actor: environment.actor.description, exitCode: hookDeadline == nil ? rendered.exitCode : 0,
-        milliseconds: milliseconds)
+        milliseconds: elapsedMilliseconds(started.duration(to: timer.now)))
       entry.workspace = execution.scope.workspace
       entry.app = execution.scope.app
+      entry.docsShown = rendered.errorCode == nil ? execution.docsShown : nil
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = logFlags(flags)
@@ -180,7 +180,8 @@ enum SiltaMain {
       return CommandExecution(
         rendered: OutputRouter.render(.success(output), mode: mode),
         scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store),
-        command: loggedPath(arguments, outputCommand))
+        command: loggedPath(arguments, outputCommand),
+        docsShown: (output.data as? BriefReport)?.docsShown)
     } catch {
       return failedExecution(
         error, command: outputCommand,
