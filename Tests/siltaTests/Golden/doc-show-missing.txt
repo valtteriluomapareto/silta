@@ -1,2 +1,2 @@
 error: Doc missing not found. [not_found]
-next: silta --ws 'acme' doc ls
+next: silta --ws 'acme' doc ls --archived --offset 0 --limit 20

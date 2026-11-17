@@ -4,6 +4,17 @@ package struct DocReadResult: Encodable, Sendable {
   package let ref: String
   /// Rendered metadata and content, with complete continuations when clipped.
   package let output: String
+  /// The visible masked Markdown, preserving the stored source ending.
+  package var body: String?
+  /// Complete known metadata fields visible in the selected window.
+  package var title: String?
+  package var about: [String]?
+  package var state: String?
+  var bodyLayout: DocBodyLayout?
+
+  private enum CodingKeys: String, CodingKey {
+    case ref, output, body, title, about, state
+  }
 }
 
 extension DocReadResult {

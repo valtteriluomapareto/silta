@@ -27,7 +27,7 @@ struct InboxCommand: OutputCommand {
             "members": .array(
               .object([
                 "ref": .string, "title": .string, "kind": .string, "why": .string,
-                "source_task": .string, "summary": .string, "read": .string,
+                "source_task": .string, "summary": .string, "read": .string, "stale_base": .bool,
               ])),
           ])),
         "tasks": .optional(

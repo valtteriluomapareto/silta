@@ -374,7 +374,7 @@ CREATE TABLE doc_verification (
   doc_rev_id INTEGER NOT NULL REFERENCES doc_rev(id),
   actor TEXT NOT NULL, message TEXT,
   app_shas TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL);
--- app_shas is an array of {app,ref,sha} snapshots, retaining multiple refs and deleted apps.
+-- app_shas is an array of {app,ref,sha,uid?} snapshots, retaining multiple refs and deleted apps.
 -- Migration fills metadata only for the current accepted revision; it invents no verification.
 
 -- A pending-only document has current_rev NULL. Its row-level title and kind may
@@ -922,7 +922,7 @@ blocks. Ready/re-plan tasks appear only in the first category, ordered by task i
 due groups sort by earliest follow-up, first task id, then stored target. Follow-up
 is due at the start of its UTC day. Ready `next` is `task unblock`; every other block
 uses `task ls --status todo`, just like `task start` (D35), with inspection actions
-for every task. Blocked and proposed attention remains visible despite explicit
+for every task. Blocked and proposed task attention remains visible despite explicit
 archiving. Task proposals appear only while `created_at` is strictly newer than 14 days
 before the read instant, newest first with descending task id breaking ties;
 `--all` includes older proposals without changing their status. Proposal actions
@@ -931,22 +931,31 @@ only that displayed proposal's accept/drop commands and approval placeholder.
 
 Document proposals use `kind: "doc_proposal"` and a concrete `doc_proposal`
 object, separate from `tasks`: `ref`, eligible `total`, at most two `members`,
-`omitted`, and an optional `next` global-list continuation. Each member has bounded
+`omitted`, and an optional `next` document-scoped list continuation. Each member has bounded
 `ref`, `title`, `kind`, `why`, `source_task`, a factual `summary`, and a complete
-`read` command. The summary compares body bytes and metadata without loading bodies.
-Unknown historical metadata stays unknown. Secret-bearing values stay masked in
+`read` command, plus a `stale_base` boolean. Staleness compares the recorded base
+with the current accepted revision in the same snapshot; two absent pointers match.
+The text summary marks a stale base separately from an unavailable recorded base,
+and compares body bytes and metadata without loading bodies. Unknown historical
+metadata stays unknown. Each displayed member offers immutable accept/reject guidance;
+stale or unavailable bases offer rejection and inspection. Actual human callers get
+direct decision commands. Agents, including those querying human attention, get an
+ask-human instruction with approval placeholders. Targeting human attention never
+grants human caller privileges. Secret-bearing values stay masked in
 bounded, single-line previews. Omitted values carry explicit size or truncation
 markers. Read commands are complete; unusable refs recover through the existing
 protected archived list or workspace list.
+Default document attention excludes archived docs, matching default document lists;
+`inbox --all` includes archived pending history, as `doc ls --archived` does.
 
-Apply the strict 14-day cutoff before grouping by stored document UID; archive
-status does not hide pending proposals. Members sort newest first, then descending
+Apply the strict 14-day cutoff before grouping by stored document UID, unless
+`--all` is requested. Members sort newest first, then descending
 revision and binary UID. Groups share the task-proposal category, newest first;
 tasks precede documents on a cross-kind time tie, preserving existing task ties and
 binary document UID ties. The shared cap and `remaining` count groups rather than
 members; `--all` includes older groups but still previews at most two members each.
 Only retained inbox groups load preview fields. Omitted members are reachable with
-existing pinned reads and archived global-list pagination.
+existing pinned reads and archived document-scoped list pagination.
 
 Within each discussion category, stored post id breaks time ties. Each live post
 appears once, with question/answer attention taking precedence over claimed-task
@@ -982,7 +991,7 @@ It lists:
 
 `doc show <slug|doc:slug|doc:slug@N> [--rev N] [--lines N|A-B]` reads
 stored revision metadata and markdown. The default is the current accepted revision;
-without one it lists up to 20 pending revision refs and points to `doc ls` for more.
+without one it lists up to 20 pending revision refs and points to `doc ls --doc <slug>` for more.
 An unpinned accepted-body read includes its pending count and a safe scoped list
 command on the existing header line. Pinned line coordinates and continuation refs
 remain unchanged; archived recovery includes archived entries. Explicit revisions,
@@ -1000,19 +1009,36 @@ source, or a half-recorded decision pair, is corrupt. These reads do not infer a
 from current claims or invoke Git, verification or writes. Complete why text is masked
 before indentation and the existing rendered-line bounds, without a preview limit.
 
-`doc ls [--about <canonical-map-ref>] [--archived] [--offset N] [--limit N]`
+`doc ls [--doc <slug|doc:slug>] [--about <map-ref>] [--archived] [--offset N] [--limit N]`
 lists current accepted and individual pending revisions, ordered by slug then revision.
+The optional document filter takes an unpinned slug or canonical document ref; pinned
+selectors are invalid. Unknown documents have zero entries. It combines with attachment,
+archive and page filters, which every continuation preserves. Inbox “more” commands and
+both unpinned pending-read hints list that document’s entries from offset zero.
 The default page has 20 entries, with a maximum of 100. Accepted entries match current
 live attachments; pending entries match only their stored target kind and UID. Archived documents require `--archived` in lists, but explicit reads
 remain available. Unknown snapshot attachments stay unknown.
+Topic aliases follow brief normalization and canonical-slug precedence in this workspace.
+New metadata stores canonical refs once per resolved target; aliases never duplicate an
+attachment. Historical snapshots stay literal. List continuations use canonical refs.
+A bare app remains invalid typed input, with a safe typed-app read suggestion when it exists.
+A missing pinned revision recovers through an archived-inclusive list so history is reachable.
 
 Reads mask secrets before rendering, clipping or line selection. Show defaults to at
 most 400 rendered lines including its continuation. List title and metadata previews
 are bounded, with omitted-character counts and a pinned show
 command. Complete continuation commands preserve the workspace, selected revision and
-list filters. JSON show data is `{ref,output}`; list data is
-`{entries:[{ref,state,output}],total,offset,limit,next?}`. JSON carries the same bounded
-masked view as text, without hidden body or metadata fields.
+list filters. JSON show data has `ref` and `output`. Stored-revision body views also
+include `body`: the masked Markdown within the selected rendered-line window, without
+header labels or continuation text, preserving its source line ending. It can be empty
+for header-only or past-end selections. Optional `title`, `about` (a ref array), and
+`state` expose complete known metadata fields only when visible in that window.
+Unknown metadata remains absent; known empty titles and attachment arrays stay empty.
+`state` is the stored revision state. Secrets spanning field boundaries cannot reappear
+in structured fields; an affected metadata field is omitted. Diff, comment and
+pending-only views retain `{ref,output}`. List data is
+`{entries:[{ref,state,output}],total,offset,limit,next?}`. All JSON fields follow the same
+bounded masked view as text, without hidden body or metadata.
 Document identities are masked in both text and JSON. Safe canonical refs remain
 copyable, including identifier exemptions from the secret scanner. Unsafe refs use a
 scoped `doc ls` recovery, without show-only flags or redacted nonfunctional commands.
@@ -1074,6 +1100,9 @@ unavailable Git evidence leave those apps absent from the array; they do not blo
 edits or reattachment. All attachment and app bindings are still checked at commit.
 Incomplete configured-app evidence clears `verified_at`; it cannot retain an older
 complete stamp. With no required apps, the attachment-only check is complete.
+New observations include the prepared app's stable UID. A present UID in supplied
+prepared evidence must match that captured binding; absent legacy UIDs remain
+unknown. Historical restore preserves optional UIDs without resolving current apps.
 Explicit verification requires all its requested evidence (§14).
 JSON success data is `{ref,archived,changed}`; text says accepted and quiet prints
 the immutable revision ref. Missing creation fields recover together in a body-free
@@ -1081,7 +1110,8 @@ edit retry. Unsafe identities/scopes use the protected read hubs described above
 
 `doc archive <slug|doc:slug>` is human-only, removes live about links and retains
 history, comments, verification evidence and revision allocations. It runs no Git
-and creates no revision. An already archived doc without live links is a true no-op,
+and creates no revision. A doc without an accepted current revision refuses without
+consuming approval. An already archived doc without live links is a true no-op,
 with no doc/approval change and an unused-approval warning when appropriate;
 residual links are a real cleanup mutation. JSON uses `{ref,archived,changed}`.
 Missing docs recover through a protected scoped doc list.
@@ -1103,7 +1133,7 @@ Target snapshots preserve historical display refs and may name removed targets.
 Document submission is available through `doc propose`, alongside `doc show`,
 `doc ls`, `doc edit`, `doc archive` and human-owned `doc triage`. Submissions remain
 pending, including from a human or with approval words. Human inbox groups expose
-read commands; decisions name explicit immutable proposal refs. Doc-specific review
+inspection and decision guidance; decisions name explicit immutable proposal refs. Doc-specific review
 measurements remain deferred.
 
 - **Propose:** `doc propose <slug> -F <file|-> -m "<why>" [--base <rev>]
@@ -1116,6 +1146,8 @@ measurements remain deferred.
   Omitted accepted metadata stays. Source defaults to the session's sole live claimed task. Input is read before
   database-dependent selection, defaults and validation; insertion uses one write
   and never runs Git.
+  Empty or whitespace-only supplied proposal bodies refuse with `invalid` before database
+  selection or allocation. This does not change accepted-edit empty-body behavior.
   Final body and metadata identical to the selected accepted base, or to a pending
   revision with the same base, refuse with `conflict` and a read of the existing
   immutable ref before any allocation or change. Attachment equality uses UID sets;
@@ -1423,7 +1455,8 @@ attribution. Live continuation behavior remains unverified; follow the
 The full agent manual, printed by the binary and versioned with it. The installed
 skill points at it instead of copying it, and Codex's block does the same, so every
 harness reads the rules the binary ships. `silta guide <topic>` prints one
-section. Topics are `when`, `start`, `recipes`, `docs`, `human`, `questions`, `blocked`,
+section. The default manual summarizes document decisions and points to `guide docs`;
+that topic carries the executable document recipes. Topics are `when`, `start`, `recipes`, `docs`, `human`, `questions`, `blocked`,
 `handoff`, `reviews`, `refusals`, `refs` and `output`, also listed in `guide --help`.
 Topic names match exactly (case-sensitive). An unknown topic returns `invalid`,
 naming the rejected topic and valid topics, with `next: silta guide --help`.
@@ -1562,8 +1595,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    quoted `<ref>: <title>` lines. Every item ends with its `next:` lines; a command
    an earlier item printed is not repeated. When the caller has any item, `more:`
    adds `silta --ws acme inbox`, which no trim removes.
-   Document proposal items use the same bounded evidence and complete read commands
-   as the inbox, with at most two members. Evidence may be shortened with an explicit
+   Document proposal items use the same bounded evidence and complete inspection
+   and decision guidance as the inbox, with at most two members. Evidence may be shortened with an explicit
    marker; recovery commands stay complete. Rendered groups fit the optional budget
    without displacing current-task context. The header still counts every eligible
    group and the complete inbox recovery remains. Selection, rendering and trimming
@@ -2171,7 +2204,9 @@ Every CLI call is its own short-lived process, and several agents run at once.
     Initialization is serialized across processes, including database mode setup,
     pending-migration discovery and the pre-migration snapshot. Concurrent openers
     wait, then see the migrated schema.
-  - Each migration sets `meta.min_writer_version`, the one write gate (D32). Every
+  - Migrations raise `meta.min_writer_version` when older writers could misinterpret
+    the changed write semantics (D32); admission or additive metadata alone need not
+    raise it, as v7 demonstrates. Every
     write transaction checks it, not just at open: an older binary, or an older app
     that's still running, gets exit 9 "update silta" and never writes. An older
     binary that meets a newer schema never migrates it, and keeps writing while

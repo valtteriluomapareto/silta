@@ -19,12 +19,39 @@ extension TaskLinkTarget {
       guard ["app", "service", "topic"].contains(kind) else {
         throw TaskError.invalid("Use app:, edge:, service: or topic: attachment references.")
       }
+      if kind == "topic" { return try topic(value, workspace: workspace, in: db) }
       let name = kind == "service" ? try decodeComponent(value) : try identifier(value)
       return Self(
         kind: kind, id: try TaskService.entity(kind, slug: name, workspace: workspace, in: db))
     } catch let error as TaskError {
-      throw CommandFailure(error: error, next: [workspaceCommand("silta ws show", workspace: slug)])
+      var next = [workspaceCommand("silta ws show", workspace: slug)]
+      if WorkspaceConfig.isValidIdentifier(raw), DocService.safeReference("app:" + raw),
+        try Int.fetchOne(
+          db, sql: "SELECT count(*) FROM app WHERE workspace_id=? AND slug=?",
+          arguments: [workspace, raw]) == 1
+      {
+        next = [
+          workspaceCommand("silta doc ls --about " + shellWord("app:" + raw), workspace: slug)
+        ]
+      }
+      throw CommandFailure(error: error, next: next)
     }
+  }
+
+  private static func topic(_ value: String, workspace: Int64, in db: Database) throws -> Self {
+    let raw = Data(value.utf8)
+    let alias = Data(WorkspaceConfig.normalize(value).utf8)
+    guard
+      let id = try Int64.fetchOne(
+        db,
+        sql: """
+          SELECT topic.id FROM topic LEFT JOIN topic_alias ON topic_alias.topic_id=topic.id
+          WHERE topic.workspace_id=? AND (topic.slug=CAST(? AS TEXT)
+            OR topic_alias.alias=CAST(? AS TEXT))
+          ORDER BY (topic.slug=CAST(? AS TEXT)) DESC,topic.slug LIMIT 1
+          """, arguments: [workspace, raw, alias, raw])
+    else { throw TaskError.notFound("topic " + value) }
+    return Self(kind: "topic", id: id)
   }
 
   private static func edge(_ raw: String, workspace: Int64, in db: Database) throws -> Self {
@@ -46,8 +73,11 @@ extension TaskLinkTarget {
         db,
         sql: """
           SELECT id FROM edge WHERE workspace_id=? AND from_app_id=?
-            AND to_app_id IS ? AND to_service_id IS ? AND kind=?
-          """, arguments: [workspace, source, service ? nil : target, service ? target : nil, kind])
+            AND to_app_id IS ? AND to_service_id IS ? AND kind=CAST(? AS TEXT)
+          """,
+        arguments: [
+          workspace, source, service ? nil : target, service ? target : nil, Data(kind.utf8),
+        ])
     else {
       throw TaskError.notFound("edge " + raw)
     }

@@ -32,11 +32,27 @@ struct DocMetadata {
       if draft.about == nil { throw DocError.missing(["--about"]) }
       throw DocError.invalid("A doc needs at least one --about map item.")
     }
-    let targets = try refs.map { try TaskLinkTarget.map($0, workspace: workspace, in: db) }
+    let selected = try attachments(refs, workspace: workspace, in: db)
     return Self(
       title: title,
-      kind: draft.kind ?? previous?.kind ?? Self.inferredKind(targets),
-      refs: refs, targets: targets)
+      kind: draft.kind ?? previous?.kind ?? Self.inferredKind(selected.targets),
+      refs: selected.refs, targets: selected.targets)
+  }
+
+  private static func attachments(_ refs: [String], workspace: Int64, in db: Database) throws
+    -> (refs: [String], targets: [TaskLinkTarget])
+  {
+    var seen: [String: Set<Int64>] = [:]
+    var selected: [(ref: String, target: TaskLinkTarget)] = []
+    for ref in refs {
+      let target = try TaskLinkTarget.map(ref, workspace: workspace, in: db)
+      guard let id = target.id else { throw StorageError.corrupt }
+      if seen[target.kind, default: []].insert(id).inserted {
+        selected.append((try target.rendered(in: db), target))
+      }
+    }
+    selected.sort { $0.ref < $1.ref }
+    return (selected.map(\.ref), selected.map(\.target))
   }
 
   static func checkTitle(_ title: String) throws {
@@ -68,14 +84,17 @@ struct DocMetadata {
     let old = try Row.fetchOne(
       db,
       sql: """
-        SELECT d.*,r.state AS revision_state FROM doc d
+        SELECT d.*,CAST(d.title AS BLOB) AS title_bytes,CAST(d.kind AS BLOB) AS kind_bytes,
+          r.state AS revision_state FROM doc d
         LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
         WHERE d.workspace_id=? AND d.slug=?
         """, arguments: [workspace, slug])
     guard let old, (old["current_rev"] as Int?) != nil else { return nil }
     guard old["revision_state"] as String? == "accepted" else { throw StorageError.corrupt }
+    guard let title = try old.strictText("title_bytes"), let kind = try old.strictText("kind_bytes")
+    else { throw StorageError.corrupt }
     return Accepted(
-      title: old["title"], kind: old["kind"],
+      title: title, kind: kind,
       refs: try DocStore.attachments(old["id"], workspace: workspace, in: db).map {
         try TaskLinkTarget.render($0, in: db)
       })
