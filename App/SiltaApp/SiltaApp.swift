@@ -6,6 +6,9 @@ import SiltaAppSupport
 @main
 struct SiltaApp: App {
   @State private var model: AppModel
+  #if DEBUG
+    private let control: ControlRuntime?
+  #endif
 
   init() {
     #if DEBUG
@@ -19,22 +22,30 @@ struct SiltaApp: App {
         exit(64)
       }
     #endif
-    _model = State(initialValue: Self.makeModel())
-  }
-
-  private static func makeModel() -> AppModel {
-    let arguments = ProcessInfo.processInfo.arguments
     #if DEBUG
       do {
-        if try FixtureLaunch.parse(arguments) {
-          let fixture = try FixtureLaunch.prepare()
-          return makeReaderModel(home: fixture.home, user: fixture.user, now: { fixture.now })
+        if let options = try ControlLaunch.parse(ProcessInfo.processInfo.arguments) {
+          let control = try ControlRuntime(options: options)
+          self.control = control
+          let fixture = control.fixture
+          let model = Self.makeReaderModel(
+            home: fixture.home, user: fixture.user, now: { fixture.now })
+          _model = State(initialValue: model)
+          Task { await control.start(model: model) }
+          return
         }
+        control = nil
       } catch {
         FileHandle.standardError.write(Data("Silta fixture launch refused: \(error)\n".utf8))
         exit(64)
       }
-    #else
+    #endif
+    _model = State(initialValue: Self.makeModel())
+  }
+
+  private static func makeModel() -> AppModel {
+    #if !DEBUG
+      let arguments = ProcessInfo.processInfo.arguments
       if arguments.contains(where: { $0.hasPrefix("-Silta") }) {
         FileHandle.standardError.write(Data("Silta development arguments require Debug.\n".utf8))
         exit(64)
@@ -74,6 +85,14 @@ struct SiltaApp: App {
   }
 
   var body: some Scene {
+    #if DEBUG
+      mainWindow.defaultLaunchBehavior(control?.options.snapshot == nil ? .presented : .suppressed)
+    #else
+      mainWindow
+    #endif
+  }
+
+  private var mainWindow: some Scene {
     Window("Silta", id: "main") {
       AppShellView(model: model)
     }.defaultSize(width: 1280, height: 840)

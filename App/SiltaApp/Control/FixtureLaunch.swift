@@ -3,22 +3,14 @@
   import SiltaAppSupport
 
   enum FixtureLaunch {
-    struct Configuration {
+    nonisolated struct Configuration: Sendable {
       let home: URL
       let user: String
       let now: Date
     }
 
     static func parse(_ arguments: [String]) throws -> Bool {
-      let controls = arguments.enumerated().filter { $0.element.hasPrefix("-Silta") }
-      guard !controls.isEmpty else { return false }
-      guard controls.count == 1, let option = controls.first,
-        option.element == "-SiltaFixture", arguments.indices.contains(option.offset + 1),
-        arguments[option.offset + 1] == "v2"
-      else {
-        throw AppLoadFailure(message: "Use -SiltaFixture v2 for an isolated Debug fixture.")
-      }
-      return true
+      try ControlLaunch.parse(arguments) != nil
     }
 
     static func prepare() throws -> Configuration {

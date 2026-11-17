@@ -8,6 +8,7 @@ final class AppModel {
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
   let reader: AppReader?
+  let taskDetail = TaskDetailModel()
   let documents: DocsModel
   var docsAbout: String?
   var includeArchivedDocuments = false
@@ -106,6 +107,7 @@ final class AppModel {
       workspace = slug
       documents.clear()
       docsAbout = nil
+      taskDetail.clear()
       boardSelection = nil
       boardInspectorPresented = false
       workspaceSelection = nil
@@ -156,11 +158,22 @@ final class AppModel {
     navigate(to: .docs)
   }
 
+  func loadTaskDetail() async {
+    guard let reader, let workspace, let ref = boardSelection?.taskRef else {
+      taskDetail.clear()
+      return
+    }
+    await taskDetail.load(workspace: workspace, ref: ref) {
+      try await Task.detached { try reader.task(ref, workspace: workspace) }.value
+    }
+  }
+
   func navigate(to route: AppRoute) {
     self.route = route
   }
 
   func inspect(task ref: String) {
+    if boardSelection?.taskRef != ref { taskDetail.clear() }
     boardSelection = BoardSelection(taskRef: ref)
     navigate(to: .board)
     boardInspectorPresented = true
