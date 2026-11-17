@@ -139,21 +139,16 @@ extension DocService {
   }
 
   private func entry(_ row: Row, in db: Database) throws -> DocListResult.Entry {
-    func text(_ name: String) throws -> String? {
-      guard let bytes: Data = row[name] else { return nil }
-      guard let value = String(data: bytes, encoding: .utf8) else { throw StorageError.corrupt }
-      return value
-    }
-    guard let slug = try text("slug") else { throw StorageError.corrupt }
+    guard let slug = try row.strictText("slug") else { throw StorageError.corrupt }
     let ref = "doc:\(slug)@\(row["rev"] as Int)"
     let state: String = row["state"]
-    let raw = try text("about_refs")
+    let raw = try row.strictText("about_refs")
     let refs: [String]?
     do {
       refs = try raw.map { try JSONDecoder().decode([String].self, from: Data($0.utf8)) }
     } catch { throw StorageError.corrupt }
-    let title = try text("title")
-    let kind = try text("kind")
+    let title = try row.strictText("title")
+    let kind = try row.strictText("kind")
     let rendered = DocReadResult(
       masking: ref,
       output: "\(ref) [\(state)] \(Self.preview(title ?? "(unknown)"))\n"
