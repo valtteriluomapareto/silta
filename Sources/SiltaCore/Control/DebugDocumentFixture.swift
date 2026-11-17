@@ -55,6 +55,11 @@
 
           Use whole cents and an explicit currency.
 
+          | Field | Type | Meaning |
+          | --- | --- | --- |
+          | total_cents | integer | Order total in whole cents |
+          | currency | string | ISO currency code |
+
           ```json
           {"total_cents": 1299, "currency": "EUR"}
           ```

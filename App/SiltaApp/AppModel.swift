@@ -195,9 +195,17 @@ nonisolated struct DocumentSelection: Equatable {
 }
 
 extension AppModel {
+  var screenTitle: String {
+    route == .docs ? documents.document?.title ?? "Docs" : route.title
+  }
+
   var screenSummary: String {
     guard let data = visibleData else { return "" }
-    if route == .docs { return "Workspace documents" }
+    if route == .docs, let doc = documents.document {
+      let count = documents.versions.filter { $0.state == "proposed" }.count
+      return
+        "\(doc.kind ?? "Document") · \(doc.state) revision @\(doc.revision) · \(count) proposed"
+    }
     if route == .workspace, let map = data.map {
       return
         "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"

@@ -59,6 +59,10 @@ struct DocBodyLayout: Sendable {
     let start = max(visible.lowerBound, position(body.lowerBound))
     let end = min(visible.upperBound, position(body.upperBound))
     result.body = text(start..<max(start, end))
+    result.lines = Self.lines(
+      full: text(position(body.lowerBound)..<position(body.upperBound)),
+      prefix: text(position(body.lowerBound)..<min(start, position(body.upperBound))),
+      visible: result.body ?? "")
     result.title = title.flatMap(complete)
     if let about, let aboutField, complete(aboutField) != nil {
       let values = about.compactMap(complete)
@@ -66,4 +70,13 @@ struct DocBodyLayout: Sendable {
     }
     result.state = complete(state)
   }
+  private static func lines(full: String, prefix: String, visible: String) -> DocLineWindow {
+    func count(_ value: String) -> Int {
+      value.utf8.filter { $0 == 10 }.count + (value.isEmpty || value.utf8.last == 10 ? 0 : 1)
+    }
+    let shown = count(visible)
+    let first = shown == 0 ? 0 : prefix.utf8.filter { $0 == 10 }.count + 1
+    return DocLineWindow(first: first, last: shown == 0 ? 0 : first + shown - 1, total: count(full))
+  }
+
 }

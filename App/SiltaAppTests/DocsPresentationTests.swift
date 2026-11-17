@@ -16,6 +16,7 @@
       let sections = DocsContent.sections(docs.groups(search: ""))
       #expect(sections.contains { $0.id.hasPrefix("edge:") })
       #expect(sections.contains { $0.id.hasPrefix("app:") })
+      #expect(sections.first?.title == "acme-mobile → acme-backend · http-api")
       #expect(sections.flatMap(\.groups).contains { $0.id == "legacy-notes" })
       #expect(sections.flatMap(\.groups).contains { $0.id == "push-categories" })
       docs.ref = "doc:order-contract@2"
@@ -54,7 +55,8 @@
       let fenced = MarkdownContent("```text\n" + table + "\n```")
       #expect(fenced.blocks.filter(\.code).count == 1)
       let diff = DocumentDiff("--- old\n+++ new\n@@ -1 +1 @@\n-old\n+new\n same")
-      #expect(diff.lines.map(\.kind) == [.metadata, .metadata, .metadata, .removed, .added, .context])
+      #expect(
+        diff.lines.map(\.kind) == [.metadata, .metadata, .metadata, .removed, .added, .context])
     }
   }
 #endif
