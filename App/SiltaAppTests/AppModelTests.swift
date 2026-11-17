@@ -119,6 +119,26 @@
       #expect(!model.boardInspectorPresented)
     }
 
+    @Test func routeInspectorsAndTypedSelectionsRemainIndependent() async {
+      let model = AppModel(load: { _, _, _ in nil })
+      model.showProposed = true
+      model.inspect(task: "AC-12")
+      model.navigate(to: .workspace)
+      #expect(!model.workspaceInspectorPresented)
+      model.select(connection: "conn:acme-mobile->acme-backend")
+      #expect(model.workspaceInspectorPresented && model.boardInspectorPresented)
+      model.toggleInspector()
+      model.navigate(to: .board)
+      #expect(model.boardSelection?.taskRef == "AC-12" && model.showProposed)
+      #expect(model.boardInspectorPresented)
+      model.navigate(to: .workspace)
+      #expect(model.workspaceSelection?.connectionRef == "conn:acme-mobile->acme-backend")
+      #expect(!model.workspaceInspectorPresented)
+      await model.selectWorkspace("other").value
+      #expect(model.workspaceSelection == nil && model.boardSelection == nil)
+      #expect(!model.boardInspectorPresented && !model.workspaceInspectorPresented)
+    }
+
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
       AppModel(
         load: { previous, workspace, force in

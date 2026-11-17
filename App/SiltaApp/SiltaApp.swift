@@ -81,6 +81,7 @@ struct SiltaApp: App {
         CommandGroup(after: .sidebar) {
           Button("My work") { model.navigate(to: .mywork) }.keyboardShortcut("1")
           Button("Board") { model.navigate(to: .board) }.keyboardShortcut("2")
+          Button("Workspace") { model.navigate(to: .workspace) }.keyboardShortcut("3")
           Button("Toggle Inspector") { model.toggleInspector() }
             .keyboardShortcut("i", modifiers: [.command, .option])
           Divider()

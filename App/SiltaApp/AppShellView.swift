@@ -63,12 +63,17 @@ struct AppShellView: View {
       switch model.route {
       case .mywork: MyWorkView(model: model)
       case .board: BoardView(model: model)
+      case .workspace: WorkspaceView(model: model)
       }
     }
   }
 
   private var subtitle: String {
     guard let data = model.visibleData else { return "" }
+    if model.route == .workspace, let map = data.map {
+      return
+        "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"
+    }
     if model.route == .board, let board = data.snapshot?.board {
       return "\(board.todo.count + board.doing.count + board.review.count) open · "
         + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"

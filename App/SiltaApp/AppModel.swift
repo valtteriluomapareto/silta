@@ -14,6 +14,8 @@ final class AppModel {
   private(set) var boardSelection: BoardSelection?
   var boardInspectorPresented = false
   var showProposed = false
+  private(set) var workspaceSelection: ConnectionSelection?
+  var workspaceInspectorPresented = false
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
   private let load: Loader
@@ -96,6 +98,8 @@ final class AppModel {
       workspace = slug
       boardSelection = nil
       boardInspectorPresented = false
+      workspaceSelection = nil
+      workspaceInspectorPresented = false
       appFilter = nil
     }
     return refresh(force: true)
@@ -111,8 +115,18 @@ final class AppModel {
     boardInspectorPresented = true
   }
 
+  func select(connection ref: String) {
+    workspaceSelection = ConnectionSelection(connectionRef: ref)
+    navigate(to: .workspace)
+    workspaceInspectorPresented = true
+  }
+
   func toggleInspector() {
-    if route == .board { boardInspectorPresented.toggle() }
+    switch route {
+    case .board: boardInspectorPresented.toggle()
+    case .workspace: workspaceInspectorPresented.toggle()
+    case .mywork: break
+    }
   }
 
   func showApp(_ slug: String) {
@@ -127,4 +141,8 @@ final class AppModel {
 
 nonisolated struct BoardSelection: Equatable {
   let taskRef: String
+}
+
+nonisolated struct ConnectionSelection: Equatable {
+  let connectionRef: String
 }
