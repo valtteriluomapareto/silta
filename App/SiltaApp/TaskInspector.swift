@@ -5,13 +5,12 @@ import SwiftUI
 
 struct TaskInspector: View {
   @Bindable var model: AppModel
-  @State private var task: AppTask?
-  @State private var failure: String?
+  @State private var detail = TaskDetailModel()
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        if let task {
+        if let task = detail.value {
           HStack {
             CopyValue(value: task.ref, title: "Copy reference")
             Text(task.status.capitalized).font(.callout).foregroundStyle(.secondary)
@@ -66,9 +65,14 @@ struct TaskInspector: View {
               NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
             }
           }
-        } else if let failure {
-          ContentUnavailableView(
-            "Task unavailable", systemImage: "exclamationmark.triangle", description: Text(failure))
+        } else if let failure = detail.failure {
+          ContentUnavailableView {
+            Label("Task unavailable", systemImage: "exclamationmark.triangle")
+          } description: {
+            Text(failure)
+          } actions: {
+            Button("Retry") { Task { await load() } }
+          }
         } else if model.selectedTask != nil {
           ProgressView("Loading task…")
         } else {
@@ -84,17 +88,14 @@ struct TaskInspector: View {
   }
 
   private func load() async {
-    task = nil
-    failure = nil
-    guard let reader = model.reader, let workspace = model.workspace, let ref = model.selectedTask
-    else { return }
-    do {
-      let detail = try await Task.detached { try reader.task(ref, workspace: workspace) }.value
-      try Task.checkCancellation()
-      task = detail
-    } catch {
-      guard !Task.isCancelled else { return }
-      failure = AppLoadFailure(error).message
+    guard let reader = model.reader, let workspace = model.workspace,
+      let ref = model.selectedTask
+    else {
+      detail.clear()
+      return
+    }
+    await detail.load {
+      try await Task.detached { try reader.task(ref, workspace: workspace) }.value
     }
   }
 

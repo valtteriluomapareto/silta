@@ -30,12 +30,14 @@ nonisolated struct BoardContent {
       Lane(title: "Review", tasks: filtered(board.review)),
       Lane(title: "Done this week", tasks: filtered(board.doneThisWeek)),
     ]
-    attention = snapshot.work.items
-    questions = Set(snapshot.work.items.filter { $0.kind == "question" }.compactMap(\.task))
+    attention = board.questions
+    questions = Set(board.questions.compactMap(\.task))
   }
   func commands(for ref: String, reader: AppReader, workspace: String) -> [AppCommand] {
-    attention.filter { $0.kind == "question" && $0.task == ref }
+    var seen = Set<String>()
+    return attention.filter { $0.kind == "question" && $0.task == ref }
       .flatMap { reader.commands(for: $0, workspace: workspace) }
+      .filter { seen.insert($0.text).inserted }
   }
 
 }

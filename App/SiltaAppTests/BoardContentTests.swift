@@ -50,18 +50,14 @@
       #expect(snapshot.work.items.count == 12 && snapshot.work.remaining > 0)
       #expect(!snapshot.work.items.contains { $0.task == "AC-14" })
       let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
-      withKnownIssue("Board attention must not inherit the My work cap") {
-        #expect(content.questions.contains("AC-14"))
-        #expect(
-          content.commands(for: "AC-14", reader: reader, workspace: "acme")
-            .contains { $0.title == "Answer question" })
-      }
+      #expect(content.questions.contains("AC-14"))
+      #expect(
+        content.commands(for: "AC-14", reader: reader, workspace: "acme")
+          .contains { $0.title == "Answer question" })
       let commands = content.commands(for: "AC-12", reader: reader, workspace: "acme")
       #expect(commands.filter { $0.title == "Answer question" }.count == 12)
-      withKnownIssue("Multiple questions must not duplicate command identities") {
-        #expect(commands.filter { $0.title == "Read task" }.count == 1)
-        #expect(Set(commands.map(\.text)).count == commands.count)
-      }
+      #expect(commands.filter { $0.title == "Read task" }.count == 1)
+      #expect(Set(commands.map(\.text)).count == commands.count)
     }
 
     private func fixture(_ body: (AppSnapshot) throws -> Void) throws {

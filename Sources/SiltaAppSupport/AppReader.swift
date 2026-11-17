@@ -57,13 +57,14 @@ public struct AppReader: Sendable {
       }
       let reviews = tasks.filter { $0.status == "review" }
       let inbox = try service.inbox(for: "me")
+      let questions = try service.questionInbox().map(AppAttention.init)
       return AppSnapshot(
         validUntil: try taskDeadline(tasks, at: at, dayEnd: day.end),
         board: AppBoard(
           todo: tasks.filter { ["todo", "blocked"].contains($0.status) },
           doing: tasks.filter { $0.status == "doing" }, review: reviews,
           doneThisWeek: completed, proposals: tasks.filter { $0.status == "proposed" },
-          appOpenCounts: counts),
+          questions: questions, appOpenCounts: counts),
         work: AppWork(
           items: inbox.items.map(AppAttention.init), remaining: inbox.remaining,
           moreCommand: inbox.more, reviews: reviews))
