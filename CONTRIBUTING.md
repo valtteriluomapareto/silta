@@ -100,6 +100,7 @@ in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
 Native app tests require an isolated temporary home before the host starts. Use
 `scripts/verify.sh app`; it supplies `SILTA_APP_TEST_HOME` and keeps xcresult evidence
 under `.build/app/`. For manual Xcode tests, configure `SILTA_APP_TEST_HOME` to an
-existing temporary directory containing a `user/` directory. Missing or unexpanded
+existing temporary directory containing a `user/` directory, and
+`SILTA_APP_TEST_CLI` to the same checkout’s built `.build/debug/silta`. Missing or unexpanded
 settings refuse startup before a reader can be constructed. App and root shared
 package pins must match; the app never links test support.

@@ -7,7 +7,7 @@
   @MainActor @Suite(.timeLimit(.minutes(1)))
   struct AppModelTests {
     @Test func forcedRequestsCoalesceAndAllCallersWait() async {
-      await withKnownIssue("Single-flight refresh is not implemented") {
+      do {
         let driver = ControlledLoads()
         let model = makeModel(driver)
         let first = model.refresh()
@@ -23,8 +23,10 @@
       }
     }
 
-    @Test(arguments: [false, true]) func selectionGenerationRejectsOldSuccessAndFailure(_ fails: Bool) async {
-      await withKnownIssue("Selection generation is not implemented") {
+    @Test(arguments: [false, true]) func selectionGenerationRejectsOldSuccessAndFailure(
+      _ fails: Bool
+    ) async {
+      do {
         let driver = ControlledLoads()
         let model = makeModel(driver)
         let initial = model.refresh()
@@ -35,8 +37,11 @@
         let beta = model.selectWorkspace("beta")
         #expect(model.visibleData == nil)
         let acme = model.selectWorkspace("acme")
-        if fails { driver.finish(stale, .failure(AppLoadFailure(message: "stale"))) }
-        else { driver.finish(stale, .success(value(2))) }
+        if fails {
+          driver.finish(stale, .failure(AppLoadFailure(message: "stale")))
+        } else {
+          driver.finish(stale, .success(value(2)))
+        }
         let current = await driver.next()
         #expect(current.workspace == "acme")
         #expect(model.data?.version == 1 && model.failure == nil)
@@ -50,7 +55,7 @@
     }
 
     @Test func failuresKeepDataAndRetryHydration() async {
-      await withKnownIssue("Failed-refresh retry is not implemented") {
+      do {
         let driver = ControlledLoads()
         let model = makeModel(driver)
         let initial = model.refresh()
@@ -70,7 +75,7 @@
     }
 
     @Test func backgroundTicksDoNotReadAndUnchangedChecksKeepData() async {
-      await withKnownIssue("Foreground-only ticks and unchanged data retention are not implemented") {
+      do {
         let driver = ControlledLoads()
         let model = makeModel(driver)
         #expect(model.tick(frontmost: false) == nil)
@@ -85,13 +90,15 @@
     }
 
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
-      AppModel(load: { previous, workspace, force in
-        try await driver.load(previous, workspace, force)
-      }, now: { AppV2Fixture.now })
+      AppModel(
+        load: { previous, workspace, force in
+          try await driver.load(previous, workspace, force)
+        }, now: { AppV2Fixture.now })
     }
 
     private func value(_ version: Int) -> AppLoadedData {
-      AppLoadedData(workspaces: [], workspace: "acme", snapshot: nil, map: nil,
+      AppLoadedData(
+        workspaces: [], workspace: "acme", snapshot: nil, map: nil,
         version: version, checkedAt: AppV2Fixture.now)
     }
   }

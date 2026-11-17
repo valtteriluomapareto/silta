@@ -12,18 +12,26 @@
     }
     private var requests: [Request] = []
     private var nextID = 0
-    private var terminal: AppLoadedData?? = nil
+    private var terminal: AppLoadedData??
     private var waiting: CheckedContinuation<Request, Never>?
     private var active: [Request] = []
 
-    func load(_ previous: AppLoadedData?, _ workspace: String?, _ force: Bool) async throws -> AppLoadedData? {
+    func load(_ previous: AppLoadedData?, _ workspace: String?, _ force: Bool) async throws
+      -> AppLoadedData?
+    {
       if let terminal { return terminal }
       return try await withCheckedThrowingContinuation { continuation in
         nextID += 1
-        let request = Request(id: nextID, previous: previous, workspace: workspace, force: force, continuation: continuation)
+        let request = Request(
+          id: nextID, previous: previous, workspace: workspace, force: force,
+          continuation: continuation)
         active.append(request)
-        if let waiting { self.waiting = nil; waiting.resume(returning: request) }
-        else { requests.append(request) }
+        if let waiting {
+          self.waiting = nil
+          waiting.resume(returning: request)
+        } else {
+          requests.append(request)
+        }
       }
     }
 

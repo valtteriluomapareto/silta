@@ -88,7 +88,10 @@ the human copies.
     quoting, so a custom app home cannot recover a different default store.
   - Reads aren't logged; §19 logging belongs to the CLI front-end.
 - **Freshness:** check `PRAGMA data_version` when the window gains focus, on ⌘R, and
-  on a 5-second timer while the window is frontmost. Reload only when it changed. The
+  on a 5-second timer while the window is frontmost. Reload when it changed, a task
+  proposal/day/week deadline expires, or a one-minute cache ceiling is reached. The
+  ceiling bounds clock-only document-attention staleness until its exact expiry is
+  available to the viewer; a foreground tick adds at most five seconds. The
   §17 change signal (`notify_post` after each commit) replaces the timer once a slice
   adds it to SiltaCore writes.
 - **Copy text:** runnable templates carry the selected `SILTA_HOME`. Use the inbox's
