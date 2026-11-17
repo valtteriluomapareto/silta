@@ -62,7 +62,7 @@ the numbers; the maintainer decides them.
 | E3 | Do agents use Silta correctly without reminders? | Logs: calls per session, `usage` error rate, retry loops | Fix guide text if `usage` errors exceed 10% of calls |
 | E4 | What does it cost? | Logs (hook ms, approvals per week); check-in question 3 | Change whatever the maintainer names twice as nearly making them stop |
 | E5 | Does the workspace data stay current? | Gap list at weeks 0, 2 and 6; `Map gap:` lines agents left while the maintainer was away | Rethink upkeep if gaps grow between reviews; build map proposals ([workspace knowledge](workspace-knowledge.md)) if `Map gap:` lines wait on the maintainer most weeks |
-| E6 | Do docs help agents, or mislead them? | Check-in `Helped:` and `Misled:` naming `doc:` refs; `Miss: doc:` lines; doc lines marked in the brief audit; logs as a lower bound | Move K6 freshness ahead of other docs work if two different docs misled an agent; revisit how the brief shows docs if no check-in in weeks 1–3 names a helpful doc |
+| E6 | Do docs help agents, or mislead them? | Check-in `Helped:` and `Misled:` naming `doc:` refs; `Miss: doc:` lines; doc lines marked in the brief audit; logs: docs each brief showed (SI-179), and doc reads as a lower bound | Move K6 freshness ahead of other docs work if two different docs misled an agent; revisit how the brief shows docs if no check-in in weeks 1–3 names a helpful doc |
 | E7 | Do agents propose docs worth the review? | Report: proposals, accepted, rejected, oldest pending; `Miss: doc:<slug> missing` lines | Tighten the proposal rule in `guide docs` if under half are accepted; improve the R2 guidance first if missing-doc lines outnumber proposals |
 
 `code` calls per cross-repo task are counted for §23 Q8, which owns that decision.
@@ -118,14 +118,15 @@ maintainer names doc review twice as a cost.
 
 **Doc numbers at each review.** The report's doc proposal counts for E7 arrive with
 SI-172. It recomputes from the database, so SI-172 can merge during the first two
-weeks; if it hasn't by week 2, E7 waits for week 6. Two more numbers need no new code;
-the agent collects them at each review:
+weeks; if it hasn't by week 2, E7 waits for week 6. SI-179 logs how many docs each
+brief showed; logs can't be recomputed, so it ships before day 0, or E6 goes without
+it. Two more numbers need no new code; the agent collects them at each review:
 - **Inbox load** for E4: the item count and oldest item from
   `silta --ws <slug> inbox --for me`. The report's "n/a (S11)" lines are ignored.
-- **Doc reads** for E6: agent sessions with a `doc show` or `doc ls` line in the
-  logs, kept 90 days (§19), leaving out the seeding sitting. Agents mostly read docs
-  in the brief without a doc command, so this is a lower bound and never decides E6
-  alone.
+- **Doc exposure and reads** for E6: agent sessions whose brief showed at least one
+  doc, and sessions with a `doc show` or `doc ls` line, from the logs, kept 90 days
+  (§19), leaving out the seeding sitting. Agents mostly read docs in the brief without
+  a doc command, so reads are a lower bound; neither count decides E6 alone.
 
 ## Taking it into use
 
