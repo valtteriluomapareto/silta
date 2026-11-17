@@ -27,6 +27,7 @@ Consecutive failures within the selected silta stream; flag values are unavailab
 
 2 sessions; median 3.5 calls; maximum 4 calls.
 Observed brief document exposure: 0 agent sessions; 0 previews.
+Observed brief document pointers: 0 counted documents.
 Legacy brief exposure unknown: 0 calls.
 
 ## Warnings

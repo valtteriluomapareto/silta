@@ -108,6 +108,7 @@ struct CommandExecution {
   /// The command name the log line uses, when it differs from the parsed path.
   var command: String?
   var docsShown: Int?
+  var docsCounted: Int?
 }
 
 /// Reads known options while ArgumentParser retains the malformed command remainder.

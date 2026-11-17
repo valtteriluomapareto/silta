@@ -60,6 +60,7 @@ enum SiltaMain {
       entry.workspace = execution.scope.workspace
       entry.app = execution.scope.app
       entry.docsShown = rendered.errorCode == nil ? execution.docsShown : nil
+      entry.docsCounted = rendered.errorCode == nil ? execution.docsCounted : nil
       entry.errorCode = rendered.errorCode
       entry.warnings = rendered.warningCodes
       entry.flags = logFlags(flags)
@@ -181,7 +182,8 @@ enum SiltaMain {
         rendered: OutputRouter.render(.success(output), mode: mode),
         scope: CommandScope.success(outputCommand, workspace: output.workspace, store: store),
         command: loggedPath(arguments, outputCommand),
-        docsShown: (output.data as? BriefReport)?.docsShown)
+        docsShown: (output.data as? BriefReport)?.docsShown,
+        docsCounted: (output.data as? BriefReport)?.docsCounted)
     } catch {
       return failedExecution(
         error, command: outputCommand,

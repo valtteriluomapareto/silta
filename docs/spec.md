@@ -2302,6 +2302,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
     rows retained after budgeting, including zero. Count-only and recovery lines
     contribute zero; repeated displayed previews count separately. Failure and timeout
     lines omit it. No document names, titles or refs are logged.
+  - `docs_counted` on the same successful calls sums document totals in retained
+    count-only pointers. Preview groups and their "more" lines contribute zero;
+    omitted groups contribute zero. These pointers do not establish preview exposure.
   - Early hook failures, including input decoding and environment assembly, append
     one body-free `env` / `hook_failed` attempt through the same exclusive completion
     owner as successful hooks and timeouts. They retain quiet exit 0 and record elapsed
@@ -2520,7 +2523,8 @@ creation and recorded triage metadata. Direct or legacy history without decision
 evidence stays unattributed. Batch and approval summaries describe observed logs;
 incomplete retained coverage leaves their ratio unavailable. Brief exposure sums
 `docs_shown` within the selected workspace/window and counts agent sessions with
-previews; legacy lines without the field cannot establish zero exposure. Reports
+previews. A separate pointer line sums `docs_counted` from count-only groups;
+legacy lines without these fields cannot establish zero exposure. Reports
 read metadata only and do not log or publish document content.
 
 ## 20. Testing strategy

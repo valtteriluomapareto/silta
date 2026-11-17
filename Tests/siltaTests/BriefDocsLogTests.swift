@@ -1,4 +1,5 @@
 import Foundation
+import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -6,6 +7,7 @@ import Testing
 struct BriefDocsLogTests {
   @Test func countsOnlyDocumentPreviewsRetainedByTheBrief() throws {
     try withScratchDirectory { scratch in
+      let tools = try DogfoodReportTests.tools(scratch)
       let repo = try WhereCommandTests().setup(scratch)
       try WhereCommandTests().git(["checkout", "-q", "api"], repo, scratch)
       func run(_ args: [String]) throws -> CLIResult {
@@ -16,6 +18,7 @@ struct BriefDocsLogTests {
       #expect(try run(["brief"]).termination == .exit(0))
       let emptyLog = try lastLog(scratch)
       #expect(emptyLog["docs_shown"] as? Int == 0)
+      #expect(emptyLog["docs_counted"] as? Int == 0)
       let config = scratch.appending(path: "workspace.yaml")
       try """
       workspace: {slug: acme, name: Acme, task_prefix: AC}
@@ -40,20 +43,42 @@ struct BriefDocsLogTests {
       #expect(full.stdout.contains("doc:app-rules") && full.stdout.contains("doc:interface"))
       let fullLog = try lastLog(scratch)
       #expect(fullLog["docs_shown"] as? Int == 2)
-      let contract = fullLog.filter { ["command", "docs_shown", "workspace"].contains($0.key) }
+      #expect(fullLog["docs_counted"] as? Int == 0)
+      let contract = fullLog.filter {
+        ["command", "docs_shown", "docs_counted", "workspace"].contains($0.key)
+      }
       let encoded = try JSONSerialization.data(withJSONObject: contract, options: [.sortedKeys])
       Golden.forTests().check(
         try #require(String(data: encoded, encoding: .utf8)) + "\n", "brief-docs-log.json")
-      for flags in [["--budget", "1"], ["--hook"]] {
+      for flags in [["--budget", "1"], ["--short"], ["--hook"]] {
         let result = try run(["brief"] + flags)
         #expect(result.termination == .exit(0))
         #expect(
           !result.stdout.contains("doc:app-rules") && !result.stdout.contains("doc:interface"))
         let entry = try lastLog(scratch)
         #expect(entry["docs_shown"] as? Int == 0)
+        #expect(entry["docs_counted"] as? Int == (flags == ["--budget", "1"] ? 0 : 2))
       }
+      let hook = try AgentsHookTests.hook(
+        shellWord(try SiltaBinary.url().path) + " --ws acme agents session-start",
+        payload: #"{"session_id":"acme"}"#, in: scratch,
+        environment: [
+          "SILTA_NOW": "2023-11-14T22:13:20.000Z",
+          "CLAUDE_ENV_FILE": scratch.appending(path: "claude-env").path,
+        ], cwd: repo)
+      #expect(hook.termination == .exit(0) && hook.stdout.contains("docs: 1"))
+      #expect(try lastLog(scratch)["docs_shown"] as? Int == 0)
+      #expect(try lastLog(scratch)["docs_counted"] as? Int == 2)
+      let report = try DogfoodReportTests.run(
+        ["--ws", "acme", "--since", "2023-11-14"], scratch: scratch, tools: tools)
+      try #require(report.termination == .exit(0), "\(report.stderr)")
+      let text = try String(
+        contentsOf: scratch.appending(path: "silta-home/reports/acme/2023-11-30.md"),
+        encoding: .utf8)
+      #expect(text.contains("Observed brief document pointers: 6 counted documents."))
       #expect(try run(["brief", "--task", "AC-999"]).termination == .exit(2))
       #expect(try lastLog(scratch)["docs_shown"] == nil)
+      #expect(try lastLog(scratch)["docs_counted"] == nil)
     }
   }
 
