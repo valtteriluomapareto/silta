@@ -68,7 +68,14 @@ private struct WorkspaceRenderer {
     try Row.fetchAll(db, sql: sql, arguments: [id]).map { row in
       var value: [String: Any] = [:]
       for (key, column) in fields {
-        if let text: String = row[column] {
+        let stored: DatabaseValue = row[column]
+        let text: String?
+        if case .blob = stored.storage {
+          text = try row.strictText(column)
+        } else {
+          text = row[column]
+        }
+        if let text {
           value[key] =
             arrays.contains(key) ? try JSONSerialization.jsonObject(with: Data(text.utf8)) : text
         }
@@ -114,13 +121,17 @@ private struct WorkspaceRenderer {
         """, fields: ["app": "app_slug", "name": "name", "url": "url"]))
     try section(
       "services",
-      String.fetchAll(
+      Row.fetchAll(
         db,
         sql: """
-          SELECT slug FROM service
+          SELECT CAST(slug AS BLOB) AS slug FROM service
           WHERE workspace_id=?
-          ORDER BY slug
-          """, arguments: [id]))
+          ORDER BY service.slug
+          """, arguments: [id]
+      ).map {
+        guard let slug = try $0.strictText("slug") else { throw StorageError.corrupt }
+        return slug
+      })
   }
 
   mutating func renderRelationships() throws {
@@ -128,7 +139,8 @@ private struct WorkspaceRenderer {
       "edges",
       query(
         """
-        SELECT edge.*,a.slug AS from_slug,COALESCE(b.slug,'service:'||s.slug) AS to_slug FROM edge
+        SELECT CAST(edge.kind AS BLOB) AS kind,edge.summary,edge.code_refs,a.slug AS from_slug,
+          CAST(COALESCE(b.slug,'service:'||s.slug) AS BLOB) AS to_slug FROM edge
         JOIN app a ON a.id=edge.from_app_id
         LEFT JOIN app b ON b.id=edge.to_app_id
         LEFT JOIN service s ON s.id=edge.to_service_id
