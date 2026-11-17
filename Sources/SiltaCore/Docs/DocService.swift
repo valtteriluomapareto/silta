@@ -41,7 +41,8 @@ package struct DocService {
     let hint =
       pending > 0
       ? "; \(pending) pending: "
-        + listPageCommand(about: nil, archived: archived, offset: 0, limit: 20) : ""
+        + listPageCommand(
+          about: nil, archived: archived, offset: 0, limit: 20, document: snapshot.slug) : ""
     var layout = DocBodyLayout()
     layout.append("\(pinned) [")
     layout.state = layout.field(snapshot.state)
@@ -87,6 +88,18 @@ package struct DocService {
       + "triaged_at: \(snapshot.triagedAt ?? "(not recorded)")\n" + why
   }
 
+  package static func documentFilter(_ raw: String?) throws -> String? {
+    guard let raw else { return nil }
+    let selected: (slug: String, revision: Int?)?
+    do { selected = try selection(raw, revision: nil) } catch { selected = nil }
+    guard let selected, selected.revision == nil else {
+      throw CommandFailure(
+        error: DocError.invalid("Use an unpinned doc slug or doc:slug with --doc."),
+        next: ["silta doc ls --help"])
+    }
+    return selected.slug
+  }
+
   var scopeIsSafe: Bool { SecretGuard.matches(in: workspace).isEmpty }
 
   var listCommand: String {
@@ -97,12 +110,32 @@ package struct DocService {
     scopeIsSafe ? workspaceCommand("silta ws show", workspace: workspace) : "silta ws ls"
   }
 
-  func listPageCommand(about: String?, archived: Bool, offset: Int, limit: Int) -> String {
-    guard scopeIsSafe, about.map(Self.safeReference) ?? true else { return listCommand }
-    var command = listCommand
+  func listPageCommand(
+    about: String?, archived: Bool, offset: Int, limit: Int,
+    document: String? = nil
+  ) -> String {
+    Self.listPageCommand(
+      workspace: workspace, about: about, archived: archived,
+      offset: offset, limit: limit, document: document)
+  }
+
+  static func listPageCommand(
+    workspace: String, about: String?, archived: Bool,
+    offset: Int, limit: Int, document: String? = nil
+  ) -> String {
+    let scope = SecretGuard.matches(in: workspace).isEmpty
+    let hub = scope ? workspaceCommand("silta doc ls", workspace: workspace) : "silta ws ls"
+    let fallback = document != nil && archived && scope ? hub + " --archived" : hub
+    let boundedHub = fallback.utf8.count <= 512 ? fallback : "silta ws ls"
+    guard scope, about.map(Self.safeReference) ?? true,
+      document.map({ Self.safeReference("doc:" + $0) }) ?? true
+    else { return document == nil ? hub : boundedHub }
+    var command = hub
+    if let document { command += " --doc " + shellWord(document) }
     if let about { command += " --about " + shellWord(about) }
     if archived { command += " --archived" }
-    return command + " --offset \(offset) --limit \(limit)"
+    command += " --offset \(offset) --limit \(limit)"
+    return document != nil && command.utf8.count > 512 ? boundedHub : command
   }
 
   func showCommand(_ ref: String, flags: String = "", lines: String? = nil) -> String {

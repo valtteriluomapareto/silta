@@ -29,7 +29,7 @@ struct BriefDiscussion {
       currentTask: current?.ref, in: db)
     let items = attention.items
     let previews = try DocProposalInbox(workspace: workspace, at: now, in: db)
-      .previews(items.compactMap(\.proposalGroup))
+      .previews(items.compactMap(\.proposalGroup), caller: caller)
     var emitted: Set<String> = []
     var task: [BriefSection] = []
     if let current {
