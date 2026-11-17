@@ -27,6 +27,7 @@ final class TaskDetailModel {
     let token = generation
     failure = nil
     isLoading = true
+    defer { if token == generation { isLoading = false } }
     do {
       let result = try await read()
       guard token == generation, !Task.isCancelled else { return }
@@ -35,6 +36,5 @@ final class TaskDetailModel {
       guard token == generation, !Task.isCancelled else { return }
       failure = AppLoadFailure(error).message
     }
-    if token == generation { isLoading = false }
   }
 }

@@ -139,6 +139,18 @@
       #expect(!model.boardInspectorPresented && !model.workspaceInspectorPresented)
     }
 
+    @Test func selectingAnotherTaskClearsAnObsoleteDetailFailure() async {
+      let model = AppModel(load: { _, _, _ in nil })
+      model.inspect(task: "AC-12")
+      await model.taskDetail.load(workspace: "acme", ref: "AC-12") {
+        throw AppLoadFailure(message: "Acme task unavailable")
+      }
+      #expect(model.taskDetail.failure != nil)
+      model.inspect(task: "AC-14")
+      #expect(model.taskDetail.failure == nil && model.taskDetail.value == nil)
+      #expect(!ControlState(model: model, run: "acme", revision: 1, dark: false).idle)
+    }
+
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
       AppModel(
         load: { previous, workspace, force in

@@ -117,8 +117,9 @@ Use a short `task plan` and one independent combined Architect/Tester implementa
 review. Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
 No planted faults except for guard tests. Split only when a diff substantially
 exceeds about 1,000 lines. Add navigation, observable state and development hooks
-only when a screen needs them. The [control plan](mac-app-control.md) is deferred
-beyond the minimal isolated fixture launcher; it does not block these screens.
+only when a screen needs them. The minimal state.json/offscreen PNG portion of
+[the control plan](mac-app-control.md) follows Workspace as its own PR. Remaining
+control work is deferred and does not block these screens.
 Merge main only for a conflict or a needed landed change. After merging, submit
 the task and report which tasks the maintainer can close; do not mark them done.
 

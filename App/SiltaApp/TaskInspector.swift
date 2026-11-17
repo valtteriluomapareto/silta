@@ -5,7 +5,7 @@ import SwiftUI
 
 struct TaskInspector: View {
   @Bindable var model: AppModel
-  @State private var detail = TaskDetailModel()
+  private var detail: TaskDetailModel { model.taskDetail }
 
   var body: some View {
     ScrollView {
@@ -96,15 +96,7 @@ struct TaskInspector: View {
   }
 
   private func load() async {
-    guard let reader = model.reader, let workspace = model.workspace,
-      let ref = model.boardSelection?.taskRef
-    else {
-      detail.clear()
-      return
-    }
-    await detail.load(workspace: workspace, ref: ref) {
-      try await Task.detached { try reader.task(ref, workspace: workspace) }.value
-    }
+    await model.loadTaskDetail()
   }
 
   private func property(_ title: String, _ value: String?) -> some View {
