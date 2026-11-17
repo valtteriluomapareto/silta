@@ -201,9 +201,7 @@
         _ = try service.block("AC-17", block)
         let due = try reader.snapshot(workspace: "acme").work.items.filter { $0.kind == "due" }
         #expect(due.count == 2 && due.allSatisfy { $0.refs == ["AC-17"] })
-        withKnownIssue("Grouped row identity must include its external target") {
-          #expect(Set(due.map(\.stableID)).count == 2)
-        }
+        #expect(Set(due.map(\.stableID)).count == 2)
       }
     }
 

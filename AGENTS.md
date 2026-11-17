@@ -58,7 +58,7 @@ through. Fix the change, or propose a decision first.
    `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
    exception with `// guard:allow-nondeterminism <reason>`.
 3. **Tests never wait on the wall clock.** That means no `sleep`, `Task.sleep` or
-   `asyncAfter`; use the fake clock. This covers `Tests/` and `SiltaTestSupport`.
+   `asyncAfter`; use the fake clock. This covers `Tests/`, `App/SiltaAppTests` and `SiltaTestSupport`.
    Enforced by `check_test_waits.py`.
 4. **Code comments don't refer to plans, phases, milestones or review rounds.**
    Enforced by `check_no_plan_refs.py`.

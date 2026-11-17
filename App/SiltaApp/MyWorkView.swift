@@ -10,12 +10,17 @@ struct MyWorkView: View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 0) {
         if let work = model.visibleData?.snapshot?.work {
-          if work.waitingCount == 0 {
+          if work.waitingCount == 0 && model.search.isEmpty {
             ContentUnavailableView("You're all caught up", systemImage: "checkmark.circle")
               .frame(maxWidth: .infinity).padding(.top, 80)
           }
+          if !model.search.isEmpty && !model.hasWorkMatches {
+            ContentUnavailableView(
+              "No matches", systemImage: "magnifyingglass",
+              description: Text("Try a different reference or search term."))
+          }
           let attentionItems = work.items.filter { $0.kind != "proposal" }
-          ForEach(Array(attentionItems.enumerated()), id: \.offset) { _, item in
+          ForEach(attentionItems, id: \.stableID) { item in
             if model.matches(item) {
               attention(item)
               Divider().padding(.vertical, 24)
@@ -36,7 +41,7 @@ struct MyWorkView: View {
           if !proposals.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
               Text("Proposed tasks · \(proposals.count)").font(.headline)
-              ForEach(Array(proposals.enumerated()), id: \.offset) { _, item in
+              ForEach(proposals, id: \.stableID) { item in
                 HStack {
                   VStack(alignment: .leading, spacing: 4) {
                     Text(item.title ?? "Proposed task").font(.body.weight(.medium))

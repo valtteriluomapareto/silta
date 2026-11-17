@@ -13,20 +13,26 @@ nonisolated final class AppReadSession: Sendable {
   }
 
   func load(previous: AppLoadedData?, workspace: String?, force: Bool) throws -> AppLoadedData? {
-    let connection = try probe.withLock { cached in
-      if let cached { return cached }
-      let opened = try reader.makeChangeProbe()
-      cached = opened
-      return opened
+    let (version, reused) = try probe.withLock { cached in
+      do {
+        let reused = cached != nil
+        let connection: AppChangeProbe
+        if let cached {
+          connection = cached
+        } else {
+          connection = try reader.makeChangeProbe()
+          cached = connection
+        }
+        return (try connection.version(), reused)
+      } catch {
+        cached = nil
+        throw error
+      }
     }
-    let version = try connection.version()
     let at = now()
-    if !force, let previous, previous.workspace == workspace, previous.version == version,
-      at >= previous.checkedAt,
-      at
-        < min(
-          previous.snapshot?.validUntil ?? .distantFuture,
-          previous.checkedAt.addingTimeInterval(60))
+    if !force, reused, let previous, previous.workspace == workspace,
+      previous.version == version, at >= previous.checkedAt,
+      at < previous.checkedAt.addingTimeInterval(60)
     {
       return nil
     }

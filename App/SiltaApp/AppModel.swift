@@ -11,24 +11,20 @@ final class AppModel {
   var search = ""
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
-  private(set) var lastCheckedAt: Date?
   private let load: Loader
-  private let now: @Sendable () -> Date
   @ObservationIgnored private var flight: Task<Void, Never>?
   @ObservationIgnored private var queuedForce = false
   @ObservationIgnored private var generation = 0
 
   init(
-    reader: AppReader? = nil, load: @escaping Loader,
-    now: @escaping @Sendable () -> Date = { Date() }
+    reader: AppReader? = nil, load: @escaping Loader
   ) {
     self.reader = reader
     self.load = load
-    self.now = now
   }
 
   func matches(_ values: [String]) -> Bool {
-    search.isEmpty || values.contains { $0.localizedCaseInsensitiveContains(search) }
+    AppSearch.matches(search, values: values)
   }
 
   func matches(_ item: AppAttention) -> Bool {
@@ -41,6 +37,12 @@ final class AppModel {
 
   var proposals: [AppAttention] {
     visibleData?.snapshot?.work.items.filter { $0.kind == "proposal" && matches($0) } ?? []
+  }
+
+  var hasWorkMatches: Bool {
+    guard let work = visibleData?.snapshot?.work else { return false }
+    return work.items.contains(where: matches)
+      || work.reviews.contains { matches([$0.ref, $0.title, $0.description]) }
   }
 
   var visibleData: AppLoadedData? { data?.workspace == workspace ? data : nil }
@@ -71,12 +73,10 @@ final class AppModel {
             if workspace == nil { workspace = result.workspace }
           }
           failure = nil
-          lastCheckedAt = now()
         }
       } catch {
         if token == generation {
           failure = AppLoadFailure(error)
-          lastCheckedAt = now()
         }
       }
       forceNext = true
@@ -93,7 +93,6 @@ final class AppModel {
     return refresh(force: true)
   }
 
-  @discardableResult func focused() -> Task<Void, Never> { refresh() }
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
     frontmost ? refresh() : nil
   }

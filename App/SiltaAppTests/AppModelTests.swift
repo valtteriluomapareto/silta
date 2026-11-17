@@ -65,7 +65,7 @@
         driver.finish(await driver.next(), .failure(AppLoadFailure(message: "unavailable")))
         await failing.value
         #expect(model.data?.version == 1 && model.failure?.message == "unavailable")
-        let retry = model.focused()
+        let retry = model.refresh()
         let request = await driver.next()
         #expect(request.force)
         driver.finish(request, .success(value(1)))
@@ -96,6 +96,9 @@
       #expect(model.matches(["AC-12", "Full question body"]))
       model.search = "QUESTION"
       #expect(model.matches(["AC-12", "Full question body"]))
+      model.search = "AC-1"
+      #expect(!model.matches(["AC-10", "AC-12", "AC-19"]))
+      #expect(model.matches(["AC-1", "Read task AC-1."]))
       model.search = "unrelated"
       #expect(!model.matches(["AC-12", "Full question body"]))
     }
@@ -104,7 +107,7 @@
       AppModel(
         load: { previous, workspace, force in
           try await driver.load(previous, workspace, force)
-        }, now: { AppV2Fixture.now })
+        })
     }
 
     private func value(_ version: Int) -> AppLoadedData {

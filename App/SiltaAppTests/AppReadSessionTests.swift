@@ -36,6 +36,22 @@
       }
     }
 
+    @Test func forceAndWorkspaceChangesReloadAnUnchangedVersion() throws {
+      try fixture { reader, _ in
+        let session = AppReadSession(reader: reader, now: { AppV2Fixture.now })
+        let first = try #require(try session.load(previous: nil, workspace: "acme", force: false))
+        #expect(try session.load(previous: first, workspace: "acme", force: false) == nil)
+        let forced = try #require(try session.load(previous: first, workspace: "acme", force: true))
+        #expect(forced.version == first.version && forced.snapshot == first.snapshot)
+        let other = AppLoadedData(
+          workspaces: [], workspace: "other", snapshot: nil, map: nil,
+          version: first.version, checkedAt: first.checkedAt)
+        let selected = try #require(
+          try session.load(previous: other, workspace: "acme", force: false))
+        #expect(selected.workspace == "acme" && selected.version == first.version)
+      }
+    }
+
     @Test func failedHydrationDoesNotConsumeAChangedVersion() throws {
       do {
         try fixture { reader, home in
@@ -82,7 +98,7 @@
       await model.refresh().value
       #expect(model.proposals.count == 3)
       model.search = "unrelated search"
-      #expect(model.proposals.isEmpty)
+      #expect(model.proposals.isEmpty && !model.hasWorkMatches)
       model.search = "AC-22"
       #expect(model.proposals.count == 1 && model.proposals.first?.refs == ["AC-22"])
       model.search = "agent:codex"

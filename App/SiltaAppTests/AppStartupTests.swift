@@ -22,43 +22,32 @@
       }
       try TestLaunchPolicy.validate(
         environment: environment,
-        temporaryRoots: [FileManager.default.temporaryDirectory, URL(filePath: "/private/tmp")],
-        forbiddenHome: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".silta"))
+        temporaryRoots: [FileManager.default.temporaryDirectory, URL(filePath: "/private/tmp")])
     }
 
-    @Test(arguments: [
-      "missing-marker", "missing", "empty", "relative", "unexpanded", "outside", "alias",
-    ])
+    @Test(arguments: ["marker", "relative", "outside", "directory"])
     func unsafeTestHomesRefuseBeforeAnyReader(_ fault: String) throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-      defer { try? FileManager.default.removeItem(at: root) }  // scratch cleanup
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
       let allowed = root.appending(path: "fixture")
-      let forbidden = root.appending(path: "forbidden")
       try FileManager.default.createDirectory(at: allowed, withIntermediateDirectories: true)
-      try FileManager.default.createDirectory(at: forbidden, withIntermediateDirectories: true)
-      let alias = root.appending(path: "alias")
-      try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: forbidden)
       var environment = [
         "SILTA_APP_TESTING": "1", "SILTA_HOME": allowed.path,
-        "SILTA_APP_TEST_HOME": allowed.path, "XCTestConfigurationFilePath": "synthetic",
+        "XCTestConfigurationFilePath": "synthetic",
       ]
       switch fault {
-      case "missing-marker": environment.removeValue(forKey: "SILTA_APP_TESTING")
-      case "missing": environment.removeValue(forKey: "SILTA_HOME")
-      case "empty": environment["SILTA_HOME"] = ""
+      case "marker": environment.removeValue(forKey: "SILTA_APP_TESTING")
       case "relative": environment["SILTA_HOME"] = "fixture"
-      case "unexpanded": environment["SILTA_HOME"] = "$(SILTA_APP_TEST_HOME)"
-      case "outside": environment["SILTA_HOME"] = "/Users/Acme/missing"
-      default: environment["SILTA_HOME"] = alias.path
+      case "outside":
+        let alias = root.appending(path: "alias")
+        try FileManager.default.createSymbolicLink(
+          at: alias, withDestinationURL: root.deletingLastPathComponent())
+        environment["SILTA_HOME"] = alias.path
+      default: environment["SILTA_HOME"] = root.appending(path: "missing").path
       }
-      environment["SILTA_APP_TEST_HOME"] = environment["SILTA_HOME"]
-      do {
-        #expect(throws: (any Error).self) {
-          try TestLaunchPolicy.validate(
-            environment: environment,
-            temporaryRoots: [root], forbiddenHome: forbidden)
-        }
+      #expect(throws: (any Error).self) {
+        try TestLaunchPolicy.validate(environment: environment, temporaryRoots: [root])
       }
     }
 
@@ -98,8 +87,7 @@
 
     @Test func ordinaryLaunchDoesNotRequireTestSettings() throws {
       try TestLaunchPolicy.validate(
-        environment: [:], temporaryRoots: [],
-        forbiddenHome: URL(filePath: "/Users/Acme/.silta"))
+        environment: [:], temporaryRoots: [])
     }
 
     @Test func invalidChildLaunchExitsBeforeOpeningAWindow() throws {

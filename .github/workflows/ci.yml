@@ -88,10 +88,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Select Xcode
         run: bash scripts/ci/select-xcode.sh
-      - name: Install pinned Swift tools
-        run: bash scripts/ci/install-swift-tools.sh
       - name: Verify native app
-        run: scripts/verify.sh app
+        run: scripts/verify-app.sh
       - name: Upload app evidence on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

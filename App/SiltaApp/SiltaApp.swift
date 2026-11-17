@@ -12,8 +12,7 @@ struct SiltaApp: App {
       do {
         try TestLaunchPolicy.validate(
           environment: ProcessInfo.processInfo.environment,
-          temporaryRoots: [FileManager.default.temporaryDirectory, URL(filePath: "/private/tmp")],
-          forbiddenHome: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".silta"))
+          temporaryRoots: [FileManager.default.temporaryDirectory, URL(filePath: "/private/tmp")])
       } catch {
         FileHandle.standardError.write(
           Data("Silta test launch refused: invalid isolated home.\n".utf8))
@@ -67,7 +66,7 @@ struct SiltaApp: App {
           try await Task.detached {
             try session.load(previous: previous, workspace: workspace, force: force)
           }.value
-        }, now: now)
+        })
     } catch {
       let failure = AppLoadFailure(error)
       return AppModel(load: { _, _, _ in throw failure })

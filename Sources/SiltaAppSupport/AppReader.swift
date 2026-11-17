@@ -41,8 +41,7 @@ public struct AppReader: Sendable {
       let at = environment.clock.now()
       var calendar = Calendar(identifier: .iso8601)
       calendar.timeZone = .gmt
-      guard let week = calendar.dateInterval(of: .weekOfYear, for: at),
-        let day = calendar.dateInterval(of: .day, for: at)
+      guard let week = calendar.dateInterval(of: .weekOfYear, for: at)
       else {
         throw StorageError.internalMisuse
       }
@@ -58,7 +57,6 @@ public struct AppReader: Sendable {
       let reviews = tasks.filter { $0.status == "review" }
       let inbox = try service.inbox(for: "me")
       return AppSnapshot(
-        validUntil: try taskDeadline(tasks, at: at, dayEnd: day.end),
         board: AppBoard(
           todo: tasks.filter { ["todo", "blocked"].contains($0.status) },
           doing: tasks.filter { $0.status == "doing" }, review: reviews,
@@ -110,14 +108,6 @@ public struct AppReader: Sendable {
       let core = try DatabaseChangeProbe(store: environment.db)
       if try core.sample().needsMigration { throw AppReadError.migrationRequired }
       return AppChangeProbe(core: core, home: environment.home.url)
-    }
-  }
-
-  private func taskDeadline(_ tasks: [AppTask], at date: Date, dayEnd: Date) throws -> Date {
-    try tasks.filter { $0.status == "proposed" }.reduce(dayEnd) { deadline, task in
-      guard let created = utcInstant(task.createdAt) else { throw StorageError.corrupt }
-      let expiry = created.addingTimeInterval(14 * 86400)
-      return expiry > date ? min(deadline, expiry) : deadline
     }
   }
 

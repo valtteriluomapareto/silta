@@ -35,7 +35,7 @@ struct AppShellView: View {
     .task(id: phase) { await foregroundChecks() }
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification))
     { _ in
-      model.focused()
+      model.refresh()
     }
   }
 
@@ -72,11 +72,11 @@ struct AppShellView: View {
 
   private func foregroundChecks() async {
     guard phase == .active else { return }
-    await model.focused().value
+    await model.refresh().value
     while !Task.isCancelled {
       do { try await Task.sleep(for: .seconds(5)) } catch { return }
       guard !Task.isCancelled else { return }
-      await model.tick(frontmost: true)?.value
+      await model.tick(frontmost: NSApplication.shared.isActive)?.value
     }
   }
 }
