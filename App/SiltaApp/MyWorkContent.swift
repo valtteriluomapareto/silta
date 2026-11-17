@@ -116,7 +116,10 @@ nonisolated struct MyWorkContent {
   static func age(_ timestamp: String?, now: Date) -> String? {
     guard let timestamp else { return nil }
     let date: Date
-    do { date = try Date(timestamp, strategy: .iso8601(includingFractionalSeconds: true)) } catch {
+    do {
+      date = try Date(
+        timestamp, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    } catch {
       return nil
     }
     let seconds = max(0, Int(now.timeIntervalSince(date)))

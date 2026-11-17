@@ -43,7 +43,8 @@
     @Test func relativeTimesUseTheReadInstantAndRejectMissingDates() {
       let now = AppV2Fixture.now
       func stamp(_ seconds: TimeInterval) -> String {
-        now.addingTimeInterval(-seconds).ISO8601Format(.iso8601(includingFractionalSeconds: true))
+        now.addingTimeInterval(-seconds).ISO8601Format(
+          Date.ISO8601FormatStyle(includingFractionalSeconds: true))
       }
       #expect(MyWorkContent.age(stamp(30), now: now) == "just now")
       #expect(MyWorkContent.age(stamp(360), now: now) == "6 min ago")
