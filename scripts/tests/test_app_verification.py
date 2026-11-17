@@ -1,5 +1,4 @@
 """Acceptance for app dependency pins and fail-closed test evidence."""
-import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -8,6 +7,9 @@ import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "guards"))
 import check_app_pins
+import check_test_waits
+import check_no_plan_refs
+import check_try_optional
 spec = importlib.util.spec_from_file_location("app_results", Path(__file__).resolve().parents[1] / "check-app-test-results.py")
 results = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(results)
@@ -27,11 +29,9 @@ class AppPinsTests(unittest.TestCase):
     def test_matching_pins(self):
         self.assertEqual(self.pins(None), [])
 
-    @unittest.expectedFailure
     def test_missing_pin_refuses(self):
         self.assertTrue(self.pins({"pins": [], "version": 3}))
 
-    @unittest.expectedFailure
     def test_mismatched_pin_refuses(self):
         self.assertTrue(self.pins({"pins": [{"identity": "yams", "state": {"version": "6.2.3", "revision": "def"}}], "version": 3}))
 
@@ -46,24 +46,42 @@ class AppResultTests(unittest.TestCase):
     def test_success(self):
         self.assertEqual(results.check(*self.valid(), ["AppStartupTests"]), [])
 
-    @unittest.expectedFailure
     def test_zero_tests(self):
         summary, tests = self.valid()
         summary.update(totalTestCount=0, passedTests=0)
         self.assertTrue(results.check(summary, tests, ["AppStartupTests"]))
 
-    @unittest.expectedFailure
     def test_failure_skip_and_expected_failure(self):
         for field in ("failedTests", "skippedTests", "expectedFailures"):
             summary, tests = self.valid()
             summary[field] = 1
             self.assertTrue(results.check(summary, tests, ["AppStartupTests"]), field)
 
-    @unittest.expectedFailure
     def test_missing_suite(self):
         self.assertTrue(results.check(*self.valid(), ["MissingTests"]))
 
-    @unittest.expectedFailure
     def test_malformed_and_unsupported(self):
         for summary, tests in (({}, {}), ([], []), ({"result": "unknown"}, {"testNodes": []})):
             self.assertTrue(results.check(summary, tests, ["AppStartupTests"]))
+
+
+class AppSourceGuardsTests(unittest.TestCase):
+    def check_source(self, path, source, checker):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / path
+            target.parent.mkdir(parents=True)
+            target.write_text(source)
+            return checker.check(root)
+
+    @unittest.expectedFailure
+    def test_app_tests_reject_wall_clock_sleeps(self):
+        self.assertTrue(self.check_source("App/SiltaAppTests/Probe.swift", "try await Task.sleep(for: .seconds(1))", check_test_waits))
+
+    @unittest.expectedFailure
+    def test_app_comments_reject_plan_refs(self):
+        self.assertTrue(self.check_source("App/SiltaApp/Probe.swift", "// phase 2", check_no_plan_refs))
+
+    @unittest.expectedFailure
+    def test_app_optional_errors_require_reasons(self):
+        self.assertTrue(self.check_source("App/SiltaApp/Probe.swift", "try? load()", check_try_optional))
