@@ -104,13 +104,10 @@ extension DoctorService {
     }
   }
 
-  /// Persisted data that fails admission or normal interpretation.
+  /// Persisted rows the read and write paths refuse to interpret as valid Silta state.
   private static func storedDataProblems(_ db: Database) throws -> [String] {
     guard try db.tableExists("meta"), try db.tableExists("task") else { return [] }
     var problems: [String] = []
-    if try StoredUIDV9.unsupported(in: db) {
-      problems.append("Stored IDs must be nonempty ASCII text without NUL")
-    }
     let unreadable =
       try Int.fetchOne(
         db,
@@ -141,8 +138,7 @@ extension DoctorService {
     let schemaCheck: DoctorCheck
     do {
       schemaCheck = try schema(
-        db, path: path, recovery: recovery, allowInitialization: backups.isKnownEmpty,
-        allowMigration: checks.first?.status == .pass)
+        db, path: path, recovery: recovery, allowInitialization: backups.isKnownEmpty)
     } catch {
       schemaCheck = DoctorCheck(
         id: "database.schema", status: .fail, message: "Schema metadata could not be checked.",
@@ -173,9 +169,7 @@ extension DoctorService {
     return checks
   }
 
-  private static func integrity(_ db: Database, recovery: [String])
-    -> [DoctorCheck]
-  {
+  private static func integrity(_ db: Database, recovery: [String]) -> [DoctorCheck] {
     var checks: [DoctorCheck] = []
     do {
       let structural = try String.fetchAll(db, sql: "PRAGMA integrity_check") == ["ok"]
@@ -213,8 +207,7 @@ extension DoctorService {
   }
 
   private static func schema(
-    _ db: Database, path: String, recovery: [String], allowInitialization: Bool,
-    allowMigration: Bool
+    _ db: Database, path: String, recovery: [String], allowInitialization: Bool
   ) throws
     -> DoctorCheck
   {
@@ -244,7 +237,7 @@ extension DoctorService {
         id: "database.schema", status: .fail,
         message:
           "Database \(path.debugDescription) has pending migrations; doctor never migrates it.",
-        next: allowMigration ? ["silta init"] : recovery, nextBy: allowMigration ? .human : .agent)
+        next: ["silta init"], nextBy: .human)
     }
     guard complete, version <= DatabaseStore.writerVersion else {
       return DoctorCheck(

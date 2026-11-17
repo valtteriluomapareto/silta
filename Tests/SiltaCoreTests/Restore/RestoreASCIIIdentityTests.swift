@@ -52,54 +52,6 @@ struct RestoreASCIIIdentityTests {
     try RestoreDocumentGraph(tree: tree, documents: documents, slug: "acme").run()
   }
 
-  @Test(arguments: ["repo", "app", "task"], [0, 1])
-  func doctorDiagnosesStoredLookalikesWithoutChangingMachineState(kind: String, example: Int) throws
-  {
-    try withScratchDirectory { home in
-      let target = try RestoreDocumentRowSupport.make(home)
-      let id: Int64 = kind == "repo" ? 1100 : kind == "app" ? 1102 : 700
-      let legacy = Data(["K\u{0}tail", "K"][example].utf8)
-      try target.write {
-        try $0.database.execute(
-          sql: "UPDATE \(kind) SET uid=CAST(? AS TEXT) WHERE id=?", arguments: [legacy, id])
-      }
-      let before = try RestoreSupport.dump(target)
-      let raw = try Self.rawUIDs(target, table: kind)
-      let machine = try RestoreOpaqueIdentityFixture.machineRows(target)
-      let checks = StoredUIDAdmissionTests.checks(target, home: home)
-      let integrity = try #require(checks.first { $0.id == "database.integrity" })
-      #expect(integrity.status == .fail && integrity.message.contains("ASCII"))
-      #expect(!integrity.message.contains("tail") && !integrity.next.contains("silta init"))
-      #expect(try RestoreSupport.dump(target) == before)
-      #expect(try Self.rawUIDs(target, table: kind) == raw)
-      #expect(try RestoreOpaqueIdentityFixture.machineRows(target) == machine)
-    }
-  }
-
-  @Test(arguments: 0..<3)
-  func admittedStoreCaptureReadsWhileDoctorDiagnosesUnsupportedUIDBytes(example: Int) throws {
-    try withScratchDirectory { home in
-      let store = try RestoreDocumentGraphFixture.source(home)
-      let bytes = Data(["", "K", "K\u{0}tail"][example].utf8)
-      try store.write {
-        try $0.database.execute(
-          sql: "UPDATE doc SET uid=CAST(? AS TEXT) WHERE id=91", arguments: [bytes])
-      }
-      let before = try RestoreSupport.dump(store)
-      let raw = try Self.rawUIDs(store, table: "doc")
-      let error = Self.failure {
-        _ = try store.read { try ExportSnapshot.capture($0, workspace: "acme") }
-      }
-      #expect(error == nil)
-      let integrity = StoredUIDAdmissionTests.checks(store, home: home).first {
-        $0.id == "database.integrity"
-      }
-      #expect(integrity?.status == .fail && integrity?.message.contains("ASCII") == true)
-      #expect(try RestoreSupport.dump(store) == before)
-      #expect(try Self.rawUIDs(store, table: "doc") == raw)
-    }
-  }
-
   static func rawUIDs(_ store: DatabaseStore, table: String) throws -> [Data] {
     try store.read {
       try Data.fetchAll($0, sql: "SELECT CAST(uid AS BLOB) FROM \(table) ORDER BY id")

@@ -38,9 +38,6 @@ enum StorageSchema {
       try db.execute(sql: "ALTER TABLE doc_rev ADD COLUMN about_targets TEXT")
       try db.execute(sql: "UPDATE meta SET value='8' WHERE key='min_writer_version'")
     }
-    migrator.registerMigration("v9") { db in
-      guard try !StoredUIDV9.unsupported(in: db) else { throw StorageError.corrupt }
-    }
     return migrator
   }
 

@@ -108,32 +108,4 @@ struct DocProposalIdentityTests {
     }
   }
 
-  @Test(arguments: [false, true])
-  func inputUIDChangeCapturesTheCurrentTarget(alternate: Bool) throws {
-    try withScratchDirectory { home in
-      let store = try AcmeDocAttachments.make(in: home)
-      let uid = try #require(
-        store.read { try String.fetchOne($0, sql: "SELECT uid FROM service") })
-      let changed = alternate ? uid + "-replacement" : "replacement-target"
-      let result = try DocProposalServiceTests.service(home, store).propose(
-        DocProposalServiceTests.request()
-      ) {
-        try store.write {
-          try $0.database.execute(sql: "UPDATE service SET uid=?", arguments: [changed])
-        }
-        return "Body"
-      }
-      let snapshot = try store.read {
-        try DocStore.revision("rules", revision: 1, workspace: 1, in: $0)
-      }
-      #expect(snapshot.aboutTargets?.map(\.uid) == [changed])
-      #expect(snapshot.state == "proposed" && snapshot.body == "Body")
-      #expect(
-        try store.read { try Data.fetchOne($0, sql: "SELECT CAST(uid AS BLOB) FROM service") }
-          == Data(changed.utf8))
-      #expect(
-        try DocService(workspace: "acme", store: store).list(about: "service:push")
-          .entries.map(\.ref) == [result.ref])
-    }
-  }
 }
