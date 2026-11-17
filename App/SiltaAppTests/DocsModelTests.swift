@@ -108,9 +108,7 @@
       #expect(docs.versions == [first] && docs.failure != nil && docs.nextVersions == 1)
       await docs.moreVersions(reader, workspace: "acme")
       #expect(docs.versions == full.entries && docs.nextVersions == nil)
-      withKnownIssue("Successful pagination must clear its earlier error") {
-        #expect(docs.failure == nil)
-      }
+      #expect(docs.failure == nil)
     }
 
     @Test func groupsPreferAcceptedAndReaderAppendsAllBodyPages() async throws {

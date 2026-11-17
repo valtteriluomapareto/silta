@@ -15,9 +15,15 @@ import SiltaAppSupport
       try await Task.detached {
         try reader.documents(workspace: workspace, about: about, archived: archived, offset: offset)
       }.value
+    },
+    readVersions: @escaping VersionsLoader = { reader, ref, workspace, offset in
+      try await Task.detached {
+        try reader.documentVersions(ref, workspace: workspace, offset: offset)
+      }.value
     }
   ) {
     self.readList = readList
+    self.readVersions = readVersions
   }
 
   struct Group: Identifiable {
@@ -226,6 +232,7 @@ import SiltaAppSupport
       guard token == generation, requested == ref, !Task.isCancelled else { return }
       versions += result.entries
       nextVersions = result.nextOffset
+      failure = nil
     } catch {
       if token == generation, requested == ref, !Task.isCancelled {
         failure = AppLoadFailure(error).message
@@ -247,6 +254,7 @@ import SiltaAppSupport
       }
       comments += result.entries
       nextComments = result.nextOffset
+      failure = nil
     } catch {
       if token == generation, requested == ref, !Task.isCancelled {
         failure = AppLoadFailure(error).message

@@ -42,7 +42,7 @@
         let refs = [
           "edge:api/service:push/Password%3Dprivate123", "edge:api/service:push/HTTP%20API",
         ]
-        let encoded = String(decoding: try JSONEncoder().encode(refs), as: UTF8.self)
+        let encoded = try #require(String(data: try JSONEncoder().encode(refs), encoding: .utf8))
         try reader.environment.db.write {
           try $0.database.execute(sql: "UPDATE doc_rev SET about_refs=?", arguments: [encoded])
         }
