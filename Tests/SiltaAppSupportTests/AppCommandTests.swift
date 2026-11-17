@@ -122,6 +122,16 @@
       }
     }
 
+    @Test func documentAttentionNeverBecomesATaskRead() throws {
+      let reader = try AppReader(home: URL(filePath: "/private/tmp/acme-unused"), user: "acme")
+      let document = AppAttention(kind: "doc_proposal", ref: "doc:rules@2", refs: ["doc:rules@2"],
+        task: nil, title: nil, author: nil, body: nil, createdAt: nil,
+        commands: ["silta doc diff 'doc:rules@2'"])
+      withKnownIssue("Document attention incorrectly falls back to task show") {
+        #expect(reader.commands(for: document, workspace: "acme").isEmpty)
+      }
+    }
+
     private func item(kind: String, refs: [String] = ["AC-12"], commands: [String]) -> AppAttention
     {
       AppAttention(
