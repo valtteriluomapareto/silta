@@ -2229,8 +2229,8 @@ Rust would win only if:
 **Layout.** One Swift package (swift-tools 6.2, Swift 6 mode, macOS 15+) with the
 `SiltaCore`, `silta` and `SiltaTestSupport` targets and the `SiltaCoreTests` and
 `siltaTests` test targets. What each target and folder holds is in
-[coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). Still to come:
-`Evals/`, the agent evaluation suite (§21, S16), and `App/SiltaApp.xcodeproj` (M5).
+[coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). The repository also contains `Evals/`, the agent evaluation suite (§21, S16),
+and the native `App/SiltaApp.xcodeproj` viewer with `SiltaAppSupport` and its tests.
 
 **Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.

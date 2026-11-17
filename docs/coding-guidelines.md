@@ -126,6 +126,8 @@ quietly diverge.
 | Target or folder | Holds |
 |---|---|
 | `Sources/SiltaCore` | The domain library: storage, policy, git access, actors, brief and output. No UI or CLI frameworks (AGENTS.md invariant 1) |
+| `App/SiltaApp` | Native SwiftUI app and DEBUG test-startup boundary; links SiltaAppSupport |
+| `App/SiltaAppTests` | Hosted native acceptance in an isolated temporary home |
 | `Sources/SiltaAppSupport` | Foundation-only public viewer read models over SiltaCore; shared development fixtures under whole-file DEBUG `Control/` (D23) |
 | `Tests/SiltaAppSupportTests` | Viewer read-model acceptance, core/CLI agreement and storage-safety tests |
 | `Sources/silta` | The CLI: ArgumentParser commands under `Commands/`, plus the entry point, global options and text renderers next to them |

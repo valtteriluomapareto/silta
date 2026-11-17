@@ -1,6 +1,13 @@
 # Silta for Mac development control plane
 
-Status: proposed
+Status: deferred
+
+Screen delivery in the [Mac app plan](mac-app.md) takes priority. The running
+My work app needs only `-SiltaFixture v2` and a launch script. Add state snapshots,
+wait, screenshot capture and live actions when a screen actually needs them;
+C1/C2 are not prerequisites for Board, Workspace or Docs. The detailed protocol
+below describes deferred work, not the current implementation. One combined
+Architect/Tester implementation review applies to each screen PR.
 
 ## Goal
 

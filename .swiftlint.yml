@@ -5,6 +5,7 @@
 included:
   - Sources
   - Tests
+  - App
 excluded:
   - .build
   - .swiftpm

@@ -37,7 +37,8 @@ verbose output.
 | Change | Run |
 |---|---|
 | Markdown only | `scripts/run-guards.sh` (link check, plans board) |
-| Swift code | `scripts/verify.sh quick` (guards, lint, build with warnings as errors, tests) |
+| App UI or Xcode project | `scripts/verify.sh app` (guards, lint, native Debug acceptance, Release build) |
+| Swift code outside `App/` | `scripts/verify.sh quick` (guards, lint, build with warnings as errors, tests) |
 | Storage, concurrency, location, agent-facing output | `scripts/verify.sh full` (adds stress, scenario and compatibility tiers, the wall-clock deadline tier alone, then the eval replays) |
 | `Evals/` (offline eval tooling) | `scripts/verify.sh evals` (builds the CLI, then the eval replay tests) |
 | A guard script | `python3 -B -m unittest discover -s scripts/tests` (self-tests) |
@@ -57,7 +58,7 @@ through. Fix the change, or propose a decision first.
    `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
    exception with `// guard:allow-nondeterminism <reason>`.
 3. **Tests never wait on the wall clock.** That means no `sleep`, `Task.sleep` or
-   `asyncAfter`; use the fake clock. This covers `Tests/` and `SiltaTestSupport`.
+   `asyncAfter`; use the fake clock. This covers `Tests/`, `App/SiltaAppTests` and `SiltaTestSupport`.
    Enforced by `check_test_waits.py`.
 4. **Code comments don't refer to plans, phases, milestones or review rounds.**
    Enforced by `check_no_plan_refs.py`.
