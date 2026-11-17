@@ -1,1 +1,1 @@
-{"error":{"code":"invalid","message":"Use an identifier for the doc slug.","next":["silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --title <title> --about <ref>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"invalid","message":"Proposals target the doc, not a revision. Use a doc slug or doc:slug.","next":["silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

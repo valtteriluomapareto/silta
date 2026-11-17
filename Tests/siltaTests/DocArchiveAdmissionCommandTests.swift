@@ -24,9 +24,11 @@ struct DocArchiveAdmissionCommandTests {
       Golden.forTests().check(
         mode == "json" ? result.stdout : result.stderr,
         "doc-archive-pending" + (mode == "json" ? ".json" : ".txt"))
+      #expect((result.stdout + result.stderr).contains("doc ls --doc 'rules'"))
+      #expect(!(result.stdout + result.stderr).contains("--archived"))
       #expect(try Self.truth(store) == before)
       let recovery = try SiltaBinary.run(
-        ["--ws", "acme", "doc", "ls", "--archived", "--offset", "0", "--limit", "20"],
+        ["--ws", "acme", "doc", "ls", "--doc", "rules", "--offset", "0", "--limit", "20"],
         in: scratch, environment: TaskCommandTests.fixed)
       #expect(recovery.termination == .exit(0) && recovery.stdout.contains("doc:rules@1"))
     }

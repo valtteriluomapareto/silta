@@ -30,7 +30,6 @@ extension DocProposalService {
         return CommandFailure(error: error, next: [hub], nextBy: .agent, message: message)
       }
       retry.slug = ref.0
-      fields += ["--title", "--about"]
     }
     let scopedRetry = workspaceCommand(retryCommand(retry, fields: fields), workspace: workspace)
     let next: [String]

@@ -40,7 +40,12 @@ struct DocProposalReferenceTests {
           }
         })
       #expect(read)
-      #expect(error.next == [Self.retry])
+      #expect(
+        error.next == [
+          metadata
+            ? Self.retry
+            : Self.retry.replacingOccurrences(of: " --title <title> --about <ref>", with: "")
+        ])
       #expect(!error.message.contains("Missing required"))
       #expect(try DocVerificationPreparationTests.truth(store) == before)
     }
