@@ -2516,6 +2516,14 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   in `data.checks`; envelope and command-log warnings describe command/environment
   warnings. Failures before CLI environment setup are not logged.
 
+Dogfood reports derive document submission, decision and pending-age metrics from
+creation and recorded triage metadata. Direct or legacy history without decision
+evidence stays unattributed. Batch and approval summaries describe observed logs;
+incomplete retained coverage leaves their ratio unavailable. Brief exposure sums
+`docs_shown` within the selected workspace/window and counts agent sessions with
+previews; legacy lines without the field cannot establish zero exposure. Reports
+read metadata only and do not log or publish document content.
+
 ## 20. Testing strategy
 
 | Tier | What | Notes |
