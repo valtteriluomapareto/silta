@@ -1,8 +1,8 @@
 import AppKit
 import Combine
 import Foundation
-import SwiftUI
 import SiltaAppSupport
+import SwiftUI
 
 struct AppShellView: View {
   @Bindable var model: AppModel
@@ -20,10 +20,9 @@ struct AppShellView: View {
           Divider()
         }
         content.frame(maxWidth: .infinity, maxHeight: .infinity)
-      }.background(Color(nsColor: .textBackgroundColor))
+      }.background(Color("Canvas"))
     }
     .navigationTitle(model.route.title)
-    .navigationSubtitle(subtitle)
     .searchable(
       text: $model.search, placement: .toolbar,
       prompt: model.route == .docs ? "Search loaded documents" : "Search"
@@ -31,6 +30,13 @@ struct AppShellView: View {
     .searchFocused($searchFocused)
     .focusedSceneValue(\.findAction, { searchFocused = true })
     .toolbar {
+      ToolbarItem(placement: .principal) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text(model.route.title).font(.system(size: 15, weight: .bold))
+          Text(model.screenSummary).font(.system(size: 11))
+            .foregroundStyle(Color("SecondaryInk"))
+        }
+      }
       ToolbarItem(placement: .primaryAction) {
         Button("Refresh", systemImage: "arrow.clockwise") { model.refresh(force: true) }
           .labelStyle(.iconOnly).help("Refresh (⌘R)")
@@ -73,21 +79,6 @@ struct AppShellView: View {
       case .docs: DocsView(model: model)
       }
     }
-  }
-
-  private var subtitle: String {
-    guard let data = model.visibleData else { return "" }
-    if model.route == .docs { return "Workspace documents" }
-    if model.route == .workspace, let map = data.map {
-      return
-        "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"
-    }
-    if model.route == .board, let board = data.snapshot?.board {
-      return "\(board.todo.count + board.doing.count + board.review.count) open · "
-        + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
-    }
-    let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
-    return "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed"
   }
 
   private func foregroundChecks() async {

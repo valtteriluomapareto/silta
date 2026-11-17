@@ -64,21 +64,23 @@ struct AppSidebar: View {
                     Text("Step \(task.steps.filter(\.done).count) of \(task.steps.count)")
                       .font(.caption)
                   }
-                  Text(task.claimedBy ?? "").font(.caption2).lineLimit(1)
+                  Text(ActorPresentation(task.claimedBy ?? "").name).font(.system(size: 11))
+                    .lineLimit(1)
                 }
               } icon: {
-                Image(systemName: "terminal").frame(width: 16)
+                ActorLabel(actor: task.claimedBy ?? "").labelStyle(.iconOnly)
               }
             }.buttonStyle(.plain)
           }
         }
-      }.listStyle(.sidebar)
+      }.listStyle(.sidebar).font(.system(size: 13))
+        .environment(\.defaultMinListRowHeight, 28)
       Divider()
       HStack(spacing: 8) {
         if model.isLoading {
           ProgressView().controlSize(.small)
         } else {
-          Image(systemName: model.failure == nil ? "checkmark.circle" : "exclamationmark.circle")
+          StatusDot(color: model.failure == nil ? Color("Success") : Color("Warning"))
         }
         Text(
           model.isLoading ? "Refreshing…" : model.failure == nil ? "Up to date" : "Refresh failed"

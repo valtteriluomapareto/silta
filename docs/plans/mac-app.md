@@ -94,7 +94,8 @@ the human copies.
   a foreground tick adds at most five seconds. The
   §17 change signal (`notify_post` after each commit) replaces the timer once a slice
   adds it to SiltaCore writes.
-- **Copy text:** runnable templates carry the selected `SILTA_HOME`. Use the inbox's
+- **Copy text:** runnable templates carry `SILTA_HOME` only for a custom data home;
+  commands for the default `~/.silta` omit the prefix. Use the inbox's
   human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
   nothing is pre-filled for drop or reject, and there's no `-F -`.
@@ -114,8 +115,9 @@ the human copies.
 | A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; state and PNG checks; unlocked interaction follow-up |
 
 Delivery order is My work, Board, Workspace, then Docs: one screen per PR.
-Use a short `task plan` and one independent combined Architect/Tester implementation
-review. Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
+Use a short `task plan` and implementation reviews following
+[AGENTS.md Reviews](../../AGENTS.md#dogfooding) and the
+[persona-review skill](../../skills/persona-review/SKILL.md). Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
 No planted faults except for guard tests. Split only when a diff substantially
 exceeds about 1,000 lines. Add navigation, observable state and development hooks
 only when a screen needs them. The minimal [control support](mac-app-control.md)
