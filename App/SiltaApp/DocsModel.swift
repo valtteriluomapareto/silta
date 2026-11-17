@@ -140,8 +140,7 @@ import SiltaAppSupport
           values: [entry.ref, entry.title ?? "", entry.kind ?? ""]
             + (entry.about ?? []))
     }
-    return Dictionary(grouping: matching, by: \.slug).map { Group(id: $0.key, entries: $0.value) }
-      .sorted { $0.id < $1.id }
+    return DocsContent.groups(matching)
   }
 
   @discardableResult

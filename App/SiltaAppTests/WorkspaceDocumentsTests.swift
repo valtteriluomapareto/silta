@@ -9,10 +9,9 @@
       try await fixture { reader in
         let edge = "edge:acme-mobile/acme-backend/http-api"
         let page = try reader.documents(workspace: "acme", about: edge)
-        var partial = false
-        var calls = 0
+        let flags = WorkspaceReadFlags()
         let docs = WorkspaceDocumentsModel(read: { _, _, refs in
-          calls += 1
+          flags.calls += 1
           let value =
             partial
             ? AppDocumentList(
@@ -23,11 +22,12 @@
         #expect(docs.groups(for: edge).count == 3 && docs.countLabel(for: edge) == "3 docs")
         #expect(docs.groups(for: edge).first { $0.id == "order-contract" }?.entries.count == 2)
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [edge])
-        #expect(calls == 1)
-        partial = true
+        #expect(flags.calls == 1)
+        flags.partial = true
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [edge], force: true)
         #expect(
-          calls == 2 && docs.countText(for: edge) == "1+" && docs.countLabel(for: edge) == "1+ docs"
+          flags.calls == 2 && docs.countText(for: edge) == "1+"
+            && docs.countLabel(for: edge) == "1+ docs"
         )
       }
     }
@@ -36,17 +36,17 @@
       try await fixture { reader in
         let edge = "edge:acme-mobile/acme-backend/http-api"
         let page = try reader.documents(workspace: "acme", about: edge)
-        var fails = false
+        let flags = WorkspaceReadFlags()
         let docs = WorkspaceDocumentsModel(read: { _, _, _ in
-          if fails { throw AppLoadFailure(message: "Acme read failed") }
+          if flags.fails { throw AppLoadFailure(message: "Acme read failed") }
           return [edge: page]
         })
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [edge])
-        fails = true
+        flags.fails = true
         await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
         #expect(docs.failure != nil && docs.countLabel(for: edge) == "3 docs")
         #expect(docs.phase(workspace: "acme", version: 2, connections: [edge]) == .failed)
-        fails = false
+        flags.fails = false
         await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
         #expect(docs.failure == nil && !docs.loading)
         #expect(docs.phase(workspace: "acme", version: 2, connections: [edge]) == .ready)
@@ -56,9 +56,9 @@
     @Test func overlappingReadersJoinTheSameFlight() async throws {
       try await fixture { reader in
         let gate = PausedWorkspaceRead()
-        var calls = 0
+        let flags = WorkspaceReadFlags()
         let docs = WorkspaceDocumentsModel(read: { _, _, _ in
-          calls += 1
+          flags.calls += 1
           await gate.pause()
           return [:]
         })
@@ -68,7 +68,7 @@
         await gate.started()
         let release = Task { gate.resume() }
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [])
-        #expect(calls == 1 && !docs.loading)
+        #expect(flags.calls == 1 && !docs.loading)
         await first.value
         await release.value
       }
@@ -127,13 +127,19 @@
       }
     }
 
-    private func fixture(_ body: (AppReader) async throws -> Void) async throws {
+    private func fixture(_ body: @MainActor (AppReader) async throws -> Void) async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
       let home = root.appending(path: "data")
       try AppDocsFixture.seed(home: home)
       try await body(AppReader(home: home, user: "acme", now: { AppV2Fixture.now }))
     }
+  }
+
+  @MainActor private final class WorkspaceReadFlags {
+    var partial = false
+    var fails = false
+    var calls = 0
   }
 
   @MainActor private final class PausedWorkspaceRead {

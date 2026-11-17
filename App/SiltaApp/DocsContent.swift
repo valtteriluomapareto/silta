@@ -18,6 +18,11 @@ import SiltaAppSupport
     }
   }
 
+  static func groups(_ entries: [AppDocument]) -> [DocsModel.Group] {
+    Dictionary(grouping: entries, by: \.slug).map { DocsModel.Group(id: $0.key, entries: $0.value) }
+      .sorted { $0.id < $1.id }
+  }
+
   static func sections(_ groups: [DocsModel.Group]) -> [Section] {
     var result: [String: [DocsModel.Group]] = [:]
     for group in groups {
