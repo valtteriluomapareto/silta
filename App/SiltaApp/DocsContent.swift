@@ -43,7 +43,7 @@ import SiltaAppSupport
   }
 
   static func readerText(_ document: AppDocument?, body: String, diagnostic: String) -> String {
-    body.isEmpty ? diagnostic : body
+    document == nil ? diagnostic : body
   }
 
   static func proposal(in revisions: [AppDocument]) -> AppDocument? {
@@ -60,7 +60,7 @@ import SiltaAppSupport
     let message = doc.message.map { " · “" + $0 + "”" } ?? ""
     if doc.state == "proposed" { return creation + message }
     let accepted =
-      doc.triagedBy.map { "Accepted by " + ActorPresentation($0).name }
+      doc.triagedBy.map { doc.state.capitalized + " by " + ActorPresentation($0).name }
       ?? "\(doc.state.capitalized) revision @\(doc.revision)"
     let acceptedAge = RelativeAge.text(doc.triagedAt, now: now).map { " " + $0 } ?? ""
     return accepted + acceptedAge + " · Created by " + actor

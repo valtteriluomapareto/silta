@@ -52,12 +52,8 @@
         ref: "doc:contract@3", slug: "contract", revision: 3, title: "Contract",
         kind: "contract", about: [], state: "rejected", archived: false,
         actor: "agent:codex:test", triagedBy: "human:acme")
-      withKnownIssue("Rejected triage is labeled accepted") {
-        #expect(DocsContent.attribution(doc, now: AppV2Fixture.now).hasPrefix("Rejected by acme"))
-      }
-      withKnownIssue("Empty body is replaced with CLI metadata") {
-        #expect(DocsContent.readerText(doc, body: "", diagnostic: "CLI metadata").isEmpty)
-      }
+      #expect(DocsContent.attribution(doc, now: AppV2Fixture.now).hasPrefix("Rejected by acme"))
+      #expect(DocsContent.readerText(doc, body: "", diagnostic: "CLI metadata").isEmpty)
       #expect(
         DocsContent.readerText(nil, body: "", diagnostic: "No accepted revision")
           == "No accepted revision")
@@ -82,14 +78,10 @@
         })
       await model.refresh().value
       model.navigate(to: .docs)
-      withKnownIssue("No-selection Docs falls through to My work summary") {
-        #expect(model.screenSummary == "Workspace documents")
-      }
+      #expect(model.screenSummary == "Workspace documents")
       model.select(document: "doc:order-contract@2")
       await docs.show(reader, workspace: "acme")
-      withKnownIssue("Partial history count is presented as complete") {
-        #expect(model.screenSummary.contains("loaded history"))
-      }
+      #expect(model.screenSummary.contains("loaded history"))
     }
 
     @Test func markdownTablesAndDiffRemainReadable() {
