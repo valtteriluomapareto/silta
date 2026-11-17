@@ -125,7 +125,7 @@
     @Test func documentAttentionNeverBecomesATaskRead() throws {
       let reader = try AppReader(home: URL(filePath: "/private/tmp/acme-unused"), user: "acme")
       let document = AppAttention(
-        kind: "doc_proposal", ref: "doc:rules@2", refs: ["doc:rules@2"],
+        kind: "doc_proposal", target: nil, ref: "doc:rules@2", refs: ["doc:rules@2"],
         task: nil, title: nil, author: nil, body: nil, createdAt: nil,
         commands: ["silta doc diff 'doc:rules@2'"])
       do {
@@ -136,7 +136,7 @@
     private func item(kind: String, refs: [String] = ["AC-12"], commands: [String]) -> AppAttention
     {
       AppAttention(
-        kind: kind, ref: "AC-12/2", refs: refs, task: refs.first,
+        kind: kind, target: nil, ref: "AC-12/2", refs: refs, task: refs.first,
         title: nil, author: nil, body: nil, createdAt: nil, commands: commands)
     }
 

@@ -88,7 +88,9 @@ the human copies.
     quoting, so a custom app home cannot recover a different default store.
   - Reads aren't logged; §19 logging belongs to the CLI front-end.
 - **Freshness:** check `PRAGMA data_version` when the window gains focus, on ⌘R, and
-  on a 5-second timer while the window is frontmost. Reload only when it changed. The
+  on a 5-second timer while the window is frontmost. Reload when it changed or a
+  one-minute cache ceiling is reached. The ceiling bounds clock-only staleness;
+  a foreground tick adds at most five seconds. The
   §17 change signal (`notify_post` after each commit) replaces the timer once a slice
   adds it to SiltaCore writes.
 - **Copy text:** runnable templates carry the selected `SILTA_HOME`. Use the inbox's
@@ -105,16 +107,20 @@ the human copies.
 |---|---|---|---|
 | A1a (SI-154) | `SiltaAppSupport`: workspace list, human inbox and review tasks, board and task detail; shared v2 seed in DEBUG `SiltaAppSupport/Control/` with a `SiltaTestSupport` wrapper and release-isolation guard | — | `swift test` on the seed: task counts reconcile; models match `task ls`/`task show`/`inbox --for me`; Release package build excludes fixtures |
 | A1b (SI-155) | Typed workspace-map read models and persistent `data_version` probe | A1a | Map counts and edges match the seed; probe sees an external CLI write and stays unchanged by reads |
-| A2 | Xcode app shell: sidebar, toolbar, My work, ref chip and command block with copy, store states, focus/⌘R/timer refresh | A1a, A1b | Build locally; command templates execute in a fixture with placeholders filled; unfilled placeholders are refused with no write; manual pass on the dogfood workspace |
-| A3 | Board and task inspector | A2, C1b / SI-153 in [control plan](mac-app-control.md) | View-model tests on the seed; manual pass |
-| A4 | Workspace and connection inspector | A2, C1b / SI-153 in [control plan](mac-app-control.md) | View-model tests on `docs/examples/acme-workspace.yaml` loaded into a store |
-| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A2, C1b / SI-153, C2, SI-126, SI-134 | Read-model tests on fixture docs, including pending-only, archived, legacy metadata and a doc over 400 lines; manual pass |
+| A2 (SI-145) | Running Debug app: sidebar, My work, copyable refs/commands, isolated fixture launch, store states and refresh; folds SI-175, SI-176 and A2c into one screen PR. SI-173 commands can land separately | A1a, A1b | Native view-model tests, Debug/Release builds and a real fixture click/keyboard pass |
+| A3 | Board and task inspector | A2 | View-model tests on the seed; manual pass |
+| A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed; manual pass |
+| A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; manual pass |
 
-The [development control plane](mac-app-control.md) runs C1a / SI-152 then
-C1b / SI-153 after A2. C2, A3 and A4 can then run alongside one another. A3/A4
-add their routes and selection state with their screens, and their live actions
-after C2 is available. A5 additionally waits for C2 and its docs prerequisites.
-Each slice targets one PR of about 800 lines.
+Delivery order is My work, Board, Workspace, then Docs: one screen per PR.
+Use a short `task plan` and one independent combined Architect/Tester implementation
+review. Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
+No planted faults except for guard tests. Split only when a diff substantially
+exceeds about 1,000 lines. Add navigation, observable state and development hooks
+only when a screen needs them. The [control plan](mac-app-control.md) is deferred
+beyond the minimal isolated fixture launcher; it does not block these screens.
+Merge main only for a conflict or a needed landed change. After merging, submit
+the task and report which tasks the maintainer can close; do not mark them done.
 
 ## Validation
 
@@ -133,7 +139,7 @@ Each slice targets one PR of about 800 lines.
   - `verify.sh app` runs `xcodebuild test` for `SiltaAppTests` (Debug), then
     `xcodebuild build` (Release). Release on every PR proves the DEBUG-only control code
     compiles out. Both runs:
-    - use `-derivedDataPath .build/app-control-tests` and `-clonedSourcePackagesDirPath`;
+    - use `-derivedDataPath .build/app/DerivedData` and `-clonedSourcePackagesDirPath`;
     - use `-onlyUsePackageVersionsFromResolvedFile`, with MarkdownUI pinned in the
       project's own `Package.resolved` (D18);
     - set `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES` in the project, so local builds match;

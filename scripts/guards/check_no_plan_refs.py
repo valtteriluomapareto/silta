@@ -23,7 +23,7 @@ PATTERNS = {
 
 def check(root: Path) -> list[str]:
     errors = []
-    for path in swift_files(root, "Sources", "Tests"):
+    for path in swift_files(root, "Sources", "Tests", "App"):
         _, comments = split_swift(path.read_text(encoding="utf-8"))
         for line, text in comments:
             for label, pattern in PATTERNS.items():

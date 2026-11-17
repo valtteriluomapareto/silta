@@ -41,7 +41,8 @@ public struct AppReader: Sendable {
       let at = environment.clock.now()
       var calendar = Calendar(identifier: .iso8601)
       calendar.timeZone = .gmt
-      guard let week = calendar.dateInterval(of: .weekOfYear, for: at) else {
+      guard let week = calendar.dateInterval(of: .weekOfYear, for: at)
+      else {
         throw StorageError.internalMisuse
       }
       let completed = try tasks.filter { task in

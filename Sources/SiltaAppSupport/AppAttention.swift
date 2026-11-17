@@ -2,8 +2,14 @@ import SiltaCore
 
 /// One core inbox action; separate questions on one task stay separate entries.
 public struct AppAttention: Equatable, Sendable {
+  /// Stable presentation identity, independent of row position.
+  public var stableID: String {
+    kind + ":" + (target ?? "") + ":" + (ref ?? task ?? refs.joined(separator: ","))
+  }
   /// Core inbox category.
   public let kind: String
+  /// External grouping target, already redacted by Core.
+  public let target: String?
   /// Canonical item reference, when present.
   public let ref: String?
   /// Display refs for a grouped action, or its containing task/item.
@@ -25,7 +31,7 @@ public struct AppAttention: Equatable, Sendable {
 extension AppAttention {
   init(_ item: InboxItem) {
     self.init(
-      kind: item.kind, ref: item.ref,
+      kind: item.kind, target: item.target, ref: item.ref,
       refs: item.tasks?.map(\.ref) ?? item.task.map { [$0] } ?? item.ref.map { [$0] } ?? [],
       task: item.task, title: item.tasks?.first?.title, author: item.author,
       body: item.body ?? item.tasks?.first?.why, createdAt: item.createdAt, commands: item.next)
