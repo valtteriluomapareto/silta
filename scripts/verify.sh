@@ -94,7 +94,8 @@ full_swift() {
 
   step "test (with slow tiers)"
   export SILTA_SLOW_TESTS=1
-  SILTA_DEADLINE_TESTS='' run_tests
+  # Bound competing subprocess and filesystem work on the CI runner.
+  SILTA_DEADLINE_TESTS='' run_tests --experimental-maximum-parallelization-width 4
   # The stress test and every test that drives a prior-writer binary.
   require_passed twentyProcessesAddFiveHundredTasksWithoutSequenceGaps \
     actualPriorWriterRefusesUpgradedDatabaseWithoutChangingIt \
