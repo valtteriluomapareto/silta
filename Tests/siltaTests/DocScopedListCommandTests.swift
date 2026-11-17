@@ -143,7 +143,20 @@ struct DocScopedListCommandTests {
         (explicit ? ["--ws", "acme"] : [])
           + ["doc", "ls", "--doc", ref, "--json"], in: home, environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(1))
-      #expect(try DocEditCommandTests.error(result)["code"] as? String == "invalid")
+      let error = try DocEditCommandTests.error(result)
+      #expect(error["code"] as? String == "invalid")
+      withKnownIssue("Pinned document filters need local help recovery.") {
+        #expect(
+          error["next"] as? [String] == ["silta doc ls --help"])
+      }
+      let text = try SiltaBinary.run(
+        (explicit ? ["--ws", "acme"] : []) + ["doc", "ls", "--doc", ref],
+        in: home, environment: TaskCommandTests.fixed)
+      #expect(text.termination == .exit(1))
+      withKnownIssue("Pinned document filters need local help recovery.") {
+        #expect((text.stdout + text.stderr).contains("silta doc ls --help"))
+      }
+      #expect(!(text.stdout + text.stderr).contains(ref))
       #expect(
         !FileManager.default.fileExists(atPath: home.appending(path: "silta-home/silta.db").path))
     }
