@@ -15,8 +15,8 @@ enum DocDiff {
     let header =
       "\(ref) [\(revision.state)] diff against \(oldRef)\n"
       + "actor: \(revision.actor)\ncreated_at: \(revision.createdAt)\n"
-    let oldMetadata = base.map(metadata) ?? "  (empty)\n"
     let newMetadata = metadata(revision)
+    let oldMetadata = base.map(metadata) ?? Array(repeating: "", count: newMetadata.count)
     let identitiesChanged: Bool
     if let old = base?.aboutTargets, let new = revision.aboutTargets {
       identitiesChanged = Set(old) != Set(new)
@@ -25,24 +25,34 @@ enum DocDiff {
     }
     let body = steps(old: lines(base?.body ?? ""), new: lines(revision.body))
     let changedBody = body.contains { $0.prefix != " " }
-    guard
-      changedBody || identitiesChanged
-        || !oldMetadata.utf8.elementsEqual(newMetadata.utf8)
+    let changed = zip(oldMetadata, newMetadata).filter { $0 != $1 }
+    guard changedBody || identitiesChanged || !changed.isEmpty
     else { return header + "no visible changes\n" }
     let summary =
-      header + "--- metadata \(oldRef)\n" + oldMetadata
-      + "+++ metadata \(ref)\n" + newMetadata
+      header
+      + (changed.isEmpty
+        ? "metadata unchanged\n"
+        : "--- metadata \(oldRef)\n" + (base == nil ? "  (empty)\n" : changed.map(\.0).joined())
+          + "+++ metadata \(ref)\n" + changed.map(\.1).joined())
       + (identitiesChanged ? "attachment identities: changed\n" : "")
     guard changedBody else { return summary }
     return summary + "--- \(oldRef)\n+++ \(ref)\n" + hunks(body)
   }
 
-  private static func metadata(_ revision: DocRevision) -> String {
-    let text =
-      "title: \(revision.title ?? "(unknown)")\nkind: \(revision.kind ?? "(unknown)")\n"
-      + "about: \(DocService.about(revision.about))\n" + DocService.evidence(revision)
-    return SecretGuard.redacted(text).components(separatedBy: "\n").dropLast()
-      .map { "  " + $0 + "\n" }.joined()
+  private static func metadata(_ revision: DocRevision) -> [String] {
+    let fields =
+      [
+        "title: \(revision.title ?? "(unknown)")",
+        "kind: \(revision.kind ?? "(unknown)")",
+        "about: \(DocService.about(revision.about))",
+      ]
+      + DocService.evidence(revision).split(
+        separator: "\n", maxSplits: 3, omittingEmptySubsequences: false
+      ).map(String.init)
+    return fields.map {
+      SecretGuard.redacted($0).trimmingCharacters(in: .newlines)
+        .components(separatedBy: "\n").map { "  " + $0 + "\n" }.joined()
+    }
   }
 
   private static func lines(_ body: String) -> [String] {

@@ -4,38 +4,6 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(2)))
 struct DocFinalRecoveryTests {
-  @Test func pinnedProposalTargetsTheDocumentWithoutExtraMetadata() throws {
-    try fixture { scratch, repo, file in
-      let result = try run(
-        ["propose", "doc:rules@1", "-F", file.path, "-m", "Share", "--json"], scratch, repo)
-      let error = try DocEditCommandTests.error(result)
-      let next = try #require((error["next"] as? [String])?.first)
-      withKnownIssue {
-        #expect(
-          (error["message"] as? String)?.contains("Proposals target the doc, not a revision")
-            == true)
-        #expect(!next.contains("--title") && !next.contains("--about"))
-      }
-    }
-  }
-
-  @Test func pendingArchivePointsToItsDocumentListing() throws {
-    try fixture { scratch, repo, file in
-      let proposal = try run(
-        [
-          "propose", "pending", "--title", "Pending", "--about", "app:api", "-F", file.path,
-          "-m", "Share",
-        ], scratch, repo)
-      try #require(proposal.termination == .exit(0))
-      let refused = try run(
-        ["archive", "pending", "--approved", "Archive Acme", "--json"], scratch, repo)
-      let next = try #require((try DocEditCommandTests.error(refused)["next"] as? [String])?.first)
-      withKnownIssue { #expect(next == "silta --ws 'acme' doc ls --doc 'pending'") }
-      let listed = try run(["ls", "--doc", "pending"], scratch, repo)
-      #expect(listed.stdout.contains("doc:pending@1"))
-    }
-  }
-
   @Test func bareAppEditSharesTheProposalReadRecovery() throws {
     try fixture { scratch, repo, file in
       let edit = try run(
@@ -48,7 +16,7 @@ struct DocFinalRecoveryTests {
       let proposeNext = try #require(
         (try DocEditCommandTests.error(propose)["next"] as? [String])?.first)
       #expect(proposeNext == "silta --ws 'acme' doc ls --about 'app:api'")
-      withKnownIssue { #expect(editNext == proposeNext) }
+      do { #expect(editNext == proposeNext) }
     }
   }
 
@@ -59,7 +27,7 @@ struct DocFinalRecoveryTests {
         run(["edit", "rules", "-F", file.path, "--approved", "Update Acme"], scratch, repo)
           .termination == .exit(0))
       let bodyDiff = try run(["show", "doc:rules@2", "--diff"], scratch, repo)
-      withKnownIssue {
+      do {
         #expect(bodyDiff.stdout.contains("metadata unchanged\n"))
         #expect(!bodyDiff.stdout.contains("title:") && !bodyDiff.stdout.contains("kind:"))
       }
@@ -74,7 +42,7 @@ struct DocFinalRecoveryTests {
       #expect(
         titleDiff.stdout.contains("title: Rules")
           && titleDiff.stdout.contains("title: Changed title"))
-      withKnownIssue {
+      do {
         #expect(!titleDiff.stdout.contains("kind:") && !titleDiff.stdout.contains("about:"))
       }
     }

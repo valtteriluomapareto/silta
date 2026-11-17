@@ -70,6 +70,10 @@ package struct DocProposalService {
   private func capture(
     _ request: DocProposalRequest, workspace: String, at: Date, in db: Database
   ) throws -> Prepared {
+    if request.slug.contains("@") {
+      throw DocError.invalid(
+        "Proposals target the doc, not a revision. Use a doc slug or doc:slug.")
+    }
     guard WorkspaceConfig.isValidIdentifier(request.slug) else {
       throw DocError.invalid("Use an identifier for the doc slug.")
     }
