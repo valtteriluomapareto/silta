@@ -74,12 +74,12 @@
           let question = try #require(snapshot.work.items.first { $0.kind == "question" })
           let answer = try #require(reader.commands(for: question, workspace: "acme").first).text
           let refused = try run(answer, scratch)
-          #expect(refused.stdout.contains("[invalid] Comment body required"), "\(refused)")
+          #expect(refused.stdout.contains("Comment body required; use -m or -F. [invalid]"), "\(refused)")
           #expect(try version(observer) == before)
           let proposal = try #require(snapshot.work.items.first { $0.kind == "proposal" })
           let accept = try #require(reader.commands(for: proposal, workspace: "acme").first).text
           let invalid = try run(accept, scratch)
-          #expect(invalid.stdout.contains("[invalid] REFS: invalid task reference"), "\(invalid)")
+          #expect(invalid.stdout.contains("REFS: invalid task reference. [invalid]"), "\(invalid)")
           #expect(try version(observer) == before)
           let posted = try run(
             answer.replacingOccurrences(
