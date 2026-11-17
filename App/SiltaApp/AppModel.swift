@@ -122,6 +122,7 @@ final class AppModel {
   }
 
   func inspect(task ref: String) {
+    if boardSelection?.taskRef != ref { taskDetail.clear() }
     boardSelection = BoardSelection(taskRef: ref)
     navigate(to: .board)
     boardInspectorPresented = true

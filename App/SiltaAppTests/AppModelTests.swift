@@ -147,9 +147,8 @@
       }
       #expect(model.taskDetail.failure != nil)
       model.inspect(task: "AC-14")
-      withKnownIssue("A newly selected task must not retain the previous task's failure") {
-        #expect(model.taskDetail.failure == nil && model.taskDetail.value == nil)
-      }
+      #expect(model.taskDetail.failure == nil && model.taskDetail.value == nil)
+      #expect(!ControlState(model: model, run: "acme", revision: 1, dark: false).idle)
     }
 
     private func makeModel(_ driver: ControlledLoads) -> AppModel {
