@@ -23,7 +23,7 @@ struct BriefDocsLogTests {
       let full = try run(["brief"])
       #expect(full.stdout.contains("doc:app-rules") && full.stdout.contains("doc:interface"))
       let fullLog = try lastLog(scratch)
-      #expect(fullLog["docs_shown"] as? Int == 2)
+      #expect(fullLog["docs_shown"] as? Int == 3)
       #expect(fullLog["docs_counted"] as? Int == 0)
       try checkLogContract(fullLog)
       for flags in [["--budget", "1"], ["--short"], ["--hook"]] {
@@ -33,7 +33,7 @@ struct BriefDocsLogTests {
           !result.stdout.contains("doc:app-rules") && !result.stdout.contains("doc:interface"))
         let entry = try lastLog(scratch)
         #expect(entry["docs_shown"] as? Int == 0)
-        #expect(entry["docs_counted"] as? Int == (flags == ["--budget", "1"] ? 0 : 2))
+        #expect(entry["docs_counted"] as? Int == (flags == ["--budget", "1"] ? 0 : 3))
       }
       let hook = try AgentsHookTests.hook(
         shellWord(try SiltaBinary.url().path) + " --ws acme agents session-start",
@@ -42,16 +42,16 @@ struct BriefDocsLogTests {
           "SILTA_NOW": "2023-11-14T22:13:20.000Z",
           "CLAUDE_ENV_FILE": scratch.appending(path: "claude-env").path,
         ], cwd: repo)
-      #expect(hook.termination == .exit(0) && hook.stdout.contains("docs: 1"))
+      #expect(hook.termination == .exit(0) && hook.stdout.contains("docs: 2"))
       #expect(try lastLog(scratch)["docs_shown"] as? Int == 0)
-      #expect(try lastLog(scratch)["docs_counted"] as? Int == 2)
+      #expect(try lastLog(scratch)["docs_counted"] as? Int == 3)
       let report = try DogfoodReportTests.run(
         ["--ws", "acme", "--since", "2023-11-14"], scratch: scratch, tools: tools)
       try #require(report.termination == .exit(0), "\(report.stderr)")
       let text = try String(
         contentsOf: scratch.appending(path: "silta-home/reports/acme/2023-11-30.md"),
         encoding: .utf8)
-      #expect(text.contains("Observed brief document pointers: 6 counted documents."))
+      #expect(text.contains("Observed brief document pointers: 9 counted documents."))
       #expect(try run(["brief", "--task", "AC-999"]).termination == .exit(2))
       #expect(try lastLog(scratch)["docs_shown"] == nil)
       #expect(try lastLog(scratch)["docs_counted"] == nil)
@@ -81,7 +81,9 @@ struct BriefDocsLogTests {
     try #require(updated.termination == .exit(0), "\(updated.stderr)")
     let body = scratch.appending(path: "body.md")
     try "Keep the Acme fallback explicit.\n".write(to: body, atomically: true, encoding: .utf8)
-    for (slug, about) in [("app-rules", "app:api"), ("interface", "edge:api/portal/http")] {
+    for (slug, about) in [
+      ("app-rules", "app:api"), ("fallback", "app:api"), ("interface", "edge:api/portal/http"),
+    ] {
       try #require(
         run([
           "doc", "edit", slug, "--title", "Acme rules", "--about", about,
