@@ -212,7 +212,7 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   ($oldest != "none" and $oldest <= $since and $unreadable == 0 and
     ([$selected[] | select(.workspace == null and (stamp|in_range))] | length) == 0 and
     $doc_approvals == $agent_batches) as $batch_covered |
-  ($logs | map(select(.exit_code == 0 and .error_code == null and (.actor|startswith("agent:")) and
+  ($logs | map(select(.exit_code == 0 and .error_code == null and (.timestamp|seconds|in_range) and (.actor|startswith("agent:")) and
     (.command == "silta brief" or .command == "silta agents session-start")))) as $briefs |
   "# Silta dogfood report", "",
   "Since: \($since) (UTC, inclusive).",

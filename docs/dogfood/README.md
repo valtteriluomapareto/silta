@@ -138,14 +138,13 @@ workspace and excludes its own actor's calls and approvals.
   Failures before CLI environment setup are not logged and cannot appear here.
 - **Repeated failures** means adjacent failures within the selected Silta stream for
   one agent actor/session.
-- **Human load.** Approvals per ISO week and command. Proposals are accepted,
+- **Human load.** Approvals per ISO week and command. Task proposals are accepted,
   dropped, or left untriaged past 14 days, each counted once; an agent withdrawing
   its own proposal is not triage and isn't counted; the oldest pending
   proposal shows what still waits. The first report's numbers are mostly the setup
   triage. Questions and inbox measurements are `n/a` until S11.
 
-Document proposal measurements are deferred until public proposal review commands
-are available. The report currently measures task review and recorded approvals.
+The report also measures document proposal decisions and observed brief exposure.
 
 **Private report (DF3).** `scripts/dogfood-report.sh --ws <slug>` reports on any
 workspace, `silta` included, and keeps it on this machine:

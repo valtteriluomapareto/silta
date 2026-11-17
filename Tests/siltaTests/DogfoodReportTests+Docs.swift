@@ -50,9 +50,7 @@ extension DogfoodReportTests {
       #expect(report.contains("Unattributed terminal history created in range: 1"))
       #expect(report.contains("Recorded doc-triage approvals in range: 1."))
       #expect(report.contains("Observed approvals per successful batch (human + agent): 1."))
-      withKnownIssue("Brief exposure must end at the captured report time") {
-        #expect(report.contains("Observed brief document exposure: 1 agent sessions; 2 previews."))
-      }
+      #expect(report.contains("Observed brief document exposure: 1 agent sessions; 2 previews."))
       #expect(report.contains("Legacy brief exposure unknown: 0 calls."))
       #expect(!report.contains("Keep Acme fallback") && !report.contains("Use the Acme decisions"))
     }
