@@ -93,7 +93,9 @@ package struct DocService {
     let selected: (slug: String, revision: Int?)?
     do { selected = try selection(raw, revision: nil) } catch { selected = nil }
     guard let selected, selected.revision == nil else {
-      throw DocError.invalid("Use an unpinned doc slug or doc:slug with --doc.")
+      throw CommandFailure(
+        error: DocError.invalid("Use an unpinned doc slug or doc:slug with --doc."),
+        next: ["silta doc ls --help"])
     }
     return selected.slug
   }
