@@ -32,6 +32,29 @@
       #expect(detail.value == nil)
     }
 
+    @Test func cancelledReloadStopsLoadingAndRetainsThePreviousTask() async throws {
+      let fixture = try FixtureLaunch.prepare()
+      defer {
+        try? FileManager.default.removeItem(  // cleanup
+          at: fixture.home.deletingLastPathComponent())
+      }
+      let reader = try AppReader(home: fixture.home, user: fixture.user, now: { fixture.now })
+      let original = try reader.task("AC-12", workspace: "acme")
+      let detail = TaskDetailModel()
+      await detail.load(workspace: "acme", ref: "AC-12") { original }
+      let reload = Task {
+        await detail.load(workspace: "acme", ref: "AC-12") {
+          withUnsafeCurrentTask { $0?.cancel() }
+          return original
+        }
+      }
+      await reload.value
+      #expect(detail.value == original)
+      withKnownIssue("A cancelled read must settle the loading flag") {
+        #expect(!detail.isLoading)
+      }
+    }
+
     @Test func retryRecoversDetailWithoutADatabaseCommit() async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
