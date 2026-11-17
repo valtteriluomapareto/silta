@@ -1051,8 +1051,8 @@ recovery: its continuation restarts the broader scoped list without a filter or 
 
 `doc show <ref> --diff` compares the body with the revision's recorded `base_rev`
 using contextual line hunks whose coordinates refer to the masked body. Separate
-metadata headers show stored title, kind, attachments, why, source task and paired
-decision evidence. Known attachment identities can change even when their displayed
+metadata headers show only changed stored title, kind, attachments, why, source task
+and paired decision evidence fields; an unchanged set says "metadata unchanged". Known attachment identities can change even when their displayed
 refs do not; that change is shown without resolving historical targets or exposing
 their internal ids. Historical unknown identities are not inferred.
 A bounded search may render a broader replacement hunk for complex edits; it
