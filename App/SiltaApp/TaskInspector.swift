@@ -8,83 +8,106 @@ struct TaskInspector: View {
   private var detail: TaskDetailModel { model.taskDetail }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
-        if let task = detail.value {
-          HStack {
-            CopyValue(value: task.ref, title: "Copy reference")
-            Text(task.status.capitalized).font(.callout).foregroundStyle(.secondary)
-          }
-          Text(task.title).font(.title3.weight(.semibold)).textSelection(.enabled)
-          Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
-            property("App", task.app)
-            property("Priority", String(task.priority))
-            property("Branch", task.branch)
-            property("Claimed by", task.claimedBy)
-            property("Claimed", task.claimedAt)
-            property("Updated", task.updatedAt)
-          }.font(.callout).textSelection(.enabled)
-          if !task.description.isEmpty { Text(task.description).textSelection(.enabled) }
-          if !task.plan.isEmpty {
-            HStack {
-              Text("Plan").font(.headline)
-              Spacer()
-              Text("Revision \(task.planRevision)").font(.caption).foregroundStyle(.secondary)
+    GeometryReader { geometry in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 16) {
+          if let task = detail.value {
+            HStack(spacing: 8) {
+              CopyValue(value: task.ref, title: "Copy reference")
+              statusDot(task.status)
+              Text(task.status.capitalized).font(.system(size: 12))
             }
-            ForEach(Array(task.steps.enumerated()), id: \.offset) { _, step in
-              Label(step.title, systemImage: step.done ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(step.done ? .secondary : .primary)
-            }
-            DisclosureGroup("Full plan") { Text(task.plan).textSelection(.enabled) }
-          }
-          Text("Discussion").font(.headline)
-          if task.comments.isEmpty { Text("No discussion yet").foregroundStyle(.secondary) }
-          ForEach(task.comments, id: \.ref) { comment in
-            VStack(alignment: .leading, spacing: 8) {
-              HStack {
-                Text(comment.actor + " · " + comment.kind).font(.caption).foregroundStyle(
-                  .secondary)
-                Spacer()
-                CopyValue(value: comment.ref, title: "Copy comment reference")
+            Text(task.title).font(.system(size: 16, weight: .semibold)).textSelection(.enabled)
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+              property("App", task.app)
+              property("Priority", String(task.priority))
+              property("Branch", task.branch, monospaced: true)
+              property("Claimed by", TaskPresentation.claimant(task.claimedBy))
+              property("Claimed", age(task.claimedAt))
+              property("Updated", age(task.updatedAt))
+            }.font(.system(size: 12)).textSelection(.enabled)
+            if !task.description.isEmpty { DocumentMarkdown(task.description) }
+            if !task.plan.isEmpty {
+              VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                  Text("Plan").font(.system(size: 12, weight: .semibold))
+                  Spacer()
+                  Text(TaskPresentation.progress(task.steps, revision: task.planRevision))
+                    .font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+                }
+                ForEach(Array(task.steps.enumerated()), id: \.offset) { _, step in
+                  HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: step.done ? "checkmark.circle.fill" : "circle")
+                      .foregroundStyle(Color(step.done ? "TideText" : "SecondaryInk"))
+                      .accessibilityLabel(step.done ? "Complete" : "Incomplete")
+                    Text(step.title).foregroundStyle(Color(step.done ? "SecondaryInk" : "Ink"))
+                  }.font(.system(size: 13))
+                }
+                DisclosureGroup("Full plan") { Text(task.plan).textSelection(.enabled) }
+                  .font(.system(size: 12))
               }
-              Text(comment.body).textSelection(.enabled)
             }
-          }
-          if let failure = detail.failure {
-            Label(failure, systemImage: "exclamationmark.triangle")
-              .font(.callout).foregroundStyle(.secondary)
-            Button("Retry") { Task { await load() } }
-          }
-          if let reader = model.reader, let workspace = model.workspace {
-            let questions = questionCommands(reader, workspace: workspace, ref: task.ref)
-            ForEach(questions, id: \.text) { command in CommandBlock(command: command) }
-            if task.status == "review" {
-              let reads = reader.commands(forReview: task, workspace: workspace)
-              ForEach(reads, id: \.text) { command in CommandBlock(command: command) }
+            VStack(alignment: .leading, spacing: 10) {
+              Text("Discussion").font(.system(size: 12, weight: .semibold))
+              if task.comments.isEmpty {
+                Text("No discussion yet").font(.system(size: 13)).foregroundStyle(
+                  Color("SecondaryInk"))
+              }
+              ForEach(task.comments, id: \.ref) { comment in
+                VStack(alignment: .leading, spacing: 3) {
+                  HStack(alignment: .firstTextBaseline) {
+                    Text(
+                      [ActorPresentation(comment.actor).name, comment.kind, age(comment.createdAt)]
+                        .compactMap { $0 }.joined(separator: " · ")
+                    )
+                    .font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+                    Spacer(minLength: 4)
+                    CopyValue(value: comment.ref, title: "Copy comment reference", compact: true)
+                  }
+                  Text(comment.body).font(.system(size: 13)).textSelection(.enabled)
+                }
+              }
             }
-          }
-          if let path = task.worktree, path.hasPrefix("/"),
-            FileManager.default.fileExists(atPath: path)
-          {
-            Button("Reveal worktree", systemImage: "folder") {
-              NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+            if let failure = detail.failure {
+              Label(failure, systemImage: "exclamationmark.triangle")
+                .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+              Button("Retry") { Task { await model.loadTaskDetail() } }
             }
+            Spacer(minLength: 12)
+            actions(task)
+          } else if let failure = detail.failure {
+            ContentUnavailableView {
+              Label("Task unavailable", systemImage: "exclamationmark.triangle")
+            } description: {
+              Text(failure)
+            } actions: {
+              Button("Retry") { Task { await model.loadTaskDetail() } }
+            }
+          } else if model.boardSelection?.taskRef != nil {
+            ProgressView("Loading task…")
+          } else {
+            ContentUnavailableView("Select a task", systemImage: "sidebar.right")
           }
-        } else if let failure = detail.failure {
-          ContentUnavailableView {
-            Label("Task unavailable", systemImage: "exclamationmark.triangle")
-          } description: {
-            Text(failure)
-          } actions: {
-            Button("Retry") { Task { await load() } }
-          }
-        } else if model.boardSelection?.taskRef != nil {
-          ProgressView("Loading task…")
-        } else {
-          ContentUnavailableView("Select a task", systemImage: "sidebar.right")
-        }
-      }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-    }.task(id: selection) { await load() }
+        }.padding(18).frame(
+          maxWidth: .infinity, minHeight: geometry.size.height, alignment: .topLeading)
+      }
+    }.foregroundStyle(Color("Ink"))
+      .task(id: selection) { await model.loadTaskDetail() }
+  }
+
+  @ViewBuilder private func statusDot(_ status: String) -> some View {
+    if status == "todo" {
+      Circle().strokeBorder(Color("SecondaryInk"), lineWidth: 1.5).frame(width: 8, height: 8)
+    } else {
+      StatusDot(
+        color: Color(status == "doing" ? "TideText" : status == "done" ? "DiffAddition" : "Warning")
+      )
+    }
+  }
+
+  private func age(_ value: String?) -> String? {
+    guard let now = model.visibleData?.checkedAt else { return value }
+    return RelativeAge.text(value, now: now) ?? value
   }
 
   private var selection: String {
@@ -95,21 +118,38 @@ struct TaskInspector: View {
     .joined(separator: ":")
   }
 
-  private func load() async {
-    await model.loadTaskDetail()
-  }
-
-  private func property(_ title: String, _ value: String?) -> some View {
+  private func property(_ title: String, _ value: String?, monospaced: Bool = false) -> some View {
     GridRow {
-      Text(title).foregroundStyle(.secondary)
-      Text(value ?? "—").fixedSize(horizontal: false, vertical: true)
+      Text(title).foregroundStyle(Color("SecondaryInk"))
+      Text(value ?? "—").font(.system(size: 12, design: monospaced ? .monospaced : .default))
+        .fixedSize(horizontal: false, vertical: true)
     }
   }
 
-  private func questionCommands(_ reader: AppReader, workspace: String, ref: String) -> [AppCommand]
-  {
-    guard let snapshot = model.visibleData?.snapshot else { return [] }
-    return BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
-      .commands(for: ref, reader: reader, workspace: workspace)
+  @ViewBuilder private func actions(_ task: AppTask) -> some View {
+    if let reader = model.reader, let workspace = model.workspace,
+      let snapshot = model.visibleData?.snapshot
+    {
+      let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+      ForEach(content.answers(for: task.ref, reader: reader, workspace: workspace)) { answer in
+        VStack(alignment: .leading, spacing: 8) {
+          Text(answer.actor.map { "Answer " + ActorPresentation($0).name } ?? "Answer question")
+            .font(.system(size: 12, weight: .semibold))
+          CommandBlock(command: answer.command)
+        }
+      }
+      if task.status == "review" {
+        ForEach(reader.commands(forReview: task, workspace: workspace), id: \.text) {
+          CommandBlock(command: $0)
+        }
+      }
+    }
+    let path = task.worktree
+    let available =
+      path.map { $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0) } ?? false
+    Button("Reveal worktree", systemImage: "folder") {
+      if let path { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
+    }.buttonStyle(CompactActionStyle()).disabled(!available).opacity(available ? 1 : 0.45)
+      .help(available ? "Reveal the recorded worktree" : "No existing worktree is recorded")
   }
 }
