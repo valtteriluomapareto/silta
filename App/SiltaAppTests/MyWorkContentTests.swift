@@ -13,11 +13,9 @@
         #expect(content.documents.count == 2 && content.tasks.count == 3)
         #expect(Set(content.tasks.map(\.ref)) == ["AC-21", "AC-22", "AC-23"])
         #expect(content.questions.first?.ref == "AC-12")
-        withKnownIssue("#220: subsecond fixture timestamps cross the displayed minute boundary") {
-          #expect(
-            content.questions.first?.metadata
-              == "Claude asks you · Parse push categories · 6 min ago")
-        }
+        #expect(
+          content.questions.first?.metadata == "Claude asks you · Parse push categories · 6 min ago"
+        )
         let question = snapshot.work.items.first { $0.kind == "question" }
         #expect(content.questions.first?.headline == question?.body)
         let command = content.questions.first?.command(reader: reader, workspace: "acme")
@@ -50,6 +48,7 @@
       }
       #expect(MyWorkContent.age(stamp(30), now: now) == "just now")
       #expect(MyWorkContent.age(stamp(360), now: now) == "6 min ago")
+      #expect(MyWorkContent.age(stamp(359.999), now: now) == "6 min ago")
       #expect(MyWorkContent.age(stamp(7200), now: now) == "2 h ago")
       #expect(MyWorkContent.age(stamp(259200), now: now) == "3 d ago")
       #expect(MyWorkContent.age(stamp(-60), now: now) == "just now")

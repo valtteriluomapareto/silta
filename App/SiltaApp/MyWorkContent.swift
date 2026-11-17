@@ -122,7 +122,7 @@ nonisolated struct MyWorkContent {
     } catch {
       return nil
     }
-    let seconds = max(0, Int(now.timeIntervalSince(date)))
+    let seconds = max(0, Int(now.timeIntervalSince(date).rounded()))
     if seconds < 60 { return "just now" }
     if seconds < 3600 { return "\(seconds / 60) min ago" }
     if seconds < 86400 { return "\(seconds / 3600) h ago" }

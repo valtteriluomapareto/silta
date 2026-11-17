@@ -154,6 +154,15 @@ struct MyWorkView: View {
       }
       if let body = item.body { Text(body).font(.system(size: 13)).textSelection(.enabled) }
       if let author = item.author { ActorLabel(actor: author) }
+      if !item.refs.isEmpty && (item.refs.count > 1 || item.ref == nil && item.task == nil) {
+        ScrollView(.horizontal) {
+          HStack(spacing: 8) {
+            ForEach(item.refs, id: \.self) { ref in
+              CopyValue(value: ref, title: "Copy task reference")
+            }
+          }
+        }
+      }
       let commands = model.reader?.commands(for: item, workspace: workspace) ?? []
       ForEach(commands, id: \.text) { command in
         CommandBlock(command: command)
