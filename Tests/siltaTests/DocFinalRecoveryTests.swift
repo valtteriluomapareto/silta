@@ -53,7 +53,7 @@ struct DocFinalRecoveryTests {
       try #require(
         run(
           [
-            "edit", "rules", "--title", "-----BEGIN PRIVATE KEY-----", "--keep-body",
+            "edit", "rules", "--title=-----BEGIN PRIVATE KEY-----", "--keep-body",
             "--approved", "Retitle Acme",
           ], scratch, repo
         ).termination == .exit(0))
