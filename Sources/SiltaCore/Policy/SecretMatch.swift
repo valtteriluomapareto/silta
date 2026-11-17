@@ -5,6 +5,8 @@ package struct SecretMatch: Sendable {
   /// Entire covered range, including any overlapping detected secrets.
   package let range: Range<String.Index>
 
+  var replacement: String { "[REDACTED:\(rule)]" }
+
   /// Reveals at most four leading characters, always hiding at least one character.
   /// Those are a public marker (`AKIA`, `ghp_`, a field name) for every rule except a
   /// henkilötunnus (a birth date) and an Azure PAT (the token itself), which show none.
