@@ -5,6 +5,12 @@ struct DocsView: View {
   @Bindable var model: AppModel
   private var docs: DocsModel { model.documents }
 
+  private var phase: DocsModel.Phase {
+    docs.phase(
+      workspace: model.workspace, about: model.docsAbout,
+      archived: model.includeArchivedDocuments, version: model.visibleData?.version)
+  }
+
   var body: some View {
     HSplitView {
       VStack(alignment: .leading, spacing: 12) {
@@ -111,11 +117,11 @@ struct DocsView: View {
             Text(error).foregroundStyle(.secondary)
             Button("Retry") { Task { await show(force: true) } }
           }
-          if docs.loading { ProgressView("Loading document…") }
-          if docs.ref == nil {
+          if phase == .loading { ProgressView("Loading document…") }
+          if docs.ref == nil && phase == .ready {
             ContentUnavailableView("Select a document", systemImage: "doc.text")
           } else if docs.view == .comments {
-            if docs.comments.isEmpty && !docs.loading {
+            if docs.comments.isEmpty && phase == .ready {
               Text("No comments yet").foregroundStyle(.secondary)
             }
             ForEach(docs.comments, id: \.ref) { comment in

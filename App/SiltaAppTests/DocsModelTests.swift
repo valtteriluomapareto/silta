@@ -123,26 +123,22 @@
       {
         docs.phase(workspace: workspace, about: about, archived: false, version: version)
       }
-      withKnownIssue("Pending document work must not be reported ready.") {
-        #expect(phase(nil) == .starting)
-        #expect(phase() == .loading)
-      }
+      #expect(phase(nil) == .starting)
+      #expect(phase() == .loading)
       await docs.refresh(reader, workspace: "acme", about: nil, archived: false, version: 1)
       docs.ref = "doc:order-contract@2"
-      withKnownIssue("Selecting a revision needs its content.") { #expect(phase() == .loading) }
+      #expect(phase() == .loading)
       await docs.show(reader, workspace: "acme", version: 1)
       #expect(phase() == .ready)
       docs.view = .comments
-      withKnownIssue("A new view needs its own content.") { #expect(phase() == .loading) }
+      #expect(phase() == .loading)
       await docs.show(reader, workspace: "acme", version: 1)
       #expect(phase() == .ready)
-      withKnownIssue("Scope and version changes need their own load.") {
-        #expect(phase(about: "app:acme-mobile") == .loading)
-        #expect(phase(version: 2) == .loading)
-      }
+      #expect(phase(about: "app:acme-mobile") == .loading)
+      #expect(phase(version: 2) == .loading)
       docs.ref = "doc:missing@1"
       await docs.show(reader, workspace: "acme", version: 1)
-      withKnownIssue("A terminal read failure must be visible.") { #expect(phase() == .failed) }
+      #expect(phase() == .failed)
     }
 
     @Test func proposedFilterKeepsPendingOnlyAndUsesThePendingRevision() async throws {

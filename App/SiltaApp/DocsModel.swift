@@ -31,7 +31,18 @@ import SiltaAppSupport
   enum Phase: String { case starting, loading, ready, failed }
 
   func phase(workspace: String?, about: String?, archived: Bool, version: Int?) -> Phase {
-    .ready
+    guard let workspace else { return .starting }
+    guard scope == Scope(workspace: workspace, about: about, archived: archived) else {
+      return .loading
+    }
+    if listLoading || loading { return .loading }
+    if listFailure != nil || failure != nil { return .failed }
+    guard listLoaded, listVersion == version else { return .loading }
+    if let ref, loadedKey != DetailKey(workspace: workspace, ref: ref, view: view, version: version)
+    {
+      return .loading
+    }
+    return .ready
   }
 
   struct Group: Identifiable {
