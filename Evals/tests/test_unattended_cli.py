@@ -49,12 +49,13 @@ class UnattendedCLI(unittest.TestCase):
     def test_actual_matrix_core_pilot_has_no_input_and_exact_coverage(self):
         directory, report = self.run_cli('open_matrix.py', ['--models', 'fixture-pass', '--core', '--max-trial-tokens', '1000'])
         self.assertEqual({t['scenario'] for t in report['trials']},
-                         {'start-cross-repo', 'plan-not-file', 'handoff-resume', 'done-with-result'})
-        self.assertEqual(len(report['trials']), 4)
+                         {'start-cross-repo', 'plan-not-file', 'handoff-resume', 'done-with-result', 'doc-context-no-doc'})
+        self.assertEqual(len(report['trials']), 5)
         for trial in report['trials']:
             self.assertNotIn('infrastructure', trial['checks'])
             self.assertTrue(trial['checks']['stream_complete'])
-            self.assertEqual([key for key, value in trial['checks'].items() if not value], ['evidence_review'])
+            expected = ['doc_context', 'evidence_review'] if trial['scenario'] == 'doc-context-no-doc' else ['evidence_review']
+            self.assertEqual([key for key, value in trial['checks'].items() if not value], expected)
             evidence = json.loads((directory / 'fixture-pass' / trial['evidence']).read_text())
             for number, phase in enumerate(evidence['phases']):
                 transcript = directory / 'fixture-pass' / trial['id'] / f'phase-{number}.jsonl'
