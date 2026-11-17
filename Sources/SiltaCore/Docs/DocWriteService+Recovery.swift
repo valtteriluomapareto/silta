@@ -18,6 +18,15 @@ extension DocWriteService {
           : [DocService(workspace: workspace, store: environment.db).configurationCommand],
         nextBy: safe ? nil : .agent, message: message)
     }
+    if let preparation = error as? CommandFailure {
+      let safe = preparation.next.allSatisfy(DocService.safeReference)
+      return CommandFailure(
+        error: error,
+        next: safe
+          ? preparation.next + [retry(request, workspace: workspace)]
+          : [readCommand(workspace: workspace)],
+        nextBy: safe ? preparation.nextBy : .agent, message: message)
+    }
     if case .missing(let fields) = error as? DocError {
       return CommandFailure(
         error: error, next: [retry(request, fields: fields, workspace: workspace)], message: message

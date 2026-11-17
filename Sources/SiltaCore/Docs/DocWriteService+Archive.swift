@@ -68,7 +68,8 @@ extension DocWriteService {
       let next: String
       if case .invalid = error {
         next = DocService(workspace: slug, store: environment.db)
-          .listPageCommand(about: nil, archived: true, offset: 0, limit: 20)
+          .listPageCommand(
+            about: nil, archived: false, offset: 0, limit: 20, document: request.slug)
       } else {
         next = readCommand(workspace: slug)
       }
