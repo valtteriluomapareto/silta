@@ -21,7 +21,7 @@ struct AppShellView: View {
         content.frame(maxWidth: .infinity, maxHeight: .infinity)
       }.background(Color(nsColor: .textBackgroundColor))
     }
-    .navigationTitle("My work")
+    .navigationTitle(model.route.title)
     .navigationSubtitle(subtitle)
     .searchable(text: $model.search, placement: .toolbar, prompt: "Search")
     .toolbar {
@@ -60,12 +60,19 @@ struct AppShellView: View {
         "No workspaces yet", systemImage: "square.stack",
         description: Text("Create a workspace with the Silta CLI, then refresh."))
     } else {
-      MyWorkView(model: model)
+      switch model.route {
+      case .mywork: MyWorkView(model: model)
+      case .board: BoardView(model: model)
+      }
     }
   }
 
   private var subtitle: String {
     guard let data = model.visibleData else { return "" }
+    if model.route == .board, let board = data.snapshot?.board {
+      return "\(board.todo.count + board.doing.count + board.review.count) open · "
+        + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
+    }
     let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
     return "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed"
   }

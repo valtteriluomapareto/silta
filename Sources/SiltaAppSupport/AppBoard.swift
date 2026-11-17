@@ -9,7 +9,9 @@ public struct AppBoard: Equatable, Sendable {
   /// Tasks completed since Monday at 00:00 UTC.
   public let doneThisWeek: [AppTask]
   /// Visible proposals, independent of open counts.
-  public let proposedCount: Int
+  public let proposals: [AppTask]
+  /// All eligible human questions, independent of My work pagination.
+  public let questions: [AppAttention]
   /// Visible local open counts by associated app, including blocked tasks.
   public let appOpenCounts: [String: Int]
 }

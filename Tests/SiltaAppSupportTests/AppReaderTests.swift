@@ -41,7 +41,7 @@
         #expect(snapshot.board.doing.count == 2)
         #expect(snapshot.board.review.map(\.ref) == ["AC-9"])
         #expect(snapshot.board.doneThisWeek.count == 3)
-        #expect(snapshot.board.proposedCount == 3)
+        #expect(snapshot.board.proposals.count == 3)
         #expect(
           snapshot.board.appOpenCounts == ["acme-mobile": 3, "acme-backend": 3, "acme-web": 1])
         #expect(

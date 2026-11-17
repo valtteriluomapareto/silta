@@ -5,6 +5,22 @@ import SiltaTestSupport
 import Testing
 
 struct InboxTests {
+  @Test func appQuestionsUseCapturedHumanAndMatchUncappedInbox() async throws {
+    try await withScratchDirectory { home in
+      let environment = try await CommentTests.setup(home)
+      let service = TaskService(environment: environment)
+      #expect(environment.actor != environment.human)
+      var question = CommentDraft(body: "Which Acme API?", kind: "question")
+      question.recipients = [environment.human.description]
+      for _ in 0..<13 { _ = try service.comment("AC-1", question) }
+      let expected = try service.inbox(for: "me", all: true).items
+        .filter { $0.kind == "question" }.compactMap(\.ref)
+      #expect(expected.count == 13)
+      let actual = try service.questionInbox().compactMap(\.ref)
+      #expect(actual == expected)
+    }
+  }
+
   @Test(arguments: [
     "human:acme", "human:visitor", "agent:claude:recipient", "agent:codex:outsider",
   ])

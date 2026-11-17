@@ -48,6 +48,19 @@ extension TaskService {
         ? nil : command + " inbox --for " + shellWord(actor.description) + " --all")
   }
 
+  /// Uncapped eligible questions for the captured human, without document hydration.
+  package func questionInbox() throws -> [InboxItem] {
+    let actor = environment.human
+    let slug = try selected()
+    let command = "silta --ws " + shellWord(slug)
+    return try environment.db.read { db in
+      let workspaceID = try Self.workspaceID(slug, in: db)
+      return try Self.attention(for: actor, workspaceID: workspaceID, in: db)
+        .filter { $0.kind == "question" }
+        .map { inboxItem($0, actor: actor, command: command) }
+    }
+  }
+
   /// Ordered attention metadata and its uncapped count inside the caller's snapshot.
   /// The optional window excludes current-task attention when it has separate display slots.
   /// Only document IDs are selected; no proposal previews are hydrated here.
