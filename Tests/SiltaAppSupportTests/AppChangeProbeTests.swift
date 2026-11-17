@@ -15,7 +15,9 @@
         let path = reader.environment.db.path
         // A clean last-client close removes side files; the probe must still open.
         let cleanup = try DatabaseQueue(path: path)
-        try cleanup.writeWithoutTransaction { try $0.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)") }
+        try cleanup.writeWithoutTransaction {
+          try $0.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)")
+        }
         try cleanup.close()
         for suffix in ["-wal", "-shm"] where FileManager.default.fileExists(atPath: path + suffix) {
           try FileManager.default.removeItem(atPath: path + suffix)
@@ -38,7 +40,7 @@
             environment: ["USER": "acme", "SILTA_ACTOR": "agent:codex:probe"])
           try #require(result.termination == .exit(0), "\(result.stderr)")
           #expect(try version(observer) != initialObserver)
-          withKnownIssue("Persistent data-version probe is not implemented") { () throws -> Void in
+          do {
             #expect(try probe.version() != before)
           }
           let after = try probe.version()
@@ -61,30 +63,63 @@
         _ = try reader.workspaceMap(workspace: "acme")
         let writer = try DatabaseQueue(path: reader.environment.db.path)
         try writer.write { try $0.execute(sql: "INSERT INTO grdb_migrations VALUES('future-map')") }
-        withKnownIssue("Probe schema gate is not implemented") {
-          #expect(throws: AppReadError.self) { try probe.version() }
-        }
+        var failure: AppReadError?
+        do { _ = try probe.version() } catch let error as AppReadError { failure = error }
+        #expect(failure?.kind == .newerSchema)
+        #expect(failure?.next == ["update silta"])
+        #expect(throws: AppReadError.self) { try reader.makeChangeProbe() }
+        #expect(throws: AppReadError.self) { try reader.workspaceMap(workspace: "acme") }
       }
     }
 
     @Test func unavailableAndIncompatibleStoresNeverInitializeOrMigrate() throws {
       try withScratchDirectory { scratch in
         let reader = try AppReaderTests.reader(scratch)
-        withKnownIssue("Probe and map storage gates are not implemented") {
+        do {
           #expect(throws: AppReadError.self) { try reader.makeChangeProbe() }
           #expect(throws: AppReadError.self) { try reader.workspaceMap(workspace: "acme") }
         }
         #expect(!FileManager.default.fileExists(atPath: reader.environment.home.url.path))
-        try FileManager.default.createDirectory(at: reader.environment.home.url, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+          at: reader.environment.home.url, withIntermediateDirectories: true)
         let queue = try DatabaseQueue(path: reader.environment.db.path)
         try StorageSchema.migrator.migrate(queue, upTo: "v1")
-        withKnownIssue("Probe migration gate is not implemented") {
+        do {
           var failure: AppReadError?
-          do { _ = try reader.makeChangeProbe() } catch let error as AppReadError { failure = error }
+          do { _ = try reader.makeChangeProbe() } catch let error as AppReadError {
+            failure = error
+          }
           #expect(failure?.kind == .migrationRequired)
-          #expect(failure?.next.first?.contains("SILTA_HOME=") == true)
+          let command = try #require(failure?.next.first)
+          #expect(command.components(separatedBy: "SILTA_HOME=").count == 2)
         }
-        #expect(try queue.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") } == ["v1"])
+        #expect(
+          try queue.read { try String.fetchAll($0, sql: "SELECT identifier FROM grdb_migrations") }
+            == ["v1"])
+      }
+    }
+
+    @Test func readOnlyStoreWithoutWALFilesRemainsUnavailable() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppReaderTests.reader(scratch)
+        let path = reader.environment.db.path
+        let cleanup = try DatabaseQueue(path: path)
+        try cleanup.writeWithoutTransaction {
+          try $0.execute(sql: "PRAGMA wal_checkpoint(TRUNCATE)")
+        }
+        try cleanup.close()
+        for suffix in ["-wal", "-shm"] where FileManager.default.fileExists(atPath: path + suffix) {
+          try FileManager.default.removeItem(atPath: path + suffix)
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: path)
+        let files = FileManager.default
+        defer {
+          try? files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)  // cleanup
+        }
+        #expect(throws: AppReadError.self) { try reader.makeChangeProbe() }
+        #expect(!FileManager.default.fileExists(atPath: path + "-wal"))
+        #expect(!FileManager.default.fileExists(atPath: path + "-shm"))
       }
     }
 

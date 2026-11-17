@@ -77,11 +77,38 @@ public struct AppReader: Sendable {
 
   /// Reads the typed workspace map without loading YAML or mutating storage.
   public func workspaceMap(workspace: String) throws -> AppWorkspaceMap {
-    AppWorkspaceMap(apps: [], services: [], connections: [])
+    try Self.checked(home: environment.home.url) {
+      try checkSchema()
+      let map = try WorkspaceMap.read(workspace: workspace, in: environment.db)
+      return AppWorkspaceMap(
+        apps: map.apps.map {
+          AppMapApp(
+            slug: $0.slug, name: $0.name, repo: $0.repo, ref: $0.ref,
+            productionRef: $0.productionRef, subpath: $0.subpath, summary: $0.summary,
+            lifecycle: $0.lifecycle, attachment: "app:" + $0.slug)
+        },
+        services: map.services.map {
+          AppMapService(
+            slug: $0.slug, name: $0.name,
+            summary: $0.summary, attachment: $0.attachment)
+        },
+        connections: map.connections.map {
+          AppConnection(
+            attachment: $0.attachment,
+            source: $0.source, target: $0.target, kind: $0.kind, summary: $0.summary,
+            codeReferences: $0.codeReferences)
+        })
+    }
   }
 
   /// Opens one persistent read connection without initializing or migrating storage.
-  public func makeChangeProbe() throws -> AppChangeProbe { AppChangeProbe() }
+  public func makeChangeProbe() throws -> AppChangeProbe {
+    try Self.checked(home: environment.home.url) {
+      let core = try DatabaseChangeProbe(store: environment.db)
+      if try core.sample().needsMigration { throw AppReadError.migrationRequired }
+      return AppChangeProbe(core: core, home: environment.home.url)
+    }
+  }
 
   private func checkSchema() throws {
     if try environment.db.readerNeedsMigration() { throw AppReadError.migrationRequired }
