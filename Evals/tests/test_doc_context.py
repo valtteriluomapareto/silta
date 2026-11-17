@@ -333,9 +333,8 @@ class DocContext(unittest.TestCase):
             self.assertEqual(self.diagnostic_exit(dict(result, **grade), damage), 1)
         self.assertEqual(self.diagnostic_exit(result, 'valid'), 0)
         for name in result['checks']:
-            if name == 'doc_context':
-                continue
-            for value in [False, None, 'missing']:
+            values = [None, 'missing'] if name == 'doc_context' else [False, None, 'missing']
+            for value in values:
                 changed = copy.deepcopy(result)
                 if value == 'missing':
                     del changed['checks'][name]
