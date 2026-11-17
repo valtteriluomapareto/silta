@@ -13,7 +13,7 @@ struct GuideCommandTests {
     }
   }
 
-  @Test func topicsComposeFullGuide() throws {
+  @Test func fullGuideSummarizesDocsAndPreservesOtherTopics() throws {
     try withScratchDirectory { scratch in
       let full = try SiltaBinary.run(["guide"], in: scratch)
       let data = try GuideContractTests.data(SiltaBinary.run(["guide", "--json"], in: scratch))
@@ -23,9 +23,13 @@ struct GuideCommandTests {
         let result = try SiltaBinary.run(["guide", topic], in: scratch)
         #expect(result.termination == .exit(0))
         #expect(result.stderr.isEmpty)
-        sections.append(result.stdout)
+        if topic != "docs" { sections.append(result.stdout) }
       }
-      #expect(full.stdout == sections.joined(separator: "\n"))
+      var ordinary = full.stdout
+      let start = try #require(ordinary.range(of: "# Workspace docs\n"))
+      let end = try #require(ordinary.range(of: "# Working for the human\n"))
+      ordinary.removeSubrange(start.lowerBound..<end.lowerBound)
+      #expect(ordinary == sections.joined(separator: "\n"))
     }
   }
 
