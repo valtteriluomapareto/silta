@@ -351,7 +351,20 @@ def git(cwd, *args):
                                    env={k: v for k, v in os.environ.items() if k != 'FIREWORKS_API_KEY'}).strip()
 
 
-def prepare(root, binary, harness, scenario, variant, profile=None):
+def doc_fixture(seed):
+    return {'seed': seed, 'token': 'UNSORTED_' + hashlib.sha256(seed.encode()).hexdigest()[:16].upper()}
+
+
+def valid_doc_fixture(e):
+    fixture = e.get('controls', {}).get('doc_fixture')
+    if not isinstance(fixture, dict):
+        return False
+    seed = fixture.get('seed')
+    return (isinstance(seed, str) and re.fullmatch(r'[a-f0-9]{32}', seed) is not None
+            and fixture == doc_fixture(seed))
+
+
+def prepare(root, binary, harness, scenario, variant, profile=None, seed=None):
     env = isolated_env(root)
     if harness == 'claude':
         env['CLAUDE_CODE_TMPDIR'] = env['TMPDIR']
@@ -404,11 +417,13 @@ def prepare(root, binary, harness, scenario, variant, profile=None):
         yaml += 'edges: [{from: acme-mobile, to: acme-backend, kind: http-api, summary: Push API}]\n'
     (root / 'workspace.yaml').write_text(yaml)
     silta(env, cwd, ['ws', 'edit', '-F', str(root / 'workspace.yaml'), '--approved', 'Synthetic Acme fixture setup.'])
+    if scenario in ('doc-context', 'doc-context-no-doc'):
+        fixture = doc_fixture(seed if seed is not None else os.urandom(16).hex())
     if scenario == 'doc-context':
         silta(env, cwd, ['doc', 'edit', 'acme-push-rules', '--title', 'Acme push handling',
                          '--about', 'edge:acme-mobile/acme-backend/http-api', '-F', '-',
                          '--approved', 'Synthetic Acme fixture setup.'],
-              '# Acme push handling\n\nPush parsing compatibility rules.\n\nFallback category: UNSORTED_Q7\n')
+              '# Acme push handling\n\nPush parsing compatibility rules.\n\nFallback category: ' + fixture['token'] + '\n')
     silta(env, cwd, ['repo', 'fetch', 'acme-backend'])
     guide_default = silta(env, cwd, ['guide'])['stdout']
     silta(env, cwd, ['task', 'add', 'Acme push categories' if scenario == 'start-cross-repo' else 'Acme parser work', '--app', 'acme-mobile', '--approved', 'Synthetic Acme fixture setup.'])
@@ -443,8 +458,11 @@ def prepare(root, binary, harness, scenario, variant, profile=None):
                     CLAUDE_ENV_FILE=str(Path(env['HOME']) / '.claude/control.env'))
     hook = silta(hook_env, cwd, ['agents', 'session-start'],
                  json.dumps({'session_id': 'eval-control'}))
-    return env, cwd, sha, {'tiny': json.loads(tiny['stdout']), 'guide': guide,
-                           'gate': json.loads(gate['stdout']), 'hook': hook['stdout'], 'guide_default': guide_default}
+    controls = {'tiny': json.loads(tiny['stdout']), 'guide': guide,
+                'gate': json.loads(gate['stdout']), 'hook': hook['stdout'], 'guide_default': guide_default}
+    if scenario in ('doc-context', 'doc-context-no-doc'):
+        controls['doc_fixture'] = fixture
+    return env, cwd, sha, controls
 
 
 def proposal_command(variant, root):
@@ -1078,13 +1096,14 @@ def doc_context(e):
     """Attribute an outcome to a plan row or an exclusively owned result interval."""
     baseline, phases = e.get('baseline', {}), e.get('phases', [])
     original = next((t for t in baseline.get('tasks', []) if t['seq'] == 1), None)
-    if not original or not phases:
+    if not original or not phases or not valid_doc_fixture(e):
         return False
+    token = e['controls']['doc_fixture']['token']
     def task(state):
         return next((t for t in (state or {}).get('tasks', [])
                      if t['id'] == original['id'] and t['uid'] == original['uid']), None)
     def names_token(body):
-        return bool(re.search(r'(?<!\w)UNSORTED_Q7(?!\w)', body or ''))
+        return bool(re.search(r'(?<!\w)' + re.escape(token) + r'(?!\w)', body or ''))
     final = phases[-1].get('state')
     if any(task(p.get('state')) is None for p in phases):
         return False
@@ -1173,6 +1192,7 @@ def grade(e):
     checks['evidence_review'] = reviewed(e)
     scenario = e['scenario']
     if scenario in ('doc-context', 'doc-context-no-doc'):
+        checks['doc_fixture'] = valid_doc_fixture(e)
         checks['doc_context'] = doc_context(e)
     if scenario == 'start-cross-repo':
         checks['brief_used'] = bool(successful & {'silta brief', 'silta agents session-start'})
@@ -1263,6 +1283,18 @@ def trial_labels(e):
             'reviewer': (e.get('review') or {}).get('reviewer')}
 
 
+def report_passes(report):
+    def passed(trial):
+        if trial.get('scenario') != 'doc-context-no-doc':
+            return trial.get('passed') is True
+        checks = trial.get('checks', {})
+        required = {'stream_complete', 'agent_logs', 'no_forbidden', 'backend_unchanged',
+                    'evidence_review', 'doc_fixture', 'doc_context'}
+        return (required <= checks.keys() and type(checks['doc_context']) is bool
+                and all(value is True for key, value in checks.items() if key != 'doc_context'))
+    return not report.get('aborted', False) and all(passed(trial) for trial in report['trials'])
+
+
 def aggregate(trials, provenance):
     groups = []
     for harness, model, scenario in sorted({(t['harness'], t['model'], t['scenario']) for t in trials}):
@@ -1271,6 +1303,7 @@ def aggregate(trials, provenance):
         successes = sum(all(t['passed'] for t in selected if t['repeat'] == repeat) for repeat in repeats)
         groups.append({'harness': harness, 'model': model, 'scenario': scenario, 'repeats': len(repeats),
                        'pass_rate': successes / len(repeats), 'all_repeats_pass': successes == len(repeats),
+                       'diagnostic': scenario == 'doc-context-no-doc',
                        'silta_calls': known_sum(t['metrics']['silta_calls'] for t in selected),
                        **{key: known_sum(t['metrics'].get(key) for t in selected)
                           for key in ('silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads')},
@@ -1293,7 +1326,7 @@ def render_html(report):
     status = ('<p>' + escape({k: report[k] for k in RUN_FIELDS if k in report}) + '</p>'
               if 'aborted' in report else '')
     rows = ''.join('<tr>' + ''.join('<td>' + escape(g[key]) + '</td>' for key in
-                   ('harness', 'model', 'scenario', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads', 'legacy_mentioned', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
+                   ('harness', 'model', 'scenario', 'diagnostic', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads', 'legacy_mentioned', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
     links = ''.join('<li><a href="' + escape(t['evidence']) + '">' + escape(t['id']) + '</a>: '
                     + escape({k: t.get(k) for k in ('provider', 'operator', 'operator_source', 'reviewer')})
                     + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks'])
@@ -1301,7 +1334,7 @@ def render_html(report):
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
             + status
-            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Backend via Silta</th><th>Direct backend</th><th>Possible direct backend</th><th>Legacy mentioned</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
+            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Diagnostic</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Backend via Silta</th><th>Direct backend</th><th>Possible direct backend</th><th>Legacy mentioned</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
             + rows + '</table><ul>' + links + '</ul></html>')
 
 
@@ -1342,7 +1375,7 @@ def main():
     trials, aborted, profile = [], False, None
     cases = []
     for harness in (['claude', 'codex'] if args.harness == 'both' else [args.harness]):
-        for scenario in ([args.scenario] if args.scenario else [s for s in SCENARIOS if (s in CORE_SCENARIOS if args.core else s != 'doc-context-no-doc')]):
+        for scenario in ([args.scenario] if args.scenario else [s for s in SCENARIOS if not args.core or s in CORE_SCENARIOS or s == 'doc-context-no-doc']):
             spec = json.loads((ROOT / 'scenarios' / scenario / 'scenario.yaml').read_text())
             cases.extend((harness, scenario, variant, repeat) for repeat in range(1, args.repeats + 1) for variant in spec['variants'])
     try:
@@ -1400,7 +1433,7 @@ def main():
     report = redact(report, secret)
     write_json(args.output / 'report.json', report)
     (args.output / 'report.html').write_text(render_html(report))
-    return 0 if not aborted and all(t['passed'] for t in trials) else 1
+    return 0 if not aborted and report_passes(report) else 1
 
 
 if __name__ == '__main__':
