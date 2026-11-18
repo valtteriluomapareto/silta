@@ -96,6 +96,12 @@ nonisolated struct MyWorkContent {
     return Question(item: item, metadata: metadata)
   }
 
+  /// The task a My work item may unblock: only a `ready` one, whose blockers are done.
+  /// Core unblocks a human's task even with open blockers, so `replan` keeps its command.
+  static func unblockRef(_ item: AppAttention) -> String? {
+    item.kind == "ready" && item.refs.count == 1 ? item.refs.first : nil
+  }
+
   private static func answer(_ item: AppAttention, task: AppTask?, now: Date) -> Answer {
     let actor = item.author.map { ActorPresentation($0).name } ?? "Someone"
     let metadata =

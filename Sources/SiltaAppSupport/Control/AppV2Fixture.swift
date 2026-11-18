@@ -40,6 +40,12 @@
       _ = try service.link(
         "AC-9", target: "url:https://github.com/acme/example/pull/41", relation: "about")
       try answeredHumanQuestion(environment)
+      var block = TaskBlock(why: "Needs the rounded totals first.")
+      block.on = ["AC-19"]
+      _ = try service.block("AC-17", block)
+      try store.write {
+        try DebugTaskFixture.complete(19, in: $0, at: now.addingTimeInterval(-1800))
+      }
     }
 
     /// The human asks Codex on AC-14 and Codex answers, which leaves an answer to accept.
@@ -75,6 +81,7 @@
         DebugTaskFixture(16, "Paginate the orders endpoint", app: "acme-backend", status: "todo"),
         DebugTaskFixture(17, "Offline banner", app: "acme-mobile", status: "todo"),
         DebugTaskFixture(18, "Error code cleanup", app: "acme-backend", status: "todo"),
+        DebugTaskFixture(19, "Round order totals", app: "acme-backend", status: "todo"),
         DebugTaskFixture(21, "Rate-limit push sends", app: "acme-backend", status: "proposed"),
         DebugTaskFixture(22, "Cache the order list", app: "acme-mobile", status: "proposed"),
         DebugTaskFixture(23, "Drop the legacy v1 client", app: "acme-web", status: "proposed"),
