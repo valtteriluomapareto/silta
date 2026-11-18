@@ -132,9 +132,7 @@
         ("--- old", DocumentDiff.Kind.removed), ("--- metadata old", .removed),
         ("+++ new", .added), ("+++ metadata new", .added),
       ] {
-        withKnownIssue("Header-like body lines must retain hunk addition/removal colours") {
-          #expect(lines.contains { $0.text == value && $0.kind == kind })
-        }
+        #expect(lines.contains { $0.text == value && $0.kind == kind })
       }
     }
 

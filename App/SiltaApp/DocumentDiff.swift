@@ -17,6 +17,8 @@ nonisolated struct DocumentDiff {
         body = true
         metadata = .metadata
         kind = .metadata
+      } else if body {
+        kind = text.hasPrefix("+") ? .added : text.hasPrefix("-") ? .removed : .context
       } else if text.hasPrefix("--- metadata ") {
         metadata = .removed
         kind = .metadata
@@ -26,8 +28,6 @@ nonisolated struct DocumentDiff {
       } else if text.hasPrefix("--- ") || text.hasPrefix("+++ ") {
         metadata = .metadata
         kind = .metadata
-      } else if body {
-        kind = text.hasPrefix("+") ? .added : text.hasPrefix("-") ? .removed : .context
       } else {
         kind = text.hasPrefix("  ") ? metadata : .metadata
       }

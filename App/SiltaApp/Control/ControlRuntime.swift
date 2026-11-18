@@ -114,6 +114,12 @@
       window.contentView = hosting
       hosting.frame = NSRect(origin: .zero, size: size)
       hosting.layoutSubtreeIfNeeded()
+      if let model {
+        await model.refresh().value
+        if model.boardSelection != nil { await model.loadTaskDetail() }
+        if model.route == .docs { await model.loadDocuments() }
+        if model.route == .workspace { await model.loadWorkspaceDocuments() }
+      }
       await withCheckedContinuation { continuation in
         DispatchQueue.main.async { continuation.resume() }
       }

@@ -70,10 +70,8 @@
         }
         await retryGate.started()
         #expect(docs.loading)
-        withKnownIssue("A forced retry must retain stale qualifiers until it succeeds") {
-          #expect(docs.countLabel(for: edge) == "3 docs (stale)")
-          #expect(docs.countText(for: edge) == "3 (stale)")
-        }
+        #expect(docs.countLabel(for: edge) == "3 docs (stale)")
+        #expect(docs.countText(for: edge) == "3 (stale)")
         retryGate.resume()
         await retry.value
         #expect(docs.failure == nil && !docs.loading)

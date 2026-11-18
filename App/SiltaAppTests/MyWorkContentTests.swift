@@ -20,7 +20,7 @@
         #expect(content.questions.first?.headline == question?.body)
         let command = content.questions.first?.command(reader: reader, workspace: "acme")
         #expect(command?.text.hasSuffix("-m \"\"") == true)
-        #expect(content.reviews.first?.metadata.contains("step 4 of 4 · PR #41") == true)
+        #expect(content.reviews.first?.metadata.contains("step 4 of 4") == true)
         let order = content.documents.first { $0.ref == "doc:order-contract@3" }
         #expect(order?.metadata.contains("from AC-9") == true)
         #expect(content.hasMatches && content.remaining == 0 && snapshot.work.waitingCount == 7)
@@ -63,56 +63,28 @@
         RelativeAge.text(nil, now: now) == nil && RelativeAge.text("unknown", now: now) == nil)
     }
 
-    @Test func pullRequestLinksStayExplicitAndSafe() {
-      let safe = "https://github.com/acme/example/pull/41"
-      #expect(
-        MyWorkContent.pullRequest(
-          ["url:https://github.com/acme/example/issues/41", "url:" + safe].map {
-            AppTaskLink(rel: "about", target: $0)
-          })?
-          .absoluteString == safe)
-      for link in [
-        "url:file:///tmp/pull/41", "url:https://user:password@github.com/acme/example/pull/41",
-        "url:" + safe + "?token=secret", "url:https://github.com/acme/example/pull/not-a-number",
-      ] {
-        #expect(MyWorkContent.pullRequest([AppTaskLink(rel: "about", target: link)]) == nil)
-      }
-    }
-
     @Test func genericAboutLinksDoNotProvePullRequestOwnership() throws {
       try fixture { reader, _ in
         let content = MyWorkContent(
           snapshot: try reader.snapshot(workspace: "acme"), search: "", now: AppV2Fixture.now)
         let review = try #require(content.reviews.first)
         #expect(review.task.links.contains { $0.rel == "about" })
-        withKnownIssue("A generic about link does not establish that this task owns a PR") {
-          #expect(!review.metadata.contains("PR #"))
-        }
+        #expect(!review.metadata.contains("PR #"))
       }
     }
 
     @Test func citedPullRequestsCannotBecomeTheTasksOwnPR() throws {
       try fixture { reader, home in
-        @MainActor func link(_ number: Int, _ relation: String, seed: Int) throws {
-          try AppTestCLI.run(
-            [
-              "--ws", "acme", "task", "link", "AC-21",
-              "url:https://github.com/acme/example/pull/\(number)", "--rel", relation,
-            ], home: home, seed: seed)
-        }
-        try link(99, "cites", seed: 401)
-        let cited = try reader.task("AC-21", workspace: "acme")
-        #expect(
-          MyWorkContent.pullRequest(cited.links) == nil)
-        try link(41, "about", seed: 402)
-        let own = try reader.task("AC-21", workspace: "acme")
-        #expect(
-          MyWorkContent.pullRequest(own.links)?
-            .lastPathComponent == "41")
-        try link(42, "about", seed: 403)
-        let ambiguous = try reader.task("AC-21", workspace: "acme")
-        #expect(
-          MyWorkContent.pullRequest(ambiguous.links) == nil)
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "task", "link", "AC-9",
+            "url:https://github.com/acme/example/pull/99", "--rel", "cites",
+          ], home: home, seed: 401)
+        let content = MyWorkContent(
+          snapshot: try reader.snapshot(workspace: "acme"), search: "", now: AppV2Fixture.now)
+        let review = try #require(content.reviews.first)
+        #expect(review.task.links.contains { $0.rel == "cites" && $0.target.hasSuffix("/pull/99") })
+        #expect(!review.metadata.contains("PR #"))
       }
     }
 

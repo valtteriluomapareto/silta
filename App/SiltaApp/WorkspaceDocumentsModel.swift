@@ -17,6 +17,7 @@ import SiltaAppSupport
   private var workspace: String?
   private var loaded: Key?
   private var requested: Key?
+  private var countsStale = false
   private var generation = 0
   @ObservationIgnored private var flight: Task<Void, Never>?
 
@@ -54,6 +55,7 @@ import SiltaAppSupport
     requested = nil
     loaded = nil
     pages = [:]
+    countsStale = false
     failure = nil
     loading = false
   }
@@ -101,8 +103,12 @@ import SiltaAppSupport
       guard token == generation, !Task.isCancelled else { return }
       pages = value
       loaded = key
+      countsStale = false
     } catch {
-      if token == generation, !Task.isCancelled { failure = AppLoadFailure(error).message }
+      if token == generation, !Task.isCancelled {
+        failure = AppLoadFailure(error).message
+        countsStale = true
+      }
     }
   }
 
@@ -116,7 +122,7 @@ import SiltaAppSupport
   }
 
   func countText(for connection: String) -> String? {
-    rawCountText(for: connection).map { $0 + (failure == nil ? "" : " (stale)") }
+    rawCountText(for: connection).map { $0 + (countsStale ? " (stale)" : "") }
   }
 
   func countLabel(for connection: String) -> String {
@@ -124,6 +130,6 @@ import SiltaAppSupport
       return failure == nil ? "…" : "Unavailable"
     }
     let text = count == "0" ? "No docs" : count + (count == "1" ? " doc" : " docs")
-    return text + (failure == nil ? "" : " (stale)")
+    return text + (countsStale ? " (stale)" : "")
   }
 }

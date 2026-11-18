@@ -17,7 +17,6 @@ nonisolated struct MyWorkContent {
   struct Review: Identifiable {
     let task: AppTask
     let metadata: String
-    let pullRequest: URL?
     var id: String { task.ref }
   }
 
@@ -81,7 +80,6 @@ nonisolated struct MyWorkContent {
   }
 
   private static func review(_ task: AppTask, now: Date) -> Review {
-    let link = pullRequest(task.links)
     var metadata = ["Waiting for your review"]
     if let submission = task.submission {
       let elapsed = RelativeAge.text(submission.at, now: now).map { " " + $0 } ?? ""
@@ -90,8 +88,7 @@ nonisolated struct MyWorkContent {
     if !task.steps.isEmpty {
       metadata.append("step \(task.steps.filter(\.done).count) of \(task.steps.count)")
     }
-    if let link { metadata.append("PR #" + link.lastPathComponent) }
-    return Review(task: task, metadata: metadata.joined(separator: " · "), pullRequest: link)
+    return Review(task: task, metadata: metadata.joined(separator: " · "))
   }
 
   private static func document(_ item: AppAttention) -> Proposal {
@@ -112,20 +109,5 @@ nonisolated struct MyWorkContent {
       item: item, title: item.title ?? task?.title ?? "Task proposal",
       metadata: [task?.app, author].compactMap { $0 }.joined(separator: " · "),
       ref: item.refs.first ?? item.ref ?? "")
-  }
-
-  static func pullRequest(_ links: [AppTaskLink]) -> URL? {
-    let candidates = links.filter { $0.rel == "about" }.compactMap { link -> URL? in
-      let target = link.target
-      guard target.hasPrefix("url:"), let url = URL(string: String(target.dropFirst(4))),
-        url.scheme == "https", url.host != nil, url.user == nil, url.password == nil,
-        url.query == nil,
-        url.pathComponents.dropLast().last == "pull", let number = Int(url.lastPathComponent),
-        number > 0
-      else { return nil }
-      return url
-    }
-    let unique = Set(candidates)
-    return unique.count == 1 ? unique.first : nil
   }
 }
