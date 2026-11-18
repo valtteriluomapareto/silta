@@ -10,35 +10,38 @@ struct BoardView: View {
         let content = BoardContent(
           snapshot: snapshot, app: model.appFilter, search: model.search,
           proposals: model.showProposed)
-        ScrollView(.horizontal) {
-          HStack(alignment: .top, spacing: 10) {
-            ForEach(content.lanes) { lane in
-              ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                  HStack(spacing: 7) {
-                    if lane.title == "Todo" {
-                      Circle().strokeBorder(Color("SecondaryInk"), lineWidth: 1.5).frame(
-                        width: 8, height: 8)
-                    } else {
-                      StatusDot(color: laneColor(lane.title))
+        GeometryReader { geometry in
+          let laneWidth = max(144, (geometry.size.width - 78) / 4)
+          ScrollView(.horizontal) {
+            HStack(alignment: .top, spacing: 10) {
+              ForEach(content.lanes) { lane in
+                ScrollView {
+                  LazyVStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 7) {
+                      if lane.title == "Todo" {
+                        Circle().strokeBorder(Color("SecondaryInk"), lineWidth: 1.5).frame(
+                          width: 8, height: 8)
+                      } else {
+                        StatusDot(color: laneColor(lane.title))
+                      }
+                      Text(lane.title).font(.system(size: 13, weight: .semibold))
+                      Spacer(minLength: 0)
+                      Text(lane.tasks.count, format: .number).font(.system(size: 12))
+                        .foregroundStyle(Color("SecondaryInk"))
+                    }.padding(.bottom, 4)
+                    if lane.tasks.isEmpty {
+                      Text(model.search.isEmpty ? "No tasks" : "No matches")
+                        .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk")).padding(
+                          .vertical)
                     }
-                    Text(lane.title).font(.system(size: 13, weight: .semibold))
-                    Spacer(minLength: 0)
-                    Text(lane.tasks.count, format: .number).font(.system(size: 12))
-                      .foregroundStyle(Color("SecondaryInk"))
-                  }.padding(.bottom, 4)
-                  if lane.tasks.isEmpty {
-                    Text(model.search.isEmpty ? "No tasks" : "No matches")
-                      .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk")).padding(
-                        .vertical)
-                  }
-                  ForEach(lane.tasks, id: \.ref) { task in
-                    card(task, content: content)
-                  }
-                }.padding(.bottom, 24)
-              }.frame(width: 144)
-            }
-          }.padding(.horizontal, 24).padding(.top, 16)
+                    ForEach(lane.tasks, id: \.ref) { task in
+                      card(task, content: content)
+                    }
+                  }.padding(.bottom, 24)
+                }.frame(width: laneWidth)
+              }
+            }.padding(.horizontal, 24).padding(.top, 16)
+          }
         }
       }
     }

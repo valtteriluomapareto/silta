@@ -74,7 +74,6 @@ struct DocsView: View {
             Spacer(minLength: 24)
             if docs.document != nil { footer }
           }.padding(24).frame(minHeight: geometry.size.height, alignment: .topLeading)
-            .frame(maxWidth: 1000, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
       }.frame(minWidth: 400)

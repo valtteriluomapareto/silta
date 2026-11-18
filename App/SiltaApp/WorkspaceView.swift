@@ -13,20 +13,26 @@ struct WorkspaceView: View {
             ForEach(content.groups) { group in
               VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
-                  StatusDot(color: appColor(group.app.slug))
-                  Text(group.app.name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                    .help(group.app.name)
-                  Text(group.app.ref).font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Color("SecondaryInk")).lineLimit(1).help(group.app.ref)
-                  if let summary = group.app.summary {
-                    Text(summary).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
-                      .lineLimit(1).help(summary)
-                  }
-                  Spacer(minLength: 4)
-                  Text(
-                    "\(model.visibleData?.snapshot?.board.appOpenCounts[group.app.slug] ?? 0) open"
-                  )
-                  .font(.system(size: 11)).foregroundStyle(Color("SecondaryInk")).fixedSize()
+                  Button {
+                    model.openDocuments(about: group.app.attachment)
+                  } label: {
+                    HStack(spacing: 8) {
+                      StatusDot(color: appColor(group.app.slug))
+                      Text(group.app.name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                        .help(group.app.name)
+                      Text(group.app.ref).font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color("SecondaryInk")).lineLimit(1).help(group.app.ref)
+                      if let summary = group.app.summary {
+                        Text(summary).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+                          .lineLimit(1).help(summary)
+                      }
+                      Spacer(minLength: 4)
+                      Text(
+                        "\(model.visibleData?.snapshot?.board.appOpenCounts[group.app.slug] ?? 0) open"
+                      )
+                      .font(.system(size: 11)).foregroundStyle(Color("SecondaryInk")).fixedSize()
+                    }.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
+                  }.buttonStyle(.plain).help("Open documents for \(group.app.name)")
                   CopyValue(value: group.app.attachment, title: "Copy app reference", compact: true)
                 }.padding(.horizontal, 8)
                 ForEach(group.connections, id: \.attachment) { connection in

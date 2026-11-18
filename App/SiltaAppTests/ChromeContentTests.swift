@@ -77,6 +77,33 @@
       }
     }
 
+    @Test func appDocumentsOpenTheAppScopeWithoutChangingConnectionSelection() async throws {
+      try await fixture { reader, _ in
+        let model = AppModel(
+          reader: reader,
+          load: { _, _, _ in
+            AppLoadedData(
+              workspaces: [], workspace: "acme", snapshot: nil, map: nil,
+              version: 1, checkedAt: AppV2Fixture.now)
+          })
+        await model.refresh().value
+        let edge = "edge:acme-mobile/acme-backend/http-api"
+        model.select(connection: edge)
+        model.openDocument("doc:order-contract@2", about: edge)
+        let backend = try #require(
+          reader.workspaceMap(workspace: "acme").apps.first { $0.slug == "acme-backend" })
+        model.openDocuments(about: backend.attachment)
+        #expect(model.route == .docs && model.docsAbout == "app:acme-backend")
+        #expect(model.documentSelection == nil)
+        await model.loadDocuments()
+        let groups = model.documents.groups(search: "")
+        #expect(groups.contains { $0.id == "operations" })
+        #expect(model.documents.document?.about?.contains("app:acme-backend") == true)
+        #expect(model.workspaceSelection?.connectionRef == edge)
+        #expect(model.workspaceInspectorPresented)
+      }
+    }
+
     @Test func proposedReaderBannerNamesAcceptedRevisionWithoutRepeatingAttribution() throws {
       try fixture { reader in
         let revisions = try reader.documentVersions("order-contract", workspace: "acme")

@@ -75,7 +75,7 @@ struct MyWorkView: View {
             }
           }
         }.padding(.horizontal, 28).padding(.top, 8).padding(.bottom, 24)
-          .frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading)
+          .frame(maxWidth: .infinity, alignment: .leading)
       }
     }.foregroundStyle(Color("Ink"))
   }
