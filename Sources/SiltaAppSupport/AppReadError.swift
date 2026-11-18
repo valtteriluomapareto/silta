@@ -52,6 +52,7 @@ extension AppReadError {
     switch error {
     case StorageError.cannotOpen: kind = .unavailableStore
     case StorageError.schemaTooNew: kind = .newerSchema
+    case StorageError.migrationRequired: kind = .migrationRequired
     default: kind = .other
     }
     let coded: any CodedError = (error as? any CodedError) ?? StorageError.unknown

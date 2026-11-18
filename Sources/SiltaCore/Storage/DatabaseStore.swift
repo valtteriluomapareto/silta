@@ -13,15 +13,19 @@ package final class DatabaseStore: Sendable {
   private let clock: any Clock
   private let jitter: @Sendable () -> UInt64
   private let readBusyTimeout: TimeInterval
+  /// Writes only to an existing, current database: never creates or migrates one.
+  private let existingOnly: Bool
   private let writer = Mutex<DatabaseQueue?>(nil)
 
   /// Configures the fixed database/backup locations without opening or creating files.
+  /// With `existingOnly`, writes refuse a missing database or a pending migration.
   package init(
     home: URL, clock: any Clock, jitter: @escaping @Sendable () -> UInt64,
-    readBusyTimeout: TimeInterval = 5
+    readBusyTimeout: TimeInterval = 5, existingOnly: Bool = false
   ) {
     self.home = home
     self.clock = clock
+    self.existingOnly = existingOnly
     self.jitter = jitter
     self.readBusyTimeout = readBusyTimeout
     path = home.appending(path: "silta.db").path
@@ -33,7 +37,11 @@ package final class DatabaseStore: Sendable {
     do {
       try writer.withLock { cached in
         guard cached == nil else { return }
-        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        if existingOnly {
+          guard FileManager.default.fileExists(atPath: path) else { throw StorageError.cannotOpen }
+        } else {
+          try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        }
         let descriptor = Darwin.open(
           home.appending(path: "migration.lock").path, O_CREAT | O_RDWR, 0o600)
         guard descriptor >= 0 else { throw StorageError.fileFailure(errno, at: home.path) }
@@ -43,6 +51,10 @@ package final class DatabaseStore: Sendable {
           throw StorageError.fileFailure(errno, at: home.path)
         }
         defer { flock(descriptor, LOCK_UN) }
+        // Rechecked under the lock: the file may have gone since the first check.
+        if existingOnly, !FileManager.default.fileExists(atPath: path) {
+          throw StorageError.cannotOpen
+        }
         var config = Configuration()
         config.prepareDatabase { TaskVisibility.register(in: $0) }
         config.busyMode = .timeout(5)
@@ -61,6 +73,7 @@ package final class DatabaseStore: Sendable {
           }
           return pending
         }
+        if existingOnly, pending != nil { throw StorageError.migrationRequired }
         try queue.writeWithoutTransaction { db in
           try Self.requireWAL(try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL"))
         }
