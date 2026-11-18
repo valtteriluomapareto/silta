@@ -6,7 +6,8 @@ import SwiftUI
 
 struct AppShellView: View {
   @Bindable var model: AppModel
-  @FocusState private var searchFocused: Bool
+  @State private var searchFocused = false
+  @State private var windowWidth: CGFloat = 1280
   @Environment(\.scenePhase) private var phase
 
   var body: some View {
@@ -23,24 +24,17 @@ struct AppShellView: View {
       }.background(Color("Canvas"))
     }
     .navigationTitle(model.screenTitle)
-    .searchable(
-      text: $model.search, placement: .toolbar,
-      prompt: model.route == .docs ? "Search loaded documents" : "Search"
-    )
-    .searchFocused($searchFocused)
+    .navigationSubtitle(model.screenSummary)
     .focusedSceneValue(\.findAction, { searchFocused = true })
     .toolbar {
-      ToolbarItem(placement: .principal) {
-        VStack(alignment: .leading, spacing: 1) {
-          Text(model.screenTitle).font(.system(size: 15, weight: .bold))
-          Text(model.screenSummary).font(.system(size: 11))
-            .foregroundStyle(Color("SecondaryInk"))
-        }
-      }
-      ToolbarItem(placement: .primaryAction) {
-        Button("Refresh", systemImage: "arrow.clockwise") { model.refresh(force: true) }
-          .labelStyle(.iconOnly).help("Refresh (⌘R)")
-      }
+      AppScreenToolbar(
+        model: model, searchFocused: $searchFocused,
+        compactSearch: model.route == .docs && windowWidth < 1200)
+    }
+    .onGeometryChange(for: CGFloat.self) {
+      $0.size.width
+    } action: {
+      windowWidth = $0
     }
     .frame(minWidth: 1000, minHeight: 700)
     .task { await model.refresh().value }
