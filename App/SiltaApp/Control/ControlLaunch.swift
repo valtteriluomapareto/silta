@@ -5,6 +5,7 @@
   nonisolated enum ControlLaunch {
     struct Options {
       let snapshot: URL?
+      let runDirectory: URL?
       let route: Route
       let dark: Bool
       let width: Int
@@ -85,8 +86,10 @@
         index += 1
         guard flag.hasPrefix("-Silta") else { continue }
         guard values[flag] == nil,
-          ["-SiltaFixture", "-SiltaSnapshot", "-SiltaRoute", "-SiltaSize", "-SiltaDark"].contains(
-            flag)
+          [
+            "-SiltaFixture", "-SiltaSnapshot", "-SiltaRoute", "-SiltaSize", "-SiltaDark",
+            "-SiltaRunDirectory",
+          ].contains(flag)
         else { throw refusal() }
         if flag == "-SiltaDark" {
           values[flag] = ""
@@ -104,9 +107,14 @@
       }
       let snapshot = try values["-SiltaSnapshot"].map(snapshotURL)
       guard values["-SiltaFixture"] != nil || snapshot != nil else { throw refusal() }
+      let runDirectory = try values["-SiltaRunDirectory"].map { path in
+        guard path.hasPrefix("/"), snapshot == nil else { throw refusal() }
+        return URL(filePath: path)
+      }
       let size = try values["-SiltaSize"].map(parseSize) ?? (1280, 800)
       return Options(
-        snapshot: snapshot, route: try Route(values["-SiltaRoute"] ?? "mywork"),
+        snapshot: snapshot, runDirectory: runDirectory,
+        route: try Route(values["-SiltaRoute"] ?? "mywork"),
         dark: values["-SiltaDark"] != nil, width: size.0, height: size.1)
     }
 

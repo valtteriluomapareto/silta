@@ -224,6 +224,14 @@ previous installs.
   result, posts the result on the slice issue and closes it. So a PR that only plans
   work gets its own subtask; finishing it must not close the work it plans.
 
+## Mac app verification
+
+Use `scripts/silta-app.sh launch --route …` to reach a state in a private Debug
+fixture. Read its `state.json` through `state` or use `wait` for a predicate. Use
+offscreen snapshots for layout and an owned-window `shot` for glass when available.
+Stop only the fixture run you launched. See the [control-plane guide](docs/plans/mac-app-control.md#drive-a-fixture-from-the-terminal)
+for commands and evidence. Real UI checks never block a PR.
+
 ## Parallel agents and worktrees
 
 - Claude worktrees live in `.claude/worktrees/` (git-ignored). Codex worktrees live

@@ -1,9 +1,22 @@
 #if DEBUG
+  import Foundation
   import SiltaAppSupport
   @testable import SiltaApp
   import Testing
 
   @MainActor struct ControlLaunchTests {
+    @Test func driverRunDirectoryRequiresInteractiveFixtureAndAbsolutePath() throws {
+      let flags = ["-SiltaFixture", "v2", "-SiltaRunDirectory", "/private/tmp/silta-app-test"]
+      let options = try #require(try ControlLaunch.parse(flags))
+      #expect(options.runDirectory?.path == "/private/tmp/silta-app-test")
+      #expect(throws: AppLoadFailure.self) {
+        try ControlLaunch.parse(flags + ["-SiltaSnapshot", "/private/tmp/root.png"])
+      }
+      #expect(throws: AppLoadFailure.self) {
+        try ControlLaunch.parse(["-SiltaFixture", "v2", "-SiltaRunDirectory", "relative"])
+      }
+    }
+
     @Test func isolatedSnapshotLaunchAcceptsRouteAppearanceAndSize() throws {
       let arguments = [
         "SiltaApp", "-SiltaSnapshot", "/private/tmp/acme-snapshot.png",

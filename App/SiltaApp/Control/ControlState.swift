@@ -37,6 +37,8 @@
       }
     }
     let snapshotVersion = 1
+    let pid = ProcessInfo.processInfo.processIdentifier
+    let windowNumber: Int?
     let run: String
     let revision: Int
     let fixture = "v2"
@@ -49,7 +51,10 @@
     let refresh: Refresh
     let idle: Bool
 
-    @MainActor init(model: AppModel, run: String, revision: Int, dark: Bool) {
+    @MainActor init(
+      model: AppModel, run: String, revision: Int, dark: Bool, windowNumber: Int? = nil
+    ) {
+      self.windowNumber = windowNumber
       self.run = run
       self.revision = revision
       appearance = dark ? "dark" : "light"
@@ -147,11 +152,13 @@
 
     enum CodingKeys: String, CodingKey {
       case snapshotVersion, run, revision, fixture, appearance, screen, route, selection
-      case inspectorOpen, counts, refresh, idle
+      case inspectorOpen, counts, refresh, idle, pid, windowNumber
     }
     func encode(to encoder: any Encoder) throws {
       var values = encoder.container(keyedBy: CodingKeys.self)
       try values.encode(snapshotVersion, forKey: .snapshotVersion)
+      try values.encode(pid, forKey: .pid)
+      try values.encode(windowNumber, forKey: .windowNumber)
       try values.encode(run, forKey: .run)
       try values.encode(revision, forKey: .revision)
       try values.encode(fixture, forKey: .fixture)
