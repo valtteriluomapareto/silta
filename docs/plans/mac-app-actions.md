@@ -34,7 +34,8 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   user and clock. One entry point, `perform(_ write: AppWrite, workspace:)`. `AppWrite`
   is an enum: answer, comment, accept answer, accept proposals, unblock.
   - It acts as `human:<USER>` and calls the existing services (`TaskService.comment`,
-    `acceptComment`, `triage`, `unblock`) with their current arguments.
+    `acceptComment`, `triage`, `unblock`) with their current arguments; `unblock` gains
+    a package `requireReady` option that the CLI doesn't use.
   - **Existing store only.** Each write opens a fresh `DatabaseStore` with a new
     package option, `existingOnly`. Under the migration lock, `initialize` then
     refuses:
