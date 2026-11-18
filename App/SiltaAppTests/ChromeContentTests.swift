@@ -23,7 +23,7 @@
         #expect(SidebarContent.claimTitle(task) == "AC-12 · step 2 of 4")
         #expect(
           SidebarContent.claimSubtitle(task, now: AppV2Fixture.now) == "Claude · updated 6 min ago")
-        #expect(SidebarContent.appColor(index: 0) == "SecondaryInk")
+        #expect(SidebarContent.appColor(index: 0) == "AppSlate")
         #expect(SidebarContent.appColor(index: 1) == "AppViolet")
         #expect(SidebarContent.appColor(index: 2) == "AppClay")
         #expect(SidebarContent.claimAge(task, now: AppV2Fixture.now) == "6 min")
@@ -188,6 +188,41 @@
     }
 
     @MainActor private final class CatalogVersion { var value = 1 }
+
+    @Test func catalogSummaryQualifiesPagingStaleAndEmptyCatalogs() throws {
+      try fixture { reader in
+        let docs = try reader.documents(workspace: "acme", archived: true)
+        #expect(
+          DocsChromeContent.catalogSummary(docs, stale: true)
+            == "6 docs, 1 archived · 2 proposals waiting on you (stale)")
+        let first = AppDocumentList(entries: Array(docs.entries.prefix(2)), total: 9, nextOffset: 2)
+        let proposed = first.entries.filter { $0.state == "proposed" }.count
+        #expect(
+          DocsChromeContent.catalogSummary(first, stale: false)
+            == "2+ docs" + (proposed > 0 ? " · \(proposed)+ proposals waiting on you" : ""))
+        let one = AppDocumentList(
+          entries: docs.entries.filter { $0.ref == "doc:push-categories@1" }, total: 1,
+          nextOffset: nil)
+        #expect(
+          DocsChromeContent.catalogSummary(one, stale: false)
+            == "1 docs · 1 proposal waiting on you")
+        let empty = AppDocumentList(entries: [], total: 0, nextOffset: nil)
+        #expect(DocsChromeContent.catalogSummary(empty, stale: false) == "No documents")
+      }
+    }
+
+    @Test func claimAgeIsShortAndQualified() throws {
+      try fixture { reader in
+        let codex = try reader.task("AC-14", workspace: "acme")
+        #expect(SidebarContent.claimAge(codex, now: AppV2Fixture.now) == "1 h")
+        let claude = try reader.task("AC-12", workspace: "acme")
+        let updated = try #require(claude.updatedAt)
+        let date = try Date(
+          updated, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+        #expect(SidebarContent.claimAge(claude, now: date.addingTimeInterval(30)) == "just now")
+        #expect(RelativeAge.text(nil, now: AppV2Fixture.now, short: true) == nil)
+      }
+    }
 
     private func fixture(_ body: @MainActor (AppReader) throws -> Void) throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

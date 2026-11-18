@@ -46,12 +46,21 @@ struct TaskInspector: View {
                   Text(TaskPresentation.progress(task.steps, revision: task.planRevision))
                     .font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
                 }
-                ForEach(Array(task.steps.enumerated()), id: \.offset) { _, step in
+                let current = task.steps.firstIndex { !$0.done }
+                ForEach(Array(task.steps.enumerated()), id: \.offset) { index, step in
                   HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: step.done ? "checkmark.circle.fill" : "circle")
-                      .foregroundStyle(Color(step.done ? "TideText" : "SecondaryInk"))
-                      .accessibilityLabel(step.done ? "Complete" : "Incomplete")
-                    Text(step.title).foregroundStyle(Color(step.done ? "SecondaryInk" : "Ink"))
+                    Image(
+                      systemName: step.done
+                        ? "checkmark.circle.fill"
+                        : index == current ? "smallcircle.filled.circle" : "circle"
+                    )
+                    .foregroundStyle(
+                      Color(step.done || index == current ? "TideText" : "SecondaryInk")
+                    )
+                    .accessibilityLabel(
+                      step.done ? "Complete" : index == current ? "Current step" : "Incomplete")
+                    Text(step.title).fontWeight(index == current ? .semibold : .regular)
+                      .foregroundStyle(Color(step.done ? "SecondaryInk" : "Ink"))
                   }.font(.system(size: 13))
                 }
                 DisclosureGroup("Full plan") { Text(task.plan).textSelection(.enabled) }
@@ -104,7 +113,7 @@ struct TaskInspector: View {
             ContentUnavailableView("Select a task", systemImage: "sidebar.right")
           }
         }.padding(18).frame(
-          maxWidth: .infinity, minHeight: geometry.size.height - 20, alignment: .topLeading)
+          maxWidth: .infinity, minHeight: max(0, geometry.size.height - 20), alignment: .topLeading)
       }.seaPane().padding(10)
     }.foregroundStyle(Color("Ink"))
       .background { ShoreBackground() }
@@ -116,7 +125,7 @@ struct TaskInspector: View {
       Circle().strokeBorder(Color("SecondaryInk"), lineWidth: 1.5).frame(width: 8, height: 8)
     } else {
       StatusDot(
-        color: Color(status == "doing" ? "TideText" : status == "done" ? "DiffAddition" : "Warning")
+        color: Color(status == "doing" ? "TideText" : status == "done" ? "Success" : "Warning")
       )
     }
   }

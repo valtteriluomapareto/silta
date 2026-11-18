@@ -67,7 +67,7 @@ struct WorkspaceView: View {
                         selected
                           ? Color("AccentColor").opacity(0.08) : .clear, in: .rect(cornerRadius: 10)
                       )
-                  }.buttonStyle(.plain)
+                  }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
                 }
               }.padding(14).seaPane()
             }
@@ -167,15 +167,11 @@ struct ConnectionInspector: View {
               VStack(alignment: .leading, spacing: 2) {
                 Text(document.title ?? document.slug).font(.system(size: 13, weight: .semibold))
                   .lineLimit(2).help(document.title ?? document.slug)
-                Text(DocsContent.row(group)).font(.system(size: 11)).foregroundStyle(
-                  Color(
-                    group.entries.contains { $0.state == "proposed" } ? "Warning" : "SecondaryInk"))
+                Text(DocsContent.row(group)).font(.system(size: 11))
+                  .foregroundStyle(Color("SecondaryInk"))
               }.frame(maxWidth: .infinity, alignment: .leading)
-              if group.entries.contains(where: { $0.state == "proposed" }) {
-                StatusDot(color: Color("Warning")).accessibilityHidden(true)
-              }
-            }.padding(.horizontal, 12).padding(.vertical, 9)
-              .background(Color("Card"), in: .rect(cornerRadius: 12))
+              documentState(group)
+            }.padding(.horizontal, 10).padding(.vertical, 8)
               .contentShape(.rect)
           }.buttonStyle(.plain)
         }
@@ -192,8 +188,31 @@ struct ConnectionInspector: View {
         Button("Open all related Docs") { model.openDocuments(about: connection.attachment) }
           .buttonStyle(CompactActionStyle())
       }
-      Text("Click a doc to open it in Docs.").font(.system(size: 11)).foregroundStyle(
-        Color("SecondaryInk"))
+      Spacer(minLength: 12)
+      Button {
+        model.openDocuments(about: connection.attachment)
+      } label: {
+        Text("Open in Docs").font(.system(size: 13, weight: .semibold))
+          .frame(maxWidth: .infinity, minHeight: 36)
+          .background(Color("AccentColor"), in: .capsule).foregroundStyle(Color("Canvas"))
+          .contentShape(.capsule)
+      }.buttonStyle(.plain).help("Open the documents about this connection")
+    }
+  }
+
+  @ViewBuilder private func documentState(_ group: DocsModel.Group) -> some View {
+    let proposals = group.entries.filter { $0.state == "proposed" }
+    if let proposal = proposals.first {
+      HStack(spacing: 6) {
+        StatusDot(color: Color("Warning"))
+        Text("@\(proposal.revision) proposed").font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(Color("Warning"))
+      }.fixedSize()
+    } else {
+      HStack(spacing: 6) {
+        StatusDot(color: Color("Success"))
+        Text("Current").font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+      }.fixedSize()
     }
   }
 }

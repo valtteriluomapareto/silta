@@ -1,7 +1,8 @@
 import Foundation
 
 nonisolated enum RelativeAge {
-  static func text(_ timestamp: String?, now: Date) -> String? {
+  /// The age of a timestamp. `short` drops "ago" for compact lists, such as "6 min".
+  static func text(_ timestamp: String?, now: Date, short: Bool = false) -> String? {
     guard let timestamp else { return nil }
     let date: Date
     do {
@@ -12,9 +13,10 @@ nonisolated enum RelativeAge {
     }
     let seconds = max(0, Int(now.timeIntervalSince(date).rounded()))
     if seconds < 60 { return "just now" }
-    if seconds < 3600 { return "\(seconds / 60) min ago" }
-    if seconds < 86400 { return "\(seconds / 3600) h ago" }
-    return "\(seconds / 86400) d ago"
+    let suffix = short ? "" : " ago"
+    if seconds < 3600 { return "\(seconds / 60) min" + suffix }
+    if seconds < 86400 { return "\(seconds / 3600) h" + suffix }
+    return "\(seconds / 86400) d" + suffix
   }
 
 }

@@ -21,12 +21,12 @@ struct ShoreBackground: View {
   }
 }
 
-/// A floating pane or card that text can sit on.
+/// A floating pane or card that text can sit on. Increase Contrast comes from the colour
+/// assets' high-contrast appearances, so plain fills of Pane, Card and PaneBorder get it too.
 struct SeaSurface: ViewModifier {
   var radius: CGFloat = 18
   var raised = false
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-  @Environment(\.colorSchemeContrast) private var contrast
 
   func body(content: Content) -> some View {
     let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -35,8 +35,7 @@ struct SeaSurface: ViewModifier {
         .shadow(color: .black.opacity(raised ? 0.07 : 0), radius: 15, y: 10)
     }
     .overlay {
-      shape.strokeBorder(
-        contrast == .increased ? Color("Ink").opacity(0.3) : Color("PaneBorder"), lineWidth: 1)
+      shape.strokeBorder(Color("PaneBorder"), lineWidth: 1)
     }
   }
 }
@@ -74,7 +73,7 @@ struct ScreenHeader: View {
       Text(title).font(.system(size: 28, weight: .bold)).tracking(-0.5)
         .accessibilityAddTraits(.isHeader)
       if !summary.isEmpty {
-        Text(summary).font(.system(size: 13)).foregroundStyle(Color("SecondaryInk"))
+        Text(summary).font(.system(size: 13)).foregroundStyle(Color("ShoreInk"))
           .lineLimit(1)
       }
     }.foregroundStyle(Color("Ink")).frame(maxWidth: .infinity, alignment: .leading)

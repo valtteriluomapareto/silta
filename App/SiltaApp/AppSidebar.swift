@@ -75,7 +75,7 @@ struct AppSidebar: View {
   private var claimedCard: some View {
     VStack(alignment: .leading, spacing: 8) {
       Overline("Claimed now")
-      ForEach(claimed, id: \.ref) { task in
+      ForEach(claimed.prefix(SidebarContent.claimLimit), id: \.ref) { task in
         Button {
           model.inspect(task: task.ref)
         } label: {
@@ -92,6 +92,11 @@ struct AppSidebar: View {
           .accessibilityLabel(
             SidebarContent.claimTitle(task) + ", "
               + SidebarContent.claimSubtitle(task, now: model.now()))
+      }
+      if claimed.count > SidebarContent.claimLimit {
+        Button("\(claimed.count - SidebarContent.claimLimit) more on the Board") {
+          model.navigate(to: .board)
+        }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Color("TideText"))
       }
     }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
       .seaPane(radius: 12)

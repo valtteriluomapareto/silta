@@ -43,9 +43,8 @@ struct CopyValue: View {
       }
       .contentShape(.capsule)
     }.buttonStyle(.plain)
-      .help(copied ? "Copied" : title).accessibilityLabel(
-        (copied ? "Copied" : title) + ": " + value
-      )
+      .help(copied ? "Copied" : title).accessibilityLabel(copied ? "Copied" : title)
+      .accessibilityValue(value)
       .contextMenu { Button(title) { copy() } }
       .onCopyCommand { [NSItemProvider(object: value as NSString)] }
       .onChange(of: value) { copied = false }

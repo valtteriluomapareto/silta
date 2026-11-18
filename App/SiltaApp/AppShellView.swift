@@ -29,7 +29,6 @@ struct AppShellView: View {
         .background { ShoreBackground() }
     }
     .navigationTitle(model.screenTitle)
-    .navigationSubtitle(model.screenSummary)
     .toolbar(removing: .title)
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .background { ShoreBackground() }

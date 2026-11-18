@@ -6,10 +6,8 @@ struct CommandBlock: View {
 
   var body: some View {
     HStack(spacing: 10) {
-      ViewThatFits(in: .horizontal) {
-        commandText.fixedSize()
-        commandText.fixedSize(horizontal: false, vertical: true)
-      }.frame(maxWidth: .infinity, alignment: .leading)
+      commandText.fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
       CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
     }
     .padding(.leading, 14).padding(.trailing, 6).padding(.vertical, 6)

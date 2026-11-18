@@ -32,6 +32,8 @@ struct DocsView: View {
                     value: document.ref, title: "Copy document reference",
                     warning: document.state == "proposed")
                 }
+                Text(model.screenSummary).font(.system(size: 12, weight: .medium))
+                  .foregroundStyle(Color("SecondaryInk"))
                 if let now = model.visibleData?.checkedAt {
                   Text(DocsContent.attribution(document, now: now))
                     .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
@@ -82,7 +84,7 @@ struct DocsView: View {
               .frame(maxWidth: .infinity, alignment: .leading)
           }
         }
-      }.frame(minWidth: 400).clipShape(.rect(cornerRadius: 18, style: .continuous)).seaCard()
+      }.frame(minWidth: 360).clipShape(.rect(cornerRadius: 18, style: .continuous)).seaCard()
     }.padding(.bottom, 12)
       .foregroundStyle(Color("Ink"))
       .task(id: listKey) { await model.loadDocuments() }
@@ -94,12 +96,10 @@ struct DocsView: View {
 extension DocsView {
   private var documentList: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Picker(
-        "Documents", selection: Binding(get: { docs.proposedOnly }, set: { docs.proposedOnly = $0 })
-      ) {
-        Text("All").tag(false)
-        Text(docs.proposedLabel).tag(true)
-      }.pickerStyle(.segmented).labelsHidden().padding(.horizontal, 12)
+      SeaSegments(
+        label: "Documents", options: [(false, "All"), (true, docs.proposedLabel)],
+        selection: Binding(get: { docs.proposedOnly }, set: { docs.proposedOnly = $0 })
+      ).padding(.horizontal, 12)
       if let about = model.docsAbout {
         HStack(spacing: 6) {
           Text(DocsChromeContent.aboutLabel(about)).font(.system(size: 11)).lineLimit(2).help(about)
@@ -125,7 +125,11 @@ extension DocsView {
                     VStack(alignment: .leading, spacing: 4) {
                       Text(preferred.title ?? preferred.slug).font(
                         .system(size: 13, weight: .medium)
-                      ).foregroundStyle(Color(preferred.archived ? "SecondaryInk" : "Ink"))
+                      ).foregroundStyle(
+                        Color(
+                          preferred.archived
+                            ? "SecondaryInk" : docs.document?.slug == group.id ? "TideText" : "Ink")
+                      )
                       Text(DocsContent.row(group)).font(.system(size: 11)).foregroundStyle(
                         Color(
                           group.entries.contains { $0.state == "proposed" } && !preferred.archived
@@ -133,6 +137,7 @@ extension DocsView {
                     }.frame(maxWidth: .infinity, alignment: .leading)
                   }.padding(.vertical, 5).contentShape(.rect)
                 }.buttonStyle(.plain)
+                  .accessibilityAddTraits(docs.document?.slug == group.id ? .isSelected : [])
                   .listRowSeparator(.hidden)
                   .listRowBackground(
                     RoundedRectangle(cornerRadius: 10).fill(

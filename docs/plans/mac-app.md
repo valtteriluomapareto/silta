@@ -65,7 +65,7 @@ the human copies.
   build: `scripts/install-dev.sh` installs `silta` and `~/Applications/Silta Dev.app`
   from the same clean `main` commit, or replaces neither.
 - A free-form or editable graph map, an activity feed, notifications and iOS. The
-  computed workspace map is slice A6.
+  computed workspace map is slice A6b.
 
 ## Design
 
@@ -125,10 +125,11 @@ the human copies.
 | A3 | Board and task inspector | A2 | View-model tests on the seed, state and PNG checks; unlocked interaction follow-up |
 | A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed, state and PNG checks; unlocked interaction follow-up |
 | A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; state and PNG checks; unlocked interaction follow-up |
-| A6a (SI-196) | Sea glass restyle of the shell and all four screens (MVP v3) | A5 | View-model tests for header and chrome values; light and dark PNG checks of every screen; unlocked glass check follow-up |
+| A6a (SI-196) | Sea glass restyle of the shell and all four screens (MVP v3) | A5 | View-model tests for header and chrome values; light and dark PNG checks of every screen; pending unlocked check of glass, Reduce Transparency and Increase Contrast |
 | A6b (SI-197) | Workspace map: a pure, tested layout in `SiltaAppSupport` (columns, order, back edges) and a Map/List view with app, service and connection selection | A6a | Layout tests on the Acme seed, a 12-app seed and a cycle; selection and keyboard view-model tests; PNG checks |
 
-Delivery order is My work, Board, Workspace, then Docs: one screen per PR.
+Delivery order is My work, Board, Workspace, then Docs: one screen per PR. A6a is the
+one cross-screen exception, because it restyles the shared shell.
 Use a short `task plan` and implementation reviews following
 [AGENTS.md Reviews](../../AGENTS.md#dogfooding) and the
 [persona-review skill](../../skills/persona-review/SKILL.md). Logic remains test-first; SwiftUI layout gets view-model tests afterwards.

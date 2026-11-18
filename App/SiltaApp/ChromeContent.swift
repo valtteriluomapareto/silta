@@ -14,7 +14,7 @@ nonisolated struct BoardMenuContent {
 
 nonisolated enum SidebarContent {
   static func appColor(index: Int) -> String {
-    ["SecondaryInk", "AppViolet", "AppClay"][index % 3]
+    ["AppSlate", "AppViolet", "AppClay"][index % 3]
   }
 
   static func claimTitle(_ task: AppTask) -> String {
@@ -28,11 +28,12 @@ nonisolated enum SidebarContent {
     return actor + (RelativeAge.text(task.updatedAt, now: now).map { " · updated " + $0 } ?? "")
   }
 
+  /// The Claimed now card shows at most this many claims so the navigation keeps its room.
+  static let claimLimit = 3
+
   /// A short age for the Claimed now card, such as "6 min".
   static func claimAge(_ task: AppTask, now: Date) -> String? {
-    RelativeAge.text(task.updatedAt, now: now).map {
-      $0.hasSuffix(" ago") ? String($0.dropLast(4)) : $0
-    }
+    RelativeAge.text(task.updatedAt, now: now, short: true)
   }
 
   static func documentCount(_ page: AppDocumentList?, stale: Bool = false) -> String {
@@ -61,14 +62,19 @@ nonisolated enum SidebarContent {
     guard let page else { return stale ? "Documents unavailable" : "Workspace documents" }
     let more = page.nextOffset == nil ? "" : "+"
     let documents = Set(page.entries.map(\.slug)).count
-    let archived = Set(page.entries.filter(\.archived).map(\.slug)).count
-    let proposed = Set(page.entries.filter { $0.state == "proposed" && !$0.archived }.map(\.slug))
-      .count
-    var parts = ["\(documents)\(more) docs" + (archived > 0 ? ", \(archived) archived" : "")]
-    if proposed > 0 {
-      parts.append("\(proposed)\(more) proposal\(proposed == 1 ? "" : "s") waiting on you")
+    guard documents > 0 || !more.isEmpty else {
+      return stale ? "No documents (stale)" : "No documents"
     }
-    return parts.joined(separator: " · ")
+    let archived = Set(page.entries.filter(\.archived).map(\.slug)).count
+    let proposals = Set(page.entries.filter { $0.state == "proposed" && !$0.archived }.map(\.ref))
+      .count
+    var parts = ["\(documents)\(more) docs" + (archived > 0 ? ", \(archived)\(more) archived" : "")]
+    if proposals > 0 {
+      parts.append(
+        "\(proposals)\(more) \(proposals == 1 && more.isEmpty ? "proposal" : "proposals") waiting on you"
+      )
+    }
+    return parts.joined(separator: " · ") + (stale ? " (stale)" : "")
   }
 
   static func aboutLabel(_ ref: String) -> String {
