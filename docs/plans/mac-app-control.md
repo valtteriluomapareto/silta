@@ -116,12 +116,16 @@ It listens for file replacement and process exit, with a monotonic deadline.
 Timeouts show the expected and last observed values. Declared nullable fields
 can be matched with `null`. Unknown fields fail immediately; lane names and app
 slugs are literal path segments and must exist in the loaded snapshot. `launch`,
-`wait` and `shot` accept `--timeout SECONDS`.
+`wait` and `shot` accept `--timeout SECONDS`. For `shot`, it caps the readiness
+wait and `screencapture` independently. Process identity checks have separate
+short bounds.
 
 `shot` waits for ready and idle plus a real window number. It checks the live
 process identity and Core Graphics window owner before and after `screencapture
 -l<id> -o`. It publishes a PNG and matching `<output>.json` only if both checks
-pass and the projected state agrees across the capture. Choose unused output
+pass and the projected state agrees before and after capture (ignoring the publication
+number). The sidecar records the post-capture endpoint. Model state can change
+and return between those endpoints. Choose unused output
 paths. Screenshot capture requires Screen Recording in a usable window session.
 If it fails, run `shot` in an authorized Terminal on the same Mac, or take a
 manual capture of the owned window and record its run/route/revision. Use

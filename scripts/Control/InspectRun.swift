@@ -20,9 +20,17 @@
     guard count > 0 else { exit(1) }
     let end = path.firstIndex(of: 0) ?? path.count
     let executable = String(decoding: path[..<end].map(UInt8.init(bitPattern:)), as: UTF8.self)
+    var filePaths = proc_vnodepathinfo()
+    let pathSize = Int32(MemoryLayout<proc_vnodepathinfo>.size)
+    guard proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &filePaths, pathSize) == pathSize else {
+      exit(1)
+    }
+    let directory = withUnsafeBytes(of: filePaths.pvi_cdir.vip_path) { bytes in
+      String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+    }
     let identity: [String: Any] = [
       "pid": pid, "seconds": info.pbi_start_tvsec, "microseconds": info.pbi_start_tvusec,
-      "executable": executable,
+      "executable": executable, "directory": directory,
     ]
     FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: identity))
   case "window":

@@ -20,14 +20,14 @@
       let root: URL
       if let runDirectory {
         let canonical = runDirectory.resolvingSymlinksInPath().standardizedFileURL
-        guard runDirectory.path == canonical.path,
+        var metadata = stat()
+        guard lstat(runDirectory.path, &metadata) == 0,
+          metadata.st_mode & S_IFMT == S_IFDIR,
           canonical.deletingLastPathComponent().path == temporary.path,
           canonical.lastPathComponent.hasPrefix("silta-app-")
         else { throw refusedDirectory() }
-        let attributes = try manager.attributesOfItem(atPath: canonical.path)
-        guard attributes[.type] as? FileAttributeType == .typeDirectory,
-          attributes[.ownerAccountID] as? UInt32 == getuid(),
-          attributes[.posixPermissions] as? Int == 0o700,
+        guard metadata.st_uid == getuid(),
+          metadata.st_mode & 0o777 == 0o700,
           !manager.fileExists(atPath: canonical.appending(path: "state.json").path)
         else { throw refusedDirectory() }
         root = canonical
