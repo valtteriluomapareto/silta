@@ -394,7 +394,7 @@ def write_fixture_proposal(run, title):
 
 
 def fixture_write(run, write_id, title, timeout):
-    if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", write_id) is None or not title.strip() or len(title.encode()) > 512:
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", write_id) is None or not title.strip() or len(title.encode()) > 512 or "\0" in title:
         raise DriverError("Use a write ID of 1–64 letters, digits, underscores or hyphens and a short title.")
     if not (ROOT / ".build/debug/silta").is_file():
         raise DriverError("Build the fixture CLI with scripts/verify.sh app.")

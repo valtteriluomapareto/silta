@@ -44,6 +44,8 @@
       #expect(model.boardInspectorPresented && model.taskDetail.value?.ref == "AC-9")
       #expect(await actions.perform(.copyRef) == .accepted)
       #expect(await actions.perform(.copyCommand) == .accepted)
+      let failingCopy = ControlActions(model: model, copy: { _ in false })
+      #expect(await failingCopy.perform(.copyRef) == .refused(.copyFailed))
       #expect(copies.first == "AC-9" && copies.last?.contains("task show 'AC-9'") == true)
       #expect(await actions.perform(.toggleInspector) == .accepted)
       #expect(await actions.perform(.copyCommand) == .refused(.unavailable))
@@ -127,6 +129,13 @@
       #expect(model.route == .mywork)
       entered.continuation.finish()
       unblock.continuation.finish()
+    }
+
+    @Test func failedRefreshSettlesWithRefusal() async {
+      let model = AppModel(load: { _, _, _ in throw AppLoadFailure(message: "Fixture read failed") }
+      )
+      let actions = ControlActions(model: model)
+      #expect(await actions.perform(.refresh) == .refused(.readFailed))
     }
 
     private func result(_ directory: URL, _ sequence: Int) throws -> [String: Any] {

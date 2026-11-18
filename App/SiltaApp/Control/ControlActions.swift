@@ -4,7 +4,7 @@
 
   @MainActor struct ControlActions {
     let model: AppModel
-    var copy: (String) -> Bool = CopyValue.writeToPasteboard
+    var copy: @MainActor (String) -> Bool = CopyValue.writeToPasteboard
 
     func perform(_ action: ControlAction) async -> ControlOutcome {
       switch action {
