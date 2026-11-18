@@ -23,25 +23,14 @@ struct AppShellView: View {
       }.background(Color("Canvas"))
     }
     .navigationTitle(model.screenTitle)
+    .navigationSubtitle(model.screenSummary)
     .searchable(
       text: $model.search, placement: .toolbar,
       prompt: model.route == .docs ? "Search loaded documents" : "Search"
     )
     .searchFocused($searchFocused)
     .focusedSceneValue(\.findAction, { searchFocused = true })
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        VStack(alignment: .leading, spacing: 1) {
-          Text(model.screenTitle).font(.system(size: 15, weight: .bold))
-          Text(model.screenSummary).font(.system(size: 11))
-            .foregroundStyle(Color("SecondaryInk"))
-        }
-      }
-      ToolbarItem(placement: .primaryAction) {
-        Button("Refresh", systemImage: "arrow.clockwise") { model.refresh(force: true) }
-          .labelStyle(.iconOnly).help("Refresh (⌘R)")
-      }
-    }
+    .toolbar { AppScreenToolbar(model: model) }
     .frame(minWidth: 1000, minHeight: 700)
     .task { await model.refresh().value }
     .task(id: phase) { await foregroundChecks() }

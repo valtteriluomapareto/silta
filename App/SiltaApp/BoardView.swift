@@ -43,20 +43,6 @@ struct BoardView: View {
       }
     }
     .foregroundStyle(Color("Ink"))
-    .toolbar {
-      ToolbarItemGroup(placement: .primaryAction) {
-        Picker("App", selection: $model.appFilter) {
-          Text("All apps").tag(String?.none)
-          ForEach(model.visibleData?.map?.apps ?? [], id: \.slug) {
-            Text($0.name).tag(Optional($0.slug))
-          }
-        }.labelsHidden().frame(width: 150)
-        Toggle("Show proposed", isOn: $model.showProposed).toggleStyle(.checkbox)
-          .font(.system(size: 12))
-        Button("Inspector", systemImage: "sidebar.right") { model.toggleInspector() }
-          .labelStyle(.iconOnly).help("Toggle inspector (⌥⌘I)")
-      }
-    }
     .inspector(isPresented: $model.boardInspectorPresented) {
       TaskInspector(model: model).inspectorColumnWidth(min: 300, ideal: 360, max: 500)
     }
@@ -105,7 +91,11 @@ struct BoardView: View {
       .background(Color(done ? "CommandSurface" : "Canvas"), in: .rect(cornerRadius: 10))
       .overlay(
         RoundedRectangle(cornerRadius: 10).strokeBorder(
-          selected ? Color("TideText") : Color("Ink").opacity(0.12), lineWidth: selected ? 1.5 : 1
+          selected
+            ? Color("TideText")
+            : task.status == "proposed" ? Color("Warning") : Color("Ink").opacity(0.12),
+          style: StrokeStyle(
+            lineWidth: selected ? 1.5 : 1, dash: task.status == "proposed" ? [4, 3] : [])
         ))
     }.buttonStyle(.plain).accessibilityElement(children: .ignore)
       .accessibilityLabel(

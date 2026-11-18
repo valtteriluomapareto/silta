@@ -111,6 +111,23 @@ final class AppModel {
     return refresh(force: true)
   }
 
+  func loadDocumentCatalog(force: Bool) async throws {
+    guard let reader, let workspace, let data = visibleData else { return }
+    if !force, documentCatalog != nil, catalogWorkspace == workspace, catalogVersion == data.version
+    {
+      return
+    }
+    let token = generation
+    let page = try await Task.detached {
+      try reader.documents(workspace: workspace, archived: true)
+    }.value
+    guard token == generation, self.workspace == workspace, visibleData?.version == data.version
+    else { return }
+    documentCatalog = page
+    catalogWorkspace = workspace
+    catalogVersion = data.version
+  }
+
   func loadWorkspaceDocuments(force: Bool = false) async {
     guard let reader, let workspace, let map = visibleData?.map else { return }
     await workspaceDocuments.refresh(

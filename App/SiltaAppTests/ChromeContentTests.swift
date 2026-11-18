@@ -57,7 +57,7 @@
         await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
         #expect(docs.archivedCount == 1)
         #expect(docs.archivedFooter == "1 archived")
-        #expect(!docs.groups(search: "").contains { $0.id == "retired-endpoint" })
+        #expect(docs.groups(search: "").allSatisfy { $0.preferred?.archived == false })
         await docs.refresh(reader, workspace: "acme", about: nil, archived: true)
         #expect(docs.groups(search: "").contains { $0.preferred?.archived == true })
         #expect(
