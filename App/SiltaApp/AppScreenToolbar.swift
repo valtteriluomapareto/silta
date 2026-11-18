@@ -15,7 +15,8 @@ struct AppScreenToolbar: ToolbarContent {
           selection: Binding(get: { model.documents.view }, set: { model.select(documentView: $0) })
         ) {
           ForEach(AppDocumentView.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-        }.pickerStyle(.segmented).frame(width: 240)
+        }.pickerStyle(.segmented).clipShape(.capsule)
+          .padding(.horizontal, 4).frame(width: 240)
         if let document = model.documents.document {
           Picker(
             "Revision",
