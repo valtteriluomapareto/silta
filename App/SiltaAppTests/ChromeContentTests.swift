@@ -122,37 +122,36 @@
         model.navigate(to: .mywork)
         try AppTestCLI.run(
           [
-            "--ws", "acme", "task", "add", "Catalog read fixture", "--start", "--app",
-            "acme-mobile",
-          ], home: home, seed: 351)
+            "--ws", "acme", "task", "add", "Catalog read fixture", "--start",
+          ], home: home, seed: 35100)
         let task = try #require(
           reader.snapshot(workspace: "acme").board.doing.first {
             $0.title == "Catalog read fixture"
           })
-        let body = home.deletingLastPathComponent().appending(path: "catalog.md")
-        try "# Catalog\n\nSynthetic catalog contents.\n".write(
-          to: body, atomically: true, encoding: .utf8)
-        try AppTestCLI.run(
-          [
-            "--ws", "acme", "doc", "propose", "catalog-cache", "--title", "Catalog cache",
-            "--about", "app:acme-mobile", "--task", task.ref, "-F", body.path, "-m",
-            "Test catalog refresh",
-          ], home: home, seed: 352)
+        try proposeCatalog("catalog-cache", task: task.ref, home: home, seed: 35200)
         await model.refresh().value
         #expect(SidebarContent.documentCount(model.documentCatalog) == "6")
         await model.refresh(force: true).value
         #expect(SidebarContent.documentCount(model.documentCatalog) == "7")
-        try AppTestCLI.run(
-          [
-            "--ws", "acme", "doc", "propose", "catalog-version", "--title", "Catalog version",
-            "--about", "app:acme-mobile", "--task", task.ref, "-F", body.path, "-m",
-            "Test version refresh",
-          ], home: home, seed: 353)
+        try proposeCatalog("catalog-version", task: task.ref, home: home, seed: 35300)
         version.value = 2
         await model.refresh().value
         #expect(
           model.catalogFailure == nil && SidebarContent.documentCount(model.documentCatalog) == "8")
       }
+    }
+
+    private func proposeCatalog(_ slug: String, task: String, home: URL, seed: Int) throws {
+      let body = home.deletingLastPathComponent().appending(path: "catalog.md")
+      try "# Catalog\n\nSynthetic catalog contents.\n".write(
+        to: body, atomically: true, encoding: .utf8)
+      try AppTestCLI.run(
+        [
+          "--ws", "acme", "doc", "propose", slug, "--title", slug,
+          "--about", "app:acme-mobile", "--task", task, "-F", body.path, "-m",
+          "Test catalog refresh",
+        ],
+        home: home, seed: seed)
     }
 
     @MainActor private final class CatalogVersion { var value = 1 }
