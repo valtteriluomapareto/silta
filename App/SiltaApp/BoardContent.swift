@@ -36,7 +36,16 @@ nonisolated struct BoardContent {
   struct Answer: Identifiable {
     let command: AppCommand
     let actor: String?
+    /// The question's comment reference, which an answer replies to.
+    var question: String?
+    var createdAt: String?
     var id: String { command.text }
+  }
+
+  /// The newest open question to the human on a task: the one the inspector answers.
+  func newestQuestion(for ref: String, reader: AppReader, workspace: String) -> Answer? {
+    answers(for: ref, reader: reader, workspace: workspace).filter { $0.question != nil }
+      .max { ($0.createdAt ?? "") < ($1.createdAt ?? "") }
   }
 
   func questionAuthor(for ref: String) -> String? {
@@ -49,7 +58,8 @@ nonisolated struct BoardContent {
       guard let command = reader.commands(for: item, workspace: workspace).first,
         seen.insert(command.text).inserted
       else { return nil }
-      return Answer(command: command, actor: item.author)
+      return Answer(
+        command: command, actor: item.author, question: item.ref, createdAt: item.createdAt)
     }
   }
 }

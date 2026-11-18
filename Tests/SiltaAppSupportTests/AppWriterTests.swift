@@ -182,14 +182,14 @@
         try writer.perform(
           .answer(task: "AC-12", question: "AC-12/1", body: "Show them under Other."),
           workspace: "acme")
-        _ = try? Self.failure {  // the refusal itself is covered above; this checks its log line
+        #expect(throws: AppReadError.self) {
           try writer.perform(.comment(task: "AC-99", body: "Private words."), workspace: "acme")
         }
         try writer.perform(.acceptAnswer("AC-14/2"), workspace: "acme")
         let log = scratch.appending(path: "silta-home/log/2026-11-16.jsonl")
         let text = try String(contentsOf: log, encoding: .utf8)
-        let lines = text.split(separator: "\n").map {
-          try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]  // malformed fails below
+        let lines = try text.split(separator: "\n").map {
+          try JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
         }
         #expect(lines.count == 3)
         #expect(

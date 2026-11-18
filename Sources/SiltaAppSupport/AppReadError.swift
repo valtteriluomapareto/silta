@@ -30,6 +30,9 @@ public struct AppReadError: CodedError {
 }
 
 extension AppReadError {
+  /// The stable code as scripts see it, such as `not_found`.
+  public var codeName: String { code.rawValue }
+
   static let migrationRequired = AppReadError(
     kind: .migrationRequired, code: .env,
     message: "Silta data needs migrations; run the matching CLI first.", next: ["silta init"],

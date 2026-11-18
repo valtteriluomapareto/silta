@@ -60,7 +60,7 @@
         body: "Yes. After an hour the token is usually stale, so the app drops the "
           + "registration and asks for a fresh token on next launch.", kind: "answer")
       answer.replyTo = asked.comment.ref
-      _ = try service(.agent(tool: "codex", session: "fixture")).comment("AC-14", answer)
+      _ = try service(.agent(tool: "codex", session: "review")).comment("AC-14", answer)
     }
 
     private static var tasks: [DebugTaskFixture] {
