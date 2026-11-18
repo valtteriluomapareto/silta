@@ -55,26 +55,8 @@
       let name = fields.removeValue(forKey: "action") as? String
       let action: ControlAction
       switch name {
-      case "nav", "select":
-        guard let screen = fields.removeValue(forKey: "screen") as? String,
-          let route = AppRoute(rawValue: screen)
-        else { throw .invalidRequest }
-        if name == "nav" {
-          action = .navigate(route)
-        } else {
-          guard route != .mywork, let ref = fields.removeValue(forKey: "ref") as? String,
-            !ref.isEmpty, ref.utf8.count <= 512,
-            !ref.contains(where: { $0.isWhitespace })
-          else { throw .invalidRequest }
-          if let view = fields.removeValue(forKey: "view") {
-            guard route == .docs, let name = view as? String,
-              AppDocumentView(rawValue: name) != nil
-            else { throw .invalidRequest }
-            action = .select(screen + ":" + ref + ":" + name)
-          } else {
-            action = .select(screen + ":" + ref)
-          }
-        }
+      case "nav": action = .navigate(try screen(&fields))
+      case "select": action = try selection(&fields)
       case "inspector.toggle": action = .toggleInspector
       case "copy.ref": action = .copyRef
       case "copy.command": action = .copyCommand
@@ -83,6 +65,28 @@
       }
       guard fields.isEmpty else { throw .invalidRequest }
       return action
+    }
+
+    private static func screen(_ fields: inout [String: Any]) throws(ControlRefusal) -> AppRoute {
+      guard let value = fields.removeValue(forKey: "screen") as? String,
+        let route = AppRoute(rawValue: value)
+      else { throw .invalidRequest }
+      return route
+    }
+
+    private static func selection(_ fields: inout [String: Any]) throws(ControlRefusal)
+      -> ControlAction
+    {
+      let route = try screen(&fields)
+      guard route != .mywork, let ref = fields.removeValue(forKey: "ref") as? String,
+        !ref.isEmpty, ref.utf8.count <= 512, !ref.contains(where: { $0.isWhitespace }),
+        route != .docs || (ref.hasPrefix("doc:") && !ref.dropFirst(4).contains(":"))
+      else { throw .invalidRequest }
+      let value = route.rawValue + ":" + ref
+      guard let view = fields.removeValue(forKey: "view") else { return .select(value) }
+      guard route == .docs, let name = view as? String, AppDocumentView(rawValue: name) != nil
+      else { throw .invalidRequest }
+      return .select(value + ":" + name)
     }
 
     private static func integer(_ value: Any?) -> Int? {

@@ -12,26 +12,14 @@
         guard route != model.route else { return .noop }
         model.navigate(to: route)
       case .select(let value):
-        let before = Target(model)
-        do { try ControlLaunch.Route(value).apply(to: model) } catch {
-          return .refused(.unknownSelection)
-        }
-        if before == Target(model), status(before) == .accepted { return .noop }
+        if let result = applySelection(value) { return result }
       case .toggleInspector:
         guard model.route == .board || model.route == .workspace else {
           return .refused(.unavailable)
         }
         model.toggleInspector()
-      case .copyRef:
-        guard let ref = Target(model).selection?.ref else { return .refused(.unavailable) }
-        return copy(ref) ? .accepted : .refused(.copyFailed)
-      case .copyCommand:
-        guard model.route == .board, model.boardInspectorPresented,
-          let task = model.taskDetail.value, task.ref == model.boardSelection?.taskRef,
-          task.status == "review", let workspace = model.workspace,
-          let command = model.reader?.commands(forReview: task, workspace: workspace).first
-        else { return .refused(.unavailable) }
-        return copy(command.text) ? .accepted : .refused(.copyFailed)
+      case .copyRef: return copySelection()
+      case .copyCommand: return copyReviewCommand()
       case .refresh:
         let allowDefault = model.route == .docs && model.documentSelection == nil
         let before = Target(model, allowDefaultDocument: allowDefault)
@@ -43,6 +31,28 @@
       let target = Target(model, allowDefaultDocument: model.documentSelection == nil)
       await loadSelection(reload: action == .refresh)
       return await settle(target)
+    }
+
+    private func applySelection(_ value: String) -> ControlOutcome? {
+      let before = Target(model)
+      do { try ControlLaunch.Route(value).apply(to: model) } catch {
+        return .refused(.unknownSelection)
+      }
+      return before == Target(model) && status(before) == .accepted ? .noop : nil
+    }
+
+    private func copySelection() -> ControlOutcome {
+      guard let ref = Target(model).selection?.ref else { return .refused(.unavailable) }
+      return copy(ref) ? .accepted : .refused(.copyFailed)
+    }
+
+    private func copyReviewCommand() -> ControlOutcome {
+      guard model.route == .board, model.boardInspectorPresented,
+        let task = model.taskDetail.value, task.ref == model.boardSelection?.taskRef,
+        task.status == "review", let workspace = model.workspace,
+        let command = model.reader?.commands(forReview: task, workspace: workspace).first
+      else { return .refused(.unavailable) }
+      return copy(command.text) ? .accepted : .refused(.copyFailed)
     }
 
     private func loadSelection(reload: Bool) async {

@@ -22,7 +22,8 @@
     @Test func actionsDriveTheFixtureThroughExistingHandlersAndCopySources() async throws {
       let fixture = try FixtureLaunch.prepare()
       defer {
-        try? FileManager.default.removeItem(at: fixture.home.deletingLastPathComponent())  // cleanup
+        try? FileManager.default.removeItem(  // cleanup
+          at: fixture.home.deletingLastPathComponent())
       }
       let reader = try AppReader(home: fixture.home, user: fixture.user, now: { fixture.now })
       let session = AppReadSession(reader: reader, now: { fixture.now })
@@ -55,6 +56,82 @@
       #expect(await actions.perform(.navigate(.mywork)) == .noop)
       #expect(await actions.perform(.toggleInspector) == .refused(.unavailable))
       #expect(await actions.perform(.refresh) == .accepted)
+    }
+
+    @Test func mailboxRefusesMalformedCurrentRequestThenDrainsFutureAndIgnoresStale() async throws {
+      let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+      defer { try? FileManager.default.removeItem(at: directory) }  // cleanup
+      let model = AppModel(load: { _, _, _ in nil })
+      var publications: [String] = []
+      let mailbox = try ControlMailbox(
+        directory: directory, run: "owned", actions: ControlActions(model: model),
+        publish: { publications.append("\($0)/\($1)") },
+        fail: { error in
+          Issue.record("Unexpected mailbox failure: \(error)")
+        })
+      let future = try JSONSerialization.data(
+        withJSONObject: [
+          "version": 1, "run": "owned", "seq": 2, "action": "nav", "screen": "mywork",
+        ],
+        options: [.sortedKeys, .withoutEscapingSlashes])
+      try future.write(to: directory.appending(path: "req-2.json"), options: .atomic)
+      await mailbox.check()
+      #expect(mailbox.sequence == 0)
+      let malformed = Data(
+        #"{"action":"refresh","action":"copy.ref","run":"owned","seq":1,"version":1}"#.utf8)
+      try malformed.write(to: directory.appending(path: "req-1.json"), options: .atomic)
+      await mailbox.check()
+      #expect(mailbox.sequence == 2)
+      #expect(publications == ["1/0", "1/1", "2/1", "2/2"])
+      let first = try result(directory, 1)
+      let second = try result(directory, 2)
+      #expect(first["reason"] as? String == "invalidRequest")
+      #expect(second["outcome"] as? String == "noop")
+      try future.write(to: directory.appending(path: "req-1.json"), options: .atomic)
+      await mailbox.check()
+      #expect(publications.count == 4)
+    }
+
+    @Test func selectionReportsSupersessionWhenUserChangesRouteDuringARead() async throws {
+      let fixture = try FixtureLaunch.prepare()
+      defer {
+        try? FileManager.default.removeItem(  // cleanup
+          at: fixture.home.deletingLastPathComponent())
+      }
+      let reader = try AppReader(home: fixture.home, user: fixture.user, now: { fixture.now })
+      let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+      let unblock = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+      let page = try reader.documents(workspace: "acme")
+      let docs = DocsModel(readList: { _, _, _, _, _ in
+        entered.continuation.yield(())
+        var iterator = unblock.stream.makeAsyncIterator()
+        _ = await iterator.next()
+        return page
+      })
+      let model = AppModel(
+        reader: reader, documents: docs,
+        load: { _, _, _ in
+          AppLoadedData(
+            workspaces: [], workspace: "acme", snapshot: nil, map: nil,
+            version: 1, checkedAt: AppV2Fixture.now)
+        })
+      await model.refresh().value
+      let actions = ControlActions(model: model)
+      let result = Task { await actions.perform(.select("docs:doc:order-contract@3:document")) }
+      var iterator = entered.stream.makeAsyncIterator()
+      _ = await iterator.next()
+      model.navigate(to: .mywork)
+      unblock.continuation.yield(())
+      #expect(await result.value == .refused(.superseded))
+      #expect(model.route == .mywork)
+      entered.continuation.finish()
+      unblock.continuation.finish()
+    }
+
+    private func result(_ directory: URL, _ sequence: Int) throws -> [String: Any] {
+      let data = try Data(contentsOf: directory.appending(path: "res-\(sequence).json"))
+      return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
     private func wire(_ fields: [String: Any], run: String = "current", seq: Any = 1) throws
