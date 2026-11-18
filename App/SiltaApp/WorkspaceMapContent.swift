@@ -7,7 +7,8 @@ nonisolated struct WorkspaceMapContent {
   struct Edge {
     let connection: AppConnection
     let back: Bool
-    /// Parallel connections between the same pair get their own lane.
+    /// Parallel forward connections between the same pair get their own lane; back edges
+    /// each get a lane of their own across the whole map.
     let lane: Int
   }
 
@@ -30,11 +31,16 @@ nonisolated struct WorkspaceMapContent {
     self.node = node
     self.connection = connection
     var seen: [String: Int] = [:]
+    var backLane = 0
     edges = map.connections.sorted { $0.attachment < $1.attachment }.map { edge in
+      if layout.backEdges.contains(edge.attachment) {
+        defer { backLane += 1 }
+        return Edge(connection: edge, back: true, lane: backLane)
+      }
       let pair = edge.source + ">" + edge.target
       let lane = seen[pair, default: 0]
       seen[pair] = lane + 1
-      return Edge(connection: edge, back: layout.backEdges.contains(edge.attachment), lane: lane)
+      return Edge(connection: edge, back: false, lane: lane)
     }
     if let node, let selected = layout.nodes.first(where: { $0.attachment == node }) {
       var keys: Set<String> = [selected.key]

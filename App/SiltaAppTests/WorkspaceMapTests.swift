@@ -60,7 +60,14 @@
             #expect(hits.isEmpty, "\(edge.connection.attachment) crosses \(hits.keys)")
           }
         }
-        #expect((curves.last?.end.y ?? 0) <= geometry.size.height)
+        let depth = curves.map(\.start.y).max() ?? 0
+        #expect(depth <= geometry.size.height)
+        let forward = geometry.route(
+          from: edge.connection.target, to: edge.connection.source, back: false)
+        if let stub = curves.first, let line = forward.last {
+          #expect(
+            stub.start.y != line.end.y, "\(edge.connection.attachment) sits on a forward edge")
+        }
       }
       let selfLoop = geometry.route(from: "x", to: "x", back: true)
       #expect(selfLoop.count == 1 && selfLoop[0].start.y < selfLoop[0].end.y)
@@ -72,6 +79,9 @@
         ).labelPoint
       }
       #expect(Set(points.map { "\($0.x),\($0.y)" }).count == points.count)
+    }
+
+    @Test func fitScaleStaysBetweenSixtyAndOneHundredPercent() {
       #expect(
         WorkspaceMapGeometry.fitScale(
           content: CGSize(width: 400, height: 300), in: CGSize(width: 800, height: 600)) == 1)

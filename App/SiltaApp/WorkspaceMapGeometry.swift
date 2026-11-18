@@ -36,7 +36,9 @@ nonisolated struct WorkspaceMapGeometry {
       : Self.margin * 2 + CGFloat(layout.columnCount) * Self.appSize.width
         + CGFloat(layout.columnCount - 1) * Self.columnGap
     bottom = frames.values.map(\.maxY).max() ?? Self.margin
-    let below: CGFloat = layout.backEdges.isEmpty ? 0 : Self.rowPitch / 2 + 3 * Self.laneGap
+    let below: CGFloat =
+      layout.backEdges.isEmpty
+      ? 0 : Self.rowPitch / 3 + CGFloat(layout.backEdges.count) * Self.laneGap + Self.margin / 2
     size = CGSize(
       width: width, height: Self.margin * 2 + CGFloat(tallest) * Self.rowPitch + below)
   }
@@ -92,12 +94,14 @@ nonisolated struct WorkspaceMapGeometry {
       ]
     }
     if back {
-      let offset = CGFloat(lane) * 10
-      let start = CGPoint(x: from.minX, y: from.midY + offset)
+      // Ports sit below the centre line, where forward edges don't run.
+      let port = 24 + CGFloat(lane % 3) * 6
+      let offset = CGFloat(min(lane, 4)) * 10
+      let start = CGPoint(x: from.minX, y: from.midY + port)
       let out = CGPoint(x: from.minX - Self.columnGap / 2 + 12 + offset, y: start.y)
       let depth = bottom + Self.rowPitch / 3 + CGFloat(lane) * Self.laneGap
       let back = CGPoint(x: to.maxX + Self.columnGap / 2 - 12 - offset, y: depth)
-      let end = CGPoint(x: to.maxX, y: to.midY + offset)
+      let end = CGPoint(x: to.maxX, y: to.midY + port)
       return [
         .line(start, out), .line(out, CGPoint(x: out.x, y: depth)),
         .line(
