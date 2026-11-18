@@ -7,16 +7,13 @@ struct AppScreenToolbar: ToolbarContent {
   let compactSearch: Bool
 
   var body: some ToolbarContent {
+    if model.route == .docs {
+      ToolbarItem(placement: .primaryAction) { documentTabs }
+        .sharedBackgroundVisibility(.hidden)
+    }
     ToolbarItemGroup(placement: .primaryAction) {
       if model.route == .board { BoardAppMenu(model: model) }
       if model.route == .docs {
-        Picker(
-          "View",
-          selection: Binding(get: { model.documents.view }, set: { model.select(documentView: $0) })
-        ) {
-          ForEach(AppDocumentView.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-        }.pickerStyle(.segmented).clipShape(.capsule)
-          .padding(.horizontal, 4).frame(width: 240)
         if let document = model.documents.document {
           Picker(
             "Revision",
@@ -51,6 +48,25 @@ struct AppScreenToolbar: ToolbarContent {
       }
     }
   }
+
+  private var documentTabs: some View {
+    HStack(spacing: 0) {
+      ForEach(AppDocumentView.allCases, id: \.self) { view in
+        Button(view.rawValue.capitalized) { model.select(documentView: view) }
+          .buttonStyle(.plain).font(.system(size: 13))
+          .frame(maxWidth: .infinity, minHeight: 26)
+          .foregroundStyle(Color("Ink"))
+          .background(
+            model.documents.view == view ? Color("Ink").opacity(0.08) : .clear, in: .capsule
+          )
+          .accessibilityAddTraits(model.documents.view == view ? .isSelected : [])
+      }
+    }.padding(3)
+      .background(Color("Ink").opacity(0.04), in: .capsule)
+      .clipShape(.capsule).frame(width: 240)
+      .accessibilityElement(children: .contain).accessibilityLabel("View")
+  }
+
 }
 
 private struct BoardAppMenu: View {
