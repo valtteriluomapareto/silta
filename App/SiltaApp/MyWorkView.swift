@@ -53,16 +53,14 @@ struct MyWorkView: View {
               sectionHeader("Task proposals", count: content.tasks.count, color: .secondary)
               ForEach(content.tasks) { row in
                 HStack(spacing: 10) {
-                  proposalTitle(row).frame(maxWidth: .infinity, alignment: .leading)
+                  Toggle(isOn: selection(row.ref)) { proposalTitle(row) }
+                    .toggleStyle(.checkbox).accessibilityLabel("Accept \(row.ref)")
+                    .frame(maxWidth: .infinity, alignment: .leading)
                   CopyValue(value: row.ref, title: "Copy task reference", warning: true)
                     .fixedSize()
                 }.padding(.leading, 32).frame(minHeight: 28)
               }
-              if let first = content.tasks.first,
-                let command = model.reader?.commands(for: first.item, workspace: workspace).first
-              {
-                CommandBlock(command: command).padding(.leading, 32)
-              }
+              proposalFooter(content.tasks)
             }.padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
           ForEach(content.other, id: \.stableID) { item in
@@ -147,6 +145,60 @@ struct MyWorkView: View {
     }
   }
 
+  private func selection(_ ref: String) -> Binding<Bool> {
+    Binding(
+      get: { model.actions.selectedProposals.contains(ref) },
+      set: { selected in
+        if selected {
+          model.actions.selectedProposals.insert(ref)
+        } else {
+          model.actions.selectedProposals.remove(ref)
+        }
+      })
+  }
+
+  private func proposalFooter(_ rows: [MyWorkContent.Proposal]) -> some View {
+    let chosen = rows.filter { model.actions.selectedProposals.contains($0.ref) }.count
+    let target = model.target(AppModel.proposalsTarget)
+    let sending = target.map { model.actions.isSending($0) } ?? false
+    let command = rows.first.flatMap {
+      model.reader?.commands(for: $0.item, workspace: workspace).first
+    }
+    return VStack(alignment: .leading, spacing: 10) {
+      if let failure = target.flatMap({ model.actions.failures[$0] }) {
+        ActionFailureView(failure: failure)
+      }
+      HStack(spacing: 12) {
+        Text("\(chosen) of \(rows.count) selected · accepted tasks go to Todo")
+          .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+          .frame(maxWidth: .infinity, alignment: .leading)
+        if let command {
+          CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
+        }
+        Button(sending ? "Accepting…" : chosen == 0 ? "Accept" : "Accept \(chosen)") {
+          model.acceptSelectedProposals()
+        }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(chosen == 0 || sending)
+      }
+    }.padding(.leading, 32).padding(.top, 4)
+  }
+
+  private func unblockRow(_ ref: String) -> some View {
+    let target = model.target(ref)
+    let sending = target.map { model.actions.isSending($0) } ?? false
+    return VStack(alignment: .leading, spacing: 10) {
+      if let failure = target.flatMap({ model.actions.failures[$0] }) {
+        ActionFailureView(failure: failure)
+      }
+      HStack(spacing: 12) {
+        Text("Its blockers are done; unblocking returns it to Todo.").font(.system(size: 12))
+          .foregroundStyle(Color("SecondaryInk")).frame(maxWidth: .infinity, alignment: .leading)
+        Button(sending ? "Unblocking…" : "Unblock") {
+          model.perform(.unblock(ref: ref), for: ref)
+        }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
+      }
+    }
+  }
+
   private func reviewRow(_ review: MyWorkContent.Review) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(spacing: 10) {
@@ -204,9 +256,13 @@ struct MyWorkView: View {
           }
         }
       }
-      let commands = model.reader?.commands(for: item, workspace: workspace) ?? []
-      ForEach(commands, id: \.text) { command in
-        CommandBlock(command: command)
+      if item.kind == "ready", item.refs.count == 1, let ref = item.refs.first {
+        unblockRow(ref)
+      } else {
+        let commands = model.reader?.commands(for: item, workspace: workspace) ?? []
+        ForEach(commands, id: \.text) { command in
+          CommandBlock(command: command)
+        }
       }
     }
   }

@@ -22,9 +22,26 @@ extension AppModel {
       }
       await refresh(force: true).value
       await loadTaskDetail()
+      actions.selectedProposals.formIntersection(proposalRefs)
       actions.finish(target, failure: failure)
     }
   }
+
+  /// The task proposals My work lists, which a selection may name.
+  var proposalRefs: Set<String> {
+    Set(
+      visibleData?.snapshot?.work.items.filter { $0.kind == "proposal" }.flatMap(\.refs) ?? [])
+  }
+
+  /// Accepts the ticked proposals as one all-or-nothing triage.
+  @discardableResult func acceptSelectedProposals() -> Task<Void, Never>? {
+    let refs = actions.selectedProposals.intersection(proposalRefs).sorted()
+    guard !refs.isEmpty else { return nil }
+    return perform(.acceptProposals(refs: refs), for: Self.proposalsTarget)
+  }
+
+  /// The one target all proposal triage shares, so only one batch runs at a time.
+  static let proposalsTarget = "proposals"
 
   /// Sends the target's draft as an answer to a question.
   @discardableResult func answer(question: String, task: String) -> Task<Void, Never>? {

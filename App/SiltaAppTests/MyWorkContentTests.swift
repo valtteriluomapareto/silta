@@ -23,7 +23,7 @@
         #expect(content.reviews.first?.metadata.contains("step 4 of 4") == true)
         let order = content.documents.first { $0.ref == "doc:order-contract@3" }
         #expect(order?.metadata.contains("from AC-9") == true)
-        #expect(content.hasMatches && content.remaining == 0 && snapshot.work.waitingCount == 8)
+        #expect(content.hasMatches && content.remaining == 0 && snapshot.work.waitingCount == 9)
       }
     }
 
@@ -54,7 +54,7 @@
         #expect(selected.questions.isEmpty && selected.reviews.isEmpty && selected.tasks.isEmpty)
         #expect(
           !MyWorkContent(snapshot: snapshot, search: "AC-1", now: AppV2Fixture.now).hasMatches)
-        #expect(snapshot.work.waitingCount == 8)
+        #expect(snapshot.work.waitingCount == 9)
       }
     }
 
@@ -117,7 +117,7 @@
         }
         let snapshot = try reader.snapshot(workspace: "acme")
         let content = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
-        #expect(content.questions.count == 12 && content.remaining == 8)
+        #expect(content.questions.count == 11 && content.remaining == 9)
         #expect(reader.inboxCommand(workspace: "acme").text.hasSuffix("inbox --for me --all"))
       }
     }

@@ -14,7 +14,7 @@
           let before = try observer.version()
           let first = try #require(try session.load(previous: nil, workspace: nil, force: false))
           #expect(first.workspace == "acme")
-          #expect(first.snapshot?.work.waitingCount == 6)
+          #expect(first.snapshot?.work.waitingCount == 7)
           #expect(
             first.snapshot?.board.appOpenCounts == [
               "acme-mobile": 3, "acme-backend": 3, "acme-web": 1,
