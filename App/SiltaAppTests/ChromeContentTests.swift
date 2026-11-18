@@ -195,17 +195,17 @@
         #expect(
           DocsChromeContent.catalogSummary(docs, stale: true)
             == "6 docs, 1 archived · 2 proposals waiting on you (stale)")
-        let first = AppDocumentList(entries: Array(docs.entries.prefix(2)), total: 9, nextOffset: 2)
-        let proposed = first.entries.filter { $0.state == "proposed" }.count
+        let first = AppDocumentList(
+          entries: docs.entries.filter { $0.slug == "order-contract" }, total: 9, nextOffset: 2)
         #expect(
           DocsChromeContent.catalogSummary(first, stale: false)
-            == "2+ docs" + (proposed > 0 ? " · \(proposed)+ proposals waiting on you" : ""))
+            == "1+ docs · 1+ proposals waiting on you")
         let one = AppDocumentList(
           entries: docs.entries.filter { $0.ref == "doc:push-categories@1" }, total: 1,
           nextOffset: nil)
         #expect(
           DocsChromeContent.catalogSummary(one, stale: false)
-            == "1 docs · 1 proposal waiting on you")
+            == "1 doc · 1 proposal waiting on you")
         let empty = AppDocumentList(entries: [], total: 0, nextOffset: nil)
         #expect(DocsChromeContent.catalogSummary(empty, stale: false) == "No documents")
       }
@@ -216,9 +216,8 @@
         let codex = try reader.task("AC-14", workspace: "acme")
         #expect(SidebarContent.claimAge(codex, now: AppV2Fixture.now) == "1 h")
         let claude = try reader.task("AC-12", workspace: "acme")
-        let updated = try #require(claude.updatedAt)
         let date = try Date(
-          updated, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+          claude.updatedAt, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
         #expect(SidebarContent.claimAge(claude, now: date.addingTimeInterval(30)) == "just now")
         #expect(RelativeAge.text(nil, now: AppV2Fixture.now, short: true) == nil)
       }

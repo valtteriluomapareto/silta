@@ -68,7 +68,10 @@ nonisolated enum SidebarContent {
     let archived = Set(page.entries.filter(\.archived).map(\.slug)).count
     let proposals = Set(page.entries.filter { $0.state == "proposed" && !$0.archived }.map(\.ref))
       .count
-    var parts = ["\(documents)\(more) docs" + (archived > 0 ? ", \(archived)\(more) archived" : "")]
+    let noun = documents == 1 && more.isEmpty ? "doc" : "docs"
+    var parts = [
+      "\(documents)\(more) \(noun)" + (archived > 0 ? ", \(archived)\(more) archived" : "")
+    ]
     if proposals > 0 {
       parts.append(
         "\(proposals)\(more) \(proposals == 1 && more.isEmpty ? "proposal" : "proposals") waiting on you"

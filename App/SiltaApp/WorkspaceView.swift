@@ -184,20 +184,22 @@ struct ConnectionInspector: View {
         Text(failure).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
         Button("Retry") { Task { await model.loadWorkspaceDocuments(force: true) } }
       }
-      if docs.pages[connection.attachment]?.nextOffset != nil {
-        Button("Open all related Docs") { model.openDocuments(about: connection.attachment) }
-          .buttonStyle(CompactActionStyle())
-      }
       Spacer(minLength: 12)
-      Button {
-        model.openDocuments(about: connection.attachment)
-      } label: {
-        Text("Open in Docs").font(.system(size: 13, weight: .semibold))
-          .frame(maxWidth: .infinity, minHeight: 36)
-          .background(Color("AccentColor"), in: .capsule).foregroundStyle(Color("Canvas"))
-          .contentShape(.capsule)
-      }.buttonStyle(.plain).help("Open the documents about this connection")
+      if count != nil && count != "0" && docs.failure == nil {
+        openButton(connection, all: docs.pages[connection.attachment]?.nextOffset != nil)
+      }
     }
+  }
+
+  private func openButton(_ connection: AppConnection, all: Bool) -> some View {
+    Button {
+      model.openDocuments(about: connection.attachment)
+    } label: {
+      Text(all ? "Open all in Docs" : "Open in Docs").font(.system(size: 13, weight: .semibold))
+        .frame(maxWidth: .infinity, minHeight: 36)
+        .background(Color("AccentColor"), in: .capsule).foregroundStyle(Color("Canvas"))
+        .contentShape(.capsule)
+    }.buttonStyle(.plain).help("Open the documents about this connection")
   }
 
   @ViewBuilder private func documentState(_ group: DocsModel.Group) -> some View {

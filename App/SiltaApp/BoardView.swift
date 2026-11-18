@@ -11,7 +11,7 @@ struct BoardView: View {
           snapshot: snapshot, app: model.appFilter, search: model.search,
           proposals: model.showProposed)
         GeometryReader { geometry in
-          let laneWidth = max(180, (geometry.size.width - 24) / 3)
+          let laneWidth = max(180, (geometry.size.width - 28) / 3)
           let open = content.lanes.filter { $0.title != "Done this week" }
           let done = content.lanes.first { $0.title == "Done this week" }
           ScrollView(.horizontal) {
