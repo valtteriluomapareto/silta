@@ -22,12 +22,13 @@
         var filter = TaskFilter()
         filter.proposed = true
         let tasks = try service.list(filter)
-        #expect(tasks.count == 13)
-        #expect(tasks.filter { $0.status == "todo" }.count == 4)
+        #expect(tasks.count == 14)
+        #expect(tasks.filter { $0.status == "todo" }.count == 3)
+        #expect(tasks.filter { $0.status == "blocked" }.map(\.ref) == ["AC-17"])
         #expect(tasks.filter { $0.status == "doing" }.count == 2)
         #expect(tasks.filter { $0.status == "review" }.count == 1)
         #expect(tasks.filter { $0.status == "proposed" }.count == 3)
-        #expect(try service.inbox(for: "me").items.count == 5)
+        #expect(try service.inbox(for: "me").items.count == 6)
       }
     }
 
@@ -40,15 +41,17 @@
         #expect(snapshot.board.todo.count == 4)
         #expect(snapshot.board.doing.count == 2)
         #expect(snapshot.board.review.map(\.ref) == ["AC-9"])
-        #expect(snapshot.board.doneThisWeek.count == 3)
+        #expect(snapshot.board.doneThisWeek.count == 4)
         #expect(snapshot.board.proposals.count == 3)
         #expect(
           snapshot.board.appOpenCounts == ["acme-mobile": 3, "acme-backend": 3, "acme-web": 1])
         #expect(
           !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/log").path))
-        #expect(snapshot.work.waitingCount == 6)
+        #expect(snapshot.work.waitingCount == 7)
         #expect(snapshot.work.items.first { $0.ref == "AC-22" }?.author == "agent:claude:fixture")
-        #expect(snapshot.work.items.first?.commands.first?.contains("--kind answer") == true)
+        #expect(
+          snapshot.work.items.first { $0.kind == "question" }?.commands.first?.contains(
+            "--kind answer") == true)
         #expect(snapshot.work.items.allSatisfy { !$0.commands.joined().contains("--approved") })
       }
     }
@@ -84,7 +87,7 @@
         #expect(work.items.filter { $0.kind == "question" }.count == 4)
         #expect(Set(work.items.filter { $0.kind == "question" }.compactMap(\.ref)).count == 4)
         #expect(work.reviews.map(\.ref) == ["AC-9"])
-        #expect(work.waitingCount == 9)
+        #expect(work.waitingCount == 10)
       }
     }
 
@@ -108,8 +111,8 @@
         }
         let work = try reader.snapshot(workspace: "acme").work
         #expect(work.items.count == 12)
-        #expect(work.remaining == 4)
-        #expect(work.waitingCount == 17)
+        #expect(work.remaining == 5)
+        #expect(work.waitingCount == 18)
         #expect(work.moreCommand != nil)
       }
     }
@@ -134,7 +137,7 @@
           }
         }
         let snapshot = try reader.snapshot(workspace: "acme")
-        #expect(snapshot.board.doneThisWeek.map(\.ref) == ["AC-7"])
+        #expect(snapshot.board.doneThisWeek.map(\.ref) == ["AC-7", "AC-19"])
       }
     }
 
@@ -156,8 +159,10 @@
         #expect(
           Set((board.todo + board.doing + board.review).map(\.ref))
             == Set(
-              tasks.filter { ["todo", "doing", "review"].contains($0["status"] as? String ?? "") }
-                .compactMap { $0["ref"] as? String }))
+              tasks.filter {
+                ["todo", "blocked", "doing", "review"].contains($0["status"] as? String ?? "")
+              }
+              .compactMap { $0["ref"] as? String }))
         let detail = try reader.task("AC-12", workspace: "acme")
         #expect(detail.title == shown["title"] as? String)
         #expect(detail.plan == shown["plan"] as? String)
@@ -293,7 +298,7 @@
           try tx.database.execute(sql: "UPDATE meta SET value='999' WHERE key='min_writer_version'")
         }
         let snapshot = try reader.snapshot(workspace: "acme")
-        #expect(snapshot.work.waitingCount == 6)
+        #expect(snapshot.work.waitingCount == 7)
       }
     }
 

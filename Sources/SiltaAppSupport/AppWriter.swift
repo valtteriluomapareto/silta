@@ -32,6 +32,12 @@ public struct AppWriter: Sendable {
           _ = try service.comment(task, CommentDraft(body: body))
         case .acceptAnswer(let ref):
           _ = try service.acceptComment(ref)
+        case .acceptProposals(let refs):
+          var batch = TaskTriage()
+          batch.accept = refs
+          _ = try service.triage(batch)
+        case .unblock(let ref):
+          _ = try service.unblock([ref])
         }
       }
     } catch let error as AppReadError {

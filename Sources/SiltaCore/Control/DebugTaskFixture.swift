@@ -65,5 +65,19 @@
           """, arguments: ["task:\(workspace)", sequence + 1])
       try tx.recordChange(kind: "task", rowID: id)
     }
+
+    /// Completes a fixture task that other fixture writes needed open, such as a blocker.
+    package static func complete(_ sequence: Int64, in tx: StorageTransaction, at: Date) throws {
+      let stamp = TaskService.timestamp(at)
+      try tx.database.execute(
+        sql: """
+          UPDATE task SET status='done',closed_at=?,updated_at=?,result_md=?,done_sha=?
+          WHERE seq=? AND workspace_id=(SELECT id FROM workspace WHERE slug='acme')
+          """,
+        arguments: [
+          stamp, stamp, "Implemented and verified the Acme change.",
+          "1111111111111111111111111111111111111111", sequence,
+        ])
+    }
   }
 #endif

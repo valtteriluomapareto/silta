@@ -90,7 +90,9 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     command".
 - **Fixture:**
   - B1: a human question on AC-14, answered by Codex (one `answer` item).
-  - B2: AC-17 blocked on AC-8, which is done (one `ready` item).
+  - B2: AC-17 blocked on a new task AC-19, which Claude then finishes (one `ready`
+    item and one more task done this week). A task blocker must be open when the block
+    is set, so it can't name an already-done task.
   - The affected count assertions change in the same commit, which says so.
 - **Docs:**
   - `mac-app.md` stops saying the app never writes or logs.
@@ -116,7 +118,7 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
 | Slice | Scope | Depends on | Verify with |
 |---|---|---|---|
 | B1 (SI-198) | `existingOnly` store option and `StorageError.migrationRequired`; `AppWrite` and `AppWriter` with the log line; answer, accept answer and comment; the model `Writer` seam, drafts and action state; My work question and answer cards; the inspector box; the AC-14 fixture thread; this plan, D50 and §19 | A6b | Core: `existingOnly` refuses a missing store (no directory created) and a pending migration (db bytes unchanged). `AppWriterTests` on an isolated seeded home: answer, comment and accept land as `human:acme` and show in a fresh `AppReader` read; `min_writer_version` 999 refuses as `newerSchema`; a secret is refused with `invalid`; a non-asker accept keeps Core's code; a repeat accept succeeds; one log line per write with no body; a CLI write between the read and the write. Model: the draft is shared by My work and the inspector, kept on failure and cleared on success; a second send while one is in flight is refused; every write forces a refresh; Answer/Comment choice. Light and dark PNGs of the question and answer cards and the inspector box |
-| B2 | Accept proposals and unblock ready tasks; checkboxes and the selection; the AC-17 fixture block | B1 | `AppWriterTests`: triage accepts only the chosen refs. A ref accepted elsewhere first fails the batch with `conflict`, and the others stay proposed. Unblock of a ready task returns it to todo. Model: selection, "Accept N", pruning after refresh, Unblock only on `ready`. Light and dark PNGs |
+| B2 (SI-199) | Accept proposals and unblock ready tasks; checkboxes and the selection; the AC-17 block on AC-19 | B1 | `AppWriterTests`: triage accepts only the chosen refs. A ref accepted elsewhere first fails the batch with `conflict`, and the others stay proposed. Unblock of a ready task returns it to todo. Model: selection, "Accept N", pruning after refresh, Unblock only on `ready`. Light and dark PNGs |
 
 Each slice is one PR. Writes are test-first: the store and `AppWriterTests` come
 before the views.
