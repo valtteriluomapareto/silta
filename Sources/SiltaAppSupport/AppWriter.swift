@@ -37,7 +37,7 @@ public struct AppWriter: Sendable {
           batch.accept = refs
           _ = try service.triage(batch)
         case .unblock(let ref):
-          _ = try service.unblock([ref])
+          _ = try service.unblock([ref], requireReady: true)
         }
       }
     } catch let error as AppReadError {

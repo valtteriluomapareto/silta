@@ -53,7 +53,8 @@ extension MyWorkView {
   }
 
   func proposalFooter(_ rows: [MyWorkContent.Proposal]) -> some View {
-    let chosen = rows.filter { model.actions.selectedProposals.contains($0.ref) }.count
+    let visible = rows.map(\.ref)
+    let chosen = visible.filter { model.actions.selectedProposals.contains($0) }.count
     let target = model.target(AppModel.proposalsTarget)
     let sending = target.map { model.actions.isSending($0) } ?? false
     let command = rows.first.flatMap {
@@ -71,14 +72,14 @@ extension MyWorkView {
           CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
         }
         Button(sending ? "Accepting…" : chosen == 0 ? "Accept" : "Accept \(chosen)") {
-          model.acceptSelectedProposals()
+          model.acceptSelectedProposals(among: visible)
         }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(chosen == 0 || sending)
       }
     }.padding(.leading, 32).padding(.top, 4)
   }
 
   func unblockRow(_ ref: String) -> some View {
-    let target = model.target(ref)
+    let target = model.target(AppModel.unblockTarget(ref))
     let sending = target.map { model.actions.isSending($0) } ?? false
     return VStack(alignment: .leading, spacing: 10) {
       if let failure = target.flatMap({ model.actions.failures[$0] }) {
@@ -88,7 +89,7 @@ extension MyWorkView {
         Text("Its blockers are done; unblocking returns it to Todo.").font(.system(size: 12))
           .foregroundStyle(Color("SecondaryInk")).frame(maxWidth: .infinity, alignment: .leading)
         Button(sending ? "Unblocking…" : "Unblock") {
-          model.perform(.unblock(ref: ref), for: ref)
+          model.unblock(ref)
         }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
       }
     }

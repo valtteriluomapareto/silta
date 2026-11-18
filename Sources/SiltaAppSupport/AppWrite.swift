@@ -8,7 +8,7 @@ public enum AppWrite: Equatable, Sendable {
   case acceptAnswer(ref: String)
   /// Accepts task proposals as todo work, all or none.
   case acceptProposals(refs: [String])
-  /// Returns a blocked task to todo.
+  /// Returns a ready blocked task to todo; one that isn't ready refuses as `blocked`.
   case unblock(ref: String)
 
   /// The §19 command name, distinct from every CLI command.

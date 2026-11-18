@@ -78,6 +78,7 @@
           stamp, stamp, "Implemented and verified the Acme change.",
           "1111111111111111111111111111111111111111", sequence,
         ])
+      guard tx.database.changesCount == 1 else { throw StorageError.corrupt }
     }
   }
 #endif

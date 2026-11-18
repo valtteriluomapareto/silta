@@ -37,6 +37,26 @@
         }
         #expect(refused.code == .conflict)
         #expect(try Self.status(reader, "AC-22") == "proposed")
+        let log = try String(
+          contentsOf: scratch.appending(path: "silta-home/log/2026-11-16.jsonl"), encoding: .utf8)
+        #expect(log.contains("\"command\":\"app triage\"") && log.contains("\"conflict\""))
+      }
+    }
+
+    @Test func aBlockerAddedSinceTheReadKeepsTheTaskBlocked() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppWriterTests.reader(scratch)
+        #expect(try reader.snapshot(workspace: "acme").work.items.contains { $0.kind == "ready" })
+        var block = TaskBlock(why: "Also needs pagination.")
+        block.on = ["AC-16"]
+        _ = try AppWriterTests.agent(reader, .agent(tool: "claude", session: "fixture"))
+          .block("AC-17", block)
+        let refused = try AppWriterTests.failure {
+          try AppWriter(reader: reader).perform(.unblock(ref: "AC-17"), workspace: "acme")
+        }
+        #expect(refused.code == .blocked)
+        #expect(try Self.status(reader, "AC-17") == "blocked")
       }
     }
 

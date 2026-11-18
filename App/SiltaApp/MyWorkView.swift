@@ -166,7 +166,7 @@ struct MyWorkView: View {
           }
         }
       }
-      if item.kind == "ready", item.refs.count == 1, let ref = item.refs.first {
+      if let ref = MyWorkContent.unblockRef(item) {
         unblockRow(ref)
       } else {
         let commands = model.reader?.commands(for: item, workspace: workspace) ?? []

@@ -94,10 +94,11 @@
 
     @Test func acceptingTheSelectionTriagesItAndPrunesWhatLeft() async throws {
       try await fixtureModel { model, _ in
-        #expect(model.proposalRefs == ["AC-21", "AC-22", "AC-23"])
-        #expect(model.acceptSelectedProposals() == nil)
+        let all = ["AC-21", "AC-22", "AC-23"]
+        #expect(model.proposalRefs == Set(all))
+        #expect(model.acceptSelectedProposals(among: all) == nil)
         model.actions.selectedProposals = ["AC-21", "AC-23", "AC-99"]
-        await model.acceptSelectedProposals()?.value
+        await model.acceptSelectedProposals(among: all)?.value
         #expect(model.proposalRefs == ["AC-22"])
         #expect(model.actions.selectedProposals.isEmpty)
         let target = try #require(model.target(AppModel.proposalsTarget))
@@ -106,14 +107,23 @@
     }
 
     @Test func aStaleSelectionFailsWholeAndKeepsWhatIsStillProposed() async throws {
-      try await fixtureModel { model, _ in
-        model.actions.selectedProposals = ["AC-21", "AC-22"]
-        await model.acceptSelectedProposals()?.value
-        model.actions.selectedProposals = ["AC-22", "AC-23"]
+      try await fixtureModel { model, reader in
+        model.actions.selectedProposals = ["AC-21", "AC-23"]
+        try AppWriter(reader: reader).perform(
+          .acceptProposals(refs: ["AC-21"]), workspace: "acme")
+        await model.acceptSelectedProposals(among: ["AC-21", "AC-22", "AC-23"])?.value
         let target = try #require(model.target(AppModel.proposalsTarget))
-        await model.perform(.acceptProposals(refs: ["AC-21", "AC-23"]), for: target.ref)?.value
         #expect(model.actions.failures[target]?.code == "conflict")
-        #expect(model.proposalRefs == ["AC-23"])
+        #expect(model.proposalRefs == ["AC-22", "AC-23"])
+        #expect(model.actions.selectedProposals == ["AC-23"])
+      }
+    }
+
+    @Test func aSearchNeverSendsAHiddenTickedProposal() async throws {
+      try await fixtureModel { model, _ in
+        model.actions.selectedProposals = ["AC-21", "AC-23"]
+        await model.acceptSelectedProposals(among: ["AC-21"])?.value
+        #expect(model.proposalRefs == ["AC-22", "AC-23"])
         #expect(model.actions.selectedProposals == ["AC-23"])
       }
     }
@@ -122,7 +132,10 @@
       try await fixtureModel { model, _ in
         let ready = model.visibleData?.snapshot?.work.items.filter { $0.kind == "ready" }
         #expect(ready?.map(\.refs) == [["AC-17"]])
-        await model.perform(.unblock(ref: "AC-17"), for: "AC-17")?.value
+        let comment = try #require(model.target("AC-17"))
+        model.actions.setDraft("Check the banner copy.", for: comment)
+        await model.unblock("AC-17")?.value
+        #expect(model.actions.draft(comment) == "Check the banner copy.")
         #expect(model.visibleData?.snapshot?.work.items.contains { $0.kind == "ready" } == false)
         #expect(
           model.visibleData?.snapshot?.board.todo.first { $0.ref == "AC-17" }?.status == "todo")

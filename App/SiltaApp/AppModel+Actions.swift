@@ -22,7 +22,7 @@ extension AppModel {
       }
       await refresh(force: true).value
       await loadTaskDetail()
-      actions.selectedProposals.formIntersection(proposalRefs)
+      if visibleData != nil { actions.selectedProposals.formIntersection(proposalRefs) }
       actions.finish(target, failure: failure)
     }
   }
@@ -33,15 +33,23 @@ extension AppModel {
       visibleData?.snapshot?.work.items.filter { $0.kind == "proposal" }.flatMap(\.refs) ?? [])
   }
 
-  /// Accepts the ticked proposals as one all-or-nothing triage.
-  @discardableResult func acceptSelectedProposals() -> Task<Void, Never>? {
-    let refs = actions.selectedProposals.intersection(proposalRefs).sorted()
+  /// Accepts the ticked proposals among `visible` as one all-or-nothing triage, so a
+  /// search never sends a ticked proposal the human can't see.
+  @discardableResult func acceptSelectedProposals(among visible: [String]) -> Task<Void, Never>? {
+    let refs = actions.selectedProposals.intersection(proposalRefs).intersection(visible).sorted()
     guard !refs.isEmpty else { return nil }
     return perform(.acceptProposals(refs: refs), for: Self.proposalsTarget)
   }
 
+  /// Unblocks a ready task under its own target, apart from the task's comment draft.
+  @discardableResult func unblock(_ ref: String) -> Task<Void, Never>? {
+    perform(.unblock(ref: ref), for: Self.unblockTarget(ref))
+  }
+
   /// The one target all proposal triage shares, so only one batch runs at a time.
   static let proposalsTarget = "proposals"
+
+  static func unblockTarget(_ ref: String) -> String { "unblock:" + ref }
 
   /// Sends the target's draft as an answer to a question.
   @discardableResult func answer(question: String, task: String) -> Task<Void, Never>? {

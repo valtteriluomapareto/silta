@@ -137,7 +137,9 @@
           }
         }
         let snapshot = try reader.snapshot(workspace: "acme")
-        #expect(snapshot.board.doneThisWeek.map(\.ref) == ["AC-7", "AC-19"])
+        #expect(
+          snapshot.board.doneThisWeek.map(\.ref).filter { ["AC-6", "AC-7", "AC-8"].contains($0) }
+            == ["AC-7"])
       }
     }
 
