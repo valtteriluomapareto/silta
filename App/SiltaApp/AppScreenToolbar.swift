@@ -5,7 +5,7 @@ struct AppScreenToolbar: ToolbarContent {
   @Bindable var model: AppModel
 
   var body: some ToolbarContent {
-    ToolbarItemGroup(placement: .automatic) {
+    ToolbarItemGroup(placement: .primaryAction) {
       if model.route == .board { BoardAppMenu(model: model) }
       if model.route == .docs {
         Picker(
@@ -29,9 +29,9 @@ struct AppScreenToolbar: ToolbarContent {
         }
       }
     }
-    DefaultToolbarItem(kind: .search, placement: .automatic)
+    DefaultToolbarItem(kind: .search, placement: .primaryAction)
     if model.route == .board || model.route == .workspace {
-      ToolbarItem(placement: .automatic) {
+      ToolbarItem(placement: .primaryAction) {
         Button("Inspector", systemImage: "sidebar.right") { model.toggleInspector() }
           .labelStyle(.iconOnly).help("Toggle inspector (⌥⌘I)")
       }
@@ -52,7 +52,7 @@ private struct BoardAppMenu: View {
       Picker("App", selection: $model.appFilter) {
         Text("All apps").tag(String?.none)
         ForEach(apps, id: \.slug) { Text($0.name).tag(Optional($0.slug)) }
-      }.pickerStyle(.inline)
+      }.pickerStyle(.inline).labelsHidden()
       Divider()
       Toggle("Show proposed tasks (\(menu.proposedCount))", isOn: $model.showProposed)
     } label: {

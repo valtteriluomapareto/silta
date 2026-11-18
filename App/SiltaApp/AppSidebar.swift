@@ -81,30 +81,27 @@ struct AppSidebar: View {
 
   private var workspaceMenu: some View {
     let name = model.data?.workspaces.first { $0.slug == model.workspace }?.name ?? "Workspace"
-    return Menu {
-      ForEach(model.data?.workspaces ?? [], id: \.slug) { workspace in
-        Button {
-          model.selectWorkspace(workspace.slug)
-        } label: {
-          if model.workspace == workspace.slug {
-            Label(workspace.name, systemImage: "checkmark")
-          } else {
-            Text(workspace.name)
+    return HStack(spacing: 9) {
+      Text(String(name.prefix(1)).uppercased()).font(.system(size: 11, weight: .bold))
+        .foregroundStyle(.white).frame(width: 22, height: 22)
+        .background(Color("TideText"), in: .rect(cornerRadius: 6))
+      Menu(name) {
+        ForEach(model.data?.workspaces ?? [], id: \.slug) { workspace in
+          Button {
+            model.selectWorkspace(workspace.slug)
+          } label: {
+            if model.workspace == workspace.slug {
+              Label(workspace.name, systemImage: "checkmark")
+            } else {
+              Text(workspace.name)
+            }
           }
         }
-      }
-    } label: {
-      HStack(spacing: 9) {
-        Text(String(name.prefix(1)).uppercased()).font(.system(size: 11, weight: .bold))
-          .foregroundStyle(.white).frame(width: 22, height: 22)
-          .background(Color("TideText"), in: .rect(cornerRadius: 6))
-        Text(name).font(.system(size: 13, weight: .semibold))
-          .frame(maxWidth: .infinity, alignment: .leading)
-        Image(systemName: "chevron.down").font(.system(size: 9)).foregroundStyle(
-          Color("SecondaryInk"))
-      }.contentShape(.rect)
-    }.menuStyle(.borderlessButton).menuIndicator(.hidden).help("Choose workspace")
-      .disabled(model.data?.workspaces.isEmpty != false)
+      }.menuStyle(.borderlessButton).font(.system(size: 13, weight: .semibold))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("Workspace: " + name).help("Choose workspace")
+        .disabled(model.data?.workspaces.isEmpty != false)
+    }
   }
 
   private var refreshFooter: some View {

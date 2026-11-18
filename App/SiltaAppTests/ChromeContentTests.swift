@@ -98,6 +98,38 @@
       }
     }
 
+    @Test func documentCatalogCachesByVersionAndForceWithoutOwningTheDocsFilter() async throws {
+      try await fixture { reader in
+        let version = CatalogVersion()
+        let model = AppModel(
+          reader: reader,
+          load: { _, workspace, _ in
+            AppLoadedData(
+              workspaces: [], workspace: workspace ?? "acme", snapshot: nil, map: nil,
+              version: await version.value, checkedAt: AppV2Fixture.now)
+          })
+        await model.refresh().value
+        #expect(SidebarContent.documentCount(model.documentCatalog) == "6")
+        model.openDocuments(about: "edge:acme-mobile/acme-backend/http-api")
+        await model.loadDocuments()
+        #expect(model.documents.groups(search: "").count == 3)
+        #expect(SidebarContent.documentCount(model.documentCatalog) == "6")
+        await model.selectWorkspace("missing").value
+        #expect(model.failure == nil && model.catalogFailure != nil && model.documentCatalog == nil)
+        await model.selectWorkspace("acme").value
+        #expect(
+          model.catalogFailure == nil && SidebarContent.documentCount(model.documentCatalog) == "6")
+        model.navigate(to: .mywork)
+        version.value = 2
+        await model.refresh().value
+        #expect(model.catalogFailure == nil && model.documentCatalog != nil)
+        await model.refresh(force: true).value
+        #expect(SidebarContent.documentCount(model.documentCatalog) == "6")
+      }
+    }
+
+    @MainActor private final class CatalogVersion { var value = 1 }
+
     private func fixture(_ body: @MainActor (AppReader) throws -> Void) throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
