@@ -72,30 +72,3 @@ import SiltaAppSupport
       + (source.map { " " + $0 } ?? "") + message
   }
 }
-
-nonisolated struct DocumentDiff {
-  enum Kind { case metadata, added, removed, context }
-  struct Line: Identifiable {
-    let id: Int
-    let text: String
-    let kind: Kind
-  }
-  let lines: [Line]
-  init(_ source: String) {
-    let values = source.split(separator: "\n", omittingEmptySubsequences: false)
-    var body = false
-    lines = values.enumerated().map { offset, value in
-      let text = String(value)
-      let kind: Kind
-      if text.hasPrefix("@@") {
-        body = true
-        kind = .metadata
-      } else if !body {
-        kind = .metadata
-      } else {
-        kind = text.hasPrefix("+") ? .added : text.hasPrefix("-") ? .removed : .context
-      }
-      return Line(id: offset, text: text, kind: kind)
-    }
-  }
-}

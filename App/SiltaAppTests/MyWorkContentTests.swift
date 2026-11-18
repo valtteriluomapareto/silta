@@ -1,7 +1,7 @@
 #if DEBUG
   import Foundation
   @testable import SiltaApp
-  import SiltaAppSupport
+  @testable import SiltaAppSupport
   import Testing
 
   @MainActor struct MyWorkContentTests {
@@ -20,7 +20,7 @@
         #expect(content.questions.first?.headline == question?.body)
         let command = content.questions.first?.command(reader: reader, workspace: "acme")
         #expect(command?.text.hasSuffix("-m \"\"") == true)
-        #expect(content.reviews.first?.metadata.contains("step 4 of 4 · PR #41") == true)
+        #expect(content.reviews.first?.metadata.contains("step 4 of 4") == true)
         let order = content.documents.first { $0.ref == "doc:order-contract@3" }
         #expect(order?.metadata.contains("from AC-9") == true)
         #expect(content.hasMatches && content.remaining == 0 && snapshot.work.waitingCount == 7)
@@ -46,6 +46,13 @@
         now.addingTimeInterval(-seconds).ISO8601Format(
           Date.ISO8601FormatStyle(includingFractionalSeconds: true))
       }
+      for (seconds, expected) in [
+        (59.0, "just now"), (60.0, "1 min ago"),
+        (3540.0, "59 min ago"), (3600.0, "1 h ago"), (82800.0, "23 h ago"),
+        (86400.0, "1 d ago"),
+      ] {
+        #expect(RelativeAge.text(stamp(seconds), now: now) == expected)
+      }
       #expect(RelativeAge.text(stamp(30), now: now) == "just now")
       #expect(RelativeAge.text(stamp(360), now: now) == "6 min ago")
       #expect(RelativeAge.text(stamp(359.999), now: now) == "6 min ago")
@@ -56,16 +63,28 @@
         RelativeAge.text(nil, now: now) == nil && RelativeAge.text("unknown", now: now) == nil)
     }
 
-    @Test func pullRequestLinksStayExplicitAndSafe() {
-      let safe = "https://github.com/acme/example/pull/41"
-      #expect(
-        MyWorkContent.pullRequest(["url:https://github.com/acme/example/issues/41", "url:" + safe])?
-          .absoluteString == safe)
-      for link in [
-        "url:file:///tmp/pull/41", "url:https://user:password@github.com/acme/example/pull/41",
-        "url:" + safe + "?token=secret", "url:https://github.com/acme/example/pull/not-a-number",
-      ] {
-        #expect(MyWorkContent.pullRequest([link]) == nil)
+    @Test func genericAboutLinksDoNotProvePullRequestOwnership() throws {
+      try fixture { reader, _ in
+        let content = MyWorkContent(
+          snapshot: try reader.snapshot(workspace: "acme"), search: "", now: AppV2Fixture.now)
+        let review = try #require(content.reviews.first)
+        #expect(review.task.links.contains { $0.rel == "about" })
+        #expect(!review.metadata.contains("PR #"))
+      }
+    }
+
+    @Test func citedPullRequestsCannotBecomeTheTasksOwnPR() throws {
+      try fixture { reader, home in
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "task", "link", "AC-9",
+            "url:https://github.com/acme/example/pull/99", "--rel", "cites",
+          ], home: home, seed: 401)
+        let content = MyWorkContent(
+          snapshot: try reader.snapshot(workspace: "acme"), search: "", now: AppV2Fixture.now)
+        let review = try #require(content.reviews.first)
+        #expect(review.task.links.contains { $0.rel == "cites" && $0.target.hasSuffix("/pull/99") })
+        #expect(!review.metadata.contains("PR #"))
       }
     }
 

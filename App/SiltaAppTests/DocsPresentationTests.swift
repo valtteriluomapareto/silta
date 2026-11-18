@@ -84,6 +84,58 @@
       #expect(model.screenSummary.contains("loaded history"))
     }
 
+    @Test func realCLIDiffColoursBodyAndMetadataOnlyChanges() throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let body = try AppTestCLI.run(
+        ["--ws", "acme", "doc", "show", "doc:order-contract@3", "--diff"], home: home)
+      #expect(
+        DocumentDiff(body).lines.contains { $0.kind == .added && $0.text.contains("idempotency") })
+      try AppTestCLI.run(
+        [
+          "--ws", "acme", "doc", "edit", "order-contract", "--keep-body",
+          "--title", "Acme order handbook", "--kind", "runbook", "--about", "app:acme-mobile",
+          "--approved", "Update Acme metadata",
+        ], home: home)
+      let metadata = try AppTestCLI.run(
+        ["--ws", "acme", "doc", "show", "doc:order-contract@4", "--diff"], home: home)
+      #expect(!metadata.contains("@@"))
+      let lines = DocumentDiff(metadata).lines
+      for field in ["title:", "kind:", "about:"] {
+        #expect(lines.contains { $0.kind == .removed && $0.text.contains(field) })
+        #expect(lines.contains { $0.kind == .added && $0.text.contains(field) })
+      }
+    }
+
+    @Test func realCLIDiffKeepsHeaderLikeBodyLinesColoured() throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      for (offset, body) in ["-- old\n-- metadata old\nkeep", "++ new\n++ metadata new\nkeep"]
+        .enumerated()
+      {
+        let file = root.appending(path: "body.md")
+        try body.write(to: file, atomically: true, encoding: .utf8)
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "doc", "edit", "order-contract", "-F", file.path,
+            "--approved", "Record Acme punctuation",
+          ], home: home, seed: 501 + offset)
+      }
+      let text = try AppTestCLI.run(
+        ["--ws", "acme", "doc", "show", "doc:order-contract@5", "--diff"], home: home)
+      let lines = DocumentDiff(text).lines
+      for (value, kind) in [
+        ("--- old", DocumentDiff.Kind.removed), ("--- metadata old", .removed),
+        ("+++ new", .added), ("+++ metadata new", .added),
+      ] {
+        #expect(lines.contains { $0.text == value && $0.kind == kind })
+      }
+    }
+
     @Test func markdownTablesAndDiffRemainReadable() {
       let table = "| Name | Value |\n| --- | ---: |\n| amount | 42 |"
       let content = MarkdownContent("# Contract\n\n" + table, title: "Contract")

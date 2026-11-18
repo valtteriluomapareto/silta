@@ -8,16 +8,54 @@
 
   @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
   struct AppCommandTests {
-    @Test func defaultHomeCommandsOmitEnvironmentPrefix() throws {
+    @Test func defaultHomeCommandsAlwaysUseShortPinnedPrefix() throws {
       try withScratchDirectory { scratch in
         let userHome = scratch.appending(path: "user")
         let reader = try AppReader(
           home: userHome.appending(path: ".silta"), user: "acme", userHome: userHome)
         #expect(
-          reader.inboxCommand(workspace: "acme").text == "silta --ws 'acme' inbox --for me --all")
+          reader.inboxCommand(workspace: "acme").text
+            == "SILTA_HOME=~/.silta silta --ws 'acme' inbox --for me --all")
         let custom = try AppReader(
           home: scratch.appending(path: "custom data"), user: "acme", userHome: userHome)
         #expect(custom.inboxCommand(workspace: "acme").text.hasPrefix("SILTA_HOME="))
+      }
+    }
+
+    @Test(arguments: ["existing", "symlink", "var-alias", "trailing-slash"])
+    func pastedCommandsPinExistingDefaultHome(alias: String) throws {
+      try withScratchDirectory { scratch in
+        let userHome = scratch.appending(path: "home")
+        let home = userHome.appending(path: ".silta")
+        try FileManager.default.createDirectory(at: userHome, withIntermediateDirectories: true)
+        if alias == "symlink" {
+          let target = scratch.appending(path: "selected")
+          try AppV2Fixture.seed(home: target)
+          try FileManager.default.createSymbolicLink(at: home, withDestinationURL: target)
+        } else {
+          try AppV2Fixture.seed(home: home)
+        }
+        var selected = home
+        if alias == "var-alias" {
+          selected = URL(
+            filePath: home.path.replacingOccurrences(of: "/private/var/", with: "/var/"))
+        } else if alias == "trailing-slash" {
+          selected = URL(filePath: home.path + "/")
+        }
+        let reader = try AppReader(home: selected, user: "acme", userHome: userHome)
+        let command = reader.inboxCommand(workspace: "acme").text
+        #expect(command.hasPrefix("SILTA_HOME=~/.silta silta "))
+        let binary = try SiltaBinary.url()
+        let result = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-c", command], in: scratch,
+          environment: [
+            "HOME": userHome.path, "SILTA_HOME": scratch.appending(path: "hostile").path,
+            "USER": "acme", "SILTA_ACTOR": "human:acme",
+            "PATH": binary.deletingLastPathComponent().path + ":/usr/bin:/bin",
+          ])
+        #expect(result.termination == .exit(0), "\(result)")
+        #expect(result.stdout.contains("AC-12"))
+        #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "hostile").path))
       }
     }
 

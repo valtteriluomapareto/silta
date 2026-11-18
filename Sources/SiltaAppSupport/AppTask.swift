@@ -39,8 +39,8 @@ public struct AppTask: Equatable, Sendable {
   public let closedAt: String?
   /// Most recent recorded submission; nil means no submission event was recorded.
   public let submission: AppSubmission?
-  /// Masked typed task-link targets, including explicitly linked pull requests.
-  public let links: [String]
+  /// Masked task links retaining their relationship to the target.
+  public let links: [AppTaskLink]
   /// Discussion included when reading task detail.
   public let comments: [AppComment]
 }
@@ -58,15 +58,19 @@ extension AppTask {
       submission: submission.map {
         AppSubmission(actor: SecretGuard.redacted($0.actor), at: SecretGuard.redacted($0.at))
       },
-      links: task.links.map {
-        let decoded = $0.target.removingPercentEncoding ?? $0.target
-        return SecretGuard.matches(in: decoded).isEmpty
-          ? SecretGuard.redacted($0.target) : SecretGuard.redacted(decoded)
-      },
+      links: task.links.map { AppTaskLink(rel: $0.rel, target: $0.displayTarget) },
       comments: (task.comments ?? []).map {
         AppComment(
           ref: $0.ref, kind: $0.kind, actor: $0.actor, body: $0.body,
           createdAt: $0.createdAt, replyTo: $0.replyTo)
       })
   }
+}
+
+/// A displayed task link with its recorded relationship preserved.
+public struct AppTaskLink: Equatable, Sendable {
+  /// Recorded relationship, such as `about` or `cites`.
+  public let rel: String
+  /// Masked canonical target reference.
+  public let target: String
 }

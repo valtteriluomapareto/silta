@@ -5,6 +5,8 @@ package import Foundation
 package struct SiltaHome: Sendable {
   /// Canonical absolute path; resolving configuration never creates it.
   package let url: URL
+  /// Whether this directory has the identity of the user's default `.silta` home.
+  package let isDefault: Bool
   /// Whether deterministic overrides may be used at this home.
   package let permitsDeterminism: Bool
 
@@ -47,7 +49,8 @@ package struct SiltaHome: Sendable {
       return canonical.path.hasPrefix(rootPath + "/")
     }
     return SiltaHome(
-      url: canonical, permitsDeterminism: !isRealHome && (deterministic || isTemporary))
+      url: canonical, isDefault: isRealHome,
+      permitsDeterminism: !isRealHome && (deterministic || isTemporary))
   }
 }
 
