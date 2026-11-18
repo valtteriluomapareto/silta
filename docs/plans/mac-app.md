@@ -101,7 +101,7 @@ the human copies.
   otherwise a template keyed by item kind. Placeholders never decide for the human:
   nothing is pre-filled for drop or reject, and there's no `-F -`.
 - **Layout:** `NavigationSplitView` (three columns for Docs), `.inspector`,
-  `.searchable` in the toolbar. Glass only on the sidebar, toolbar and controls. The
+  native search in the toolbar, placed before the inspector toggle. Glass only on the sidebar, toolbar and controls. The
   app accent is tide `#0B6E8E`, from the asset catalog.
 
 ## Slices

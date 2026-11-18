@@ -21,7 +21,7 @@ struct AppSidebar: View {
                     .padding(.horizontal, route == .mywork ? 6 : 0)
                     .foregroundStyle(
                       route == .mywork && model.route == route
-                        ? Color.white
+                        ? Color("Canvas")
                         : model.route == route ? Color("TideText") : Color("SecondaryInk")
                     )
                     .background(
@@ -83,7 +83,7 @@ struct AppSidebar: View {
     let name = model.data?.workspaces.first { $0.slug == model.workspace }?.name ?? "Workspace"
     return HStack(spacing: 9) {
       Text(String(name.prefix(1)).uppercased()).font(.system(size: 11, weight: .bold))
-        .foregroundStyle(.white).frame(width: 22, height: 22)
+        .foregroundStyle(Color("Canvas")).frame(width: 22, height: 22)
         .background(Color("TideText"), in: .rect(cornerRadius: 6))
       Menu(name) {
         ForEach(model.data?.workspaces ?? [], id: \.slug) { workspace in
