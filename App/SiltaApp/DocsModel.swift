@@ -134,13 +134,19 @@ import SiltaAppSupport
 
   func groups(search: String) -> [Group] {
     let matching = entries.filter { entry in
-      (!proposedOnly || entry.state == "proposed")
+      (scope?.archived == true || !entry.archived)
+        && (!proposedOnly || entry.state == "proposed")
         && AppSearch.matches(
           search,
           values: [entry.ref, entry.title ?? "", entry.kind ?? ""]
             + (entry.about ?? []))
     }
     return DocsContent.groups(matching)
+  }
+
+  var archivedCount: Int { Set(entries.filter(\.archived).map(\.slug)).count }
+  var archivedFooter: String {
+    "\(archivedCount)" + (nextList == nil ? "" : "+") + " archived"
   }
 
   @discardableResult
@@ -168,7 +174,7 @@ import SiltaAppSupport
     listLoading = true
     defer { if token == listGeneration { listLoading = false } }
     do {
-      let result = try await readList(reader, workspace, about, archived, offset)
+      let result = try await readList(reader, workspace, about, true, offset)
       guard token == listGeneration, !Task.isCancelled else { return nil }
       entries = append ? entries + result.entries : result.entries
       nextList = result.nextOffset

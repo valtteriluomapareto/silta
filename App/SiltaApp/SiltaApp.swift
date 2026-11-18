@@ -72,7 +72,7 @@ struct SiltaApp: App {
       let reader = try AppReader(home: home, user: user, now: now)
       let session = AppReadSession(reader: reader, now: now)
       return AppModel(
-        reader: reader,
+        reader: reader, now: now,
         load: { previous, workspace, force in
           try await Task.detached {
             try session.load(previous: previous, workspace: workspace, force: force)
