@@ -13,15 +13,19 @@ package final class DatabaseStore: Sendable {
   private let clock: any Clock
   private let jitter: @Sendable () -> UInt64
   private let readBusyTimeout: TimeInterval
+  /// Writes only to an existing, current database: never creates or migrates one.
+  private let existingOnly: Bool
   private let writer = Mutex<DatabaseQueue?>(nil)
 
   /// Configures the fixed database/backup locations without opening or creating files.
+  /// With `existingOnly`, writes refuse a missing database or a pending migration.
   package init(
     home: URL, clock: any Clock, jitter: @escaping @Sendable () -> UInt64,
-    readBusyTimeout: TimeInterval = 5
+    readBusyTimeout: TimeInterval = 5, existingOnly: Bool = false
   ) {
     self.home = home
     self.clock = clock
+    self.existingOnly = existingOnly
     self.jitter = jitter
     self.readBusyTimeout = readBusyTimeout
     path = home.appending(path: "silta.db").path
@@ -33,7 +37,10 @@ package final class DatabaseStore: Sendable {
     do {
       try writer.withLock { cached in
         guard cached == nil else { return }
-        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        try requireExistingFile()
+        if !existingOnly {
+          try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        }
         let descriptor = Darwin.open(
           home.appending(path: "migration.lock").path, O_CREAT | O_RDWR, 0o600)
         guard descriptor >= 0 else { throw StorageError.fileFailure(errno, at: home.path) }
@@ -43,24 +50,14 @@ package final class DatabaseStore: Sendable {
           throw StorageError.fileFailure(errno, at: home.path)
         }
         defer { flock(descriptor, LOCK_UN) }
+        try requireExistingFile()  // again under the lock: it may have gone since
         var config = Configuration()
         config.prepareDatabase { TaskVisibility.register(in: $0) }
         config.busyMode = .timeout(5)
         let queue = try DatabaseQueue(path: path, configuration: config)
         let migrator = StorageSchema.migrator
-        let pending = try queue.read { db -> String? in
-          if try db.tableExists("meta") { try Self.checkWriterVersion(db) }
-          let applied = try migrator.appliedIdentifiers(db)
-          let pending = migrator.migrations.first { !applied.contains($0) }
-          // A newer binary's schema is never migrated here; min_writer_version alone
-          // decides whether this binary may still write to it (D32). One that also
-          // lacks a migration of ours has diverged, and has none of our tables to trust.
-          if try migrator.hasBeenSuperseded(db) {
-            guard pending == nil else { throw StorageError.schemaTooNew }
-            return nil
-          }
-          return pending
-        }
+        let pending = try queue.read(Self.pendingMigration)
+        if existingOnly, pending != nil { throw StorageError.migrationRequired }
         try queue.writeWithoutTransaction { db in
           try Self.requireWAL(try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL"))
         }
@@ -79,6 +76,29 @@ package final class DatabaseStore: Sendable {
     } catch {
       throw StorageError.mapped(error, at: path)
     }
+  }
+
+  /// Refuses a missing database file when this store may only write to an existing one.
+  private func requireExistingFile() throws {
+    guard !existingOnly || FileManager.default.fileExists(atPath: path) else {
+      throw StorageError.cannotOpen
+    }
+  }
+
+  /// The first migration this binary still has to apply, after the writer floor check.
+  private static func pendingMigration(_ db: Database) throws -> String? {
+    let migrator = StorageSchema.migrator
+    if try db.tableExists("meta") { try checkWriterVersion(db) }
+    let applied = try migrator.appliedIdentifiers(db)
+    let pending = migrator.migrations.first { !applied.contains($0) }
+    // A newer binary's schema is never migrated here; min_writer_version alone
+    // decides whether this binary may still write to it (D32). One that also
+    // lacks a migration of ours has diverged, and has none of our tables to trust.
+    if try migrator.hasBeenSuperseded(db) {
+      guard pending == nil else { throw StorageError.schemaTooNew }
+      return nil
+    }
+    return pending
   }
 
   /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most

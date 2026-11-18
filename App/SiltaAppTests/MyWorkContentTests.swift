@@ -23,7 +23,25 @@
         #expect(content.reviews.first?.metadata.contains("step 4 of 4") == true)
         let order = content.documents.first { $0.ref == "doc:order-contract@3" }
         #expect(order?.metadata.contains("from AC-9") == true)
-        #expect(content.hasMatches && content.remaining == 0 && snapshot.work.waitingCount == 7)
+        #expect(content.hasMatches && content.remaining == 0 && snapshot.work.waitingCount == 8)
+      }
+    }
+
+    @Test func answersToTheHumanGetTheirOwnAcceptableCard() throws {
+      try fixture { reader, _ in
+        let snapshot = try reader.snapshot(workspace: "acme")
+        let content = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
+        let answer = try #require(content.answers.first)
+        #expect(content.answers.count == 1 && answer.item.ref == "AC-14/2")
+        #expect(answer.metadata.hasPrefix("Codex answered you · Retry push registrations · "))
+        #expect(answer.item.body?.hasPrefix("Yes. After an hour") == true)
+        #expect(answer.canAccept(reader: reader, workspace: "acme"))
+        #expect(!content.other.contains { $0.kind == "answer" })
+        let board = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+        #expect(
+          board.newestQuestion(for: "AC-12", reader: reader, workspace: "acme")?.question
+            == "AC-12/1")
+        #expect(board.newestQuestion(for: "AC-15", reader: reader, workspace: "acme") == nil)
       }
     }
 
@@ -36,7 +54,7 @@
         #expect(selected.questions.isEmpty && selected.reviews.isEmpty && selected.tasks.isEmpty)
         #expect(
           !MyWorkContent(snapshot: snapshot, search: "AC-1", now: AppV2Fixture.now).hasMatches)
-        #expect(snapshot.work.waitingCount == 7)
+        #expect(snapshot.work.waitingCount == 8)
       }
     }
 
@@ -99,7 +117,7 @@
         }
         let snapshot = try reader.snapshot(workspace: "acme")
         let content = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
-        #expect(content.questions.count == 12 && content.remaining == 7)
+        #expect(content.questions.count == 12 && content.remaining == 8)
         #expect(reader.inboxCommand(workspace: "acme").text.hasSuffix("inbox --for me --all"))
       }
     }

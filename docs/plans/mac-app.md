@@ -59,8 +59,7 @@ the human copies.
   controls, and the keyboard shortcuts ⌘1–⌘4, ⌘F and ⌥⌘I.
 
 **Out of v1:**
-- **Writes.** As `human:*` the app may run them directly, but answering, triage, done
-  and doc triage as buttons with a confirm step are the next plan.
+- **Writes.** The first actions are planned in [`mac-app-actions.md`](mac-app-actions.md).
 - **A signed release bundle with the embedded CLI**, which is M5. v1 is a local dev
   build: `scripts/install-dev.sh` installs `silta` and `~/Applications/Silta Dev.app`
   from the same clean `main` commit, or replaces neither.
@@ -82,13 +81,14 @@ the human copies.
   - **Guard:** SiltaCore stays free of UI code.
 - **Store and actor:**
   - The app opens `SILTA_HOME` (default `~/.silta`) through SiltaCore's store and
-    never writes or migrates.
+    never creates or migrates it. Its writes ([`mac-app-actions.md`](mac-app-actions.md),
+    D50) open the existing store only.
   - A store with a newer schema shows the "update Silta" state.
   - Queries run as `human:<USER>`, so the inbox gives human-form `next` commands such
     as `task triage --accept …`. No `--approved` placeholders.
   - Runnable recovery commands carry the selected `SILTA_HOME` with literal shell
     quoting, so a custom app home cannot recover a different default store.
-  - Reads aren't logged; §19 logging belongs to the CLI front-end.
+  - Reads aren't logged. Each app write logs one `app <action>` line (§19).
 - **Freshness:** check `PRAGMA data_version` when the window gains focus, on ⌘R, and
   on a 5-second timer while the window is frontmost. Reload when it changed or a
   one-minute cache ceiling is reached. The ceiling bounds clock-only staleness;
