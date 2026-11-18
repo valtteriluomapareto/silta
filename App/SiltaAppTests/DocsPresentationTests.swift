@@ -109,6 +109,35 @@
       }
     }
 
+    @Test func realCLIDiffKeepsHeaderLikeBodyLinesColoured() throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      for (offset, body) in ["-- old\n-- metadata old\nkeep", "++ new\n++ metadata new\nkeep"]
+        .enumerated()
+      {
+        let file = root.appending(path: "body.md")
+        try body.write(to: file, atomically: true, encoding: .utf8)
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "doc", "edit", "order-contract", "-F", file.path,
+            "--approved", "Record Acme punctuation",
+          ], home: home, seed: 501 + offset)
+      }
+      let text = try AppTestCLI.run(
+        ["--ws", "acme", "doc", "show", "doc:order-contract@5", "--diff"], home: home)
+      let lines = DocumentDiff(text).lines
+      for (value, kind) in [
+        ("--- old", DocumentDiff.Kind.removed), ("--- metadata old", .removed),
+        ("+++ new", .added), ("+++ metadata new", .added),
+      ] {
+        withKnownIssue("Header-like body lines must retain hunk addition/removal colours") {
+          #expect(lines.contains { $0.text == value && $0.kind == kind })
+        }
+      }
+    }
+
     @Test func markdownTablesAndDiffRemainReadable() {
       let table = "| Name | Value |\n| --- | ---: |\n| amount | 42 |"
       let content = MarkdownContent("# Contract\n\n" + table, title: "Contract")
