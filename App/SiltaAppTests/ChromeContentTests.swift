@@ -23,12 +23,18 @@
         #expect(SidebarContent.claimTitle(task) == "AC-12 · step 2 of 4")
         #expect(
           SidebarContent.claimSubtitle(task, now: AppV2Fixture.now) == "Claude · updated 6 min ago")
-        #expect(SidebarContent.appColor(index: 0) == "SecondaryInk")
-        #expect(SidebarContent.appColor(index: 1) == "TideText")
-        #expect(SidebarContent.appColor(index: 2) == "Warning")
+        #expect(SidebarContent.appColor(index: 0) == "AppSlate")
+        #expect(SidebarContent.appColor(index: 1) == "AppViolet")
+        #expect(SidebarContent.appColor(index: 2) == "AppClay")
+        #expect(SidebarContent.claimAge(task, now: AppV2Fixture.now) == "6 min")
         let docs = try reader.documents(workspace: "acme", archived: true)
         #expect(SidebarContent.documentCount(docs) == "6")
         #expect(SidebarContent.documentCount(docs, stale: true) == "6 (stale)")
+        #expect(
+          DocsChromeContent.catalogSummary(docs, stale: false)
+            == "6 docs, 1 archived · 2 proposals waiting on you")
+        #expect(DocsChromeContent.catalogSummary(nil, stale: false) == "Workspace documents")
+        #expect(DocsChromeContent.catalogSummary(nil, stale: true) == "Documents unavailable")
         #expect(SidebarContent.documentCount(nil, stale: true) == "Unavailable")
         let partial = AppDocumentList(entries: docs.entries, total: 30, nextOffset: 20)
         #expect(SidebarContent.documentCount(partial) == "6+")
@@ -182,6 +188,40 @@
     }
 
     @MainActor private final class CatalogVersion { var value = 1 }
+
+    @Test func catalogSummaryQualifiesPagingStaleAndEmptyCatalogs() throws {
+      try fixture { reader in
+        let docs = try reader.documents(workspace: "acme", archived: true)
+        #expect(
+          DocsChromeContent.catalogSummary(docs, stale: true)
+            == "6 docs, 1 archived · 2 proposals waiting on you (stale)")
+        let first = AppDocumentList(
+          entries: docs.entries.filter { $0.slug == "order-contract" }, total: 9, nextOffset: 2)
+        #expect(
+          DocsChromeContent.catalogSummary(first, stale: false)
+            == "1+ docs · 1+ proposals waiting on you")
+        let one = AppDocumentList(
+          entries: docs.entries.filter { $0.ref == "doc:push-categories@1" }, total: 1,
+          nextOffset: nil)
+        #expect(
+          DocsChromeContent.catalogSummary(one, stale: false)
+            == "1 doc · 1 proposal waiting on you")
+        let empty = AppDocumentList(entries: [], total: 0, nextOffset: nil)
+        #expect(DocsChromeContent.catalogSummary(empty, stale: false) == "No documents")
+      }
+    }
+
+    @Test func claimAgeIsShortAndQualified() throws {
+      try fixture { reader in
+        let codex = try reader.task("AC-14", workspace: "acme")
+        #expect(SidebarContent.claimAge(codex, now: AppV2Fixture.now) == "1 h")
+        let claude = try reader.task("AC-12", workspace: "acme")
+        let date = try Date(
+          claude.updatedAt, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+        #expect(SidebarContent.claimAge(claude, now: date.addingTimeInterval(30)) == "just now")
+        #expect(RelativeAge.text(nil, now: AppV2Fixture.now, short: true) == nil)
+      }
+    }
 
     private func fixture(_ body: @MainActor (AppReader) throws -> Void) throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

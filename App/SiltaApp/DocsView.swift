@@ -11,76 +11,84 @@ struct DocsView: View {
   }
 
   var body: some View {
-    HSplitView {
-      documentList.frame(minWidth: 230, idealWidth: 270, maxWidth: 280)
-      GeometryReader { geometry in
-        ScrollView {
-          VStack(alignment: .leading, spacing: 20) {
-            if let banner = DocsChromeContent.banner(
-              document: docs.document, revisions: docs.versions, partial: docs.nextVersions != nil,
-              now: model.now())
-            {
-              proposalBanner(banner)
-            }
-            if let document = docs.document {
-              HStack(alignment: .firstTextBaseline) {
-                Text(document.title ?? document.slug).font(.system(size: 24, weight: .bold))
-                Spacer(minLength: 12)
-                CopyValue(
-                  value: document.ref, title: "Copy document reference",
-                  warning: document.state == "proposed")
-              }
-              if let now = model.visibleData?.checkedAt {
-                Text(DocsContent.attribution(document, now: now))
-                  .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
-              }
-              if let about = document.about, !about.isEmpty {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                  Text("About").font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
-                  ViewThatFits {
-                    HStack { ForEach(about, id: \.self) { attachment($0) } }
-                    VStack(alignment: .leading) { ForEach(about, id: \.self) { attachment($0) } }
-                  }
-                }
-              } else if document.about == nil {
-                Text("Attachments not recorded").font(.system(size: 12))
-                  .foregroundStyle(Color("SecondaryInk"))
-              }
-            }
-            if let error = docs.failure {
-              Text(error).foregroundStyle(Color("SecondaryInk"))
-              Button("Retry") { Task { await show(force: true) } }
-            }
-            if phase == .loading { ProgressView("Loading document…") }
-            if docs.ref == nil && phase == .ready {
-              ContentUnavailableView("Select a document", systemImage: "doc.text")
-            } else if docs.view == .comments {
-              comments
-            } else if docs.view == .changes {
-              diff
-            } else if docs.showingSource {
-              ScrollView(.horizontal) {
-                Text(DocsContent.readerText(docs.document, body: docs.body, diagnostic: docs.text))
-                  .font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
-              }
-            } else {
-              DocumentMarkdown(
-                DocsContent.readerText(docs.document, body: docs.body, diagnostic: docs.text),
-                title: docs.document?.title)
-            }
-            if docs.nextLine != nil, docs.view != .comments {
-              Button("Load more") { Task { await show(append: true) } }.disabled(docs.loading)
-            }
-            Spacer(minLength: 24)
-            if docs.document != nil { footer }
-          }.padding(24).frame(minHeight: geometry.size.height, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    HStack(spacing: 12) {
+      documentList.frame(width: 268).seaPane()
+      VStack(spacing: 0) {
+        if let banner = DocsChromeContent.banner(
+          document: docs.document, revisions: docs.versions, partial: docs.nextVersions != nil,
+          now: model.now())
+        {
+          proposalBanner(banner)
         }
-      }.frame(minWidth: 400)
-    }
-    .foregroundStyle(Color("Ink"))
-    .task(id: listKey) { await model.loadDocuments() }
-    .task(id: detailKey) { await show() }
+        GeometryReader { geometry in
+          ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+              if let document = docs.document {
+                HStack(alignment: .firstTextBaseline) {
+                  Text(document.title ?? document.slug).font(.system(size: 22, weight: .bold))
+                    .tracking(-0.2)
+                  Spacer(minLength: 12)
+                  CopyValue(
+                    value: document.ref, title: "Copy document reference",
+                    warning: document.state == "proposed")
+                }
+                Text(model.screenSummary).font(.system(size: 12, weight: .medium))
+                  .foregroundStyle(Color("SecondaryInk"))
+                if let now = model.visibleData?.checkedAt {
+                  Text(DocsContent.attribution(document, now: now))
+                    .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+                }
+                if let about = document.about, !about.isEmpty {
+                  HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("About").font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+                    ViewThatFits {
+                      HStack { ForEach(about, id: \.self) { attachment($0) } }
+                      VStack(alignment: .leading) { ForEach(about, id: \.self) { attachment($0) } }
+                    }
+                  }
+                } else if document.about == nil {
+                  Text("Attachments not recorded").font(.system(size: 12))
+                    .foregroundStyle(Color("SecondaryInk"))
+                }
+              }
+              if let error = docs.failure {
+                Text(error).foregroundStyle(Color("SecondaryInk"))
+                Button("Retry") { Task { await show(force: true) } }
+              }
+              if phase == .loading { ProgressView("Loading document…") }
+              if docs.ref == nil && phase == .ready {
+                ContentUnavailableView("Select a document", systemImage: "doc.text")
+              } else if docs.view == .comments {
+                comments
+              } else if docs.view == .changes {
+                diff
+              } else if docs.showingSource {
+                ScrollView(.horizontal) {
+                  Text(
+                    DocsContent.readerText(docs.document, body: docs.body, diagnostic: docs.text)
+                  )
+                  .font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
+                }
+              } else {
+                DocumentMarkdown(
+                  DocsContent.readerText(docs.document, body: docs.body, diagnostic: docs.text),
+                  title: docs.document?.title)
+              }
+              if docs.nextLine != nil, docs.view != .comments {
+                Button("Load more") { Task { await show(append: true) } }.disabled(docs.loading)
+              }
+              Spacer(minLength: 24)
+              if docs.document != nil { footer }
+            }.padding(.horizontal, 44).padding(.vertical, 26)
+              .frame(maxWidth: 760, minHeight: geometry.size.height, alignment: .topLeading)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+        }
+      }.frame(minWidth: 360).clipShape(.rect(cornerRadius: 18, style: .continuous)).seaCard()
+    }.padding(.bottom, 12)
+      .foregroundStyle(Color("Ink"))
+      .task(id: listKey) { await model.loadDocuments() }
+      .task(id: detailKey) { await show() }
   }
 
 }
@@ -88,12 +96,10 @@ struct DocsView: View {
 extension DocsView {
   private var documentList: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Picker(
-        "Documents", selection: Binding(get: { docs.proposedOnly }, set: { docs.proposedOnly = $0 })
-      ) {
-        Text("All").tag(false)
-        Text(docs.proposedLabel).tag(true)
-      }.pickerStyle(.segmented).labelsHidden().padding(.horizontal, 12)
+      SeaSegments(
+        label: "Documents", options: [(false, "All"), (true, docs.proposedLabel)],
+        selection: Binding(get: { docs.proposedOnly }, set: { docs.proposedOnly = $0 })
+      ).padding(.horizontal, 12)
       if let about = model.docsAbout {
         HStack(spacing: 6) {
           Text(DocsChromeContent.aboutLabel(about)).font(.system(size: 11)).lineLimit(2).help(about)
@@ -119,19 +125,28 @@ extension DocsView {
                     VStack(alignment: .leading, spacing: 4) {
                       Text(preferred.title ?? preferred.slug).font(
                         .system(size: 13, weight: .medium)
-                      ).foregroundStyle(Color(preferred.archived ? "SecondaryInk" : "Ink"))
+                      ).foregroundStyle(
+                        Color(
+                          preferred.archived
+                            ? "SecondaryInk" : docs.document?.slug == group.id ? "TideText" : "Ink")
+                      )
                       Text(DocsContent.row(group)).font(.system(size: 11)).foregroundStyle(
-                        Color(preferred.archived ? "SecondaryInk" : "TideText"))
+                        Color(
+                          group.entries.contains { $0.state == "proposed" } && !preferred.archived
+                            ? "Warning" : "SecondaryInk"))
                     }.frame(maxWidth: .infinity, alignment: .leading)
                   }.padding(.vertical, 5).contentShape(.rect)
                 }.buttonStyle(.plain)
+                  .accessibilityAddTraits(docs.document?.slug == group.id ? .isSelected : [])
                   .listRowSeparator(.hidden)
                   .listRowBackground(
-                    docs.document?.slug == group.id ? Color("TideText").opacity(0.12) : .clear)
+                    RoundedRectangle(cornerRadius: 10).fill(
+                      docs.document?.slug == group.id ? Color("AccentColor").opacity(0.08) : .clear
+                    ).padding(.horizontal, 6))
               }
             }
           } header: {
-            Text(section.title).font(.system(size: 11, weight: .semibold))
+            Text(section.title).font(.system(size: 12, weight: .semibold))
               .foregroundStyle(Color("SecondaryInk")).textCase(nil).help(section.id)
           }
         }
@@ -142,7 +157,7 @@ extension DocsView {
         if docs.nextList != nil {
           Button("Load more documents") { Task { await model.loadDocuments(append: true) } }
         }
-      }.listStyle(.plain)
+      }.listStyle(.plain).scrollContentBackground(.hidden)
       if docs.archivedCount > 0 || docs.nextList != nil {
         Divider()
         HStack(spacing: 6) {
@@ -162,9 +177,13 @@ extension DocsView {
   }
 
   private func proposalBanner(_ banner: DocsChromeContent.Banner) -> some View {
-    HStack(alignment: .top, spacing: 10) {
-      StatusDot(color: Color("Warning")).padding(.top, 4)
-      Text(banner.text).font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
+    HStack(alignment: .center, spacing: 10) {
+      if let actor = banner.proposal.actor {
+        ActorLabel(actor: actor).labelStyle(.iconOnly).accessibilityHidden(true)
+      } else {
+        StatusDot(color: Color("Warning"))
+      }
+      Text(banner.text).font(.system(size: 13)).frame(maxWidth: .infinity, alignment: .leading)
       Button("Show changes") {
         model.select(document: banner.proposal.ref)
         model.select(documentView: .changes)
@@ -175,7 +194,11 @@ extension DocsView {
           model.select(documentView: .document)
         }.buttonStyle(CompactActionStyle())
       }
-    }.padding(12).background(Color("Warning").opacity(0.08), in: .rect(cornerRadius: 8))
+    }.padding(.horizontal, 18).padding(.vertical, 10)
+      .background(Color("Warning").opacity(0.08))
+      .overlay(alignment: .bottom) {
+        Rectangle().fill(Color("Warning").opacity(0.15)).frame(height: 1)
+      }
   }
 
   private func attachment(_ ref: String) -> some View {

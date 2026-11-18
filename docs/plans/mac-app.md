@@ -12,10 +12,9 @@ the human copies.
 
 ## Inputs
 
-- Designs: Paper file "Silta", page "MVP v2":
-  - screens: My work, Board, Docs, Workspace;
-  - a states and dark-mode sheet;
-  - notes with the glossary and fixture dataset.
+- Designs: Paper file "Silta", page "MVP v3": My work, Board, Docs and Workspace in the
+  Sea glass language, a dark-mode sheet, map states and notes. Page "MVP v2" keeps the
+  glossary, fixture dataset, toolbar rules and the states sheet that v3 doesn't redraw.
 - The page "MVP v1" holds a feasibility review written for a CLI-based design. Its
   data mapping still applies; its process-boundary notes don't.
 - Spec:
@@ -65,7 +64,8 @@ the human copies.
 - **A signed release bundle with the embedded CLI**, which is M5. v1 is a local dev
   build: `scripts/install-dev.sh` installs `silta` and `~/Applications/Silta Dev.app`
   from the same clean `main` commit, or replaces neither.
-- A free-form graph map, an activity feed, notifications and iOS.
+- A free-form or editable graph map, an activity feed, notifications and iOS. The
+  computed workspace map is slice A6b.
 
 ## Design
 
@@ -101,9 +101,16 @@ the human copies.
   human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
   nothing is pre-filled for drop or reject, and there's no `-F -`.
-- **Layout:** `NavigationSplitView` (three columns for Docs), `.inspector`,
-  native search in the toolbar, placed before the inspector toggle. Glass only on the
-  sidebar, toolbar and controls. The app accent is tide `#0B6E8E`, from the asset catalog.
+- **Layout:** `NavigationSplitView`, `.inspector`, native search in the toolbar, placed
+  before the inspector toggle. The window toolbar holds the screen's controls; the
+  content starts with one large title and its count line (`navigationTitle` still names
+  the window). The app accent is tide `#0B6E8E`, from the asset catalog.
+- **Sea glass surfaces:** an opaque shore gradient is the window background, under the
+  system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
+  Reduce Transparency makes them opaque and drops the gradient's glows; Increase
+  Contrast adds borders. Colour roles: tide for selection, refs and actions; brass for
+  proposed or waiting on you; kelp for done; app identity uses violet, slate and clay,
+  never a status colour.
 - **App icon:** `App/SiltaApp/AppIcon.icon`, an Icon Composer document with flat
   light and dark layers in tide. Its design, geometry and regeneration steps are in
   [`app-icon.md`](../app-icon.md).
@@ -118,8 +125,11 @@ the human copies.
 | A3 | Board and task inspector | A2 | View-model tests on the seed, state and PNG checks; unlocked interaction follow-up |
 | A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed, state and PNG checks; unlocked interaction follow-up |
 | A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; state and PNG checks; unlocked interaction follow-up |
+| A6a (SI-196) | Sea glass restyle of the shell and all four screens (MVP v3) | A5 | View-model tests for header and chrome values; light and dark PNG checks of every screen; pending unlocked check of glass, Reduce Transparency and Increase Contrast |
+| A6b (SI-197) | Workspace map: a pure, tested layout in `SiltaAppSupport` (columns, order, back edges) and a Map/List view with app, service and connection selection | A6a | Layout tests on the Acme seed, a 12-app seed and a cycle; selection and keyboard view-model tests; PNG checks |
 
-Delivery order is My work, Board, Workspace, then Docs: one screen per PR.
+Delivery order is My work, Board, Workspace, then Docs: one screen per PR. A6a is the
+one cross-screen exception, because it restyles the shared shell.
 Use a short `task plan` and implementation reviews following
 [AGENTS.md Reviews](../../AGENTS.md#dogfooding) and the
 [persona-review skill](../../skills/persona-review/SKILL.md). Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
@@ -192,7 +202,7 @@ unlocked pass. Rendering limitations are disclosed and tracked separately.
 
 ## Done when
 
-- A1–A5 have merged.
+- A1–A6 have merged.
 - The app is used against the dogfood workspace for a week, and every mismatch with
   `silta` output found during that week is filed and fixed.
 - The states sheet and dark mode match the designs.

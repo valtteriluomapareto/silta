@@ -50,24 +50,11 @@ struct AppScreenToolbar: ToolbarContent {
   }
 
   private var documentTabs: some View {
-    HStack(spacing: 0) {
-      ForEach(AppDocumentView.allCases, id: \.self) { view in
-        Button {
-          model.select(documentView: view)
-        } label: {
-          Text(view.rawValue.capitalized)
-            .frame(maxWidth: .infinity, minHeight: 26).contentShape(.capsule)
-        }.buttonStyle(.plain).font(.system(size: 13))
-          .foregroundStyle(Color("Ink"))
-          .background(
-            model.documents.view == view ? Color("Ink").opacity(0.08) : .clear, in: .capsule
-          )
-          .accessibilityAddTraits(model.documents.view == view ? .isSelected : [])
-      }
-    }.padding(3)
-      .background(Color("Ink").opacity(0.04), in: .capsule)
-      .clipShape(.capsule).frame(width: 240)
-      .accessibilityElement(children: .contain).accessibilityLabel("View")
+    SeaSegments(
+      label: "View",
+      options: AppDocumentView.allCases.map { ($0, $0.rawValue.capitalized) },
+      selection: Binding(get: { model.documents.view }, set: { model.select(documentView: $0) })
+    ).frame(width: 260)
   }
 
 }

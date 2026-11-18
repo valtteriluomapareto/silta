@@ -11,36 +11,21 @@ struct BoardView: View {
           snapshot: snapshot, app: model.appFilter, search: model.search,
           proposals: model.showProposed)
         GeometryReader { geometry in
-          let laneWidth = max(144, (geometry.size.width - 78) / 4)
+          let laneWidth = max(180, (geometry.size.width - 28) / 3)
+          let open = content.lanes.filter { $0.title != "Done this week" }
+          let done = content.lanes.first { $0.title == "Done this week" }
           ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 10) {
-              ForEach(content.lanes) { lane in
-                ScrollView {
-                  LazyVStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 7) {
-                      if lane.title == "Todo" {
-                        Circle().strokeBorder(Color("SecondaryInk"), lineWidth: 1.5).frame(
-                          width: 8, height: 8)
-                      } else {
-                        StatusDot(color: laneColor(lane.title))
-                      }
-                      Text(lane.title).font(.system(size: 13, weight: .semibold))
-                      Spacer(minLength: 0)
-                      Text(lane.tasks.count, format: .number).font(.system(size: 12))
-                        .foregroundStyle(Color("SecondaryInk"))
-                    }.padding(.bottom, 4)
-                    if lane.tasks.isEmpty {
-                      Text(model.search.isEmpty ? "No tasks" : "No matches")
-                        .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk")).padding(
-                          .vertical)
-                    }
-                    ForEach(lane.tasks, id: \.ref) { task in
-                      card(task, content: content)
-                    }
-                  }.padding(.bottom, 24)
-                }.frame(width: laneWidth)
+            HStack(alignment: .top, spacing: 12) {
+              ForEach(open.prefix(2)) { lane in
+                ScrollView { laneView(lane, content: content) }.frame(width: laneWidth)
               }
-            }.padding(.horizontal, 24).padding(.top, 16)
+              ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                  ForEach(open.dropFirst(2)) { laneView($0, content: content) }
+                  if let done { doneList(done) }
+                }
+              }.frame(width: laneWidth)
+            }.padding(.horizontal, 2).padding(.top, 4)
           }
         }
       }
@@ -48,6 +33,61 @@ struct BoardView: View {
     .foregroundStyle(Color("Ink"))
     .inspector(isPresented: $model.boardInspectorPresented) {
       TaskInspector(model: model).inspectorColumnWidth(min: 300, ideal: 360, max: 500)
+    }
+  }
+
+  private func laneView(_ lane: BoardContent.Lane, content: BoardContent) -> some View {
+    LazyVStack(alignment: .leading, spacing: 10) {
+      laneHeader(lane)
+      if lane.tasks.isEmpty {
+        Text(model.search.isEmpty ? "No tasks" : "No matches")
+          .font(.system(size: 12)).foregroundStyle(Color("ShoreInk")).padding(.vertical)
+      }
+      ForEach(lane.tasks, id: \.ref) { task in
+        card(task, content: content)
+      }
+    }.padding(.bottom, 8)
+  }
+
+  private func laneHeader(_ lane: BoardContent.Lane) -> some View {
+    HStack(spacing: 7) {
+      if lane.title == "Todo" {
+        Circle().strokeBorder(Color("ShoreInk"), lineWidth: 1.5).frame(width: 8, height: 8)
+      } else {
+        StatusDot(color: laneColor(lane.title))
+      }
+      Text(lane.title).font(.system(size: 13, weight: .semibold))
+      Spacer(minLength: 0)
+      Text(lane.tasks.count, format: .number).font(.system(size: 12))
+        .foregroundStyle(Color("ShoreInk"))
+    }.padding(.horizontal, 4).padding(.bottom, 4).accessibilityElement(children: .combine)
+      .accessibilityAddTraits(.isHeader)
+  }
+
+  /// Done tasks read as a compact list: they need a glance, not cards.
+  private func doneList(_ lane: BoardContent.Lane) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      laneHeader(lane)
+      VStack(alignment: .leading, spacing: 9) {
+        if lane.tasks.isEmpty {
+          Text(model.search.isEmpty ? "No tasks" : "No matches").font(.system(size: 12))
+        }
+        ForEach(lane.tasks, id: \.ref) { task in
+          let selected = model.boardSelection?.taskRef == task.ref
+          Button {
+            model.inspect(task: task.ref)
+          } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+              Text(task.ref).font(.system(size: 11, design: .monospaced))
+              Text(task.title).font(.system(size: 13)).lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }.foregroundStyle(Color(selected ? "TideText" : "SecondaryInk")).contentShape(.rect)
+          }.buttonStyle(.plain).help(task.title)
+            .accessibilityLabel(task.ref + ": " + task.title + ", done")
+            .accessibilityAddTraits(selected ? .isSelected : [])
+        }
+      }.padding(.horizontal, 12).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading).seaPane(radius: 12)
     }
   }
 
@@ -68,7 +108,7 @@ struct BoardView: View {
             Circle().fill(Color("AttentionMarker")).frame(width: 7, height: 7).help("Asked you")
           }
         }
-        Text(task.title).font(.system(size: 13, weight: selected ? .semibold : .medium))
+        Text(task.title).font(.system(size: 14, weight: selected ? .semibold : .medium))
           .foregroundStyle(Color(done ? "SecondaryInk" : "Ink"))
           .lineLimit(3).lineSpacing(2).help(task.title)
         if task.status == "blocked" || task.status == "proposed" {
@@ -88,12 +128,12 @@ struct BoardView: View {
           Text(metadata).font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
             .lineLimit(2).help(metadata)
         }
-      }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8).padding(
-        .vertical, 10
+      }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(
+        .vertical, 12
       )
-      .background(Color(done ? "CommandSurface" : "Canvas"), in: .rect(cornerRadius: 10))
-      .overlay(cardBorder(task, selected: selected))
+      .modifier(BoardCardSurface(task: task, selected: selected))
     }.buttonStyle(.plain).accessibilityElement(children: .ignore)
+      .accessibilityAddTraits(selected ? .isSelected : [])
       .accessibilityLabel(
         task.ref + ": " + task.title + ", " + task.status
           + (asked ? ", asked you" : "")
@@ -101,20 +141,11 @@ struct BoardView: View {
             ? "" : ", " + TaskPresentation.progress(task.steps, revision: task.planRevision)))
   }
 
-  private func cardBorder(_ task: AppTask, selected: Bool) -> some View {
-    RoundedRectangle(cornerRadius: 10).strokeBorder(
-      selected
-        ? Color("TideText")
-        : task.status == "proposed" ? Color("Warning") : Color("Ink").opacity(0.12),
-      style: StrokeStyle(
-        lineWidth: selected ? 1.5 : 1, dash: task.status == "proposed" ? [4, 3] : []))
-  }
-
   private func laneColor(_ title: String) -> Color {
     switch title {
     case "Doing": Color("TideText")
     case "Review": Color("Warning")
-    case "Done this week": Color("DiffAddition")
+    case "Done this week": Color("Success")
     default: Color("SecondaryInk")
     }
   }
@@ -130,4 +161,35 @@ private struct TaskStepBar: View {
       }
     }.frame(height: 3).padding(.vertical, 2).accessibilityHidden(true)
   }
+}
+
+private struct BoardCardSurface: ViewModifier {
+  let task: AppTask
+  let selected: Bool
+  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+  func body(content: Content) -> some View {
+    content
+      .background(
+        reduceTransparency ? Color("Canvas") : Color(task.status == "done" ? "Pane" : "Card"),
+        in: .rect(cornerRadius: 14, style: .continuous)
+      )
+      .overlay(cardBorder(task, selected: selected))
+      .background {
+        if selected {
+          RoundedRectangle(cornerRadius: 17, style: .continuous)
+            .fill(Color("AccentColor").opacity(0.14)).padding(-3)
+        }
+      }
+  }
+
+  private func cardBorder(_ task: AppTask, selected: Bool) -> some View {
+    RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(
+      selected
+        ? Color("AccentColor")
+        : task.status == "proposed" ? Color("Warning") : Color("PaneBorder"),
+      style: StrokeStyle(
+        lineWidth: selected ? 2 : 1, dash: task.status == "proposed" ? [4, 3] : []))
+  }
+
 }
