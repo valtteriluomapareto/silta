@@ -81,8 +81,8 @@ maintainer names doc review twice as a cost.
 ## Data and privacy
 
 - **Everything stays local.** The workspace's tasks, comments, logs, reports and
-  check-ins stay in `~/.silta`. Nothing from it goes into the Silta repo, its issues,
-  fixtures or evals.
+  check-ins stay in `~/.silta`, and the day-0 baseline export in a private folder
+  beside it. Nothing from them goes into the Silta repo, its issues, fixtures or evals.
 - **Private report.** `scripts/dogfood-report.sh --ws <slug>` reports on any
   workspace. It validates the slug before using it, and writes the report and its
   `--since` state under `$SILTA_HOME/reports/<slug>/`, outside every repository. The
@@ -106,6 +106,22 @@ maintainer names doc review twice as a cost.
   A `doc:` ref under `Helped:` saved an explanation; under `Misled:` its content was
   wrong or out of date when an agent relied on it. A skipped week stays missing; it is
   never counted as zero. If two check-ins in a row are skipped, shorten the questions.
+
+  The commands, settled in the 2026-11-18 drill:
+
+  ```sh
+  silta --ws <slug> task add "DF3 check-in" --app none -F rules.md --approved "<your words>"
+  silta --ws <slug> task block <ref> --on ext:maintainer --follow-up 7d -m "Weekly DF3 check-in: ask the three questions."
+  silta --ws <slug> comment <ref> -F - <<'EOF'
+  Check-in: week=1 binary=<sha7> hook=on explained=2 corrections=1
+  ...
+  EOF
+  ```
+
+  Posting doesn't unblock the task; rerunning the same `block` command moves the
+  follow-up on. The due check-in appears only in `silta --ws <slug> inbox --for me`
+  (and the Mac app), never in an agent's own inbox or brief, so the maintainer starts
+  it.
 - **Misses as they happen (optional).** When the maintainer tells an agent "Silta
   missed this", the agent adds one line to the check-in task: `Miss: <what>`; for a
   doc, `Miss: doc:<slug> <wrong|missing>`. That is more reliable than a weekly recall.
@@ -138,28 +154,41 @@ it. Two more numbers need no new code; the agent collects them at each review:
    check that a session in an unregistered repo prints nothing and that the hook stays
    inside its 1.5 s budget. A scan of a whole projects directory registers every clone
    under it. Use the setup prompt below to review real app details and settings.
+   Silta has no command to remove a workspace. To rehearse `init --scan` and the
+   setup prompt, start the agent from a shell after `export SILTA_HOME="$(mktemp -d)"`.
+   Deleting that folder resets everything; nothing reaches `~/.silta` or the repos.
+   Close that shell before the real setup.
 3. **Seed the first docs:** with the map in place, use the seed prompt below for three
    to five docs on the busiest cross-app links. Without them the brief shows no docs
    in the first weeks and E6 has nothing to measure. Seeded docs are approved edits;
    later docs arrive as agent proposals.
 4. **Turn on measurement:** create the check-in task, write the decision rules into
    it as its description, and run the first private report as week 0, noting the
-   number of seeded docs.
+   number of seeded docs. Then export this state as the baseline:
+   `silta --ws <slug> export --to ~/silta-df3-baseline`. The folder holds the full
+   task and doc text, so it stays private like `~/.silta` and outside every repo.
 5. **Roll back if needed:** preview `silta agents uninstall`, then apply the preview's
-   token; the hook and blocks are removed and the data stays.
+   token; the hook and blocks are removed and the data stays. To reset the workspace
+   to the step-4 baseline instead (after a false start, say), run
+   `silta --ws <slug> restore ~/silta-df3-baseline/<slug> --dry-run`, and then the
+   printed command with the maintainer's words. Later tasks, claims, docs and map
+   edits go. Other workspaces stay, a snapshot is taken first, task refs keep counting
+   up and logs stay. Afterwards, rerun the check-in's `block` command to set a fresh
+   follow-up, and run the report with `--since` set to the new day 0.
 
 **Setup prompt (draft; it becomes `silta guide setup` after it has worked once):**
 
 ```text
 Help me fill the Silta workspace <slug>. Use `silta --ws <slug>` for every command.
+The repos are local clones under <folder>.
 Never put secrets, customer data or credentials into it: nothing scans this YAML.
 
 1. Run `silta --ws <slug> ws show`. List the gaps: apps without a summary or prod
    ref, apps with no environments or edges, repos without apps.
-2. For each app, read the first 60 lines of its README and AGENTS.md (or CLAUDE.md) with
-   `silta --ws <slug> code show <app> --lines 1-60 -- README.md`. Draft its summary,
-   environments, prod ref and the apps or services it calls. Don't search the repos
-   further.
+2. For each repo, read the first 60 lines of its README and AGENTS.md (or CLAUDE.md)
+   in its clone under <folder>; `silta code show` works only once a repo has an app.
+   Draft one or more apps per repo with a summary, environments, prod ref and the
+   apps or services it calls. Don't search the repos further.
 3. Ask me in one message about what you couldn't tell from the files, and about the
    settings `proposals` and `ask_about`. Don't apply anything yet.
 4. Write the complete YAML, starting from `ws show` (omitted rows are deleted). Show
@@ -202,7 +231,10 @@ DF3-a and DF3-b have merged. None blocks M1.
 
 - Before real data: the restore drill, DF3-b on the `silta` workspace, one check-in
   cycle there (create, answer, block again) to settle the exact commands, and one run
-  each of the setup and seed prompts on the eval fixtures.
+  each of the setup and seed prompts on the eval fixtures. **Done 2026-11-18**, in
+  temporary homes: all passed after the setup prompt's step 2 fix above. The drill
+  also found no Claude SessionStart hook record on the maintainer's machine, so step 2
+  of "Taking it into use" must install the hook and check its budget before day 0.
 - At weeks 2 and 6: generate the private report, review it with the maintainer, apply
   the decision rules, and turn findings into Silta issues through the shareable
   summary only.
