@@ -23,6 +23,9 @@ silta --help
 
 Add the `PATH` line to your shell profile if `silta` is not found in a new shell.
 
+The same script installs the read-only Mac app, `~/Applications/Silta Dev.app`, from
+the same commit. Rerun it after pulling `main` to update both.
+
 ## 3. Register your repositories
 
 Pass only the clones you want in this workspace:
