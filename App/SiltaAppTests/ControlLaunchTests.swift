@@ -1,4 +1,5 @@
 #if DEBUG
+  import Foundation
   import SiltaAppSupport
   @testable import SiltaApp
   import Testing
