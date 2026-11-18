@@ -59,7 +59,7 @@ install -m 755 "$binary" "$temporary"
 ditto "$app" "$staging/Silta Dev.app"
 # Swap the app first and the CLI last; on any failure put the previous app back.
 restore_app() {
-  [[ ! -e "$installed_app" ]] || mv "$installed_app" "$staging/failed.app"
+  [[ ! -e "$installed_app" ]] || mv "$installed_app" "$staging/failed.app" || exit 1
   [[ ! -e "$staging/previous.app" ]] || mv "$staging/previous.app" "$installed_app"
   echo 'install-dev: could not replace the installs; kept the previous app and CLI.' >&2
   exit 1
