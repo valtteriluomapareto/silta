@@ -111,7 +111,7 @@ struct AppSidebar: View {
           } else {
             StatusDot(
               color: Color(
-                model.failure != nil ? "AttentionMarker" : stale ? "Warning" : "Success"), size: 6)
+                model.failure != nil ? "AttentionMarker" : stale ? "Warning" : "Success"))
           }
           Text(
             SidebarContent.refreshText(

@@ -16,25 +16,19 @@ struct DocsView: View {
       GeometryReader { geometry in
         ScrollView {
           VStack(alignment: .leading, spacing: 20) {
-            if let proposal = DocsContent.proposal(in: docs.versions),
-              let now = model.visibleData?.checkedAt
+            if let banner = DocsChromeContent.banner(
+              document: docs.document, revisions: docs.versions, partial: docs.nextVersions != nil,
+              now: model.now())
             {
-              HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "circle.fill").font(.system(size: 7)).foregroundStyle(
-                  Color("Warning"))
-                Text(DocsContent.attribution(proposal, now: now))
-                  .font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
-                Button("Show changes") {
-                  model.select(document: proposal.ref)
-                  model.select(documentView: .changes)
-                }.buttonStyle(CompactActionStyle())
-              }.padding(12).background(Color("Warning").opacity(0.08), in: .rect(cornerRadius: 8))
+              proposalBanner(banner)
             }
             if let document = docs.document {
               HStack(alignment: .firstTextBaseline) {
                 Text(document.title ?? document.slug).font(.system(size: 24, weight: .bold))
                 Spacer(minLength: 12)
-                CopyValue(value: document.ref, title: "Copy document reference")
+                CopyValue(
+                  value: document.ref, title: "Copy document reference",
+                  warning: document.state == "proposed")
               }
               if let now = model.visibleData?.checkedAt {
                 Text(DocsContent.attribution(document, now: now))
@@ -86,27 +80,6 @@ struct DocsView: View {
       }.frame(minWidth: 400)
     }
     .foregroundStyle(Color("Ink"))
-    .toolbar {
-      ToolbarItemGroup(placement: .primaryAction) {
-        Picker(
-          "View", selection: Binding(get: { docs.view }, set: { model.select(documentView: $0) })
-        ) {
-          ForEach(AppDocumentView.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-        }.pickerStyle(.segmented).frame(width: 240)
-        if let document = docs.document {
-          Picker(
-            "Revision", selection: Binding(get: { docs.ref }, set: { model.select(document: $0) })
-          ) {
-            if !docs.versions.contains(where: { $0.ref == document.ref }) {
-              Text("@\(document.revision) · \(document.state)").tag(Optional(document.ref))
-            }
-            ForEach(docs.versions, id: \.ref) {
-              Text("@\($0.revision) · \($0.state)").tag(Optional($0.ref))
-            }
-          }.frame(width: 150)
-        }
-      }
-    }
     .task(id: listKey) { await model.loadDocuments() }
     .task(id: detailKey) { await show() }
   }
@@ -122,13 +95,15 @@ extension DocsView {
         Text("All").tag(false)
         Text("Proposed").tag(true)
       }.pickerStyle(.segmented).labelsHidden().padding(.horizontal, 12)
-      Toggle("Include archived", isOn: $model.includeArchivedDocuments)
-        .toggleStyle(.checkbox).font(.system(size: 11)).padding(.horizontal, 12)
       if let about = model.docsAbout {
-        HStack {
-          Text(about).font(.caption).lineLimit(2)
-          Button("Clear filter") { model.docsAbout = nil }
-        }.padding(.horizontal, 12)
+        HStack(spacing: 6) {
+          Text(DocsChromeContent.aboutLabel(about)).font(.system(size: 11)).lineLimit(2).help(about)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          Button("Clear filter", systemImage: "xmark") { model.docsAbout = nil }
+            .labelStyle(.iconOnly).buttonStyle(.plain)
+        }.padding(8).foregroundStyle(Color("TideText"))
+          .background(Color("TideText").opacity(0.08), in: .rect(cornerRadius: 8))
+          .padding(.horizontal, 12)
       }
       if docs.listLoading { ProgressView("Loading documents…").padding(.horizontal, 12) }
       List {
@@ -144,9 +119,10 @@ extension DocsView {
                       Color("SecondaryInk"))
                     VStack(alignment: .leading, spacing: 4) {
                       Text(preferred.title ?? preferred.slug).font(
-                        .system(size: 13, weight: .medium))
+                        .system(size: 13, weight: .medium)
+                      ).foregroundStyle(Color(preferred.archived ? "SecondaryInk" : "Ink"))
                       Text(DocsContent.row(group)).font(.system(size: 11)).foregroundStyle(
-                        Color("TideText"))
+                        Color(preferred.archived ? "SecondaryInk" : "TideText"))
                     }.frame(maxWidth: .infinity, alignment: .leading)
                   }.padding(.vertical, 5).contentShape(.rect)
                 }.buttonStyle(.plain)
@@ -168,11 +144,39 @@ extension DocsView {
           Button("Load more documents") { Task { await model.loadDocuments(append: true) } }
         }
       }.listStyle(.plain)
+      if docs.archivedCount > 0 || docs.nextList != nil {
+        Divider()
+        HStack(spacing: 6) {
+          Image(systemName: "archivebox")
+          Text(docs.archivedFooter).frame(maxWidth: .infinity, alignment: .leading)
+          Button(model.includeArchivedDocuments ? "Hide" : "Show") {
+            model.includeArchivedDocuments.toggle()
+          }.buttonStyle(.plain).foregroundStyle(Color("TideText"))
+        }.font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+          .padding(.horizontal, 12).padding(.bottom, 8)
+      }
       if let error = docs.listFailure {
         Text(error).font(.caption).padding(.horizontal, 12)
         Button("Retry list") { Task { await model.loadDocuments(force: true) } }
       }
     }.padding(.top, 12)
+  }
+
+  private func proposalBanner(_ banner: DocsChromeContent.Banner) -> some View {
+    HStack(alignment: .top, spacing: 10) {
+      StatusDot(color: Color("Warning")).padding(.top, 4)
+      Text(banner.text).font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
+      Button("Show changes") {
+        model.select(document: banner.proposal.ref)
+        model.select(documentView: .changes)
+      }.buttonStyle(CompactActionStyle())
+      if let accepted = banner.accepted {
+        Button("Read @\(accepted.revision)") {
+          model.select(document: accepted.ref)
+          model.select(documentView: .document)
+        }.buttonStyle(CompactActionStyle())
+      }
+    }.padding(12).background(Color("Warning").opacity(0.08), in: .rect(cornerRadius: 8))
   }
 
   private func attachment(_ ref: String) -> some View {
@@ -252,15 +256,7 @@ extension DocsView {
       {
         CommandBlock(command: reader.documentTriageCommand(workspace: workspace))
       }
-      if let document = docs.document, let reader = model.reader, let workspace = model.workspace,
-        let command = reader.commands(forDocument: document, workspace: workspace, view: docs.view)
-          .first
-      {
-        HStack {
-          Spacer()
-          CopyValue(value: command.text, title: "Copy document read command", compact: true)
-        }
-      }
+
     }
   }
 
