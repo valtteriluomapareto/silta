@@ -14,10 +14,19 @@ struct TaskInspector: View {
           if let task = detail.value {
             HStack(spacing: 8) {
               CopyValue(value: task.ref, title: "Copy reference")
-              statusDot(task.status)
-              Text(task.status.capitalized).font(.system(size: 12))
+              HStack(spacing: 5) {
+                statusDot(task.status)
+                Text(task.status.capitalized).font(.system(size: 11, weight: .semibold))
+              }.padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Color("Card"), in: .capsule)
+                .overlay(Capsule().strokeBorder(Color("Ink").opacity(0.08)))
+              Spacer(minLength: 4)
+              if let app = task.app {
+                Text(app).font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+              }
             }
-            Text(task.title).font(.system(size: 16, weight: .semibold)).textSelection(.enabled)
+            Text(task.title).font(.system(size: 20, weight: .bold)).tracking(-0.2)
+              .textSelection(.enabled)
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
               property("App", task.app)
               property("Priority", String(task.priority))
@@ -26,11 +35,13 @@ struct TaskInspector: View {
               property("Claimed", age(task.claimedAt))
               property("Updated", age(task.updatedAt))
             }.font(.system(size: 12)).textSelection(.enabled)
+              .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+              .background(Color("Ink").opacity(0.03), in: .rect(cornerRadius: 12))
             if !task.description.isEmpty { DocumentMarkdown(task.description) }
             if !task.plan.isEmpty {
               VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                  Text("Plan").font(.system(size: 12, weight: .semibold))
+                  Overline("Plan")
                   Spacer()
                   Text(TaskPresentation.progress(task.steps, revision: task.planRevision))
                     .font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
@@ -48,7 +59,7 @@ struct TaskInspector: View {
               }
             }
             VStack(alignment: .leading, spacing: 10) {
-              Text("Discussion").font(.system(size: 12, weight: .semibold))
+              Overline("Discussion")
               if task.comments.isEmpty {
                 Text("No discussion yet").font(.system(size: 13)).foregroundStyle(
                   Color("SecondaryInk"))
@@ -65,16 +76,20 @@ struct TaskInspector: View {
                     CopyValue(value: comment.ref, title: "Copy comment reference", compact: true)
                   }
                   Text(comment.body).font(.system(size: 13)).textSelection(.enabled)
-                }
+                }.padding(.leading, 12)
+                  .overlay(alignment: .leading) {
+                    Rectangle().fill(commentColor(comment.actor)).frame(width: 2)
+                  }
               }
             }
+            actions(task)
             if let failure = detail.failure {
               Label(failure, systemImage: "exclamationmark.triangle")
                 .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
               Button("Retry") { Task { await model.loadTaskDetail() } }
             }
             Spacer(minLength: 12)
-            actions(task)
+            worktreeButton(task)
           } else if let failure = detail.failure {
             ContentUnavailableView {
               Label("Task unavailable", systemImage: "exclamationmark.triangle")
@@ -89,9 +104,10 @@ struct TaskInspector: View {
             ContentUnavailableView("Select a task", systemImage: "sidebar.right")
           }
         }.padding(18).frame(
-          maxWidth: .infinity, minHeight: geometry.size.height, alignment: .topLeading)
-      }
+          maxWidth: .infinity, minHeight: geometry.size.height - 20, alignment: .topLeading)
+      }.seaPane().padding(10)
     }.foregroundStyle(Color("Ink"))
+      .background { ShoreBackground() }
       .task(id: selection) { await model.loadTaskDetail() }
   }
 
@@ -133,10 +149,11 @@ struct TaskInspector: View {
       let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
       ForEach(content.answers(for: task.ref, reader: reader, workspace: workspace)) { answer in
         VStack(alignment: .leading, spacing: 8) {
-          Text(answer.actor.map { "Answer " + ActorPresentation($0).name } ?? "Answer question")
-            .font(.system(size: 12, weight: .semibold))
+          Overline(
+            answer.actor.map { "Answer " + ActorPresentation($0).name } ?? "Answer question",
+            color: Color("TideText"))
           CommandBlock(command: answer.command)
-        }
+        }.padding(12).background(Color("AccentColor").opacity(0.06), in: .rect(cornerRadius: 12))
       }
       if task.status == "review" {
         ForEach(reader.commands(forReview: task, workspace: workspace), id: \.text) {
@@ -144,6 +161,15 @@ struct TaskInspector: View {
         }
       }
     }
+  }
+
+  private func commentColor(_ actor: String) -> Color {
+    let presentation = ActorPresentation(actor)
+    return presentation.isCodex
+      ? Color("Warning") : actor.hasPrefix("agent:") ? Color("AccentColor") : Color("SecondaryInk")
+  }
+
+  @ViewBuilder private func worktreeButton(_ task: AppTask) -> some View {
     let path = task.worktree
     let available =
       path.map { $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0) } ?? false

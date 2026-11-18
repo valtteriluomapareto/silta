@@ -7,6 +7,8 @@ struct CopyValue: View {
   let title: String
   var compact = false
   var warning = false
+  /// Shows a "Copy" pill instead of the value, for command blocks.
+  var pill = false
   private var tint: Color { Color(warning ? "Warning" : "TideText") }
   @State private var copied = false
 
@@ -15,17 +17,31 @@ struct CopyValue: View {
       copy()
     } label: {
       HStack(spacing: 5) {
-        if !compact { Text(copied ? "Copied" : value).font(.system(size: 12, design: .monospaced)) }
-        Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 11))
-          .foregroundStyle(copied ? Color("Success") : compact ? Color("Ink") : tint)
+        if pill {
+          Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 11))
+            .foregroundStyle(copied ? Color("Success") : Color("Ink"))
+          Text(copied ? "Copied" : "Copy").font(.system(size: 12))
+        } else {
+          if !compact {
+            Text(copied ? "Copied" : value).font(.system(size: 11, design: .monospaced))
+          }
+          Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 10))
+            .foregroundStyle(copied ? Color("Success") : compact ? Color("Ink") : tint)
+        }
       }
-      .padding(.horizontal, compact ? 7 : 8).padding(.vertical, compact ? 7 : 3)
-      .foregroundStyle(copied || compact ? Color("Ink") : tint)
-      .background(
-        compact ? Color.clear : tint.opacity(0.1),
-        in: RoundedRectangle(cornerRadius: 6)
+      .padding(.horizontal, pill ? 10 : compact ? 7 : 9).padding(
+        .vertical, pill ? 0 : compact ? 7 : 4
       )
-      .contentShape(RoundedRectangle(cornerRadius: 6))
+      .frame(minHeight: pill ? 26 : nil)
+      .foregroundStyle(copied || compact || pill ? Color("Ink") : tint)
+      .background {
+        if pill {
+          Capsule().fill(Color("Card")).overlay(Capsule().strokeBorder(Color("Ink").opacity(0.1)))
+        } else if !compact {
+          Capsule().fill(tint.opacity(0.1))
+        }
+      }
+      .contentShape(.capsule)
     }.buttonStyle(.plain)
       .help(copied ? "Copied" : title).accessibilityLabel(
         (copied ? "Copied" : title) + ": " + value

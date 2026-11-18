@@ -266,9 +266,15 @@ extension AppModel {
       return "\(board.todo.count + board.doing.count + board.review.count) open · "
         + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
     }
-    let claimed = data.snapshot?.board.doing.filter { $0.claimedBy != nil }.count ?? 0
-    return
-      "\(data.snapshot?.work.waitingCount ?? 0) waiting on you · \(claimed) tasks claimed"
+    return "\(data.snapshot?.work.waitingCount ?? 0) waiting on you"
+  }
+
+  /// The large in-content title. Docs keeps the document's title in its reader.
+  var headerTitle: String { route.title }
+
+  var headerSummary: String {
+    guard route == .docs else { return screenSummary }
+    return DocsChromeContent.catalogSummary(documentCatalog, stale: catalogFailure != nil)
   }
 
 }

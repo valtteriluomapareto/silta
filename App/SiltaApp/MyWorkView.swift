@@ -9,7 +9,7 @@ struct MyWorkView: View {
     ScrollView {
       if let data = model.visibleData, let snapshot = data.snapshot {
         let content = MyWorkContent(snapshot: snapshot, search: model.search, now: data.checkedAt)
-        LazyVStack(alignment: .leading, spacing: 22) {
+        LazyVStack(alignment: .leading, spacing: 10) {
           if snapshot.work.waitingCount == 0 && model.search.isEmpty {
             ContentUnavailableView(
               "Nothing waits on you", systemImage: "tray",
@@ -21,15 +21,14 @@ struct MyWorkView: View {
               description: Text("Try another reference or search term."))
           }
           ForEach(content.questions) { question in
-            questionRow(question)
-            Divider()
+            questionRow(question).padding(.horizontal, 22).padding(.vertical, 20)
+              .seaCard()
           }
           ForEach(content.reviews) { review in
-            reviewRow(review)
-            Divider()
+            reviewRow(review).padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
           if !content.documents.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
               sectionHeader(
                 "Doc proposals", count: content.documents.count, color: Color("Warning"))
               ForEach(content.documents) { row in
@@ -37,35 +36,34 @@ struct MyWorkView: View {
                   proposalTitle(row).frame(maxWidth: .infinity, alignment: .leading)
                   Button("Show changes") { model.openDocument(row.ref) }
                     .buttonStyle(CompactActionStyle())
-                  CopyValue(value: row.ref, title: "Copy document reference")
+                  CopyValue(value: row.ref, title: "Copy document reference", warning: true)
                     .lineLimit(1).truncationMode(.middle).frame(width: 196, alignment: .trailing)
-                }.padding(.leading, 28).frame(minHeight: 30)
+                }.padding(.leading, 32).frame(minHeight: 30)
               }
               if let command = model.reader?.documentTriageCommand(workspace: workspace) {
-                CommandBlock(command: command).padding(.leading, 28)
+                CommandBlock(command: command).padding(.leading, 32)
               }
-            }
-            Divider()
+            }.padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
           if !content.tasks.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
               sectionHeader("Task proposals", count: content.tasks.count, color: .secondary)
               ForEach(content.tasks) { row in
                 HStack(spacing: 10) {
                   proposalTitle(row).frame(maxWidth: .infinity, alignment: .leading)
-                  CopyValue(value: row.ref, title: "Copy task reference").fixedSize()
-                }.padding(.leading, 28).frame(minHeight: 28)
+                  CopyValue(value: row.ref, title: "Copy task reference", warning: true)
+                    .fixedSize()
+                }.padding(.leading, 32).frame(minHeight: 28)
               }
               if let first = content.tasks.first,
                 let command = model.reader?.commands(for: first.item, workspace: workspace).first
               {
-                CommandBlock(command: command).padding(.leading, 28)
+                CommandBlock(command: command).padding(.leading, 32)
               }
-            }
+            }.padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
           ForEach(content.other, id: \.stableID) { item in
-            Divider()
-            otherAttention(item)
+            otherAttention(item).padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
           if content.remaining > 0 {
             Text("\(content.remaining) more waiting items").font(
@@ -74,7 +72,7 @@ struct MyWorkView: View {
               CommandBlock(command: command)
             }
           }
-        }.padding(.horizontal, 28).padding(.top, 8).padding(.bottom, 24)
+        }.padding(.bottom, 24)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
     }.foregroundStyle(Color("Ink"))
@@ -83,39 +81,41 @@ struct MyWorkView: View {
   private var workspace: String { model.workspace ?? "" }
 
   private func questionRow(_ question: MyWorkContent.Question) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 14) {
       HStack(spacing: 10) {
         if let author = question.item.author {
-          ActorLabel(actor: author).labelStyle(.iconOnly).accessibilityHidden(true).frame(width: 18)
+          ActorLabel(actor: author).labelStyle(.iconOnly).accessibilityHidden(true).frame(width: 22)
         }
-        Text(question.metadata).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+        Text(question.metadata).font(.system(size: 13)).foregroundStyle(Color("SecondaryInk"))
           .lineLimit(1).help(question.metadata)
           .frame(maxWidth: .infinity, alignment: .leading)
+        Overline("Question", color: Color("TideText"))
         if let ref = question.ref { CopyValue(value: ref, title: "Copy task reference") }
       }
-      Text(question.headline).font(.system(size: 17, weight: .semibold)).lineLimit(2)
-        .help(question.headline).textSelection(.enabled).padding(.leading, 28)
+      Text(question.headline).font(.system(size: 18, weight: .semibold)).lineLimit(3)
+        .lineSpacing(3).help(question.headline).textSelection(.enabled).padding(.leading, 32)
+        .frame(maxWidth: 760, alignment: .leading)
       if let reader = model.reader,
         let command = question.command(reader: reader, workspace: workspace)
       {
-        CommandBlock(command: command).padding(.leading, 28)
+        CommandBlock(command: command).padding(.leading, 32)
       }
     }
   }
 
   private func reviewRow(_ review: MyWorkContent.Review) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 12) {
       HStack(spacing: 10) {
-        StatusDot(color: Color("Warning")).frame(width: 18)
+        StatusDot(color: Color("Warning")).frame(width: 22)
         VStack(alignment: .leading, spacing: 2) {
-          Text(review.task.title).font(.system(size: 14, weight: .semibold)).lineLimit(2).help(
+          Text(review.task.title).font(.system(size: 15, weight: .semibold)).lineLimit(2).help(
             review.task.title)
           Text(review.metadata).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
         }.frame(maxWidth: .infinity, alignment: .leading)
         CopyValue(value: review.task.ref, title: "Copy task reference")
       }
       if let command = model.reader?.commands(forReview: review.task, workspace: workspace).first {
-        CommandBlock(command: command).padding(.leading, 28)
+        CommandBlock(command: command).padding(.leading, 32)
       }
     }
   }
@@ -133,8 +133,8 @@ struct MyWorkView: View {
 
   private func sectionHeader(_ title: String, count: Int, color: Color) -> some View {
     HStack(spacing: 10) {
-      StatusDot(color: color).frame(width: 18)
-      Text("\(title) · \(count)").font(.system(size: 14, weight: .semibold))
+      StatusDot(color: color).frame(width: 22)
+      Text("\(title) · \(count)").font(.system(size: 15, weight: .semibold))
     }
   }
 

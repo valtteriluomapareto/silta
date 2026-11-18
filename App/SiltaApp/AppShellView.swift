@@ -14,17 +14,25 @@ struct AppShellView: View {
     NavigationSplitView {
       AppSidebar(model: model)
     } detail: {
-      VStack(spacing: 0) {
+      VStack(spacing: 12) {
         if let failure = model.failure, model.visibleData != nil {
           Label(failure.message, systemImage: "exclamationmark.triangle")
             .font(.callout).frame(maxWidth: .infinity, alignment: .leading).padding(12)
-          Divider()
+            .seaPane(radius: 12)
+        }
+        if model.visibleData != nil {
+          ScreenHeader(title: model.headerTitle, summary: model.headerSummary)
+            .padding(.horizontal, 6)
         }
         content.frame(maxWidth: .infinity, maxHeight: .infinity)
-      }.background(Color("Canvas"))
+      }.padding(.horizontal, 18).padding(.top, 4)
+        .background { ShoreBackground() }
     }
     .navigationTitle(model.screenTitle)
     .navigationSubtitle(model.screenSummary)
+    .toolbar(removing: .title)
+    .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    .background { ShoreBackground() }
     .focusedSceneValue(\.findAction, { searchFocused = true })
     .toolbar {
       AppScreenToolbar(

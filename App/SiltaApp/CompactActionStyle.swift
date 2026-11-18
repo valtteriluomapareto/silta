@@ -1,14 +1,14 @@
 import SwiftUI
 
+/// A 28 pt pill for secondary actions.
 struct CompactActionStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label.font(.system(size: 12)).foregroundStyle(Color("Ink"))
-      .padding(.horizontal, 10).frame(height: 24)
-      .background(Color("Canvas"), in: RoundedRectangle(cornerRadius: 7))
+      .padding(.horizontal, 12).frame(minHeight: 28)
+      .background(Color("Card"), in: .capsule)
       .overlay(
-        RoundedRectangle(cornerRadius: 7)
-          .strokeBorder(Color("Ink").opacity(configuration.isPressed ? 0.3 : 0.14))
+        Capsule().strokeBorder(Color("Ink").opacity(configuration.isPressed ? 0.3 : 0.12))
       )
-      .shadow(color: .black.opacity(0.06), radius: 1, y: 1)
+      .contentShape(.capsule)
   }
 }

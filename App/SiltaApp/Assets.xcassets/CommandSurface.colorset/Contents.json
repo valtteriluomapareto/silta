@@ -1,34 +1,34 @@
 {
   "colors": [
     {
-      "idiom": "universal",
       "color": {
         "color-space": "srgb",
         "components": {
-          "red": "0.952941",
-          "green": "0.960784",
-          "blue": "0.960784",
-          "alpha": "1.000"
-        }
-      }
-    },
-    {
-      "idiom": "universal",
-      "color": {
-        "color-space": "srgb",
-        "components": {
-          "red": "0.149020",
-          "green": "0.160784",
-          "blue": "0.168627",
-          "alpha": "1.000"
+          "red": "0.082",
+          "green": "0.098",
+          "blue": "0.110",
+          "alpha": "0.039"
         }
       },
+      "idiom": "universal"
+    },
+    {
       "appearances": [
         {
           "appearance": "luminosity",
           "value": "dark"
         }
-      ]
+      ],
+      "color": {
+        "color-space": "srgb",
+        "components": {
+          "red": "1.000",
+          "green": "1.000",
+          "blue": "1.000",
+          "alpha": "0.051"
+        }
+      },
+      "idiom": "universal"
     }
   ],
   "info": {
