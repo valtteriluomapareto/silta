@@ -95,8 +95,9 @@ the human copies.
   a foreground tick adds at most five seconds. The
   §17 change signal (`notify_post` after each commit) replaces the timer once a slice
   adds it to SiltaCore writes.
-- **Copy text:** runnable templates carry `SILTA_HOME` only for a custom data home;
-  commands for the default `~/.silta` omit the prefix. Use the inbox's
+- **Copy text:** runnable templates always pin `SILTA_HOME`: the default home uses
+  `SILTA_HOME=~/.silta`, and a custom home uses its full shell-quoted path.
+  Default-home identity follows Core's `SiltaHome`, including filesystem aliases. Use the inbox's
   human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
   nothing is pre-filled for drop or reject, and there's no `-F -`.
