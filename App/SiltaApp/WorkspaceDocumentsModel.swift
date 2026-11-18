@@ -110,13 +110,17 @@ import SiltaAppSupport
     DocsContent.groups(pages[connection]?.entries ?? [])
   }
 
-  func countText(for connection: String) -> String? {
+  private func rawCountText(for connection: String) -> String? {
     guard let page = pages[connection] else { return nil }
     return "\(groups(for: connection).count)" + (page.nextOffset == nil ? "" : "+")
   }
 
+  func countText(for connection: String) -> String? {
+    rawCountText(for: connection).map { $0 + (failure == nil ? "" : " (stale)") }
+  }
+
   func countLabel(for connection: String) -> String {
-    guard let count = countText(for: connection) else {
+    guard let count = rawCountText(for: connection) else {
       return failure == nil ? "…" : "Unavailable"
     }
     let text = count == "0" ? "No docs" : count + (count == "1" ? " doc" : " docs")

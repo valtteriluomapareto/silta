@@ -55,6 +55,7 @@
         gate.resume()
         await reload.value
         #expect(docs.failure != nil && docs.countLabel(for: edge) == "3 docs (stale)")
+        #expect(docs.countText(for: edge) == "3 (stale)")
         #expect(docs.phase(workspace: "acme", version: 2, connections: [edge]) == .failed)
         flags.fails = false
         await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
