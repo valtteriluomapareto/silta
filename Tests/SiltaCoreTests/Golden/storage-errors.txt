@@ -69,3 +69,8 @@ ask human: update silta
 error: Required database backup could not be completed. [env]
 ask human: silta doctor
 {"error":{"code":"env","message":"Required database backup could not be completed.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## migrationRequired
+error: Database needs migrations; run the matching silta CLI first. [env]
+ask human: silta init
+{"error":{"code":"env","message":"Database needs migrations; run the matching silta CLI first.","next":["silta init"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

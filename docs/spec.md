@@ -2343,6 +2343,12 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   `app` is set only when the command names an app with `--app` that exists in that
   workspace. Neither field ever carries a raw argument.
 
+  The Mac app logs one line per write, never per read. Its command is `app answer`,
+  `app comment`, `app accept-answer`, `app triage` or `app unblock`, with the human
+  actor, the workspace, and the exit and error code the matching CLI failure gives
+  (D50). Those writes open only an existing, current store: a missing one or one with
+  pending migrations is refused as `env`, the latter with `next` `silta init`.
+
   A suppressed hook failure logs its actual process exit status of 0 while retaining
   the underlying `error_code`. Hook output never writes diagnostics to stderr.
   Watchdog timeout records carry `hook_timeout` and omit workspace until one can be

@@ -1,7 +1,8 @@
 import Foundation
 public import SiltaCore
 
-/// A body-free coded failure exposed without package-scoped implementation types.
+/// A body-free coded failure exposed without package-scoped implementation types. Reads
+/// and the app's writes (D50) share it.
 public struct AppReadError: CodedError {
   /// Presentation states that cannot be selected by error code alone.
   public enum Kind: Sendable {
@@ -30,6 +31,9 @@ public struct AppReadError: CodedError {
 }
 
 extension AppReadError {
+  /// The stable code as scripts see it, such as `not_found`.
+  public var codeName: String { code.rawValue }
+
   static let migrationRequired = AppReadError(
     kind: .migrationRequired, code: .env,
     message: "Silta data needs migrations; run the matching CLI first.", next: ["silta init"],
@@ -47,6 +51,10 @@ extension AppReadError {
   init(_ error: any Error) {
     if let existing = error as? AppReadError {
       self = existing
+      return
+    }
+    if case StorageError.migrationRequired = error {
+      self = .migrationRequired
       return
     }
     switch error {
