@@ -52,9 +52,12 @@ struct AppScreenToolbar: ToolbarContent {
   private var documentTabs: some View {
     HStack(spacing: 0) {
       ForEach(AppDocumentView.allCases, id: \.self) { view in
-        Button(view.rawValue.capitalized) { model.select(documentView: view) }
-          .buttonStyle(.plain).font(.system(size: 13))
-          .frame(maxWidth: .infinity, minHeight: 26)
+        Button {
+          model.select(documentView: view)
+        } label: {
+          Text(view.rawValue.capitalized)
+            .frame(maxWidth: .infinity, minHeight: 26).contentShape(.capsule)
+        }.buttonStyle(.plain).font(.system(size: 13))
           .foregroundStyle(Color("Ink"))
           .background(
             model.documents.view == view ? Color("Ink").opacity(0.08) : .clear, in: .capsule
