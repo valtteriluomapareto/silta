@@ -104,11 +104,9 @@ the human copies.
 - **Layout:** `NavigationSplitView` (three columns for Docs), `.inspector`,
   native search in the toolbar, placed before the inspector toggle. Glass only on the
   sidebar, toolbar and controls. The app accent is tide `#0B6E8E`, from the asset catalog.
-- **App icon:** `App/SiltaApp/AppIcon.icon`, an Icon Composer document from the Paper
-  artboard "App icon · final": a task card spanning like a bridge, with the backlog
-  behind it. Four flat layers with light and dark fills in tide; glass, specular
-  highlights and shadows are off. Edit it in Icon Composer; check renders with
-  `ictool AppIcon.icon --export-image --platform macOS --rendition Dark …`.
+- **App icon:** `App/SiltaApp/AppIcon.icon`, an Icon Composer document with flat
+  light and dark layers in tide. Its design, geometry and regeneration steps are in
+  [`app-icon.md`](../app-icon.md).
 
 ## Slices
 
