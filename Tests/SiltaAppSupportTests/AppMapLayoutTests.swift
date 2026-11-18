@@ -89,9 +89,8 @@
       let parallel = AppMapLayout(
         map: Self.map(
           apps: ["a", "b", "c", "w", "x"], services: [],
-          edges: [
-            ("a", "x", "http-api"), ("a", "x", "graphql"), ("c", "x", "http-api"),
-            ("b", "w", "http-api"),
+          links: [
+            Link("a", "x"), Link("a", "x", kind: "graphql"), Link("c", "x"), Link("b", "w"),
           ]))
       #expect(place(parallel).suffix(2) == ["w 1/0", "x 1/1"])
 

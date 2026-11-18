@@ -15,7 +15,7 @@ nonisolated struct WorkspaceMapGeometry {
   let frames: [String: CGRect]
   let size: CGSize
   /// The bottom edge of the lowest node; back edges run below it.
-  private let floor: CGFloat
+  private let bottom: CGFloat
 
   init(layout: AppMapLayout) {
     let rows = Dictionary(grouping: layout.nodes, by: \.column).mapValues(\.count)
@@ -35,7 +35,7 @@ nonisolated struct WorkspaceMapGeometry {
       ? 0
       : Self.margin * 2 + CGFloat(layout.columnCount) * Self.appSize.width
         + CGFloat(layout.columnCount - 1) * Self.columnGap
-    floor = frames.values.map(\.maxY).max() ?? Self.margin
+    bottom = frames.values.map(\.maxY).max() ?? Self.margin
     let below: CGFloat = layout.backEdges.isEmpty ? 0 : Self.rowPitch / 2 + 3 * Self.laneGap
     size = CGSize(
       width: width, height: Self.margin * 2 + CGFloat(tallest) * Self.rowPitch + below)
