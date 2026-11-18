@@ -4,12 +4,10 @@ Status: active
 
 ## Goal
 
-Validate the running app without depending on an unlocked Mac. The current slice
-is SI-152: isolated DEBUG fixture launch, model-owned state.json and offscreen PNGs.
-It has its own PR, stacked on Workspace and merged after #210. Screen delivery in
-[the Mac app plan](mac-app.md) remains My work, Board, Workspace, then Docs.
+Validate the running app with an isolated Debug fixture. C1a shipped in #214.
+The [Mac app plan](mac-app.md#validation) explains what each validation layer proves.
 
-## Current scope: C1a / SI-152
+## Fixture and offscreen output
 
 Use the shared `v2` fixture from `SiltaAppSupport/Control`, its fixed clock and the
 existing ID generator. `SiltaTestSupport` reuses these implementations. Every
@@ -40,13 +38,13 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
   exits. Use a separate output directory for each capture to retain matching
   state/PNG evidence. Each snapshot also writes `sidebar.png` from the real
   AppSidebar. With Board or Workspace's inspector open, it writes `inspector.png`
-  from the real task or connection inspector. These filenames are reserved;
+  from the real task, connection, app or service inspector. These filenames are reserved;
   choose a different name for the root PNG. Parts use the same model and logical
   height, at 240 and 360 points wide, with active control appearance.
 - Render the real AppShellView in an offscreen NSHostingView, using
   `bitmapImageRepForCachingDisplay` and `cacheDisplay`. Do not use ImageRenderer:
   it cannot draw the native split view, lists or inspectors. This path shows
-  layout and content; **glass and vibrancy are not represented**. It does not
+  layout and content. The native toolbar, glass and vibrancy require a real window. It does not
   require Screen Recording permission. Inspect every resulting PNG.
 - State projects model-owned route, typed selections, per-route inspector flags
   and loaded data. Observation schedules a coalesced projection after mutation;
@@ -57,6 +55,7 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | Field | Meaning |
 |---|---|
 | `snapshotVersion` | Schema version, currently 1 |
+| `pid`, `windowNumber` | Process ID and real window number. The window number is null until available and in offscreen mode. |
 | `run`, `revision` | Unique launch identity and increasing publication number |
 | `fixture`, `appearance` | `v2` and `light`/`dark` |
 | `screen`, `route` | Current screen and canonical route including selected ref and document view |
@@ -94,31 +93,51 @@ There is no pending field or mailbox state in this slice.
   pending real UI checks never hold a PR.
 - Stop owned fixture builds when testing ends. Do not terminate unrelated apps.
 
-## Deferred slices
+## Drive a fixture from the terminal
 
-| Slice | Scope | Depends on | Verify with |
-|---|---|---|---|
-| C1a / SI-152 / #178 | Isolated v2 launch, current routes, atomic state, offscreen PNG, Release isolation | A2; model-owned navigation in A3/A4 | Launch/state tests, hosted tests, inspected PNGs, Debug/Release |
-| C1b / SI-153 / #178 | `launch/state/wait/shot`, verified process ownership, window number | C1a; capture preflight before starting | Script/wait/shot tests and inspected real-window capture when available |
-| C2 / SI-147 / #179 | Mailbox, dispatch through UI handlers, sequence barriers, copy and fixture-write refresh | C1b | Strict decoding/action tests and isolated external-write refresh |
+Build the Debug app from the repository with `scripts/verify.sh app` or
+`scripts/run-mac-fixture.sh` (the latter also opens a fixture window). Use a fresh
+run for each independent check. `launch` prints its private directory after the
+requested route and its initial reads settle. The directory contains `app.log`,
+`state.json`, the fixture store in `data/` and the driver’s process record.
+`stop` terminates the matching fixture and leaves the directory for inspection.
 
-C1b and C2 are not prerequisites for screen PRs. Add fixture variants, state
-fields, routes and actions only when a screen needs them. C2 may proceed alongside
-screen work once its own dependencies are satisfied; screens add live actions
-later. Keep one slice per PR and no grandchildren tasks.
+```sh
+run=$(scripts/silta-app.sh launch --route board:AC-12 --dark)
+scripts/silta-app.sh state "$run" selection
+scripts/silta-app.sh wait "$run" 'idle=true' 'refresh.phase="ready"' 'selection.ref="AC-12"'
+scripts/silta-app.sh shot "$run" "$run/board.png"
+scripts/silta-app.sh stop "$run"
+```
 
-For C1b, the app publishes its actual window number. `shot` verifies that the
-window belongs to the recorded live PID, then runs
-`/usr/sbin/screencapture -l"$windowNumber" -o "$output"`. Before starting SI-153,
-record a capture preflight from the actual execution host and permission context.
-Screen Recording denial is a real limitation; offscreen PNGs or CUA success do not
-prove this permission. The fallback is the same command in a human-authorized
-Terminal, or a manual owned-window capture paired with its state/run. Do not grant
-permissions automatically or block a screen PR on this capability.
+`state RUN [PATH]` prints JSON. `wait` takes one or more `PATH=JSON` arguments
+and prints the matching state. Quote strings as JSON even inside shell quotes.
+It listens for file replacement and process exit, with a monotonic deadline.
+Timeouts show the expected and last observed values. Declared nullable fields
+can be matched with `null`. Unknown fields fail immediately; lane names and app
+slugs are literal path segments and must exist in the loaded snapshot. `launch`,
+`wait` and `shot` accept `--timeout SECONDS`.
 
-C1b should consider Poimi's immediate failure on undeclared wait paths, rather than
-requiring has(). Distinguish an unknown path from a declared null field; decide
-this with tests then, without adding a jq/schema parser to C1a.
+`shot` waits for ready and idle plus a real window number. It checks the live
+process identity and Core Graphics window owner before and after `screencapture
+-l<id> -o`. It publishes a PNG and matching `<output>.json` only if both checks
+pass and the projected state agrees across the capture. Choose unused output
+paths. Screenshot capture requires Screen Recording in a usable window session.
+If it fails, run `shot` in an authorized Terminal on the same Mac, or take a
+manual capture of the owned window and record its run/route/revision. Use
+`-SiltaSnapshot` for offscreen evidence. The fixture validation and merge gate
+stay available without either real-window capture path.
+
+## Slices
+
+| Slice | Scope | Status |
+|---|---|---|
+| C1a / SI-152 / #178 | Isolated v2 launch, route selection, state JSON and offscreen PNG | Shipped in #214, with additional screens and snapshot parts in later PRs |
+| C1b / SI-153 / #178 | Driver, predicate waits, owned real-window capture and cleanup | Implemented here |
+| C2 / SI-147 / #179 | Mailbox, shared UI handlers, sequence barriers, copy and fixture-write refresh | Planned after C1b |
+
+Neither C1b nor C2 blocks screen PRs. Add fixture variants, state fields, routes
+and actions as screens need them. Keep one slice per PR and no grandchildren tasks.
 
 SI-146 remains the C1 implementation parent, doing and out of review until its
 implementation parts are complete. SI-152 and SI-153 track those parts; plan-only

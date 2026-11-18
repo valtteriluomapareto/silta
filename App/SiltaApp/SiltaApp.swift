@@ -95,6 +95,11 @@ struct SiltaApp: App {
   private var mainWindow: some Scene {
     Window("Silta", id: "main") {
       AppShellView(model: model)
+        #if DEBUG
+          .background {
+            if let control { ControlWindowProbe(report: control.attach) }
+          }
+        #endif
     }.defaultSize(width: 1280, height: 840)
       .commands {
         FindCommands()

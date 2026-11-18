@@ -11,6 +11,8 @@
     private let run = UUID().uuidString
     private var revision = 0
     private var model: AppModel?
+    private var windowNumber: Int?
+    private var started = false
     private var stateURL: URL {
       (options.snapshot?.deletingLastPathComponent() ?? fixture.home.deletingLastPathComponent())
         .appending(path: "state.json")
@@ -18,7 +20,7 @@
 
     init(options: ControlLaunch.Options) throws {
       self.options = options
-      fixture = try FixtureLaunch.prepare()
+      fixture = try FixtureLaunch.prepare(runDirectory: options.runDirectory)
     }
 
     func start(model: AppModel) async {
@@ -27,7 +29,6 @@
         try FileManager.default.createDirectory(
           at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         NSApplication.shared.appearance = NSAppearance(named: options.dark ? .darkAqua : .aqua)
-        try observe()
         await model.refresh().value
         try options.route.apply(to: model)
         if model.boardSelection != nil { await model.loadTaskDetail() }
@@ -39,17 +40,30 @@
           FileHandle.standardOutput.write(Data((output.path + "\n" + stateURL.path + "\n").utf8))
           exit(0)
         }
-        try publish()
+        try observe()
+        started = true
         FileHandle.standardOutput.write(Data(("Silta fixture state: " + stateURL.path + "\n").utf8))
       } catch {
         Self.fail(error)
       }
     }
 
+    func attach(window: NSWindow?) {
+      guard options.snapshot == nil else { return }
+      let number = window.flatMap { $0.windowNumber > 0 ? $0.windowNumber : nil }
+      guard windowNumber != number else { return }
+      windowNumber = number
+      if started {
+        do { try publish() } catch { Self.fail(error) }
+      }
+    }
+
     private func observe() throws {
       guard let model else { return }
       let state = withObservationTracking {
-        ControlState(model: model, run: run, revision: revision + 1, dark: options.dark)
+        ControlState(
+          model: model, run: run, revision: revision + 1, dark: options.dark,
+          windowNumber: windowNumber)
       } onChange: { [weak self] in
         Task { @MainActor in
           do { try self?.observe() } catch { Self.fail(error) }
@@ -62,8 +76,9 @@
     private func publish() throws {
       guard let model else { return }
       revision += 1
-      try ControlState(model: model, run: run, revision: revision, dark: options.dark)
-        .write(to: stateURL)
+      try ControlState(
+        model: model, run: run, revision: revision, dark: options.dark, windowNumber: windowNumber
+      ).write(to: stateURL)
     }
 
     private func snapshot(model: AppModel, to output: URL) async throws {
