@@ -30,7 +30,7 @@ struct AppSidebar: View {
                 if let count = count(route) {
                   Text(count, format: .number).font(.caption.monospacedDigit())
                 }
-              }
+              }.contentShape(.rect)
             }.buttonStyle(.plain)
               .foregroundStyle(model.route == route ? Color.accentColor : .primary)
           }
@@ -48,7 +48,7 @@ struct AppSidebar: View {
                   model.visibleData?.snapshot?.board.appOpenCounts[app.slug] ?? 0, format: .number
                 )
                 .font(.caption.monospacedDigit())
-              }
+              }.contentShape(.rect)
             }.buttonStyle(.plain)
           }
         }
@@ -69,7 +69,7 @@ struct AppSidebar: View {
                 }
               } icon: {
                 ActorLabel(actor: task.claimedBy ?? "").labelStyle(.iconOnly)
-              }
+              }.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
             }.buttonStyle(.plain)
           }
         }
