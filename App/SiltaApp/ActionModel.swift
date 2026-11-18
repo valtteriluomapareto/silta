@@ -9,18 +9,21 @@ nonisolated struct ActionTarget: Hashable, Sendable {
   let ref: String
 }
 
-/// A refused write as the card shows it: Core's code and message.
+/// A refused write as the card shows it: Core's code, message and recovery commands.
 nonisolated struct ActionFailure: Equatable, Sendable {
   let code: String?
   let message: String
+  let commands: [String]
 
   init(_ error: any Error) {
     if let failure = error as? AppReadError {
       code = failure.codeName
       message = failure.message
+      commands = failure.next
     } else {
       code = nil
       message = "Couldn’t save to Silta."
+      commands = []
     }
   }
 }

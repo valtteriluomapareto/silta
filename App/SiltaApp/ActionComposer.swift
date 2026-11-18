@@ -1,4 +1,3 @@
-import AppKit
 import SiltaAppSupport
 import SwiftUI
 
@@ -48,7 +47,9 @@ struct ActionComposer: View {
             .lineLimit(1)
         }
         Spacer(minLength: 0)
-        if let command { CopyCommandLink(command: command) }
+        if let command {
+          CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
+        }
         Button(action: send) {
           HStack(spacing: 8) {
             if sending { ProgressView().controlSize(.mini) }
@@ -74,29 +75,13 @@ struct ActionFailureView: View {
       if let code = failure.code {
         Text(code).font(.system(size: 11, design: .monospaced)).foregroundStyle(Color("Danger"))
       }
+      if let command = failure.commands.first {
+        CopyValue(value: command, title: "Copy recovery command", pill: true)
+      }
     }
     .padding(.horizontal, 12).padding(.vertical, 9)
     .background(Color("Danger").opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
     .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color("Danger").opacity(0.25)))
     .accessibilityElement(children: .combine)
-  }
-}
-
-/// The CLI command for the same action, kept as a fallback for Terminal.
-struct CopyCommandLink: View {
-  let command: AppCommand
-  @State private var copied = false
-
-  var body: some View {
-    Button(copied ? "Copied" : "Copy command") {
-      NSPasteboard.general.clearContents()
-      copied = NSPasteboard.general.setString(command.text, forType: .string)
-    }.buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Color("TideText"))
-      .help(command.text)
-      .task(id: copied) {
-        guard copied else { return }
-        do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
-        copied = false
-      }
   }
 }

@@ -2346,7 +2346,10 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   The Mac app logs one line per write, never per read. Its command is `app answer`,
   `app comment`, `app accept-answer`, `app triage` or `app unblock`, with the human
   actor, the workspace, and the exit and error code the matching CLI failure gives
-  (D50).
+  (D50). Those writes open only an existing, current store: a missing one is refused as
+  `env` "Database file could not be opened", and one with pending migrations as `env`
+  "Database needs migrations; run the matching silta CLI first." with `next`
+  `silta init`.
 
   A suppressed hook failure logs its actual process exit status of 0 while retaining
   the underlying `error_code`. Hook output never writes diagnostics to stderr.

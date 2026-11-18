@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 import SiltaCore
 
 /// The app's writes as `human:<USER>`: one SiltaCore service call per action, on the
@@ -41,17 +41,20 @@ public struct AppWriter: Sendable {
   }
 
   /// A fresh existing-only store per write, so a cached connection never outlives a
-  /// store that was replaced or removed.
+  /// store that was replaced or removed. Busy retries use the CLI's jitter, so the app
+  /// and a CLI process don't retry in lockstep.
   private func environment() -> SiltaEnvironment {
     SiltaEnvironment(
       clock: base.clock, ids: base.ids, git: base.git, home: base.home,
-      db: DatabaseStore(home: base.home.url, clock: base.clock, jitter: { 0 }, existingOnly: true),
+      db: DatabaseStore(
+        home: base.home.url, clock: base.clock, jitter: { UInt64.random(in: 10...50) },
+        existingOnly: true),
       log: base.log, actor: base.actor, human: base.human)
   }
 
-  /// Logs into an existing data home only; a refused missing store stays absent.
+  /// Logs only beside an existing store, so a refused missing store leaves nothing behind.
   private func log(_ write: AppWrite, workspace: String, started: Date, failure: ErrorCode?) {
-    guard FileManager.default.fileExists(atPath: base.home.url.path) else { return }
+    guard FileManager.default.fileExists(atPath: base.db.path) else { return }
     var entry = LogEntry(
       timestamp: started, command: write.logCommand, actor: base.actor.description,
       exitCode: failure?.exitCode ?? 0,

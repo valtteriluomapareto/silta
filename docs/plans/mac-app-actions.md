@@ -42,7 +42,8 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     - a pending migration, as a new `StorageError.migrationRequired` (code `env`).
 
     `min_writer_version` and a newer schema refuse as `schemaTooNew`, as they already
-    do. So the app never creates or migrates a store, by construction. The CLI's
+    do. So the app doesn't create or migrate a store. A file deleted in the instant
+    between the recheck and SQLite's open would still be recreated empty. The CLI's
     behaviour doesn't change.
   - Failures throw `AppReadError`, the viewer's body-free coded error, which is also
     used for writes. Store refusals keep their kinds (`unavailableStore`,
@@ -65,8 +66,8 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     one draft and one in-flight guard.
   - One write per target at a time; the field and button are disabled while it runs.
     A failure is stored per target with the error.
-  - Drafts clear only on success. A draft whose target has gone after a refresh is
-    dropped with it.
+  - Drafts clear only on success. A draft whose target has gone is simply never shown
+    again; drafts last until the app quits.
   - Every write, success or failure, forces a refresh and reloads the open task
     detail. That also covers stale views: `conflict`, `not_found` or `claimed`.
   - A slow write (busy retries) shows "Sending…" until Core returns or gives up. Core
@@ -114,7 +115,7 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
 
 | Slice | Scope | Depends on | Verify with |
 |---|---|---|---|
-| B1 (SI-198) | `existingOnly` store option and `StorageError.migrationRequired`; `AppWrite` and `AppWriter` with the log line; answer, accept answer and comment; the model `Writer` seam, drafts and action state; My work question and answer cards; the inspector box; the AC-14 fixture thread; this plan, D50 and §19 | A6b | Core: `existingOnly` refuses a missing store (no directory created) and a pending migration (db bytes unchanged). `AppWriterTests` on an isolated seeded home: answer, comment and accept land as `human:acme` and show in a fresh `AppReader` read; `min_writer_version` 999 refuses as `newerSchema`; a secret is refused with `invalid`; a non-asker accept keeps Core's code; a repeat accept succeeds; one log line per write with no body; a CLI write between the read and the write. Model: the draft is shared by My work and the inspector, kept on failure and cleared on success; a second send while one is in flight is refused; every write forces a refresh; a vanished target drops its draft; Answer/Comment choice. Light and dark PNGs of the question and answer cards and the inspector box |
+| B1 (SI-198) | `existingOnly` store option and `StorageError.migrationRequired`; `AppWrite` and `AppWriter` with the log line; answer, accept answer and comment; the model `Writer` seam, drafts and action state; My work question and answer cards; the inspector box; the AC-14 fixture thread; this plan, D50 and §19 | A6b | Core: `existingOnly` refuses a missing store (no directory created) and a pending migration (db bytes unchanged). `AppWriterTests` on an isolated seeded home: answer, comment and accept land as `human:acme` and show in a fresh `AppReader` read; `min_writer_version` 999 refuses as `newerSchema`; a secret is refused with `invalid`; a non-asker accept keeps Core's code; a repeat accept succeeds; one log line per write with no body; a CLI write between the read and the write. Model: the draft is shared by My work and the inspector, kept on failure and cleared on success; a second send while one is in flight is refused; every write forces a refresh; Answer/Comment choice. Light and dark PNGs of the question and answer cards and the inspector box |
 | B2 | Accept proposals and unblock ready tasks; checkboxes and the selection; the AC-17 fixture block | B1 | `AppWriterTests`: triage accepts only the chosen refs. A ref accepted elsewhere first fails the batch with `conflict`, and the others stay proposed. Unblock of a ready task returns it to todo. Model: selection, "Accept N", pruning after refresh, Unblock only on `ready`. Light and dark PNGs |
 
 Each slice is one PR. Writes are test-first: the store and `AppWriterTests` come
@@ -129,6 +130,9 @@ before the views.
 - PNGs cover the states a route reaches: cards, inspector box, checkboxes. Sending
   and error states are covered by model tests only.
 - **Unverified until a live run:** keyboard focus, ⌘↩ and VoiceOver announcements.
+- **Unverified:** a store deleted while a write holds the migration lock. The recheck
+  under the lock has no test, because deleting between two file calls needs a hook
+  Core doesn't have.
 
 ## Risks
 

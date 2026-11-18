@@ -5,7 +5,7 @@ public enum AppWrite: Equatable, Sendable {
   /// Posts a plain comment on a task.
   case comment(task: String, body: String)
   /// Accepts an answer to the human's question, resolving its thread.
-  case acceptAnswer(String)
+  case acceptAnswer(ref: String)
 
   /// The §19 command name, distinct from every CLI command.
   var logCommand: String {

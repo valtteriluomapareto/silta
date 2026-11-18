@@ -1,7 +1,8 @@
 import Foundation
 public import SiltaCore
 
-/// A body-free coded failure exposed without package-scoped implementation types.
+/// A body-free coded failure exposed without package-scoped implementation types. Reads
+/// and the app's writes (D50) share it.
 public struct AppReadError: CodedError {
   /// Presentation states that cannot be selected by error code alone.
   public enum Kind: Sendable {
@@ -52,10 +53,13 @@ extension AppReadError {
       self = existing
       return
     }
+    if case StorageError.migrationRequired = error {
+      self = .migrationRequired
+      return
+    }
     switch error {
     case StorageError.cannotOpen: kind = .unavailableStore
     case StorageError.schemaTooNew: kind = .newerSchema
-    case StorageError.migrationRequired: kind = .migrationRequired
     default: kind = .other
     }
     let coded: any CodedError = (error as? any CodedError) ?? StorageError.unknown

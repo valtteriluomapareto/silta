@@ -20,6 +20,17 @@
       return try #require(failure)
     }
 
+    static func agent(_ reader: AppReader, _ actor: ActorID, seed: UInt64 = 5) -> TaskService {
+      let clock = FakeClock(now: AppV2Fixture.now)
+      return TaskService(
+        environment: SiltaEnvironment(
+          clock: clock, ids: SeededIDGenerator(seed: seed), git: ScriptedGitRunner(script: []),
+          home: reader.environment.home,
+          db: DatabaseStore(home: reader.environment.home.url, clock: clock, jitter: { 0 }),
+          log: FakeLog(), actor: actor),
+        workspace: "acme")
+    }
+
     @Test func answerLandsAsTheHumanAndLeavesMyWork() throws {
       try withScratchDirectory { scratch in
         try AppFixtures.seed(in: scratch)
@@ -62,10 +73,10 @@
           answer.commands.contains { $0.hasSuffix("comment accept 'AC-14/2'") },
           "\(answer.commands)")
         let writer = AppWriter(reader: reader)
-        try writer.perform(.acceptAnswer("AC-14/2"), workspace: "acme")
+        try writer.perform(.acceptAnswer(ref: "AC-14/2"), workspace: "acme")
         #expect(
           !(try reader.snapshot(workspace: "acme").work.items.contains { $0.kind == "answer" }))
-        try writer.perform(.acceptAnswer("AC-14/2"), workspace: "acme")
+        try writer.perform(.acceptAnswer(ref: "AC-14/2"), workspace: "acme")
       }
     }
 
@@ -76,7 +87,7 @@
         let writer = AppWriter(reader: reader)
         let before = try reader.task("AC-12", workspace: "acme").comments
         let question = try Self.failure {
-          try writer.perform(.acceptAnswer("AC-12/1"), workspace: "acme")
+          try writer.perform(.acceptAnswer(ref: "AC-12/1"), workspace: "acme")
         }
         #expect(question.kind == .other)
         #expect(question.code == .invalid)
@@ -85,6 +96,32 @@
         }
         #expect(missing.code == .notFound)
         #expect(try reader.task("AC-12", workspace: "acme").comments == before)
+      }
+    }
+
+    @Test func onlyTheAskerOrClaimerMayAcceptAnAnswer() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try Self.reader(scratch)
+        var question = CommentDraft(body: "Which endpoint?", kind: "question")
+        question.recipients = ["agent:codex:fixture"]
+        let asked = try Self.agent(reader, .agent(tool: "claude", session: "other"))
+          .comment("AC-15", question)
+        var answer = CommentDraft(body: "The paged one.", kind: "answer")
+        answer.replyTo = asked.comment.ref
+        let answered = try Self.agent(reader, .agent(tool: "codex", session: "fixture"), seed: 6)
+          .comment("AC-15", answer)
+        let before = try reader.task("AC-15", workspace: "acme").comments
+        let refused = try Self.failure {
+          try AppWriter(reader: reader).perform(
+            .acceptAnswer(ref: answered.comment.ref), workspace: "acme")
+        }
+        #expect(refused.kind == .other && refused.code == .conflict)
+        #expect(try reader.task("AC-15", workspace: "acme").comments == before)
+        #expect(
+          !(try reader.snapshot(workspace: "acme").work.items.contains {
+            $0.ref == answered.comment.ref
+          }))
       }
     }
 
@@ -100,6 +137,9 @@
         }
         #expect(refused.code == .invalid)
         #expect(try reader.task("AC-15", workspace: "acme").comments == before)
+        let log = try String(
+          contentsOf: scratch.appending(path: "silta-home/log/2026-11-16.jsonl"), encoding: .utf8)
+        #expect(log.contains("\"error_code\":\"invalid\"") && !log.contains("sk-ant"))
       }
     }
 
@@ -158,19 +198,16 @@
         try AppFixtures.seed(in: scratch)
         let reader = try Self.reader(scratch)
         let read = try reader.task("AC-12", workspace: "acme")
-        let agent = SiltaEnvironment(
-          clock: FakeClock(now: AppV2Fixture.now), ids: SeededIDGenerator(seed: 5),
-          git: ScriptedGitRunner(script: []), home: reader.environment.home,
-          db: DatabaseStore(
-            home: reader.environment.home.url, clock: FakeClock(now: AppV2Fixture.now),
-            jitter: { 0 }),
-          log: FakeLog(), actor: .agent(tool: "claude", session: "fixture"))
-        _ = try TaskService(environment: agent, workspace: "acme").comment(
+        _ = try Self.agent(reader, .agent(tool: "claude", session: "fixture")).comment(
           "AC-12", CommentDraft(body: "Still parsing."))
         try AppWriter(reader: reader).perform(
           .answer(task: "AC-12", question: "AC-12/1", body: "Other."), workspace: "acme")
-        let refs = try reader.task("AC-12", workspace: "acme").comments.map(\.ref).sorted()
-        #expect(refs == read.comments.map(\.ref) + ["AC-12/2", "AC-12/3"])
+        let comments = try reader.task("AC-12", workspace: "acme").comments
+        #expect(comments.map(\.ref).sorted() == read.comments.map(\.ref) + ["AC-12/2", "AC-12/3"])
+        let agent = comments.first { $0.ref == "AC-12/2" }
+        let human = comments.first { $0.ref == "AC-12/3" }
+        #expect(agent?.actor == "agent:claude:fixture" && agent?.body == "Still parsing.")
+        #expect(human?.actor == "human:acme" && human?.replyTo == "AC-12/1")
       }
     }
 
@@ -185,7 +222,7 @@
         #expect(throws: AppReadError.self) {
           try writer.perform(.comment(task: "AC-99", body: "Private words."), workspace: "acme")
         }
-        try writer.perform(.acceptAnswer("AC-14/2"), workspace: "acme")
+        try writer.perform(.acceptAnswer(ref: "AC-14/2"), workspace: "acme")
         let log = scratch.appending(path: "silta-home/log/2026-11-16.jsonl")
         let text = try String(contentsOf: log, encoding: .utf8)
         let lines = try text.split(separator: "\n").map {

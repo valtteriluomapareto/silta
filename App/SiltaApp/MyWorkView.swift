@@ -98,17 +98,15 @@ struct MyWorkView: View {
       Text(question.headline).font(.system(size: 18, weight: .semibold)).lineLimit(3)
         .lineSpacing(3).help(question.headline).textSelection(.enabled).padding(.leading, 32)
         .frame(maxWidth: 760, alignment: .leading)
-      let command = model.reader.flatMap { question.command(reader: $0, workspace: workspace) }
-      if model.writer != nil, let ref = question.item.ref, let task = question.item.task,
+      if let ref = question.item.ref, let task = question.item.task,
         let target = model.target(ref)
       {
         ActionComposer(
           model: model, target: target, placeholder: "Your answer to \(ref)",
-          sendTitle: "Send answer", command: command,
+          sendTitle: "Send answer",
+          command: model.reader.flatMap { question.command(reader: $0, workspace: workspace) },
           caption: "Replies to \(ref) as you"
         ) { model.answer(question: ref, task: task) }.padding(.leading, 32)
-      } else if let command {
-        CommandBlock(command: command).padding(.leading, 32)
       }
     }
   }
@@ -139,12 +137,10 @@ struct MyWorkView: View {
         if let task = answer.item.task {
           Button("Open task") { model.inspect(task: task) }.buttonStyle(CompactActionStyle())
         }
-        if model.writer != nil, let reader = model.reader,
-          answer.canAccept(reader: reader, workspace: workspace)
-        {
+        if let reader = model.reader, answer.canAccept(reader: reader, workspace: workspace) {
           let sending = target.map { model.actions.isSending($0) } ?? false
           Button(sending ? "Accepting…" : "Accept answer") {
-            model.perform(.acceptAnswer(ref), for: ref)
+            model.perform(.acceptAnswer(ref: ref), for: ref)
           }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
         }
       }.padding(.leading, 32)

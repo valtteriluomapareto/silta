@@ -156,21 +156,10 @@ struct TaskInspector: View {
       let snapshot = model.visibleData?.snapshot
     {
       let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
-      if model.writer != nil {
-        TaskComposer(
-          model: model, task: task.ref,
-          question: content.newestQuestion(for: task.ref, reader: reader, workspace: workspace)
-        ).id(task.ref)
-      } else {
-        ForEach(content.answers(for: task.ref, reader: reader, workspace: workspace)) { answer in
-          VStack(alignment: .leading, spacing: 8) {
-            Overline(
-              answer.actor.map { "Answer " + ActorPresentation($0).name } ?? "Answer question",
-              color: Color("TideText"))
-            CommandBlock(command: answer.command)
-          }.padding(12).background(Color("AccentColor").opacity(0.06), in: .rect(cornerRadius: 12))
-        }
-      }
+      TaskComposer(
+        model: model, task: task.ref,
+        question: content.newestQuestion(for: task.ref, reader: reader, workspace: workspace)
+      ).id(task.ref)
       if task.status == "review" {
         ForEach(reader.commands(forReview: task, workspace: workspace), id: \.text) {
           CommandBlock(command: $0)

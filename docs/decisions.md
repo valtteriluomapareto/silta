@@ -776,7 +776,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   accept proposals, unblock). The app calls Core services in process as
   `human:<USER>` (§4.1, D38). It can't spawn the CLI, because the CLI treats only a
   terminal as human. Each app write opens the existing store only: a missing store or
-  a pending migration is refused under the migration lock, so the app never creates
-  or migrates one. Each write logs one body-free §19 line named `app <action>`, so
-  measurement can tell app use from terminal use. Plan:
+  a pending migration is refused, rechecked under the migration lock, so the app
+  doesn't create or migrate one. (A file deleted in the instant between that recheck
+  and SQLite's open would still be recreated empty.) Each write logs one body-free §19
+  line named `app <action>`, beside an existing store only, so measurement can tell app
+  use from terminal use. Reads and writes share the facade's `AppReadError`. Plan:
   [`mac-app-actions.md`](plans/mac-app-actions.md).
