@@ -79,6 +79,18 @@
       }
     }
 
+    @Test func genericAboutLinksDoNotProvePullRequestOwnership() throws {
+      try fixture { reader, _ in
+        let content = MyWorkContent(
+          snapshot: try reader.snapshot(workspace: "acme"), search: "", now: AppV2Fixture.now)
+        let review = try #require(content.reviews.first)
+        #expect(review.task.links.contains { $0.rel == "about" })
+        withKnownIssue("A generic about link does not establish that this task owns a PR") {
+          #expect(!review.metadata.contains("PR #"))
+        }
+      }
+    }
+
     @Test func citedPullRequestsCannotBecomeTheTasksOwnPR() throws {
       try fixture { reader, home in
         @MainActor func link(_ number: Int, _ relation: String, seed: Int) throws {

@@ -32,23 +32,28 @@
       }
     }
 
-    @Test func reloadFailureRetainsValuesAndRetryClearsTheFailure() async throws {
+    @Test(arguments: [1, 2]) func reloadFailureRetainsValuesAndRetryClearsTheFailure(version: Int)
+      async throws
+    {
       try await fixture { reader in
         let edge = "edge:acme-mobile/acme-backend/http-api"
         let page = try reader.documents(workspace: "acme", about: edge)
         let flags = WorkspaceReadFlags()
         let gate = PausedWorkspaceRead()
+        let retryGate = PausedWorkspaceRead()
         let docs = WorkspaceDocumentsModel(read: { _, _, _ in
           if flags.fails {
             await gate.pause()
             throw AppLoadFailure(message: "Acme read failed")
           }
+          if flags.pauses { await retryGate.pause() }
           return [edge: page]
         })
         await docs.refresh(reader, workspace: "acme", version: 1, connections: [edge])
         flags.fails = true
         let reload = Task {
-          await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
+          await docs.refresh(
+            reader, workspace: "acme", version: version, connections: [edge], force: true)
         }
         await gate.started()
         #expect(docs.loading && docs.countLabel(for: edge) == "3 docs")
@@ -56,11 +61,24 @@
         await reload.value
         #expect(docs.failure != nil && docs.countLabel(for: edge) == "3 docs (stale)")
         #expect(docs.countText(for: edge) == "3 (stale)")
-        #expect(docs.phase(workspace: "acme", version: 2, connections: [edge]) == .failed)
+        #expect(docs.phase(workspace: "acme", version: version, connections: [edge]) == .failed)
         flags.fails = false
-        await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
+        flags.pauses = true
+        let retry = Task {
+          await docs.refresh(
+            reader, workspace: "acme", version: version, connections: [edge], force: true)
+        }
+        await retryGate.started()
+        #expect(docs.loading)
+        withKnownIssue("A forced retry must retain stale qualifiers until it succeeds") {
+          #expect(docs.countLabel(for: edge) == "3 docs (stale)")
+          #expect(docs.countText(for: edge) == "3 (stale)")
+        }
+        retryGate.resume()
+        await retry.value
         #expect(docs.failure == nil && !docs.loading)
-        #expect(docs.phase(workspace: "acme", version: 2, connections: [edge]) == .ready)
+        #expect(docs.countLabel(for: edge) == "3 docs" && docs.countText(for: edge) == "3")
+        #expect(docs.phase(workspace: "acme", version: version, connections: [edge]) == .ready)
       }
     }
 
@@ -170,6 +188,7 @@
   @MainActor private final class WorkspaceReadFlags {
     var partial = false
     var fails = false
+    var pauses = false
     var calls = 0
   }
 
