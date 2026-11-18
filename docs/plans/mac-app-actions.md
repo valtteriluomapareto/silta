@@ -85,7 +85,9 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     refs that leave the list.
   - **My work `ready` item:** "Unblock". Core unblocks a human's task even with an open
     blocker, so the app offers it only on `ready` items. `replan` items keep their
-    read command.
+    read command. The write passes Core's `requireReady`, so a blocker added since the
+    read refuses as `blocked` instead of being cleared. Unblock has its own target, apart
+    from the task's comment draft.
   - **Errors** show in the card or inspector with the code, the message and "Copy
     command".
 - **Fixture:**
