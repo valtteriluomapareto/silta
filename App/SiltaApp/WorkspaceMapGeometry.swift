@@ -1,4 +1,4 @@
-import CoreGraphics
+import Foundation
 import SiltaAppSupport
 
 /// Points for a computed map layout: fixed node sizes, a fixed row pitch and columns

@@ -1,5 +1,4 @@
 #if DEBUG
-  import CoreGraphics
   import Foundation
   @testable import SiltaApp
   @testable import SiltaAppSupport
