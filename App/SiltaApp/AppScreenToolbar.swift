@@ -3,6 +3,8 @@ import SwiftUI
 
 struct AppScreenToolbar: ToolbarContent {
   @Bindable var model: AppModel
+  @Binding var searchFocused: Bool
+  let compactSearch: Bool
 
   var body: some ToolbarContent {
     ToolbarItemGroup(placement: .primaryAction) {
@@ -29,7 +31,18 @@ struct AppScreenToolbar: ToolbarContent {
         }
       }
     }
-    DefaultToolbarItem(kind: .search, placement: .primaryAction)
+    ToolbarItem(placement: .primaryAction) {
+      if compactSearch && !searchFocused {
+        Button("Search", systemImage: "magnifyingglass") { searchFocused = true }
+          .labelStyle(.iconOnly)
+      } else {
+        ToolbarSearchField(
+          text: $model.search, focused: $searchFocused,
+          prompt: model.route == .docs ? "Search loaded documents" : "Search"
+        )
+        .frame(width: 220)
+      }
+    }
     if model.route == .board || model.route == .workspace {
       ToolbarItem(placement: .primaryAction) {
         Button("Inspector", systemImage: "sidebar.right") { model.toggleInspector() }

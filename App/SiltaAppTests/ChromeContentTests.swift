@@ -54,7 +54,7 @@
     }
 
     @Test func archiveFooterAndAboutChipUseTheLoadedScope() async throws {
-      try await fixture { reader in
+      try await fixture { reader, _ in
         let docs = DocsModel()
         await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
         #expect(docs.archivedCount == 1)
@@ -99,7 +99,7 @@
     }
 
     @Test func documentCatalogCachesByVersionAndForceWithoutOwningTheDocsFilter() async throws {
-      try await fixture { reader in
+      try await fixture { reader, home in
         let version = CatalogVersion()
         let model = AppModel(
           reader: reader,
@@ -120,11 +120,38 @@
         #expect(
           model.catalogFailure == nil && SidebarContent.documentCount(model.documentCatalog) == "6")
         model.navigate(to: .mywork)
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "task", "add", "Catalog read fixture", "--start", "--app",
+            "acme-mobile",
+          ], home: home, seed: 351)
+        let task = try #require(
+          reader.snapshot(workspace: "acme").board.doing.first {
+            $0.title == "Catalog read fixture"
+          })
+        let body = home.deletingLastPathComponent().appending(path: "catalog.md")
+        try "# Catalog\n\nSynthetic catalog contents.\n".write(
+          to: body, atomically: true, encoding: .utf8)
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "doc", "propose", "catalog-cache", "--title", "Catalog cache",
+            "--about", "app:acme-mobile", "--task", task.ref, "-F", body.path, "-m",
+            "Test catalog refresh",
+          ], home: home, seed: 352)
+        await model.refresh().value
+        #expect(SidebarContent.documentCount(model.documentCatalog) == "6")
+        await model.refresh(force: true).value
+        #expect(SidebarContent.documentCount(model.documentCatalog) == "7")
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "doc", "propose", "catalog-version", "--title", "Catalog version",
+            "--about", "app:acme-mobile", "--task", task.ref, "-F", body.path, "-m",
+            "Test version refresh",
+          ], home: home, seed: 353)
         version.value = 2
         await model.refresh().value
-        #expect(model.catalogFailure == nil && model.documentCatalog != nil)
-        await model.refresh(force: true).value
-        #expect(SidebarContent.documentCount(model.documentCatalog) == "6")
+        #expect(
+          model.catalogFailure == nil && SidebarContent.documentCount(model.documentCatalog) == "8")
       }
     }
 
@@ -138,12 +165,12 @@
       try body(AppReader(home: home, user: "acme", now: { AppV2Fixture.now }))
     }
 
-    private func fixture(_ body: @MainActor (AppReader) async throws -> Void) async throws {
+    private func fixture(_ body: @MainActor (AppReader, URL) async throws -> Void) async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
       let home = root.appending(path: "data")
       try AppDocsFixture.seed(home: home)
-      try await body(AppReader(home: home, user: "acme", now: { AppV2Fixture.now }))
+      try await body(AppReader(home: home, user: "acme", now: { AppV2Fixture.now }), home)
     }
   }
 #endif
