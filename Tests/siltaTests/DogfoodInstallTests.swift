@@ -64,7 +64,9 @@ struct DogfoodInstallTests {
         printf '%s' \(shellWord(text)) > "$app/marker"
         cat > "$app/Info.plist" <<PLIST
         <?xml version="1.0" encoding="UTF-8"?>
-        <plist version="1.0"><dict><key>CFBundleVersion</key><string>$version</string></dict></plist>
+        <plist version="1.0"><dict>
+        <key>CFBundleVersion</key><string>$version</string>
+        </dict></plist>
         PLIST
         """, in: tools)
   }
@@ -191,7 +193,8 @@ struct DogfoodInstallTests {
       #expect(try Self.install(clone, scratch: scratch, tools: tools).termination == .exit(0))
       #expect(try Self.read(scratch.appending(path: "installed/silta")) == "Acme binary 2")
       #expect(try Self.read(app.appending(path: "Contents/marker")) == "Acme app 2")
-      #expect(!FileManager.default.fileExists(atPath: app.appending(path: "Contents/old-only").path))
+      let oldOnly = app.appending(path: "Contents/old-only")
+      #expect(!FileManager.default.fileExists(atPath: oldOnly.path))
       let leftovers = try FileManager.default.contentsOfDirectory(
         atPath: scratch.appending(path: "apps").path)
       #expect(leftovers == [Self.appName])
