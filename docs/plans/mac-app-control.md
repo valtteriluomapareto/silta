@@ -55,6 +55,7 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | Field | Meaning |
 |---|---|
 | `snapshotVersion` | Schema version, currently 1 |
+| `seq`, `settledSeq` | Last issued and settled action sequence. Both start at zero in a driver run and are null in other modes. |
 | `pid`, `windowNumber` | Process ID and real window number. The window number is null until available and in offscreen mode. |
 | `run`, `revision` | Unique launch identity and increasing publication number |
 | `fixture`, `appearance` | `v2` and `light`/`dark` |
@@ -69,7 +70,7 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 Lane keys use their displayed names: Todo, Doing, Review, Done this week. Failed
 loads may be idle; also check refresh.phase. Idle does not prove painted pixels.
 Bodies, comments, filesystem paths and arbitrary error messages are excluded.
-There is no pending field or mailbox state in this slice.
+The sequence gap `seq > settledSeq` indicates an action in progress.
 
 ## Validation and merge gate
 
@@ -119,7 +120,7 @@ slugs are literal path segments and must exist in the loaded snapshot. `launch`,
 wait and `screencapture` independently. Process identity checks have separate
 short bounds.
 
-`shot` waits for ready and idle plus a real window number. It checks the live
+`shot` waits for ready and idle, a settled mailbox, and a real window number. It checks the live
 process identity and Core Graphics window owner before and after `screencapture
 -l<id> -o`. It publishes a PNG and matching `<output>.json` only if both checks
 pass and the projected state agrees before and after capture (ignoring the publication
@@ -131,13 +132,60 @@ manual capture of the owned window and record its run/route/revision. Use
 `-SiltaSnapshot` for offscreen evidence. The fixture validation and merge gate
 stay available without either real-window capture path.
 
+## Live actions and fixture writes
+
+`action RUN JSON` calls the same model handlers as the app’s controls. It is available
+in interactive runs created with `scripts/silta-app.sh launch`. Arguments are JSON
+objects with the exact fields below:
+
+| Action | Extra fields | Meaning |
+|---|---|---|
+| `nav` | `screen` | Open `mywork`, `board`, `workspace`, or `docs`. |
+| `select` | `screen`, `ref`, optional `view` for Docs | Select a Board task, Workspace edge/app/service, or Docs revision. Docs views are `document`, `changes`, `comments`. |
+| `inspector.toggle` | | Open or close the current Board or Workspace inspector. |
+| `copy.ref` | | Copy the current task, app, service, connection or document ref to the Mac clipboard. |
+| `copy.command` | | Copy the Board inspector’s read command for the selected task in review. |
+| `refresh` | | Force a model refresh and settle the current scope. |
+
+```sh
+run=$(scripts/silta-app.sh launch)
+scripts/silta-app.sh action "$run" '{"action":"select","screen":"board","ref":"AC-9"}'
+scripts/silta-app.sh wait "$run" 'settledSeq=1' 'selection.ref="AC-9"' 'idle=true'
+scripts/silta-app.sh fixture.write "$run" sample-proposal 'Check the Acme refresh'
+scripts/silta-app.sh state "$run" counts.sidebar.waiting
+scripts/silta-app.sh stop "$run"
+```
+
+The driver serializes clients with a per-run lock. It adds `version`, `run` and `seq`
+and publishes a compact, sorted UTF-8 `req-<seq>.json`. The app consumes the next
+sequence once, including malformed requests, and publishes `settledSeq` before an
+atomic `res-<seq>.json`. Results include the run and sequence, plus `accepted`, `noop`
+or `refused` with a stable reason. A refused action exits nonzero. Reasons distinguish
+an invalid request, stale run, unknown selection, unavailable action, read failure,
+superseded selection, and clipboard failure. The model’s loader state is checked before
+completing a selection. Users can still change the window while a request is in flight.
+
+On an action timeout, retry the same JSON with `--seq N` to recover that request’s
+result. The driver checks the stored request to avoid applying it twice. Keep the run
+folder for its logs, state, and receipts. Stop and launch a fresh fixture if a child
+exits or the run can’t be recovered.
+
+`fixture.write RUN WRITE_ID TITLE` creates one Acme task proposal through the repository’s
+built CLI, using only the run’s private `data/` and a fixed argument list. It then sends
+an ordinary `refresh` and reports the new task ref and refresh outcome. A fresh write
+requires a live mailbox with no earlier action waiting to settle. Keep the same
+write ID and title to retry refresh after a successful write. If the CLI result was
+interrupted, inspect the fixture and the write receipt before doing another write.
+The same ID cannot execute another CLI write, including after an ambiguous interruption.
+Copy actions write only to the clipboard and the mailbox never executes copied commands.
+
 ## Slices
 
 | Slice | Scope | Status |
 |---|---|---|
 | C1a / SI-152 / #178 | Isolated v2 launch, route selection, state JSON and offscreen PNG | Shipped in #214, with additional screens and snapshot parts in later PRs |
-| C1b / SI-153 / #178 | Driver, predicate waits, owned real-window capture and cleanup | Implemented here |
-| C2 / SI-147 / #179 | Mailbox, shared UI handlers, sequence barriers, copy and fixture-write refresh | Planned after C1b |
+| C1b / SI-153 / #178 | Driver, predicate waits, owned real-window capture and cleanup | Implemented in C1b |
+| C2 / SI-147 / #179 | Mailbox, shared UI handlers, sequence barriers, copy and fixture-write refresh | Implemented in C2 |
 
 Neither C1b nor C2 blocks screen PRs. Add fixture variants, state fields, routes
 and actions as screens need them. Keep one slice per PR and no grandchildren tasks.
