@@ -7,7 +7,7 @@
   @MainActor struct ControlLaunchTests {
     @Test func driverRunDirectoryRequiresInteractiveFixtureAndAbsolutePath() throws {
       let flags = ["-SiltaFixture", "v2", "-SiltaRunDirectory", "/private/tmp/silta-app-test"]
-      let options = try #require(ControlLaunch.parse(flags))
+      let options = try #require(try ControlLaunch.parse(flags))
       #expect(options.runDirectory?.path == "/private/tmp/silta-app-test")
       #expect(throws: AppLoadFailure.self) {
         try ControlLaunch.parse(flags + ["-SiltaSnapshot", "/private/tmp/root.png"])
