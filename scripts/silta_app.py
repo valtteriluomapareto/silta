@@ -169,12 +169,18 @@ class Run:
     def __init__(self, root, record=None):
         self.root = validate_run(root)
         self.record = read_json(self.root / "driver.json") if record is None else record
+        if record is None and (not isinstance(self.record, dict)
+                               or not isinstance(self.record.get("run"), str)
+                               or not self.record["run"]):
+            raise DriverError("The fixture driver record has no run identity.")
         self.pid = self.record["process"]["pid"]
         self.verify()
 
     def verify(self):
         saved = self.record["process"]
-        if not isinstance(saved, dict) or saved.get("executable") != str(APP.resolve()) or identity(self.pid) != saved:
+        if (not isinstance(saved, dict) or saved.get("executable") != str(APP.resolve())
+                or not isinstance(saved.get("directory"), str)
+                or Path(saved["directory"]).resolve() != self.root or identity(self.pid) != saved):
             raise DriverError("Fixture process exited or changed identity. Launch a fresh run.")
 
     def read(self):
@@ -207,6 +213,7 @@ def launch(args):
     with (root / "app.log").open("xb") as log:
         child = subprocess.Popen([APP, *flags], stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                                  env=environment, start_new_session=True, cwd=root)
+    handed_off = False
     try:
         process = identity(child.pid) if child.poll() is None else None
         if process is None:
@@ -215,17 +222,21 @@ def launch(args):
         state = run.wait(READY, args.timeout)
         run.record["run"] = state["run"]
         atomic_json(root / "driver.json", run.record)
-        print(root)
-    except (DriverError, OSError, KeyError, TypeError, ValueError) as error:
+        print(root, flush=True)
+        handed_off = True
+    except (DriverError, OSError, KeyError, TypeError, ValueError, subprocess.SubprocessError,
+            KeyboardInterrupt) as error:
+        detail = str(error) or "Interrupted fixture startup."
+        raise DriverError(f"{detail}\nStartup log: {root / 'app.log'}") from error
+    finally:
         # The unreaped child PID remains reserved until poll/wait collects it.
-        if child.poll() is None:
+        if not handed_off and child.poll() is None:
             child.terminate()
             try:
                 child.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 child.kill()
                 child.wait(timeout=2)
-        raise DriverError(f"{error}\nStartup log: {root / 'app.log'}") from error
 
 
 def same_capture_state(before, after):
@@ -313,6 +324,8 @@ def main(argv=None):
         if args.command == "shot":
             shot(run, args.output, args.timeout)
         elif args.command == "stop":
+            if run.read() is None:
+                raise DriverError("Fixture has no matching published state.")
             run.verify()
             os.kill(run.pid, signal.SIGTERM)
         else:

@@ -3,9 +3,12 @@ import importlib.util
 import os
 from pathlib import Path
 import select
+import subprocess
 import tempfile
 import threading
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 spec = importlib.util.spec_from_file_location(
     "silta_app", Path(__file__).resolve().parents[1] / "silta_app.py"
@@ -65,7 +68,7 @@ class Waits(unittest.TestCase):
 
     def test_process_that_already_exited_refuses(self):
         with tempfile.TemporaryDirectory() as root:
-            child = __import__("subprocess").Popen(["/usr/bin/true"])
+            child = subprocess.Popen(["/usr/bin/true"])
             child.wait()
             with self.assertRaisesRegex(driver.DriverError, "exited"):
                 driver.wait_for(Path(root), child.pid, lambda: None, [], 0)
@@ -88,3 +91,55 @@ class OwnedRuns(unittest.TestCase):
         self.assertTrue(driver.same_capture_state(before, dict(before, revision=12)))
         self.assertFalse(driver.same_capture_state(before, dict(before, screen="docs")))
         self.assertFalse(driver.same_capture_state(before, dict(before, windowNumber=8)))
+
+    def test_copied_driver_record_cannot_stop_a_different_run(self):
+        with tempfile.TemporaryDirectory(prefix="silta-app-") as original, \
+                tempfile.TemporaryDirectory(prefix="silta-app-") as copied:
+            record = {"run": "original", "process": {"pid": 10, "seconds": 1,
+                       "microseconds": 2, "directory": original,
+                       "executable": str(driver.APP.resolve())}}
+            driver.atomic_json(Path(copied) / "driver.json", record)
+            with patch.object(driver, "identity", return_value=record["process"]), \
+                    patch.object(driver.os, "kill") as signal:
+                self.assertEqual(driver.main(["stop", str(Path(copied).resolve())]), 1)
+                signal.assert_not_called()
+
+    def test_interrupted_identity_lookup_stops_the_spawned_child(self):
+        for error in (subprocess.TimeoutExpired("identity", 5), KeyboardInterrupt()):
+            with self.subTest(error=type(error)), tempfile.TemporaryDirectory() as scratch:
+                root = Path(scratch)
+                app = root / "SiltaApp"
+                app.touch()
+                child = Mock(pid=10, poll=Mock(return_value=None))
+                with patch.object(driver, "APP", app), patch.object(driver, "native_tool"), \
+                        patch.object(driver.tempfile, "mkdtemp", return_value=str(root)), \
+                        patch.object(driver.subprocess, "Popen", return_value=child), \
+                        patch.object(driver, "identity", side_effect=error):
+                    with self.assertRaisesRegex(driver.DriverError, "Startup log"):
+                        driver.launch(SimpleNamespace(route="mywork", dark=False, timeout=1))
+                child.terminate.assert_called_once()
+                child.wait.assert_called_once_with(timeout=2)
+
+    def test_shot_publishes_png_and_correlated_state_only_after_postcheck(self):
+        with tempfile.TemporaryDirectory() as root:
+            output = Path(root) / "window.png"
+            before = {"revision": 3, "windowNumber": 8, "screen": "mywork"}
+            run = Mock(pid=9)
+            run.wait.return_value = before
+
+            def capture(arguments, **_):
+                Path(arguments[-1]).write_bytes(b"\x89PNG\r\n\x1a\nimage")
+                return SimpleNamespace(returncode=0)
+
+            with patch.object(driver, "confirm_window") as confirm, \
+                    patch.object(driver.subprocess, "run", side_effect=capture):
+                run.read.return_value = dict(before, screen="docs")
+                with self.assertRaisesRegex(driver.DriverError, "changed during capture"):
+                    driver.shot(run, output, 1)
+                self.assertFalse(output.exists())
+                self.assertFalse(output.with_suffix(".png.json").exists())
+                run.read.return_value = dict(before, revision=4)
+                driver.shot(run, output, 1)
+                self.assertEqual(confirm.call_count, 4)
+            self.assertTrue(output.exists())
+            self.assertEqual(driver.read_json(output.with_suffix(".png.json"))["revision"], 4)
