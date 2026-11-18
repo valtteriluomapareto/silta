@@ -104,10 +104,8 @@
       #expect(!metadata.contains("@@"))
       let lines = DocumentDiff(metadata).lines
       for field in ["title:", "kind:", "about:"] {
-        withKnownIssue("CLI metadata changes are all classified as neutral metadata") {
-          #expect(lines.contains { $0.kind == .removed && $0.text.contains(field) })
-          #expect(lines.contains { $0.kind == .added && $0.text.contains(field) })
-        }
+        #expect(lines.contains { $0.kind == .removed && $0.text.contains(field) })
+        #expect(lines.contains { $0.kind == .added && $0.text.contains(field) })
       }
     }
 

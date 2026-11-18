@@ -22,11 +22,16 @@ import SiltaAppSupport
 
   init(
     read: @escaping Loader = { reader, workspace, connections in
-      try await Task.detached {
+      let operation = Task.detached {
         try WorkspaceDocumentsModel.readPages(connections: connections) {
           try reader.documents(workspace: workspace, about: $0)
         }
-      }.value
+      }
+      return try await withTaskCancellationHandler {
+        try await operation.value
+      } onCancel: {
+        operation.cancel()
+      }
     }
   ) { self.read = read }
 
@@ -34,7 +39,10 @@ import SiltaAppSupport
     connections: [String], read: (String) throws -> AppDocumentList
   ) throws -> [String: AppDocumentList] {
     var pages: [String: AppDocumentList] = [:]
-    for ref in connections { pages[ref] = try read(ref) }
+    for ref in connections {
+      try Task.checkCancellation()
+      pages[ref] = try read(ref)
+    }
     return pages
   }
 
@@ -111,7 +119,7 @@ import SiltaAppSupport
     guard let count = countText(for: connection) else {
       return failure == nil ? "…" : "Unavailable"
     }
-    if count == "0" { return "No docs" }
-    return count + (count == "1" ? " doc" : " docs")
+    let text = count == "0" ? "No docs" : count + (count == "1" ? " doc" : " docs")
+    return text + (failure == nil ? "" : " (stale)")
   }
 }

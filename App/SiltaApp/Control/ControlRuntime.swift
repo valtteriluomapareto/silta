@@ -70,6 +70,10 @@
       let size = NSSize(width: options.width, height: options.height)
       try await capture(AppShellView(model: model), size: size, to: output)
       let directory = output.deletingLastPathComponent()
+      let inspector = directory.appending(path: "inspector.png")
+      if FileManager.default.fileExists(atPath: inspector.path) {
+        try FileManager.default.removeItem(at: inspector)
+      }
       try await capture(
         AppSidebar(model: model), size: NSSize(width: 240, height: size.height),
         to: directory.appending(path: "sidebar.png"))
@@ -110,12 +114,6 @@
       window.contentView = hosting
       hosting.frame = NSRect(origin: .zero, size: size)
       hosting.layoutSubtreeIfNeeded()
-      if let model {
-        await model.refresh().value
-        if model.boardSelection != nil { await model.loadTaskDetail() }
-        if model.route == .docs { await model.loadDocuments() }
-        if model.route == .workspace { await model.loadWorkspaceDocuments() }
-      }
       await withCheckedContinuation { continuation in
         DispatchQueue.main.async { continuation.resume() }
       }

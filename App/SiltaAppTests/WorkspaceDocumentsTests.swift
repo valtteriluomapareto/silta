@@ -54,9 +54,7 @@
         #expect(docs.loading && docs.countLabel(for: edge) == "3 docs")
         gate.resume()
         await reload.value
-        withKnownIssue("Retained counts are presented as current after a failed reload") {
-          #expect(docs.failure != nil && docs.countLabel(for: edge) == "3 docs (stale)")
-        }
+        #expect(docs.failure != nil && docs.countLabel(for: edge) == "3 docs (stale)")
         #expect(docs.phase(workspace: "acme", version: 2, connections: [edge]) == .failed)
         flags.fails = false
         await docs.refresh(reader, workspace: "acme", version: 2, connections: [edge])
@@ -78,9 +76,7 @@
         return calls
       }
       let calls = await operation.value
-      withKnownIssue("The workspace loader continues reading connections after cancellation") {
-        #expect(calls == ["first"])
-      }
+      #expect(calls == ["first"])
     }
 
     @Test(arguments: [false, true]) func overlappingReadersJoinTheSameFlight(force: Bool)

@@ -70,8 +70,8 @@ extension AppReader {
 
   private func command(_ title: String, suffix: String, workspace: String) -> AppCommand {
     let prefix =
-      environment.home.url == defaultHome
-      ? "" : "SILTA_HOME=" + shellWord(environment.home.url.path) + " "
+      environment.home.isDefault
+      ? "SILTA_HOME=~/.silta " : "SILTA_HOME=" + shellWord(environment.home.url.path) + " "
     return AppCommand(
       title: title, text: prefix + "silta --ws " + shellWord(workspace) + " " + suffix)
   }

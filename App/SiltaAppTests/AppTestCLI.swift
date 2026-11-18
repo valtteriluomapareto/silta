@@ -29,7 +29,8 @@
         kill(process.processIdentifier, SIGKILL)
       }
       process.waitUntilExit()
-      let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      let text = try #require(
+        String(bytes: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8))
       try #require(process.terminationReason == .exit && process.terminationStatus == 0, "\(text)")
       return text
     }

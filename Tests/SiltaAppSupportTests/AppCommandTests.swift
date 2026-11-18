@@ -13,11 +13,9 @@
         let userHome = scratch.appending(path: "user")
         let reader = try AppReader(
           home: userHome.appending(path: ".silta"), user: "acme", userHome: userHome)
-        withKnownIssue("Default-home commands must stay pinned under hostile exported SILTA_HOME") {
-          #expect(
-            reader.inboxCommand(workspace: "acme").text
-              == "SILTA_HOME=~/.silta silta --ws 'acme' inbox --for me --all")
-        }
+        #expect(
+          reader.inboxCommand(workspace: "acme").text
+            == "SILTA_HOME=~/.silta silta --ws 'acme' inbox --for me --all")
         let custom = try AppReader(
           home: scratch.appending(path: "custom data"), user: "acme", userHome: userHome)
         #expect(custom.inboxCommand(workspace: "acme").text.hasPrefix("SILTA_HOME="))
@@ -46,9 +44,7 @@
         }
         let reader = try AppReader(home: selected, user: "acme", userHome: userHome)
         let command = reader.inboxCommand(workspace: "acme").text
-        withKnownIssue("Existing/default aliases currently retain a full URL-derived prefix") {
-          #expect(command.hasPrefix("SILTA_HOME=~/.silta silta "))
-        }
+        #expect(command.hasPrefix("SILTA_HOME=~/.silta silta "))
         let binary = try SiltaBinary.url()
         let result = try SiltaBinary.runProcess(
           URL(filePath: "/bin/sh"), ["-c", command], in: scratch,

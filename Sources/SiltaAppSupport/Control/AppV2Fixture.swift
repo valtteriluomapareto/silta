@@ -37,7 +37,8 @@
       question.recipients = ["human:\(user)"]
       let service = TaskService(environment: environment, workspace: "acme")
       _ = try service.comment("AC-12", question)
-      _ = try service.link("AC-9", target: "url:https://github.com/acme/example/pull/41")
+      _ = try service.link(
+        "AC-9", target: "url:https://github.com/acme/example/pull/41", relation: "about")
     }
 
     private static var tasks: [DebugTaskFixture] {

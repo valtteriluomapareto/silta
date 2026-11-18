@@ -114,8 +114,9 @@ nonisolated struct MyWorkContent {
       ref: item.refs.first ?? item.ref ?? "")
   }
 
-  static func pullRequest(_ targets: [String]) -> URL? {
-    targets.compactMap { target -> URL? in
+  static func pullRequest(_ links: [AppTaskLink]) -> URL? {
+    let candidates = links.filter { $0.rel == "about" }.compactMap { link -> URL? in
+      let target = link.target
       guard target.hasPrefix("url:"), let url = URL(string: String(target.dropFirst(4))),
         url.scheme == "https", url.host != nil, url.user == nil, url.password == nil,
         url.query == nil,
@@ -123,6 +124,8 @@ nonisolated struct MyWorkContent {
         number > 0
       else { return nil }
       return url
-    }.first
+    }
+    let unique = Set(candidates)
+    return unique.count == 1 ? unique.first : nil
   }
 }

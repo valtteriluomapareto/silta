@@ -1,7 +1,7 @@
 #if DEBUG
   import Foundation
   @testable import SiltaApp
-  import SiltaAppSupport
+  @testable import SiltaAppSupport
   import Testing
 
   @MainActor struct MyWorkContentTests {
@@ -46,6 +46,13 @@
         now.addingTimeInterval(-seconds).ISO8601Format(
           Date.ISO8601FormatStyle(includingFractionalSeconds: true))
       }
+      for (seconds, expected) in [
+        (59.0, "just now"), (60.0, "1 min ago"),
+        (3540.0, "59 min ago"), (3600.0, "1 h ago"), (82800.0, "23 h ago"),
+        (86400.0, "1 d ago"),
+      ] {
+        #expect(RelativeAge.text(stamp(seconds), now: now) == expected)
+      }
       #expect(RelativeAge.text(stamp(30), now: now) == "just now")
       #expect(RelativeAge.text(stamp(360), now: now) == "6 min ago")
       #expect(RelativeAge.text(stamp(359.999), now: now) == "6 min ago")
@@ -59,13 +66,16 @@
     @Test func pullRequestLinksStayExplicitAndSafe() {
       let safe = "https://github.com/acme/example/pull/41"
       #expect(
-        MyWorkContent.pullRequest(["url:https://github.com/acme/example/issues/41", "url:" + safe])?
+        MyWorkContent.pullRequest(
+          ["url:https://github.com/acme/example/issues/41", "url:" + safe].map {
+            AppTaskLink(rel: "about", target: $0)
+          })?
           .absoluteString == safe)
       for link in [
         "url:file:///tmp/pull/41", "url:https://user:password@github.com/acme/example/pull/41",
         "url:" + safe + "?token=secret", "url:https://github.com/acme/example/pull/not-a-number",
       ] {
-        #expect(MyWorkContent.pullRequest([link]) == nil)
+        #expect(MyWorkContent.pullRequest([AppTaskLink(rel: "about", target: link)]) == nil)
       }
     }
 
@@ -80,23 +90,17 @@
         }
         try link(99, "cites", seed: 401)
         let cited = try reader.task("AC-21", workspace: "acme")
-        withKnownIssue("A cited PR is currently presented as the task's own PR") {
-          #expect(
-            MyWorkContent.pullRequest(cited.links) == nil)
-        }
+        #expect(
+          MyWorkContent.pullRequest(cited.links) == nil)
         try link(41, "about", seed: 402)
         let own = try reader.task("AC-21", workspace: "acme")
-        withKnownIssue("The first cited link wins over an explicit own-PR link") {
-          #expect(
-            MyWorkContent.pullRequest(own.links)?
-              .lastPathComponent == "41")
-        }
+        #expect(
+          MyWorkContent.pullRequest(own.links)?
+            .lastPathComponent == "41")
         try link(42, "about", seed: 403)
         let ambiguous = try reader.task("AC-21", workspace: "acme")
-        withKnownIssue("Ambiguous own-PR links should hide the badge") {
-          #expect(
-            MyWorkContent.pullRequest(ambiguous.links) == nil)
-        }
+        #expect(
+          MyWorkContent.pullRequest(ambiguous.links) == nil)
       }
     }
 
