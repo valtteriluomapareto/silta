@@ -88,3 +88,35 @@ class OwnedRuns(unittest.TestCase):
         self.assertTrue(driver.same_capture_state(before, dict(before, revision=12)))
         self.assertFalse(driver.same_capture_state(before, dict(before, screen="docs")))
         self.assertFalse(driver.same_capture_state(before, dict(before, windowNumber=8)))
+
+
+class FixtureWriteRecovery(unittest.TestCase):
+    def test_intent_survives_interruption_and_never_replays(self):
+        with tempfile.TemporaryDirectory() as root:
+            record = Path(root) / "write.json"
+            calls = []
+
+            def interrupted(title):
+                calls.append(title)
+                raise OSError("interrupted after commit")
+
+            with self.assertRaises(OSError):
+                driver.fixture_receipt(record, "Acme proposal", interrupted)
+            with self.assertRaisesRegex(driver.DriverError, "ambiguous"):
+                driver.fixture_receipt(record, "Acme proposal", interrupted)
+            self.assertEqual(calls, ["Acme proposal"])
+
+    def test_definite_success_reuses_ref_for_refresh_only(self):
+        with tempfile.TemporaryDirectory() as root:
+            record = Path(root) / "write.json"
+            calls = []
+
+            def write(title):
+                calls.append(title)
+                return "AC-24"
+
+            self.assertEqual(driver.fixture_receipt(record, "Acme proposal", write), "AC-24")
+            self.assertEqual(driver.fixture_receipt(record, "Acme proposal", write), "AC-24")
+            with self.assertRaises(driver.DriverError):
+                driver.fixture_receipt(record, "Different proposal", write)
+            self.assertEqual(calls, ["Acme proposal"])

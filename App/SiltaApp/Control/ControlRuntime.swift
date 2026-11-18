@@ -13,6 +13,9 @@
     private var model: AppModel?
     private var windowNumber: Int?
     private var started = false
+    private var mailbox: ControlMailbox?
+    private var sequence: Int?
+    private var settled: Int?
     private var stateURL: URL {
       (options.snapshot?.deletingLastPathComponent() ?? fixture.home.deletingLastPathComponent())
         .appending(path: "state.json")
@@ -40,9 +43,21 @@
           FileHandle.standardOutput.write(Data((output.path + "\n" + stateURL.path + "\n").utf8))
           exit(0)
         }
+        if let directory = options.runDirectory {
+          sequence = 0
+          settled = 0
+          mailbox = try ControlMailbox(
+            directory: directory, run: run, actions: ControlActions(model: model),
+            publish: { [weak self] sequence, settled in
+              self?.sequence = sequence
+              self?.settled = settled
+              try self?.publish()
+            }, fail: { Self.fail($0) })
+        }
         try observe()
         started = true
         FileHandle.standardOutput.write(Data(("Silta fixture state: " + stateURL.path + "\n").utf8))
+        await mailbox?.check()
       } catch {
         Self.fail(error)
       }
@@ -63,7 +78,7 @@
       let state = withObservationTracking {
         ControlState(
           model: model, run: run, revision: revision + 1, dark: options.dark,
-          windowNumber: windowNumber)
+          windowNumber: windowNumber, seq: sequence, settledSeq: settled)
       } onChange: { [weak self] in
         Task { @MainActor in
           do { try self?.observe() } catch { Self.fail(error) }
@@ -77,7 +92,8 @@
       guard let model else { return }
       revision += 1
       try ControlState(
-        model: model, run: run, revision: revision, dark: options.dark, windowNumber: windowNumber
+        model: model, run: run, revision: revision, dark: options.dark, windowNumber: windowNumber,
+        seq: sequence, settledSeq: settled
       ).write(to: stateURL)
     }
 

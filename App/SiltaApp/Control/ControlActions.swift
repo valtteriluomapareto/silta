@@ -1,0 +1,112 @@
+#if DEBUG
+  import Observation
+  import SiltaAppSupport
+
+  @MainActor struct ControlActions {
+    let model: AppModel
+    var copy: (String) -> Bool = CopyValue.writeToPasteboard
+
+    func perform(_ action: ControlAction) async -> ControlOutcome {
+      switch action {
+      case .navigate(let route):
+        guard route != model.route else { return .noop }
+        model.navigate(to: route)
+      case .select(let value):
+        let before = Target(model)
+        do { try ControlLaunch.Route(value).apply(to: model) } catch {
+          return .refused(.unknownSelection)
+        }
+        if before == Target(model), status(before) == .accepted { return .noop }
+      case .toggleInspector:
+        guard model.route == .board || model.route == .workspace else {
+          return .refused(.unavailable)
+        }
+        model.toggleInspector()
+      case .copyRef:
+        guard let ref = Target(model).selection?.ref else { return .refused(.unavailable) }
+        return copy(ref) ? .accepted : .refused(.copyFailed)
+      case .copyCommand:
+        guard model.route == .board, model.boardInspectorPresented,
+          let task = model.taskDetail.value, task.ref == model.boardSelection?.taskRef,
+          task.status == "review", let workspace = model.workspace,
+          let command = model.reader?.commands(forReview: task, workspace: workspace).first
+        else { return .refused(.unavailable) }
+        return copy(command.text) ? .accepted : .refused(.copyFailed)
+      case .refresh:
+        let allowDefault = model.route == .docs && model.documentSelection == nil
+        let before = Target(model, allowDefaultDocument: allowDefault)
+        await model.refresh(force: true).value
+        guard before == Target(model, allowDefaultDocument: allowDefault) else {
+          return .refused(.superseded)
+        }
+      }
+      let target = Target(model, allowDefaultDocument: model.documentSelection == nil)
+      await loadSelection(reload: action == .refresh)
+      return await settle(target)
+    }
+
+    private func loadSelection(reload: Bool) async {
+      switch model.route {
+      case .board where model.boardInspectorPresented:
+        if reload || !model.taskDetail.isCurrent(version: model.visibleData?.version) {
+          await model.loadTaskDetail()
+        }
+      case .docs: await model.loadDocuments()
+      case .workspace: await model.loadWorkspaceDocuments()
+      default: break
+      }
+    }
+
+    private func settle(_ target: Target) async -> ControlOutcome {
+      let changes = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+      defer { changes.continuation.finish() }
+      var iterator = changes.stream.makeAsyncIterator()
+      while !Task.isCancelled {
+        let result = withObservationTracking {
+          status(target)
+        } onChange: {
+          changes.continuation.yield(())
+        }
+        if let result { return result }
+        guard await iterator.next() != nil else { break }
+      }
+      return .refused(.superseded)
+    }
+
+    private func status(_ target: Target) -> ControlOutcome? {
+      guard target == Target(model, allowDefaultDocument: target.allowDefaultDocument) else {
+        return .refused(.superseded)
+      }
+      let state = ControlState(model: model, run: "", revision: 0, dark: false)
+      guard state.idle else { return nil }
+      guard state.refresh.phase == "ready" else { return .refused(.readFailed) }
+      if model.route == .board, model.boardInspectorPresented, model.boardSelection != nil,
+        !model.taskDetail.isCurrent(version: model.visibleData?.version)
+      {
+        return .refused(.readFailed)
+      }
+      return .accepted
+    }
+
+    private struct Target: Equatable {
+      let workspace: String?
+      let route: AppRoute
+      let selection: ControlState.Selection?
+      let inspector: Bool
+      let about: String?
+      let archived: Bool
+      let allowDefaultDocument: Bool
+
+      init(_ model: AppModel, allowDefaultDocument: Bool = false) {
+        let state = ControlState(model: model, run: "", revision: 0, dark: false)
+        workspace = model.workspace
+        route = model.route
+        selection = allowDefaultDocument && route == .docs ? nil : state.selection
+        inspector = state.inspectorOpen
+        about = route == .docs ? model.docsAbout : nil
+        archived = route == .docs && model.includeArchivedDocuments
+        self.allowDefaultDocument = allowDefaultDocument
+      }
+    }
+  }
+#endif

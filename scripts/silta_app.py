@@ -1,9 +1,11 @@
 """Drive the macOS Debug app against a private synthetic fixture."""
 import argparse
-from contextlib import closing
+from contextlib import closing, contextmanager
 from functools import lru_cache
+import fcntl
 import json
 import math
+import re
 import os
 from pathlib import Path
 import select
@@ -23,7 +25,7 @@ STATE = {
     "selection": {"kind": None, "ref": None, "view": None},
     "counts": {"lanes": {}, "sidebar": {"waiting": None, "claimed": None, "apps": {}}},
     "refresh": {"phase": None, "dataVersion": None}, "idle": None,
-    "pid": None, "windowNumber": None,
+    "pid": None, "windowNumber": None, "seq": None, "settledSeq": None,
 }
 READY = [("idle", True), ("refresh.phase", "ready")]
 
@@ -32,14 +34,19 @@ class DriverError(Exception):
     pass
 
 
-def atomic_json(path, value):
+def atomic_json(path, value, *, exclusive=False):
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
                                      delete=False) as stream:
         temporary = Path(stream.name)
         try:
-            json.dump(value, stream)
+            json.dump(value, stream, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+            stream.flush()
+            os.fsync(stream.fileno())
             stream.close()
-            temporary.replace(path)
+            if exclusive:
+                os.link(temporary, path)
+            else:
+                temporary.replace(path)
         finally:
             temporary.unlink(missing_ok=True)
 
@@ -277,6 +284,119 @@ def shot(run, destination, timeout):
     print(output)
 
 
+@contextmanager
+def client_lock(run):
+    with os.fdopen(os.open(run.root / "client.lock",
+                          os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600), "rb+") as lock:
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise DriverError("Fixture client lock is not a regular file.")
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise DriverError("Another client is driving this run. Retry after it finishes.") from error
+        yield
+
+
+def unique_fields(pairs):
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError("duplicate JSON object key")
+    return result
+
+
+def action_fields(literal):
+    value = json.loads(literal, object_pairs_hook=unique_fields, parse_constant=invalid_constant)
+    if (not isinstance(value, dict) or not isinstance(value.get("action"), str)
+            or {"version", "run", "seq"} & value.keys()
+            or len(literal.encode()) > 15_000):
+        raise DriverError("Use an action JSON object without version, run, or seq.")
+    return value
+
+
+def action(run, fields, timeout, sequence=None):
+    state = run.read()
+    if not state or type(state.get("settledSeq")) is not int:
+        raise DriverError("Run does not have a live action mailbox.")
+    recover = sequence is not None
+    if sequence is None:
+        sequence = state["settledSeq"] + 1
+    request = run.root / f"req-{sequence}.json"
+    response = run.root / f"res-{sequence}.json"
+    envelope = {**fields, "version": 1, "run": state["run"], "seq": sequence}
+    try:
+        existing = read_json(request)
+    except FileNotFoundError:
+        if recover or sequence <= state["settledSeq"]:
+            raise DriverError(f"No recorded action at sequence {sequence}.")
+        run.verify()
+        atomic_json(request, envelope, exclusive=True)
+    else:
+        if json_text(existing) != json_text(envelope):
+            raise DriverError(f"Sequence {sequence} already has a different request. Recover that action first.")
+    try:
+        run.wait([], timeout, lambda current: current["settledSeq"] >= sequence and response.exists())
+    except DriverError as error:
+        raise DriverError(f"{error}\nAction {sequence} may have run. Repeat with --seq {sequence} to read its result without replaying it.") from error
+    result = read_json(response)
+    if (result.get("version") != 1 or result.get("run") != state["run"]
+            or result.get("seq") != sequence or result.get("outcome") not in ("accepted", "noop", "refused")):
+        raise DriverError(f"Invalid result for action {sequence}.")
+    return result
+
+
+def fixture_receipt(path, title, write):
+    try:
+        receipt = read_json(path)
+    except FileNotFoundError:
+        atomic_json(path, {"title": title}, exclusive=True)
+        reference = write(title)
+        atomic_json(path, {"title": title, "ref": reference})
+        return reference
+    if receipt["title"] != title:
+        raise DriverError("The fixture write ID belongs to a different title.")
+    if not receipt.get("ref"):
+        raise DriverError(f"Fixture write result is ambiguous ({path.name}). Inspect the run’s isolated store before choosing a new ID.")
+    return receipt["ref"]
+
+
+def write_fixture_proposal(run, title):
+    cli = ROOT / ".build/debug/silta"
+    if not cli.is_file():
+        raise DriverError("Build the fixture CLI with scripts/verify.sh app.")
+    run.verify()
+    data = run.root / "data"
+    if data.is_symlink() or not (data / "silta.db").is_file() or any(
+        path.is_symlink() or (path.is_file() and path.stat().st_nlink != 1)
+        for path in data.rglob("*")
+    ):
+        raise DriverError("Fixture store must be an isolated directory with ordinary files.")
+    environment = {"PATH": "/usr/bin:/bin", "HOME": str(run.root), "USER": "acme",
+                   "SILTA_HOME": str(data), "SILTA_ACTOR": "agent:codex:control",
+                   "SILTA_NOW": "2026-11-16T12:00:00.000Z", "TZ": "UTC"}
+    command = [cli, "--ws", "acme", "task", "add", "--quiet", "--", title]
+    result = subprocess.run(command, env=environment, cwd=run.root, stdin=subprocess.DEVNULL,
+                            capture_output=True, text=True, timeout=15)
+    reference = result.stdout.strip()
+    if result.returncode or re.fullmatch(r"AC-[1-9][0-9]*", reference) is None:
+        raise DriverError("Fixture CLI did not return a task reference. Inspect the isolated store before retrying.")
+    return reference
+
+
+def fixture_write(run, write_id, title, timeout):
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", write_id) is None or not title.strip() or len(title.encode()) > 512:
+        raise DriverError("Use a write ID of 1–64 letters, digits, underscores or hyphens and a short title.")
+    if not (ROOT / ".build/debug/silta").is_file():
+        raise DriverError("Build the fixture CLI with scripts/verify.sh app.")
+    with client_lock(run):
+        reference = fixture_receipt(run.root / f"write-{write_id}.json", title,
+                                    lambda value: write_fixture_proposal(run, value))
+        try:
+            result = action(run, {"action": "refresh"}, timeout)
+        except (DriverError, OSError, subprocess.SubprocessError) as error:
+            raise DriverError(f"Created {reference}. Refresh is uncertain: {error}") from error
+    return {"ref": reference, "refresh": result}
+
+
 def seconds(value):
     amount = float(value)
     if not math.isfinite(amount) or not 0 < amount <= 300:
@@ -302,6 +422,16 @@ def main(argv=None):
             sub.add_argument("--timeout", type=seconds, default=10)
         if name == "shot":
             sub.add_argument("output", type=Path)
+    send = commands.add_parser("action", help="drive a running fixture through app handlers")
+    send.add_argument("run", type=Path)
+    send.add_argument("request")
+    send.add_argument("--seq", type=int)
+    send.add_argument("--timeout", type=seconds, default=10)
+    write = commands.add_parser("fixture.write", help="propose a task in the fixture and refresh")
+    write.add_argument("run", type=Path)
+    write.add_argument("write_id")
+    write.add_argument("title")
+    write.add_argument("--timeout", type=seconds, default=10)
     args = parser.parse_args(argv)
     try:
         if args.command == "launch":
@@ -310,6 +440,17 @@ def main(argv=None):
         if sys.platform != "darwin":
             raise DriverError("The Silta fixture driver requires macOS.")
         run = Run(args.run)
+        if args.command == "action":
+            if args.seq is not None and args.seq < 1:
+                raise DriverError("Sequence must be a positive integer.")
+            with client_lock(run):
+                result = action(run, action_fields(args.request), args.timeout, args.seq)
+            print(json_text(result))
+            return int(result["outcome"] == "refused")
+        if args.command == "fixture.write":
+            result = fixture_write(run, args.write_id, args.title, args.timeout)
+            print(json_text(result))
+            return int(result["refresh"]["outcome"] == "refused")
         if args.command == "shot":
             shot(run, args.output, args.timeout)
         elif args.command == "stop":

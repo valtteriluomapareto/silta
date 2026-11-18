@@ -171,7 +171,7 @@ final class AppModel {
       taskDetail.clear()
       return
     }
-    await taskDetail.load(workspace: workspace, ref: ref) {
+    await taskDetail.load(workspace: workspace, ref: ref, version: visibleData?.version) {
       try await Task.detached { try reader.task(ref, workspace: workspace) }.value
     }
   }
