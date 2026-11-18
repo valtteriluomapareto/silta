@@ -18,8 +18,16 @@ struct AppSidebar: View {
                 Text(route.title).frame(maxWidth: .infinity, alignment: .leading)
                 if let count = count(route) {
                   Text(count).font(.system(size: 11)).monospacedDigit()
+                    .padding(.horizontal, route == .mywork ? 6 : 0)
                     .foregroundStyle(
-                      model.route == route ? Color("TideText") : Color("SecondaryInk"))
+                      route == .mywork && model.route == route
+                        ? Color.white
+                        : model.route == route ? Color("TideText") : Color("SecondaryInk")
+                    )
+                    .background(
+                      route == .mywork
+                        ? (model.route == route ? Color("TideText") : Color("Ink").opacity(0.08))
+                        : .clear, in: .capsule)
                 }
               }.padding(.horizontal, 8).padding(.vertical, 6)
                 .background(
@@ -32,13 +40,12 @@ struct AppSidebar: View {
           }.listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         }
         Section("Apps") {
-          ForEach(Array((model.visibleData?.map?.apps ?? []).enumerated()), id: \.element.slug) {
-            index, app in
+          ForEach(model.visibleData?.map?.apps ?? [], id: \.slug) { app in
             Button {
               model.showApp(app.slug)
             } label: {
               HStack(spacing: 9) {
-                StatusDot(color: Color(SidebarContent.appColor(index: index))).frame(width: 16)
+                StatusDot(color: appColor(app.slug)).frame(width: 16)
                 Text(app.slug).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).help(
                   app.slug)
                 Text(
@@ -136,6 +143,11 @@ struct AppSidebar: View {
       }.font(.system(size: 11)).padding(18)
         .background(model.failure == nil ? .clear : Color("AttentionMarker").opacity(0.08))
     }
+  }
+
+  private func appColor(_ slug: String) -> Color {
+    let index = model.visibleData?.map?.apps.firstIndex { $0.slug == slug } ?? 0
+    return Color(SidebarContent.appColor(index: index))
   }
 
   private var claimed: [AppTask] {

@@ -89,20 +89,22 @@ struct BoardView: View {
         .vertical, 10
       )
       .background(Color(done ? "CommandSurface" : "Canvas"), in: .rect(cornerRadius: 10))
-      .overlay(
-        RoundedRectangle(cornerRadius: 10).strokeBorder(
-          selected
-            ? Color("TideText")
-            : task.status == "proposed" ? Color("Warning") : Color("Ink").opacity(0.12),
-          style: StrokeStyle(
-            lineWidth: selected ? 1.5 : 1, dash: task.status == "proposed" ? [4, 3] : [])
-        ))
+      .overlay(cardBorder(task, selected: selected))
     }.buttonStyle(.plain).accessibilityElement(children: .ignore)
       .accessibilityLabel(
         task.ref + ": " + task.title + ", " + task.status
           + (asked ? ", asked you" : "")
           + (task.steps.isEmpty
             ? "" : ", " + TaskPresentation.progress(task.steps, revision: task.planRevision)))
+  }
+
+  private func cardBorder(_ task: AppTask, selected: Bool) -> some View {
+    RoundedRectangle(cornerRadius: 10).strokeBorder(
+      selected
+        ? Color("TideText")
+        : task.status == "proposed" ? Color("Warning") : Color("Ink").opacity(0.12),
+      style: StrokeStyle(
+        lineWidth: selected ? 1.5 : 1, dash: task.status == "proposed" ? [4, 3] : []))
   }
 
   private func laneColor(_ title: String) -> Color {

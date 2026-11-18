@@ -93,7 +93,7 @@ extension DocsView {
         "Documents", selection: Binding(get: { docs.proposedOnly }, set: { docs.proposedOnly = $0 })
       ) {
         Text("All").tag(false)
-        Text("Proposed").tag(true)
+        Text(docs.proposedLabel).tag(true)
       }.pickerStyle(.segmented).labelsHidden().padding(.horizontal, 12)
       if let about = model.docsAbout {
         HStack(spacing: 6) {

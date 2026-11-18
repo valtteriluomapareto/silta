@@ -28,6 +28,7 @@ nonisolated enum TaskPresentation {
       return task.submission.map { ActorPresentation($0.actor).name + " · waiting for your review" }
         ?? "Waiting for your review"
     }
+    if task.status == "proposed" { return "Proposed by " + ActorPresentation(task.createdBy).name }
     guard task.status == "doing" else { return nil }
     let actor = task.claimedBy.map { ActorPresentation($0).name }
     let age = RelativeAge.text(task.updatedAt, now: now).map { "updated " + $0 }

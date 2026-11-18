@@ -36,7 +36,9 @@ nonisolated enum SidebarContent {
   static func refreshText(loading: Bool, failure: Bool, checkedAt: Date?, now: Date) -> String {
     if loading { return "Updating…" }
     if failure { return "Couldn't read the Silta data" }
-    return RelativeAge.text(checkedAt, now: now).map { "Updated " + $0 } ?? "Not loaded"
+    return RelativeAge.text(
+      checkedAt?.ISO8601Format(.init(includingFractionalSeconds: true)), now: now
+    ).map { "Updated " + $0 } ?? "Not loaded"
   }
 }
 

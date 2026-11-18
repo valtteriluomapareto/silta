@@ -1,7 +1,7 @@
 #if DEBUG
   import Foundation
   @testable import SiltaApp
-  import SiltaAppSupport
+  @testable import SiltaAppSupport
   import Testing
 
   @MainActor struct ChromeContentTests {
@@ -57,6 +57,7 @@
         await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
         #expect(docs.archivedCount == 1)
         #expect(docs.archivedFooter == "1 archived")
+        #expect(docs.proposedLabel == "Proposed · 2")
         #expect(docs.groups(search: "").allSatisfy { $0.preferred?.archived == false })
         await docs.refresh(reader, workspace: "acme", about: nil, archived: true)
         #expect(docs.groups(search: "").contains { $0.preferred?.archived == true })
@@ -95,7 +96,7 @@
       }
     }
 
-    private func fixture(_ body: (AppReader) throws -> Void) throws {
+    private func fixture(_ body: @MainActor (AppReader) throws -> Void) throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
       let home = root.appending(path: "data")
@@ -103,7 +104,7 @@
       try body(AppReader(home: home, user: "acme", now: { AppV2Fixture.now }))
     }
 
-    private func fixture(_ body: (AppReader) async throws -> Void) async throws {
+    private func fixture(_ body: @MainActor (AppReader) async throws -> Void) async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
       let home = root.appending(path: "data")
