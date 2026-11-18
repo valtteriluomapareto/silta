@@ -120,7 +120,7 @@ slugs are literal path segments and must exist in the loaded snapshot. `launch`,
 wait and `screencapture` independently. Process identity checks have separate
 short bounds.
 
-`shot` waits for ready and idle plus a real window number. It checks the live
+`shot` waits for ready and idle, a settled mailbox, and a real window number. It checks the live
 process identity and Core Graphics window owner before and after `screencapture
 -l<id> -o`. It publishes a PNG and matching `<output>.json` only if both checks
 pass and the projected state agrees before and after capture (ignoring the publication
@@ -172,7 +172,8 @@ exits or the run can’t be recovered.
 
 `fixture.write RUN WRITE_ID TITLE` creates one Acme task proposal through the repository’s
 built CLI, using only the run’s private `data/` and a fixed argument list. It then sends
-an ordinary `refresh` and reports the new task ref and refresh outcome. Keep the same
+an ordinary `refresh` and reports the new task ref and refresh outcome. A fresh write
+requires a live mailbox with no earlier action waiting to settle. Keep the same
 write ID and title to retry refresh after a successful write. If the CLI result was
 interrupted, inspect the fixture and the write receipt before doing another write.
 The same ID cannot execute another CLI write, including after an ambiguous interruption.

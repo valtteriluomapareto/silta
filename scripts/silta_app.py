@@ -267,7 +267,7 @@ def shot(run, destination, timeout):
     if os.path.lexists(output) or os.path.lexists(sidecar):
         raise DriverError("Choose an unused PNG path and sidecar path.")
     before = run.wait(READY, timeout, lambda s: type(s.get("windowNumber")) is int
-                      and s["windowNumber"] > 0)
+                      and s["windowNumber"] > 0 and s.get("seq") == s.get("settledSeq"))
     number = before["windowNumber"]
     with tempfile.TemporaryDirectory(dir=output.parent) as directory:
         temporary = Path(directory) / "capture.png"
@@ -324,32 +324,54 @@ def action_fields(literal):
     return value
 
 
-def action(run, fields, timeout, sequence=None):
+def mailbox_state(run):
     state = run.read()
-    if not state or type(state.get("settledSeq")) is not int:
+    if (not state or type(state.get("settledSeq")) is not int or type(state.get("seq")) is not int
+            or not 0 <= state["settledSeq"] <= state["seq"] <= state["settledSeq"] + 1):
         raise DriverError("Run does not have a live action mailbox.")
+    return state
+
+
+def recovery_error(error, sequence):
+    detail = str(error) or "Interrupted while reading the action result."
+    return DriverError(f"{detail}\nAction {sequence} may have run. Repeat with --seq {sequence} "
+                       "to read its result without replaying it.")
+
+
+def action(run, fields, timeout, sequence=None):
+    state = mailbox_state(run)
     recover = sequence is not None
     if sequence is None:
         sequence = state["settledSeq"] + 1
     request = run.root / f"req-{sequence}.json"
-    response = run.root / f"res-{sequence}.json"
     envelope = {**fields, "version": 1, "run": state["run"], "seq": sequence}
     try:
         existing = read_json(request)
     except FileNotFoundError:
-        if recover or sequence <= state["settledSeq"]:
+        existing = None
+    except (OSError, ValueError, KeyboardInterrupt) as error:
+        raise recovery_error(error, sequence) from error
+    if existing is None:
+        if recover or sequence <= state["seq"]:
             raise DriverError(f"No recorded action at sequence {sequence}.")
         run.verify()
-        atomic_json(request, envelope, exclusive=True)
-    else:
-        if json_text(existing) != json_text(envelope):
-            raise DriverError(f"Sequence {sequence} already has a different request. Recover that action first.")
+    elif json_text(existing) != json_text(envelope):
+        raise DriverError(f"Sequence {sequence} already has a different request. "
+                          f"Read {request.name} and recover that action with --seq {sequence}.")
     try:
-        run.wait([], timeout, lambda current: current["settledSeq"] >= sequence and response.exists())
-    except DriverError as error:
-        raise DriverError(f"{error}\nAction {sequence} may have run. Repeat with --seq {sequence} to read its result without replaying it.") from error
+        if existing is None:
+            atomic_json(request, envelope, exclusive=True)
+        return await_result(run, sequence, state["run"], timeout)
+    except (DriverError, OSError, ValueError, TypeError, AttributeError, KeyError,
+            subprocess.SubprocessError, KeyboardInterrupt) as error:
+        raise recovery_error(error, sequence) from error
+
+
+def await_result(run, sequence, run_id, timeout):
+    response = run.root / f"res-{sequence}.json"
+    run.wait([], timeout, lambda current: current["settledSeq"] >= sequence and response.exists())
     result = read_json(response)
-    if (result.get("version") != 1 or result.get("run") != state["run"]
+    if (result.get("version") != 1 or result.get("run") != run_id
             or result.get("seq") != sequence or result.get("outcome") not in ("accepted", "noop", "refused")):
         raise DriverError(f"Invalid result for action {sequence}.")
     return result
@@ -360,8 +382,12 @@ def fixture_receipt(path, title, write):
         receipt = read_json(path)
     except FileNotFoundError:
         atomic_json(path, {"title": title}, exclusive=True)
-        reference = write(title)
-        atomic_json(path, {"title": title, "ref": reference})
+        try:
+            reference = write(title)
+            atomic_json(path, {"title": title, "ref": reference})
+        except (DriverError, OSError, ValueError, subprocess.SubprocessError, KeyboardInterrupt) as error:
+            raise DriverError(f"Fixture write result is ambiguous ({path.name}). Inspect the "
+                              f"run’s isolated store before choosing a new ID. {error}") from error
         return reference
     if receipt["title"] != title:
         raise DriverError("The fixture write ID belongs to a different title.")
@@ -399,8 +425,15 @@ def fixture_write(run, write_id, title, timeout):
     if not (ROOT / ".build/debug/silta").is_file():
         raise DriverError("Build the fixture CLI with scripts/verify.sh app.")
     with client_lock(run):
-        reference = fixture_receipt(run.root / f"write-{write_id}.json", title,
-                                    lambda value: write_fixture_proposal(run, value))
+        receipt = run.root / f"write-{write_id}.json"
+        if not os.path.lexists(receipt):
+            state = mailbox_state(run)
+            next_sequence = state["settledSeq"] + 1
+            pending = run.root / f"req-{next_sequence}.json"
+            if state["seq"] >= next_sequence or os.path.lexists(pending):
+                raise DriverError(f"Action {next_sequence} is outstanding. Read {pending.name} "
+                                  f"and recover it with --seq {next_sequence} before writing.")
+        reference = fixture_receipt(receipt, title, lambda value: write_fixture_proposal(run, value))
         try:
             result = action(run, {"action": "refresh"}, timeout)
         except (DriverError, OSError, subprocess.SubprocessError) as error:

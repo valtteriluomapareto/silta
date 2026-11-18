@@ -154,7 +154,7 @@ class FixtureWriteRecovery(unittest.TestCase):
                 calls.append(title)
                 raise OSError("interrupted after commit")
 
-            with self.assertRaises(OSError):
+            with self.assertRaisesRegex(driver.DriverError, "ambiguous"):
                 driver.fixture_receipt(record, "Acme proposal", interrupted)
             with self.assertRaisesRegex(driver.DriverError, "ambiguous"):
                 driver.fixture_receipt(record, "Acme proposal", interrupted)
@@ -174,3 +174,60 @@ class FixtureWriteRecovery(unittest.TestCase):
             with self.assertRaises(driver.DriverError):
                 driver.fixture_receipt(record, "Different proposal", write)
             self.assertEqual(calls, ["Acme proposal"])
+
+    def test_new_write_does_not_create_intent_with_no_mailbox_or_pending_request(self):
+        for state in ({"run": "owned", "seq": None, "settledSeq": None},
+                      {"run": "owned", "seq": 1, "settledSeq": 0},
+                      {"run": "owned", "seq": 0, "settledSeq": 0}):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as scratch:
+                root = Path(scratch)
+                cli = root / ".build/debug/silta"
+                cli.parent.mkdir(parents=True)
+                cli.touch()
+                if state["seq"] == 0:
+                    driver.atomic_json(root / "req-1.json", {"action": "nav"})
+                run = Mock(root=root)
+                run.read.return_value = state
+                with patch.object(driver, "ROOT", root), \
+                        patch.object(driver, "write_fixture_proposal") as write:
+                    with self.assertRaisesRegex(driver.DriverError, "mailbox|outstanding"):
+                        driver.fixture_write(run, "new", "Acme review", 1)
+                    write.assert_not_called()
+                self.assertFalse((root / "write-new.json").exists())
+
+    def test_published_action_failure_identifies_the_recoverable_sequence(self):
+        for error in (subprocess.TimeoutExpired("identity", 5), OSError("read failed"),
+                      KeyboardInterrupt()):
+            with self.subTest(error=type(error)), tempfile.TemporaryDirectory() as scratch:
+                root = Path(scratch)
+                run = Mock(root=root)
+                run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0}
+                run.wait.side_effect = error
+                fields = {"action": "inspector.toggle"}
+                with self.assertRaisesRegex(driver.DriverError, "--seq 1"):
+                    driver.action(run, fields, 1)
+                original = (root / "req-1.json").read_bytes()
+                run.wait.side_effect = None
+                driver.atomic_json(root / "res-1.json", {"version": 1, "run": "owned", "seq": 1,
+                                                         "outcome": "accepted"})
+                self.assertEqual(driver.action(run, fields, 1, sequence=1)["outcome"], "accepted")
+                self.assertEqual((root / "req-1.json").read_bytes(), original)
+                self.assertFalse((root / "req-2.json").exists())
+
+    def test_written_receipt_retries_only_refresh_after_failure(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            cli = root / ".build/debug/silta"
+            cli.parent.mkdir(parents=True)
+            cli.touch()
+            run = Mock(root=root)
+            run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0}
+            with patch.object(driver, "ROOT", root), \
+                    patch.object(driver, "write_fixture_proposal", return_value="AC-24") as write, \
+                    patch.object(driver, "action", side_effect=[driver.DriverError("refresh wait"),
+                                                                 {"outcome": "accepted"}]) as send:
+                with self.assertRaisesRegex(driver.DriverError, "Created AC-24. Refresh is uncertain"):
+                    driver.fixture_write(run, "new", "Acme recovery", 1)
+                self.assertEqual(driver.fixture_write(run, "new", "Acme recovery", 1)["ref"], "AC-24")
+                write.assert_called_once_with(run, "Acme recovery")
+                self.assertEqual(send.call_count, 2)
