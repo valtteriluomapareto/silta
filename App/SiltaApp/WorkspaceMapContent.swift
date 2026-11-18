@@ -46,16 +46,34 @@ nonisolated struct WorkspaceMapContent {
     } else {
       highlighted = nil
     }
+    unmatched = Self.unmatched(map: map, layout: layout, search: search)
+  }
+
+  /// Nodes that a search fades: the same fields the List searches, and a node stays when
+  /// it matches itself or any connection it takes part in matches.
+  private static func unmatched(map: AppWorkspaceMap, layout: AppMapLayout, search: String)
+    -> Set<String>
+  {
     let query = search.trimmingCharacters(in: .whitespaces)
-    unmatched =
-      query.isEmpty
-      ? []
-      : Set(
-        layout.nodes.filter { node in
-          let app = map.apps.first { $0.slug == node.key }
-          let values = [node.key, app?.name ?? "", app?.summary ?? ""]
-          return !values.contains { $0.localizedCaseInsensitiveContains(query) }
-        }.map(\.key))
+    guard !query.isEmpty else { return [] }
+    func matches(_ values: [String]) -> Bool {
+      values.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+    var kept: Set<String> = []
+    for app in map.apps
+    where matches([app.slug, app.name, app.ref, app.repo, app.summary ?? "", app.attachment]) {
+      kept.insert(app.slug)
+    }
+    for service in map.services
+    where matches([service.slug, service.name, service.summary ?? "", service.attachment]) {
+      kept.insert("service:" + service.slug)
+    }
+    for edge in map.connections
+    where matches([edge.attachment, edge.target, edge.kind, edge.summary] + edge.codeReferences) {
+      kept.insert(edge.source)
+      kept.insert(edge.target)
+    }
+    return Set(layout.nodes.map(\.key)).subtracting(kept)
   }
 
   func isFaded(_ attachment: String) -> Bool {

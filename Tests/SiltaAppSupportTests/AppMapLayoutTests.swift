@@ -77,6 +77,41 @@
       #expect(layout.neighbour(of: "service:push", .right, connections: edges) == nil)
     }
 
+    @Test func cycleWalkStartsFromTheCallerLessApp() {
+      let layout = AppMapLayout(
+        map: Self.map(
+          apps: ["a", "b", "z"], services: [], edges: [("a", "b"), ("b", "a"), ("z", "b")]))
+      #expect(layout.backEdges == ["edge:a/b/http-api"])
+      #expect(place(layout) == ["z 0/0", "b 1/0", "a 2/0"])
+    }
+
+    @Test func callersCountOnceAndNonAdjacentCallersOrderLaterColumns() {
+      let parallel = AppMapLayout(
+        map: Self.map(
+          apps: ["a", "b", "c", "w", "x"], services: [],
+          edges: [
+            ("a", "x", "http-api"), ("a", "x", "graphql"), ("c", "x", "http-api"),
+            ("b", "w", "http-api"),
+          ]))
+      #expect(place(parallel).suffix(2) == ["w 1/0", "x 1/1"])
+
+      let services = AppMapLayout(
+        map: Self.map(
+          apps: ["p", "q", "r", "s"], services: ["a-svc", "z-svc", "idle"],
+          edges: [("p", "r"), ("q", "s"), ("s", "service:a-svc"), ("p", "service:z-svc")]))
+      #expect(
+        place(services).suffix(3) == ["service:z-svc 2/0", "service:a-svc 2/1", "service:idle 2/2"])
+    }
+
+    @Test func layoutIgnoresInputOrder() {
+      let edges = [("web", "api"), ("mobile", "api"), ("api", "service:mail"), ("api", "web")]
+      let sorted = Self.map(apps: ["api", "mobile", "web"], services: ["mail"], edges: edges)
+      let shuffled = AppWorkspaceMap(
+        apps: sorted.apps.reversed(), services: sorted.services,
+        connections: sorted.connections.reversed())
+      #expect(AppMapLayout(map: sorted) == AppMapLayout(map: shuffled))
+    }
+
     @Test func emptyAndUncalledNodesStillPlace() {
       #expect(AppMapLayout(map: Self.map(apps: [], services: [], edges: [])).columnCount == 0)
       let layout = AppMapLayout(map: Self.map(apps: ["web", "api"], services: ["mail"], edges: []))
@@ -90,6 +125,12 @@
     private static func map(apps: [String], services: [String], edges: [(String, String)])
       -> AppWorkspaceMap
     {
+      map(apps: apps, services: services, links: edges.map { Link($0.0, $0.1) })
+    }
+
+    private static func map(
+      apps: [String], services: [String], links: [Link]
+    ) -> AppWorkspaceMap {
       AppWorkspaceMap(
         apps: apps.sorted().map {
           AppMapApp(
@@ -99,11 +140,23 @@
         services: services.sorted().map {
           AppMapService(slug: $0, name: $0, summary: nil, attachment: "service:" + $0)
         },
-        connections: edges.map {
+        connections: links.map {
           AppConnection(
-            attachment: "edge:\($0.0)/\($0.1)/http-api", source: $0.0, target: $0.1,
-            kind: "http-api", summary: "", codeReferences: [])
+            attachment: "edge:\($0.from)/\($0.to)/\($0.kind)", source: $0.from, target: $0.to,
+            kind: $0.kind, summary: "", codeReferences: [])
         })
+    }
+
+    struct Link {
+      let from: String
+      let to: String
+      var kind = "http-api"
+
+      init(_ from: String, _ to: String, kind: String = "http-api") {
+        self.from = from
+        self.to = to
+        self.kind = kind
+      }
     }
   }
 #endif

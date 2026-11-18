@@ -5,6 +5,37 @@
   import Testing
 
   @MainActor struct ControlStateTests {
+    @Test func workspaceRoutesSelectAppsAndServicesAndRefuseUnknownRefs() async throws {
+      let fixture = try FixtureLaunch.prepare()
+      defer {
+        try? FileManager.default.removeItem(  // cleanup
+          at: fixture.home.deletingLastPathComponent())
+      }
+      let reader = try AppReader(home: fixture.home, user: fixture.user, now: { fixture.now })
+      let session = AppReadSession(reader: reader, now: { fixture.now })
+      let model = AppModel(
+        reader: reader,
+        load: { previous, workspace, force in
+          try session.load(previous: previous, workspace: workspace, force: force)
+        })
+      await model.refresh().value
+      try ControlLaunch.Route("workspace:app:acme-mobile").apply(to: model)
+      let app = ControlState(model: model, run: "acme", revision: 1, dark: false)
+      #expect(app.selection?.kind == "app" && app.selection?.ref == "app:acme-mobile")
+      #expect(app.inspectorOpen && model.workspaceSelection == nil)
+      try ControlLaunch.Route("workspace:service:push").apply(to: model)
+      let service = ControlState(model: model, run: "acme", revision: 2, dark: false)
+      #expect(service.selection?.kind == "service" && service.selection?.ref == "service:push")
+      try ControlLaunch.Route("workspace:edge:acme-mobile/acme-backend/http-api").apply(to: model)
+      #expect(model.workspaceNode == nil)
+      #expect(
+        ControlState(model: model, run: "acme", revision: 3, dark: false).selection?.kind
+          == "connection")
+      #expect(throws: AppLoadFailure.self) {
+        try ControlLaunch.Route("workspace:app:acme-missing").apply(to: model)
+      }
+    }
+
     @Test func projectionUsesNavigationAndFilteredCountsAndWritesAtomicJSON() async throws {
       let fixture = try FixtureLaunch.prepare()
       defer {

@@ -1,5 +1,5 @@
-import Foundation
 import SiltaAppSupport
+import SwiftUI
 
 /// Points for a computed map layout: fixed node sizes, a fixed row pitch and columns
 /// centred on the tallest one. The layout never depends on the window size.
@@ -10,8 +10,12 @@ nonisolated struct WorkspaceMapGeometry {
   static let rowPitch: CGFloat = 112
   static let margin: CGFloat = 32
 
+  static let laneGap: CGFloat = 14
+
   let frames: [String: CGRect]
   let size: CGSize
+  /// The bottom edge of the lowest node; back edges run below it.
+  private let floor: CGFloat
 
   init(layout: AppMapLayout) {
     let rows = Dictionary(grouping: layout.nodes, by: \.column).mapValues(\.count)
@@ -31,7 +35,8 @@ nonisolated struct WorkspaceMapGeometry {
       ? 0
       : Self.margin * 2 + CGFloat(layout.columnCount) * Self.appSize.width
         + CGFloat(layout.columnCount - 1) * Self.columnGap
-    let below: CGFloat = layout.backEdges.isEmpty ? 0 : Self.rowPitch / 2
+    floor = frames.values.map(\.maxY).max() ?? Self.margin
+    let below: CGFloat = layout.backEdges.isEmpty ? 0 : Self.rowPitch / 2 + 3 * Self.laneGap
     size = CGSize(
       width: width, height: Self.margin * 2 + CGFloat(tallest) * Self.rowPitch + below)
   }
@@ -71,20 +76,31 @@ nonisolated struct WorkspaceMapGeometry {
 
   /// The segments of an edge: one curve between neighbouring columns; across skipped
   /// columns, a straight run through the gap between rows closest to the middle; for a back
-  /// edge, a curve below both nodes. The middle segment carries the label.
+  /// edge, a curve below the lowest node; for a self-loop, a small loop to the node's right.
+  /// The middle segment carries the label.
   func route(from source: String, to target: String, back: Bool, lane: Int = 0) -> [Curve] {
     guard let from = frames[source], let to = frames[target] else { return [] }
+    if source == target {
+      let reach = 44 + CGFloat(lane) * Self.laneGap
+      let start = CGPoint(x: from.maxX, y: from.midY - 12)
+      let end = CGPoint(x: from.maxX, y: from.midY + 12)
+      return [
+        Curve(
+          start: start, control1: CGPoint(x: start.x + reach, y: start.y - 24),
+          control2: CGPoint(x: end.x + reach, y: end.y + 24), end: end)
+      ]
+    }
     if back {
       let start = CGPoint(x: from.midX, y: from.maxY)
       let end = CGPoint(x: to.midX, y: to.maxY)
-      let depth = max(start.y, end.y) + Self.rowPitch / 2
+      let depth = bottom + Self.rowPitch / 3 + CGFloat(lane) * Self.laneGap
       return [
         Curve(
           start: start, control1: CGPoint(x: start.x, y: depth),
           control2: CGPoint(x: end.x, y: depth), end: end)
       ]
     }
-    let shift = CGFloat(lane) * 14
+    let shift = CGFloat(lane) * Self.laneGap
     let start = CGPoint(x: from.maxX, y: from.midY + shift)
     let end = CGPoint(x: to.minX, y: to.midY + shift)
     let between = frames.values.filter {
@@ -96,7 +112,7 @@ nonisolated struct WorkspaceMapGeometry {
       [start.y, end.y, goal]
       + between.flatMap { [$0.minY - 4, $0.maxY + 4] }
     let clear = candidates.filter { y in !between.contains { $0.minY < y && y < $0.maxY } }
-    let track = clear.min { abs($0 - goal) < abs($1 - goal) } ?? goal
+    let track = (clear.min { abs($0 - goal) < abs($1 - goal) } ?? goal) + shift
     let entry = CGPoint(x: from.maxX + Self.columnGap / 2, y: track)
     let exit = CGPoint(x: to.minX - Self.columnGap / 2, y: track)
     return [.bend(start, entry), .line(entry, exit), .bend(exit, end)]

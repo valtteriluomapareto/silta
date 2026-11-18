@@ -4,7 +4,8 @@
 /// callers, in slug order, marks the connections that close a cycle as back edges;
 /// columns are the longest path over the remaining edges. Services take one column after
 /// the last app column. Column 0 is ordered by slug; later columns by the mean row of
-/// their callers, then by slug.
+/// their distinct callers in earlier columns, then by slug; nodes without such callers
+/// come last.
 public struct AppMapLayout: Equatable, Sendable {
   /// One app or service on the map.
   public struct Node: Equatable, Sendable {
@@ -47,11 +48,13 @@ public struct AppMapLayout: Equatable, Sendable {
     }
     let serviceColumn = (column.values.max() ?? -1) + 1
     let services = map.services.map { "service:" + $0.slug }.sorted()
+    var attachments = Dictionary(uniqueKeysWithValues: map.apps.map { ($0.slug, $0.attachment) })
+    for service in map.services { attachments["service:" + service.slug] = service.attachment }
     for service in services { column[service] = serviceColumn }
 
-    var callers: [String: [String]] = [:]
+    var callers: [String: Set<String>] = [:]
     for edge in edges where !back.contains(edge.attachment) && column[edge.target] != nil {
-      callers[edge.target, default: []].append(edge.source)
+      callers[edge.target, default: []].insert(edge.source)
     }
     let keys = apps + services
     let count = keys.isEmpty ? 0 : (column.values.max() ?? 0) + 1
@@ -69,7 +72,7 @@ public struct AppMapLayout: Equatable, Sendable {
         let isService = key.hasPrefix("service:")
         ordered.append(
           Node(
-            attachment: isService ? key : "app:" + key, key: key, column: index, row: position,
+            attachment: attachments[key] ?? key, key: key, column: index, row: position,
             isService: isService))
       }
     }
@@ -144,7 +147,7 @@ public struct AppMapLayout: Equatable, Sendable {
   }
 
   private static func meanRow(
-    _ callers: [String], rows: [String: Int], before index: Int, column: [String: Int]
+    _ callers: Set<String>, rows: [String: Int], before index: Int, column: [String: Int]
   ) -> Double {
     let placed = callers.filter { (column[$0] ?? index) < index }.compactMap { rows[$0] }
     guard !placed.isEmpty else { return .infinity }

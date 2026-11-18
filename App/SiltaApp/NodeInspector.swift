@@ -16,12 +16,13 @@ struct NodeInspector: View {
           header("Service", title: service.name, ref: service.attachment)
           if let summary = service.summary { Text(summary).font(.system(size: 13)) }
           connections(
-            "Called by", map.connections.filter { $0.target == service.attachment },
+            "Called by", map.connections.filter { $0.target == "service:" + service.slug },
             incoming: true)
           if service.summary == nil {
             Text("No summary in the workspace YAML.").font(.system(size: 11))
               .foregroundStyle(Color("SecondaryInk"))
           }
+          openDocuments(service.attachment)
         } else {
           ContentUnavailableView("Select an app or a service", systemImage: "sidebar.right")
         }
@@ -64,6 +65,18 @@ struct NodeInspector: View {
         .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(Color("TideText"))
         .padding(.top, 4)
     }
+    openDocuments(app.attachment)
+  }
+
+  private func openDocuments(_ ref: String) -> some View {
+    Button {
+      model.openDocuments(about: ref)
+    } label: {
+      Text("Open in Docs").font(.system(size: 13, weight: .semibold))
+        .frame(maxWidth: .infinity, minHeight: 36)
+        .background(Color("AccentColor"), in: .capsule).foregroundStyle(Color("Canvas"))
+        .contentShape(.capsule)
+    }.buttonStyle(.plain).help("Open the documents about \(ref)")
   }
 
   private func header(_ kind: String, title: String, ref: String) -> some View {
