@@ -23,7 +23,7 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 ```
 
 - Snapshot mode implies the isolated v2 fixture. Routes available with these
-  screens are `mywork`, `board[:task-ref]`, `workspace[:edge-ref]` and
+  screens are `mywork`, `board[:task-ref]`, `workspace[:edge-, app- or service-ref]` and
   `docs[:doc-ref[:view]]`. Document views are `document` (default), `changes` and
   `comments`. Apply routes through AppModel handlers and validate selected refs
   against fixture data. The native launch adds Docs examples through
@@ -60,7 +60,7 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | `run`, `revision` | Unique launch identity and increasing publication number |
 | `fixture`, `appearance` | `v2` and `light`/`dark` |
 | `screen`, `route` | Current screen and canonical route including selected ref and document view |
-| `selection` | Null, typed `{kind: task/connection, ref: ...}`, or `{kind: document, ref: ..., view: ...}` |
+| `selection` | Null, typed `{kind: task/connection/app/service, ref: ...}`, or `{kind: document, ref: ..., view: ...}` |
 | `inspectorOpen` | Flag belonging to the current route |
 | `counts.lanes` | Visible Board lane counts, including current filters/proposals; null until loaded |
 | `counts.sidebar` | Actionable waiting, claimed tasks and app open-count badges; null until loaded |

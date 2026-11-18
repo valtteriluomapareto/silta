@@ -34,4 +34,14 @@ nonisolated enum TaskPresentation {
     let age = RelativeAge.text(task.updatedAt, now: now).map { "updated " + $0 }
     return [actor, age].compactMap { $0 }.joined(separator: " · ")
   }
+
+  /// A short status for a task row in the map inspector: who holds it and which step, or
+  /// its status.
+  static func mapStatus(_ task: AppTask) -> String {
+    if let actor = task.claimedBy, !task.steps.isEmpty {
+      return ActorPresentation(actor).name + " · step \(task.steps.filter(\.done).count) of "
+        + "\(task.steps.count)"
+    }
+    return task.status.capitalized
+  }
 }

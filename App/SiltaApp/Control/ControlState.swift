@@ -133,8 +133,13 @@
           model.boardInspectorPresented
         )
       case .workspace:
+        let connection = model.workspaceSelection.map {
+          Selection(kind: "connection", ref: $0.connectionRef)
+        }
         return (
-          model.workspaceSelection.map { Selection(kind: "connection", ref: $0.connectionRef) },
+          model.workspaceNode.map {
+            Selection(kind: $0.hasPrefix("service:") ? "service" : "app", ref: $0)
+          } ?? connection,
           model.workspaceInspectorPresented
         )
       }

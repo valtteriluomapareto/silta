@@ -22,7 +22,10 @@
           parts.count == 1 || (screen != .mywork && !parts[1].isEmpty)
         else {
           throw AppLoadFailure(
-            message: "Use mywork, board[:task-ref], workspace[:edge-ref] or docs[:doc-ref[:view]].")
+            message:
+              "Use mywork, board[:task-ref], workspace[:edge-, app- or service-ref] or "
+              + "docs[:doc-ref[:view]]."
+          )
         }
         self.screen = screen
         var selectedRef = parts.count == 2 ? String(parts[1]) : nil
@@ -47,14 +50,17 @@
             }
             model.inspect(task: try reader.task(ref, workspace: workspace).ref)
           case .workspace:
-            guard
-              let connection = model.visibleData?.map?.connections.first(where: {
-                $0.attachment == ref
-              })
-            else {
-              throw AppLoadFailure(message: "The fixture has no matching connection.")
+            let map = model.visibleData?.map
+            if let connection = map?.connections.first(where: { $0.attachment == ref }) {
+              model.select(connection: connection.attachment)
+            } else if map?.apps.contains(where: { $0.attachment == ref }) == true
+              || map?.services.contains(where: { $0.attachment == ref }) == true
+            {
+              model.select(node: ref)
+            } else {
+              throw AppLoadFailure(
+                message: "The fixture has no matching connection, app or service.")
             }
-            model.select(connection: connection.attachment)
           case .docs:
             guard let reader = model.reader, let workspace = model.workspace,
               let document = try reader.document(ref, workspace: workspace).document

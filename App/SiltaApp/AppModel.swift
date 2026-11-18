@@ -28,6 +28,10 @@ final class AppModel {
   var boardInspectorPresented = false
   var showProposed = false
   private(set) var workspaceSelection: ConnectionSelection?
+  /// The selected app or service on the map (`app:<slug>` or `service:<slug>`). Exclusive
+  /// with `workspaceSelection`.
+  private(set) var workspaceNode: String?
+  var workspaceView: WorkspaceViewMode = .map
   var workspaceInspectorPresented = false
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
@@ -107,6 +111,7 @@ final class AppModel {
       boardSelection = nil
       boardInspectorPresented = false
       workspaceSelection = nil
+      workspaceNode = nil
       workspaceInspectorPresented = false
       appFilter = nil
     }
@@ -184,8 +189,39 @@ final class AppModel {
 
   func select(connection ref: String) {
     workspaceSelection = ConnectionSelection(connectionRef: ref)
+    workspaceNode = nil
     navigate(to: .workspace)
     workspaceInspectorPresented = true
+  }
+
+  /// Selects an app or service on the map by its map reference.
+  func select(node ref: String) {
+    workspaceNode = ref
+    workspaceSelection = nil
+    navigate(to: .workspace)
+    workspaceInspectorPresented = true
+  }
+
+  func clearWorkspaceSelection() {
+    workspaceNode = nil
+    workspaceSelection = nil
+  }
+
+  /// Moves the map selection with an arrow key. A selected connection starts from its
+  /// source going left and its target going right.
+  func moveMapSelection(_ direction: AppMapLayout.Direction) {
+    guard let map = visibleData?.map else { return }
+    let layout = AppMapLayout(map: map)
+    var start = workspaceNode
+    if start == nil, let ref = workspaceSelection?.connectionRef,
+      let edge = map.connections.first(where: { $0.attachment == ref })
+    {
+      start = layout.node(direction == .left ? edge.source : edge.target)?.attachment
+      if let start { return select(node: start) }
+    }
+    if let next = layout.neighbour(of: start, direction, connections: map.connections) {
+      select(node: next)
+    }
   }
 
   func toggleInspector() {
@@ -204,6 +240,10 @@ final class AppModel {
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
     frontmost ? refresh() : nil
   }
+}
+
+nonisolated enum WorkspaceViewMode: String, CaseIterable {
+  case map, list
 }
 
 nonisolated struct BoardSelection: Equatable {
