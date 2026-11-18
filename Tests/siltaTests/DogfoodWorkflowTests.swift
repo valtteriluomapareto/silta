@@ -109,6 +109,7 @@ struct DogfoodWorkflowTests {
       "swift",
       text: "#!/bin/bash\nmkdir -p .build/release\ncp " + shellWord(try SiltaBinary.url().path)
         + " .build/release/silta\n", in: tools)
+    try DogfoodInstallTests.xcodebuild("Acme app", in: tools)
     #expect(
       try DogfoodInstallTests.install(clone, scratch: scratch, tools: tools).termination
         == .exit(0))
