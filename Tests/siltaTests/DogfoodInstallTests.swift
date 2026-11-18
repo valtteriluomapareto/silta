@@ -5,6 +5,8 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(3)))
 struct DogfoodInstallTests {
+  static let appName = "Silta Dev.app"
+
   static func git(_ args: [String], in scratch: URL, cwd: URL) throws -> String {
     let result = try SiltaBinary.runProcess(
       URL(filePath: "/usr/bin/git"), args,
@@ -34,6 +36,39 @@ struct DogfoodInstallTests {
     return clone
   }
 
+  /// A `swift` stub that writes `text` as the release binary.
+  static func swift(_ text: String, in tools: URL) throws {
+    try DogfoodReportTests.tool(
+      "swift",
+      text: """
+        #!/bin/bash
+        [[ "$*" == 'build -c release --only-use-versions-from-resolved-file' ]] || exit 98
+        mkdir -p .build/release
+        printf '%s' \(shellWord(text)) > .build/release/silta
+        """, in: tools)
+  }
+
+  /// An `xcodebuild` stub that writes a Release app recording its arguments and `text`.
+  static func xcodebuild(_ text: String, in tools: URL) throws {
+    try DogfoodReportTests.tool(
+      "xcodebuild",
+      text: """
+        #!/bin/bash
+        app=.build/app/DerivedData/Build/Products/Release/SiltaApp.app/Contents
+        mkdir -p "$app"
+        printf '%s\\n' "$@" > "$app/args"
+        printf '%s' \(shellWord(text)) > "$app/marker"
+        """, in: tools)
+  }
+
+  static func failing(_ name: String, scratch: URL, in tools: URL, status: Int = 99) throws {
+    try DogfoodReportTests.tool(
+      name,
+      text: "#!/bin/bash\necho \(name) >> "
+        + shellWord(scratch.appending(path: "build-called").path) + "\nexit \(status)\n",
+      in: tools)
+  }
+
   static func install(_ clone: URL, scratch: URL, tools: URL) throws -> CLIResult {
     try SiltaBinary.runProcess(
       URL(filePath: "/bin/bash"),
@@ -41,17 +76,20 @@ struct DogfoodInstallTests {
       environment: [
         "PATH": tools.path + ":/usr/bin:/bin",
         "SILTA_INSTALL_DIR": scratch.appending(path: "installed").path,
+        "SILTA_APP_INSTALL_DIR": scratch.appending(path: "apps").path,
       ])
+  }
+
+  static func read(_ url: URL) throws -> String {
+    try String(contentsOf: url, encoding: .utf8)
   }
 
   @Test func installerRefusesDirtyOtherBranchAndDetachedBeforeBuild() throws {
     try withScratchDirectory { scratch in
       let clone = try Self.clone(scratch)
       let tools = scratch.appending(path: "tools")
-      try DogfoodReportTests.tool(
-        "swift",
-        text: "#!/bin/bash\necho called >> "
-          + shellWord(scratch.appending(path: "build-called").path) + "\nexit 99\n", in: tools)
+      try Self.failing("swift", scratch: scratch, in: tools)
+      try Self.failing("xcodebuild", scratch: scratch, in: tools)
       try Data("Acme untracked".utf8).write(to: clone.appending(path: "untracked"))
       #expect(try Self.install(clone, scratch: scratch, tools: tools).termination != .exit(0))
       try FileManager.default.removeItem(at: clone.appending(path: "untracked"))
@@ -62,6 +100,7 @@ struct DogfoodInstallTests {
       #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "build-called").path))
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "installed/silta").path))
+      #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "apps").path))
     }
   }
 
@@ -70,9 +109,8 @@ struct DogfoodInstallTests {
     try withScratchDirectory { scratch in
       let clone = try Self.clone(scratch)
       let tools = scratch.appending(path: "tools")
-      try DogfoodReportTests.tool(
-        "swift", text: "#!/bin/bash\nmkdir -p .build/release\necho Acme > .build/release/silta\n",
-        in: tools)
+      try Self.swift("Acme", in: tools)
+      try Self.xcodebuild("Acme app", in: tools)
       let commit = [
         "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit",
         "--allow-empty", "-qm", "Acme " + direction,
@@ -84,46 +122,76 @@ struct DogfoodInstallTests {
       #expect(result.stderr.contains(direction == "behind" ? "1 behind" : "1 ahead"))
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "installed/silta").path))
+      #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "apps").path))
     }
   }
 
-  @Test func installerBuildsCleanMainAndPreservesExistingBinaryOnFailure() throws {
+  @Test func installerInstallsCLIAndAppFromOneCommit() throws {
     try withScratchDirectory { scratch in
       let clone = try Self.clone(scratch)
       let tools = scratch.appending(path: "tools")
-      let destination = scratch.appending(path: "installed/silta")
-      try DogfoodReportTests.tool(
-        "swift",
-        text: """
-          #!/bin/bash
-          [[ "$*" == 'build -c release --only-use-versions-from-resolved-file' ]] || exit 98
-          mkdir -p .build/release
-          printf 'Acme binary' > .build/release/silta
-          """, in: tools)
+      try Self.swift("Acme binary", in: tools)
+      try Self.xcodebuild("Acme app", in: tools)
       let result = try Self.install(clone, scratch: scratch, tools: tools)
       #expect(result.termination == .exit(0))
-      #expect(try String(contentsOf: destination, encoding: .utf8) == "Acme binary")
+      let app = scratch.appending(path: "apps").appending(path: Self.appName)
+        .appending(path: "Contents")
+      #expect(try Self.read(scratch.appending(path: "installed/silta")) == "Acme binary")
+      #expect(try Self.read(app.appending(path: "marker")) == "Acme app")
+      let short = try Self.git(["rev-parse", "--short=12", "HEAD"], in: scratch, cwd: clone)
+      let args = try Self.read(app.appending(path: "args")).split(separator: "\n").map(String.init)
+      for expected in [
+        "-project", "App/SiltaApp.xcodeproj", "-scheme", "SiltaApp", "-configuration", "Release",
+        "-onlyUsePackageVersionsFromResolvedFile", "CURRENT_PROJECT_VERSION=" + short, "build",
+      ] {
+        #expect(args.contains(expected), "missing xcodebuild argument \(expected)")
+      }
       let commit = try Self.git(["rev-parse", "HEAD"], in: scratch, cwd: clone)
       #expect(result.stdout.contains(commit))
+      #expect(result.stdout.contains(Self.appName))
       #expect(result.stdout.contains("Next: follow "))
       #expect(result.stdout.contains("/docs/getting-started.md.\n"))
-      try DogfoodReportTests.tool("swift", text: "#!/bin/bash\nexit 42\n", in: tools)
-      #expect(try Self.install(clone, scratch: scratch, tools: tools).termination != .exit(0))
-      #expect(try String(contentsOf: destination, encoding: .utf8) == "Acme binary")
-      try FileManager.default.removeItem(at: clone.appending(path: ".build"))
-      try DogfoodReportTests.tool("swift", text: "#!/bin/bash\nexit 0\n", in: tools)
-      #expect(try Self.install(clone, scratch: scratch, tools: tools).termination != .exit(0))
-      #expect(try String(contentsOf: destination, encoding: .utf8) == "Acme binary")
+      let leftovers = try FileManager.default.contentsOfDirectory(
+        atPath: scratch.appending(path: "apps").path)
+      #expect(leftovers == [Self.appName])
     }
   }
 
-  @Test func defaultInstallDirectoryUsesOnlyTheTemporaryHome() throws {
+  @Test(arguments: ["swift", "xcodebuild", "missing-cli", "missing-app"])
+  func installerKeepsBothInstallsWhenEitherBuildFails(failure: String) throws {
     try withScratchDirectory { scratch in
       let clone = try Self.clone(scratch)
       let tools = scratch.appending(path: "tools")
-      try DogfoodReportTests.tool(
-        "swift", text: "#!/bin/bash\nmkdir -p .build/release\necho Acme > .build/release/silta\n",
-        in: tools)
+      try Self.swift("Acme binary", in: tools)
+      try Self.xcodebuild("Acme app", in: tools)
+      #expect(try Self.install(clone, scratch: scratch, tools: tools).termination == .exit(0))
+      try Self.swift("Acme binary 2", in: tools)
+      try Self.xcodebuild("Acme app 2", in: tools)
+      switch failure {
+      case "swift", "xcodebuild": try Self.failing(failure, scratch: scratch, in: tools, status: 42)
+      case "missing-cli":
+        try FileManager.default.removeItem(at: clone.appending(path: ".build"))
+        try DogfoodReportTests.tool("swift", text: "#!/bin/bash\nexit 0\n", in: tools)
+      default:
+        try FileManager.default.removeItem(at: clone.appending(path: ".build"))
+        try DogfoodReportTests.tool("xcodebuild", text: "#!/bin/bash\nexit 0\n", in: tools)
+      }
+      #expect(try Self.install(clone, scratch: scratch, tools: tools).termination != .exit(0))
+      #expect(try Self.read(scratch.appending(path: "installed/silta")) == "Acme binary")
+      let app = scratch.appending(path: "apps").appending(path: Self.appName)
+      #expect(try Self.read(app.appending(path: "Contents/marker")) == "Acme app")
+      let leftovers = try FileManager.default.contentsOfDirectory(
+        atPath: scratch.appending(path: "apps").path)
+      #expect(leftovers == [Self.appName])
+    }
+  }
+
+  @Test func defaultInstallDirectoriesUseOnlyTheTemporaryHome() throws {
+    try withScratchDirectory { scratch in
+      let clone = try Self.clone(scratch)
+      let tools = scratch.appending(path: "tools")
+      try Self.swift("Acme", in: tools)
+      try Self.xcodebuild("Acme app", in: tools)
       let result = try SiltaBinary.runProcess(
         URL(filePath: "/bin/bash"),
         [clone.appending(path: "scripts/install-dev.sh").path], in: scratch,
@@ -132,6 +200,10 @@ struct DogfoodInstallTests {
       #expect(
         FileManager.default.fileExists(
           atPath: scratch.appending(path: "home/.local/bin/silta").path))
+      #expect(
+        FileManager.default.fileExists(
+          atPath: scratch.appending(path: "home/Applications").appending(path: Self.appName)
+            .appending(path: "Contents/marker").path))
     }
   }
 }
