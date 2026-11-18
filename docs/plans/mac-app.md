@@ -126,7 +126,7 @@ the human copies.
 | A4 | Workspace and connection inspector | A3 | View-model tests on the Acme seed, state and PNG checks; unlocked interaction follow-up |
 | A5 | Docs read models and view: list, reader, revisions, paging, Comments; Changes with the doc triage command block | A4, SI-126, SI-134 | Read-model and view-model tests on pending-only, archived, legacy-metadata docs and a doc over 400 lines; state and PNG checks; unlocked interaction follow-up |
 | A6a (SI-196) | Sea glass restyle of the shell and all four screens (MVP v3) | A5 | View-model tests for header and chrome values; light and dark PNG checks of every screen; pending unlocked check of glass, Reduce Transparency and Increase Contrast |
-| A6b (SI-197) | Workspace map: a pure, tested layout in `SiltaAppSupport` (columns, order, back edges) and a Map/List view with app, service and connection selection | A6a | Layout tests on the Acme seed, a 12-app seed and a cycle; selection and keyboard view-model tests; PNG checks |
+| A6b (SI-197) | Workspace map: a pure, tested layout in `SiltaAppSupport` (columns, order, back edges, arrow-key neighbours) and a Map/List view with app, service and connection selection, an app/service inspector, Esc to clear, and a fit-to-pane zoom between 60% and 100% (no manual zoom yet) | A6a | Layout tests on the Acme seed, a 12-app map and cycles; geometry, map-content and selection tests; PNG checks of app, service and connection selection |
 
 Delivery order is My work, Board, Workspace, then Docs: one screen per PR. A6a is the
 one cross-screen exception, because it restyles the shared shell.

@@ -11,6 +11,14 @@ struct AppScreenToolbar: ToolbarContent {
       ToolbarItem(placement: .primaryAction) { documentTabs }
         .sharedBackgroundVisibility(.hidden)
     }
+    if model.route == .workspace {
+      ToolbarItem(placement: .primaryAction) {
+        SeaSegments(
+          label: "Workspace view", options: [(.map, "Map"), (.list, "List")],
+          selection: $model.workspaceView
+        ).frame(width: 130)
+      }.sharedBackgroundVisibility(.hidden)
+    }
     ToolbarItemGroup(placement: .primaryAction) {
       if model.route == .board { BoardAppMenu(model: model) }
       if model.route == .docs {
