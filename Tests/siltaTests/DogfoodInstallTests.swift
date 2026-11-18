@@ -48,16 +48,35 @@ struct DogfoodInstallTests {
         """, in: tools)
   }
 
-  /// An `xcodebuild` stub that writes a Release app recording its arguments and `text`.
+  /// An `xcodebuild` stub that writes a Release app recording its arguments and `text`, with
+  /// `CFBundleVersion` taken from `CURRENT_PROJECT_VERSION` like the real build.
   static func xcodebuild(_ text: String, in tools: URL) throws {
     try DogfoodReportTests.tool(
       "xcodebuild",
       text: """
         #!/bin/bash
         app=.build/app/DerivedData/Build/Products/Release/SiltaApp.app/Contents
-        mkdir -p "$app"
+        rm -rf "$app" && mkdir -p "$app"
+        for argument in "$@"; do
+          case "$argument" in CURRENT_PROJECT_VERSION=*) version="${argument#*=}" ;; esac
+        done
         printf '%s\\n' "$@" > "$app/args"
         printf '%s' \(shellWord(text)) > "$app/marker"
+        cat > "$app/Info.plist" <<PLIST
+        <?xml version="1.0" encoding="UTF-8"?>
+        <plist version="1.0"><dict><key>CFBundleVersion</key><string>$version</string></dict></plist>
+        PLIST
+        """, in: tools)
+  }
+
+  /// An `mv` stub that fails only when moving the staged app into place.
+  static func failingAppSwap(in tools: URL) throws {
+    try DogfoodReportTests.tool(
+      "mv",
+      text: """
+        #!/bin/bash
+        [[ "$1" == */.silta-app.*/Silta\\ Dev.app ]] && exit 1
+        exec /bin/mv "$@"
         """, in: tools)
   }
 
@@ -109,8 +128,8 @@ struct DogfoodInstallTests {
     try withScratchDirectory { scratch in
       let clone = try Self.clone(scratch)
       let tools = scratch.appending(path: "tools")
-      try Self.swift("Acme", in: tools)
-      try Self.xcodebuild("Acme app", in: tools)
+      try Self.failing("swift", scratch: scratch, in: tools)
+      try Self.failing("xcodebuild", scratch: scratch, in: tools)
       let commit = [
         "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit",
         "--allow-empty", "-qm", "Acme " + direction,
@@ -120,6 +139,7 @@ struct DogfoodInstallTests {
       let result = try Self.install(clone, scratch: scratch, tools: tools)
       #expect(result.termination == .exit(1))
       #expect(result.stderr.contains(direction == "behind" ? "1 behind" : "1 ahead"))
+      #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "build-called").path))
       #expect(
         !FileManager.default.fileExists(atPath: scratch.appending(path: "installed/silta").path))
       #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "apps").path))
@@ -157,8 +177,31 @@ struct DogfoodInstallTests {
     }
   }
 
-  @Test(arguments: ["swift", "xcodebuild", "missing-cli", "missing-app"])
-  func installerKeepsBothInstallsWhenEitherBuildFails(failure: String) throws {
+  @Test func installerReplacesAnExistingAppWithoutLeftovers() throws {
+    try withScratchDirectory { scratch in
+      let clone = try Self.clone(scratch)
+      let tools = scratch.appending(path: "tools")
+      try Self.swift("Acme binary", in: tools)
+      try Self.xcodebuild("Acme app", in: tools)
+      #expect(try Self.install(clone, scratch: scratch, tools: tools).termination == .exit(0))
+      let app = scratch.appending(path: "apps").appending(path: Self.appName)
+      try Data("Acme stale".utf8).write(to: app.appending(path: "Contents/old-only"))
+      try Self.swift("Acme binary 2", in: tools)
+      try Self.xcodebuild("Acme app 2", in: tools)
+      #expect(try Self.install(clone, scratch: scratch, tools: tools).termination == .exit(0))
+      #expect(try Self.read(scratch.appending(path: "installed/silta")) == "Acme binary 2")
+      #expect(try Self.read(app.appending(path: "Contents/marker")) == "Acme app 2")
+      #expect(!FileManager.default.fileExists(atPath: app.appending(path: "Contents/old-only").path))
+      let leftovers = try FileManager.default.contentsOfDirectory(
+        atPath: scratch.appending(path: "apps").path)
+      #expect(leftovers == [Self.appName])
+    }
+  }
+
+  @Test(arguments: [
+    "swift", "xcodebuild", "missing-cli", "missing-app", "stale-app", "ditto", "app-swap",
+  ])
+  func installerKeepsBothInstallsWhenAnyStepFails(failure: String) throws {
     try withScratchDirectory { scratch in
       let clone = try Self.clone(scratch)
       let tools = scratch.appending(path: "tools")
@@ -168,13 +211,25 @@ struct DogfoodInstallTests {
       try Self.swift("Acme binary 2", in: tools)
       try Self.xcodebuild("Acme app 2", in: tools)
       switch failure {
-      case "swift", "xcodebuild": try Self.failing(failure, scratch: scratch, in: tools, status: 42)
+      case "swift", "xcodebuild", "ditto":
+        try Self.failing(failure, scratch: scratch, in: tools, status: 42)
       case "missing-cli":
         try FileManager.default.removeItem(at: clone.appending(path: ".build"))
         try DogfoodReportTests.tool("swift", text: "#!/bin/bash\nexit 0\n", in: tools)
-      default:
+      case "missing-app":
         try FileManager.default.removeItem(at: clone.appending(path: ".build"))
         try DogfoodReportTests.tool("xcodebuild", text: "#!/bin/bash\nexit 0\n", in: tools)
+      case "stale-app":
+        let origin = scratch.appending(path: "origin")
+        _ = try Self.git(
+          [
+            "-c", "user.name=Acme", "-c", "user.email=acme@example.invalid", "commit",
+            "--allow-empty", "-qm", "Acme next",
+          ], in: scratch, cwd: origin)
+        _ = try Self.git(["pull", "-q", "--ff-only"], in: scratch, cwd: clone)
+        try DogfoodReportTests.tool("xcodebuild", text: "#!/bin/bash\nexit 0\n", in: tools)
+      default:
+        try Self.failingAppSwap(in: tools)
       }
       #expect(try Self.install(clone, scratch: scratch, tools: tools).termination != .exit(0))
       #expect(try Self.read(scratch.appending(path: "installed/silta")) == "Acme binary")

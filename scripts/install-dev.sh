@@ -40,18 +40,33 @@ xcodebuild -project App/SiltaApp.xcodeproj -scheme SiltaApp -configuration Relea
   "CURRENT_PROJECT_VERSION=$short" -quiet build
 app="$app_build/DerivedData/Build/Products/Release/SiltaApp.app"
 [[ -d "$app" ]] || { echo 'install-dev: release app is missing.' >&2; exit 1; }
+# The app's CFBundleVersion is the commit, so a stale product from another build is refused.
+built="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist" 2>/dev/null || true)"
+[[ "$built" == "$short" ]] || {
+  echo "install-dev: the release app is not from commit $short." >&2
+  exit 1
+}
 
 destination="${SILTA_INSTALL_DIR:-$HOME/.local/bin}"
 apps="${SILTA_APP_INSTALL_DIR:-$HOME/Applications}"
 installed_app="$apps/Silta Dev.app"
+temporary="" staging=""
+trap 'rm -rf "$temporary" "$staging"' EXIT
 mkdir -p "$destination" "$apps"
 temporary="$(mktemp "$destination/.silta.XXXXXX")"
 staging="$(mktemp -d "$apps/.silta-app.XXXXXX")"
-trap 'rm -rf "$temporary" "$staging"' EXIT
 install -m 755 "$binary" "$temporary"
 ditto "$app" "$staging/Silta Dev.app"
-mv -f "$temporary" "$destination/silta"
+# Swap the app first and the CLI last; on any failure put the previous app back.
+restore_app() {
+  [[ ! -e "$installed_app" ]] || mv "$installed_app" "$staging/failed.app"
+  [[ ! -e "$staging/previous.app" ]] || mv "$staging/previous.app" "$installed_app"
+  echo 'install-dev: could not replace the installs; kept the previous app and CLI.' >&2
+  exit 1
+}
 [[ ! -e "$installed_app" ]] || mv "$installed_app" "$staging/previous.app"
-mv "$staging/Silta Dev.app" "$installed_app"
+mv "$staging/Silta Dev.app" "$installed_app" || restore_app
+mv -f "$temporary" "$destination/silta" || restore_app
 printf 'Installed %s and %s from commit %s.\n' "$destination/silta" "$installed_app" "$commit"
+echo 'Reopen Silta Dev.app if it is running.'
 printf 'Next: follow %s/docs/getting-started.md.\n' "$root"

@@ -164,7 +164,9 @@ with `silta --ws silta task show <ref>`.
 
 Every command runs as `silta --ws silta …` with `~/.local/bin/silta`, which
 `scripts/install-dev.sh` builds from `main`. Rerun that script after pulling `main`,
-and never use a binary from your own worktree.
+and never use a binary from your own worktree. It also builds and installs
+`~/Applications/Silta Dev.app` with Xcode; if either build fails, it keeps both
+previous installs.
 
 - **Find the slice's task; never add a second one.** Look for the issue's `url:`
   link in `task ls --proposed --promoted --archived --json`. Plain `task ls` hides
