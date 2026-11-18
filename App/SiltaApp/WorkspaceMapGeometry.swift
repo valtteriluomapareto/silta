@@ -76,7 +76,8 @@ nonisolated struct WorkspaceMapGeometry {
 
   /// The segments of an edge: one curve between neighbouring columns; across skipped
   /// columns, a straight run through the gap between rows closest to the middle; for a back
-  /// edge, a curve below the lowest node; for a self-loop, a small loop to the node's right.
+  /// edge, a run through the column gaps and below the lowest node, entering the target
+  /// from its right; for a self-loop, a small loop to the node's right.
   /// The middle segment carries the label.
   func route(from source: String, to target: String, back: Bool, lane: Int = 0) -> [Curve] {
     guard let from = frames[source], let to = frames[target] else { return [] }
@@ -91,13 +92,17 @@ nonisolated struct WorkspaceMapGeometry {
       ]
     }
     if back {
-      let start = CGPoint(x: from.midX, y: from.maxY)
-      let end = CGPoint(x: to.midX, y: to.maxY)
+      let offset = CGFloat(lane) * 10
+      let start = CGPoint(x: from.minX, y: from.midY + offset)
+      let out = CGPoint(x: from.minX - Self.columnGap / 2 + 12 + offset, y: start.y)
       let depth = bottom + Self.rowPitch / 3 + CGFloat(lane) * Self.laneGap
+      let back = CGPoint(x: to.maxX + Self.columnGap / 2 - 12 - offset, y: depth)
+      let end = CGPoint(x: to.maxX, y: to.midY + offset)
       return [
-        Curve(
-          start: start, control1: CGPoint(x: start.x, y: depth),
-          control2: CGPoint(x: end.x, y: depth), end: end)
+        .line(start, out), .line(out, CGPoint(x: out.x, y: depth)),
+        .line(
+          CGPoint(x: out.x, y: depth), back),
+        .line(back, CGPoint(x: back.x, y: end.y)), .line(CGPoint(x: back.x, y: end.y), end),
       ]
     }
     let shift = CGFloat(lane) * Self.laneGap

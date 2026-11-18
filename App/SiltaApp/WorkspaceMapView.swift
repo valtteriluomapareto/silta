@@ -35,7 +35,7 @@ struct WorkspaceMapView: View {
           }
         }
         .frame(width: geometry.size.width, height: geometry.size.height)
-        .scaleEffect(scale, anchor: .topLeading)
+        .scaleEffect(scale, anchor: .center)
         .frame(width: geometry.size.width * scale, height: geometry.size.height * scale)
         .frame(minWidth: proxy.size.width, minHeight: proxy.size.height)
       }
@@ -76,7 +76,8 @@ struct WorkspaceMapView: View {
         layer.opacity = style == .faded ? 0.35 : 1
         layer.stroke(path, with: .color(color), style: stroke)
         layer.stroke(
-          arrowhead(to: last.end, from: last.control2), with: .color(color),
+          arrowhead(to: last.end, from: last.control2 == last.end ? last.start : last.control2),
+          with: .color(color),
           style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
       }
     }.frame(width: geometry.size.width, height: geometry.size.height).allowsHitTesting(false)

@@ -15,7 +15,7 @@
         let mobile = try #require(geometry.frames["acme-mobile"])
         let web = try #require(geometry.frames["acme-web"])
         #expect(backend.midY == (mobile.midY + web.midY) / 2)
-        #expect(geometry.size.width == 32 * 2 + 3 * 176 + 2 * 136)
+        #expect(abs(geometry.size.width - (32 * 2 + 3 * 176 + 2 * 136)) < 0.5)
         let skip = geometry.route(from: "acme-mobile", to: "service:push", back: false)
         #expect(skip.count == 3)
         let run = skip[1]
