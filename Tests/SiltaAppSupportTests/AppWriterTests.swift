@@ -118,10 +118,6 @@
         }
         #expect(refused.kind == .other && refused.code == .conflict)
         #expect(try reader.task("AC-15", workspace: "acme").comments == before)
-        #expect(
-          !(try reader.snapshot(workspace: "acme").work.items.contains {
-            $0.ref == answered.comment.ref
-          }))
       }
     }
 

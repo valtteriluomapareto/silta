@@ -94,6 +94,9 @@
       let inspector = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
         .newestQuestion(for: "AC-12", reader: reader, workspace: "acme")?.question
       #expect(question == "AC-12/1" && inspector == question)
+      let fromMyWork = try #require(question.flatMap { model.target($0) })
+      model.actions.setDraft("Other.", for: fromMyWork)
+      #expect(inspector.flatMap { model.target($0) }.map { model.actions.draft($0) } == "Other.")
       let refused = try #require(model.perform(.acceptAnswer(ref: "AC-12/1"), for: "AC-12/1"))
       await refused.value
       let failure = try #require(model.target("AC-12/1").flatMap { model.actions.failures[$0] })
