@@ -95,8 +95,7 @@ There is no pending field or mailbox state in this slice.
 
 ## Drive a fixture from the terminal
 
-Build the Debug app from the repository with `scripts/verify.sh app` or
-`scripts/run-mac-fixture.sh` (the latter also opens a fixture window). Use a fresh
+Build the Debug app from the repository with `scripts/verify.sh app`. Use a fresh
 run for each independent check. `launch` prints its private directory after the
 requested route and its initial reads settle. The directory contains `app.log`,
 `state.json`, the fixture store in `data/` and the driver’s process record.
