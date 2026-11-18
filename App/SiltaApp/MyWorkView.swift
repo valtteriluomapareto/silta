@@ -112,9 +112,6 @@ struct MyWorkView: View {
             review.task.title)
           Text(review.metadata).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
         }.frame(maxWidth: .infinity, alignment: .leading)
-        if let url = review.pullRequest {
-          Link("Open PR", destination: url).buttonStyle(CompactActionStyle())
-        }
         CopyValue(value: review.task.ref, title: "Copy task reference")
       }
       if let command = model.reader?.commands(forReview: review.task, workspace: workspace).first {

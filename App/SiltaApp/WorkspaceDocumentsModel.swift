@@ -17,20 +17,35 @@ import SiltaAppSupport
   private var workspace: String?
   private var loaded: Key?
   private var requested: Key?
+  private var countsStale = false
   private var generation = 0
   @ObservationIgnored private var flight: Task<Void, Never>?
 
   init(
     read: @escaping Loader = { reader, workspace, connections in
-      try await Task.detached {
-        var pages: [String: AppDocumentList] = [:]
-        for ref in connections {
-          pages[ref] = try reader.documents(workspace: workspace, about: ref)
+      let operation = Task.detached {
+        try WorkspaceDocumentsModel.readPages(connections: connections) {
+          try reader.documents(workspace: workspace, about: $0)
         }
-        return pages
-      }.value
+      }
+      return try await withTaskCancellationHandler {
+        try await operation.value
+      } onCancel: {
+        operation.cancel()
+      }
     }
   ) { self.read = read }
+
+  nonisolated static func readPages(
+    connections: [String], read: (String) throws -> AppDocumentList
+  ) throws -> [String: AppDocumentList] {
+    var pages: [String: AppDocumentList] = [:]
+    for ref in connections {
+      try Task.checkCancellation()
+      pages[ref] = try read(ref)
+    }
+    return pages
+  }
 
   func clear() {
     generation += 1
@@ -40,6 +55,7 @@ import SiltaAppSupport
     requested = nil
     loaded = nil
     pages = [:]
+    countsStale = false
     failure = nil
     loading = false
   }
@@ -87,8 +103,12 @@ import SiltaAppSupport
       guard token == generation, !Task.isCancelled else { return }
       pages = value
       loaded = key
+      countsStale = false
     } catch {
-      if token == generation, !Task.isCancelled { failure = AppLoadFailure(error).message }
+      if token == generation, !Task.isCancelled {
+        failure = AppLoadFailure(error).message
+        countsStale = true
+      }
     }
   }
 
@@ -96,16 +116,20 @@ import SiltaAppSupport
     DocsContent.groups(pages[connection]?.entries ?? [])
   }
 
-  func countText(for connection: String) -> String? {
+  private func rawCountText(for connection: String) -> String? {
     guard let page = pages[connection] else { return nil }
     return "\(groups(for: connection).count)" + (page.nextOffset == nil ? "" : "+")
   }
 
+  func countText(for connection: String) -> String? {
+    rawCountText(for: connection).map { $0 + (countsStale ? " (stale)" : "") }
+  }
+
   func countLabel(for connection: String) -> String {
-    guard let count = countText(for: connection) else {
+    guard let count = rawCountText(for: connection) else {
       return failure == nil ? "…" : "Unavailable"
     }
-    if count == "0" { return "No docs" }
-    return count + (count == "1" ? " doc" : " docs")
+    let text = count == "0" ? "No docs" : count + (count == "1" ? " doc" : " docs")
+    return text + (countsStale ? " (stale)" : "")
   }
 }
