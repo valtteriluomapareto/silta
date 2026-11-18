@@ -84,6 +84,33 @@
       #expect(model.screenSummary.contains("loaded history"))
     }
 
+    @Test func realCLIDiffColoursBodyAndMetadataOnlyChanges() throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let body = try AppTestCLI.run(
+        ["--ws", "acme", "doc", "show", "doc:order-contract@3", "--diff"], home: home)
+      #expect(
+        DocumentDiff(body).lines.contains { $0.kind == .added && $0.text.contains("idempotency") })
+      try AppTestCLI.run(
+        [
+          "--ws", "acme", "doc", "edit", "order-contract", "--keep-body",
+          "--title", "Acme order handbook", "--kind", "runbook", "--about", "app:acme-mobile",
+          "--approved", "Update Acme metadata",
+        ], home: home)
+      let metadata = try AppTestCLI.run(
+        ["--ws", "acme", "doc", "show", "doc:order-contract@4", "--diff"], home: home)
+      #expect(!metadata.contains("@@"))
+      let lines = DocumentDiff(metadata).lines
+      for field in ["title:", "kind:", "about:"] {
+        withKnownIssue("CLI metadata changes are all classified as neutral metadata") {
+          #expect(lines.contains { $0.kind == .removed && $0.text.contains(field) })
+          #expect(lines.contains { $0.kind == .added && $0.text.contains(field) })
+        }
+      }
+    }
+
     @Test func markdownTablesAndDiffRemainReadable() {
       let table = "| Name | Value |\n| --- | ---: |\n| amount | 42 |"
       let content = MarkdownContent("# Contract\n\n" + table, title: "Contract")

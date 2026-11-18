@@ -14,7 +14,9 @@
         let reader = try AppReader(
           home: userHome.appending(path: ".silta"), user: "acme", userHome: userHome)
         withKnownIssue("Default-home commands must stay pinned under hostile exported SILTA_HOME") {
-          #expect(reader.inboxCommand(workspace: "acme").text == "SILTA_HOME=~/.silta silta --ws 'acme' inbox --for me --all")
+          #expect(
+            reader.inboxCommand(workspace: "acme").text
+              == "SILTA_HOME=~/.silta silta --ws 'acme' inbox --for me --all")
         }
         let custom = try AppReader(
           home: scratch.appending(path: "custom data"), user: "acme", userHome: userHome)
@@ -37,7 +39,8 @@
         }
         var selected = home
         if alias == "var-alias" {
-          selected = URL(filePath: home.path.replacingOccurrences(of: "/private/var/", with: "/var/"))
+          selected = URL(
+            filePath: home.path.replacingOccurrences(of: "/private/var/", with: "/var/"))
         } else if alias == "trailing-slash" {
           selected = URL(filePath: home.path + "/")
         }
@@ -49,9 +52,11 @@
         let binary = try SiltaBinary.url()
         let result = try SiltaBinary.runProcess(
           URL(filePath: "/bin/sh"), ["-c", command], in: scratch,
-          environment: ["HOME": userHome.path, "SILTA_HOME": scratch.appending(path: "hostile").path,
+          environment: [
+            "HOME": userHome.path, "SILTA_HOME": scratch.appending(path: "hostile").path,
             "USER": "acme", "SILTA_ACTOR": "human:acme",
-            "PATH": binary.deletingLastPathComponent().path + ":/usr/bin:/bin"])
+            "PATH": binary.deletingLastPathComponent().path + ":/usr/bin:/bin",
+          ])
         #expect(result.termination == .exit(0), "\(result)")
         #expect(result.stdout.contains("AC-12"))
         #expect(!FileManager.default.fileExists(atPath: scratch.appending(path: "hostile").path))

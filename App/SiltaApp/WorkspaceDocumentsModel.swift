@@ -23,14 +23,20 @@ import SiltaAppSupport
   init(
     read: @escaping Loader = { reader, workspace, connections in
       try await Task.detached {
-        var pages: [String: AppDocumentList] = [:]
-        for ref in connections {
-          pages[ref] = try reader.documents(workspace: workspace, about: ref)
+        try WorkspaceDocumentsModel.readPages(connections: connections) {
+          try reader.documents(workspace: workspace, about: $0)
         }
-        return pages
       }.value
     }
   ) { self.read = read }
+
+  nonisolated static func readPages(
+    connections: [String], read: (String) throws -> AppDocumentList
+  ) throws -> [String: AppDocumentList] {
+    var pages: [String: AppDocumentList] = [:]
+    for ref in connections { pages[ref] = try read(ref) }
+    return pages
+  }
 
   func clear() {
     generation += 1

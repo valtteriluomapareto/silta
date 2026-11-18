@@ -4,7 +4,9 @@
   import Testing
 
   @MainActor enum AppTestCLI {
-    static func run(_ arguments: [String], home: URL, seed: Int = 151) throws {
+    @discardableResult static func run(_ arguments: [String], home: URL, seed: Int = 151) throws
+      -> String
+    {
       let path = try #require(ProcessInfo.processInfo.environment["SILTA_APP_TEST_CLI"])
       let process = Process()
       process.executableURL = URL(filePath: path)
@@ -17,7 +19,8 @@
         "SILTA_NOW": "2026-11-16T12:00:00.000Z", "SILTA_ID_SEED": String(seed),
       ]
       process.standardInput = FileHandle.nullDevice
-      process.standardOutput = FileHandle.nullDevice
+      let output = Pipe()
+      process.standardOutput = output
       process.standardError = FileHandle.nullDevice
       let finished = DispatchSemaphore(value: 0)
       process.terminationHandler = { _ in finished.signal() }
@@ -26,7 +29,9 @@
         kill(process.processIdentifier, SIGKILL)
       }
       process.waitUntilExit()
-      try #require(process.terminationReason == .exit && process.terminationStatus == 0)
+      let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+      try #require(process.terminationReason == .exit && process.terminationStatus == 0, "\(text)")
+      return text
     }
   }
 #endif

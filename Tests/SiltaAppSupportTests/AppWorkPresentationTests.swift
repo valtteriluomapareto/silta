@@ -85,7 +85,11 @@
         }
         withKnownIssue("The seq=24 mutation silently misses the dynamically allocated task") {
           let poisoned = try reader.environment.db.read { db in
-            try String.fetchOne(db, sql: "SELECT actor FROM task_event WHERE task_id=(SELECT id FROM task WHERE workspace_id=(SELECT id FROM workspace WHERE slug='acme') AND seq=?) AND kind='status' ORDER BY id DESC LIMIT 1", arguments: [Int(ref.split(separator: "-").last ?? "")])
+            try String.fetchOne(
+              db,
+              sql:
+                "SELECT actor FROM task_event WHERE task_id=(SELECT id FROM task WHERE workspace_id=(SELECT id FROM workspace WHERE slug='acme') AND seq=?) AND kind='status' ORDER BY id DESC LIMIT 1",
+              arguments: [Int(ref.split(separator: "-").last ?? "")])
           }
           #expect(poisoned == "Password=private123")
         }

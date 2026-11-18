@@ -69,6 +69,37 @@
       }
     }
 
+    @Test func citedPullRequestsCannotBecomeTheTasksOwnPR() throws {
+      try fixture { reader, home in
+        @MainActor func link(_ number: Int, _ relation: String, seed: Int) throws {
+          try AppTestCLI.run(
+            [
+              "--ws", "acme", "task", "link", "AC-21",
+              "url:https://github.com/acme/example/pull/\(number)", "--rel", relation,
+            ], home: home, seed: seed)
+        }
+        try link(99, "cites", seed: 401)
+        let cited = try reader.task("AC-21", workspace: "acme")
+        withKnownIssue("A cited PR is currently presented as the task's own PR") {
+          #expect(
+            MyWorkContent.pullRequest(cited.links) == nil)
+        }
+        try link(41, "about", seed: 402)
+        let own = try reader.task("AC-21", workspace: "acme")
+        withKnownIssue("The first cited link wins over an explicit own-PR link") {
+          #expect(
+            MyWorkContent.pullRequest(own.links)?
+              .lastPathComponent == "41")
+        }
+        try link(42, "about", seed: 403)
+        let ambiguous = try reader.task("AC-21", workspace: "acme")
+        withKnownIssue("Ambiguous own-PR links should hide the badge") {
+          #expect(
+            MyWorkContent.pullRequest(ambiguous.links) == nil)
+        }
+      }
+    }
+
     @Test func manyQuestionsKeepTheCoreCapAndTheReadMorePath() throws {
       try fixture { reader, home in
         for index in 0..<13 {
