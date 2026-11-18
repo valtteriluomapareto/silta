@@ -28,9 +28,10 @@ nonisolated enum SidebarContent {
     return actor + (RelativeAge.text(task.updatedAt, now: now).map { " · updated " + $0 } ?? "")
   }
 
-  static func documentCount(_ page: AppDocumentList?) -> String {
-    guard let page else { return "…" }
+  static func documentCount(_ page: AppDocumentList?, stale: Bool = false) -> String {
+    guard let page else { return stale ? "Unavailable" : "…" }
     return "\(Set(page.entries.map(\.slug)).count)" + (page.nextOffset == nil ? "" : "+")
+      + (stale ? " (stale)" : "")
   }
 
   static func refreshText(loading: Bool, failure: Bool, checkedAt: Date?, now: Date) -> String {

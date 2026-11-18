@@ -159,7 +159,8 @@ struct AppSidebar: View {
     switch route {
     case .mywork: return String(snapshot.work.waitingCount)
     case .workspace: return nil
-    case .docs: return SidebarContent.documentCount(model.documentCatalog)
+    case .docs:
+      return SidebarContent.documentCount(model.documentCatalog, stale: model.catalogFailure != nil)
     case .board:
       return String(
         snapshot.board.todo.count + snapshot.board.doing.count + snapshot.board.review.count)

@@ -10,6 +10,7 @@ final class AppModel {
   let reader: AppReader?
   let now: @Sendable () -> Date
   private(set) var documentCatalog: AppDocumentList?
+  private(set) var catalogFailure: String?
   private var catalogWorkspace: String?
   private var catalogVersion: Int?
   let taskDetail = TaskDetailModel()
@@ -75,7 +76,7 @@ final class AppModel {
             if workspace == nil { workspace = result.workspace }
           }
           failure = nil
-          try await loadDocumentCatalog(force: forced)
+          await loadDocumentCatalog(force: forced)
           guard token == generation else { continue }
           if route == .docs { await loadDocuments(force: forced) }
           if route == .workspace { await loadWorkspaceDocuments(force: forced) }
@@ -97,6 +98,7 @@ final class AppModel {
       workspace = slug
       documents.clear()
       documentCatalog = nil
+      catalogFailure = nil
       catalogWorkspace = nil
       catalogVersion = nil
       workspaceDocuments.clear()
@@ -109,23 +111,6 @@ final class AppModel {
       appFilter = nil
     }
     return refresh(force: true)
-  }
-
-  func loadDocumentCatalog(force: Bool) async throws {
-    guard let reader, let workspace, let data = visibleData else { return }
-    if !force, documentCatalog != nil, catalogWorkspace == workspace, catalogVersion == data.version
-    {
-      return
-    }
-    let token = generation
-    let page = try await Task.detached {
-      try reader.documents(workspace: workspace, archived: true)
-    }.value
-    guard token == generation, self.workspace == workspace, visibleData?.version == data.version
-    else { return }
-    documentCatalog = page
-    catalogWorkspace = workspace
-    catalogVersion = data.version
   }
 
   func loadWorkspaceDocuments(force: Bool = false) async {
@@ -235,6 +220,31 @@ nonisolated struct DocumentSelection: Equatable {
 }
 
 extension AppModel {
+  private func loadDocumentCatalog(force: Bool) async {
+    guard let reader, let workspace, let data = visibleData else { return }
+    if !force, documentCatalog != nil, catalogFailure == nil,
+      catalogWorkspace == workspace, catalogVersion == data.version
+    {
+      return
+    }
+    let token = generation
+    do {
+      let page = try await Task.detached {
+        try reader.documents(workspace: workspace, archived: true)
+      }.value
+      guard token == generation, self.workspace == workspace, visibleData?.version == data.version
+      else { return }
+      documentCatalog = page
+      catalogWorkspace = workspace
+      catalogVersion = data.version
+      catalogFailure = nil
+    } catch {
+      if token == generation, self.workspace == workspace {
+        catalogFailure = AppLoadFailure(error).message
+      }
+    }
+  }
+
   var screenTitle: String {
     route == .docs ? documents.document.map { $0.title ?? $0.slug } ?? "Docs" : route.title
   }

@@ -132,31 +132,6 @@ import SiltaAppSupport
     detailWorkspace = nil
   }
 
-  func groups(search: String) -> [Group] {
-    let matching = entries.filter { entry in
-      (scope?.archived == true || !entry.archived)
-        && (!proposedOnly || entry.state == "proposed")
-        && AppSearch.matches(
-          search,
-          values: [entry.ref, entry.title ?? "", entry.kind ?? ""]
-            + (entry.about ?? []))
-    }
-    return DocsContent.groups(matching)
-  }
-
-  var proposedLabel: String {
-    let count = Set(
-      entries.filter { $0.state == "proposed" && (scope?.archived == true || !$0.archived) }.map(
-        \.slug)
-    ).count
-    return "Proposed · \(count)" + (nextList == nil ? "" : "+")
-  }
-
-  var archivedCount: Int { Set(entries.filter(\.archived).map(\.slug)).count }
-  var archivedFooter: String {
-    "\(archivedCount)" + (nextList == nil ? "" : "+") + " archived"
-  }
-
   @discardableResult
   func refresh(
     _ reader: AppReader, workspace: String, about: String?, archived: Bool,
@@ -324,5 +299,32 @@ extension DocsModel {
     let page: AppDocumentPage
     let versions: AppDocumentList
     let comments: AppDocumentComments?
+  }
+}
+
+extension DocsModel {
+  func groups(search: String) -> [Group] {
+    let matching = entries.filter { entry in
+      (scope?.archived == true || !entry.archived)
+        && (!proposedOnly || entry.state == "proposed")
+        && AppSearch.matches(
+          search,
+          values: [entry.ref, entry.title ?? "", entry.kind ?? ""]
+            + (entry.about ?? []))
+    }
+    return DocsContent.groups(matching)
+  }
+
+  var proposedLabel: String {
+    let count = Set(
+      entries.filter { $0.state == "proposed" && (scope?.archived == true || !$0.archived) }.map(
+        \.slug)
+    ).count
+    return "Proposed · \(count)" + (nextList == nil ? "" : "+")
+  }
+
+  var archivedCount: Int { Set(entries.filter(\.archived).map(\.slug)).count }
+  var archivedFooter: String {
+    "\(archivedCount)" + (nextList == nil ? "" : "+") + " archived"
   }
 }

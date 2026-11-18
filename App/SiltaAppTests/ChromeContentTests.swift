@@ -28,6 +28,8 @@
         #expect(SidebarContent.appColor(index: 2) == "Warning")
         let docs = try reader.documents(workspace: "acme", archived: true)
         #expect(SidebarContent.documentCount(docs) == "6")
+        #expect(SidebarContent.documentCount(docs, stale: true) == "6 (stale)")
+        #expect(SidebarContent.documentCount(nil, stale: true) == "Unavailable")
         let partial = AppDocumentList(entries: docs.entries, total: 30, nextOffset: 20)
         #expect(SidebarContent.documentCount(partial) == "6+")
         #expect(SidebarContent.documentCount(nil) == "…")
