@@ -81,8 +81,8 @@ maintainer names doc review twice as a cost.
 ## Data and privacy
 
 - **Everything stays local.** The workspace's tasks, comments, logs, reports and
-  check-ins stay in `~/.silta`. Nothing from it goes into the Silta repo, its issues,
-  fixtures or evals.
+  check-ins stay in `~/.silta`, and the day-0 baseline export in a private folder
+  beside it. Nothing from them goes into the Silta repo, its issues, fixtures or evals.
 - **Private report.** `scripts/dogfood-report.sh --ws <slug>` reports on any
   workspace. It validates the slug before using it, and writes the report and its
   `--since` state under `$SILTA_HOME/reports/<slug>/`, outside every repository. The
@@ -154,24 +154,27 @@ it. Two more numbers need no new code; the agent collects them at each review:
    check that a session in an unregistered repo prints nothing and that the hook stays
    inside its 1.5 s budget. A scan of a whole projects directory registers every clone
    under it. Use the setup prompt below to review real app details and settings.
-   To rehearse `init --scan` and the setup prompt first, run
-   `export SILTA_HOME="$(mktemp -d)"` in that shell; deleting the folder resets
-   everything, and nothing reaches `~/.silta` or the repos. Silta has no command to remove a workspace.
+   Silta has no command to remove a workspace. To rehearse `init --scan` and the
+   setup prompt, start the agent from a shell after `export SILTA_HOME="$(mktemp -d)"`.
+   Deleting that folder resets everything; nothing reaches `~/.silta` or the repos.
+   Close that shell before the real setup.
 3. **Seed the first docs:** with the map in place, use the seed prompt below for three
    to five docs on the busiest cross-app links. Without them the brief shows no docs
    in the first weeks and E6 has nothing to measure. Seeded docs are approved edits;
    later docs arrive as agent proposals.
 4. **Turn on measurement:** create the check-in task, write the decision rules into
    it as its description, and run the first private report as week 0, noting the
-   number of seeded docs. Then export the day-0 baseline outside every repo:
-   `silta --ws <slug> export --to ~/silta-df3-baseline`.
+   number of seeded docs. Then export this state as the baseline:
+   `silta --ws <slug> export --to ~/silta-df3-baseline`. The folder holds the full
+   task and doc text, so it stays private like `~/.silta` and outside every repo.
 5. **Roll back if needed:** preview `silta agents uninstall`, then apply the preview's
    token; the hook and blocks are removed and the data stays. To reset the workspace
-   to day 0 instead (after a false start, say), run
+   to the step-4 baseline instead (after a false start, say), run
    `silta --ws <slug> restore ~/silta-df3-baseline/<slug> --dry-run`, and then the
-   printed command with the maintainer's words. Later tasks, claims and docs go;
-   other workspaces stay, a snapshot is taken first, task refs keep counting up and
-   logs stay, so run the report with `--since` set to the new day 0.
+   printed command with the maintainer's words. Later tasks, claims, docs and map
+   edits go. Other workspaces stay, a snapshot is taken first, task refs keep counting
+   up and logs stay. Afterwards, rerun the check-in's `block` command to set a fresh
+   follow-up, and run the report with `--since` set to the new day 0.
 
 **Setup prompt (draft; it becomes `silta guide setup` after it has worked once):**
 
