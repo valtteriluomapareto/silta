@@ -156,14 +156,10 @@ struct TaskInspector: View {
       let snapshot = model.visibleData?.snapshot
     {
       let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
-      ForEach(content.answers(for: task.ref, reader: reader, workspace: workspace)) { answer in
-        VStack(alignment: .leading, spacing: 8) {
-          Overline(
-            answer.actor.map { "Answer " + ActorPresentation($0).name } ?? "Answer question",
-            color: Color("TideText"))
-          CommandBlock(command: answer.command)
-        }.padding(12).background(Color("AccentColor").opacity(0.06), in: .rect(cornerRadius: 12))
-      }
+      TaskComposer(
+        model: model, task: task.ref,
+        question: content.newestQuestion(for: task.ref, reader: reader, workspace: workspace)
+      ).id(task.ref)
       if task.status == "review" {
         ForEach(reader.commands(forReview: task, workspace: workspace), id: \.text) {
           CommandBlock(command: $0)
@@ -186,5 +182,45 @@ struct TaskInspector: View {
       if let path { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
     }.buttonStyle(CompactActionStyle()).disabled(!available).opacity(available ? 1 : 0.45)
       .help(available ? "Reveal the recorded worktree" : "No existing worktree is recorded")
+  }
+}
+
+/// The inspector's box: answer the newest open question to the human, or comment.
+private struct TaskComposer: View {
+  @Bindable var model: AppModel
+  let task: String
+  let question: BoardContent.Answer?
+  @State private var commenting = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if let question, let ref = question.question {
+        Picker("Reply as", selection: $commenting) {
+          Text(question.actor.map { "Answer " + ActorPresentation($0).name } ?? "Answer")
+            .tag(false)
+          Text("Comment").tag(true)
+        }.pickerStyle(.segmented).labelsHidden().fixedSize()
+        if !commenting, let target = model.target(ref) {
+          ActionComposer(
+            model: model, target: target, placeholder: "Your answer to \(ref)",
+            sendTitle: "Send answer", command: question.command
+          ) { model.answer(question: ref, task: task) }
+        } else {
+          comment
+        }
+      } else {
+        Overline("Comment on \(task)")
+        comment
+      }
+    }
+  }
+
+  @ViewBuilder private var comment: some View {
+    if let target = model.target(task) {
+      ActionComposer(
+        model: model, target: target, placeholder: "Add a comment", sendTitle: "Comment",
+        command: nil
+      ) { model.comment(task: task) }
+    }
   }
 }

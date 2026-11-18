@@ -12,8 +12,8 @@ The [Mac app plan](mac-app.md#validation) explains what each validation layer pr
 Use the shared `v2` fixture from `SiltaAppSupport/Control`, its fixed clock and the
 existing ID generator. `SiltaTestSupport` reuses these implementations. Every
 launch creates a fresh private temporary data home before opening the app reader;
-control never accepts or inherits an existing SILTA_HOME. Product views remain
-read-only and never run CLI commands.
+control never accepts or inherits an existing SILTA_HOME. The app’s product action
+flows are documented in the [Mac actions plan](mac-app-actions.md).
 
 ```text
 SiltaApp -SiltaFixture v2 [-SiltaRoute mywork] [-SiltaDark]

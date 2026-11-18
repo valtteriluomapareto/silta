@@ -14,6 +14,18 @@ nonisolated struct MyWorkContent {
     }
   }
 
+  /// An answer to the human's own question, which they may accept.
+  struct Answer: Identifiable {
+    let item: AppAttention
+    let metadata: String
+    var id: String { item.stableID }
+
+    /// Core offers accepting only to the asker or the current claimer.
+    func canAccept(reader: AppReader, workspace: String) -> Bool {
+      reader.commands(for: item, workspace: workspace).contains { $0.title == "Accept answer" }
+    }
+  }
+
   struct Review: Identifiable {
     let task: AppTask
     let metadata: String
@@ -29,13 +41,15 @@ nonisolated struct MyWorkContent {
   }
 
   let questions: [Question]
+  let answers: [Answer]
   let reviews: [Review]
   let documents: [Proposal]
   let tasks: [Proposal]
   let other: [AppAttention]
   let remaining: Int
   var hasMatches: Bool {
-    !questions.isEmpty || !reviews.isEmpty || !documents.isEmpty || !tasks.isEmpty || !other.isEmpty
+    !questions.isEmpty || !answers.isEmpty || !reviews.isEmpty || !documents.isEmpty
+      || !tasks.isEmpty || !other.isEmpty
   }
 
   init(snapshot: AppSnapshot, search: String, now: Date) {
@@ -55,6 +69,9 @@ nonisolated struct MyWorkContent {
     questions = items.filter {
       $0.kind == "question" && matches($0, extra: [byRef[$0.task ?? ""]?.title ?? ""])
     }.map { Self.question($0, task: byRef[$0.task ?? ""], now: now) }
+    answers = items.filter {
+      $0.kind == "answer" && matches($0, extra: [byRef[$0.task ?? ""]?.title ?? ""])
+    }.map { Self.answer($0, task: byRef[$0.task ?? ""], now: now) }
     reviews = snapshot.work.reviews.map { Self.review($0, now: now) }.filter {
       AppSearch.matches(
         search, values: [$0.task.ref, $0.task.title, $0.task.description, $0.metadata])
@@ -64,7 +81,7 @@ nonisolated struct MyWorkContent {
       $0.kind == "proposal" && matches($0, extra: [byRef[$0.ref ?? ""]?.app ?? ""])
     }.map { Self.proposal($0, task: byRef[$0.refs.first ?? $0.ref ?? ""]) }
     other = items.filter {
-      !["question", "doc_proposal", "proposal"].contains($0.kind) && matches($0)
+      !["question", "answer", "doc_proposal", "proposal"].contains($0.kind) && matches($0)
     }
     remaining = snapshot.work.remaining
   }
@@ -77,6 +94,15 @@ nonisolated struct MyWorkContent {
       + [title, RelativeAge.text(item.createdAt, now: now)].compactMap { $0 })
       .joined(separator: " · ")
     return Question(item: item, metadata: metadata)
+  }
+
+  private static func answer(_ item: AppAttention, task: AppTask?, now: Date) -> Answer {
+    let actor = item.author.map { ActorPresentation($0).name } ?? "Someone"
+    let metadata =
+      ([actor + " answered you"]
+      + [task?.title ?? item.task, RelativeAge.text(item.createdAt, now: now)].compactMap { $0 })
+      .joined(separator: " · ")
+    return Answer(item: item, metadata: metadata)
   }
 
   private static func review(_ task: AppTask, now: Date) -> Review {

@@ -31,6 +31,8 @@ package enum StorageError: CodedError, CaseIterable {
   case schemaTooNew
   /// A required complete backup could not be created or installed.
   case backupFailed
+  /// The database needs migrations that this caller may not run.
+  case migrationRequired
 
   /// The locked classes are retryable; the rest need their printed recovery.
   package var code: ErrorCode {
@@ -72,12 +74,17 @@ package enum StorageError: CodedError, CaseIterable {
         + "with silta doctor output."
     case .schemaTooNew: "Database requires a newer version of silta."
     case .backupFailed: "Required database backup could not be completed."
+    case .migrationRequired: "Database needs migrations; run the matching silta CLI first."
     }
   }
 
   /// Fixed safe diagnostics; command arguments are never reconstructed or retained.
   package var next: [String] {
-    self == .schemaTooNew ? ["update silta"] : ["silta doctor"]
+    switch self {
+    case .schemaTooNew: ["update silta"]
+    case .migrationRequired: ["silta init"]
+    default: ["silta doctor"]
+    }
   }
 
   /// Suggested delay after the bounded busy attempts are exhausted.

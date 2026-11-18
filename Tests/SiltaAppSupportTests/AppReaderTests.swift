@@ -27,7 +27,7 @@
         #expect(tasks.filter { $0.status == "doing" }.count == 2)
         #expect(tasks.filter { $0.status == "review" }.count == 1)
         #expect(tasks.filter { $0.status == "proposed" }.count == 3)
-        #expect(try service.inbox(for: "me").items.count == 4)
+        #expect(try service.inbox(for: "me").items.count == 5)
       }
     }
 
@@ -46,7 +46,7 @@
           snapshot.board.appOpenCounts == ["acme-mobile": 3, "acme-backend": 3, "acme-web": 1])
         #expect(
           !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/log").path))
-        #expect(snapshot.work.waitingCount == 5)
+        #expect(snapshot.work.waitingCount == 6)
         #expect(snapshot.work.items.first { $0.ref == "AC-22" }?.author == "agent:claude:fixture")
         #expect(snapshot.work.items.first?.commands.first?.contains("--kind answer") == true)
         #expect(snapshot.work.items.allSatisfy { !$0.commands.joined().contains("--approved") })
@@ -84,7 +84,7 @@
         #expect(work.items.filter { $0.kind == "question" }.count == 4)
         #expect(Set(work.items.filter { $0.kind == "question" }.compactMap(\.ref)).count == 4)
         #expect(work.reviews.map(\.ref) == ["AC-9"])
-        #expect(work.waitingCount == 8)
+        #expect(work.waitingCount == 9)
       }
     }
 
@@ -108,8 +108,8 @@
         }
         let work = try reader.snapshot(workspace: "acme").work
         #expect(work.items.count == 12)
-        #expect(work.remaining == 3)
-        #expect(work.waitingCount == 16)
+        #expect(work.remaining == 4)
+        #expect(work.waitingCount == 17)
         #expect(work.moreCommand != nil)
       }
     }
@@ -293,7 +293,7 @@
           try tx.database.execute(sql: "UPDATE meta SET value='999' WHERE key='min_writer_version'")
         }
         let snapshot = try reader.snapshot(workspace: "acme")
-        #expect(snapshot.work.waitingCount == 5)
+        #expect(snapshot.work.waitingCount == 6)
       }
     }
 

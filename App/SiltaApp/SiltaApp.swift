@@ -71,8 +71,12 @@ struct SiltaApp: App {
     do {
       let reader = try AppReader(home: home, user: user, now: now)
       let session = AppReadSession(reader: reader, now: now)
+      let writer = AppWriter(reader: reader)
       return AppModel(
         reader: reader, now: now,
+        writer: { write, workspace in
+          try await Task.detached { try writer.perform(write, workspace: workspace) }.value
+        },
         load: { previous, workspace, force in
           try await Task.detached {
             try session.load(previous: previous, workspace: workspace, force: force)

@@ -5,6 +5,7 @@ import SiltaAppSupport
 @MainActor @Observable
 final class AppModel {
   typealias Loader = @Sendable (AppLoadedData?, String?, Bool) async throws -> AppLoadedData?
+  typealias Writer = @Sendable (AppWrite, String) async throws -> Void
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
   let reader: AppReader?
@@ -14,6 +15,9 @@ final class AppModel {
   private var catalogWorkspace: String?
   private var catalogVersion: Int?
   let taskDetail = TaskDetailModel()
+  let actions = ActionModel()
+  /// Runs one write in a workspace; nil where the app can't write (no store, previews).
+  let writer: Writer?
   let documents: DocsModel
   let workspaceDocuments: WorkspaceDocumentsModel
   var docsAbout: String?
@@ -43,9 +47,11 @@ final class AppModel {
   init(
     reader: AppReader? = nil, now: @escaping @Sendable () -> Date = { Date() },
     documents: DocsModel = DocsModel(),
-    workspaceDocuments: WorkspaceDocumentsModel = WorkspaceDocumentsModel(), load: @escaping Loader
+    workspaceDocuments: WorkspaceDocumentsModel = WorkspaceDocumentsModel(),
+    writer: Writer? = nil, load: @escaping Loader
   ) {
     self.reader = reader
+    self.writer = writer
     self.now = now
     self.documents = documents
     self.workspaceDocuments = workspaceDocuments
