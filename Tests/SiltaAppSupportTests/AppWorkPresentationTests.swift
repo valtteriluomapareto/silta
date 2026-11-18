@@ -30,7 +30,7 @@
             $0.rel == "about" && $0.target == "url:https://github.com/acme/example/pull/41"
           })
         #expect(review.steps.count == 4 && review.steps.allSatisfy(\.done))
-        #expect(snapshot.work.waitingCount == 7)
+        #expect(snapshot.work.waitingCount == 8)
         #expect(try observer.read { try Int.fetchOne($0, sql: "PRAGMA data_version") } == before)
         let inbox = try TaskService(environment: reader.environment, workspace: "acme").inbox(
           for: "me")

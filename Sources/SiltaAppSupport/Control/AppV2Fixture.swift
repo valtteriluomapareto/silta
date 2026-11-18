@@ -39,6 +39,28 @@
       _ = try service.comment("AC-12", question)
       _ = try service.link(
         "AC-9", target: "url:https://github.com/acme/example/pull/41", relation: "about")
+      try answeredHumanQuestion(environment)
+    }
+
+    /// The human asks Codex on AC-14 and Codex answers, which leaves an answer to accept.
+    private static func answeredHumanQuestion(_ environment: SiltaEnvironment) throws {
+      func service(_ actor: ActorID) -> TaskService {
+        TaskService(
+          environment: SiltaEnvironment(
+            clock: environment.clock, ids: environment.ids, git: environment.git,
+            home: environment.home, db: environment.db, log: environment.log, actor: actor,
+            human: environment.human),
+          workspace: "acme")
+      }
+      var question = CommentDraft(
+        body: "Should retries give up after an hour?", kind: "question")
+      question.recipients = ["agent:codex:fixture"]
+      let asked = try service(environment.human).comment("AC-14", question)
+      var answer = CommentDraft(
+        body: "Yes. After an hour the token is usually stale, so the app drops the "
+          + "registration and asks for a fresh token on next launch.", kind: "answer")
+      answer.replyTo = asked.comment.ref
+      _ = try service(.agent(tool: "codex", session: "fixture")).comment("AC-14", answer)
     }
 
     private static var tasks: [DebugTaskFixture] {
