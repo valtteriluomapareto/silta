@@ -88,7 +88,7 @@ struct WorkspaceView: View {
 
   private func appColor(_ slug: String) -> Color {
     let index = model.visibleData?.map?.apps.firstIndex { $0.slug == slug } ?? 0
-    return Color(["SecondaryInk", "TideText", "Warning"][index % 3])
+    return Color(SidebarContent.appColor(index: index))
   }
 }
 
@@ -145,7 +145,8 @@ struct ConnectionInspector: View {
         if let document = group.preferred {
           Button {
             model.openDocument(
-              document.ref, view: document.state == "proposed" ? .changes : .document)
+              document.ref, view: document.state == "proposed" ? .changes : .document,
+              about: connection.attachment)
           } label: {
             HStack(alignment: .top, spacing: 8) {
               Image(systemName: "doc.text").font(.system(size: 13)).foregroundStyle(

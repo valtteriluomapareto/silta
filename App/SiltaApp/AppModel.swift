@@ -8,6 +8,11 @@ final class AppModel {
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
   let reader: AppReader?
+  let now: @Sendable () -> Date
+  private(set) var documentCatalog: AppDocumentList?
+  private(set) var catalogFailure: String?
+  private var catalogWorkspace: String?
+  private var catalogVersion: Int?
   let taskDetail = TaskDetailModel()
   let documents: DocsModel
   let workspaceDocuments: WorkspaceDocumentsModel
@@ -32,10 +37,12 @@ final class AppModel {
   @ObservationIgnored private var generation = 0
 
   init(
-    reader: AppReader? = nil, documents: DocsModel = DocsModel(),
+    reader: AppReader? = nil, now: @escaping @Sendable () -> Date = { Date() },
+    documents: DocsModel = DocsModel(),
     workspaceDocuments: WorkspaceDocumentsModel = WorkspaceDocumentsModel(), load: @escaping Loader
   ) {
     self.reader = reader
+    self.now = now
     self.documents = documents
     self.workspaceDocuments = workspaceDocuments
     self.load = load
@@ -69,6 +76,8 @@ final class AppModel {
             if workspace == nil { workspace = result.workspace }
           }
           failure = nil
+          await loadDocumentCatalog(force: forced)
+          guard token == generation else { continue }
           if route == .docs { await loadDocuments(force: forced) }
           if route == .workspace { await loadWorkspaceDocuments(force: forced) }
         }
@@ -88,6 +97,10 @@ final class AppModel {
       generation += 1
       workspace = slug
       documents.clear()
+      documentCatalog = nil
+      catalogFailure = nil
+      catalogWorkspace = nil
+      catalogVersion = nil
       workspaceDocuments.clear()
       docsAbout = nil
       taskDetail.clear()
@@ -135,8 +148,8 @@ final class AppModel {
     documents.view = view
   }
 
-  func openDocument(_ ref: String, view: AppDocumentView = .changes) {
-    docsAbout = nil
+  func openDocument(_ ref: String, view: AppDocumentView = .changes, about: String? = nil) {
+    docsAbout = about
     documents.view = view
     select(document: ref)
   }
@@ -207,6 +220,31 @@ nonisolated struct DocumentSelection: Equatable {
 }
 
 extension AppModel {
+  private func loadDocumentCatalog(force: Bool) async {
+    guard let reader, let workspace, let data = visibleData else { return }
+    if !force, documentCatalog != nil, catalogFailure == nil,
+      catalogWorkspace == workspace, catalogVersion == data.version
+    {
+      return
+    }
+    let token = generation
+    do {
+      let page = try await Task.detached {
+        try reader.documents(workspace: workspace, archived: true)
+      }.value
+      guard token == generation, self.workspace == workspace, visibleData?.version == data.version
+      else { return }
+      documentCatalog = page
+      catalogWorkspace = workspace
+      catalogVersion = data.version
+      catalogFailure = nil
+    } catch {
+      if token == generation, self.workspace == workspace {
+        catalogFailure = AppLoadFailure(error).message
+      }
+    }
+  }
+
   var screenTitle: String {
     route == .docs ? documents.document.map { $0.title ?? $0.slug } ?? "Docs" : route.title
   }
