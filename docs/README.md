@@ -13,6 +13,7 @@
 | Plans and their lifecycle | [`plans/README.md`](plans/README.md), [`plans/_template.md`](plans/_template.md) |
 | Reviewing plans and implementations | [`../skills/persona-review/SKILL.md`](../skills/persona-review/SKILL.md) |
 | Briefing another agent on a slice | [`agent-brief.md`](agent-brief.md) |
+| The Mac app icon: design, layers and how to regenerate it | [`app-icon.md`](app-icon.md) |
 | Building Silta with Silta | [`dogfood/README.md`](dogfood/README.md) (below) |
 | Pull requests and slice issues | [`../.github/pull_request_template.md`](../.github/pull_request_template.md), [`../.github/ISSUE_TEMPLATE/slice.yml`](../.github/ISSUE_TEMPLATE/slice.yml) |
 | The agent manual, as agents read it | `silta guide`; its text is in `Sources/silta/Commands/GuideCommand.swift` (spec §11) |
