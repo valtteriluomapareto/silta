@@ -4,10 +4,12 @@ import GRDB
 extension TaskService {
   /// Returns an answered batch to todo atomically. A batch with a task that isn't ready
   /// (spec §8: every blocker a done task) needs the human's go-ahead, decided inside the
-  /// write; one approval row covers the batch.
-  package func unblock(_ refs: [String], why: String? = nil, allowSecret: Bool = false) throws
-    -> (tasks: [TaskResult], approvalUsed: Bool)
-  {
+  /// write; one approval row covers the batch. With `requireReady`, a task that isn't
+  /// ready refuses as `blocked` even for the human, so a caller that offered unblocking
+  /// only for a ready task never clears a blocker added since it read.
+  package func unblock(
+    _ refs: [String], why: String? = nil, allowSecret: Bool = false, requireReady: Bool = false
+  ) throws -> (tasks: [TaskResult], approvalUsed: Bool) {
     guard !refs.isEmpty else {
       throw TaskError.invalid("Unblock needs at least one task reference.")
     }
@@ -20,6 +22,7 @@ extension TaskService {
     let slug = try selected()
     return try environment.db.write { tx in
       let tasks = try blockedBatch(refs, workspace: slug, at: at, in: tx.database)
+      if requireReady { try Self.requireReady(tasks, at: at, in: tx.database) }
       let open = try tasks.compactMap { task -> ActorError.Wait? in
         guard try Self.waiting(task, at: at, in: tx.database)?.ready != true else { return nil }
         let unmet = try Self.unmet(task, in: tx.database)
@@ -51,6 +54,15 @@ extension TaskService {
           warnings: content.1 ? [SecretGuard.warning] : [])
       }
       return (results, used != nil)
+    }
+  }
+
+  /// Refuses a batch with a task that isn't ready, read inside the unblocking write.
+  private static func requireReady(_ tasks: [TaskDetails], at: Date, in db: Database) throws {
+    for task in tasks {
+      if let waiting = try waiting(task, at: at, in: db), !waiting.ready {
+        throw TaskError.blocked(task.ref, waiting)
+      }
     }
   }
 

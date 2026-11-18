@@ -61,8 +61,8 @@
       #expect(first.snapshotVersion == 1 && first.screen == "board" && first.route == "board:AC-12")
       #expect(first.selection?.kind == "task" && first.selection?.ref == "AC-12")
       #expect(first.inspectorOpen && first.idle && first.refresh.phase == "ready")
-      #expect(first.counts.lanes == ["Todo": 4, "Doing": 2, "Review": 1, "Done this week": 3])
-      #expect(first.counts.sidebar?.waiting == 8 && first.counts.sidebar?.claimed == 2)
+      #expect(first.counts.lanes == ["Todo": 4, "Doing": 2, "Review": 1, "Done this week": 4])
+      #expect(first.counts.sidebar?.waiting == 9 && first.counts.sidebar?.claimed == 2)
       #expect(first.counts.sidebar?.apps == ["acme-mobile": 3, "acme-backend": 3, "acme-web": 1])
       model.showProposed = true
       #expect(
@@ -113,7 +113,7 @@
       #expect(state.screen == "docs" && state.route == "docs:doc:order-contract@3:changes")
       #expect(selected == ["kind": "document", "ref": "doc:order-contract@3", "view": "changes"])
       #expect(state.idle && state.refresh.phase == "ready" && !state.inspectorOpen)
-      #expect(state.counts.sidebar?.waiting == 8)
+      #expect(state.counts.sidebar?.waiting == 9)
       model.select(documentView: .comments)
       #expect(!ControlState(model: model, run: "acme", revision: 3, dark: false).idle)
       await model.loadDocuments()

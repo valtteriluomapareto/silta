@@ -114,6 +114,7 @@ final class AppModel {
       workspaceDocuments.clear()
       docsAbout = nil
       taskDetail.clear()
+      actions.selectedProposals = []
       boardSelection = nil
       boardInspectorPresented = false
       workspaceSelection = nil

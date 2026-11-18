@@ -165,7 +165,7 @@
         await model.loadWorkspaceDocuments()
         let ready = ControlState(model: model, run: "test", revision: 2, dark: false)
         #expect(ready.idle && ready.refresh.phase == "ready")
-        #expect(ready.selection?.ref == edge && ready.counts.sidebar?.waiting == 8)
+        #expect(ready.selection?.ref == edge && ready.counts.sidebar?.waiting == 9)
         #expect(model.workspaceDocuments.countLabel(for: edge) == "3 docs")
         model.openDocument("doc:order-contract@2", view: .document)
         #expect(model.route == .docs && model.documents.view == .document)

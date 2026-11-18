@@ -53,16 +53,14 @@ struct MyWorkView: View {
               sectionHeader("Task proposals", count: content.tasks.count, color: .secondary)
               ForEach(content.tasks) { row in
                 HStack(spacing: 10) {
-                  proposalTitle(row).frame(maxWidth: .infinity, alignment: .leading)
+                  Toggle(isOn: selection(row.ref)) { proposalTitle(row) }
+                    .toggleStyle(.checkbox).accessibilityLabel("Accept \(row.ref)")
+                    .frame(maxWidth: .infinity, alignment: .leading)
                   CopyValue(value: row.ref, title: "Copy task reference", warning: true)
                     .fixedSize()
                 }.padding(.leading, 32).frame(minHeight: 28)
               }
-              if let first = content.tasks.first,
-                let command = model.reader?.commands(for: first.item, workspace: workspace).first
-              {
-                CommandBlock(command: command).padding(.leading, 32)
-              }
+              proposalFooter(content.tasks)
             }.padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
           ForEach(content.other, id: \.stableID) { item in
@@ -81,7 +79,7 @@ struct MyWorkView: View {
     }.foregroundStyle(Color("Ink"))
   }
 
-  private var workspace: String { model.workspace ?? "" }
+  var workspace: String { model.workspace ?? "" }
 
   private func questionRow(_ question: MyWorkContent.Question) -> some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -108,42 +106,6 @@ struct MyWorkView: View {
           caption: "Replies to \(ref) as you"
         ) { model.answer(question: ref, task: task) }.padding(.leading, 32)
       }
-    }
-  }
-
-  private func answerRow(_ answer: MyWorkContent.Answer) -> some View {
-    let ref = answer.item.ref ?? ""
-    let target = model.target(ref)
-    return VStack(alignment: .leading, spacing: 12) {
-      HStack(spacing: 10) {
-        if let author = answer.item.author {
-          ActorLabel(actor: author).labelStyle(.iconOnly).accessibilityHidden(true).frame(width: 22)
-        }
-        Text(answer.metadata).font(.system(size: 13)).foregroundStyle(Color("SecondaryInk"))
-          .lineLimit(1).help(answer.metadata).frame(maxWidth: .infinity, alignment: .leading)
-        Overline("Answer", color: Color("TideText"))
-        CopyValue(value: ref, title: "Copy answer reference")
-      }
-      if let body = answer.item.body {
-        Text(body).font(.system(size: 15)).lineSpacing(3).textSelection(.enabled)
-          .padding(.leading, 32).frame(maxWidth: 792, alignment: .leading)
-      }
-      if let failure = target.flatMap({ model.actions.failures[$0] }) {
-        ActionFailureView(failure: failure).padding(.leading, 32)
-      }
-      HStack(spacing: 12) {
-        Text("Accepting resolves your question.").font(.system(size: 12))
-          .foregroundStyle(Color("SecondaryInk")).frame(maxWidth: .infinity, alignment: .leading)
-        if let task = answer.item.task {
-          Button("Open task") { model.inspect(task: task) }.buttonStyle(CompactActionStyle())
-        }
-        if let reader = model.reader, answer.canAccept(reader: reader, workspace: workspace) {
-          let sending = target.map { model.actions.isSending($0) } ?? false
-          Button(sending ? "Accepting…" : "Accept answer") {
-            model.perform(.acceptAnswer(ref: ref), for: ref)
-          }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
-        }
-      }.padding(.leading, 32)
     }
   }
 
@@ -204,9 +166,13 @@ struct MyWorkView: View {
           }
         }
       }
-      let commands = model.reader?.commands(for: item, workspace: workspace) ?? []
-      ForEach(commands, id: \.text) { command in
-        CommandBlock(command: command)
+      if let ref = MyWorkContent.unblockRef(item) {
+        unblockRow(ref)
+      } else {
+        let commands = model.reader?.commands(for: item, workspace: workspace) ?? []
+        ForEach(commands, id: \.text) { command in
+          CommandBlock(command: command)
+        }
       }
     }
   }

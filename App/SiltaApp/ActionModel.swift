@@ -35,6 +35,8 @@ final class ActionModel {
   private var drafts: [ActionTarget: String] = [:]
   private(set) var sending: Set<ActionTarget> = []
   private(set) var failures: [ActionTarget: ActionFailure] = [:]
+  /// Task proposals ticked in My work; none at first.
+  var selectedProposals: Set<String> = []
 
   func draft(_ target: ActionTarget) -> String { drafts[target] ?? "" }
 
