@@ -63,7 +63,8 @@ the human copies.
 - **Writes.** As `human:*` the app may run them directly, but answering, triage, done
   and doc triage as buttons with a confirm step are the next plan.
 - **A signed release bundle with the embedded CLI**, which is M5. v1 is a local dev
-  build from the same commit as the installed `silta`.
+  build: `scripts/install-dev.sh` installs `silta` and `~/Applications/Silta Dev.app`
+  from the same clean `main` commit, or replaces neither.
 - A free-form graph map, an activity feed, notifications and iOS.
 
 ## Design
@@ -177,8 +178,9 @@ unlocked pass. Rendering limitations are disclosed and tracked separately.
 ## Risks
 
 - **Version skew** between the dev app and an installed CLI from another commit.
-  Mitigation: a newer store schema refuses; the About box shows both commits. M5
-  removes the skew by bundling.
+  Mitigation: one install builds both from the same commit and replaces both only
+  when both builds succeed; the app's version (About panel) is that commit; a newer
+  store schema refuses. M5 removes the skew by bundling.
 - **SiltaCore read paths built for the CLI** (bounded text, masking) may not suit the
   views. Add typed read queries to SiltaCore that the CLI can also use; never query
   tables from the app.
