@@ -8,7 +8,7 @@
     @Test func lanesFilterAppsAndKeepProposalsOptional() throws {
       try fixture { snapshot in
         let ordinary = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
-        #expect(ordinary.lanes.map { $0.tasks.count } == [4, 2, 1, 3])
+        #expect(ordinary.lanes.map { $0.tasks.count } == [4, 2, 1, 4])
         let mobile = BoardContent(
           snapshot: snapshot, app: "acme-mobile", search: "", proposals: true)
         #expect(mobile.lanes.map { $0.tasks.count } == [2, 2, 0, 2])

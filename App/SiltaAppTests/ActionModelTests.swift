@@ -73,7 +73,8 @@
       #expect(loads.forced.withLock { $0 } == 2)
     }
 
-    @Test func coreRefusalsShowTheirCodeAndShareOneDraftAcrossScreens() async throws {
+    /// A model on a fresh fixture home that reads and writes through the real facade.
+    private func fixtureModel(_ body: (AppModel, AppReader) async throws -> Void) async throws {
       let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: root) }  // cleanup
       let home = root.appending(path: "data")
@@ -88,19 +89,87 @@
           try session.load(previous: previous, workspace: workspace, force: force)
         })
       await model.refresh().value
-      let snapshot = try #require(model.visibleData?.snapshot)
-      let question = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
-        .questions.first?.item.ref
-      let inspector = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
-        .newestQuestion(for: "AC-12", reader: reader, workspace: "acme")?.question
-      #expect(question == "AC-12/1" && inspector == question)
-      let fromMyWork = try #require(question.flatMap { model.target($0) })
-      model.actions.setDraft("Other.", for: fromMyWork)
-      #expect(inspector.flatMap { model.target($0) }.map { model.actions.draft($0) } == "Other.")
-      let refused = try #require(model.perform(.acceptAnswer(ref: "AC-12/1"), for: "AC-12/1"))
-      await refused.value
-      let failure = try #require(model.target("AC-12/1").flatMap { model.actions.failures[$0] })
-      #expect(failure.code == "invalid" && !failure.message.isEmpty)
+      try await body(model, reader)
+    }
+
+    @Test func acceptingTheSelectionTriagesItAndPrunesWhatLeft() async throws {
+      try await fixtureModel { model, _ in
+        let all = ["AC-21", "AC-22", "AC-23"]
+        #expect(model.proposalRefs == Set(all))
+        #expect(model.acceptSelectedProposals(among: all) == nil)
+        model.actions.selectedProposals = ["AC-21", "AC-23", "AC-99"]
+        await model.acceptSelectedProposals(among: all)?.value
+        #expect(model.proposalRefs == ["AC-22"])
+        #expect(model.actions.selectedProposals.isEmpty)
+        let target = try #require(model.target(AppModel.proposalsTarget))
+        #expect(model.actions.failures[target] == nil)
+      }
+    }
+
+    @Test func aStaleSelectionFailsWholeAndKeepsWhatIsStillProposed() async throws {
+      try await fixtureModel { model, reader in
+        model.actions.selectedProposals = ["AC-21", "AC-23"]
+        try AppWriter(reader: reader).perform(
+          .acceptProposals(refs: ["AC-21"]), workspace: "acme")
+        await model.acceptSelectedProposals(among: ["AC-21", "AC-22", "AC-23"])?.value
+        let target = try #require(model.target(AppModel.proposalsTarget))
+        #expect(model.actions.failures[target]?.code == "conflict")
+        #expect(model.proposalRefs == ["AC-22", "AC-23"])
+        #expect(model.actions.selectedProposals == ["AC-23"])
+      }
+    }
+
+    @Test func aSearchNeverSendsAHiddenTickedProposal() async throws {
+      try await fixtureModel { model, _ in
+        model.actions.selectedProposals = ["AC-21", "AC-23"]
+        await model.acceptSelectedProposals(among: ["AC-21"])?.value
+        #expect(model.proposalRefs == ["AC-22", "AC-23"])
+        #expect(model.actions.selectedProposals == ["AC-23"])
+      }
+    }
+
+    @Test func unblockingTheReadyTaskClearsItsItem() async throws {
+      try await fixtureModel { model, _ in
+        let ready = model.visibleData?.snapshot?.work.items.filter { $0.kind == "ready" }
+        #expect(ready?.map(\.refs) == [["AC-17"]])
+        let comment = try #require(model.target("AC-17"))
+        model.actions.setDraft("Check the banner copy.", for: comment)
+        await model.unblock("AC-17")?.value
+        #expect(model.actions.draft(comment) == "Check the banner copy.")
+        #expect(model.visibleData?.snapshot?.work.items.contains { $0.kind == "ready" } == false)
+        #expect(
+          model.visibleData?.snapshot?.board.todo.first { $0.ref == "AC-17" }?.status == "todo")
+      }
+    }
+
+    @Test func workspaceSwitchesClearTheProposalSelection() async {
+      let model = AppModel(load: { _, workspace, _ in
+        AppLoadedData(
+          workspaces: [], workspace: workspace ?? "acme", snapshot: nil, map: nil, version: 1,
+          checkedAt: AppV2Fixture.now)
+      })
+      await model.refresh().value
+      model.actions.selectedProposals = ["AC-21"]
+      await model.selectWorkspace("beta").value
+      #expect(model.actions.selectedProposals.isEmpty)
+    }
+
+    @Test func coreRefusalsShowTheirCodeAndShareOneDraftAcrossScreens() async throws {
+      try await fixtureModel { model, reader in
+        let snapshot = try #require(model.visibleData?.snapshot)
+        let question = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
+          .questions.first?.item.ref
+        let inspector = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+          .newestQuestion(for: "AC-12", reader: reader, workspace: "acme")?.question
+        #expect(question == "AC-12/1" && inspector == question)
+        let fromMyWork = try #require(question.flatMap { model.target($0) })
+        model.actions.setDraft("Other.", for: fromMyWork)
+        #expect(inspector.flatMap { model.target($0) }.map { model.actions.draft($0) } == "Other.")
+        let refused = try #require(model.perform(.acceptAnswer(ref: "AC-12/1"), for: "AC-12/1"))
+        await refused.value
+        let failure = try #require(model.target("AC-12/1").flatMap { model.actions.failures[$0] })
+        #expect(failure.code == "invalid" && !failure.message.isEmpty)
+      }
     }
 
     @Test func emptyDraftsDoNotSendAndCommentsTargetTheTask() async throws {
