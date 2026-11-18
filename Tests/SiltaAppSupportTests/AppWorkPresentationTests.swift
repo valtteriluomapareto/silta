@@ -58,6 +58,7 @@
         }
         var draft = TaskDraft(title: "Acme review attribution")
         draft.app = TaskDraft.noneApp
+        _ = try await service(.human(name: "acme")).add(draft, directory: scratch)
         let ref = try await service(.human(name: "acme")).add(draft, directory: scratch).ref
         let submitter = service(.agent(tool: "claude", session: "submitter"))
         _ = try await submitter.start(ref, directory: scratch)
@@ -81,6 +82,12 @@
               WHERE from_kind='task' AND from_id=(SELECT id FROM task WHERE seq=24)
               """
           )
+        }
+        withKnownIssue("The seq=24 mutation silently misses the dynamically allocated task") {
+          let poisoned = try reader.environment.db.read { db in
+            try String.fetchOne(db, sql: "SELECT actor FROM task_event WHERE task_id=(SELECT id FROM task WHERE workspace_id=(SELECT id FROM workspace WHERE slug='acme') AND seq=?) AND kind='status' ORDER BY id DESC LIMIT 1", arguments: [Int(ref.split(separator: "-").last ?? "")])
+          }
+          #expect(poisoned == "Password=private123")
         }
         let masked = try reader.task(ref, workspace: "acme")
         let actor = masked.submission?.actor ?? ""
