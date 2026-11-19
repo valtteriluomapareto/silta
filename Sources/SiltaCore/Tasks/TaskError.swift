@@ -128,7 +128,7 @@ package enum TaskError: CodedError, Equatable {
     case .git: "Git could not report the task's worktree or commit; ask a human to check git."
     case .foreignRepo: "Use a worktree and commit from the task's registered repository."
     case .outsideAppRepo(let app, let repo, let origin):
-      "App \(app) lives in \(repo)"
+      "App \(app) lives in \(HumanText.line(repo))"
         + (origin.map { " (\($0))" } ?? "")
         + "; run this from that repository, or pass --app none for non-code work."
     case .gate: "A human approval is required; ask a human to approve or use done --force."

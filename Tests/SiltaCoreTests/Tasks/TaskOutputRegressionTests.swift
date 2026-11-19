@@ -19,11 +19,9 @@ struct TaskOutputRegressionTests {
       "api", repo: "/acme/Local\u{2028}Work/api", origin: "inherited from AC-3")
     let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
     let json = try Self.json(error)
-    withKnownIssue("#254: the repository path changes the refusal's line framing") {
-      #expect(
-        text.stderr.contains("App api lives in /acme/Local Work/api (inherited from AC-3)")
-          && (json["message"] as? String)?.contains("/acme/Local Work/api") == true)
-    }
+    #expect(
+      text.stderr.contains("App api lives in /acme/Local Work/api (inherited from AC-3)")
+        && (json["message"] as? String)?.contains("/acme/Local Work/api") == true)
     #expect(text.exitCode == 1 && json["code"] as? String == "invalid")
     #expect(json["next"] as? [String] == error.next)
   }
