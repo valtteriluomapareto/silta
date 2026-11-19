@@ -33,7 +33,7 @@ extension DogfoodReportTests {
     }
   }
 
-  @Test(arguments: ["exit", "envelope", "negative", "fractional"])
+  @Test(arguments: ["exit", "envelope", "negative", "fractional", "multiple"])
   func failedHumanInboxCollectionDoesNotPublish(failure: String) throws {
     try withScratchDirectory { scratch in
       _ = try Self.setup(scratch)
@@ -47,6 +47,11 @@ extension DogfoodReportTests {
         response = #"echo '{"ok":true,"data":{"items":{}}}'"#
       case "negative":
         response = #"echo '{"ok":true,"data":{"items":[],"remaining":-1}}'"#
+      case "multiple":
+        response = #"""
+          printf '%s\n' '{"ok":false,"data":{"items":[],"remaining":1}}' \
+            '{"ok":true,"data":{"items":[],"remaining":0}}'
+          """#
       default:
         response = #"echo '{"ok":true,"data":{"items":[],"remaining":0.5}}'"#
       }
@@ -62,13 +67,22 @@ extension DogfoodReportTests {
           """, in: tools)
       let result = try Self.run(
         ["--ws", "silta", "--since", "2023-11-14"], scratch: scratch, tools: tools)
-      #expect(result.termination == .exit(1) && result.stdout.isEmpty)
-      #expect(
-        result.stderr.contains(
-          failure == "exit" ? "human inbox read failed" : "invalid human inbox"))
-      #expect(
-        !FileManager.default.fileExists(
-          atPath: scratch.appending(path: "silta-home/reports").path))
+      let verifyRefusal = {
+        #expect(result.termination == .exit(1) && result.stdout.isEmpty)
+        #expect(
+          result.stderr.contains(
+            failure == "exit" ? "human inbox read failed" : "invalid human inbox"))
+        #expect(
+          !FileManager.default.fileExists(
+            atPath: scratch.appending(path: "silta-home/reports").path))
+      }
+      if failure == "multiple" {
+        withKnownIssue("#267: streaming validation accepts a failed inbox envelope") {
+          verifyRefusal()
+        }
+      } else {
+        verifyRefusal()
+      }
     }
   }
 
