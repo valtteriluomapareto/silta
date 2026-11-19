@@ -114,6 +114,12 @@ the human copies.
 - **Appearance:** System, Light or Dark, from View ▸ Appearance or Settings (⌘,),
   stored in defaults and applied app-wide from launch. Automated control runs keep the
   launch flags' choice; a fixture launched with `-SiltaDark` starts in dark.
+- **Discussion (Paper "Discussion v1"):** the task inspector groups posts into threads:
+  a root keeps its author's rail and its replies sit inside it. More than two replies
+  fold to the newest. A post over four lines clamps with Show more. Resolved threads,
+  which Core's normal read only counts, come from one Core read with it and fold to one
+  line. Reply opens a box inside the thread that posts with `replyTo`; on an open
+  question to the human it answers instead.
 - **Sea glass surfaces:** an opaque shore gradient is the window background, under the
   system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
   Reduce Transparency makes them opaque and drops the gradient's glows; Increase

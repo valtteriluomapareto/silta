@@ -41,12 +41,15 @@ public struct AppTask: Equatable, Sendable {
   public let submission: AppSubmission?
   /// Masked task links retaining their relationship to the target.
   public let links: [AppTaskLink]
-  /// Discussion included when reading task detail.
+  /// Discussion as Core's normal read shows it, roots before replies. It can include a
+  /// resolved thread: Core keeps the newest handoff even when resolved.
   public let comments: [AppComment]
+  /// Posts of the resolved threads Core's normal read hides, roots before replies.
+  public let resolvedComments: [AppComment]
 }
 
 extension AppTask {
-  init(_ task: TaskDetails, submission: TaskEvent? = nil) {
+  init(_ task: TaskDetails, submission: TaskEvent? = nil, resolved: [CommentDetails] = []) {
     self.init(
       ref: task.ref, title: task.title, status: task.status, app: task.app,
       priority: task.priority, description: task.description, plan: task.plan,
@@ -59,11 +62,18 @@ extension AppTask {
         AppSubmission(actor: SecretGuard.redacted($0.actor), at: SecretGuard.redacted($0.at))
       },
       links: task.links.map { AppTaskLink(rel: $0.rel, target: $0.displayTarget) },
-      comments: (task.comments ?? []).map {
-        AppComment(
-          ref: $0.ref, kind: $0.kind, actor: $0.actor, body: $0.body,
-          createdAt: $0.createdAt, replyTo: $0.replyTo)
-      })
+      comments: (task.comments ?? []).map(AppComment.init),
+      resolvedComments: resolved.map(AppComment.init))
+  }
+}
+
+extension AppComment {
+  init(_ post: CommentDetails) {
+    self.init(
+      ref: post.ref, kind: post.kind, actor: post.actor, body: post.body,
+      createdAt: post.createdAt, replyTo: post.replyTo, accepted: post.accepted,
+      deleted: post.deleted, resolvedAt: post.resolvedAt, resolvedBy: post.resolvedBy,
+      mentions: post.mentions, answered: post.answered)
   }
 }
 

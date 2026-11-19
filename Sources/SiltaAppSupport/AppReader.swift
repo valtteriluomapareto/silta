@@ -24,6 +24,9 @@ public struct AppReader: Sendable {
     }
   }
 
+  /// The human the app acts as, such as `human:acme`.
+  public var human: String { environment.human.description }
+
   /// Lists workspaces without writing selection or command logs.
   public func workspaces() throws -> [AppWorkspace] {
     try Self.checked(home: environment.home.url) {
@@ -80,9 +83,10 @@ public struct AppReader: Sendable {
     try Self.checked(home: environment.home.url) {
       try checkSchema()
       let service = TaskService(environment: environment, workspace: workspace)
-      let task = try service.show(ref)
+      let (task, resolved) = try service.showWithResolvedThreads(ref)
       return AppTask(
-        task, submission: task.status == "review" ? try service.reviewSubmission(ref) : nil)
+        task, submission: task.status == "review" ? try service.reviewSubmission(ref) : nil,
+        resolved: resolved)
     }
   }
 

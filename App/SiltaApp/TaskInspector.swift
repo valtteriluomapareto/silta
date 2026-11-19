@@ -67,30 +67,7 @@ struct TaskInspector: View {
                   .font(.system(size: 12))
               }
             }
-            VStack(alignment: .leading, spacing: 10) {
-              Overline("Discussion")
-              if task.comments.isEmpty {
-                Text("No discussion yet").font(.system(size: 13)).foregroundStyle(
-                  Color("SecondaryInk"))
-              }
-              ForEach(task.comments, id: \.ref) { comment in
-                VStack(alignment: .leading, spacing: 3) {
-                  HStack(alignment: .firstTextBaseline) {
-                    Text(
-                      [ActorPresentation(comment.actor).name, comment.kind, age(comment.createdAt)]
-                        .compactMap { $0 }.joined(separator: " · ")
-                    )
-                    .font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
-                    Spacer(minLength: 4)
-                    CopyValue(value: comment.ref, title: "Copy comment reference", compact: true)
-                  }
-                  Text(comment.body).font(.system(size: 13)).textSelection(.enabled)
-                }.padding(.leading, 12)
-                  .overlay(alignment: .leading) {
-                    Rectangle().fill(commentColor(comment.actor)).frame(width: 2)
-                  }
-              }
-            }
+            DiscussionView(model: model, task: task).id(task.ref)
             actions(task)
             if let failure = detail.failure {
               Label(failure, systemImage: "exclamationmark.triangle")
@@ -165,12 +142,6 @@ struct TaskInspector: View {
         }
       }
     }
-  }
-
-  private func commentColor(_ actor: String) -> Color {
-    let presentation = ActorPresentation(actor)
-    return presentation.isCodex
-      ? Color("Warning") : actor.hasPrefix("agent:") ? Color("AccentColor") : Color("SecondaryInk")
   }
 
   @ViewBuilder private func worktreeButton(_ task: AppTask) -> some View {

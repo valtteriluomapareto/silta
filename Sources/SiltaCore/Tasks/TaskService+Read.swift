@@ -59,46 +59,74 @@ extension TaskService {
   package func show(_ ref: String, timeline: Bool = false) throws -> TaskDetails {
     let slug = try selected()
     return try environment.db.read { db in
-      var task = try Self.decorate(
-        Self.lookup(ref, workspace: slug, in: db), at: environment.clock.now(), in: db)
-      let comments = try Self.discussion(task, timeline: timeline, in: db)
-      task.comments = comments.isEmpty ? nil : comments
-      if !timeline {
-        let resolved = try Self.hiddenResolvedThreads(task, displayed: comments, in: db)
-        if resolved > 0 { task.resolvedThreads = resolved }
-      }
-      if task.status == "doing", task.claimedBy == nil, task.externalRef == nil,
-        let body = try String.fetchOne(
-          db,
-          sql: """
-            SELECT body FROM task_event WHERE task_id=? AND kind='claim' ORDER BY id DESC LIMIT 1
-            """, arguments: [task.id]), body.hasPrefix("released ")
-      {
-        task.resumeAvailable = true
-        let ref = String(body.dropFirst("released ".count))
-        let live =
-          try Bool.fetchOne(
-            db,
-            sql: """
-              SELECT EXISTS(SELECT 1 FROM comment
-              WHERE task_id=? AND ? || '/' || seq=? AND deleted_at IS NULL)
-              """,
-            arguments: [task.id, task.ref, ref]) ?? false
-        if live { task.handedOff = ref }
-      }
-      if timeline {
-        task.timeline = try Row.fetchAll(
-          db,
-          sql: """
-            SELECT kind,actor,body,created_at
-            FROM task_event
-            WHERE task_id=?
-            ORDER BY id
-            """, arguments: [task.id]
-        ).map { try Self.safeEvent($0, in: db) }
-      }
-      return task
+      try read(ref, workspace: slug, timeline: timeline, in: db)
     }
+  }
+
+  /// The normal read plus the resolved threads it hides, each root followed by its
+  /// replies, in one transaction and without the event timeline. A deleted root without
+  /// live replies stays hidden, as in the normal read. The Mac app shows these folded.
+  package func showWithResolvedThreads(_ ref: String) throws
+    -> (task: TaskDetails, resolved: [CommentDetails])
+  {
+    let slug = try selected()
+    return try environment.db.read { db in
+      let task = try read(ref, workspace: slug, timeline: false, in: db)
+      guard task.resolvedThreads != nil else { return (task, []) }
+      let posts = try Self.discussion(task, timeline: true, in: db)
+      let shown = Set((task.comments ?? []).map(\.ref))
+      let roots = posts.filter { root in
+        guard root.replyTo == nil, root.resolvedAt != nil, !shown.contains(root.ref) else {
+          return false
+        }
+        return !root.deleted || posts.contains { $0.replyTo == root.ref && !$0.deleted }
+      }
+      return (task, roots.flatMap { root in [root] + posts.filter { $0.replyTo == root.ref } })
+    }
+  }
+
+  private func read(_ ref: String, workspace slug: String, timeline: Bool, in db: Database)
+    throws -> TaskDetails
+  {
+    var task = try Self.decorate(
+      Self.lookup(ref, workspace: slug, in: db), at: environment.clock.now(), in: db)
+    let comments = try Self.discussion(task, timeline: timeline, in: db)
+    task.comments = comments.isEmpty ? nil : comments
+    if !timeline {
+      let resolved = try Self.hiddenResolvedThreads(task, displayed: comments, in: db)
+      if resolved > 0 { task.resolvedThreads = resolved }
+    }
+    if task.status == "doing", task.claimedBy == nil, task.externalRef == nil,
+      let body = try String.fetchOne(
+        db,
+        sql: """
+          SELECT body FROM task_event WHERE task_id=? AND kind='claim' ORDER BY id DESC LIMIT 1
+          """, arguments: [task.id]), body.hasPrefix("released ")
+    {
+      task.resumeAvailable = true
+      let ref = String(body.dropFirst("released ".count))
+      let live =
+        try Bool.fetchOne(
+          db,
+          sql: """
+            SELECT EXISTS(SELECT 1 FROM comment
+            WHERE task_id=? AND ? || '/' || seq=? AND deleted_at IS NULL)
+            """,
+          arguments: [task.id, task.ref, ref]) ?? false
+      if live { task.handedOff = ref }
+    }
+    if timeline {
+      task.timeline = try Row.fetchAll(
+        db,
+        sql: """
+          SELECT kind,actor,body,created_at
+          FROM task_event
+          WHERE task_id=?
+          ORDER BY id
+          """, arguments: [task.id]
+      ).map { try Self.safeEvent($0, in: db) }
+    }
+    return task
   }
 
   /// Reads the latest actual submission for a task currently awaiting review.
