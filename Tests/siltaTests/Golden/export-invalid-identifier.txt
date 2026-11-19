@@ -1,0 +1,2 @@
+error: Cannot export this workspace: the service slug is not an identifier. Nothing was written. [invalid]
+next: silta ws ls

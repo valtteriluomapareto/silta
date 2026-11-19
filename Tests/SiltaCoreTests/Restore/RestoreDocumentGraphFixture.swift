@@ -14,7 +14,7 @@ enum RestoreDocumentGraphFixture {
   }
 
   static func graph() throws -> ExportSnapshot {
-    let legacy = try ExportTree.parse(ExportVersionTests.frozen())
+    let legacy = try ExportVersionTests.restorableFormatOne()
     let source = ExportTask(
       ref: "AC-2",
       row: ExportDocumentTests.row([
@@ -74,7 +74,7 @@ enum RestoreDocumentGraphFixture {
           (1103,'01HF7YAT01N0YQWDEY30BMK5K7',17,'edge','edge',1100,'origin/edge'),
           (1104,'01HF7YAT01C57NC0BQVHTPFZMB',17,'service','service',1100,'origin/service');
         INSERT INTO service(id,uid,workspace_id,slug,name) VALUES
-          (1301,'01HF7YAT01R1ETMJWASXV792N2',17,'push service','push service');
+          (1301,'01HF7YAT01R1ETMJWASXV792N2',17,'push-service','push service');
         INSERT INTO edge(id,uid,workspace_id,from_app_id,to_app_id,to_service_id,kind,summary)
         VALUES (1201,'01HF7YAT01N1BMRVXEDPDPYETA',17,1101,1102,NULL,'HTTP API','Push'),
           (1202,'01HF7YAT01CC5ZVDX6MRTABWDA',17,1101,NULL,1301,'SDK / v1','Delivery');

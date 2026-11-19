@@ -1,0 +1,2 @@
+error: Cannot restore this workspace: the service slug is not an identifier. Check the source workspace before exporting again. [invalid]
+next: silta ws ls
