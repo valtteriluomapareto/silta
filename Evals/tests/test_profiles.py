@@ -402,6 +402,7 @@ class Profiles(unittest.TestCase):
             self.assertGreater(trial['metrics']['silta_calls'], 0, 'Known calls were discarded')
             self.assertEqual(trial['metrics']['tokens'], 15)
             evidence = json.loads((output / trial['evidence']).read_text())
+            self.assertIn('phases', evidence, 'Captured phase evidence was discarded')
             self.assertEqual(len(evidence['phases']), 1)
             audit = subprocess.run([sys.executable, '-B', str(ROOT / 'audit.py'), str(output)],
                                    env=self.env, capture_output=True, text=True)
