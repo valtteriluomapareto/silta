@@ -112,8 +112,8 @@ the human copies.
   starts with one large title and its count line (`navigationTitle` still names the
   window). The app accent is tide `#0B6E8E`, from the asset catalog.
 - **Appearance:** System, Light or Dark, from View ▸ Appearance or Settings (⌘,),
-  stored in defaults and applied app-wide from launch. Automated control runs, and a
-  fixture launched with `-SiltaDark`, keep the launch flags' choice.
+  stored in defaults and applied app-wide from launch. Automated control runs keep the
+  launch flags' choice; a fixture launched with `-SiltaDark` starts in dark.
 - **Sea glass surfaces:** an opaque shore gradient is the window background, under the
   system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
   Reduce Transparency makes them opaque and drops the gradient's glows; Increase
