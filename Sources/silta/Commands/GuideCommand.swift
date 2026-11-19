@@ -54,8 +54,10 @@ extension GuideCommand {
         # When to use Silta
         Use Silta for cross-repo work, another app or backend, branch-as-app repos, plans, \
         handoffs, review requests and meeting decisions. Trivial single-repo edits need no \
-        task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; \
-        never create tracker items yourself.
+        task. Keep plans and results in Silta, never in PLAN.md or other repo plan files, and \
+        never create tracker items yourself. Exception: when the repository's own instructions \
+        require a plan file, write it where they say; the Silta task plan then holds that \
+        file's path and branch or PR, plus the steps to tick, not a copy.
         """ + "\n"),
     Section(
       topic: "start",
@@ -95,7 +97,8 @@ extension GuideCommand {
         two-proposal cap and needs triage unless the human asked for it in this chat; then \
         pass their words as --approved. Preview imports before writing; imports keep the \
         source by default. --delete is not human-only; it removes only an unchanged untracked \
-        source after commit and refuses harness files.
+        source after commit and refuses harness files. Don't import or --delete a plan file \
+        the repository's instructions require; point the task plan at it.
         ```sh
         silta --ws acme task add --start 'Implement Acme sign-in' --app platform-api
         silta --ws acme task plan AC-12 -F - <<'PLAN'
@@ -314,7 +317,8 @@ extension GuideCommand {
         code default. Never use --force, --steal, `where --set/--unset`, `task promote` or \
         --allow-secret on your own initiative; name the exact command, wait for the human's \
         reply in this chat, then pass their words through --approved. Never create tracker \
-        items or repo plan files. With no human in this chat, see `silta guide human`.
+        items, or plan files the repository's instructions don't require. With no human in \
+        this chat, see `silta guide human`.
         """ + "\n" + ErrorCode.allCases.map { "  \($0.helpLine)\n" }.joined()),
     Section(
       topic: "refs",

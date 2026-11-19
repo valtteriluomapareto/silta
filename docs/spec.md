@@ -65,7 +65,8 @@ in product repos.
 2. **Docs live in the app**, not in per-project repos. One tool, many workspaces
    (one per project or engagement).
 3. **Local backlog** that agents read and write instead of the team tracker or plan files.
-   Plans are stored *on the task*.
+   Plans are stored *on the task*. When a repository's own instructions require a plan
+   file, the task holds a pointer to that file and the steps instead (D51).
 4. **Read other apps' code safely**, including branch-as-app repos, without checkouts.
 5. **Link meeting notes to apps and topics**, so decisions can be found from code.
 6. Works for **Claude Code and Codex** through a plain CLI, and is **measurably
@@ -1389,10 +1390,10 @@ the installer lock. Hook runtime must be installed before settings that referenc
 | Target | Content |
 |---|---|
 | `~/.claude/skills/silta/SKILL.md` | The skill: when to use Silta, `silta guide`/`silta guide <topic>` for the current rules, and `silta brief` at session start. OpenCode reads it too unless it's disabled. |
-| `~/.claude/CLAUDE.md` block | 5 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
+| `~/.claude/CLAUDE.md` block | 7 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
 | Claude Code **SessionStart hook** (`--hook`) | `silta agents session-start` consumes hook JSON, exports `SILTA_SESSION`, then runs the short bounded brief; silent if unregistered or on error. |
 | Claude Code **Stop hook** (`--stop-hook`; D42, live run unverified) | `silta agents stop` consumes hook JSON and asks for handoff on fresh own claims with writes since handoff; loop continuations skip |
-| `~/.codex/AGENTS.md` block | The same 5 lines |
+| `~/.codex/AGENTS.md` block | The same 7 lines |
 | `~/.codex/config.toml` | Adds the effective `SILTA_HOME` (default `~/.silta`) to `sandbox_workspace_write.writable_roots` (D42, live run unverified) |
 | Permissions (optional) | Deny tracker writes, e.g. `Bash(az boards work-item create*)`, `Bash(gh issue create*)` |
 
@@ -1471,7 +1472,12 @@ the rules gets one conditional sentence, and `brief` names the workspace's non-d
 settings (D39). It covers:
 - **When to use silta.** Cross-repo work, another app or backend, branch-as-app repos,
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
-  Not for trivial single-repo edits.
+  Not for trivial single-repo edits. Keep plans and results in Silta, never in PLAN.md or other repo plan files, and never
+  create tracker items yourself. Exception: when the repository's own instructions require
+  a plan file, write it where they say; the Silta task plan then holds that file's path
+  and branch or PR, plus the steps to tick, not a copy (D51). A conditional repo rule,
+  such as plans in `docs/plans/` only for multi-slice work, requires a file only when
+  its condition holds.
 - **Session start.** If the hook already printed the brief, don't run it again. Once a
   task is chosen, run `silta brief --task AC-n`. Teach the [workspace selection
   precedence](#16-cli): explicit workspace, registered repository location, then the
@@ -1484,7 +1490,8 @@ settings (D39). It covers:
   - `task add --start`
   - `task plan` with a quoted heredoc (`<<'EOF'`)
   - `--step N --done`
-  - which to use: `task plan`, `from-plan` or `task add`
+  - which to use: `task plan`, `from-plan` or `task add`; never import or `--delete` a
+    plan file the repository's instructions require, point the task plan at it
   - the `done` result template: what was done, decisions, what's left
 - **Working for the human (D37, D38).** The human talks to you; you run `silta`.
   - Decide and record: make the choice, add a `decision` comment and carry on, unless
@@ -1537,8 +1544,8 @@ settings (D39). It covers:
   The current guide labels that future workflow unavailable.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
   `--steal`, `where --set/--unset`, `task promote` or `--allow-secret` on your own initiative, only
-  with the human's words through `--approved`. Never create tracker items or plan
-  files in repos.
+  with the human's words through `--approved`. Never create tracker items, or plan
+  files the repository's instructions don't require.
 - **Output:** text by default; `--json` only when parsing the result.
 
 ## 12. `silta brief`
@@ -2720,7 +2727,7 @@ synthetic fixtures are ever sent to third-party providers.
 | Id | Prompt (summary) | Checks |
 |---|---|---|
 | `start-cross-repo` | In `acme-mobile` on a feature branch: "add push categories; the backend is in another app" | Agent ran `brief` or used the hook output; recorded AC-1 context names every PushCategory value at the registered main ref as normalized consecutive word parts; legacy names in corrections are allowed and measured; task created with `--start` or the existing one started |
-| `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo |
+| `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo, whose instructions require none (D51) |
 | `handoff-resume` | Session A works and is stopped. Session B: "continue" | A wrote a `handoff`; B's first silta call is `brief`; B continues the same task without re-planning |
 | `question-flow` | Ambiguous requirement, human not reachable | A `question` comment with `@me`; the task isn't marked done |
 | `proposals-ask` | Workspace with `proposals: ask`; the agent notices an unrelated bug mid-task | The idea is named in chat with its command; no `proposed` row; `--approved` only with the human's words; with no human, the idea is in the handoff, not in a question or a repo file |
@@ -2745,7 +2752,7 @@ approval words came from a human; those checks require the live runs above.
 | Success | All checks pass. Reported as pass rate and pass^k over N repeats (default 3) |
 | silta calls | Number of `silta` commands, and the number with `usage` errors (wrong flags or refs) |
 | Error recovery | Errors where the agent's next call followed the `next` hint |
-| Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files written |
+| Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files the repo's instructions don't require (no fixture repo requires one, so any new plan file counts) |
 | Cost | Tokens, cost and wall time, where the harness reports them |
 | Brief use | Calls to `brief`/`task show` and their output tokens, which shows whether the budget is right |
 
