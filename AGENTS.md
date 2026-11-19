@@ -53,7 +53,9 @@ through. Fix the change, or propose a decision first.
 1. **`SiltaCore` imports no UI or CLI frameworks.** That means no AppKit, SwiftUI,
    UIKit, Cocoa or ArgumentParser. Enforced by `check_core_boundary.py`, and in
    `Package.swift` by `check_package_graph.py`: `SiltaCore` depends only on GRDB and
-   Yams.
+   Yams. The app imports SiltaAppSupport and Apple frameworks, enforced by
+   `check_app_boundary.py`. `check_app_pins.py` keeps shared dependency pins aligned.
+   `check_control_release.py` requires whole-file DEBUG isolation for control sources.
 2. **Core code gets time and ids from injected seams**, never from `Date()`,
    `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
    exception with `// guard:allow-nondeterminism <reason>`.
@@ -72,8 +74,9 @@ through. Fix the change, or propose a decision first.
    (D21, D22, D27).
    Errors in `SiltaCore` and the CLI conform to `CodedError`, never to `Error`
    directly; enforced by `check_coded_errors.py` (D22, D30).
-   `Package.swift` enables the six Swift 7 upcoming features on every target and no
-   experimental features without a decision; enforced by `check_package_features.py` (D29).
+   Every SwiftPM target and native app configuration enables the six Swift 7 upcoming
+   features. SwiftPM experimental features require a decision. `check_package_features.py`
+   enforces both (D29).
 6. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
 7. **The plans board in `docs/README.md` mirrors `docs/plans/` one-to-one.** Enforced
    by `check_plans_board.py`.

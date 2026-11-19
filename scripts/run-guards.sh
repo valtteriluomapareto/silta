@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run the guard self-tests, then every repository guard. Keeps going after a failure
-# and lists all failures at the end. Needs only python3; no build.
+# and lists all failures at the end. Uses Python 3 and macOS plutil, without building.
 #
 #   scripts/run-guards.sh
 set -uo pipefail
