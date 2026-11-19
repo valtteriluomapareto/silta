@@ -44,8 +44,8 @@ struct ScenarioExpectationTests {
   }
 
   @Test(arguments: [
-    "fixture: true\nsteps: []\n",
-    "steps:\n  - args: []\n    enviroment: {}\n    expect: {exit: 0}\n",
+    "fixture: true\nsteps:\n  - args: [--version]\n    expect: {exit: 0}\n",
+    "steps:\n  - args: [--version]\n    enviroment: {}\n    expect: {exit: 0}\n",
   ])
   func unknownScenarioKeysFail(yaml: String) throws {
     try withScratchDirectory { scratch in

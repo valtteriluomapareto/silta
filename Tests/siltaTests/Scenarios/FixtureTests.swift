@@ -145,7 +145,7 @@ struct FixtureTests {
       }
       #expect(try Data(contentsOf: sentinel) == Data("Acme".utf8))
       let failure = try String(contentsOf: evidence.appending(path: "failure.md"), encoding: .utf8)
-      #expect(failure.contains("fixture"))
+      #expect(failure.contains("fixture generation failed:"))
     }
   }
 
