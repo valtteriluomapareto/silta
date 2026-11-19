@@ -3,6 +3,7 @@ import Foundation
 import GRDB
 @testable import SiltaCore
 import SiltaTestSupport
+import Synchronization
 import Testing
 
 /// How export puts a tree in place and what it leaves: the fallback for volumes without
@@ -162,15 +163,50 @@ struct ExportPublishTests {
     }
   }
 
+  @Test func rootIdentityChangeRefusesBeforePublication() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let root = scratch.appending(path: "exports")
+      let moved = scratch.appending(path: "moved-exports")
+      let attempted = Mutex(false)
+      let moves = ExportMoves(
+        rename: { _, _ in
+          attempted.withLock { $0 = true }
+          return -1
+        },
+        sync: { path in
+          if path.lastPathComponent == "tree" {
+            let fm = FileManager.default
+            try fm.moveItem(at: root, to: moved)
+            try fm.createDirectory(at: root, withIntermediateDirectories: false)
+          }
+        })
+      #expect(throws: ExportError.self) {
+        try ExportService.export(
+          workspace: "acme", to: root, store: store, home: home, moves: moves)
+      }
+      #expect(!attempted.withLock { $0 })
+      #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
+      #expect(
+        try FileManager.default.contentsOfDirectory(atPath: moved.path).contains {
+          $0.hasPrefix(".acme.export-")
+        })
+    }
+  }
+
   /// Each work directory is new and exclusively created, so it can never be someone
   /// else's directory under a predictable name.
   @Test func workDirectoriesAreNewAndDistinct() throws {
     try withScratchDirectory { scratch in
-      let first = try ExportService.ownDirectory(in: scratch, prefix: ".acme.export-")
-      let second = try ExportService.ownDirectory(in: scratch, prefix: ".acme.export-")
+      let parent = try DirectoryPath.open(scratch)
+      defer { close(parent) }
+      let first = try DirectoryPath.makeTemporary(in: parent, prefix: ".acme.export-")
+      let second = try DirectoryPath.makeTemporary(in: parent, prefix: ".acme.export-")
       #expect(first != second)
-      for directory in [first, second] {
-        #expect(directory.lastPathComponent.hasPrefix(".acme.export-"))
+      for name in [first, second] {
+        #expect(name.hasPrefix(".acme.export-"))
+        let directory = scratch.appending(path: name)
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
       }
     }

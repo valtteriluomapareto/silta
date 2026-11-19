@@ -56,7 +56,7 @@ package enum RestoreService {
     }
     let milliseconds = Int64(identity.date.timeIntervalSince1970 * 1000)
     let snapshot = "silta-\(utcDay(identity.date))-before-restore-\(milliseconds).db"
-    return try store.write(rollingBack: dryRun) { tx in
+    return try store.write(rollingBack: dryRun, keepingBackup: \.snapshot) { tx in
       var writer = RestoreWriter(tx: tx, tree: tree, slug: slug)
       var report = try writer.prepare(digest: digest, dryRun: dryRun)
       if !dryRun && !report.created {

@@ -1,0 +1,2 @@
+error: Database file could not be opened; it may be missing or its directory may not exist. [env]
+ask human: silta doctor

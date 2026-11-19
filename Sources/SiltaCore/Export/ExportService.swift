@@ -71,10 +71,11 @@ package enum ExportService {
     workspace slug: String, to root: URL, store: DatabaseStore, home: URL,
     clock: any Clock = SystemClock()
   ) throws -> ExportResult {
+    try validateDefaultRoot(root, home: home)
     try store.initialize()
     let lock = try exportLock(home: home, clock: clock)
     defer { withExtendedLifetime(lock) {} }
-    return try write(workspace: slug, to: root, store: store, moves: ExportMoves()).result
+    return try write(workspace: slug, to: root, store: store, home: home).result
   }
 
   static func export(
@@ -83,7 +84,7 @@ package enum ExportService {
     try store.initialize()
     let lock = try exportLock(home: home, clock: SystemClock())
     defer { withExtendedLifetime(lock) {} }
-    return try write(workspace: slug, to: root, store: store, moves: moves).result
+    return try write(workspace: slug, to: root, store: store, home: home, moves: moves).result
   }
 
   static func exportLock(home: URL, clock: any Clock) throws -> BoundedFileLock {
@@ -94,9 +95,10 @@ package enum ExportService {
 
   /// The caller holds the export lock, including through any Git operation.
   static func write(
-    workspace slug: String, to root: URL, store: DatabaseStore, moves: ExportMoves
+    workspace slug: String, to root: URL, store: DatabaseStore, home: URL,
+    moves: ExportMoves? = nil
   ) throws -> (result: ExportResult, paths: [String]) {
-    let root = root.standardizedFileURL
+    let root = normalizedRoot(root, home: home)
     let failed = ExportError.unwritable(path: root.path, workspace: slug)
     let (files, repos) = try store.read { db in
       (
@@ -114,11 +116,8 @@ package enum ExportService {
         throw ExportError.insideRepo(path: target.path, repo: repo["slug"], workspace: slug)
       }
     }
-    do {
-      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    } catch {
-      throw failed
-    }
+    let directory = try openRoot(root, home: home, workspace: slug)
+    defer { close(directory) }
     let prefix = ".\(slug).export-"
     let crashed = leftovers(in: root, prefix: prefix)
     // A failure still reports the leftovers the human may need to look at.
@@ -127,9 +126,11 @@ package enum ExportService {
     }
     let kept: [ExportLeftover]
     do {
+      guard DirectoryPath.matches(directory, path: root) else { throw failed }
       try checkTarget(target, workspace: slug)
-      try ExportDurability.syncAncestors(of: root, moves: moves)
-      kept = try publish(files, to: target, prefix: prefix, workspace: slug, moves: moves)
+      guard DirectoryPath.matches(directory, path: root) else { throw failed }
+      try ExportDurability.syncAncestors(of: root, moves: moves ?? ExportMoves())
+      kept = try publish(files, to: target, in: directory, workspace: slug, moves: moves)
     } catch let error as ExportError {
       if case .publicationUnconfirmed(_, let work) = error {
         throw ExportFailure(
@@ -155,35 +156,45 @@ package enum ExportService {
   /// the previous tree aside first and puts it back on failure; when even that fails,
   /// the work directory is kept and `previousKept` names it.
   private static func publish(
-    _ files: [String: Data], to target: URL, prefix: String, workspace: String,
-    moves: ExportMoves
+    _ files: [String: Data], to target: URL, in parent: Int32, workspace: String,
+    moves: ExportMoves?
   ) throws -> [ExportLeftover] {
-    let fm = FileManager.default
-    let work = try ownDirectory(in: target.deletingLastPathComponent(), prefix: prefix)
+    let name = try DirectoryPath.makeTemporary(in: parent, prefix: ".\(workspace).export-")
+    let work = target.deletingLastPathComponent().appending(path: name)
+    let descriptor = try DirectoryPath.open(name, in: parent)
+    defer { close(descriptor) }
+    let stage = ExportStage(work: work, parent: parent, directory: descriptor)
+    let moves = moves ?? stage.moves
     let staging = work.appending(path: "tree")
     let previous = work.appending(path: "previous")
-    func discard() { try? fm.removeItem(at: work) }  // best-effort: only this run's directory
-    do {
-      for (path, data) in files {
-        let file = staging.appending(path: path)
-        try fm.createDirectory(
-          at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: file)
+    func discard() {
+      if stage.attached {
+        try? stage.remove()  // best-effort: only this run's directory
       }
+    }
+    do {
+      try stage.write(files)
       try ExportDurability.stage(files, tree: staging, moves: moves)
     } catch {
       discard()
       throw error
     }
-    guard fm.fileExists(atPath: target.path) else {
-      guard moves.rename(staging.path, target.path) == 0 else {
+    guard stage.attached else { throw SwapFailure() }
+    var targetInfo = stat()
+    if fstatat(parent, workspace, &targetInfo, AT_SYMLINK_NOFOLLOW) != 0 {
+      guard errno == ENOENT, moves.rename(staging.path, target.path) == 0 else {
         discard()
         throw SwapFailure()
       }
-      return try finish(work, replaced: nil, target: target, workspace: workspace, moves: moves)
+      return try finish(stage, replaced: nil, target: target, workspace: workspace, moves: moves)
+    }
+    guard targetInfo.st_mode & S_IFMT == S_IFDIR else {
+      discard()
+      throw SwapFailure()
     }
     if moves.swap(staging.path, target.path) == 0 {
-      return try finish(work, replaced: staging, target: target, workspace: workspace, moves: moves)
+      return try finish(
+        stage, replaced: staging, target: target, workspace: workspace, moves: moves)
     }
     guard errno == ENOTSUP || errno == EINVAL, moves.rename(target.path, previous.path) == 0 else {
       discard()
@@ -197,25 +208,30 @@ package enum ExportService {
       discard()
       throw SwapFailure()
     }
-    return try finish(work, replaced: previous, target: target, workspace: workspace, moves: moves)
+    return try finish(stage, replaced: previous, target: target, workspace: workspace, moves: moves)
   }
 
   private static func finish(
-    _ work: URL, replaced: URL?, target: URL, workspace: String, moves: ExportMoves
+    _ stage: ExportStage, replaced: URL?, target: URL, workspace: String, moves: ExportMoves
   ) throws -> [ExportLeftover] {
     do {
-      try moves.sync(work)
+      guard stage.attached else { throw SwapFailure() }
+      try moves.sync(stage.work)
       try moves.sync(target.deletingLastPathComponent())
+      guard stage.attached else { throw SwapFailure() }
     } catch {
-      throw ExportError.publicationUnconfirmed(path: target.path, kept: work.path)
+      throw ExportError.publicationUnconfirmed(path: target.path, kept: stage.work.path)
     }
-    return retire(work, replaced: replaced, workspace: workspace)
+    return retire(stage, replaced: replaced, workspace: workspace)
   }
 
   /// Removes the work directory once the tree it holds is export's own, checked again
   /// now, since files can appear in the target while the new tree is written. Otherwise
   /// the directory stays and is returned, as is one that could not be removed.
-  private static func retire(_ work: URL, replaced: URL?, workspace: String) -> [ExportLeftover] {
+  private static func retire(_ stage: ExportStage, replaced: URL?, workspace: String)
+    -> [ExportLeftover]
+  {
+    let work = stage.work
     if let replaced {
       do { try checkTarget(replaced, workspace: workspace) } catch {
         var problem = "something export did not write"
@@ -230,35 +246,12 @@ package enum ExportService {
       }
     }
     do {
-      try FileManager.default.removeItem(at: work)
+      guard stage.attached else { throw SwapFailure() }
+      try stage.remove()
       return []
     } catch {
       return [ExportLeftover(path: work.path, reason: "could not be removed")]
     }
-  }
-
-  /// Work directories an earlier export left under `root`; a root that can't be listed
-  /// is reported itself, since it may hold some.
-  private static func leftovers(in root: URL, prefix: String) -> [ExportLeftover] {
-    guard let names = try? FileManager.default.contentsOfDirectory(atPath: root.path)  // reported
-    else {
-      return [ExportLeftover(path: root.path, reason: "could not be listed for work directories")]
-    }
-    return names.filter { $0.hasPrefix(prefix) }.sorted().map {
-      ExportLeftover(
-        path: root.appending(path: $0).path, reason: "was left by an export that did not finish")
-    }
-  }
-
-  /// A new directory under `parent` that no one else has: `mkdtemp` creates it exclusively.
-  static func ownDirectory(in parent: URL, prefix: String) throws -> URL {
-    var template = Array(parent.appending(path: prefix + "XXXXXX").path.utf8CString)
-    let created = template.withUnsafeMutableBufferPointer { mkdtemp($0.baseAddress) }
-    let bytes = template.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
-    guard created != nil, let path = String(bytes: bytes, encoding: .utf8) else {
-      throw SwapFailure()
-    }
-    return URL(filePath: path, directoryHint: .isDirectory)
   }
 
   private struct SwapFailure: Error {}  // guard:allow-error mapped to unwritable by export

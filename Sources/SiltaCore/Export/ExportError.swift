@@ -18,6 +18,8 @@ package enum ExportError: CodedError, Equatable {
   case newerFormat
   /// The tree could not be written under the root.
   case unwritable(path: String, workspace: String)
+  /// The default export directory could not safely be opened without following links.
+  case defaultRootUnavailable
   /// The new tree could not be put in place and the previous one could not be moved
   /// back; it is kept at `path`.
   case previousKept(path: String, target: String, workspace: String)
@@ -50,7 +52,7 @@ package enum ExportError: CodedError, Equatable {
       .invalidManifest, .invalidRestoreIdentifier:
       .invalid
     case .unsupported, .newerFormat, .unwritable, .previousKept, .gitFailed,
-      .publicationUnconfirmed:
+      .publicationUnconfirmed, .defaultRootUnavailable:
       .env
     }
   }
@@ -99,6 +101,8 @@ package enum ExportError: CodedError, Equatable {
       "This export uses a newer format than this version of silta can read; nothing was changed."
     case .unwritable(let path, _):
       "The export could not be written under \(path); the previous export, if any, is unchanged."
+    case .defaultRootUnavailable:
+      "The default export directory could not be safely opened. Nothing was exported."
     case .previousKept(let path, let target, _):
       "The new export could not replace \(target), and the previous export could not be "
         + "moved back; it is kept at \(path), next to the new tree. Move it back only while "
@@ -126,6 +130,7 @@ package enum ExportError: CodedError, Equatable {
   package var next: [String] {
     switch self {
     case .busy: ["silta export"]
+    case .defaultRootUnavailable: ["silta doctor"]
     case .notWorkTree(let root):
       [
         "git -C " + shellWord(root) + " rev-parse --is-inside-work-tree",

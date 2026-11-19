@@ -626,6 +626,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     `--add-dir` adds writable directories. `CODEX_THREAD_ID` has the observation
     recorded in spec §11; its presence across harnesses/versions remains unverified.
     No official marker guarantee was found in the documentation checked.
+  - Silta protects its managed backup and export entries inside the configured data
+    directory (spec §18). Temporary-home tests verify Silta's path handling.
+    Effective permissions in a live harness require their own acceptance check.
   - [Claude hook reference](https://code.claude.com/docs/en/hooks) documents appending
     exports to `CLAUDE_ENV_FILE` in SessionStart for later shell commands. Stop can
     return `decision: block` with a reason; `stop_hook_active` avoids endless

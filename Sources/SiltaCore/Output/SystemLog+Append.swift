@@ -10,21 +10,8 @@ extension SystemLog {
     else {
       throw POSIXError(.EINVAL)
     }
-    var parent = open("/", O_RDONLY | O_DIRECTORY)
-    guard parent >= 0 else { throw POSIXError(.EIO) }
+    let parent = try DirectoryPath.open(directory, creating: true)
     defer { close(parent) }
-    for component in directory.path.split(separator: "/") {
-      guard component != ".", component != ".." else { throw POSIXError(.EINVAL) }
-      let name = String(component)
-      var child = openat(parent, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
-      if child < 0, errno == ENOENT {
-        guard mkdirat(parent, name, 0o700) == 0 || errno == EEXIST else { throw POSIXError(.EIO) }
-        child = openat(parent, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
-      }
-      guard child >= 0 else { throw POSIXError(.EIO) }
-      close(parent)
-      parent = child
-    }
     let descriptor = openat(
       parent, name, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_NONBLOCK, 0o600)
     guard descriptor >= 0 else { throw POSIXError(.EIO) }
