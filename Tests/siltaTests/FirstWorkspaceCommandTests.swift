@@ -155,6 +155,28 @@ struct FirstWorkspaceCommandTests {
     }
   }
 
+  @Test func derivedWorkspaceNameDoesNotMoveAnUnrelatedLiveBinding() throws {
+    try withScratchDirectory { scratch in
+      let original = scratch.appending(path: "original/acme")
+      let unrelated = scratch.appending(path: "unrelated/acme")
+      try InitCommandTests.makeRepo(original, in: scratch)
+      try InitCommandTests.makeRepo(unrelated, in: scratch)
+      let first = try SiltaBinary.run(["init", "--scan", "."], in: scratch, cwd: original)
+      try #require(first.termination == .exit(0))
+      let second = try SiltaBinary.run(
+        ["init", "--scan", ".", "--json"], in: scratch, cwd: unrelated)
+      let old = try SiltaBinary.run(["where"], in: scratch, cwd: original)
+      let new = try SiltaBinary.run(["where"], in: scratch, cwd: unrelated)
+      try withKnownIssue("#260: an implicit clone name can retarget the existing repo identity") {
+        #expect(second.termination == .exit(6))
+        #expect(old.termination == .exit(0))
+        #expect(new.termination == .exit(2))
+        let hints = try TaskStateRegressionTests.error(second)["next"] as? [String]
+        #expect(hints == ["silta --ws 'acme' ws show"])
+      }
+    }
+  }
+
   @Test func missingRootNamesThePathAndRefusesTheWholeScan() throws {
     try withScratchDirectory { scratch in
       let repo = scratch.appending(path: "acme")
