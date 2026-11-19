@@ -139,6 +139,29 @@ struct RepositoryScanTests {
     }
   }
 
+  @Test func generatedStubsUseValidSlugsAndSkipReservedNames() async throws {
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "service")
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      let git = ScriptedGitRunner(
+        script: Self.script(
+          try Self.path(repo), refs: "origin/main\norigin/v1.2\norigin/v1.2-prod\n"))
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      var failure: String?
+      do {
+        _ = try await RepositoryScan.scan(
+          [repo], target: .named(slug: "acme", prefix: "AC"), store: store, git: git,
+          identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+      } catch let error as any CodedError {
+        failure = error.message
+      }
+      withKnownIssue("#260: generated release and reserved-slug stubs abort a scan") {
+        #expect(failure == nil)
+      }
+    }
+  }
+
   @Test func pathConflictRollsBackEntireNewWorkspace() async throws {
     try await withScratchDirectory { home in
       let repo = home.appending(path: "new")

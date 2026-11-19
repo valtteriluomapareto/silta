@@ -6,11 +6,14 @@ import Testing
 struct AgentHealthTests {
   static let now = ["SILTA_NOW": "2026-11-06T12:00:00.000Z"]
 
-  static func setup(_ scratch: URL) throws -> [String: String] {
+  static func setup(_ scratch: URL, stop: Bool = true) throws -> [String: String] {
     _ = try SiltaBinary.run(["init"], in: scratch, environment: now)
-    #expect(
-      try AgentsInstallTests.apply(["install", "--stop-hook"], in: scratch, environment: now)
-        .termination == .exit(0))
+    let flags = stop ? ["--stop-hook"] : ["--hook"]
+    for profile in [["--claude"] + flags, ["--codex"]] {
+      try #require(
+        try AgentsInstallTests.apply(["install"] + profile, in: scratch, environment: now)
+          .termination == .exit(0))
+    }
     let bin = scratch.appending(path: "bin")
     try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
     for (name, path) in [
