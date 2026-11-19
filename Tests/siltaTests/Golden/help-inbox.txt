@@ -5,6 +5,7 @@ OVERVIEW: See questions, proposals and other work that needs attention.
 Use --for me for the human's inbox. The default is the caller's inbox.
 See task and document proposals, questions and grouped blockers.
 Reading leaves items in place. Check trackers for current status.
+Handle an `ask human:` instruction in chat.
 See `silta guide questions` for relay and approval rules.
 Read pending attention: silta inbox
 

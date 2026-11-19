@@ -17,7 +17,8 @@ silta --ws acme inbox --for me --all
 - **Proposals** are suggested tasks or document revisions for you to review.
 - **Questions** are addressed to you. An agent can write a question for `@me`
   on a task when you are away. The inbox also shows answers to your questions
-  that are waiting for you to accept them.
+  waiting for your acceptance. Follow its `comment accept <answer-ref>` action
+  when an answer resolves your question.
 - **Blocked work** returns when a follow-up is due, a prerequisite is complete,
   or a dropped prerequisite calls for a new plan. Ask the agent to inspect the
   task and follow up with the named person, unblock ready work, or re-plan.
@@ -50,7 +51,7 @@ silta --ws acme doc triage --accept doc:deploy@2
 ```
 
 Some workspaces use the `proposals: ask` policy. In those workspaces the agent
-asks in chat before creating unsolicited work.
+asks in chat before creating unsolicited task proposals.
 
 ## Answer a question
 
@@ -62,7 +63,8 @@ on task `AC-1`.
 silta --ws acme comment AC-1 --kind answer --reply-to AC-1/2 -m "Use the test API."
 ```
 
-The asker can read and accept the recorded answer. The reply stays with the task.
+The asker can accept a reply you post directly. If the asking agent records it
+for you, it can close the question after you confirm the recorded answer.
 
 ## Approve a command
 

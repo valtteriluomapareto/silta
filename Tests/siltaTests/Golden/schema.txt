@@ -21,7 +21,7 @@ silta task keep  Keep a task visible regardless of its closed age.
 silta task link  Link a task to a reference in this workspace or an external URL.
 silta task promote  Record an external tracker and make the task read-only (human-only).
 silta task block  Record blockers; Silta sends nothing.
-silta task unblock  Return blocked tasks to todo (human-only for unresolved blockers).
+silta task unblock  Return blocked tasks to todo (human-only unless every task is ready).
 silta code show  Read a committed file, optionally selecting lines.
 silta code grep  Search committed text, returning app-relative paths and line numbers.
 silta code log  List commit SHA and subject at the selected ref.

@@ -41,8 +41,8 @@ SUBCOMMANDS:
   promote                 Record an external tracker and make the task
                           read-only (human-only).
   block                   Record blockers; Silta sends nothing.
-  unblock                 Return blocked tasks to todo (human-only for
-                          unresolved blockers).
+  unblock                 Return blocked tasks to todo (human-only unless every
+                          task is ready).
 
   See 'silta help task <subcommand>' for detailed help.
 
@@ -485,7 +485,7 @@ OPTIONS:
 
 ### silta task unblock
 
-OVERVIEW: Return blocked tasks to todo (human-only for unresolved blockers).
+OVERVIEW: Return blocked tasks to todo (human-only unless every task is ready).
 
 USAGE: silta task unblock [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <refs> ...
 

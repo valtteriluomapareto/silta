@@ -7,6 +7,7 @@ struct InboxCommand: OutputCommand {
     discussion: "Use --for me for the human's inbox. The default is the caller's inbox.\n"
       + "See task and document proposals, questions and grouped blockers.\n"
       + "Reading leaves items in place. Check trackers for current status.\n"
+      + "Handle an `ask human:` instruction in chat.\n"
       + "See `silta guide questions` for relay and approval rules.\n"
       + "Read pending attention: silta inbox")
   static let workspaceSource = WorkspaceSource.option
