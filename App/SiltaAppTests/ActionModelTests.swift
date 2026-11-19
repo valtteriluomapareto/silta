@@ -1,5 +1,6 @@
 #if DEBUG
   import Foundation
+  import Observation
   @testable import SiltaApp
   import SiltaAppSupport
   import Synchronization
@@ -90,6 +91,37 @@
         })
       await model.refresh().value
       try await body(model, reader)
+    }
+
+    @Test func aCommentRefreshesTheOpenDetailBeforeReleasingTheTarget() async throws {
+      try await fixtureModel { model, _ in
+        let ref = "AC-15"
+        let body = "Acme inspector discussion."
+        model.inspect(task: ref)
+        await model.loadTaskDetail()
+        let old = try #require(model.taskDetail.value)
+        #expect(!old.comments.contains { $0.body == body })
+
+        let target = try #require(model.target(ref))
+        model.actions.setDraft(body, for: target)
+        let send = try #require(model.comment(task: ref))
+        #expect(model.actions.isSending(target))
+        #expect(model.comment(task: ref) == nil)
+        let refreshedOnRelease = Mutex<Bool?>(nil)
+        withObservationTracking {
+          _ = model.actions.isSending(target)
+        } onChange: {
+          let refreshed = MainActor.assumeIsolated {
+            !model.taskDetail.isLoading
+              && model.taskDetail.value?.comments.contains { $0.body == body } == true
+          }
+          refreshedOnRelease.withLock { $0 = refreshed }
+        }
+        await send.value
+        #expect(refreshedOnRelease.withLock { $0 } == true)
+        #expect(!model.actions.isSending(target))
+        #expect(model.taskDetail.value?.comments.last?.body == body)
+      }
     }
 
     @Test func acceptingTheSelectionTriagesItAndPrunesWhatLeft() async throws {

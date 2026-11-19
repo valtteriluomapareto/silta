@@ -98,6 +98,9 @@ full_swift() {
   SILTA_DEADLINE_TESTS='' run_tests --experimental-maximum-parallelization-width 4
   # The stress test and every test that drives a prior-writer binary.
   require_passed twentyProcessesAddFiveHundredTasksWithoutSequenceGaps \
+    allScenariosReplayByteIdentically \
+    tenDistinctSessionsHaveExactlyOneSuccessfulClaim \
+    busyRetryNamesOnlyFailedCommandPath \
     actualPriorWriterRefusesUpgradedDatabaseWithoutChangingIt \
     actualMetadataWriterCannotWriteAfterNamespaceUpgrade \
     actualV6WriterKeepsPopulatedAuditFields \

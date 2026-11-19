@@ -32,17 +32,27 @@ struct BackupCommandTests {
     #expect(values.1 == "0123: on #x")
   }
 
-  @Test func reportsThePublishedWholeDatabaseSnapshot() throws {
+  @Test(arguments: [false, true])
+  func reportsThePublishedWholeDatabaseSnapshot(json: Bool) throws {
     try withScratchDirectory { scratch in
       try ExportCommandTests.seed(scratch)
-      let result = try Self.run(scratch)
-      let path = try Self.path(result)
+      let result = try SiltaBinary.run(
+        ["backup"] + (json ? ["--json"] : []), in: scratch,
+        environment: ExportCommandTests.environment)
+      #expect(result.termination == .exit(0) && result.stderr.isEmpty)
+      let path = try json ? Self.path(result) : Self.textPath(result.stdout)
       try Self.check(path)
       let masked = ExportCommandTests.masked(result.stdout, scratch).replacingOccurrences(
         of: #"silta-2023-11-14-manual-[0-9]+-[A-Za-z0-9]{6}\.db"#, with: "<snapshot>.db",
         options: .regularExpression)
-      Golden.forTests().check(masked, "backup.json")
+      Golden.forTests().check(masked, "backup.\(json ? "json" : "txt")")
     }
+  }
+
+  private static func textPath(_ text: String) throws -> String {
+    let prefix = "Backed up the whole database to "
+    try #require(text.hasPrefix(prefix) && text.hasSuffix(".\n"))
+    return String(text.dropFirst(prefix.count).dropLast(2))
   }
 
   @Test func independentRetentionAndDoctorDailyCoverage() throws {

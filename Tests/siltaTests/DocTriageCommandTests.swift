@@ -159,10 +159,8 @@ struct DocTriageCommandTests {
           "silta --ws 'acme' doc show 'doc:rules@2'",
           "silta --ws 'acme' doc show 'doc:rules@3'",
         ])
-      withKnownIssue("#263: overlap repeats the same document proposal command") {
-        #expect(next.count == 3)
-        #expect(next.filter { $0.contains(" doc propose ") }.count == 1)
-      }
+      #expect(next.count == 3)
+      #expect(next.filter { $0.contains(" doc propose ") }.count == 1)
       #expect(try Self.truth(store) == before)
     }
   }
