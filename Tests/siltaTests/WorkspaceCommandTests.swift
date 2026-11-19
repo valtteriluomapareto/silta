@@ -31,10 +31,10 @@ struct WorkspaceCommandTests {
     }
   }
 
-  @Test func agentCannotOpenEditor() throws {
+  @Test func unapprovedAgentCannotReadWorkspaceInput() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
-        ["ws", "edit"], in: scratch,
+        ["ws", "edit", "-F", "missing.yaml"], in: scratch,
         environment: ["SILTA_ACTOR": "agent:codex:acme", "EDITOR": "/usr/bin/false"])
       #expect(result.termination == .exit(3))
       Golden.forTests().check(result.stderr, "ws-edit-refused.txt")
@@ -71,7 +71,7 @@ struct WorkspaceCommandTests {
     try withScratchDirectory { scratch in
       for json in [false, true] {
         let result = try SiltaBinary.run(
-          arguments + (json ? ["--json"] : []), in: scratch,
+          arguments + ["-F", "missing.yaml"] + (json ? ["--json"] : []), in: scratch,
           environment: ["SILTA_ACTOR": "agent:codex:acme"])
         #expect(result.termination == .exit(3))
         Golden.forTests().check(
@@ -84,7 +84,7 @@ struct WorkspaceCommandTests {
   @Test func refusalQuotesWorkspaceShellCharacters() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
-        ["ws", "edit", "acme's", "--json"], in: scratch,
+        ["ws", "edit", "acme's", "-F", "missing.yaml", "--json"], in: scratch,
         environment: ["SILTA_ACTOR": "agent:codex:acme"])
       #expect(result.termination == .exit(3))
       let object = try #require(

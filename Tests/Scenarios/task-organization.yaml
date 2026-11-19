@@ -18,8 +18,11 @@ steps:
     env: {SILTA_ACTOR: 'agent:codex:acme'}
     expect: {exit: 0, json: {data.status: doing}}
   - args: [task, edit, AC-1, --json]
-    env: {SILTA_ACTOR: 'agent:codex:acme', EDITOR: '/usr/bin/perl -pi -e s/Acme/AcmeEdited/g'}
-    expect: {exit: 0}
+    env: {SILTA_ACTOR: 'agent:codex:acme', EDITOR: '/usr/bin/echo'}
+    expect: {exit: 1, code: usage}
+  - args: [task, edit, AC-1, --print, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: AC-1, data.status: doing}}
   - args: [task, link, AC-1, 'url:https://example.com/acme/42', --json]
     env: {SILTA_ACTOR: 'agent:codex:acme'}
     expect: {exit: 0}
@@ -31,4 +34,4 @@ steps:
     expect: {exit: 3, code: read_only_promoted}
   - args: [task, show, AC-1, --json]
     env: {SILTA_ACTOR: 'agent:codex:later'}
-    expect: {exit: 0, json: {data.title: AcmeEdited idea, data.priority: 1, data.external_ref: 'ado:42'}}
+    expect: {exit: 0, json: {data.title: Acme idea, data.priority: 1, data.external_ref: 'ado:42'}}

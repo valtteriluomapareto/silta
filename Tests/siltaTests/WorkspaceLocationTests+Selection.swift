@@ -172,7 +172,6 @@ extension WorkspaceLocationTests {
       try yaml.stdout.write(to: config, atomically: true, encoding: .utf8)
       for args in [
         ["task", "add", "Must refuse", "--start"], ["ws", "show"],
-        ["ws", "edit", "--approved", "Edit Acme workspace"],
         ["ws", "edit", "-F", config.path, "--approved", "Edit Acme workspace"],
       ] {
         let result = try Self.run(args + ["--json"], scratch, repo)

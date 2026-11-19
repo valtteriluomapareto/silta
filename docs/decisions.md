@@ -10,7 +10,8 @@ They're summarised here so every decision has one index.
 ## Product
 
 - **D1: SQLite is the source of truth.** It holds everything Silta owns. YAML is only
-  an editing view of the configuration (`silta ws edit`).
+  an editing view of the configuration (`silta ws edit`). A workspace save checks
+  the captured view against SQLite before applying it (spec §17).
 - **D2: External sources are indexed, never owned.** That means meeting notes and repo
   docs.
 - **D3: Deterministic export** to a text tree for backup and diff. `restore` replaces
