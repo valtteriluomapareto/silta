@@ -66,7 +66,8 @@ in product repos.
    (one per project or engagement).
 3. **Local backlog** that agents read and write instead of the team tracker or plan files.
    Plans are stored *on the task*. When a repository's own instructions require a plan
-   file, the task holds a pointer to that file and the steps instead (D51).
+   file, that file is the plan of record, and the task holds its path and branch or PR
+   plus the steps to tick (D51).
 4. **Read other apps' code safely**, including branch-as-app repos, without checkouts.
 5. **Link meeting notes to apps and topics**, so decisions can be found from code.
 6. Works for **Claude Code and Codex** through a plain CLI, and is **measurably
@@ -1474,10 +1475,11 @@ settings (D39). It covers:
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
   Not for trivial single-repo edits. Keep plans and results in Silta, never in PLAN.md
   or other repo plan files, and never create tracker items yourself. Exception: when
-  the repository's own instructions require a plan file, write it where they say; the
-  Silta task plan then holds that file's path and branch or PR, plus the steps to tick,
-  not a copy (D51). A conditional repo rule, such as plans in `docs/plans/` only for
-  multi-slice work, requires a file only when its condition holds.
+  the repository's own instructions require a plan file, write it where they say; that
+  file is the plan of record, and the Silta task plan holds its path and branch or PR
+  plus a short checklist of steps to tick, not its full text (D51). A conditional rule,
+  such as plans in docs/plans/ only for work that spans several slices, requires a file
+  only when its condition holds.
 - **Session start.** If the hook already printed the brief, don't run it again. Once a
   task is chosen, run `silta brief --task AC-n`. Teach the [workspace selection
   precedence](#16-cli): explicit workspace, registered repository location, then the

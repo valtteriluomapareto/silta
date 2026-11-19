@@ -791,8 +791,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   a contradiction found while dogfooding: a repository whose instructions require
   committed plan files (for example a reviewed `docs/plans/` folder) met Silta's
   "never create repo plan files". When the repository's own instructions require a
-  plan file, agents write it where they say, and the Silta task plan holds that file's
-  path and branch or PR plus the steps to tick, not a copy. Everywhere else plans stay
+  plan file, agents write it where they say. That file is the plan of record: the
+  Silta task plan holds its path and branch or PR plus a short checklist of steps to
+  tick, not its full text, and the file wins if they disagree. Everywhere else plans stay
   on the task (§2 goal 3), and the rule about tracker items is unchanged. This follows
   §3 (Silta doesn't replace repo-local `AGENTS.md`) and D39 (a repo's own rules still
   apply). The installed block, `silta guide` and spec §11 carry one wording; older

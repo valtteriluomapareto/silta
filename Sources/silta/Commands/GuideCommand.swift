@@ -56,8 +56,10 @@ extension GuideCommand {
         handoffs, review requests and meeting decisions. Trivial single-repo edits need no \
         task. Keep plans and results in Silta, never in PLAN.md or other repo plan files, and \
         never create tracker items yourself. Exception: when the repository's own instructions \
-        require a plan file, write it where they say; the Silta task plan then holds that \
-        file's path and branch or PR, plus the steps to tick, not a copy.
+        require a plan file, write it where they say; that file is the plan of record, and \
+        the Silta task plan holds its path and branch or PR plus a short checklist of steps \
+        to tick, not its full text. A conditional rule, such as plans in docs/plans/ only \
+        for work that spans several slices, requires a file only when its condition holds.
         """ + "\n"),
     Section(
       topic: "start",
