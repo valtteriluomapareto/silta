@@ -790,3 +790,16 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   line named `app <action>`, beside an existing store only, so measurement can tell app
   use from terminal use. Reads and writes share the facade's `AppReadError`. Plan:
   [`mac-app-actions.md`](plans/mac-app-actions.md).
+- **D51: A repository's own plan rule wins.** On 2026-11-19 the maintainer chose to fix
+  a contradiction found while dogfooding: a repository whose instructions require
+  committed plan files (for example a reviewed `docs/plans/` folder) met Silta's
+  "never create repo plan files". When the repository's own instructions require a
+  plan file, agents write it where they say. That file is the plan of record: the
+  Silta task plan holds its path and branch or PR plus a short checklist of steps to
+  tick, not its full text, and the file wins if they disagree. Everywhere else plans stay
+  on the task (§2 goal 3), and the rule about tracker items is unchanged. This follows
+  §3 (Silta doesn't replace repo-local `AGENTS.md`) and D39 (a repo's own rules still
+  apply). The installed block, `silta guide` and spec §11 carry one wording; older
+  installs show as stale in `doctor --install` until reinstalled. The eval fixtures
+  require no plan file, so `plan-not-file` and the forbidden-attempt check stay as
+  they are (§21).
