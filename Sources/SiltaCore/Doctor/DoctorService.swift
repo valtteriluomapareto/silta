@@ -1,3 +1,4 @@
+import Darwin
 package import Foundation
 
 /// Diagnoses existing data without initializing, migrating, fetching or repairing it.
@@ -25,8 +26,25 @@ package enum DoctorService {
     var checks = database(store, backups: backups, at: now)
     checks.append(writability(store.path))
     checks.append(wal(home))
+    if let exports = unsafeExports(home) { checks.append(exports) }
     checks.append(await gitVersion(git))
     return DoctorReport(checks: orderedChecks(checks))
+  }
+
+  private static func unsafeExports(_ home: URL) -> DoctorCheck? {
+    let directory = DirectoryPath.canonicalHome(home).appending(path: "exports")
+    do {
+      let descriptor = try DirectoryPath.open(directory)
+      close(descriptor)
+      return nil
+    } catch let error as POSIXError where error.code == .ENOENT {
+      return nil
+    } catch {
+      return DoctorCheck(
+        id: "data.exports", status: .warning,
+        message: "The default exports entry could not be safely opened as a directory.",
+        next: ["/bin/ls -ld " + shellWord(directory.path)])
+    }
   }
 
   /// Fills reserved ids while retaining unregistered computed checks visibly.

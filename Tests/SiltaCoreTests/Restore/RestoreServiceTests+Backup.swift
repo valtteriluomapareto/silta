@@ -25,9 +25,7 @@ extension RestoreServiceTests {
         let copy = try DatabaseQueue(path: path)
         return try copy.read { try String.fetchOne($0, sql: "SELECT title FROM task WHERE seq=2") }
       }
-      withKnownIssue("#261: retention removes both newly published snapshots") {
-        #expect(titles == ["Acme before restore", "Acme before restore"])
-      }
+      #expect(titles == ["Acme before restore", "Acme before restore"])
     }
   }
 }

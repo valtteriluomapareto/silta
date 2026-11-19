@@ -28,9 +28,7 @@ extension StorageBackupTests {
       try store.write { _ in () }
       let daily = "silta-2023-11-14.db"
       let names = try RestoreSupport.backups(home)
-      withKnownIssue("#261: retention ranks future names above the daily snapshot") {
-        #expect(names == Set(older + [migration, daily]))
-      }
+      #expect(names == Set(older + [migration, daily]))
     }
   }
 }

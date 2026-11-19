@@ -1,3 +1,4 @@
+import Darwin
 package import Foundation
 
 /// The path of a complete whole-database snapshot.
@@ -13,22 +14,23 @@ package enum BackupService {
   package static func backup(store: DatabaseStore, home: URL, clock: any Clock) throws
     -> BackupResult
   {
-    try store.initialize()
+    try store.initialize(creating: false)
     let lock = try BoundedFileLock(home.appending(path: "backup.lock"), clock: clock)
     defer { withExtendedLifetime(lock) {} }
-    let directory = home.appending(path: "backups")
+    let backup = StorageBackup(home: home)
     do {
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      let work = try ExportService.ownDirectory(in: directory, prefix: ".manual-")
-      defer { try? FileManager.default.removeItem(at: work) }  // only this invocation's staging
+      try backup.cleanManualStaging()
+      let parent = try DirectoryPath.open(backup.home)
+      defer { close(parent) }
+      let work = try DirectoryPath.makeTemporary(in: parent, prefix: ".manual-")
+      defer { _ = removefileat(parent, work, nil, UInt32(REMOVEFILE_RECURSIVE)) }
       let date = clock.now()
       let milliseconds = Int64(date.timeIntervalSince1970 * 1000)
-      let token = String(work.lastPathComponent.dropFirst(".manual-".count))
+      let token = String(work.dropFirst(".manual-".count))
       let name = "silta-\(utcDay(date))-manual-\(milliseconds)-\(token).db"
-      let backup = StorageBackup(home: home)
       let path = try backup.snapshot(
-        name: name, staging: work.lastPathComponent + "/snapshot.pending")
-      try backup.prune(manual: true, keeping: path)
+        name: name, staging: work)
+      try backup.prune(on: utcDay(date), manual: true, keeping: [name])
       return BackupResult(path: path.path)
     } catch { throw StorageError.backupFailed }
   }

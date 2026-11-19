@@ -166,11 +166,14 @@ struct ExportPublishTests {
   /// else's directory under a predictable name.
   @Test func workDirectoriesAreNewAndDistinct() throws {
     try withScratchDirectory { scratch in
-      let first = try ExportService.ownDirectory(in: scratch, prefix: ".acme.export-")
-      let second = try ExportService.ownDirectory(in: scratch, prefix: ".acme.export-")
+      let parent = try DirectoryPath.open(scratch)
+      defer { close(parent) }
+      let first = try DirectoryPath.makeTemporary(in: parent, prefix: ".acme.export-")
+      let second = try DirectoryPath.makeTemporary(in: parent, prefix: ".acme.export-")
       #expect(first != second)
-      for directory in [first, second] {
-        #expect(directory.lastPathComponent.hasPrefix(".acme.export-"))
+      for name in [first, second] {
+        #expect(name.hasPrefix(".acme.export-"))
+        let directory = scratch.appending(path: name)
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
       }
     }

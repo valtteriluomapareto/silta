@@ -4,14 +4,23 @@ import SiltaTestSupport
 import Testing
 
 extension BackupCommandTests {
-  @Test func missingBackupHomeRemainsAbsent() throws {
+  @Test(arguments: [true, false]) func missingBackupStoreDoesNotCreateFiles(json: Bool) throws {
     try withScratchDirectory { scratch in
+      let fm = FileManager.default
       let home = scratch.appending(path: "silta-home")
-      let result = try Self.run(scratch)
-      withKnownIssue("#261: backup creates a new home and reports success for an empty store") {
-        #expect(result.termination == .exit(9))
-        #expect(!FileManager.default.fileExists(atPath: home.path))
-      }
+      let args = ["backup"] + (json ? ["--json"] : [])
+      let result = try SiltaBinary.run(args, in: scratch)
+      #expect(result.termination == .exit(9))
+      let output = json ? result.stdout : result.stderr
+      Golden.forTests().check(output, "backup-missing-store." + (json ? "json" : "txt"))
+      #expect(!fm.fileExists(atPath: home.path))
+      try fm.createDirectory(at: home, withIntermediateDirectories: false)
+      #expect(try SiltaBinary.run(args, in: scratch) == result)
+      #expect(try fm.contentsOfDirectory(atPath: home.path).isEmpty)
+      let diagnostic = try SiltaBinary.run(json ? ["doctor", "--json"] : ["doctor"], in: scratch)
+      #expect(diagnostic.termination == .exit(9))
+      #expect(
+        (json ? diagnostic.stdout : diagnostic.stderr + diagnostic.stdout).contains("database"))
     }
   }
 
@@ -36,15 +45,15 @@ extension BackupCommandTests {
         let files =
           [
             "silta.db", "silta.db-wal", "silta.db-shm", "backups/silta-2023-11-14.db",
-            "exports/acme/manifest.json",
+            "exports/acme/manifest.json", "exports/acme/tasks/AC-1.md",
           ].map { home.appending(path: $0) } + [URL(filePath: manual)]
-        let directories = ["backups", "exports/acme"].map { home.appending(path: $0) }
+        let directories = ["backups", "exports", "exports/acme", "exports/acme/tasks"].map {
+          home.appending(path: $0)
+        }
         let fileModes = try files.map(Self.mode)
         let directoryModes = try directories.map(Self.mode)
-        withKnownIssue("#261: database, WAL, backups and exports are readable by other users") {
-          #expect(fileModes == Array(repeating: 0o600, count: files.count))
-          #expect(directoryModes == Array(repeating: 0o700, count: directories.count))
-        }
+        #expect(fileModes == Array(repeating: 0o600, count: files.count))
+        #expect(directoryModes == Array(repeating: 0o700, count: directories.count))
       }
     }
   }

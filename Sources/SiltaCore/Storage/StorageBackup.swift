@@ -6,75 +6,109 @@ import GRDB
 struct StorageBackup {
   let home: URL
 
-  /// The daily backup (`reuseExisting`) runs inside the write transaction and the
-  /// pre-migration one under the migration lock, so each kind stages under one fixed
-  /// name, and a crashed attempt's leftover is replaced by the next attempt.
-  /// The staged file is flushed to disk before it is linked, so a published backup is
-  /// complete; with `reuseExisting`, one already published under `name` counts as done.
-  /// `staging` names the staging file when the caller is neither of those two kinds.
+  init(home: URL) {
+    self.home = DirectoryPath.canonicalHome(home)
+  }
+
+  /// Daily and pre-migration snapshots stage under fixed names protected by their
+  /// caller's write or migration lock. Manual snapshots have a private work directory.
   func snapshot(name: String, reuseExisting: Bool = false, staging: String? = nil) throws -> URL {
-    let directory = home.appending(path: "backups")
-    let destination = directory.appending(path: name)
-    let temporary = directory.appending(
-      path: staging ?? (reuseExisting ? "daily.pending" : "migration.pending"))
-    let fm = FileManager.default
     do {
-      try fm.createDirectory(at: directory, withIntermediateDirectories: true)
-      try? fm.removeItem(at: temporary)  // a crashed attempt's leftover, when there is one
-      defer { try? fm.removeItem(at: temporary) }  // best-effort cleanup of an unpublished snapshot
-      var config = Configuration()
-      // SQLite needs write access to initialize WAL sidecars, even though VACUUM INTO
-      // only reads the source database's contents.
-      config.busyMode = .timeout(5)
-      let source = try DatabaseQueue(
-        path: home.appending(path: "silta.db").path, configuration: config)
-      try source.writeWithoutTransaction { db in
-        try db.execute(sql: "VACUUM INTO ?", arguments: [temporary.path])
+      let parent = try DirectoryPath.open(home)
+      defer { close(parent) }
+      let directory = try DirectoryPath.open("backups", in: parent, creating: true)
+      defer { close(directory) }
+      let nameInHome = staging ?? (reuseExisting ? "daily.pending" : "migration.pending")
+      let fixed = !nameInHome.hasPrefix(".manual-")
+      let work = fixed ? ".backup-" + nameInHome : nameInHome
+      let stage = try DirectoryPath.open(work, in: parent, creating: fixed)
+      defer { close(stage) }
+      var info = stat()
+      guard fstat(stage, &info) == 0, info.st_uid == geteuid(), info.st_mode & 0o077 == 0
+      else { throw StorageError.backupFailed }
+      let leaf = "snapshot.pending"
+      defer {
+        _ = unlinkat(stage, leaf, 0)
+        if fixed { _ = unlinkat(parent, work, AT_REMOVEDIR) }
       }
-      let staged = open(temporary.path, O_RDONLY)
-      guard staged >= 0 else { throw StorageError.backupFailed }
-      defer { close(staged) }
-      // Network volumes may not support F_FULLFSYNC; plain fsync is what SQLite falls back to.
-      guard fcntl(staged, F_FULLFSYNC) == 0 || fsync(staged) == 0 else {
-        throw StorageError.backupFailed
+      if fixed {
+        // Clear the previous staging name, including one left by an older writer.
+        _ = unlinkat(directory, nameInHome, 0)
+        _ = unlinkat(stage, leaf, 0)
       }
-      do {
-        try fm.linkItem(at: temporary, to: destination)
-      } catch {
-        guard reuseExisting, try isRegularFile(destination) else { throw error }
+      try copy(to: home.appending(path: work).appending(path: leaf))
+      let file = openat(stage, leaf, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+      guard file >= 0 else { throw StorageError.backupFailed }
+      defer { close(file) }
+      guard fstat(file, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1,
+        fchmod(file, 0o600) == 0, fcntl(file, F_FULLFSYNC) == 0 || fsync(file) == 0
+      else { throw StorageError.backupFailed }
+      if linkat(stage, leaf, directory, name, 0) != 0 {
+        guard reuseExisting, errno == EEXIST, Self.regularSize(name, in: directory) != nil else {
+          throw StorageError.backupFailed
+        }
       }
-      return destination
+      return home.appending(path: "backups").appending(path: name)
     } catch {
       throw StorageError.backupFailed
     }
   }
 
-  func prune(manual: Bool = false, keeping: URL? = nil) throws {
-    let directory = home.appending(path: "backups")
-    let backups = try FileManager.default.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]
-    )
-    .filter {
-      let name = $0.lastPathComponent
-      let recognized =
-        manual
-        ? name.wholeMatch(of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}-manual-[0-9]+-[A-Za-z0-9]{6}\.db/)
-          != nil
-        : name.wholeMatch(
-          of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-before-[A-Za-z0-9]+-[0-9]+)?\.db/) != nil
-      guard recognized
-      else { return false }
-      return try isRegularFile($0)
-    }
-    .filter { $0.standardizedFileURL != keeping?.standardizedFileURL }
-    .sorted { $0.lastPathComponent < $1.lastPathComponent }
-    for file in backups.dropLast(keeping == nil ? 7 : 6) {
-      try FileManager.default.removeItem(at: file)
+  private func copy(to temporary: URL) throws {
+    // Keep SQLite's named destination in the home, independent of the backups entry.
+    // A read-write connection can initialize WAL sidecars while reading committed state.
+    var config = Configuration()
+    config.busyMode = .timeout(5)
+    let source = try DatabaseQueue(
+      path: home.appending(path: "silta.db").path, configuration: config)
+    try source.writeWithoutTransaction { db in
+      try db.execute(sql: "VACUUM INTO ?", arguments: [temporary.path])
     }
   }
 
-  private func isRegularFile(_ file: URL) throws -> Bool {
-    let values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-    return values.isRegularFile == true && values.isSymbolicLink != true
+  func prune(on day: String, manual: Bool = false, keeping: Set<String> = []) throws {
+    let directory = try DirectoryPath.open(home.appending(path: "backups"))
+    defer { close(directory) }
+    let files = try DirectoryPath.names(in: directory).compactMap { name -> (String, Bool)? in
+      guard let date = Self.day(of: name, manual: manual),
+        Self.regularSize(name, in: directory) != nil
+      else { return nil }
+      return (name, Self.validDay(date) && date <= day)
+    }
+    let unprotected = files.filter { !keeping.contains($0.0) }.sorted { a, b in
+      a.1 == b.1 ? a.0 < b.0 : !a.1
+    }
+    let slots = 7 - (files.count - unprotected.count)
+    for (name, _) in unprotected.dropLast(slots) {
+      guard unlinkat(directory, name, 0) == 0 || errno == ENOENT else {
+        throw StorageError.backupFailed
+      }
+    }
+  }
+
+  static func day(of name: String, manual: Bool) -> String? {
+    let recognized =
+      manual
+      ? name.wholeMatch(of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}-manual-[0-9]+-[A-Za-z0-9]{6}\.db/)
+        != nil
+      : name.wholeMatch(of: /silta-[0-9]{4}-[0-9]{2}-[0-9]{2}(?:-before-[A-Za-z0-9]+-[0-9]+)?\.db/)
+        != nil
+    return recognized ? String(name.dropFirst(6).prefix(10)) : nil
+  }
+
+  static func validDay(_ day: String) -> Bool {
+    do {
+      let date = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(
+        day + "T00:00:00.000Z")
+      return utcDay(date) == day
+    } catch { return false }
+  }
+
+  static func regularSize(_ name: String, in directory: Int32) -> off_t? {
+    var file = stat()
+    guard fstatat(directory, name, &file, AT_SYMLINK_NOFOLLOW) == 0,
+      file.st_mode & S_IFMT == S_IFREG
+    else { return nil }
+    return file.st_size
   }
 }

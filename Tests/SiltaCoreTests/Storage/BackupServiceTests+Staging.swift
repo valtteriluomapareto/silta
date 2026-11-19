@@ -20,10 +20,36 @@ extension BackupServiceTests {
 
       _ = try BackupService.backup(
         store: store, home: home, clock: FakeClock(now: StorageSchemaTests.instant))
-      withKnownIssue("#261: a successful backup leaves old manual staging in place") {
-        #expect(!FileManager.default.fileExists(atPath: stale.path))
-      }
+      #expect(!FileManager.default.fileExists(atPath: stale.path))
       #expect(try Data(contentsOf: unrelated.appending(path: "notes.txt")) == note)
+    }
+  }
+}
+
+extension BackupServiceTests {
+  @Test(arguments: [true, false]) func linkedBackupDirectoryIsRefused(manual: Bool) throws {
+    try withScratchDirectory { home in
+      let store = StorageSchemaTests.store(home)
+      try store.initialize()
+      let fm = FileManager.default
+      let backups = home.appending(path: "backups")
+      let reserved = home.appending(path: "original-backups")
+      let other = home.appending(path: "acme-empty")
+      try fm.moveItem(at: backups, to: reserved)
+      try fm.createDirectory(at: other, withIntermediateDirectories: false)
+      try fm.createSymbolicLink(at: backups, withDestinationURL: other)
+      #expect(throws: StorageError.backupFailed) {
+        if manual {
+          _ = try BackupService.backup(
+            store: store, home: home, clock: FakeClock(now: StorageSchemaTests.instant))
+        } else {
+          try store.write { _ in () }
+        }
+      }
+      #expect(try fm.contentsOfDirectory(atPath: other.path).isEmpty)
+      let doctor = DoctorBackups(home: home, at: StorageSchemaTests.instant)
+      #expect(!doctor.readable)
+      #expect(!doctor.isKnownEmpty)
     }
   }
 }
