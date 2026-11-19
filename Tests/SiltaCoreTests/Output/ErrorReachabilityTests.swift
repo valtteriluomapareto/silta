@@ -229,6 +229,7 @@ extension ExportError: ErrorExamples {
       .invalidTree(reason: "links.jsonl does not match its sha256", workspace: "acme"),
       .invalidExport(reason: "the task prefix is not an identifier"),
       .invalidRestoreIdentifier(field: "service slug"),
+      .defaultRootUnavailable,
       .invalidManifest(directory: "/tmp/acme-notes/acme"),
       .notATree(path: "/tmp/acme-notes", reason: "it has no manifest.json", child: "acme"),
       .notATree(path: "/tmp/silta-2023-11-14.db", reason: "it is a file", child: nil),

@@ -68,7 +68,7 @@ enum SiltaMain {
       if hookDeadline != nil {
         return completeHook(rendered, entry: entry, watchdog: watchdog, log: environment.log)
       }
-      environment.log.record(entry)
+      record(entry, environment: environment)
       return rendered
     } catch {
       if hookDeadline != nil {
@@ -314,4 +314,14 @@ extension SiltaMain {
         command, store: context.environment.db, prepared: context.environment.workspaceSelection),
       command: loggedPath(arguments, command))
   }
+}
+
+private func record(_ entry: LogEntry, environment: SiltaEnvironment) {
+  // An on-demand backup must not create a home when its database is missing.
+  if entry.command == "silta backup",
+    !FileManager.default.fileExists(atPath: environment.db.path)
+  {
+    return
+  }
+  environment.log.record(entry)
 }

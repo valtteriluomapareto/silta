@@ -1736,12 +1736,15 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 
 - **Daily backup (M1):** on the first write of each day, `VACUUM INTO
   $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
-  first.
+  first. Retention protects the current operation's snapshots and prefers valid
+  dates through today over invalid or future-dated names.
 - **`silta backup`** takes an on-demand whole-database SQLite snapshot, including
   every workspace regardless of `--ws`, and reports its path. It publishes a complete
   `backups/silta-<day>-manual-<ms>-<unique>.db` from staging owned by that invocation.
-  Concurrent invocations use distinct names. It keeps seven on-demand files separately
-  from daily and pre-restore backups; neither retention class evicts the other.
+  Concurrent invocations use distinct names. The next on-demand backup clears
+  interrupted staging it recognizes as its own. It keeps seven on-demand files
+  separately from daily and pre-restore backups. It requires an existing database
+  file, and a missing-store refusal creates no files or directories.
   It does not export a text tree or run Git, and never advances `last_backup_day`.
 - **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
@@ -1922,7 +1925,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     re-resolved with `silta init --scan`.
   - Replacing a workspace first takes `backups/silta-<day>-before-restore-<ms>.db`,
     which counts toward the 7 backups kept; a refusal found inside the transaction may
-    leave it.
+    leave it. If the same restore takes the day's backup too, retention protects both.
   - `--dry-run` runs the same transaction and rolls it back, so it finds every
     refusal the real run would. It never changes a workspace, though like any write it
     may create the database and take the day's backup. It reports what would change:
@@ -2300,11 +2303,17 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   are the exception.
 - Exports are per workspace. Evals use synthetic fixtures only and never real
   project data (§21).
+- New database files, SQLite sidecars, backup files and export files are private
+  to the owner (0600). Silta creates private backup and export directories (0700).
+  The managed `backups` and default `exports` entries must open without following
+  symbolic links. Refusals report `env` with `silta doctor`. An explicitly selected
+  export root outside the default location may be a directory alias.
 
 ## 19. Observability
 
 - **Logs:** `$SILTA_HOME/log/YYYY-MM-DD.jsonl`, kept 90 days (D36). One line per command,
-  except help and version print without touching storage, so they aren't logged:
+  except help and version, and `backup` refusing a missing store. These leave storage
+  untouched and write no command log:
   - timestamp, command and flags (bodies excluded), actor, workspace, app
   - exit code and error code
   - ms; busy retries, git calls and git ms join when the first command counts them
@@ -2510,7 +2519,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   use `-readonly` and are evidence, not repeated repair attempts. Initialization is
   suggested for a missing or empty database only when backup inspection succeeded and no
   published backups were found. Unreadable inventory stays unknown and leads to
-  inspection, even if no write has yet required a daily backup.
+  inspection, even if no write has yet required a daily backup. A linked managed
+  backup directory provides no recovery evidence. An unsafe `backups` or default
+  `exports` directory produces a diagnostic with an inspection command.
   SQLite `.db` snapshot recovery is manual: the human stops all clients, preserves
   the original home including WAL/SHM files, copies the selected snapshot as
   `silta.db` into a fresh empty home without old sidecars, and inspects that home
