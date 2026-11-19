@@ -51,6 +51,7 @@ extension BodyInputCommandTests {
       let store =
         try route.usesDocs
         ? AcmeDocAttachments.make(in: scratch) : Self.setupPlan(in: scratch)
+      if route.usesDocs { try AcmeDocAttachments.attach("rules", to: "service", in: store) }
       let source = scratch.appending(path: "private Acme filename")
       try Self.oversizedPlan().write(to: source)
       let before = try Self.storedInput(in: store)
@@ -148,7 +149,8 @@ extension BodyInputCommandTests {
         environment: TaskCommandTests.actor)
       try #require(saved.termination == .exit(0))
       let before = try Self.storedInput(in: store)
-      #expect(before.contains(large))
+      let savedPlan = try store.read { try String.fetchOne($0, sql: "SELECT plan_md FROM task") }
+      #expect(savedPlan == large)
       let output = try EditorTerminalFixture.run(
         EditorCommandTests.taskEdit + ["--json"], in: scratch,
         environment: TaskCommandTests.actor.merging(["EDITOR": "/usr/bin/true"]) { _, new in new })
@@ -174,21 +176,19 @@ extension BodyInputCommandTests {
         #expect(json.termination == .exit(1) && text.termination == .exit(1))
         let error = try TaskStateRegressionTests.error(json)
         #expect(error["code"] as? String == "invalid")
-        withKnownIssue("#268: body recovery can expose an unvalidated workspace") {
-          #expect(error["next"] as? [String] == [help])
-          #expect(text.stderr.contains("next: " + help))
-          #expect(!text.stderr.contains(scope) && !json.stdout.contains(scope))
-        }
+        #expect(error["next"] as? [String] == [help])
+        #expect(text.stderr.contains("next: " + help))
+        #expect(!text.stderr.contains(scope) && !json.stdout.contains(scope))
+        try EditorCommandTests.followRecovery(json.stdout, in: scratch)
       }
     }
   }
 
   private static func storedInput(in store: DatabaseStore) throws -> [String] {
     try store.read { db in
-      try String.fetchAll(db, sql: "SELECT plan_md FROM task WHERE plan_md IS NOT NULL ORDER BY id")
-        + ["task", "workspace", "doc", "doc_rev", "approval"].map { table in
-          String(try Int.fetchOne(db, sql: "SELECT count(*) FROM " + table) ?? 0)
-        }
+      try ["task", "task_plan_rev", "workspace", "doc", "doc_rev", "approval"].flatMap { table in
+        try Row.fetchAll(db, sql: "SELECT * FROM " + table + " ORDER BY id").map(\.description)
+      }
     }
   }
 }

@@ -1,10 +1,7 @@
 /// Limits supplied document bodies, including after redaction.
-package enum DocInput {
-  /// The fixed supplied-input byte limit, before and after redaction.
-  package static let maximumBytes = 64 * 1024
-
+enum DocInput {
   static func check(_ text: String) throws {
-    guard text.utf8.count <= maximumBytes else {
+    guard text.utf8.count <= BoundedInput.maximumBodyBytes else {
       throw DocError.invalid("Doc input exceeds 65536 bytes.")
     }
     guard !text.utf8.contains(0) else {

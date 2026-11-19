@@ -9,7 +9,7 @@ import Testing
     let text = ["", String(repeating: "a", count: 65_536), String(repeating: "é", count: 32_768)][
       example]
     var bytes = Data(text.utf8)
-    let result = try BoundedInput.read(maximum: DocInput.maximumBytes) { maximum in
+    let result = try BoundedInput.read(maximum: BoundedInput.maximumBodyBytes) { maximum in
       let chunk = bytes.prefix(min(maximum, 7))
       bytes.removeFirst(chunk.count)
       return Data(chunk)
@@ -22,14 +22,14 @@ import Testing
   @Test func overflowReadsExactlyOneBytePastTheLimit() throws {
     var consumed = 0
     #expect(throws: BodyInputError.self) {
-      _ = try BoundedInput.read(maximum: DocInput.maximumBytes) { maximum in
+      _ = try BoundedInput.read(maximum: BoundedInput.maximumBodyBytes) { maximum in
         consumed += maximum
         return Data(repeating: 97, count: maximum)
       }
     }
     #expect(consumed == 65_537)
     #expect(throws: StorageError.internalMisuse) {
-      _ = try BoundedInput.read(maximum: DocInput.maximumBytes) { _ in
+      _ = try BoundedInput.read(maximum: BoundedInput.maximumBodyBytes) { _ in
         throw StorageError.internalMisuse
       }
     }

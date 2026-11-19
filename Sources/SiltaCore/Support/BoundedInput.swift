@@ -3,6 +3,9 @@ package import Foundation
 
 /// Reads a limited byte stream or opens a regular file for bounded input.
 package enum BoundedInput {
+  /// The supplied body byte ceiling shared by the CLI and document validation.
+  package static let maximumBodyBytes = 64 * 1024
+
   /// Reads at most one byte past the limit and reports overflow before waiting for EOF.
   package static func read(
     maximum: Int, nextBytes: (Int) throws -> Data?

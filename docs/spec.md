@@ -2006,7 +2006,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   stdin bodies accept up to 65,536 bytes of valid UTF-8, including any headers. A
   named source must open a regular file. Unreadable files, nonregular named
   sources, invalid UTF-8, and input beyond the byte ceiling return `invalid`
-  and help for the invoked command. Stdin can be a pipe, and overflow is refused
+  and help for the invoked command. The help command includes the workspace when
+  its name can be printed safely. Stdin can be a pipe, and overflow is refused
   when its first extra byte arrives. Content checks for each command still apply.
   Interactive `task edit` and `ws edit` require terminal input and terminal stderr. Both editor output streams
   go to that terminal, leaving Silta's stdout for its own output. These commands

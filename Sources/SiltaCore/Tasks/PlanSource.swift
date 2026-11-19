@@ -62,8 +62,7 @@ struct PlanSource: Sendable {
           directory: snapshot.canonical.deletingLastPathComponent(), runner: runner) == location,
         try Self.capture(source, location: location, size: snapshot.content.count) == snapshot
       else { return false }
-      try FileManager.default.removeItem(at: source)
-      return true
+      return unlink(source.path) == 0
     } catch {
       return false
     }

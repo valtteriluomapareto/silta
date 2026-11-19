@@ -305,11 +305,16 @@ extension SiltaMain {
     if let body = error as? BodyInputError {
       let help = commandPath(arguments) + " --help"
       let workspace = (command as? WsEditCommand)?.workspace ?? command.global.ws
-      let inspect = (command as? TaskEditCommand).map {
-        "silta task edit " + shellWord($0.ref) + " --print"
-      }
-      let next = [inspect, help].compactMap { $0 }.map { command in
-        workspace.map { workspaceCommand(command, workspace: $0) } ?? command
+      let next: [String]
+      if let workspace, WorkspaceConfig.isValidIdentifier(workspace),
+        RestoreService.canNameInRecovery(workspace)
+      {
+        let inspect = (command as? TaskEditCommand).map {
+          "silta task edit " + shellWord($0.ref) + " --print"
+        }
+        next = [inspect, help].compactMap { $0 }.map { workspaceCommand($0, workspace: workspace) }
+      } else {
+        next = [help]
       }
       failure = CommandFailure(error: body, next: next)
     } else if let coded = failure as? any CodedError {

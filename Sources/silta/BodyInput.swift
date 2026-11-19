@@ -6,7 +6,7 @@ enum BodyInput {
     do {
       let handle =
         try source == "-" ? FileHandle.standardInput : BoundedInput.openRegular(source).handle
-      let bytes = try BoundedInput.read(maximum: DocInput.maximumBytes) {
+      let bytes = try BoundedInput.read(maximum: BoundedInput.maximumBodyBytes) {
         try handle.read(upToCount: $0)
       }
       guard let text = String(data: bytes, encoding: .utf8) else {
