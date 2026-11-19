@@ -23,9 +23,9 @@ extension BodyInputCommandTests {
       self == .docEdit || self == .docPropose
     }
 
-    func arguments(_ source: String) -> [String] {
+    func arguments(_ source: String, workspace: String = "acme") -> [String] {
       let command = command.split(separator: " ").map(String.init)
-      return ["--ws", "acme"] + command + tail(source)
+      return ["--ws", workspace] + command + tail(source)
     }
 
     private func tail(_ source: String) -> [String] {
@@ -154,6 +154,32 @@ extension BodyInputCommandTests {
         environment: TaskCommandTests.actor.merging(["EDITOR": "/usr/bin/true"]) { _, new in new })
       #expect(output.result.termination == .exit(0), "\(output.result.stdout)")
       #expect(try Self.storedInput(in: store) == before)
+    }
+  }
+
+  @Test func unsafeWorkspaceNamesDoNotEnterBodyRecoveryHints() throws {
+    try withScratchDirectory { scratch in
+      _ = try AcmeDocAttachments.make(in: scratch)
+      let source = scratch.appending(path: "absent input")
+      let cases = [
+        ("acme\nfixture", Route.workspaceEdit),
+        ("AKIA" + String(repeating: "0", count: 16), Route.docPropose),
+      ]
+      for (scope, route) in cases {
+        let command = route.arguments(source.path, workspace: scope)
+        let help = "silta " + route.command + " --help"
+        let json = try SiltaBinary.run(
+          command + ["--json"], in: scratch, environment: TaskCommandTests.fixed)
+        let text = try SiltaBinary.run(command, in: scratch, environment: TaskCommandTests.fixed)
+        #expect(json.termination == .exit(1) && text.termination == .exit(1))
+        let error = try TaskStateRegressionTests.error(json)
+        #expect(error["code"] as? String == "invalid")
+        withKnownIssue("#268: body recovery can expose an unvalidated workspace") {
+          #expect(error["next"] as? [String] == [help])
+          #expect(text.stderr.contains("next: " + help))
+          #expect(!text.stderr.contains(scope) && !json.stdout.contains(scope))
+        }
+      }
     }
   }
 
