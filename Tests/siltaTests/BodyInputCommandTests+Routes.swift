@@ -60,11 +60,14 @@ extension BodyInputCommandTests {
       let text = try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.fixed)
       let error = try GuideContractTests.object(json.stdout)["error"] as? [String: Any]
       let help = "silta --ws 'acme' " + route.command + " --help"
+      let next =
+        route == .taskEdit
+        ? ["silta --ws 'acme' task edit 'AC-1' --print", help] : [help]
       let after = try Self.storedInput(in: store)
       #expect(json.termination == .exit(1) && text.termination == .exit(1))
       #expect(json.stderr.isEmpty && text.stdout.isEmpty)
       #expect(error?["code"] as? String == "invalid")
-      #expect(error?["next"] as? [String] == [help])
+      #expect(error?["next"] as? [String] == next)
       #expect(error?["next_by"] as? String == "agent")
       #expect(error?["message"] as? String == "Body input exceeds 65536 bytes.")
       #expect(text.stderr.contains("next: " + help))

@@ -79,12 +79,17 @@ extension ApprovalRecoveryRegressionTests {
       let file = scratch.appending(path: "input.yaml")
       let repair = "silta ws edit 'acme' -F <file> --approved \"<the human's words>\""
       let rename = Data("workspace: {slug: other, name: Acme, task_prefix: ZZ}".utf8)
-      for (content, code) in [
-        (Data("workspace: [".utf8), Int32(1)),
-        (rename, Int32(1)),
-        (Data("workspace: {slug: acme, name: Changed, task_prefix: AC}".utf8), Int32(6)),
-        (Data([255]), Int32(9)),
-        (nil, Int32(9)),
+      let formatRepair = ["silta ws show 'acme'", repair]
+      let inputHelp = ["silta --ws 'acme' ws edit --help"]
+      for (content, code, next) in [
+        (Data("workspace: [".utf8), Int32(1), formatRepair),
+        (rename, Int32(1), formatRepair),
+        (
+          Data("workspace: {slug: acme, name: Changed, task_prefix: AC}".utf8), Int32(6),
+          formatRepair
+        ),
+        (Data([255]), Int32(1), inputHelp),
+        (nil, Int32(1), inputHelp),
       ] {
         if let content { try content.write(to: file) }
         for prefix in [["ws", "edit", "acme"], ["--ws", "acme", "ws", "edit"]] {
@@ -99,15 +104,10 @@ extension ApprovalRecoveryRegressionTests {
                 json ? "ws-edit-rename-refused.json" : "ws-edit-rename-refused.txt")
             }
             if json {
-              let object = try #require(
-                JSONSerialization.jsonObject(with: Data(result.stdout.utf8)) as? [String: Any])
-              let error = try #require(object["error"] as? [String: Any])
-              #expect(
-                error["next"] as? [String]
-                  == (code == 9 ? [repair] : ["silta ws show 'acme'", repair]))
+              let error = try TaskStateRegressionTests.error(result)
+              #expect(error["next"] as? [String] == next)
             } else {
-              #expect(result.stderr.contains(repair))
-              if code != 9 { #expect(result.stderr.contains("silta ws show 'acme'")) }
+              #expect(next.allSatisfy { result.stderr.contains($0) })
             }
           }
         }
