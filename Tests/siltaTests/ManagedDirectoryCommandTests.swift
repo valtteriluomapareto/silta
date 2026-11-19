@@ -4,11 +4,13 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct ManagedDirectoryCommandTests {
-  @Test(arguments: [
-    ["backup"], ["export", "--ws", "acme"], ["export", "--ws", "acme", "--commit"],
-  ])
-  func managedDirectoryRefusalNamesDoctor(arguments: [String]) throws {
-    try withScratchDirectory { scratch in
+  @Test(
+    arguments: [["backup"], ["export", "--ws", "acme"], ["export", "--ws", "acme", "--commit"]],
+    [false, true])
+  func managedDirectoryRefusalNamesDoctor(arguments: [String], escapes: Bool) throws {
+    try withScratchDirectory { temporary in
+      let scratch = escapes ? temporary.appending(path: "acme\nfixture") : temporary
+      try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
       try ExportCommandTests.seed(scratch)
       let fm = FileManager.default
       let home = scratch.appending(path: "silta-home")
@@ -39,7 +41,12 @@ struct ManagedDirectoryCommandTests {
       let check = try #require(checks.first { $0["id"] as? String == diagnostic })
       let next = try #require((check["next"] as? [String])?.first)
       #expect(next.hasPrefix("/bin/ls -ld "))
-      #expect(next.contains(directory.path))
+      #expect(!next.contains("\n"))
+      if escapes {
+        #expect(next.contains("SILTA_HOME") && next.hasSuffix("/\(name)\""))
+      } else {
+        #expect(next.contains(directory.path))
+      }
       let inspected = try SiltaBinary.runProcess(
         URL(filePath: "/bin/sh"), ["-c", next], in: scratch)
       #expect(inspected.termination == .exit(0))

@@ -3,6 +3,7 @@ import Foundation
 import GRDB
 @testable import SiltaCore
 import SiltaTestSupport
+import Synchronization
 import Testing
 
 /// How export puts a tree in place and what it leaves: the fallback for volumes without
@@ -159,6 +160,38 @@ struct ExportPublishTests {
         result.leftovers.map { URL(filePath: $0.path).lastPathComponent } == [".acme.export-a1b2c3"]
       )
       #expect(FileManager.default.fileExists(atPath: leftover.path))
+    }
+  }
+
+  @Test func rootIdentityChangeRefusesBeforePublication() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let root = scratch.appending(path: "exports")
+      let moved = scratch.appending(path: "moved-exports")
+      let attempted = Mutex(false)
+      let moves = ExportMoves(
+        rename: { _, _ in
+          attempted.withLock { $0 = true }
+          return -1
+        },
+        sync: { path in
+          if path.lastPathComponent == "tree" {
+            let fm = FileManager.default
+            try fm.moveItem(at: root, to: moved)
+            try fm.createDirectory(at: root, withIntermediateDirectories: false)
+          }
+        })
+      #expect(throws: ExportError.self) {
+        try ExportService.export(
+          workspace: "acme", to: root, store: store, home: home, moves: moves)
+      }
+      #expect(!attempted.withLock { $0 })
+      #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
+      #expect(
+        try FileManager.default.contentsOfDirectory(atPath: moved.path).contains {
+          $0.hasPrefix(".acme.export-")
+        })
     }
   }
 

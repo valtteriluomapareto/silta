@@ -43,8 +43,16 @@ package enum DoctorService {
       return DoctorCheck(
         id: "data.exports", status: .warning,
         message: "The default exports entry could not be safely opened as a directory.",
-        next: ["/bin/ls -ld " + shellWord(directory.path)])
+        next: [inspectManagedPath(directory)])
     }
+  }
+
+  static func inspectManagedPath(_ directory: URL) -> String {
+    let command = "/bin/ls -ld "
+    if RestoreService.canNameInRecovery(directory.path) {
+      return command + shellWord(directory.path)
+    }
+    return command + #""${SILTA_HOME:-$HOME/.silta}/\#(directory.lastPathComponent)""#
   }
 
   /// Fills reserved ids while retaining unregistered computed checks visibly.

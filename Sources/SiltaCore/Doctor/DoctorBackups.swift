@@ -54,7 +54,7 @@ struct DoctorBackups {
       return DoctorCheck(
         id: "data.backup", status: .warning,
         message: "The backups entry must be a directory without symbolic links.",
-        next: ["/bin/ls -ld " + shellWord(directory.path)])
+        next: [DoctorService.inspectManagedPath(directory)])
     }
     guard readable else {
       return DoctorCheck(

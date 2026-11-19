@@ -18,7 +18,8 @@ extension StorageBackup {
       let opened = try? DirectoryPath.open(name, in: parent)  // may be unrelated or unreadable
       guard let opened else { continue }
       defer { close(opened) }
-      let names = try DirectoryPath.names(in: opened)
+      guard let names = try? DirectoryPath.names(in: opened)  // unreadable is not known staging
+      else { continue }
       guard
         names.isEmpty
           || (names == ["snapshot.pending"]

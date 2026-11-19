@@ -17,7 +17,7 @@ struct ScenarioTests {
       let steps = try Scenario.decode(String(contentsOf: file, encoding: .utf8)).steps
       let loggedSteps = steps.enumerated().filter { step in
         let arguments = step.element.args
-        if step.offset == 0, arguments.first == "backup", step.element.expect.code == "env" {
+        if step.offset == 0, file.lastPathComponent == "backup-existing-store.yaml" {
           return false  // a backup refusing the initial missing database leaves no log
         }
         return arguments.first != "help" && !arguments.contains("--help")

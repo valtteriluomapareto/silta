@@ -126,7 +126,9 @@ package enum ExportService {
     }
     let kept: [ExportLeftover]
     do {
+      guard DirectoryPath.matches(directory, path: root) else { throw failed }
       try checkTarget(target, workspace: slug)
+      guard DirectoryPath.matches(directory, path: root) else { throw failed }
       try ExportDurability.syncAncestors(of: root, moves: moves ?? ExportMoves())
       kept = try publish(files, to: target, in: directory, workspace: slug, moves: moves)
     } catch let error as ExportError {
@@ -165,7 +167,11 @@ package enum ExportService {
     let moves = moves ?? stage.moves
     let staging = work.appending(path: "tree")
     let previous = work.appending(path: "previous")
-    func discard() { try? stage.remove() }  // best-effort: only this run's directory
+    func discard() {
+      if stage.attached {
+        try? stage.remove()  // best-effort: only this run's directory
+      }
+    }
     do {
       try stage.write(files)
       try ExportDurability.stage(files, tree: staging, moves: moves)
@@ -173,6 +179,7 @@ package enum ExportService {
       discard()
       throw error
     }
+    guard stage.attached else { throw SwapFailure() }
     var targetInfo = stat()
     if fstatat(parent, workspace, &targetInfo, AT_SYMLINK_NOFOLLOW) != 0 {
       guard errno == ENOENT, moves.rename(staging.path, target.path) == 0 else {
@@ -208,8 +215,10 @@ package enum ExportService {
     _ stage: ExportStage, replaced: URL?, target: URL, workspace: String, moves: ExportMoves
   ) throws -> [ExportLeftover] {
     do {
+      guard stage.attached else { throw SwapFailure() }
       try moves.sync(stage.work)
       try moves.sync(target.deletingLastPathComponent())
+      guard stage.attached else { throw SwapFailure() }
     } catch {
       throw ExportError.publicationUnconfirmed(path: target.path, kept: stage.work.path)
     }
@@ -237,6 +246,7 @@ package enum ExportService {
       }
     }
     do {
+      guard stage.attached else { throw SwapFailure() }
       try stage.remove()
       return []
     } catch {

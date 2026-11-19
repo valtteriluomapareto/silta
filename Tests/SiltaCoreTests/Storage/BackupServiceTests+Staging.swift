@@ -53,3 +53,29 @@ extension BackupServiceTests {
     }
   }
 }
+
+extension BackupServiceTests {
+  @Test func sourceRemovedDuringBackupIsNotRecreated() throws {
+    try withScratchDirectory { home in
+      let store = try ExportFixture.make(home)
+      let path = URL(filePath: store.path)
+      let moved = home.appending(path: "moved.db")
+      let clock = BackupMoveClock(path: path, moved: moved)
+      _ = try? BackupService.backup(store: store, home: home, clock: clock)  // refusal is valid
+      #expect(FileManager.default.fileExists(atPath: moved.path))
+      #expect(!FileManager.default.fileExists(atPath: path.path))
+    }
+  }
+}
+
+private struct BackupMoveClock: SiltaCore.Clock {
+  let path: URL
+  let moved: URL
+
+  func now() -> Date {
+    try? FileManager.default.moveItem(at: path, to: moved)  // assertions check the fixture moved
+    return StorageSchemaTests.instant
+  }
+
+  func wait(milliseconds: UInt64) {}
+}

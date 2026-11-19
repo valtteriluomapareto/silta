@@ -29,8 +29,8 @@ package enum BackupService {
       let token = String(work.dropFirst(".manual-".count))
       let name = "silta-\(utcDay(date))-manual-\(milliseconds)-\(token).db"
       let path = try backup.snapshot(
-        name: name, staging: work)
-      try backup.prune(on: utcDay(date), manual: true, keeping: [name])
+        name: name, staging: work, source: store.preparedWriter())
+      try? backup.prune(on: utcDay(date), manual: true, keeping: [name])  // best-effort
       return BackupResult(path: path.path)
     } catch { throw StorageError.backupFailed }
   }

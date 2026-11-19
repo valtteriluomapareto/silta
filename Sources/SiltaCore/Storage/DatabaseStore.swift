@@ -121,6 +121,12 @@ package final class DatabaseStore: Sendable {
     return pending
   }
 
+  /// The already-open connection for snapshotting an existing store.
+  func preparedWriter() throws -> DatabaseQueue {
+    guard let queue = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
+    return queue
+  }
+
   /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most
   /// three times. The closure must perform database-only work: a rolled-back attempt
   /// can run again.
@@ -134,7 +140,7 @@ package final class DatabaseStore: Sendable {
     var kept: T?
     do {
       try initialize()
-      guard let queue = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
+      let queue = try preparedWriter()
       let backup = StorageBackup(home: home)
       let (result, day) = try withStorageRetry(clock: clock, jitter: jitter) {
         try queue.write { db in

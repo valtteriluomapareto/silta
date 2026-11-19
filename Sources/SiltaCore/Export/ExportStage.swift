@@ -8,6 +8,11 @@ struct ExportStage {
   let parent: Int32
   let directory: Int32
 
+  var attached: Bool {
+    DirectoryPath.matches(parent, path: work.deletingLastPathComponent())
+      && DirectoryPath.matches(directory, path: work)
+  }
+
   func write(_ files: [String: Data]) throws {
     let tree = try DirectoryPath.open("tree", in: directory, creating: true)
     defer { close(tree) }

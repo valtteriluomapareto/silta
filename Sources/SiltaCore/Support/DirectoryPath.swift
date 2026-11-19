@@ -73,6 +73,14 @@ enum DirectoryPath {
     }
   }
 
+  /// Confirms a pathname still denotes the directory used for relative mutations.
+  static func matches(_ descriptor: Int32, path: URL) -> Bool {
+    var opened = stat()
+    var named = stat()
+    return fstat(descriptor, &opened) == 0 && stat(path.path, &named) == 0
+      && opened.st_dev == named.st_dev && opened.st_ino == named.st_ino
+  }
+
   static func failure() -> POSIXError {
     POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
   }
