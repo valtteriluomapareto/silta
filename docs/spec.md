@@ -2688,7 +2688,7 @@ scriptable and deterministic (D13).
     (including `SILTA_ACTOR` and `SILTA_SESSION`)
   - expectations: `exit`, optional `code`, `stdout` golden filename, or `json`
     dotted paths (numeric components select array indices) equal to string, integer or boolean values.
-    An explicit `json` expectation must contain at least one path.
+    A `json` map must contain at least one path.
   - `fixtures: true` builds the fixed Acme suite. Seed-data/file/DB expectations
     join the format when commands need them.
   - An unknown key fails the scenario, so a misspelled expectation can't pass unchecked.
