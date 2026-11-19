@@ -1,4 +1,5 @@
 #if DEBUG
+  import Darwin
   import Foundation
   import Observation
   @testable import SiltaApp
@@ -89,7 +90,9 @@
       #expect(copied.response(run: "owned", sequence: 1)["copied"] as? String == "AC-9")
       let command = await actions.perform(.copyCommand)
       let text = try #require(command.response(run: "owned", sequence: 2)["copied"] as? String)
-      let path = fixture.home.resolvingSymlinksInPath().path
+      let canonical = try #require(realpath(fixture.home.path, nil))
+      defer { free(canonical) }
+      let path = String(cString: canonical)
       #expect(text == "SILTA_HOME='\(path)' silta --ws 'acme' task show 'AC-9' --timeline")
       #expect(await actions.perform(.select("board:AC-9")) == .noop)
       #expect(await actions.perform(.toggleInspector) == .accepted)
