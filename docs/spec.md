@@ -97,7 +97,7 @@ in product repos.
 | D1 | **SQLite is the source of truth** for everything `silta` owns. Humans edit configuration as YAML (`silta ws edit`), which is validated and applied to the DB. | Relations and queries are first-class; YAML is just an editing view. |
 | D2 | **External sources are indexed, never owned.** Meeting-note folders and repo docs are read-only and re-indexed on change. | Notes stay the output of whatever produces them; repo docs stay in repos. |
 | D3 | **Deterministic export** to a text tree for backup and diff. `silta restore` replaces a workspace from it. | A `.db` file can't be diffed or reviewed; the export can. |
-| D4 | **CLI only, `--json` everywhere. No MCP server, no daemon.** | Every target harness has a shell tool. If shell-less clients ever matter, it would be a `silta mcp` stdio subcommand, never hosted in the app. |
+| D4, D50 | **Shell CLI for agents and a native development app for people.** | Agent harnesses use the CLI's `--json` contract. Both front-ends share SiltaCore. MCP and a daemon remain outside the current scope. |
 | D5 | **Agent writes are gated.** Unsolicited agent tasks start as `proposed`. Agent doc changes are proposed revisions or human-approved edits (D38). Human-only commands need the human's go-ahead (D38). | Prevents spam and rot by default, without blocking work the human asked for in chat (§8). |
 | D6 | **`silta` resolves "where am I"** from cwd, git branch, upstream and claimed task (§7). | Agents shouldn't need to know which branch is which app. |
 | D7 | **Code access is read-only** via `git show`/`grep`/`log` on configured refs. | No checkout means you can't edit the wrong branch. |
