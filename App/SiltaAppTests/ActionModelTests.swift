@@ -190,6 +190,30 @@
       #expect(loads.forced.withLock { $0 } == 1)
     }
 
+    @Test func aReplyPostsIntoItsThreadWithItsOwnDraft() async throws {
+      let writes = ControlledWrites()
+      let loads = Loads()
+      let model = await makeModel(writes, loads)
+      let reply = try #require(model.target(AppModel.replyTarget("AC-9/1")))
+      let comment = try #require(model.target("AC-9"))
+      model.actions.setDraft("Thanks, merging.", for: reply)
+      model.actions.setDraft("New thread draft", for: comment)
+      let first = try #require(model.reply(to: "AC-9/1", task: "AC-9"))
+      let request = await writes.next()
+      #expect(
+        request.write == .comment(task: "AC-9", body: "Thanks, merging.", replyTo: "AC-9/1"))
+      request.continuation.resume(throwing: Refused())
+      await first.value
+      #expect(model.actions.draft(reply) == "Thanks, merging.")
+      #expect(model.actions.failures[reply] != nil)
+      let second = try #require(model.reply(to: "AC-9/1", task: "AC-9"))
+      (await writes.next()).continuation.resume()
+      await second.value
+      #expect(model.actions.draft(reply) == "")
+      #expect(model.actions.draft(comment) == "New thread draft")
+      #expect(loads.forced.withLock { $0 } == 2)
+    }
+
     @Test func noWriterMeansNoAction() async {
       let model = AppModel(load: { _, _, _ in nil })
       #expect(model.perform(.acceptAnswer(ref: "AC-14/2"), for: "AC-14/2") == nil)

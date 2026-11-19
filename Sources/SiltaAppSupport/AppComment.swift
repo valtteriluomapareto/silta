@@ -13,11 +13,31 @@ public struct AppComment: Equatable, Sendable {
   /// Root reference for a reply.
   public let replyTo: String?
   /// Whether the asker or claimer accepted this answer.
-  public internal(set) var accepted = false
+  public let accepted: Bool
+  /// Whether the author deleted this post; its body is Core's placeholder.
+  public let deleted: Bool
   /// When the thread was resolved; set on the root only.
-  public internal(set) var resolvedAt: String?
+  public let resolvedAt: String?
   /// Who resolved the thread; set on the root only.
-  public internal(set) var resolvedBy: String?
+  public let resolvedBy: String?
   /// Complete recipients, such as the actors a question is addressed to.
-  public internal(set) var mentions: [String] = []
+  public let mentions: [String]
+
+  init(
+    ref: String, kind: String, actor: String, body: String, createdAt: String,
+    replyTo: String?, accepted: Bool = false, deleted: Bool = false, resolvedAt: String? = nil,
+    resolvedBy: String? = nil, mentions: [String] = []
+  ) {
+    self.ref = ref
+    self.kind = kind
+    self.actor = actor
+    self.body = body
+    self.createdAt = createdAt
+    self.replyTo = replyTo
+    self.accepted = accepted
+    self.deleted = deleted
+    self.resolvedAt = resolvedAt
+    self.resolvedBy = resolvedBy
+    self.mentions = mentions
+  }
 }

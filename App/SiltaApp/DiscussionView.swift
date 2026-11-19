@@ -61,7 +61,7 @@ struct DiscussionView: View {
             Rectangle().fill(Self.railColor(reply.actor).opacity(0.45)).frame(width: 2)
           }
       }
-      if !thread.resolved { threadFooter(thread) }
+      if thread.canReply { threadFooter(thread) }
     }
     .padding(.leading, 12)
     .overlay(alignment: .leading) {
@@ -70,21 +70,32 @@ struct DiscussionView: View {
   }
 
   @ViewBuilder private func threadFooter(_ thread: DiscussionContent.Thread) -> some View {
-    if replyingTo == thread.id, let target = model.target(AppModel.replyTarget(thread.id)) {
+    // An open question to the human is answered, sharing the inspector's answer draft;
+    // any other thread gets a reply draft of its own.
+    let answers = thread.asks(human)
+    let targetRef = answers ? thread.id : AppModel.replyTarget(thread.id)
+    if replyingTo == thread.id, let target = model.target(targetRef) {
       ActionComposer(
-        model: model, target: target, placeholder: "Reply to \(thread.id)", sendTitle: "Reply",
-        command: nil, caption: "Replies to \(thread.id)", cancel: { replyingTo = nil },
+        model: model, target: target,
+        placeholder: "\(answers ? "Answer" : "Reply to") \(thread.id)",
+        sendTitle: answers ? "Send answer" : "Reply", command: nil,
+        caption: (answers ? "Answers " : "Replies to ") + thread.id, cancel: { replyingTo = nil },
         send: {
           Task {
-            await model.reply(to: thread.id, task: task.ref)?.value
-            if model.actions.failures[target] == nil { replyingTo = nil }
+            let sent =
+              answers
+              ? model.answer(question: thread.id, task: task.ref)
+              : model.reply(to: thread.id, task: task.ref)
+            await sent?.value
+            if sent != nil, model.actions.failures[target] == nil { replyingTo = nil }
           }
         })
     } else {
       HStack(spacing: 14) {
-        if model.writer != nil {
-          Button("Reply") { replyingTo = thread.id }.buttonStyle(.plain)
+        if model.writer != nil, thread.canReply {
+          Button(answers ? "Answer" : "Reply") { replyingTo = thread.id }.buttonStyle(.plain)
             .foregroundStyle(Color("TideText"))
+            .accessibilityLabel((answers ? "Answer " : "Reply to ") + thread.id)
         }
         Text(thread.state).foregroundStyle(Color("SecondaryInk"))
       }.font(.system(size: 12))
@@ -139,7 +150,7 @@ struct DiscussionView: View {
         CopyValue(value: comment.ref, title: "Copy comment reference", compact: true)
       }
       ClampedBody(
-        text: comment.body,
+        text: comment.body, ref: comment.ref,
         expanded: Binding(
           get: { expandedPosts.contains(comment.ref) },
           set: {
@@ -186,6 +197,7 @@ struct DiscussionView: View {
 /// A post body clamped to four lines, with Show more only when the clamp cut it.
 private struct ClampedBody: View {
   let text: String
+  let ref: String
   @Binding var expanded: Bool
   @State private var fullHeight: CGFloat = 0
   @State private var clampedHeight: CGFloat = 0
@@ -220,6 +232,7 @@ private struct ClampedBody: View {
           .labelStyle(TrailingIconLabelStyle())
           .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color("TideText"))
         }.buttonStyle(.plain)
+          .accessibilityLabel((expanded ? "Show less of " : "Show more of ") + ref)
       }
     }
   }

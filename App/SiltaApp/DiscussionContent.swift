@@ -9,6 +9,14 @@ nonisolated struct DiscussionContent {
     let replies: [AppComment]
     var id: String { root.ref }
     var resolved: Bool { root.resolvedAt != nil }
+    /// Core refuses replies to a resolved or deleted root.
+    var canReply: Bool { !resolved && !root.deleted }
+
+    /// An open question to the human, which a reply should answer rather than comment on.
+    func asks(_ human: String) -> Bool {
+      root.kind == "question" && root.mentions.contains(human)
+        && !replies.contains { $0.kind == "answer" && !$0.deleted }
+    }
 
     /// Replies shown while the thread is folded: all of up to two, else only the newest.
     func visibleReplies(expanded: Bool) -> [AppComment] {
@@ -23,7 +31,8 @@ nonisolated struct DiscussionContent {
 
     /// The thread's state line, such as "Open · 2 replies".
     var state: String {
-      let count = replies.isEmpty ? nil : DiscussionContent.replyCount(replies.count)
+      let live = replies.filter { !$0.deleted }.count
+      let count = live == 0 ? nil : DiscussionContent.replyCount(live)
       return ([resolved ? "Resolved" : "Open"] + [count].compactMap { $0 })
         .joined(separator: " · ")
     }
@@ -37,9 +46,13 @@ nonisolated struct DiscussionContent {
   var isEmpty: Bool { open.isEmpty && resolved.isEmpty }
   var count: Int { open.count + resolved.count }
 
+  /// `comments` is Core's normal read and `resolved` the threads it hides. A thread goes
+  /// by its root's state, so a resolved newest handoff, which Core keeps in the normal
+  /// read, still lands with the resolved threads.
   init(comments: [AppComment], resolved: [AppComment]) {
-    open = Self.threads(comments)
-    self.resolved = Self.threads(resolved)
+    let threads = Self.threads(comments) + Self.threads(resolved)
+    open = threads.filter { !$0.resolved }
+    self.resolved = threads.filter(\.resolved)
   }
 
   /// Groups posts in order: a root starts a thread and its replies join it. A reply whose

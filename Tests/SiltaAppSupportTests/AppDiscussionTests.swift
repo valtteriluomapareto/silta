@@ -1,6 +1,7 @@
 #if DEBUG
   import Foundation
   @testable import SiltaAppSupport
+  @testable import SiltaCore
   import SiltaTestSupport
   import Testing
 
@@ -22,12 +23,25 @@
       }
     }
 
-    @Test func aTaskWithoutResolvedThreadsReadsOnce() throws {
+    @Test func aTaskWithoutResolvedThreadsHasNone() throws {
       try withScratchDirectory { scratch in
         try AppFixtures.seed(in: scratch)
         let task = try AppWriterTests.reader(scratch).task("AC-12", workspace: "acme")
         #expect(task.resolvedComments.isEmpty)
         #expect(task.comments.first?.mentions == ["human:acme"])
+      }
+    }
+
+    @Test func anEmptyDeletedResolvedRootStaysHidden() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppWriterTests.reader(scratch)
+        let reviewer = AppWriterTests.agent(reader, .agent(tool: "claude", session: "review"))
+        let note = try reviewer.comment("AC-9", CommentDraft(body: "Scratch note."))
+        _ = try reviewer.updateComments([note.comment.ref], action: .resolve)
+        _ = try reviewer.updateComments([note.comment.ref], action: .delete)
+        let task = try reader.task("AC-9", workspace: "acme")
+        #expect(task.resolvedComments.map(\.ref) == ["AC-9/3", "AC-9/4"])
       }
     }
 
