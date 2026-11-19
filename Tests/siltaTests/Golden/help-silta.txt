@@ -34,8 +34,8 @@ SUBCOMMANDS:
   doc                     Read and edit stored documents.
   where                   Resolve the workspace, repository and app for a local
                           path.
-  doctor                  Check the database, repositories and agent setup for
-                          problems.
+  doctor                  Check the database, repositories and agent setup
+                          without repairs.
   comment                 Post task discussion; a claimer's handoff releases
                           its claim.
   brief                   Read budgeted local context for the current task.

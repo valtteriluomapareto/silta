@@ -6,7 +6,7 @@ struct DoctorCommand: OutputCommand {
   static let workspaceSource = WorkspaceSource.none
   static let configuration = CommandConfiguration(
     commandName: "doctor",
-    abstract: "Check the database, repositories and agent setup for problems.",
+    abstract: "Check the database, repositories and agent setup without repairs.",
     discussion: "--install checks agent setup only. Checks are scoped to all workspaces.\n"
       + "Harness checks are read without launches; broad inspection can update SQLite "
       + "sidecars.\n"

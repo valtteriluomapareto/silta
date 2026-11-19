@@ -33,7 +33,7 @@ silta doc archive  Archive a document and remove its live attachments (human-onl
 silta doc propose  Submit a complete document proposal.
 silta doc triage  Accept or reject document proposals atomically (human-only).
 silta where  Resolve the workspace, repository and app for a local path.
-silta doctor  Check the database, repositories and agent setup for problems.
+silta doctor  Check the database, repositories and agent setup without repairs.
 silta comment  Post task discussion; a claimer's handoff releases its claim.
 silta comment resolve  Resolve discussion threads atomically.
 silta comment reopen  Reopen discussion threads atomically.
