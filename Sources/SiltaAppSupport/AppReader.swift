@@ -81,8 +81,27 @@ public struct AppReader: Sendable {
       try checkSchema()
       let service = TaskService(environment: environment, workspace: workspace)
       let task = try service.show(ref)
-      return AppTask(
+      var result = AppTask(
         task, submission: task.status == "review" ? try service.reviewSubmission(ref) : nil)
+      if task.resolvedThreads != nil {
+        result.resolvedComments = Self.resolvedThreads(
+          try service.show(ref, timeline: true).comments ?? [], shown: result.comments)
+      }
+      return result
+    }
+  }
+
+  /// Resolved roots that Core's normal read hid, each followed by its replies. A thread
+  /// it already shows (the newest handoff) is not repeated.
+  static func resolvedThreads(_ timeline: [CommentDetails], shown: [AppComment])
+    -> [AppComment]
+  {
+    let shownRefs = Set(shown.map(\.ref))
+    let roots = timeline.filter {
+      $0.replyTo == nil && $0.resolvedAt != nil && !shownRefs.contains($0.ref)
+    }
+    return roots.flatMap { root in
+      [AppComment(root)] + timeline.filter { $0.replyTo == root.ref }.map(AppComment.init)
     }
   }
 

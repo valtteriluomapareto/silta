@@ -2,8 +2,8 @@
 public enum AppWrite: Equatable, Sendable {
   /// Answers a question on a task, in the question's thread.
   case answer(task: String, question: String, body: String)
-  /// Posts a plain comment on a task.
-  case comment(task: String, body: String)
+  /// Posts a plain comment on a task, as a new thread or as a reply in `replyTo`'s thread.
+  case comment(task: String, body: String, replyTo: String? = nil)
   /// Accepts an answer to the human's question, resolving its thread.
   case acceptAnswer(ref: String)
   /// Accepts task proposals as todo work, all or none.

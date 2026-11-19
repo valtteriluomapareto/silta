@@ -41,8 +41,10 @@ public struct AppTask: Equatable, Sendable {
   public let submission: AppSubmission?
   /// Masked task links retaining their relationship to the target.
   public let links: [AppTaskLink]
-  /// Discussion included when reading task detail.
+  /// Discussion included when reading task detail: open threads, roots before replies.
   public let comments: [AppComment]
+  /// Posts of resolved threads, which Core's normal read leaves out, roots before replies.
+  public internal(set) var resolvedComments: [AppComment] = []
 }
 
 extension AppTask {
@@ -59,11 +61,16 @@ extension AppTask {
         AppSubmission(actor: SecretGuard.redacted($0.actor), at: SecretGuard.redacted($0.at))
       },
       links: task.links.map { AppTaskLink(rel: $0.rel, target: $0.displayTarget) },
-      comments: (task.comments ?? []).map {
-        AppComment(
-          ref: $0.ref, kind: $0.kind, actor: $0.actor, body: $0.body,
-          createdAt: $0.createdAt, replyTo: $0.replyTo)
-      })
+      comments: (task.comments ?? []).map(AppComment.init))
+  }
+}
+
+extension AppComment {
+  init(_ post: CommentDetails) {
+    self.init(
+      ref: post.ref, kind: post.kind, actor: post.actor, body: post.body,
+      createdAt: post.createdAt, replyTo: post.replyTo, accepted: post.accepted,
+      resolvedAt: post.resolvedAt, resolvedBy: post.resolvedBy, mentions: post.mentions)
   }
 }
 
