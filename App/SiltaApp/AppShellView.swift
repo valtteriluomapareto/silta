@@ -27,17 +27,17 @@ struct AppShellView: View {
         content.frame(maxWidth: .infinity, maxHeight: .infinity)
       }.padding(.horizontal, 18).padding(.top, 4)
         .background { ShoreBackground() }
+        .toolbar {
+          AppScreenToolbar(
+            model: model, searchFocused: $searchFocused,
+            compactSearch: model.route == .docs && windowWidth < 1200)
+        }
     }
     .navigationTitle(model.screenTitle)
     .toolbar(removing: .title)
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     .background { ShoreBackground() }
     .focusedSceneValue(\.findAction, { searchFocused = true })
-    .toolbar {
-      AppScreenToolbar(
-        model: model, searchFocused: $searchFocused,
-        compactSearch: model.route == .docs && windowWidth < 1200)
-    }
     .onGeometryChange(for: CGFloat.self) {
       $0.size.width
     } action: {

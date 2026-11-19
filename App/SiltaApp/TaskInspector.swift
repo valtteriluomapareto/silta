@@ -113,10 +113,9 @@ struct TaskInspector: View {
             ContentUnavailableView("Select a task", systemImage: "sidebar.right")
           }
         }.padding(18).frame(
-          maxWidth: .infinity, minHeight: max(0, geometry.size.height - 20), alignment: .topLeading)
-      }.seaPane().padding(10)
+          maxWidth: .infinity, minHeight: geometry.size.height, alignment: .topLeading)
+      }.seaPane()
     }.foregroundStyle(Color("Ink"))
-      .background { ShoreBackground() }
       .task(id: selection) { await model.loadTaskDetail() }
   }
 

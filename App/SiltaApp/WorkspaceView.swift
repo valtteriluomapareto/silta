@@ -98,7 +98,7 @@ struct WorkspaceView: View {
               }.padding(.bottom, 24)
             }
           }
-        }.inspector(isPresented: $model.workspaceInspectorPresented) {
+        }.seaInspector(isPresented: model.workspaceInspectorPresented) {
           Group {
             if let node = model.workspaceNode {
               NodeInspector(ref: node, map: map, model: model)
@@ -107,7 +107,7 @@ struct WorkspaceView: View {
                 connection: content.connection(model.workspaceSelection?.connectionRef),
                 model: model)
             }
-          }.inspectorColumnWidth(min: 300, ideal: 360, max: 500)
+          }
         }
       } else {
         ContentUnavailableView("No workspace map", systemImage: "network")
@@ -170,8 +170,7 @@ struct ConnectionInspector: View {
           ContentUnavailableView("Select a connection", systemImage: "sidebar.right")
         }
       }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
-    }.seaPane().padding(10).foregroundStyle(Color("Ink"))
-      .background { ShoreBackground() }
+    }.seaPane().foregroundStyle(Color("Ink"))
   }
 
   private func documents(_ connection: AppConnection) -> some View {

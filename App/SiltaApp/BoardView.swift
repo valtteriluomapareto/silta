@@ -31,8 +31,8 @@ struct BoardView: View {
       }
     }
     .foregroundStyle(Color("Ink"))
-    .inspector(isPresented: $model.boardInspectorPresented) {
-      TaskInspector(model: model).inspectorColumnWidth(min: 300, ideal: 360, max: 500)
+    .seaInspector(isPresented: model.boardInspectorPresented) {
+      TaskInspector(model: model)
     }
   }
 
