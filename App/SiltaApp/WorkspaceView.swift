@@ -3,6 +3,7 @@ import SwiftUI
 
 struct WorkspaceView: View {
   @Bindable var model: AppModel
+  @AppStorage(SeaInspectorMetrics.storageKey) private var inspectorWidth = SeaInspectorMetrics.width
 
   var body: some View {
     Group {
@@ -98,7 +99,7 @@ struct WorkspaceView: View {
               }.padding(.bottom, 24)
             }
           }
-        }.seaInspector(isPresented: model.workspaceInspectorPresented) {
+        }.seaInspector(isPresented: model.workspaceInspectorPresented, width: $inspectorWidth) {
           Group {
             if let node = model.workspaceNode {
               NodeInspector(ref: node, map: map, model: model)
