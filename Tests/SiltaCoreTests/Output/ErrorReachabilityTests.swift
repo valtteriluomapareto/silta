@@ -220,6 +220,12 @@ extension ActorError: ErrorExamples {
   }
 }
 
+extension WorkspaceEditConflict: ErrorExamples {
+  static var examples: [WorkspaceEditConflict] {
+    [.init(workspace: "acme")]
+  }
+}
+
 extension ExportError: ErrorExamples {
   static var examples: [ExportError] {
     [
@@ -282,7 +288,8 @@ struct ErrorReachabilityTests {
     ScanError.self, CommentError.self, DocError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,
-    ExportError.self, ExportFailure.self, ExportGitFailure.self, AppReadError.self,
+    WorkspaceEditConflict.self, ExportError.self, ExportFailure.self, ExportGitFailure.self,
+    AppReadError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.

@@ -1969,8 +1969,12 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   of both location and default, carries no workspace tag.
   `where`, `brief` and status retain their location-first rules. Help, usage errors
   and commands without workspace scope do not infer a workspace.
-- Bodies come from `-m <text>` or `-F <file|->`. With neither on a TTY, `$EDITOR`
-  opens.
+- Bodies come from `-m <text>` or `-F <file|->`. Interactive `task edit` and
+  `ws edit` require terminal input and terminal stderr. Both editor output streams
+  go to that terminal, leaving Silta's stdout for its own output. These commands
+  return `usage` and point to `-F` without a terminal or file input. Editor startup
+  failures return `env` with help for the edit command. `task edit --print`
+  remains available without a terminal.
 - Refs follow §5.1.
 - Text payloads currently preserve ANSI/control escapes (comments, descriptions and
   plans included). Quote framing separates comment bodies from headers; it is not
@@ -2198,6 +2202,10 @@ Every CLI call is its own short-lived process, and several agents run at once.
   reused and no counter bootstrap state is needed. Doc-revision comments (M2) use
   `seq_counter` scope `comment:doc_rev:<id>`, allocated with their row.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
+- **Workspace edits** capture the selected configuration before launching the editor
+  or reading `-F`. The save verifies the baseline in its write transaction. A
+  competing change returns `conflict`. A stale interactive edit keeps its private
+  YAML file and points to the current configuration for review.
 - **Read commands never change `silta.db`'s contents and never migrate.** Archiving is
   computed, and caches are best-effort writes to `index.db`. A read may recreate the
   `-wal`/`-shm` files that another SQLite client, or copying `silta.db` alone, left
@@ -2981,8 +2989,11 @@ noninteractively, and network/authentication failures ask a human to repair the 
 repositories; it never overrides a unique registered cwd location. With no workspace yet, a human's
 `ws edit` opens starter YAML. Otherwise it edits the workspace selected by the
 [CLI precedence](#16-cli).
-An unchanged valid file or nonzero editor exit makes no changes; validation problems are
-reopened as comments above the YAML.
+An unchanged valid file or deliberate editor cancellation makes no changes.
+Validation problems are reopened as comments above the YAML. Returning the same
+invalid buffer ends the edit with its validation error. Approval is stored with a
+successful save. An accepted `--approved` value supplied for a no-op is reported
+as unused.
 
 **Settings (D39).** Only keys that are set are stored; reads fill in the defaults.
 Values are words, never YAML booleans.

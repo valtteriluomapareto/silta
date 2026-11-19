@@ -9,32 +9,44 @@ struct EditorCommandTests {
   static let taskEdit = ["--ws", "acme", "task", "edit", "AC-1"]
   static let wsEdit = ["ws", "edit", "acme", "--approved", "yes, update Acme fixture"]
 
-  @Test(arguments: [Self.taskEdit, Self.wsEdit])
-  func editorWithoutATerminalRefusesWithOneEnvelope(arguments: [String]) throws {
+  @Test(arguments: [Self.taskEdit, Self.wsEdit], [false, true])
+  func editorWithoutATerminalRefusesWithOneEnvelope(arguments: [String], json: Bool) throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)
       let result = try SiltaBinary.run(
-        arguments + ["--json"], in: scratch, environment: Self.editor("echo"))
-      withKnownIssue("#256: a nonterminal editor invocation runs the child") {
-        #expect(result.termination == .exit(1))
+        arguments + (json ? ["--json"] : []), in: scratch, environment: Self.editor("echo"))
+      #expect(result.termination == .exit(1))
+      let kind = arguments.contains("task") ? "task" : "ws"
+      Golden.forTests().check(
+        json ? result.stdout : result.stderr, kind + "-edit-terminal." + (json ? "json" : "txt"))
+      if json {
         #expect(result.stdout.split(whereSeparator: \.isNewline).count == 1)
-        #expect(result.stdout.contains(#""code":"usage""#))
-        #expect(result.stdout.contains("-F"))
         #expect(result.stderr.isEmpty)
+        try Self.followRecovery(result.stdout, in: scratch)
+      } else {
+        #expect(result.stdout.isEmpty)
       }
     }
   }
 
-  @Test(arguments: [Self.taskEdit, Self.wsEdit])
-  func unlaunchableEditorIsAnErrorOnATerminal(arguments: [String]) throws {
+  @Test(arguments: [Self.taskEdit, Self.wsEdit], [false, true])
+  func unlaunchableEditorIsAnErrorOnATerminal(arguments: [String], json: Bool) throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)
       let editor = scratch.appending(path: "missing-editor").path
       let output = try EditorTerminalFixture.run(
-        arguments + ["--json"], in: scratch, environment: Self.editor(editor))
-      withKnownIssue("#256: failed shell exec reports unchanged success") {
-        #expect(output.result.termination == .exit(9))
-        #expect(output.result.stdout.contains(#""code":"env""#))
+        arguments + (json ? ["--json"] : []), in: scratch, environment: Self.editor(editor))
+      #expect(output.result.termination == .exit(9))
+      let kind = arguments.contains("task") ? "task" : "ws"
+      if json {
+        Golden.forTests().check(output.result.stdout, kind + "-edit-launch.json")
+        try Self.followRecovery(output.result.stdout, in: scratch)
+      } else {
+        #expect(output.result.stdout.isEmpty)
+        let refusal = output.terminal.split(whereSeparator: \.isNewline)
+          .filter { $0.hasPrefix("error:") || $0.hasPrefix("ask human:") }
+          .joined(separator: "\n")
+        Golden.forTests().check(refusal + "\n", kind + "-edit-launch.txt")
       }
     }
   }
@@ -51,10 +63,25 @@ struct EditorCommandTests {
       let output = try SiltaBinary.run(
         Self.wsEdit + ["-F", file.path, "--json"], in: scratch, environment: env)
       #expect(output.termination == .exit(0))
-      withKnownIssue("#256: unchanged workspace claims to have used approval") {
-        #expect(output.stdout.contains("approval_unused"))
-      }
+      #expect(output.stdout.contains("approval_unused"))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
+    }
+  }
+
+  static func followRecovery(_ envelope: String, in scratch: URL) throws {
+    let json = try #require(
+      JSONSerialization.jsonObject(with: Data(envelope.utf8)) as? [String: Any])
+    let error = try #require(json["error"] as? [String: Any])
+    let commands = try #require(error["next"] as? [String])
+    try #require(!commands.isEmpty)
+    let directory = try SiltaBinary.url().deletingLastPathComponent().path
+    let env = TaskCommandTests.actor.merging(["PATH": directory + ":/usr/bin:/bin"]) { _, value in
+      value
+    }
+    for command in commands {
+      let result = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", command], in: scratch, environment: env)
+      #expect(result.termination == .exit(0), "\(result.stderr)")
     }
   }
 

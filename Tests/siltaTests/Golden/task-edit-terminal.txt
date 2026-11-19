@@ -1,0 +1,2 @@
+error: Editing needs terminal input and terminal stderr. Supply -F <file> or -F - for stdin. [usage]
+next: silta task edit --help

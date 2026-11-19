@@ -191,16 +191,15 @@ struct WorkspaceSettingsRegressionTests {
       let identity = (SeededIDGenerator(seed: 3) as any IDGenerator, TaskServiceTests.now)
       if interactive {
         var calls = 0
-        _ = try WorkspaceEditor.edit(
-          slug: "acme", store: store, actor: human, identity: identity
-        ) { file in
-          calls += 1
-          if calls == 1 { return 0 }
-          let content = try String(contentsOf: file, encoding: .utf8)
-          #expect(content.hasPrefix("# line"))
-          return 1
+        #expect(throws: CommandFailure.self) {
+          _ = try WorkspaceEditor.edit(
+            slug: "acme", store: store, actor: human, identity: identity
+          ) { _ in
+            calls += 1
+            return 0
+          }
         }
-        #expect(calls == 2)
+        #expect(calls == 1)
       } else {
         #expect(throws: WorkspaceError.self) {
           _ = try WorkspaceEditor.apply(
