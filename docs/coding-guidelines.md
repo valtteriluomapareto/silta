@@ -241,7 +241,7 @@ written first. The Tester reviewer checks it.
   `SiltaMain` only writes its result.
 - **Implementations:**
   - the CLI writes the JSONL command log (§19), plus stderr with `--verbose`
-  - the app uses `os.Logger` with subsystem `com.valtteriluoma.silta`
+  - the app records its action receipts in the JSONL command log (D50)
   - tests capture lines
 - **Privacy:** logs carry ids, counts, codes and timings. They never carry bodies
   (task text, comments, plans, file contents), so secrets and project data can't

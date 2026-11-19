@@ -1491,10 +1491,9 @@ section. `topic` is absent for the full manual; `topics` lists every available t
 includes its terminating newline in both modes. `--quiet` preserves these reads.
 The guide never opens the truth database or changes harness configuration; ordinary
 command logging still applies. Native `silta help [command…]` remains available.
-The manual labels workflows unavailable in the binary instead of teaching them as
-runnable commands. The text is the same in every workspace: a setting that changes
-the rules gets one conditional sentence, and `brief` names the workspace's non-default
-settings (D39). It covers:
+The manual covers commands shipped in the binary. Its text is the same in every
+workspace. A setting that changes the rules gets one conditional sentence, and
+`brief` names the workspace's non-default settings (D39). The guide covers:
 - **When to use silta.** Cross-repo work, another app or backend, branch-as-app repos,
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
   Not for trivial single-repo edits. Keep plans and results in Silta, never in PLAN.md
@@ -1567,7 +1566,6 @@ settings (D39). It covers:
   `--reply-to`, naming the change and proving test. Authors do not resolve findings
   unless assigned that responsibility. M2 (not yet available): `inbox` → `inbox take`
   → `task diff` → one `task review` with a lines file → replies → batch `comment resolve`.
-  The guide covers shipped commands. This spec carries the future workflow.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
   `--steal`, `where --set/--unset`, `task promote` or `--allow-secret` on your own initiative, only
   with the human's words through `--approved`. Never create tracker items, or plan
@@ -2875,7 +2873,7 @@ steps, questions, handoffs and results.
 |---|---|---|
 | **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | One task per slice in the `silta` workspace, linked to its issue. See the [current dogfooding workflow](../AGENTS.md#dogfooding) for claiming, submitting and finishing it (D41). |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
-| **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
+| **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The verified SessionStart hook runs `silta brief` for this repository’s configured Claude Code sessions. |
 | **DF3: a real second workspace** | S13 and S11's inbox ([DF3 plan](plans/df3-real-workspace.md)) | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
 
 **Rules:**

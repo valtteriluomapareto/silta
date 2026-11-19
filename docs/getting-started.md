@@ -47,8 +47,8 @@ rescan command. If it lists several candidates, inspect their configuration firs
 ## 4. Connect your agents
 
 If you use Codex, install it before its agent edits the workspace so it receives the
-writable Silta data root. Codex has no session hooks; your Codex agent runs `silta brief`
-at session start itself. Preview its user-level instructions and writable data root with:
+writable Silta data root. Silta's Codex instructions tell the agent to run
+`silta brief` at session start. Preview those instructions and the writable data root with:
 
 ```sh
 silta agents install --codex

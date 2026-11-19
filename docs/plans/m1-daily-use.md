@@ -90,7 +90,7 @@ built with Silta.
 |---|---|---|
 | DF0 | S6, S10, DF | Tasks, plans, steps and results for the remaining slices |
 | DF1 | S11 | Questions and handoffs between sessions |
-| DF2 | S12, S13 | Every session starts with `silta brief` through the hook |
+| DF2 | S12, S13 | [Verified SessionStart brief](../spec.md#221-dogfooding) |
 | DF3 | S13, S11 inbox | A second, multi-repo workspace ([plan](df3-real-workspace.md)) |
 
 At the end of each wave, review the tasks with topic `dogfood`. Each becomes a

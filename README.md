@@ -42,7 +42,7 @@ neighbour: api -> service:push [uses] Acme push
 - You need team coordination: Silta is single-user, local and has no sync; your team
   tracker remains the record of committed work.
 - You need a server, MCP integration or a web UI.
-- Your Mac runs an earlier version than macOS 26.
+- You need Silta Dev or the combined installer on a Mac earlier than macOS 26.
 
 ## Status
 
