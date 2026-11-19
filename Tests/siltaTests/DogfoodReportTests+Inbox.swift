@@ -21,12 +21,16 @@ extension DogfoodReportTests {
   @Test func undatedHumanInboxItemKeepsOldestUnknown() throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
+      let tools = try Self.tools(scratch)
+      let dated = try Self.run(["--since", "2023-11-25"], scratch: scratch, tools: tools)
+      #expect(dated.termination == .exit(0))
+      #expect(dated.stdout.contains("Inbox size: 2 items. Oldest item: 13 days."))
       try store.write {
         try $0.database.execute(
           sql: "UPDATE task SET external_ref='gh:acme/silta#12' WHERE uid='silta-task-12'")
       }
       let result = try Self.run(
-        ["--since", "2023-11-25"], scratch: scratch, tools: Self.tools(scratch))
+        ["--since", "2023-11-25"], scratch: scratch, tools: tools)
       #expect(result.termination == .exit(0))
       #expect(result.stdout.contains("Questions to @me: 1."))
       #expect(result.stdout.contains("Inbox size: 3 items. Oldest item: unknown."))
@@ -67,22 +71,13 @@ extension DogfoodReportTests {
           """, in: tools)
       let result = try Self.run(
         ["--ws", "silta", "--since", "2023-11-14"], scratch: scratch, tools: tools)
-      let verifyRefusal = {
-        #expect(result.termination == .exit(1) && result.stdout.isEmpty)
-        #expect(
-          result.stderr.contains(
-            failure == "exit" ? "human inbox read failed" : "invalid human inbox"))
-        #expect(
-          !FileManager.default.fileExists(
-            atPath: scratch.appending(path: "silta-home/reports").path))
-      }
-      if failure == "multiple" {
-        withKnownIssue("#267: streaming validation accepts a failed inbox envelope") {
-          verifyRefusal()
-        }
-      } else {
-        verifyRefusal()
-      }
+      #expect(result.termination == .exit(1) && result.stdout.isEmpty)
+      #expect(
+        result.stderr.contains(
+          failure == "exit" ? "human inbox read failed" : "invalid human inbox"))
+      #expect(
+        !FileManager.default.fileExists(
+          atPath: scratch.appending(path: "silta-home/reports").path))
     }
   }
 

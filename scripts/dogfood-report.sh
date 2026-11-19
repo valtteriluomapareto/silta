@@ -113,11 +113,12 @@ done <<<"$(/usr/bin/jq -r '.data.tasks[].ref' "$temporary/tasks")"
 silta --ws "$ws" schema --json > "$temporary/schema" || fail 'schema read failed.'
 /usr/bin/jq -e '.ok == true and (.data.commands | type == "array")' "$temporary/schema" >/dev/null || fail 'invalid schema.'
 silta --ws "$ws" inbox --for me --json > "$temporary/inbox" || fail "human inbox read failed. Run silta --ws $ws inbox --for me."
-/usr/bin/jq -e '
-  .ok == true and (.data.items | type == "array")
-  and (.data.remaining | type == "number" and . >= 0 and floor == .)
-  and all(.data.items[]; type == "object" and (.kind | type == "string")
-    and (.created_at == null or (.created_at | type == "string")))
+/usr/bin/jq -es '
+  length == 1 and (.[0] |
+    .ok == true and (.data.items | type == "array")
+    and (.data.remaining | type == "number" and . >= 0 and floor == .)
+    and all(.data.items[]; type == "object" and (.kind | type == "string")
+      and (.created_at == null or (.created_at | type == "string"))))
 ' "$temporary/inbox" >/dev/null 2>&1 || fail 'invalid human inbox.'
 /usr/bin/sqlite3 -readonly -json "$home/silta.db" "
 SELECT created_at,command
