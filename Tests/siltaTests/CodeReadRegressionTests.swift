@@ -5,6 +5,79 @@ import Testing
 
 /// Regressions for code reads: regex flavour, bounds, decoding, attributes, refs and paths.
 extension CodeCommandTests {
+  @Test(arguments: [true, false])
+  func grepAndLogRequireTheConfiguredAppDirectory(grep: Bool) throws {
+    try withScratchDirectory { scratch in
+      _ = try setup(scratch)
+      let verb = grep ? "grep" : "log"
+      let pattern = grep ? ["noAcmeMatch"] : []
+      let missing = try SiltaBinary.run(
+        ["--json", "code", verb, "console@origin/portal"] + pattern, in: scratch)
+      withKnownIssue("#264: grep and log report success when the app directory is absent") {
+        #expect(missing.termination == .exit(2))
+        #expect(missing.stdout.contains("App subpath \\\"apps/console\\\" not found"))
+        #expect(missing.stdout.contains("\"code\":\"not_found\""))
+        #expect(missing.stdout.contains("\"next\":[\"silta --ws 'acme' ws show\"]"))
+      }
+      let present = try SiltaBinary.run(
+        ["--json", "code", verb, "console"] + (grep ? pattern : ["no-such-path"]), in: scratch)
+      #expect(present.termination == .exit(0))
+      #expect(try envelope(present.stdout)["output"] as? String == "")
+    }
+  }
+
+  @Test(arguments: ["../x", "/x"])
+  func workspaceEditRejectsUnreadableSubpaths(path: String) throws {
+    try withScratchDirectory { scratch in
+      _ = try setup(scratch)
+      let before = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
+      try #require(before.termination == .exit(0))
+      let file = scratch.appending(path: "workspace.yaml")
+      let yaml = before.stdout.replacingOccurrences(of: "apps/console", with: path)
+      try #require(yaml != before.stdout)
+      try Data(yaml.utf8).write(to: file)
+      let result = try SiltaBinary.run(
+        ["--ws", "acme", "--json", "ws", "edit", "-F", file.path, "--approved", "Edit Acme"],
+        in: scratch, environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      let after = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
+      withKnownIssue("#264: workspace edit stores app subpaths no code read can use") {
+        #expect(result.termination == .exit(1))
+        #expect(result.stdout.contains("\"code\":\"invalid\""))
+        #expect(result.stdout.contains("subpath must be relative"))
+        #expect(after.stdout == before.stdout)
+      }
+    }
+  }
+
+  @Test func oversizedGitReadsKeepLateLineSelection() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let path = "oversized.txt"
+      let largeLine = String(repeating: "é", count: 1_100_000)
+      let file = "Acme start\nAcme \(largeLine)\nAcme end\n"
+      try Data(file.utf8).write(to: repo.appending(path: "apps/console/" + path))
+      try commitAll(repo, scratch)
+      let show = try SiltaBinary.run(
+        ["--json", "code", "show", "console@HEAD", path], in: scratch)
+      let grep = try SiltaBinary.run(
+        ["--json", "code", "grep", "console@HEAD", "Acme", "--", path], in: scratch)
+      for result in [show, grep] {
+        try #require(result.termination == .exit(0))
+        let value = try #require(try envelope(result.stdout)["output"] as? String)
+        let cutoff = try warnings(result.stdout)["output_truncated"]
+        withKnownIssue("#264: Git output is captured and formatted without a byte cap") {
+          #expect(value.utf8.count <= 1_048_576)
+          #expect(!value.contains("�"))
+          #expect(cutoff != nil)
+        }
+      }
+      let late = try SiltaBinary.run(
+        ["--json", "code", "show", "console@HEAD", path, "--lines", "3"], in: scratch)
+      #expect(try envelope(late.stdout)["output"] as? String == "Acme end\n")
+      #expect(try warnings(late.stdout)["lines_past_eof"] == nil)
+    }
+  }
+
   @Test func grepUsesExtendedRegularExpressions() throws {
     try withScratchDirectory { scratch in
       _ = try setup(scratch)
