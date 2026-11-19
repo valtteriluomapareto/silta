@@ -7,8 +7,15 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocTargetMigrationTests {
+  static var fixture: URL {
+    DocsMigrationTests.fixture.deletingLastPathComponent().appending(path: "storage-v7.db")
+  }
+
   @Test func v7HistoryRemainsUnknownWithoutChangingExistingColumns() throws {
     try withScratchDirectory { home in
+      withKnownIssue("#258: the starting database must come from the historical v7 writer") {
+        #expect(FileManager.default.fileExists(atPath: Self.fixture.path))
+      }
       let store = try DocAuditMigrationTests.copy(DocAuditMigrationTests.fixture, to: home)
       let queue = try DatabaseQueue(path: store.path)
       try StorageSchema.migrator.migrate(queue, upTo: "v7")
