@@ -142,7 +142,11 @@ workspace and excludes its own actor's calls and approvals.
   dropped, or left untriaged past 14 days, each counted once; an agent withdrawing
   its own proposal is not triage and isn't counted; the oldest pending
   proposal shows what still waits. The first report's numbers are mostly the setup
-  triage. Questions and inbox measurements are `n/a` until S11.
+  triage. The report reads the current human inbox for the selected workspace.
+  It counts questions addressed to `@me` and includes omitted entries in the
+  inbox size. When the inbox omits entries, the question count is a lower bound.
+  The oldest age is unknown if any entry is omitted or lacks a timestamp.
+  These inbox measurements describe the report time, regardless of `--since`.
 
 The report also measures document proposal decisions and observed brief exposure.
 
