@@ -2218,7 +2218,8 @@ The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 An empty `ws ls` prints a scan command from a Git checkout or `silta init --help`
 elsewhere. The command supplies valid naming options when the checkout name
-would give an invalid workspace slug or task prefix. Its JSON includes `next` and `next_by` for the empty list.
+would give an invalid workspace slug or task prefix. Its JSON includes `next` and
+`next_by` for the empty list.
 A successful scan lists the workspace and its sorted registered repository and app
 slugs. Text tells a human how to open the workspace editor and tells agents to ask
 before editing. Text and JSON give one read-only, workspace-scoped `ws show` next.

@@ -227,26 +227,6 @@ struct ScanNamingTests {
     }
   }
 
-  /// A scan without naming options refreshes an existing workspace, whatever its
-  /// directory would derive: `a-team` derives the invalid prefix `A-`.
-  @Test func noOptionScanOfAnExistingWorkspaceKeepsItsStoredPrefix() async throws {
-    try await withScratchDirectory { home in
-      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      try WorkspaceConfigTests.apply(
-        "workspace: {slug: a-team, name: A Team, task_prefix: AT}\nrepos: [{slug: team}]\n",
-        to: store)
-      let root = home.appending(path: "a-team")
-      let path = try Self.clone(root.appending(path: "team"))
-      let outcome = try await Self.create(
-        [root], store: store,
-        git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
-      #expect(outcome.workspace == "a-team")
-      #expect(try Self.workspaces(store) == ["a-team:A Team:AT"])
-      #expect(
-        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == path.path)
-    }
-  }
-
   @Test func invalidNamesFailAndNameTheFix() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
@@ -514,6 +494,33 @@ extension ScanNamingTests {
           ])
       }
       #expect(try WorkspaceSelection.list(in: store).isEmpty)
+    }
+  }
+}
+
+extension ScanNamingTests {
+  /// A scan with a verified binding keeps the existing prefix. The directory
+  /// name `a-team` would derive the invalid prefix `A-` for a new workspace.
+  @Test func noOptionScanOfAnExistingWorkspaceKeepsItsStoredPrefix() async throws {
+    try await withScratchDirectory { home in
+      let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      try WorkspaceConfigTests.apply(
+        "workspace: {slug: a-team, name: A Team, task_prefix: AT}\nrepos: [{slug: team}]\n",
+        to: store)
+      let root = home.appending(path: "a-team")
+      let path = try Self.clone(root.appending(path: "team"))
+      try store.write { tx in
+        try tx.database.execute(
+          sql: "INSERT INTO repo_path(repo_id,path) SELECT id,? FROM repo WHERE slug='team'",
+          arguments: [path.path])
+      }
+      let outcome = try await Self.create(
+        [root], store: store,
+        git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
+      #expect(outcome.workspace == "a-team")
+      #expect(try Self.workspaces(store) == ["a-team:A Team:AT"])
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT path FROM repo_path") } == path.path)
     }
   }
 }
