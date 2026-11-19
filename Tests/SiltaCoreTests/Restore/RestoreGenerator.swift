@@ -2,8 +2,8 @@ import Foundation
 import GRDB
 
 /// Adds seeded random rows to the fixture's Acme workspace: tasks whose parent was
-/// created after them, threaded comments, links of every kind, events, plan revisions
-/// and approvals, with values from an escaping corpus.
+/// created after them, threaded comments, links of every kind, events, plan revisions,
+/// approvals, and document history, with values from an escaping corpus.
 struct RestoreGenerator {
   private var state: UInt64
 
@@ -110,5 +110,58 @@ struct RestoreGenerator {
           VALUES(?,'acme','agent:codex:acme','silta ws edit',?,'2023-11-15T00:06:00.000Z')
           """, arguments: [uid("A"), text()])
     }
+    try insertDocuments(db)
+  }
+
+  private mutating func insertDocuments(_ db: Database) throws {
+    let active = try insertDocument(
+      db, slug: "generated-active", states: ["accepted", "proposed", "rejected", "superseded"],
+      archived: false, current: 1)
+    _ = try insertDocument(
+      db, slug: "generated-pending", states: ["proposed"], archived: false, current: nil)
+    _ = try insertDocument(
+      db, slug: "generated-archived", states: ["accepted"], archived: true, current: 1)
+    try db.execute(
+      sql: """
+        INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
+        VALUES(?,1,'doc',?,'about','app',1,'human:acme',?);
+        INSERT INTO doc_verification(uid,doc_rev_id,actor,message,app_shas,created_at)
+        SELECT ?,id,'human:acme',?,?,? FROM doc_rev WHERE doc_id=? AND rev=1;
+        """,
+      arguments: [
+        uid("DL"), active, Self.documentInstant, uid("DV"), text(),
+        #"[{"app":"portal","ref":"portal","sha":"0000000000000000000000000000000000000000"}]"#,
+        Self.documentInstant, active,
+      ])
+  }
+
+  private static let documentInstant = "2023-11-15T00:07:00.000Z"
+
+  private mutating func insertDocument(
+    _ db: Database, slug: String, states: [String], archived: Bool, current: Int?
+  ) throws -> Int64 {
+    try db.execute(
+      sql: """
+        INSERT INTO doc(uid,workspace_id,slug,title,kind,current_rev,archived,created_at,updated_at)
+        VALUES(?,1,?,?,'design',?,?,?,?)
+        """,
+      arguments: [
+        uid("D"), slug, slug, current, archived,
+        Self.documentInstant, Self.documentInstant,
+      ])
+    let document = db.lastInsertedRowID
+    for (index, state) in states.enumerated() {
+      try db.execute(
+        sql: """
+          INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,created_at,
+            title,kind)
+          VALUES(?,?,?,?,?,?,'human:acme',?,?,'design')
+          """,
+        arguments: [
+          uid("DR"), document, index + 1, index == 0 ? nil : 1, text(), state,
+          Self.documentInstant, slug,
+        ])
+    }
+    return document
   }
 }
