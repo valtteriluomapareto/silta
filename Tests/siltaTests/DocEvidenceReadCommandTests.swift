@@ -92,6 +92,40 @@ struct DocEvidenceReadCommandTests {
     }
   }
 
+  @Test func terminalDocumentPaginationKeepsItsLineCoordinates() throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let storedRow = "Acme first\u{2028}continued\u{2029}paragraph\rending"
+      let displayedRow = "Acme first continued paragraph ending"
+      let following = (2...410).map { "Acme line \($0)" }
+      let body = ([storedRow] + following).joined(separator: "\n")
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET body_md=? WHERE rev=2", arguments: [body])
+      }
+      let page = try run([], scratch)
+      let raw = try TaskStateRegressionTests.data(run([], scratch, json: true))
+      let rawLines = try #require(raw["output"] as? String).components(separatedBy: "\n")
+      let row = try #require(rawLines.firstIndex(of: storedRow))
+      let footer = try #require(rawLines.first { $0.contains("lines omitted; next: ") })
+      let range = try #require(footer.components(separatedBy: " --lines ").dropFirst().first)
+      let one = try run(["--lines", String(row + 1)], scratch, quiet: true)
+      let diff = try run(["--diff"], scratch)
+      let continued = try run(["--lines", range], scratch)
+      let items = (page.stdout + continued.stdout).split(separator: "\n")
+        .filter { $0.hasPrefix("Acme ") }.map(String.init)
+      withKnownIssue("#254: terminal projection changes the selected document lines") {
+        #expect(
+          one.stdout == displayedRow + "\n"
+            && diff.stdout.contains("+" + displayedRow + "\n")
+            && page.stdout.split(separator: "\n").count <= 400
+            && items == [displayedRow] + following,
+          "The terminal page and selected row must keep the JSON line coordinates.")
+      }
+      #expect(page.stdout.contains(footer))
+    }
+  }
+
   @Test(arguments: ["accepted", "proposed", "rejected", "superseded"])
   func allReadableStatesUseRecordedSourceWithoutLiveClaim(state: String) throws {
     try withScratchDirectory { scratch in
