@@ -17,9 +17,7 @@ extension RestoreServiceTests {
       try DatabaseQueue(path: store.path).write { try generator.insert($0) }
       let exported = try ExportTreeTests.render(store)
       let snapshot = try ExportTree.parse(exported)
-      withKnownIssue("#258: generated workspaces lack document history and attachments") {
-        Self.expectGeneratedDocuments(snapshot)
-      }
+      Self.expectGeneratedDocuments(snapshot)
       let tree = try RestoreSupport.write(exported, to: scratch.appending(path: "tree/acme"))
       let fresh = ExportFixture.store(scratch.appending(path: "b"))
       try fresh.initialize()
@@ -49,5 +47,6 @@ extension RestoreServiceTests {
         && $0.value("rel") == "about"
     }
     #expect(attachments.map { $0.value("to_kind") } == ["app"])
+    #expect(attachments.map { $0.value("to") } == ["01HZAPP0000000000000000009"])
   }
 }

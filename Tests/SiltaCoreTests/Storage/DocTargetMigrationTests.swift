@@ -13,13 +13,26 @@ struct DocTargetMigrationTests {
 
   @Test func v7HistoryRemainsUnknownWithoutChangingExistingColumns() throws {
     try withScratchDirectory { home in
-      withKnownIssue("#258: the starting database must come from the historical v7 writer") {
-        #expect(FileManager.default.fileExists(atPath: Self.fixture.path))
+      let store = try DocAuditMigrationTests.copy(Self.fixture, to: home)
+      var config = Configuration()
+      config.readonly = true
+      let queue = try DatabaseQueue(path: store.path, configuration: config)
+      try queue.read { db in
+        #expect(
+          try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid")
+            == ["v1", "v2", "v3", "v4", "v5", "v6", "v7"])
+        #expect(
+          try Int.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'") == 6)
+        #expect(try String.fetchOne(db, sql: "PRAGMA integrity_check") == "ok")
+        let decision = try #require(
+          try Row.fetchOne(db, sql: "SELECT triaged_at,triaged_by FROM doc_rev WHERE id=14"))
+        #expect(decision["triaged_at"] as String? == "2023-11-14T22:14:00.000Z")
+        #expect(decision["triaged_by"] as String? == "human:acme")
+        #expect(
+          try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev WHERE triaged_at IS NULL") == 4)
       }
-      let store = try DocAuditMigrationTests.copy(DocAuditMigrationTests.fixture, to: home)
-      let queue = try DatabaseQueue(path: store.path)
-      try StorageSchema.migrator.migrate(queue, upTo: "v7")
       let columns = try DocAuditMigrationTests.columns(store.path, table: "doc_rev")
+      #expect(!columns.contains("about_targets"))
       let before = try DocAuditMigrationTests.rows(store.path, table: "doc_rev", columns: columns)
       try store.initialize()
       #expect(
