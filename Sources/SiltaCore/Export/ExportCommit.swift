@@ -7,13 +7,14 @@ extension ExportService {
     workspace: String, to root: URL, store: DatabaseStore, home: URL,
     seams: (git: any GitRunner, clock: any Clock)
   ) async throws -> ExportResult {
-    let root = root.standardizedFileURL
-    let operation = ExportCommit(root: root, workspace: workspace, git: seams.git)
+    let root = normalizedRoot(root, home: home)
+    try validateDefaultRoot(root, home: home)
+    let operation = ExportCommit(root: root, home: home, workspace: workspace, git: seams.git)
     try await operation.preflight()
     try store.initialize()
     let lock = try exportLock(home: home, clock: seams.clock)
     defer { withExtendedLifetime(lock) {} }
-    let written = try write(workspace: workspace, to: root, store: store, moves: ExportMoves())
+    let written = try write(workspace: workspace, to: root, store: store, home: home)
     return try await operation.commit(written.result, paths: written.paths)
   }
 }
@@ -21,13 +22,15 @@ extension ExportService {
 /// Git operations for one export root, with warnings retained on every post-write failure.
 private struct ExportCommit {
   let root: URL
+  let home: URL
   let workspace: String
   let git: any GitRunner
 
   var failed: ExportError { .gitFailed(root: root.path, workspace: workspace) }
 
   func run(_ arguments: [String]) async throws -> GitResult {
-    try await git.run(.init(arguments: arguments, directory: root))
+    try ExportService.validateDefaultRoot(root, home: home)
+    return try await git.run(.init(arguments: arguments, directory: root))
   }
 
   func preflight() async throws {

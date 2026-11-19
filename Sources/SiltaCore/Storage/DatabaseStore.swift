@@ -34,15 +34,22 @@ package final class DatabaseStore: Sendable {
   /// Creates the database and applies pending migrations after a complete snapshot.
   /// A platform file lock serializes initialization across processes. Failures are coded.
   package func initialize() throws {
+    try initialize(creating: !existingOnly)
+  }
+
+  /// Initializes an existing store without creating a database at a new location.
+  func initialize(creating: Bool) throws {
     do {
       try writer.withLock { cached in
+        if !creating { try requireExistingFile() }
         guard cached == nil else { return }
-        try requireExistingFile()
-        if !existingOnly {
-          try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        if creating {
+          let directory = try DirectoryPath.open(DirectoryPath.canonicalHome(home), creating: true)
+          close(directory)
         }
         let descriptor = Darwin.open(
-          home.appending(path: "migration.lock").path, O_CREAT | O_RDWR, 0o600)
+          home.appending(path: "migration.lock").path, O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC,
+          0o600)
         guard descriptor >= 0 else { throw StorageError.fileFailure(errno, at: home.path) }
         defer { close(descriptor) }
         // Covers WAL setup and discovery as well as migration execution across processes.
@@ -50,7 +57,7 @@ package final class DatabaseStore: Sendable {
           throw StorageError.fileFailure(errno, at: home.path)
         }
         defer { flock(descriptor, LOCK_UN) }
-        try requireExistingFile()  // again under the lock: it may have gone since
+        try prepareDatabaseFile(creating: creating)
         var config = Configuration()
         config.prepareDatabase { TaskVisibility.register(in: $0) }
         config.busyMode = .timeout(5)
@@ -69,7 +76,7 @@ package final class DatabaseStore: Sendable {
           let backup = StorageBackup(home: home)
           _ = try backup.snapshot(name: name)
           try migrator.migrate(queue)
-          try? backup.prune()  // best-effort retention after the committed migration
+          try? backup.prune(on: utcDay(timestamp), keeping: [name])  // retention after commit
         }
         cached = queue
       }
@@ -78,9 +85,22 @@ package final class DatabaseStore: Sendable {
     }
   }
 
-  /// Refuses a missing database file when this store may only write to an existing one.
+  private func prepareDatabaseFile(creating: Bool) throws {
+    if creating {
+      let file = Darwin.open(path, O_CREAT | O_EXCL | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0o600)
+      if file >= 0 {
+        close(file)
+      } else if errno != EEXIST {
+        throw StorageError.fileFailure(errno, at: path)
+      }
+    }
+    try requireExistingFile()
+  }
+
+  /// Confirms the fixed database entry is an existing regular file.
   private func requireExistingFile() throws {
-    guard !existingOnly || FileManager.default.fileExists(atPath: path) else {
+    var file = stat()
+    guard lstat(path, &file) == 0, file.st_mode & S_IFMT == S_IFREG else {
       throw StorageError.cannotOpen
     }
   }
@@ -101,20 +121,28 @@ package final class DatabaseStore: Sendable {
     return pending
   }
 
+  /// The already-open connection for snapshotting an existing store.
+  func preparedWriter() throws -> DatabaseQueue {
+    guard let queue = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
+    return queue
+  }
+
   /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most
   /// three times. The closure must perform database-only work: a rolled-back attempt
   /// can run again.
   /// Checks writer compatibility and completes the required daily snapshot before calling the body.
   /// With `rollingBack`, the body's result is returned and its transaction rolled back.
-  package func write<T>(rollingBack: Bool = false, _ body: (StorageTransaction) throws -> T)
-    throws -> T
-  {
+  /// A caller that also publishes a snapshot supplies its path through `keepingBackup`.
+  package func write<T>(
+    rollingBack: Bool = false, keepingBackup: ((T) -> String?)? = nil,
+    _ body: (StorageTransaction) throws -> T
+  ) throws -> T {
     var kept: T?
     do {
       try initialize()
-      guard let queue = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
+      let queue = try preparedWriter()
       let backup = StorageBackup(home: home)
-      let result = try withStorageRetry(clock: clock, jitter: jitter) {
+      let (result, day) = try withStorageRetry(clock: clock, jitter: jitter) {
         try queue.write { db in
           try Self.checkWriterVersion(db)
           // WAL lock acquisition alone does not prove the main file is writable.
@@ -135,10 +163,12 @@ package final class DatabaseStore: Sendable {
             kept = value
             throw RollBack()
           }
-          return value
+          return (value, day)
         }
       }
-      try? backup.prune()  // best-effort retention cannot invalidate a committed write
+      var keeping: Set<String> = ["silta-\(day).db"]
+      if let path = keepingBackup?(result) { keeping.insert(URL(filePath: path).lastPathComponent) }
+      try? backup.prune(on: day, keeping: keeping)  // best-effort retention
       return result
     } catch is RollBack {
       guard let kept else { throw StorageError.internalMisuse }  // set before every RollBack

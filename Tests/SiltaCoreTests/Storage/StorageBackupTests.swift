@@ -23,7 +23,7 @@ struct StorageBackupTests {
         let file = try backups.snapshot(name: name)
         let queue = try DatabaseQueue(path: file.path)
         #expect(try queue.read { try String.fetchOne($0, sql: "PRAGMA integrity_check") } == "ok")
-        try backups.prune()
+        try backups.prune(on: "2023-12-31")
       }
       let names = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
       #expect(names.count == 9)
@@ -119,7 +119,7 @@ struct StorageBackupTests {
         _ = try backup.snapshot(
           name: String(format: "silta-2023-12-%02d.db", day))
       }
-      try backup.prune()
+      try backup.prune(on: "2023-12-31")
       #expect(FileManager.default.fileExists(atPath: note.path))
       #expect(FileManager.default.fileExists(atPath: alias.path))
     }
