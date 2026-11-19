@@ -197,7 +197,10 @@ if mode == 'timeout':
     read_end, write_end = os.pipe()
     os.read(read_end, 1)
 recording = json.loads((ROOT / 'tests/recordings' / (scenario + '-pass.json')).read_text())
-for index, action in enumerate(recording['phases'][phase]):
+actions = recording['phases'][phase]
+if mode == 'stream-error-steal':
+    actions = [*actions, {'args': ['task', 'start', 'AC-1', '--steal', '--json'], 'exit': 3}]
+for index, action in enumerate(actions):
     if 'message' in action:
         message(action['message'])
         continue
@@ -211,6 +214,10 @@ for index, action in enumerate(recording['phases'][phase]):
     else:
         argv = ['silta', '--ws', 'acme', *[value.format(sha=sha) for value in action['args']]]
         stdin = action.get('stdin')
+    if mode == 'stream-error-steal' and '--steal' in argv:
+        other = dict(os.environ, SILTA_ACTOR='agent:codex:acme-other')
+        subprocess.run(['silta', '--ws', 'acme', 'task', 'start', 'AC-1', '--json'],
+                       env=other, capture_output=True, check=True)
     command = shlex.join(argv)
     identifier = 'tool-' + str(index)
     emit({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': identifier, 'name': 'Bash', 'input': {'command': command}}]}}
@@ -220,7 +227,7 @@ for index, action in enumerate(recording['phases'][phase]):
            'content': run.stdout + run.stderr, 'is_error': run.returncode != 0}]}}
          if harness == 'claude' else {'type': 'item.completed', 'item': {'id': identifier, 'type': 'command_execution', 'command': command,
          'exit_code': run.returncode, 'aggregated_output': run.stdout + run.stderr}})
-    assert run.returncode == 0, run.stdout + run.stderr
+    assert run.returncode == action.get('exit', 0), run.stdout + run.stderr
 hook('Stop')
 answer = 'PREVIOUS_TRIAL_ANSWER:' + actor
 for name in HISTORY_FILES[harness]:
@@ -267,8 +274,8 @@ if harness == 'codex' and mode != 'missing-usage':
             'total_token_usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}}}}])) + '\n')
 if mode == 'malformed':
     print('invalid native JSON', flush=True)
-terminal = ({'type': 'result', 'is_error': mode == 'stream-error', 'usage': {'input_tokens': 10, 'output_tokens': 5}}
-            if harness == 'claude' else {'type': 'turn.failed' if mode == 'stream-error' else 'turn.completed',
+terminal = ({'type': 'result', 'is_error': mode.startswith('stream-error'), 'usage': {'input_tokens': 10, 'output_tokens': 5}}
+            if harness == 'claude' else {'type': 'turn.failed' if mode.startswith('stream-error') else 'turn.completed',
                                         'usage': {'input_tokens': 10 * count, 'output_tokens': 5 * count}})
 if mode == 'missing-usage':
     terminal.pop('usage')

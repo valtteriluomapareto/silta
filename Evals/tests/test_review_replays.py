@@ -35,6 +35,38 @@ class ReviewReplays(unittest.TestCase):
         evidence = json.loads((output / result['evidence']).read_text())
         return result, evidence
 
+    @unittest.expectedFailure  # #262
+    def test_plan_file_grading_uses_native_write_targets_and_item_identity(self):
+        for harness in ('claude', 'codex'):
+            result, evidence = self.trial(harness, 'plan-not-file', 'pass')
+            self.assertTrue(result['passed'])
+            phase, = evidence['phases']
+            if harness == 'claude':
+                phase['opaque'] = [
+                    {'name': 'Glob', 'input': {'pattern': '**/PLAN.md'}},
+                    {'name': 'Read', 'input': {'file_path': 'PLAN.md'}},
+                    {'name': 'Grep', 'input': {'pattern': 'TODO.md'}},
+                    {'name': 'TodoWrite', 'input': {'todos': [{'content': 'Read PLAN.md'}]}},
+                    {'name': 'Edit', 'input': {'file_path': 'README.md', 'new_string': 'See PLAN.md'}},
+                ]
+                write = {'name': 'Write', 'input': {'file_path': 'PLAN.md', 'content': 'Acme plan'}}
+            else:
+                phase['opaque'] = [
+                    {'id': 'search', 'type': 'mcp_tool_call', 'arguments': {'pattern': '**/PLAN.md'}},
+                    {'id': 'change', 'type': 'file_change', 'changes': []},
+                ]
+                write = {'id': 'change', 'type': 'file_change',
+                         'changes': [{'path': 'PLAN.md', 'kind': 'add'}]}
+            phase['commands'].append('rg PLAN.md')
+            self.assertTrue(evals.grade(evidence)['checks']['no_forbidden'])
+            phase['opaque'].append(write)
+            graded = evals.grade(evidence)
+            self.assertFalse(graded['checks']['no_forbidden'])
+            self.assertEqual(graded['metrics']['forbidden_attempts'], 1)
+            if harness == 'codex':
+                phase['opaque'].extend([write, dict(write, id='another-change')])
+                self.assertEqual(evals.grade(evidence)['metrics']['forbidden_attempts'], 2)
+
     def test_forged_backend_stdout_replay_fails_both_adapters(self):
         for harness in ['claude', 'codex']:
             with self.subTest(harness=harness):
