@@ -109,6 +109,77 @@ struct RestoreRefusalTests {
     }
   }
 
+  @Test(
+    arguments: ["workspace", "task_prefix", "repos", "apps", "topics", "services"], [false, true])
+  func malformedIdentifiersLeaveTheStoreUnchanged(_ field: String, dryRun: Bool) throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      var snapshot = try ExportTree.parse(ExportTreeTests.render(store))
+      try Self.replaceIdentifier(field, in: &snapshot)
+      let tree = try RestoreSupport.write(
+        snapshot.files(), to: scratch.appending(path: "tree/acme"))
+      try RestoreSupport.settle(store)
+      let dump = try RestoreSupport.dump(store)
+      let backups = try RestoreSupport.backups(home)
+      let result = Result {
+        try RestoreSupport.restore(tree, into: store, home: home, dryRun: dryRun)
+      }
+      let unchanged = try RestoreSupport.dump(store) == dump
+      let snapshots = try RestoreSupport.backups(home)
+      let labels = [
+        "workspace": "workspace slug", "task_prefix": "task prefix", "repos": "repo slug",
+        "apps": "app slug", "topics": "topic slug", "services": "service slug",
+      ]
+      let label = try #require(labels[field])
+      let refusal = ExportError.invalidTree(
+        reason: "the \(label) is not an identifier", workspace: snapshot.workspace.value("slug"))
+      withKnownIssue("#253: Restore lacks dedicated identifier admission.") {
+        #expect(throws: refusal) { try result.get() }
+        #expect(unchanged)
+        #expect(snapshots == backups)
+      }
+    }
+  }
+
+  @Test func taskSequenceMustLeaveRoomForTheNextRef() throws {
+    try withScratchDirectory { scratch in
+      let store = try ExportFixture.make(scratch.appending(path: "home"))
+      var snapshot = try ExportTree.parse(ExportTreeTests.render(store))
+      snapshot.tasks[0].row = snapshot.tasks[0].row.replacing(
+        "seq", with: String(Int64.max), keys: ExportFormat.taskKeys)
+      let validation = RestoreValidation(tree: snapshot, slug: "acme")
+      withKnownIssue("#253: Restore row admission accepts an exhausted task sequence.") {
+        #expect(throws: ExportError.self) {
+          try validation.rows(documents: snapshot.documents)
+        }
+      }
+    }
+  }
+
+  private static func replaceIdentifier(_ field: String, in tree: inout ExportSnapshot) throws {
+    switch field {
+    case "workspace":
+      tree.workspace = tree.workspace.replacing(
+        "slug", with: "acme research", keys: ExportFormat.workspaceKeys)
+    case "task_prefix":
+      tree.workspace = tree.workspace.replacing(
+        "task_prefix", with: "AC LAB", keys: ExportFormat.workspaceKeys)
+      for index in tree.tasks.indices {
+        let ref = "AC LAB-" + (tree.tasks[index].row.value("seq") ?? "")
+        tree.tasks[index].ref = ref
+        tree.tasks[index].row = tree.tasks[index].row.replacing(
+          "ref", with: ref, keys: ExportFormat.taskKeys)
+      }
+    default:
+      let index = try #require(tree.sections.firstIndex { $0.name == field })
+      let keys = ExportFormat.sections[index].keys
+      let section = tree.sections[index]
+      let row = try #require(section.rows.first)
+      tree.sections[index].rows[0] = row.replacing("slug", with: "team/research", keys: keys)
+    }
+  }
+
   @Test func newerDatabaseIsRefusedAfterDocumentReplacement() throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "a")

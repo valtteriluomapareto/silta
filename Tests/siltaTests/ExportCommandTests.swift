@@ -197,15 +197,24 @@ struct ExportCommandTests {
   @Test func unexpandedTildeIsRefused() throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)
-      for to in ["~/notes", "~"] {
+      for to in ["~/notes", "~", "~acme/notes", "~acme"] {
         let result = try SiltaBinary.run(
           ["--ws", "acme", "export", "--to", to, "--json"], in: scratch)
-        #expect(result.termination == .exit(1))
-        #expect(result.stdout.contains(#""code":"invalid""#))
+        let verify = {
+          #expect(result.termination == .exit(1))
+          #expect(result.stdout.contains(#""code":"invalid""#))
+        }
+        if to.hasPrefix("~acme") {
+          withKnownIssue("#253: Named tilde paths are accepted.", verify)
+        } else {
+          verify()
+        }
       }
-      #expect(
-        try FileManager.default.contentsOfDirectory(atPath: scratch.appending(path: "work").path)
-          .isEmpty)
+      let children = try FileManager.default.contentsOfDirectory(
+        atPath: scratch.appending(path: "work").path)
+      withKnownIssue("#253: A named tilde path publishes an export.") {
+        #expect(children.isEmpty)
+      }
     }
   }
 

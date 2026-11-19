@@ -25,8 +25,15 @@ private struct ExportLockProbe: GitRunner {
       return GitResult(termination: .exit(0), stdout: Data("true\n".utf8))
     }
     if request.arguments.first == "check-ignore" { return GitResult(termination: .exit(1)) }
-    if request.arguments.first == "diff" { return GitResult(termination: .exit(1)) }
-    if request.arguments.first == "commit" {
+    let arguments = request.arguments
+    let command = arguments.drop(while: { $0 == "--literal-pathspecs" }).first
+    if ["add", "diff", "commit"].contains(where: { $0 == command }) {
+      withKnownIssue("#253: Export supplies a nonliteral pathspec.") {
+        #expect(arguments.first == "--literal-pathspecs")
+      }
+    }
+    if command == "diff" { return GitResult(termination: .exit(1)) }
+    if command == "commit" {
       let descriptor = open(home.appending(path: "export.lock").path, O_RDWR)
       try #require(descriptor >= 0)
       defer { close(descriptor) }

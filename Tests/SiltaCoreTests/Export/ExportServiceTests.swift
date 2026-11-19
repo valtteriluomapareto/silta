@@ -29,6 +29,29 @@ struct ExportServiceTests {
     return files
   }
 
+  @Test(arguments: ["slug", "task_prefix", "service"])
+  func malformedStoredIdentifierDoesNotPublish(field: String) throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let store = try ExportFixture.make(home)
+      let root = scratch.appending(path: "exports")
+      let slug = field == "slug" ? "acme research" : "acme"
+      try store.write {
+        let sql =
+          field == "service"
+          ? "UPDATE service SET slug=? WHERE slug='mailer'"
+          : "UPDATE workspace SET \(field)=? WHERE slug='acme'"
+        try $0.database.execute(sql: sql, arguments: ["acme research"])
+      }
+      withKnownIssue("#253: Export builds paths from malformed stored identifiers.") {
+        #expect(throws: ExportError.self) {
+          try ExportService.export(workspace: slug, to: root, store: store, home: home)
+        }
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+      }
+    }
+  }
+
   @Test func writesTheTreeAndReplacesAPreviousExport() throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "home")
