@@ -1,0 +1,12 @@
+fixtures: true
+steps:
+  - args: [task, from-plan, fixtures/acme-platform, --dry-run, --json]
+    expect:
+      exit: 1
+      code: invalid
+      json:
+        error.message: Body input requires a regular file or standard input.
+        error.next.0: silta task from-plan --help
+        error.next_by: agent
+  - args: [task, from-plan, --help]
+    expect: {exit: 0}

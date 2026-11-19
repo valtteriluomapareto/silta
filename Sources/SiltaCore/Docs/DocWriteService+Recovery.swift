@@ -2,7 +2,7 @@ extension DocWriteService {
   func recovery(_ error: any CodedError, request: DocEditRequest, workspace: String)
     -> any CodedError
   {
-    if error is StorageError { return error }
+    if error is StorageError || error is BodyInputError { return error }
     if error.code == .env, error.next == ["silta backup"] { return error }
     let message = SecretGuard.redacted(error.message)
     guard safeScopeAndIdentity(request, workspace: workspace) else {

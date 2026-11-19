@@ -458,16 +458,7 @@ extension DocWritePolicyTests {
     for body in [
       "\u{0}tail", "Acme\u{0}tail", "é\u{0}", String(repeating: "a", count: 65_535) + "\u{0}",
     ] {
-      var bytes = Data(body.utf8)
-      let read = DocProposalServiceTests.refusal(.invalid) {
-        _ = try DocInput.read { maximum in
-          let chunk = bytes.prefix(min(maximum, 7))
-          bytes.removeFirst(chunk.count)
-          return Data(chunk)
-        }
-      }
       let direct = DocProposalServiceTests.refusal(.invalid) { try DocInput.check(body) }
-      #expect(read?.code == .invalid && read?.message == DocInputTests.refusal)
       #expect(direct?.code == .invalid && direct?.message == DocInputTests.refusal)
     }
     let callers = [false, true].flatMap { proposal in [false, true].map { (proposal, $0) } }

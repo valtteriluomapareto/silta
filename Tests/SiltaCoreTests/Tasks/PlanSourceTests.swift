@@ -7,6 +7,9 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct PlanSourceTests {
+  static let grownBody = TaskImportTests.text + String(repeating: "a", count: 65_537)
+  static let replacements = ["changed": "Changed", "grown": grownBody]
+
   static let locationArguments = [
     "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir",
   ]
@@ -92,7 +95,8 @@ struct PlanSourceTests {
   }
 
   @Test(arguments: [
-    "same", "changed", "replaced", "staged", "gitfail", "removed", "unwritable", "gitdir_changed",
+    "same", "changed", "grown", "replaced", "staged", "gitfail", "removed", "unwritable",
+    "gitdir_changed",
     "source_gitdir_changed",
   ])
   func postcommitChangesPreserveSuccessAndAvoidRetry(mode: String) async throws {
@@ -124,25 +128,27 @@ struct PlanSourceTests {
       if mode == "same" || mode == "removed" {
         #expect(!FileManager.default.fileExists(atPath: source.path))
       } else {
-        #expect(
-          try String(contentsOf: source, encoding: .utf8)
-            == (mode == "changed" ? "Changed" : TaskImportTests.text))
+        let expected =
+          Self.replacements[mode] ?? TaskImportTests.text
+        #expect(try String(contentsOf: source, encoding: .utf8) == expected)
       }
     }
   }
 }
 
 extension PlanSourceTests {
-  @Test func precommitInterleavingAndLaterChildFailureRetainSource() async throws {
+  @Test(arguments: [false, true])
+  func precommitInterleavingRetainsChangedSource(grown: Bool) async throws {
     try await withScratchDirectory { home in
       let root = home.appending(path: "repo", directoryHint: .isDirectory)
       try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
       let source = root.appending(path: "plan.md")
       try TaskImportTests.text.write(to: source, atomically: true, encoding: .utf8)
       let steps = Self.script(root)
+      let replacement = grown ? Self.grownBody : "Changed"
       let changing = ScriptedGitRunner(script: steps) { request in
         if request.arguments.contains("ls-files") {
-          try Data("Changed".utf8).write(to: source)
+          try Data(replacement.utf8).write(to: source)
         }
       }
       var options = TaskImport()
@@ -154,6 +160,7 @@ extension PlanSourceTests {
           TaskImportTests.text, options: options, source: source, directory: root)
       }
       #expect(try pre.db.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 0)
+      #expect(try String(contentsOf: source, encoding: .utf8) == replacement)
     }
   }
 
@@ -316,7 +323,8 @@ extension PlanSourceTests {
       guard count == 2 else { return }
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 1)
       switch mode {
-      case "changed": try Data("Changed".utf8).write(to: source)
+      case "changed", "grown":
+        try Data((Self.replacements[mode] ?? TaskImportTests.text).utf8).write(to: source)
       case "replaced":
         try TaskImportTests.text.write(to: source, atomically: true, encoding: .utf8)
       case "removed": try FileManager.default.removeItem(at: source)

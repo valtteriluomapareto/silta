@@ -36,12 +36,10 @@ struct BodyInputCommandTests {
       let payload = try GuideContractTests.object(result.stdout)["error"] as? [String: Any]
       let stored = try SiltaBinary.run(
         ["task", "show", "AC-1", "--json"], in: scratch, environment: TaskCommandTests.actor)
-      withKnownIssue("#268: a supplied task plan has no transport byte limit") {
-        #expect(result.termination == .exit(1))
-        #expect(payload?["code"] as? String == "invalid")
-        #expect((payload?["message"] as? String)?.contains("65536") == true)
-        #expect(stored.stdout.contains(Self.originalPlan))
-      }
+      #expect(result.termination == .exit(1))
+      #expect(payload?["code"] as? String == "invalid")
+      #expect((payload?["message"] as? String)?.contains("65536") == true)
+      #expect(stored.stdout.contains(Self.originalPlan))
     }
   }
 }

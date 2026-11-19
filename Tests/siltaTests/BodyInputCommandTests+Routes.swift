@@ -61,17 +61,16 @@ extension BodyInputCommandTests {
       let error = try GuideContractTests.object(json.stdout)["error"] as? [String: Any]
       let help = "silta --ws 'acme' " + route.command + " --help"
       let after = try Self.storedInput(in: store)
-      withKnownIssue("#268: each raw body reader has its own limit or recovery") {
-        #expect(json.termination == .exit(1) && text.termination == .exit(1))
-        #expect(json.stderr.isEmpty && text.stdout.isEmpty)
-        #expect(error?["code"] as? String == "invalid")
-        #expect(error?["next"] as? [String] == [help])
-        #expect(error?["next_by"] as? String == "agent")
-        #expect(error?["message"] as? String == "Body input exceeds 65536 bytes.")
-        #expect(text.stderr.contains("next: " + help))
-        #expect(!json.stdout.contains(source.path) && !text.stderr.contains(source.path))
-        #expect(after == before)
-      }
+      #expect(json.termination == .exit(1) && text.termination == .exit(1))
+      #expect(json.stderr.isEmpty && text.stdout.isEmpty)
+      #expect(error?["code"] as? String == "invalid")
+      #expect(error?["next"] as? [String] == [help])
+      #expect(error?["next_by"] as? String == "agent")
+      #expect(error?["message"] as? String == "Body input exceeds 65536 bytes.")
+      #expect(text.stderr.contains("next: " + help))
+      #expect(!json.stdout.contains(source.path) && !text.stderr.contains(source.path))
+      #expect(after == before)
+      try EditorCommandTests.followRecovery(json.stdout, in: scratch)
     }
   }
 
@@ -112,6 +111,45 @@ extension BodyInputCommandTests {
         in: scratch, environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(3))
       #expect(try TaskStateRegressionTests.error(result)["code"] as? String == "human_only")
+      #expect(try Self.storedInput(in: store) == before)
+    }
+  }
+
+  @Test func invalidUtf8AndDocumentNulRefuseWithoutAnApprovalRecord() throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      let source = scratch.appending(path: "raw body")
+      let before = try Self.storedInput(in: store)
+      for (bytes, message) in [
+        (Data([0xc3]), "Body input must be valid UTF-8."),
+        (Data("Acme\u{0}tail".utf8), "Doc input must not contain NUL bytes."),
+      ] {
+        try bytes.write(to: source)
+        let result = try SiltaBinary.run(
+          Route.docEdit.arguments(source.path) + ["--json"], in: scratch,
+          environment: TaskCommandTests.fixed)
+        #expect(result.termination == .exit(1))
+        let error = try TaskStateRegressionTests.error(result)
+        #expect(error["message"] as? String == message)
+        #expect(try Self.storedInput(in: store) == before)
+      }
+    }
+  }
+
+  @Test func existingLargePlansStillRoundTripThroughTheEditor() throws {
+    try withScratchDirectory { scratch in
+      let store = try Self.setupPlan(in: scratch)
+      let large = try #require(String(data: Self.oversizedPlan(), encoding: .utf8))
+      let saved = try SiltaBinary.run(
+        ["--ws", "acme", "task", "plan", "AC-1", "-m", large], in: scratch,
+        environment: TaskCommandTests.actor)
+      try #require(saved.termination == .exit(0))
+      let before = try Self.storedInput(in: store)
+      #expect(before.contains(large))
+      let output = try EditorTerminalFixture.run(
+        EditorCommandTests.taskEdit + ["--json"], in: scratch,
+        environment: TaskCommandTests.actor.merging(["EDITOR": "/usr/bin/true"]) { _, new in new })
+      #expect(output.result.termination == .exit(0), "\(output.result.stdout)")
       #expect(try Self.storedInput(in: store) == before)
     }
   }

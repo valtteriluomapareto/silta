@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// A source snapshot whose postcommit cleanup cannot turn into a retry of creation.
@@ -18,6 +19,9 @@ struct PlanSource: Sendable {
     var content: Data
   }
 
+  private static let sourceChanged = TaskError.invalid(
+    "The source changed while being read; inspect it before importing.")
+
   private var source: URL
 
   private var location: Location
@@ -30,9 +34,9 @@ struct PlanSource: Sendable {
     _ source: URL, content: Data, directory: URL, runner: any GitRunner
   ) async throws -> PlanSource {
     let location = try await locate(directory: directory, runner: runner)
-    let captured = try capture(source, location: location)
+    let captured = try capture(source, location: location, size: content.count)
     guard captured.content == content else {
-      throw TaskError.invalid("The source changed while being read; inspect it before importing.")
+      throw sourceChanged
     }
     guard
       try await locate(
@@ -44,7 +48,7 @@ struct PlanSource: Sendable {
     guard try await checked.isUntracked(runner: runner) else {
       throw TaskError.invalid("--delete refuses a tracked source; import without --delete.")
     }
-    guard try capture(source, location: location) == captured else {
+    guard try capture(source, location: location, size: content.count) == captured else {
       throw TaskError.invalid("The source changed during validation; inspect it before importing.")
     }
     return checked
@@ -56,7 +60,7 @@ struct PlanSource: Sendable {
         try await Self.locate(directory: location.root, runner: runner) == location,
         try await Self.locate(
           directory: snapshot.canonical.deletingLastPathComponent(), runner: runner) == location,
-        try Self.capture(source, location: location) == snapshot
+        try Self.capture(source, location: location, size: snapshot.content.count) == snapshot
       else { return false }
       try FileManager.default.removeItem(at: source)
       return true
@@ -93,7 +97,7 @@ struct PlanSource: Sendable {
     }
   }
 
-  private static func capture(_ source: URL, location: Location) throws -> Snapshot {
+  private static func capture(_ source: URL, location: Location, size: Int) throws -> Snapshot {
     do {
       let canonical = source.resolvingSymlinksInPath()
       let protected: Set<String> = [".git", ".claude", ".codex", ".opencode", ".agents", ".cursor"]
@@ -105,16 +109,18 @@ struct PlanSource: Sendable {
         throw TaskError.invalid(
           "--delete refuses sources outside the worktree or in Git/harness directories.")
       }
-      let attributes = try FileManager.default.attributesOfItem(atPath: source.path)
-      guard attributes[.type] as? FileAttributeType == .typeRegular,
-        let device = attributes[.systemNumber] as? NSNumber,
-        let inode = attributes[.systemFileNumber] as? NSNumber
-      else {
-        throw TaskError.invalid("--delete requires a regular file, not a symlink or directory.")
+      let file = try BoundedInput.openRegular(source.path, followSymlinks: false)
+      guard file.info.st_size == size else { throw sourceChanged }
+      let content = try BoundedInput.read(maximum: size) {
+        try file.handle.read(upToCount: $0)
       }
       return Snapshot(
-        canonical: canonical, device: device.uint64Value, inode: inode.uint64Value,
-        content: try Data(contentsOf: source))
+        canonical: canonical, device: UInt64(truncatingIfNeeded: file.info.st_dev),
+        inode: file.info.st_ino, content: content)
+    } catch BodyInputError.notRegular {
+      throw TaskError.invalid("--delete requires a regular file, not a symlink or directory.")
+    } catch BodyInputError.tooLarge {
+      throw sourceChanged
     } catch let error as TaskError {
       throw error
     } catch {

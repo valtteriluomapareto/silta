@@ -50,7 +50,7 @@ struct DocEditCommand: OutputCommand {
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let input: (() throws -> String)? = file.map { file in
-      { try DocInputFile.read(file, command: "silta doc edit") }
+      { try BodyInput.read(file) }
     }
     let result = try await service(context).edit(request, input: input)
     return CommandOutput(

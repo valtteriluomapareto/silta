@@ -1997,8 +1997,14 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   of both location and default, carries no workspace tag.
   `where`, `brief` and status retain their location-first rules. Help, usage errors
   and commands without workspace scope do not infer a workspace.
-- Bodies come from `-m <text>` or `-F <file|->`. Interactive `task edit` and
-  `ws edit` require terminal input and terminal stderr. Both editor output streams
+- Bodies come from `-m <text>` or `-F <file|->`. The positional source to
+  `task from-plan` follows the same file and stdin rules as `-F`. Supplied file or
+  stdin bodies accept up to 65,536 bytes of valid UTF-8, including any headers. A
+  named source must open a regular file. Unreadable files, nonregular named
+  sources, invalid UTF-8, and input beyond the byte ceiling return `invalid`
+  and help for the invoked command. Stdin can be a pipe, and overflow is refused
+  when its first extra byte arrives. Content checks for each command still apply.
+  Interactive `task edit` and `ws edit` require terminal input and terminal stderr. Both editor output streams
   go to that terminal, leaving Silta's stdout for its own output. These commands
   return `usage` and point to `-F` without a terminal or file input. Editor startup
   failures return `env` with help for the edit command. `task edit --print`

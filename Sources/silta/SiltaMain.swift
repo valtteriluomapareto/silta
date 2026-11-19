@@ -302,7 +302,12 @@ extension SiltaMain {
     explicitWorkspace: String?, arguments: [String], context: CommandContext
   ) -> CommandExecution {
     var failure: any Error = error
-    if let coded = failure as? any CodedError {
+    if let body = error as? BodyInputError {
+      let help = commandPath(arguments) + " --help"
+      let workspace = (command as? WsEditCommand)?.workspace ?? command.global.ws
+      failure = CommandFailure(
+        error: body, next: [workspace.map { workspaceCommand(help, workspace: $0) } ?? help])
+    } else if let coded = failure as? any CodedError {
       var recoveryCommand = command
       // Approval hints retain caller selection; operation logs retain captured selection.
       if coded is ActorError { recoveryCommand.global.ws = explicitWorkspace }

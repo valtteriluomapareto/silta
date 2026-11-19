@@ -16,11 +16,10 @@ struct WallClockBodyInputTests {
         ["--ws", "acme", "doc", "edit", "rules"] + DocEditCommandTests.creation
           + ["-F", pipe.path, "--approved", "Keep these rules", "--json"],
         in: scratch, environment: TaskCommandTests.fixed, timeout: 5)
-      withKnownIssue("#268: opening a named FIFO as a doc body waits for a writer") {
-        #expect(result.termination == .exit(1))
-        #expect(result.stdout.contains("\"code\":\"invalid\""))
-        #expect(result.stderr.isEmpty)
-      }
+      #expect(result.termination == .exit(1))
+      #expect(result.stdout.contains("\"code\":\"invalid\""))
+      #expect(result.stdout.contains("Body input requires a regular file or standard input."))
+      #expect(result.stderr.isEmpty)
     }
   }
 
@@ -33,12 +32,10 @@ struct WallClockBodyInputTests {
         URL(filePath: "/usr/bin/python3"),
         ["-c", Self.heldOpenInput, try SiltaBinary.url().path, file.path],
         in: scratch, environment: TaskCommandTests.actor, timeout: 10)
-      withKnownIssue("#268: a supplied stdin body waits for EOF beyond the limit") {
-        #expect(result.termination == .exit(1))
-        #expect(result.stdout.contains("\"code\":\"invalid\""))
-        #expect(result.stdout.contains("65536"))
-        #expect(result.stderr.isEmpty)
-      }
+      #expect(result.termination == .exit(1))
+      #expect(result.stdout.contains("\"code\":\"invalid\""))
+      #expect(result.stdout.contains("65536"))
+      #expect(result.stderr.isEmpty)
     }
   }
 

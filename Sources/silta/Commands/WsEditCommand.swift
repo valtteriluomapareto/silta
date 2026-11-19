@@ -40,7 +40,7 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     let selected: String?
     if let file {
       selected = try WorkspaceEditor.apply(
-        try read(file), slug: workspace, store: environment.db, actor: environment.actor,
+        try BodyInput.read(file), slug: workspace, store: environment.db, actor: environment.actor,
         identity: identity, approved: global.approved, prepared: environment.workspaceSelection,
         retryFromStdin: file == "-")
     } else {
@@ -56,17 +56,6 @@ struct WsEditCommand: WorkspaceArgumentCommand {
       data: Data(workspace: selected), approvalUsed: selected != nil && !environment.actor.isHuman)
     output.workspace = selected
     return output
-  }
-
-  private func read(_ file: String) throws -> String {
-    do {
-      let data =
-        try file == "-"
-        ? FileHandle.standardInput.readToEnd() ?? Foundation.Data()
-        : Foundation.Data(contentsOf: URL(filePath: file))
-      guard let text = String(data: data, encoding: .utf8) else { throw WorkspaceError.input }
-      return text
-    } catch { throw WorkspaceError.input }
   }
 
   private struct Data: Encodable {
