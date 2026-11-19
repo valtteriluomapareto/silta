@@ -38,7 +38,7 @@ struct AgentInstallTarget {
       Read `silta brief` at session start unless the hook already printed it.
       Read docs shown in the brief before cross-app work; details: `silta guide docs`.
       Keep plans and results in Silta; never create tracker items. Write a repo plan file
-      only where the repo's own instructions require one; the task plan then points to it.
+      only when the repo's own instructions require one; the task plan then points to it.
       Leave a handoff before stopping; read errors and their next commands.
       Details: `silta guide`.
       """ + "\n"

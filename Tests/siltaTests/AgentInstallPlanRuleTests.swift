@@ -53,7 +53,7 @@ struct AgentInstallPlanRuleTests {
       #expect(changes.map { $0["path"] } == [target.path])
       let diff = try #require(changes.first?["diff"])
       #expect(diff.contains("-Keep plans and results in Silta; never create repo plan files"))
-      #expect(diff.contains("+only where the repo's own instructions require one"))
+      #expect(diff.contains("+only when the repo's own instructions require one"))
 
       let args = ["install", "--\(target.harness)"]
       let applied = try AgentsInstallTests.apply(args, in: scratch, environment: env)
