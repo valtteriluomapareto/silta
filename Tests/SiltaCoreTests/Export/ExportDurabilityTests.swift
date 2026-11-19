@@ -6,6 +6,13 @@ import Synchronization
 import Testing
 
 struct ExportDurabilityTests {
+  @Test(arguments: ["", "/manifest.json", "tasks//AC-1.md", "tasks/./AC-1.md", ".."])
+  func generatedPathsRequireOrdinaryRelativeComponents(_ path: String) {
+    #expect(!ExportDurability.isRelativeFilePath(path))
+    #expect(ExportDurability.isRelativeFilePath("tasks/AC-1.md"))
+    #expect(ExportDurability.isRelativeFilePath("manifest.json"))
+  }
+
   @Test func firstPublicationSyncFailureNamesAnEmptyWorkDirectoryAccurately() throws {
     try withScratchDirectory { scratch in
       let home = scratch.appending(path: "home")

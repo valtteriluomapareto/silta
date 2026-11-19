@@ -136,7 +136,7 @@ struct RestoreDocumentTamperTests {
       do {
         _ = try RestoreSupport.restore(
           directory, into: target, home: home,
-          manifest: kind == "approval" ? "deadbeef" : nil)
+          manifest: kind == "approval" ? "deadbeefcafe" : nil)
         Issue.record("Restored damaged document tree: \(kind)")
       } catch let error as any CodedError {
         #expect(error.code == (kind == "approval" ? .conflict : .invalid))

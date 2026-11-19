@@ -197,15 +197,16 @@ struct ExportCommandTests {
   @Test func unexpandedTildeIsRefused() throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)
-      for to in ["~/notes", "~"] {
+      for to in ["~/notes", "~", "~acme/notes", "~acme"] {
         let result = try SiltaBinary.run(
           ["--ws", "acme", "export", "--to", to, "--json"], in: scratch)
         #expect(result.termination == .exit(1))
         #expect(result.stdout.contains(#""code":"invalid""#))
+        #expect(result.stdout.contains("unexpanded ~"))
       }
-      #expect(
-        try FileManager.default.contentsOfDirectory(atPath: scratch.appending(path: "work").path)
-          .isEmpty)
+      let children = try FileManager.default.contentsOfDirectory(
+        atPath: scratch.appending(path: "work").path)
+      #expect(children.isEmpty)
     }
   }
 

@@ -51,6 +51,11 @@ struct RestoreSafetyTests {
       }
       #expect(try RestoreSupport.dump(store) == dump)
       let report = try RestoreSupport.restore(tree, into: store, home: home, dryRun: true)
+      #expect(throws: ExportError.self) {
+        try RestoreSupport.restore(
+          tree, into: store, home: home, dryRun: true,
+          manifest: String(report.manifestSHA256.prefix(11)))
+      }
       _ = try RestoreSupport.restore(
         tree, into: store, home: home, manifest: String(report.manifestSHA256.prefix(12)))
     }

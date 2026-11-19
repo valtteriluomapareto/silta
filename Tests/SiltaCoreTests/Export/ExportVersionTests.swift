@@ -16,6 +16,16 @@ struct ExportVersionTests {
     try RestoreService.readTree(frozenDirectory)
   }
 
+  /// The old schema and encoding, with a service slug admitted by current restores.
+  static func restorableFormatOne() throws -> ExportSnapshot {
+    var snapshot = try ExportTree.parse(frozen())
+    let index = try #require(snapshot.sections.firstIndex { $0.name == "services" })
+    let service = try #require(snapshot.sections[index].rows.first)
+    snapshot.sections[index].rows[0] = service.replacing(
+      "slug", with: "push-service", keys: ExportFormat.sections[index].keys)
+    return snapshot
+  }
+
   static func frozenTwo() throws -> [String: Data] {
     var files = try ExportTreeTests.golden("acme")
     let manifest = URL(filePath: #filePath).deletingLastPathComponent()
@@ -105,12 +115,29 @@ struct ExportVersionTests {
     }
   }
 
-  @Test func frozenTreeRestoresLiteralLegacyValuesIntoCurrentFormat() throws {
+  @Test(arguments: [false, true])
+  func originalFormatOneServiceSlugIsRefused(dryRun: Bool) throws {
     try withScratchDirectory { home in
-      let before = try ExportTree.parse(Self.frozen())
       let store = ExportFixture.store(home)
       try store.initialize()
-      _ = try RestoreSupport.restore(Self.frozenDirectory, into: store, home: home)
+      let dump = try RestoreSupport.dump(store)
+      #expect(
+        throws: ExportError.invalidRestoreIdentifier(field: "service slug")
+      ) {
+        try RestoreSupport.restore(Self.frozenDirectory, into: store, home: home, dryRun: dryRun)
+      }
+      #expect(try RestoreSupport.dump(store) == dump)
+    }
+  }
+
+  @Test func restorableFormatOnePreservesLegacyEdgesAndReservedApps() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "home")
+      let before = try Self.restorableFormatOne()
+      let directory = try RestoreSupport.write(before.files(), to: scratch.appending(path: "acme"))
+      let store = ExportFixture.store(home)
+      try store.initialize()
+      _ = try RestoreSupport.restore(directory, into: store, home: home)
       let files = try ExportTreeTests.render(store)
       #expect(try Self.version(files) == "4")
       let after = try ExportTree.parse(files)
@@ -126,7 +153,9 @@ struct ExportVersionTests {
       let home = scratch.appending(path: "home")
       let store = ExportFixture.store(home)
       try store.initialize()
-      _ = try RestoreSupport.restore(Self.frozenDirectory, into: store, home: home)
+      let writable = try RestoreSupport.write(
+        Self.restorableFormatOne().files(), to: scratch.appending(path: "source/acme"))
+      _ = try RestoreSupport.restore(writable, into: store, home: home)
       let root = scratch.appending(path: "out")
       let target = try RestoreSupport.write(Self.frozen(), to: root.appending(path: "acme"))
       _ = try ExportService.export(workspace: "acme", to: root, store: store, home: home)

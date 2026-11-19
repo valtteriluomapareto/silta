@@ -726,6 +726,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   legacy edge kind. Retaining an executable for repair would leave fresh installs
   and attached identities without a reliable upgrade path.
 
+  ↳ 2026-11-19: Workspace editing and ref resolution retain legacy service
+  identities. Text export and restore both require identifier-shaped service slugs,
+  including restore of older supported formats. Legacy edge kinds retain their
+  existing round-trip behavior. See [spec §15](spec.md#15-export-backup-restore).
+
   Task-link input does not yet accept edge/service targets: its add-only surface
   has no unlink recovery. The internal resolver serves doc attachments, whose
   accepted set can be replaced. Typed task prefixes refuse instead of falling
