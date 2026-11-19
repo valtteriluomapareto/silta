@@ -124,7 +124,7 @@ FAULTS = [
      '            except (Exception, KeyboardInterrupt) as error:\n                trial_id =',
      '            except (OSError, RuntimeError, ValueError, KeyError, TypeError, EOFError, KeyboardInterrupt) as error:\n                trial_id =',
      'test_native_failures.NativeFailures.test_helper_exceptions_preserve_known_and_unknown_observations', '0 != 1'),
-    ('failure_retries_metrics_helper', 'evals.py', "metrics=failure_metrics(evidence)", 'metrics=metrics(evidence)',
+    ('failure_retries_metrics_helper', 'evals.py', "metrics=failure_metrics(evidence, enrich=False)", 'metrics=metrics(evidence)',
      'test_native_failures.NativeFailures.test_helper_exceptions_preserve_known_and_unknown_observations', 'Known terminal usage was lost'),
     ('malformed_fields_grade_as_complete', 'evals.py', 'valid and not schema_errors and terminal', 'valid and terminal',
      'test_native_failures.NativeFailures.test_malformed_native_schemas_still_finish_aborted_reports', 'False is not true'),

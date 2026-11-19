@@ -342,7 +342,6 @@ class Profiles(unittest.TestCase):
         self.assertIn('unapproved gate: silta task start', trial['violations'])
         self.assertEqual(trial['metrics']['forbidden_attempts'], len(trial['violations']))
 
-    @unittest.expectedFailure  # #262
     def test_pregrade_failure_keeps_independent_log_evidence(self):
         output, report, entries, _, _ = self.run_live('codex', 'pregrade-gate', fault='pregrade_gate')
         model, = [row for row in entries if row['event'] == 'model']

@@ -47,7 +47,6 @@ class OutcomeGrading(unittest.TestCase):
         self.assertCountEqual(evals.forbidden(e), ['repository file: ' + plan,
                                                    'repository file: acme-mobile/TODO'])
 
-    @unittest.expectedFailure  # #262
     def test_context_metrics_use_observed_output_and_the_immediate_followup(self):
         e = evidence()
         p = e['phases'][0]

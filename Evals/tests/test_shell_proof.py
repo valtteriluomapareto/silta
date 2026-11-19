@@ -81,7 +81,6 @@ class ShellProof(unittest.TestCase):
         p = phase({'A': 'exit 0; silta brief'}, [('A', 'started'), ('A', 'completed')], [])
         self.assertIsNone(evals.trace_matches_logs(p, 'codex'))
 
-    @unittest.expectedFailure  # #262
     def test_tracker_grading_distinguishes_observed_writes_from_reads(self):
         writes = [
             'gh --repo acme/example issue edit 1 --title Acme',

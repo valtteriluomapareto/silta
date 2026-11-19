@@ -381,10 +381,12 @@ show/grep and SessionStart), usage errors and observed forbidden attempts. Usage
 `[usage]` diagnostics for parse failures that occur before command logging.
 Native model token usage and cost are included when available. The report sums
 elapsed native launch time across phases, excluding setup and operator input. It
-counts an observed recovery when the next attributable call follows a concrete
-command printed by a Silta refusal. Brief and task-show output estimates use
-one token per four captured characters for matched successful calls. Missing
-timing, sequencing and output evidence is reported as unknown.
+counts a recovery when a recorded Silta refusal matches the command log and
+the next attributable call follows its concrete agent-owned command. The
+comparison preserves scope, authorization and action and ignores presentation
+flags. Brief and task-show output estimates use one token per four captured
+characters for matched successful calls. Missing timing, sequencing and
+output evidence is reported as unknown.
 Setup, installer and control calls are outside these metrics.
 
 ## Attach the report to issue #18

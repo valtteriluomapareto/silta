@@ -2812,7 +2812,7 @@ approval words came from a human; those checks require the live runs above.
 |---|---|
 | Success | All checks pass. Reported as pass rate and pass^k over N repeats (default 3) |
 | silta calls | Number of `silta` commands, and the number with `usage` errors (wrong flags or refs) |
-| Error recovery | Observed Silta refusals whose next attributable native call followed a concrete `next` command |
+| Error recovery | Log-attributed Silta refusals whose next native call followed a concrete agent-owned `next` command |
 | Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files the repo's instructions don't require (no fixture repo requires one, so any new plan file counts) |
 | Cost | Model tokens and cost where reported, plus elapsed native launch time across observed trial phases |
 | Brief use | Calls to `brief`/`task show` and an estimate of one token per four captured output characters for matched successful calls |
