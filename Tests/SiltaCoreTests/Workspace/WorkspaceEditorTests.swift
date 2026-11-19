@@ -7,8 +7,10 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkspaceEditorTests {
-  @Test(arguments: ["workspace: [\n", "workspace: {slug: beta, name: Beta, task_prefix: BE}\n"])
-  func unchangedInvalidInputEndsTheEditorLoop(invalidInput: String) throws {
+  @Test(
+    arguments: ["workspace: [\n", "workspace: {slug: beta, name: Beta, task_prefix: BE}\n"],
+    [false, true])
+  func unchangedInvalidInputEndsTheEditorLoop(invalidInput: String, rewrites: Bool) throws {
     try withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home)
       try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
@@ -20,7 +22,7 @@ struct WorkspaceEditorTests {
           identity: (SeededIDGenerator(seed: 2), WorkspaceConfigTests.instant)
         ) { file in
           count += 1
-          if count == 1 {
+          if count == 1 || rewrites {
             try invalidInput.write(to: file, atomically: true, encoding: .utf8)
           }
           guard count < 3 else { throw WorkspaceError.editor }
@@ -75,14 +77,17 @@ struct WorkspaceEditorTests {
       #expect(approvals == 0)
     }
   }
-  @Test func fileInputCapturesConfigurationBeforeReading() throws {
+  @Test(arguments: [false, true])
+  func fileInputCapturesConfigurationBeforeReading(unchanged: Bool) throws {
     try withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home)
       let original = WorkspaceConfigTests.minimal
       try WorkspaceConfigTests.apply(original, to: store)
+      let rendered = try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") }
       func read() throws -> String {
         try WorkspaceConfigTests.apply(original + "services: [mailer]\n", to: store)
-        return original.replacingOccurrences(of: "name: Acme", with: "name: Edited")
+        return unchanged
+          ? rendered : original.replacingOccurrences(of: "name: Acme", with: "name: Edited")
       }
       #expect(throws: WorkspaceEditConflict.self) {
         try WorkspaceEditor.apply(
@@ -94,6 +99,11 @@ struct WorkspaceEditorTests {
       #expect(service == "mailer")
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
     }
+  }
+
+  @Test func unsafeCaptureUsesWorkspaceDiscovery() {
+    let conflict = WorkspaceEditConflict(workspace: "Acme\nlegacy")
+    #expect(conflict.next == ["silta ws ls"])
   }
 
 }

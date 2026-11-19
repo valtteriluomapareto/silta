@@ -17,8 +17,12 @@ enum TerminalEditor {
     let editor = configured.isEmpty ? "vi" : configured
     let process = Process()
     process.executableURL = URL(filePath: "/bin/sh")
-    // The file path is a positional argument to the user's shell command.
-    process.arguments = ["-c", "exec " + editor + " \"$1\"", "silta-editor", file.path]
+    let script = "exec " + editor + " \"$1\""
+    let launch = #"""
+      if ! /bin/sh -n -c "$1"; then exit 127; fi
+      exec /bin/sh -c "$1" silta-editor "$2"
+      """#
+    process.arguments = ["-c", launch, "silta-editor", script, file.path]
     process.standardOutput = FileHandle.standardError
     process.standardError = FileHandle.standardError
     let failure = CommandFailure(error: WorkspaceError.editor, next: [command + " --help"])

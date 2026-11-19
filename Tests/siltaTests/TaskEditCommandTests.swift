@@ -63,6 +63,7 @@ struct TaskEditCommandTests {
     let script = scratch.appending(path: "editor.sh")
     let capture = scratch.appending(path: "capture.txt")
     let body = """
+      test -t 0 || exit 3
       printf '%s' "$1" > \(shellWord(capture.path))
       cp \(shellWord(file.path)) "$1"
       printf 'Acme editor stdout\n'

@@ -45,7 +45,7 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     }
     var output = CommandOutput(
       text: selected.map { "Updated workspace \($0)." } ?? "No changes.",
-      data: Data(workspace: selected), approvalUsed: selected != nil)
+      data: Data(workspace: selected), approvalUsed: selected != nil && !environment.actor.isHuman)
     output.workspace = selected
     return output
   }

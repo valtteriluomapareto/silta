@@ -29,7 +29,10 @@ package enum WorkspaceEditor {
     let text = try input()
     let baseline = try captured.get()
     let config = try WorkspaceConfig.parse(text)
-    if baseline.slug != nil, text.utf8.elementsEqual(baseline.text.utf8) { return nil }
+    if baseline.slug != nil, text.utf8.elementsEqual(baseline.text.utf8) {
+      try store.read(baseline.check)
+      return nil
+    }
     return try save(
       config, baseline: baseline, store: store, identity: identity,
       approval: (approval, command))
@@ -100,13 +103,15 @@ package enum WorkspaceEditor {
       try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
       let file = directory.appending(path: "workspace.yaml")
       var content = baseline.text
-      var lastProblem: WorkspaceError?
+      var rejected: (text: String, error: WorkspaceError)?
       while true {
         try content.write(to: file, atomically: true, encoding: .utf8)
         guard try editor(file) == 0 else { return nil }
         let changed = try String(contentsOf: file, encoding: .utf8)
         let unchanged = changed.utf8.elementsEqual(content.utf8)
-        if unchanged, let lastProblem { throw unchangedFailure(lastProblem, baseline: baseline) }
+        if let rejected, unchanged || changed.utf8.elementsEqual(rejected.text.utf8) {
+          throw unchangedFailure(rejected.error, baseline: baseline)
+        }
         do {
           let config = try WorkspaceConfig.parse(changed)
           guard !unchanged else { return nil }
@@ -118,7 +123,7 @@ package enum WorkspaceEditor {
           throw conflict
         } catch let error as WorkspaceError {
           guard !unchanged else { throw unchangedFailure(error, baseline: baseline) }
-          lastProblem = error
+          rejected = (changed, error)
           content =
             "# " + error.message.replacingOccurrences(of: "; ", with: "\n# ") + "\n" + changed
         }
@@ -133,10 +138,7 @@ package enum WorkspaceEditor {
   private static func unchangedFailure(_ error: WorkspaceError, baseline: Baseline)
     -> CommandFailure
   {
-    let next =
-      baseline.slug.map { workspaceCommand("silta ws show", workspace: $0) }
-      ?? "silta ws edit --help"
-    return CommandFailure(error: error, next: [next], nextBy: .agent)
+    CommandFailure(error: error, next: [workspaceEditRead(baseline.slug)], nextBy: .agent)
   }
 
   private static func save(
@@ -163,9 +165,7 @@ struct WorkspaceEditConflict: CodedError {
 
   var code: ErrorCode { .conflict }
   var nextBy: NextBy { .agent }
-  var next: [String] {
-    workspace.map { [workspaceCommand("silta ws show", workspace: $0)] } ?? ["silta ws ls"]
-  }
+  var next: [String] { [workspaceEditRead(workspace)] }
 
   var message: String {
     let change = "Workspace configuration changed while editing. Review the current configuration."
@@ -174,4 +174,11 @@ struct WorkspaceEditConflict: CodedError {
       ? change + " The edited YAML is kept at \(buffer.path)."
       : change + " The edited YAML is kept in a private temporary file."
   }
+}
+
+private func workspaceEditRead(_ slug: String?) -> String {
+  guard let slug, WorkspaceConfig.isValidIdentifier(slug),
+    RestoreService.canNameInRecovery(slug)
+  else { return "silta ws ls" }
+  return workspaceCommand("silta ws show", workspace: slug)
 }

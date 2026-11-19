@@ -33,20 +33,22 @@ struct EditorCommandTests {
   func unlaunchableEditorIsAnErrorOnATerminal(arguments: [String], json: Bool) throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)
-      let editor = scratch.appending(path: "missing-editor").path
-      let output = try EditorTerminalFixture.run(
-        arguments + (json ? ["--json"] : []), in: scratch, environment: Self.editor(editor))
-      #expect(output.result.termination == .exit(9))
-      let kind = arguments.contains("task") ? "task" : "ws"
-      if json {
-        Golden.forTests().check(output.result.stdout, kind + "-edit-launch.json")
-        try Self.followRecovery(output.result.stdout, in: scratch)
-      } else {
-        #expect(output.result.stdout.isEmpty)
-        let refusal = output.terminal.split(whereSeparator: \.isNewline)
-          .filter { $0.hasPrefix("error:") || $0.hasPrefix("ask human:") }
-          .joined(separator: "\n")
-        Golden.forTests().check(refusal + "\n", kind + "-edit-launch.txt")
+      let missing = scratch.appending(path: "missing-editor").path
+      for editor in [missing, "unmatched'"] {
+        let output = try EditorTerminalFixture.run(
+          arguments + (json ? ["--json"] : []), in: scratch, environment: Self.editor(editor))
+        #expect(output.result.termination == .exit(9))
+        let kind = arguments.contains("task") ? "task" : "ws"
+        if json {
+          Golden.forTests().check(output.result.stdout, kind + "-edit-launch.json")
+          try Self.followRecovery(output.result.stdout, in: scratch)
+        } else {
+          #expect(output.result.stdout.isEmpty)
+          let refusal = output.terminal.split(whereSeparator: \.isNewline)
+            .filter { $0.hasPrefix("error:") || $0.hasPrefix("ask human:") }
+            .joined(separator: "\n")
+          Golden.forTests().check(refusal + "\n", kind + "-edit-launch.txt")
+        }
       }
     }
   }
