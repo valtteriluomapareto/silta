@@ -157,6 +157,18 @@ struct FirstWorkspaceCommandTests {
     }
   }
 
+  @Test func missingFirstRootWithSpacesNamesItsFullPath() throws {
+    try withScratchDirectory { scratch in
+      let missing = scratch.appending(path: "Missing Acme")
+      let result = try SiltaBinary.run(["init", "--scan", missing.path, "--json"], in: scratch)
+      let error = try TaskStateRegressionTests.error(result)
+      withKnownIssue("#260: naming can preempt the explicit scan root check") {
+        #expect(result.termination == .exit(9) && error["code"] as? String == "env")
+        #expect((error["message"] as? String)?.contains(missing.path) == true)
+      }
+    }
+  }
+
   @Test func unreadableChildWarnsWhileItsSiblingIsRegistered() throws {
     try withScratchDirectory { scratch in
       let root = scratch.appending(path: "acme")
