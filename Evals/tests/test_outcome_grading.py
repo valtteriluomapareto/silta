@@ -47,6 +47,50 @@ class OutcomeGrading(unittest.TestCase):
         self.assertCountEqual(evals.forbidden(e), ['repository file: ' + plan,
                                                    'repository file: acme-mobile/TODO'])
 
+    @unittest.expectedFailure  # #262
+    def test_context_metrics_use_observed_output_and_the_immediate_followup(self):
+        e = evidence()
+        p = e['phases'][0]
+        wanted = "silta --ws 'acme' task show 'AC-1'"
+        output = json.dumps({'schema': 1, 'ok': False,
+                             'error': {'code': 'conflict', 'next': [wanted]}})
+        p['wall_time_s'] = 0.75
+        for number, (command, code, stdout) in enumerate([
+            ('silta --ws acme brief', 0, 'Acme',),
+            ('silta --ws acme task start AC-1', 6, output),
+            (wanted, 0, 'Task'),
+        ]):
+            p['commands'].append(command)
+            p['tool_results'].append({'id': str(number), 'native_start': 2 * number,
+                                      'native_end': 2 * number + 1, 'command': command,
+                                      'exit': code, 'output': stdout})
+        p['logs'] = [dict(command='silta ' + command, exit_code=code)
+                     for command, code in [('brief', 0), ('task start', 6), ('task show', 0)]]
+        expected = dict(brief_calls=2, brief_output_tokens_estimate=2,
+                        observed_error_recoveries=1, wall_time_s=0.75)
+        for key, value in expected.items():
+            self.assertEqual(evals.metrics(e)[key], value, key)
+        trial = dict(harness='codex', model='fixture', scenario='start-cross-repo', repeat=1,
+                     passed=False, id='run', evidence='evidence.json', checks={}, metrics=evals.metrics(e))
+        report = evals.aggregate([trial], 'stub')
+        self.assertEqual({k: report['groups'][0][k] for k in expected}, expected)
+        self.assertIn('Brief output tokens (estimate)', evals.render_html(report))
+
+        wrong_scope = 'silta --ws later task show AC-1'
+        p['commands'][-1] = p['tool_results'][-1]['command'] = wrong_scope
+        self.assertEqual(evals.metrics(e)['observed_error_recoveries'], 0)
+        p['commands'][-1] = p['tool_results'][-1]['command'] = wanted
+        p['tool_results'][-1]['native_start'] = p['tool_results'][-2]['native_end']
+        self.assertIsNone(evals.metrics(e)['observed_error_recoveries'])
+        p['complete'] = False
+        p['tool_results'].clear()
+        p['logs'] = None
+        measured = evals.failure_metrics(e)
+        self.assertIsNone(measured['observed_error_recoveries'])
+        self.assertIsNone(measured['brief_calls'])
+        self.assertIsNone(measured['brief_output_tokens_estimate'])
+        self.assertEqual(measured['wall_time_s'], 0.75)
+
     def test_main_values_allow_corrections(self):
         for body in [MAIN, 'Legacy checkout: ' + WRONG + '. Registered main: ' + MAIN]:
             with self.subTest(body=body):
