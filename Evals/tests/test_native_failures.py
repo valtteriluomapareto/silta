@@ -44,7 +44,8 @@ class NativeFailures(unittest.TestCase):
             self.assertEqual(phase['transcript_sha256'], hashlib.sha256((directory / f'phase-{number}.jsonl').read_bytes()).hexdigest())
         unknown = (harness == 'claude' and mode == 'schema-usage'
                    or harness == 'codex' and mode in ('schema-thread', 'schema-thread-nan'))
-        self.assertEqual(trial['metrics']['tokens'], None if unknown else 15 * fault_after)
+        self.assertEqual(trial['metrics'].get('tokens'), None if unknown else 15 * fault_after,
+                         'Known terminal usage was lost')
         if fault == 'logs':
             self.assertIsNone(trial['metrics']['silta_calls'], 'Unavailable calls were reported as zero')
         else:

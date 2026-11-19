@@ -4,7 +4,7 @@ import posixpath
 import re
 
 
-_SILTA_VALUES = set('''-m --message --title --result --description --acceptance --summary
+SILTA_VALUE_OPTIONS = set('''-m --message --title --result --description --acceptance --summary
 --ws --approved --app --parent --kind --reply-to --to --from --topic --task --budget
 --priority --status --for --relation --external-ref --until --step --if-rev -n'''.split())
 
@@ -21,7 +21,7 @@ def silta_options(argv):
             flag, equals, value = '-F', '=', word[2:]
         if flag.startswith('-'):
             flags.append(flag)
-            if flag in _SILTA_VALUES | {'-F', '--file'}:
+            if flag in SILTA_VALUE_OPTIONS | {'-F', '--file'}:
                 if not equals:
                     index += 1
                     value = argv[index] if index < len(argv) else ''
