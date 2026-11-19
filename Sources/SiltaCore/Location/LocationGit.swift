@@ -4,7 +4,9 @@ struct LocationGit {
   let runner: any GitRunner
   let directory: URL
 
-  func value(_ arguments: [String], optional: Bool = false) async throws -> String? {
+  func value(_ arguments: [String], optional: Bool = false, missingStatus: Int32? = nil)
+    async throws -> String?
+  {
     let result: GitResult
     do {
       result = try await runner.run(
@@ -13,7 +15,9 @@ struct LocationGit {
       throw LocationError.git
     }
     guard result.termination == .exit(0) else {
-      if optional, case .exit = result.termination { return nil }
+      if case .exit(let status) = result.termination, optional || status == missingStatus {
+        return nil
+      }
       throw LocationError.git
     }
     guard var text = String(data: result.stdout, encoding: .utf8) else { throw LocationError.git }
@@ -24,6 +28,30 @@ struct LocationGit {
   func required(_ arguments: [String]) async throws -> String {
     guard let value = try await value(arguments) else { throw LocationError.git }
     return value
+  }
+
+  func headState() async throws -> (branch: String?, head: String) {
+    let prefix = "refs/heads/"
+    let symbolic = try await value(["symbolic-ref", "--quiet", "HEAD"], missingStatus: 1)
+    let branch: String?
+    if let symbolic {
+      guard symbolic.hasPrefix(prefix), symbolic.count > prefix.count else {
+        throw LocationError.git
+      }
+      branch = String(symbolic.dropFirst(prefix.count))
+    } else {
+      branch = nil
+    }
+    if let sha = try await value(
+      ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], missingStatus: 1)
+    {
+      return (branch, sha)
+    }
+    // A ref with an unreadable commit is an environment error, even when attached.
+    guard branch != nil,
+      try await value(["rev-parse", "--verify", "--quiet", "HEAD"], missingStatus: 1) == nil
+    else { throw LocationError.git }
+    return (branch, "")
   }
 
   func commonDirectory() async throws -> URL? {

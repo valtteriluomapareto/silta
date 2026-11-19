@@ -1,0 +1,1 @@
+{"error":{"code":"not_found","message":"App subpath \"apps/console\" not found at selected commit.","next":["silta --ws 'acme' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

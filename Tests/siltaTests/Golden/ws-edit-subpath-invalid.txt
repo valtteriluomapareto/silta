@@ -1,0 +1,3 @@
+error: line 4: subpath must be relative, without .. components or NUL [invalid]
+next: silta ws show 'acme'
+next: silta ws edit --help

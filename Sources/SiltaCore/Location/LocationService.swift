@@ -30,9 +30,7 @@ package struct LocationService {
     let selectedTask = try task.map { try explicitTask($0, workspace: repo.workspace) }
     let git = context.git
     let candidates = context.candidates
-    let branch = try await git.value(
-      ["symbolic-ref", "--quiet", "--short", "HEAD"], optional: true)
-    let head = try await git.required(["rev-parse", "--verify", "HEAD"])
+    let (branch, head) = try await git.headState()
     let current = try currentTask(selectedTask, context: context, app: app, branch: branch)
     var result = LocationResult(
       path: context.path.path, worktree: context.root.path,
@@ -64,6 +62,7 @@ package struct LocationService {
     {
       return picked(taskApp, "task")
     }
+    guard !head.isEmpty else { return result }
     let available = candidates.filter { candidate in context.refs.contains { $0.0 == candidate.app }
     }
     if let evidence = try await git.evidence(branch: branch, candidates: available) {

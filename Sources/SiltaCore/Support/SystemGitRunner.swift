@@ -105,7 +105,51 @@ package struct SystemGitRunner: GitRunner {
         ? .exit(process.terminationStatus) : .signal(process.terminationStatus)
     }
     process.waitUntilExit()
+    return try readCapture(termination, from: outURL, errors: errURL, limit: request.capture)
+  }
+
+  private func readCapture(
+    _ termination: GitTermination, from stdout: URL, errors stderr: URL, limit: GitCapture?
+  ) throws -> GitResult {
+    guard let limit else {
+      return try GitResult(
+        termination: termination, stdout: Data(contentsOf: stdout), stderr: Data(contentsOf: stderr)
+      )
+    }
+    let out = try FileHandle(forReadingFrom: stdout)
+    defer { try? out.close() }  // best-effort close of an already captured stream
+    let err = try FileHandle(forReadingFrom: stderr)
+    defer { try? err.close() }  // best-effort close of an already captured stream
+    let skipped = try skipLines(limit.skipLines, in: out)
+    var bytes = try out.read(upToCount: limit.byteLimit + 1) ?? Data()
+    let truncated = bytes.count > limit.byteLimit
+    if truncated { bytes.removeLast() }
     return try GitResult(
-      termination: termination, stdout: Data(contentsOf: outURL), stderr: Data(contentsOf: errURL))
+      termination: termination, stdout: bytes,
+      stderr: err.read(upToCount: limit.byteLimit) ?? Data(),
+      stdoutTruncated: truncated, stdoutSkippedLines: skipped)
+  }
+
+  /// Seek to a later line using fixed-size blocks, including across an oversized line.
+  /// If the requested line is beyond EOF, report the actual number of preceding lines.
+  private func skipLines(_ count: Int, in file: FileHandle) throws -> Int {
+    guard count > 0 else { return 0 }
+    var offset: UInt64 = 0
+    var skipped = 0
+    var unterminated = false
+    while let chunk = try file.read(upToCount: 32 * 1024), !chunk.isEmpty {
+      var start = chunk.startIndex
+      while let newline = chunk[start...].firstIndex(of: 10) {
+        skipped += 1
+        start = newline + 1
+        if skipped == count {
+          try file.seek(toOffset: offset + UInt64(start))
+          return skipped
+        }
+      }
+      unterminated = start < chunk.endIndex
+      offset += UInt64(chunk.count)
+    }
+    return skipped + (unterminated ? 1 : 0)
   }
 }

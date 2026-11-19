@@ -13,16 +13,32 @@ extension CodeCommandTests {
       let pattern = grep ? ["noAcmeMatch"] : []
       let missing = try SiltaBinary.run(
         ["--json", "code", verb, "console@origin/portal"] + pattern, in: scratch)
-      withKnownIssue("#264: grep and log report success when the app directory is absent") {
-        #expect(missing.termination == .exit(2))
-        #expect(missing.stdout.contains("App subpath \\\"apps/console\\\" not found"))
-        #expect(missing.stdout.contains("\"code\":\"not_found\""))
-        #expect(missing.stdout.contains("\"next\":[\"silta --ws 'acme' ws show\"]"))
-      }
+      #expect(missing.termination == .exit(2))
+      Golden.forTests().check(missing.stdout, "code-app-subpath-missing.json")
+      let text = try SiltaBinary.run(
+        ["code", verb, "console@origin/portal"] + pattern, in: scratch)
+      #expect(text.termination == .exit(2))
+      Golden.forTests().check(text.stderr, "code-app-subpath-missing.txt")
       let present = try SiltaBinary.run(
         ["--json", "code", verb, "console"] + (grep ? pattern : ["no-such-path"]), in: scratch)
       #expect(present.termination == .exit(0))
       #expect(try envelope(present.stdout)["output"] as? String == "")
+    }
+  }
+
+  @Test func aFileCannotBeTheAppSubpath() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let subpath = repo.appending(path: "apps/console")
+      try FileManager.default.removeItem(at: subpath)
+      try Data("Acme file\n".utf8).write(to: subpath)
+      try commitAll(repo, scratch)
+      for arguments in [["show", "."], ["grep", "Acme"], ["log"], ["ls"]] {
+        let result = try SiltaBinary.run(
+          ["--json", "code", arguments[0], "console@HEAD"] + arguments.dropFirst(), in: scratch)
+        #expect(result.termination == .exit(2))
+        Golden.forTests().check(result.stdout, "code-app-subpath-missing.json")
+      }
     }
   }
 
@@ -33,19 +49,25 @@ extension CodeCommandTests {
       let before = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
       try #require(before.termination == .exit(0))
       let file = scratch.appending(path: "workspace.yaml")
-      let yaml = before.stdout.replacingOccurrences(of: "apps/console", with: path)
-      try #require(yaml != before.stdout)
+      let yaml = """
+        workspace: {slug: acme, name: Acme, task_prefix: AC}
+        repos: [{slug: platform}]
+        apps:
+          - {slug: console, repo: platform, ref: origin/api, subpath: \(path)}
+        """
       try Data(yaml.utf8).write(to: file)
       let result = try SiltaBinary.run(
         ["--ws", "acme", "--json", "ws", "edit", "-F", file.path, "--approved", "Edit Acme"],
         in: scratch, environment: ["SILTA_ACTOR": "agent:codex:acme"])
       let after = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
-      withKnownIssue("#264: workspace edit stores app subpaths no code read can use") {
-        #expect(result.termination == .exit(1))
-        #expect(result.stdout.contains("\"code\":\"invalid\""))
-        #expect(result.stdout.contains("subpath must be relative"))
-        #expect(after.stdout == before.stdout)
-      }
+      #expect(result.termination == .exit(1))
+      Golden.forTests().check(result.stdout, "ws-edit-subpath-invalid.json")
+      let text = try SiltaBinary.run(
+        ["--ws", "acme", "ws", "edit", "-F", file.path, "--approved", "Edit Acme"],
+        in: scratch, environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      #expect(text.termination == .exit(1))
+      Golden.forTests().check(text.stderr, "ws-edit-subpath-invalid.txt")
+      #expect(after.stdout == before.stdout)
     }
   }
 
@@ -65,11 +87,9 @@ extension CodeCommandTests {
         try #require(result.termination == .exit(0))
         let value = try #require(try envelope(result.stdout)["output"] as? String)
         let cutoff = try warnings(result.stdout)["output_truncated"]
-        withKnownIssue("#264: Git output is captured and formatted without a byte cap") {
-          #expect(value.utf8.count <= 1_048_576)
-          #expect(!value.contains("�"))
-          #expect(cutoff != nil)
-        }
+        #expect(value.utf8.count <= 1_048_576)
+        #expect(!value.contains("�"))
+        #expect(cutoff != nil)
       }
       let late = try SiltaBinary.run(
         ["--json", "code", "show", "console@HEAD", path, "--lines", "3"], in: scratch)
