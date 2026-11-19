@@ -36,9 +36,10 @@ package enum RepositoryScan {
   ) async throws -> ScanOutcome {
     guard let first = roots.first else { throw RepoError.scan }
     let paths = roots.map(\.path)
+    let readable = try roots.map(readableRoot)
     let directory = first.standardizedFileURL.lastPathComponent
     let naming = try naming(target, directory: directory, roots: paths)
-    let (repos, skipped) = try await discover(roots, git: git)
+    let (repos, skipped) = try await discover(Array(zip(paths, readable)), git: git)
     if repos.isEmpty, let firstSkipped = skipped.first {
       throw ScanError.unreadableRoot(firstSkipped)
     }
@@ -278,15 +279,15 @@ extension RepositoryScan {
     ).map { (repo: $0["repo"] as String, workspace: $0["workspace"] as String) }
   }
 
-  private static func discover(_ roots: [URL], git: any GitRunner) async throws
+  private static func discover(_ roots: [(String, URL)], git: any GitRunner) async throws
     -> (repos: [DiscoveredRepo], skipped: [String])
   {
     var candidates: Set<String> = []
     var skipped: [String] = []
-    for root in roots {
+    for (path, directory) in roots {
       do {
-        try walk(canonical(root), depth: 0, into: &candidates, skipped: &skipped)
-      } catch { throw ScanError.unreadableRoot(root.path) }
+        try walk(directory, depth: 0, into: &candidates, skipped: &skipped)
+      } catch { throw ScanError.unreadableRoot(path) }
     }
     var found: [String: DiscoveredRepo] = [:]
     for candidate in candidates.sorted() {
@@ -344,6 +345,7 @@ extension RepositoryScan {
   static func repair(
     _ root: URL, workspace: String?, store: DatabaseStore, git: any GitRunner
   ) async throws -> ScanError? {
+    guard FileManager.default.fileExists(atPath: store.path) else { return nil }
     let hasPathless = try store.read {
       try Bool.fetchOne(
         $0,
@@ -370,9 +372,7 @@ extension RepositoryScan {
     _ directory: URL, depth: Int, into paths: inout Set<String>, skipped: inout [String]
   ) throws {
     let fm = FileManager.default
-    guard try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true,
-      fm.isReadableFile(atPath: directory.path)
-    else { throw RepoError.scan }
+    try requireReadable(directory)
     if fm.fileExists(atPath: directory.appending(path: ".git").path) {
       paths.insert(directory.path)
       return
@@ -387,6 +387,21 @@ extension RepositoryScan {
         try walk(canonical(child), depth: depth + 1, into: &paths, skipped: &skipped)
       } catch { skipped.append(child.path) }
     }
+  }
+
+  private static func readableRoot(_ root: URL) throws -> URL {
+    do {
+      let directory = try canonical(root)
+      try requireReadable(directory)
+      return directory
+    } catch { throw ScanError.unreadableRoot(root.path) }
+  }
+
+  private static func requireReadable(_ directory: URL) throws {
+    let fm = FileManager.default
+    guard try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true,
+      fm.isReadableFile(atPath: directory.path), fm.isExecutableFile(atPath: directory.path)
+    else { throw RepoError.scan }
   }
 
   private static func canonical(_ url: URL) throws -> URL {

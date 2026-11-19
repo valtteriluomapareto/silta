@@ -35,6 +35,20 @@ struct FirstWorkspaceCommandTests {
       #expect(try TaskStateRegressionTests.data(located)["workspace"] as? String == "platform")
       let final = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
       #expect((try TaskStateRegressionTests.data(final)["workspaces"] as? [Any])?.count == 1)
+
+      let human = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/script"),
+        ["-q", "/dev/null", try SiltaBinary.url().path, "init", "--scan", "."],
+        in: scratch, cwd: repo, environment: ["USER": "acme"])
+      #expect(human.termination == .exit(0))
+      #expect(human.stdout.contains("Edit from your terminal with silta ws edit 'platform'."))
+      #expect(!human.stdout.contains("--approved"))
+      let agent = try SiltaBinary.run(
+        ["init", "--scan", "."], in: scratch, cwd: repo,
+        environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      #expect(agent.termination == .exit(0))
+      #expect(agent.stdout.contains("Ask the human before editing the workspace configuration."))
+      #expect(!agent.stdout.contains("--approved"))
     }
   }
 
@@ -162,10 +176,10 @@ struct FirstWorkspaceCommandTests {
       let missing = scratch.appending(path: "Missing Acme")
       let result = try SiltaBinary.run(["init", "--scan", missing.path, "--json"], in: scratch)
       let error = try TaskStateRegressionTests.error(result)
-      withKnownIssue("#260: naming can preempt the explicit scan root check") {
-        #expect(result.termination == .exit(9) && error["code"] as? String == "env")
-        #expect((error["message"] as? String)?.contains(missing.path) == true)
-      }
+      #expect(result.termination == .exit(9) && error["code"] as? String == "env")
+      #expect((error["message"] as? String)?.contains(missing.path) == true)
+      #expect(error["next"] as? [String] == ["silta init --help"])
+      #expect(error["next_by"] as? String == "agent")
     }
   }
 
