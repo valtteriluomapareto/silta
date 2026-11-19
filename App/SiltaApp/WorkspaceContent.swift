@@ -38,25 +38,10 @@ nonisolated struct WorkspaceContent {
   private let connections: [AppConnection]
 
   init(map: AppWorkspaceMap, search: String) {
-    let query = search.trimmingCharacters(in: .whitespaces)
-    func matches(_ values: [String]) -> Bool {
-      query.isEmpty || values.contains { $0.localizedCaseInsensitiveContains(query) }
-    }
-    func matches(_ edge: AppConnection) -> Bool {
-      matches([edge.attachment, edge.source, edge.target, edge.kind, edge.summary] + edge.codeReferences)
-    }
+    let filter = Filter(search)
     connections = map.connections
     let layout = AppMapLayout(map: map)
-    let position = Dictionary(
-      uniqueKeysWithValues: layout.nodes.enumerated().map { ($1.key, $0) })
-    func ordered(_ edges: [AppConnection], by end: KeyPath<AppConnection, String>)
-      -> [AppConnection]
-    {
-      edges.sorted {
-        (position[$0[keyPath: end]] ?? .max, $0.attachment)
-          < (position[$1[keyPath: end]] ?? .max, $1.attachment)
-      }
-    }
+    let order = CallOrder(layout)
     let callers = Dictionary(grouping: map.connections, by: \.target).mapValues {
       Set($0.map(\.source)).count
     }
@@ -65,8 +50,8 @@ nonisolated struct WorkspaceContent {
       guard let app = apps[node.key] else { return nil }
       let touching = map.connections.filter { $0.source == app.slug || $0.target == app.slug }
       guard
-        matches([app.slug, app.name, app.ref, app.repo, app.summary ?? "", app.attachment])
-          || touching.contains(where: matches)
+        filter.matches([app.slug, app.name, app.ref, app.repo, app.summary ?? "", app.attachment])
+          || touching.contains(where: filter.matches)
       else { return nil }
       let outgoing = map.connections.filter { $0.source == app.slug }
       let uses = outgoing.filter { layout.node($0.target)?.isService == true }.sorted {
@@ -75,21 +60,56 @@ nonisolated struct WorkspaceContent {
       }
       return AppRow(
         app: app,
-        calledBy: ordered(map.connections.filter { $0.target == app.slug }, by: \.source),
-        calls: ordered(outgoing.filter { apps[$0.target] != nil }, by: \.target),
+        calledBy: order.sorted(map.connections.filter { $0.target == app.slug }, by: \.source),
+        calls: order.sorted(outgoing.filter { apps[$0.target] != nil }, by: \.target),
         uses: uses)
     }
     let services = map.services.compactMap { service -> ServiceRow? in
-      let users = map.connections.filter { $0.target == service.attachment }
+      let users = map.connections.filter { $0.target == service.key }
       guard
-        matches([service.slug, service.name, service.summary ?? "", service.attachment])
-          || users.contains(where: matches)
+        filter.matches([service.slug, service.name, service.summary ?? "", service.attachment])
+          || users.contains(where: filter.matches)
       else { return nil }
-      return ServiceRow(service: service, users: ordered(users, by: \.source))
+      return ServiceRow(service: service, users: order.sorted(users, by: \.source))
     }.sorted { ($1.apps, $0.service.slug) < ($0.apps, $1.service.slug) }
     let shared = services.filter { $0.apps > 1 }
     self.shared = shared.isEmpty ? services : shared
     folded = shared.isEmpty ? [] : services.filter { $0.apps <= 1 }
+  }
+
+  /// The search the list applies: a node or connection matches when any of its fields
+  /// contains the trimmed query, ignoring case.
+  private struct Filter {
+    let query: String
+
+    init(_ search: String) { query = search.trimmingCharacters(in: .whitespaces) }
+
+    func matches(_ values: [String]) -> Bool {
+      query.isEmpty || values.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    func matches(_ edge: AppConnection) -> Bool {
+      matches(
+        [edge.attachment, edge.source, edge.target, edge.kind, edge.summary] + edge.codeReferences)
+    }
+  }
+
+  /// Sorts connections by where one of their ends sits on the map, then by reference.
+  private struct CallOrder {
+    let position: [String: Int]
+
+    init(_ layout: AppMapLayout) {
+      position = Dictionary(uniqueKeysWithValues: layout.nodes.enumerated().map { ($1.key, $0) })
+    }
+
+    func sorted(_ edges: [AppConnection], by end: KeyPath<AppConnection, String>)
+      -> [AppConnection]
+    {
+      edges.sorted {
+        (position[$0[keyPath: end]] ?? .max, $0.attachment)
+          < (position[$1[keyPath: end]] ?? .max, $1.attachment)
+      }
+    }
   }
 
   func connection(_ attachment: String?) -> AppConnection? {

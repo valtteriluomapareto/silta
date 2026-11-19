@@ -64,8 +64,15 @@ struct WorkspaceList: View {
     let isOpen = open.contains(row.id)
     let count = model.visibleData?.snapshot?.board.appOpenCounts[row.id] ?? 0
     return Button {
-      model.select(node: row.app.attachment)
-      if isOpen { open.remove(row.id) } else { open.insert(row.id) }
+      // The first click selects the row and opens it; later clicks fold and unfold it.
+      if !selected {
+        model.select(node: row.app.attachment)
+        open.insert(row.id)
+      } else if isOpen {
+        open.remove(row.id)
+      } else {
+        open.insert(row.id)
+      }
     } label: {
       HStack(spacing: 12) {
         HStack(spacing: 8) {
@@ -127,7 +134,7 @@ struct WorkspaceList: View {
       // The groups wrap under each other when the inspector leaves little room.
       FlowLayout(spacing: 32, lineSpacing: 14) {
         group("Called by", edges: row.calledBy) { $0.source }
-        group("Calls", edges: row.calls, docs: true) { $0.target }
+        group("Calls", edges: row.calls) { $0.target }
         VStack(alignment: .leading, spacing: 6) {
           Overline("Uses")
           if row.uses.isEmpty {
@@ -149,8 +156,7 @@ struct WorkspaceList: View {
   }
 
   private func group(
-    _ title: String, edges: [AppConnection], docs: Bool = false,
-    app: @escaping (AppConnection) -> String
+    _ title: String, edges: [AppConnection], app: @escaping (AppConnection) -> String
   ) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       Overline(title)
@@ -161,20 +167,17 @@ struct WorkspaceList: View {
         HStack(spacing: 6) {
           RoundedRectangle(cornerRadius: 2).fill(appColor(app(edge))).frame(width: 7, height: 7)
           connectionButton(edge, name: app(edge))
-          if docs, let count = model.workspaceDocuments.countText(for: edge.attachment),
-            count != "0"
-          {
-            Text(count == "1" ? "1 doc" : count + " docs").font(.system(size: 11, weight: .semibold))
-              .foregroundStyle(Color("TideText"))
-          }
         }
       }
     }.fixedSize()
   }
 
-  /// A connection as a button that selects it: the other end's name, then its kind.
+  /// A connection as a button that selects it: the other end's name, its kind and, when
+  /// it has any, its doc count.
   private func connectionButton(_ edge: AppConnection, name: String) -> some View {
     let selected = model.workspaceSelection?.connectionRef == edge.attachment
+    let docs = model.workspaceDocuments.countText(for: edge.attachment)
+    let label = WorkspaceMapContent.labelText(kind: edge.kind, docs: docs)
     return Button {
       model.select(connection: edge.attachment)
     } label: {
@@ -182,10 +185,14 @@ struct WorkspaceList: View {
         Text(name).font(.system(size: 12)).lineLimit(1)
         Text(edge.kind).font(.system(size: 10, design: .monospaced))
           .foregroundStyle(Color("SecondaryInk")).lineLimit(1)
+        if let docs, docs != "0" {
+          Text(docs == "1" ? "1 doc" : docs + " docs").font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color("TideText")).lineLimit(1)
+        }
       }.foregroundStyle(Color(selected ? "TideText" : "Ink")).contentShape(.rect)
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("\(edge.source) calls \(edge.target) over \(edge.kind)")
+    .accessibilityLabel("\(edge.source) calls \(edge.target) over \(label)")
     .accessibilityAddTraits(selected ? .isSelected : [])
     .help(edge.summary.isEmpty ? edge.attachment : edge.summary)
   }
@@ -220,14 +227,16 @@ struct WorkspaceList: View {
   }
 
   private func serviceRow(_ row: WorkspaceContent.ServiceRow, selected: String?) -> some View {
-    let isSelected = selected == row.service.attachment
+    let isSelected = selected == row.service.key
     return HStack(spacing: 12) {
       Button {
         model.select(node: row.service.attachment)
       } label: {
         HStack(spacing: 12) {
           RoundedRectangle(cornerRadius: 4)
-            .strokeBorder(Color("Ink").opacity(0.4), style: StrokeStyle(lineWidth: 1.2, dash: [3, 2]))
+            .strokeBorder(
+              Color("Ink").opacity(0.4), style: StrokeStyle(lineWidth: 1.2, dash: [3, 2])
+            )
             .frame(width: 14, height: 14)
           Text(row.service.name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
             .frame(width: 110, alignment: .leading)
@@ -254,14 +263,16 @@ struct WorkspaceList: View {
     .background(
       Color("AccentColor").opacity(isSelected ? 0.10 : 0), in: .rect(cornerRadius: 10))
   }
+}
 
-  private func appColor(_ slug: String) -> Color {
+extension WorkspaceList {
+  fileprivate func appColor(_ slug: String) -> Color {
     Color(SidebarContent.appColor(index: map.apps.firstIndex { $0.slug == slug } ?? 0))
   }
 
   static func foldedTitle(_ rows: [WorkspaceContent.ServiceRow]) -> String {
     rows.allSatisfy { $0.apps == 1 }
-      ? "\(rows.count) more used by one app" : "\(rows.count) more"
+      ? "\(rows.count) more used by one app" : "\(rows.count) more used by one app or none"
   }
 
   static func description(_ row: WorkspaceContent.AppRow, open: Int) -> String {
@@ -274,7 +285,7 @@ extension AppWorkspaceMap {
   /// The connection key of a map node reference: an app slug or `service:<slug>`.
   func nodeKey(for attachment: String) -> String? {
     if let app = apps.first(where: { $0.attachment == attachment }) { return app.slug }
-    return services.contains { $0.attachment == attachment } ? attachment : nil
+    return services.first { $0.attachment == attachment }?.key
   }
 }
 

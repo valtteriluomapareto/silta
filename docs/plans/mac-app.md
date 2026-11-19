@@ -39,9 +39,10 @@ the human copies.
   properties and discussion.
 - **Workspace:** apps and connections with a connection inspector, read from the
   workspace model rather than YAML. Paper "Map v2":
-  - The map keeps app columns in call order. Services sit in a row under the apps,
-    ordered by their callers' columns, and wrap past the apps' width. Lines to services
-    are faint and unlabelled until an app, service or connection is selected.
+  - The map keeps app columns in call order. Services sit in one row under the apps,
+    ordered by their callers' columns. Lines to services are faint and unlabelled until
+    an app, service or connection is selected, so they are clicked through their app or
+    service; each app's VoiceOver label still lists them.
   - The List shows one flat row per app in the same call order, with its open count and
     the services it uses. Opening a row adds who calls it, what it calls (with doc
     counts) and how it uses each service. Services follow, most shared first; those used

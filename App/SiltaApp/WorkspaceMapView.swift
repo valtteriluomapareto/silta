@@ -33,7 +33,7 @@ struct WorkspaceMapView: View {
             if let point = geometry.route(
               from: edge.connection.source, to: edge.connection.target, back: edge.back,
               lane: edge.lane, lanes: edge.lanes
-            ).labelPoint {
+            ).labelPoint(toService: edge.toService) {
               label(edge, content: content).position(point)
             }
           }
@@ -114,7 +114,10 @@ struct WorkspaceMapView: View {
       focused = true
     } label: {
       if node.isService {
-        serviceCard(node, callers: content.callers(of: node.key))
+        serviceCard(
+          name: map.services.first { $0.key == node.key }?.name
+            ?? String(node.key.dropFirst("service:".count)),
+          callers: content.callers(of: node.key))
       } else if let app = map.apps.first(where: { $0.slug == node.key }) {
         appCard(app)
       }
@@ -171,10 +174,9 @@ struct WorkspaceMapView: View {
     .seaCard(radius: 16)
   }
 
-  private func serviceCard(_ node: AppMapLayout.Node, callers: Int) -> some View {
+  private func serviceCard(name: String, callers: Int) -> some View {
     VStack(alignment: .leading, spacing: 2) {
-      Text(String(node.key.dropFirst("service:".count))).font(.system(size: 13, weight: .semibold))
-        .lineLimit(1)
+      Text(name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
       Text(callers == 1 ? "1 app" : "\(callers) apps").font(.system(size: 11))
         .foregroundStyle(Color("SecondaryInk"))
     }
@@ -223,6 +225,10 @@ struct WorkspaceMapView: View {
 }
 
 extension [WorkspaceMapGeometry.Curve] {
-  /// Where an edge's label sits: the middle of its middle segment.
-  var labelPoint: CGPoint? { isEmpty ? nil : self[count / 2].midpoint }
+  /// Where an edge's label sits: the middle of its middle segment, or of the final bend
+  /// for a line to a service, so labels of one app's lines don't stack in its gap.
+  func labelPoint(toService: Bool = false) -> CGPoint? {
+    guard let last else { return nil }
+    return toService ? last.midpoint : self[count / 2].midpoint
+  }
 }

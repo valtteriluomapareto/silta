@@ -30,18 +30,9 @@
         let around = geometry.route(from: "acme-mobile", to: "service:push", back: false)
         #expect(around.count == 3 && around[0].start.x == mobile.maxX)
         #expect(around.last?.end == CGPoint(x: push.midX, y: push.minY))
-        for edge in map.connections where edge.target.hasPrefix("service:") {
-          for curve in geometry.route(from: edge.source, to: edge.target, back: false) {
-            for step in 1..<20 {
-              let point = Self.point(curve, at: CGFloat(step) / 20)
-              let hits = geometry.frames.filter { key, frame in
-                key != edge.source && key != edge.target
-                  && frame.insetBy(dx: 1, dy: 1).contains(point)
-              }
-              #expect(hits.isEmpty, "\(edge.attachment) crosses \(hits.keys)")
-            }
-          }
-        }
+        let content = WorkspaceMapContent(
+          map: map, layout: layout, node: nil, connection: nil, search: "")
+        Self.expectServiceLinesClear(content, geometry)
         #expect(geometry.route(from: "acme-mobile", to: "acme-backend", back: false).count == 1)
         #expect(WorkspaceMapGeometry.fitScale(content: geometry.size, in: geometry.size) == 1)
         #expect(
@@ -98,46 +89,9 @@
       let points = content.edges.compactMap {
         geometry.route(
           from: $0.connection.source, to: $0.connection.target, back: $0.back, lane: $0.lane
-        ).labelPoint
+        ).labelPoint()
       }
       #expect(Set(points.map { "\($0.x),\($0.y)" }).count == points.count)
-    }
-
-    @Test func servicesWrapPastTheAppsWidthAndLinesSpreadAcrossTheirApp() throws {
-      let services = (1...8).map { "s\($0)" }
-      let map = AppWorkspaceMap(
-        apps: Self.map(apps: ["api"], edges: []).apps,
-        services: services.map {
-          AppMapService(slug: $0, name: $0, summary: nil, attachment: "service:" + $0)
-        },
-        connections: ["s1", "s2", "s3"].map {
-          AppConnection(
-            attachment: "edge:api/service:\($0)/sdk", source: "api", target: "service:" + $0,
-            kind: "sdk", summary: "", codeReferences: [])
-        })
-      let layout = AppMapLayout(map: map)
-      let geometry = WorkspaceMapGeometry(layout: layout)
-      let first = try #require(geometry.frames["service:s1"])
-      let sixth = try #require(geometry.frames["service:s6"])
-      let seventh = try #require(geometry.frames["service:s7"])
-      let eighth = try #require(geometry.frames["service:s8"])
-      #expect(first.minY == sixth.minY && seventh.minY > first.maxY)
-      #expect(abs((seventh.minX + eighth.maxX) / 2 - (first.minX + sixth.maxX) / 2) < 0.5)
-      #expect(
-        geometry.size.width == sixth.maxX + 32 && geometry.size.height == eighth.maxY + 24 + 32)
-
-      let content = WorkspaceMapContent(
-        map: map, layout: layout, node: nil, connection: nil, search: "")
-      let starts = content.edges.sorted { $0.lane < $1.lane }.map { edge in
-        geometry.route(
-          from: edge.connection.source, to: edge.connection.target, back: edge.back,
-          lane: edge.lane, lanes: edge.lanes
-        )[0].start.x
-      }
-      let api = try #require(geometry.frames["api"])
-      #expect(starts.count == 3 && starts == starts.sorted() && Set(starts).count == 3)
-      #expect(abs(starts[1] - api.midX) < 0.5)
-      #expect(content.edges.allSatisfy { $0.toService && $0.lanes == 3 })
     }
 
     @Test func fitScaleStaysBetweenSixtyAndOneHundredPercent() {
@@ -229,7 +183,7 @@
       }
     }
 
-    private static func point(_ curve: WorkspaceMapGeometry.Curve, at t: CGFloat) -> CGPoint {
+    fileprivate static func point(_ curve: WorkspaceMapGeometry.Curve, at t: CGFloat) -> CGPoint {
       let u = 1 - t
       let a = u * u * u
       let b = 3 * u * u * t
@@ -252,7 +206,7 @@
       }
     }
 
-    private static func map(apps: [String], edges: [Link]) -> AppWorkspaceMap {
+    fileprivate static func map(apps: [String], edges: [Link]) -> AppWorkspaceMap {
       AppWorkspaceMap(
         apps: apps.map {
           AppMapApp(
@@ -281,6 +235,134 @@
       let home = root.appending(path: "data")
       try AppDocsFixture.seed(home: home)
       try body(AppReader(home: home, user: "acme", now: { AppV2Fixture.now }))
+    }
+  }
+
+  extension WorkspaceMapTests {
+    @Test func servicesStayInOneRowWithTheAppsCentredOverIt() throws {
+      let services = (1...8).map { "s\($0)" }
+      let map = AppWorkspaceMap(
+        apps: Self.map(apps: ["api"], edges: []).apps,
+        services: services.map {
+          AppMapService(slug: $0, name: $0, summary: nil, attachment: "service:" + $0)
+        },
+        connections: ["s1", "s2", "s3"].map {
+          AppConnection(
+            attachment: "edge:api/service:\($0)/sdk", source: "api", target: "service:" + $0,
+            kind: "sdk", summary: "", codeReferences: [])
+        })
+      let layout = AppMapLayout(map: map)
+      let geometry = WorkspaceMapGeometry(layout: layout)
+      let first = try #require(geometry.frames["service:s1"])
+      let eighth = try #require(geometry.frames["service:s8"])
+      let api = try #require(geometry.frames["api"])
+      #expect(services.allSatisfy { geometry.frames["service:" + $0]?.minY == first.minY })
+      #expect(abs(api.midX - (first.minX + eighth.maxX) / 2) < 0.5)
+      #expect(
+        geometry.size.width == eighth.maxX + 32 && geometry.size.height == eighth.maxY + 24 + 32)
+
+      let content = WorkspaceMapContent(
+        map: map, layout: layout, node: nil, connection: nil, search: "")
+      let starts = content.edges.sorted { $0.lane < $1.lane }.map { edge in
+        geometry.route(
+          from: edge.connection.source, to: edge.connection.target, back: edge.back,
+          lane: edge.lane, lanes: edge.lanes
+        )[0].start.x
+      }
+      #expect(starts.count == 3 && starts == starts.sorted() && Set(starts).count == 3)
+      #expect(abs(starts[1] - api.midX) < 0.5)
+      #expect(content.edges.allSatisfy { $0.toService && $0.lanes == 3 })
+    }
+
+    @Test func stackedAppsBackEdgesAndManyServiceLinesKeepTheirOwnPaths() {
+      let links: [(String, String)] = [
+        ("a", "x"), ("a", "y"), ("x", "a"),
+        ("a", "service:s1"), ("a", "service:s2"), ("a", "service:s3"), ("a", "service:s4"),
+        ("a", "service:s5"), ("b", "service:s1"), ("b", "service:s2"), ("c", "service:s3"),
+        ("x", "service:s4"), ("y", "service:s5"),
+      ]
+      let map = AppWorkspaceMap(
+        apps: Self.map(apps: ["a", "b", "c", "x", "y"], edges: []).apps,
+        services: (1...5).map {
+          AppMapService(slug: "s\($0)", name: "s\($0)", summary: nil, attachment: "service:s\($0)")
+        },
+        connections: links.map {
+          AppConnection(
+            attachment: "edge:\($0.0)/\($0.1)/http-api", source: $0.0, target: $0.1,
+            kind: "http-api", summary: "", codeReferences: [])
+        })
+      let layout = AppMapLayout(map: map)
+      #expect(layout.backEdges == ["edge:x/a/http-api"])
+      let geometry = WorkspaceMapGeometry(layout: layout)
+      let content = WorkspaceMapContent(
+        map: map, layout: layout, node: nil, connection: nil, search: "")
+      Self.expectServiceLinesClear(content, geometry)
+
+      var drops: [String: Set<CGFloat>] = [:]
+      for edge in content.edges where edge.toService {
+        let curves = geometry.route(
+          from: edge.connection.source, to: edge.connection.target, back: false,
+          lane: edge.lane, lanes: edge.lanes)
+        if curves.count == 3 {
+          drops[edge.connection.source, default: []].insert(curves[1].start.x)
+        }
+      }
+      #expect(drops["a"]?.count == 5 && drops["b"]?.count == 2 && drops["x"]?.count == 1)
+      #expect(drops["c"] == nil && drops["y"] == nil)
+      #expect(drops["a"]?.isDisjoint(with: drops["b"] ?? []) == true)
+      let x = geometry.frames["x"] ?? .zero
+      #expect(drops["x"]?.allSatisfy { $0 < x.minX } == true)
+    }
+
+    @Test func servicesWithoutAppsStillPlace() throws {
+      let map = AppWorkspaceMap(
+        apps: [],
+        services: ["a", "b"].map {
+          AppMapService(slug: $0, name: $0, summary: nil, attachment: "service:" + $0)
+        }, connections: [])
+      let geometry = WorkspaceMapGeometry(layout: AppMapLayout(map: map))
+      let a = try #require(geometry.frames["service:a"])
+      #expect(a.minY == 32 && a.minX == 32 && geometry.shelfLabel != nil)
+      #expect(geometry.size.height == a.maxY + 24 + 32)
+    }
+
+    /// Every line to a service stays inside the map, crosses no card but its own two
+    /// ends, starts where no other edge meets its app, and gets a label point of its own.
+    fileprivate static func expectServiceLinesClear(
+      _ content: WorkspaceMapContent, _ geometry: WorkspaceMapGeometry
+    ) {
+      var others: Set<String> = []
+      for edge in content.edges where !edge.toService {
+        let curves = geometry.route(
+          from: edge.connection.source, to: edge.connection.target, back: edge.back,
+          lane: edge.lane, lanes: edge.lanes)
+        for curve in curves { others.formUnion(["\(curve.start)", "\(curve.end)"]) }
+      }
+      var starts: Set<String> = []
+      var labels: Set<String> = []
+      for edge in content.edges where edge.toService {
+        let curves = geometry.route(
+          from: edge.connection.source, to: edge.connection.target, back: false,
+          lane: edge.lane, lanes: edge.lanes)
+        let start = "\(curves[0].start)"
+        #expect(
+          !others.contains(start) && starts.insert(start).inserted, "\(edge.connection.attachment)")
+        if let label = curves.labelPoint(toService: true) { labels.insert("\(label)") }
+        for curve in curves {
+          for step in 0...20 {
+            let point = Self.point(curve, at: CGFloat(step) / 20)
+            #expect(
+              point.x >= 0 && point.x <= geometry.size.width && point.y >= 0
+                && point.y <= geometry.size.height)
+            let hits = geometry.frames.filter { key, frame in
+              key != edge.connection.source && key != edge.connection.target
+                && frame.insetBy(dx: 1, dy: 1).contains(point)
+            }
+            #expect(hits.isEmpty, "\(edge.connection.attachment) crosses \(hits.keys)")
+          }
+        }
+      }
+      #expect(labels.count == content.edges.filter(\.toService).count)
     }
   }
 #endif
