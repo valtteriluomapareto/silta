@@ -192,9 +192,7 @@
       retry.cancel()
       await retry.value
       #expect(detail.value?.ref == old.ref)
-      withKnownIssue("A cancelled retry can treat the retained value as the failed version") {
-        #expect(detail.phase(workspace: "acme", ref: "AC-9", version: 3) == .loading)
-      }
+      #expect(detail.phase(workspace: "acme", ref: "AC-9", version: 3) == .loading)
     }
 
     private func wire(_ fields: [String: Any], run: String = "current", seq: Any = 1) throws

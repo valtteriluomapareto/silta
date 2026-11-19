@@ -97,6 +97,7 @@
 
       var versions = versionChange.stream.makeAsyncIterator()
       _ = await versions.next()
+      await waitForGlobalRefresh(model)
       var events = publications.stream.makeAsyncIterator()
       #expect(await events.next() == 0)
       let current = try #require(model.visibleData)
@@ -136,6 +137,19 @@
       #expect(!ControlState.readiness(model).idle)
       finish.continuation.yield(())
       await view.value
+    }
+
+    private func waitForGlobalRefresh(_ model: AppModel) async {
+      if model.isLoading {
+        await withCheckedContinuation { continuation in
+          withObservationTracking {
+            _ = model.isLoading
+          } onChange: {
+            continuation.resume()
+          }
+        }
+      }
+      #expect(!model.isLoading)
     }
 
     private func result(_ directory: URL, _ sequence: Int) throws -> [String: Any] {

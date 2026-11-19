@@ -75,6 +75,11 @@ class Waits(unittest.TestCase):
                 driver.wait_for(Path(root), child.pid, lambda: None, [], 0)
 
     def test_action_waits_for_both_settlement_and_the_response_link(self):
+        for state_first in (True, False):
+            with self.subTest(state_first=state_first):
+                self.round_trip_with_split_publication(state_first)
+
+    def round_trip_with_split_publication(self, state_first):
         with tempfile.TemporaryDirectory() as scratch:
             root = Path(scratch)
             request = root / "req-1.json"
@@ -85,19 +90,28 @@ class Waits(unittest.TestCase):
                         "copied": "AC-9"}
             driver.atomic_json(state_url, initial)
             waiting = threading.Event()
-            saw_settled_without_response = threading.Event()
+            saw_first_without_second = threading.Event()
+
+            def publish_state():
+                driver.atomic_json(state_url, dict(initial, seq=1, settledSeq=1))
+
+            def publish_response():
+                driver.atomic_json(response, expected, exclusive=True)
 
             def fake_app():
                 if waiting.wait(4):
-                    driver.atomic_json(state_url, dict(initial, seq=1, settledSeq=1))
-                    if saw_settled_without_response.wait(4):
-                        driver.atomic_json(response, expected, exclusive=True)
+                    first, second = ((publish_state, publish_response) if state_first
+                                     else (publish_response, publish_state))
+                    first()
+                    if saw_first_without_second.wait(4):
+                        second()
 
             def wait(conditions, timeout, ready):
                 def check(state):
                     result = ready(state)
-                    if state["settledSeq"] == 1 and not result:
-                        saw_settled_without_response.set()
+                    first_visible = state["settledSeq"] == 1 if state_first else response.exists()
+                    if first_visible and not result:
+                        saw_first_without_second.set()
                     return result
 
                 waiting.set()
@@ -112,10 +126,10 @@ class Waits(unittest.TestCase):
                 self.assertEqual(driver.action(run, fields, 4), expected)
                 self.assertEqual(driver.read_json(request), {**fields, "version": 1,
                                                              "run": "owned", "seq": 1})
-                self.assertTrue(saw_settled_without_response.is_set())
+                self.assertTrue(saw_first_without_second.is_set())
             finally:
                 waiting.set()
-                saw_settled_without_response.set()
+                saw_first_without_second.set()
                 app.join(5)
 
 
@@ -174,17 +188,17 @@ class OwnedRuns(unittest.TestCase):
             child = Mock(pid=10, poll=Mock(return_value=None))
             failed = {"idle": True, "refresh": {"phase": "failed"}}
 
-            def wait(conditions, timeout, ready):
-                self.assertEqual(conditions, [])
-                self.assertTrue(ready(failed))
-                return failed
+            def wait(directory, pid, read, conditions, timeout):
+                self.assertEqual(conditions, driver.READY)
+                return read()
 
-            run = Mock(wait=wait)
+            run = Mock(root=root, pid=10, read=Mock(return_value=failed))
             with patch.object(driver, "APP", app), patch.object(driver, "native_tool"), \
                     patch.object(driver.tempfile, "mkdtemp", return_value=str(root)), \
                     patch.object(driver.subprocess, "Popen", return_value=child), \
                     patch.object(driver, "identity", return_value={"pid": 10}), \
-                    patch.object(driver, "Run", return_value=run):
+                    patch.object(driver, "Run", return_value=run), \
+                    patch.object(driver, "wait_for", side_effect=wait):
                 with self.assertRaisesRegex(driver.DriverError, "initial fixture view failed"):
                     driver.launch(SimpleNamespace(route="board", dark=False, timeout=1))
             child.terminate.assert_called_once()
@@ -340,6 +354,21 @@ class FixtureWriteRecovery(unittest.TestCase):
                     write.assert_not_called()
                 self.assertFalse((root / "write-new.json").exists())
 
+    def test_missing_clock_refuses_without_creating_intent(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            cli = root / ".build/debug/silta"
+            cli.parent.mkdir(parents=True)
+            cli.touch()
+            run = Mock(root=root)
+            run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0}
+            with patch.object(driver, "ROOT", root), \
+                    patch.object(driver, "write_fixture_proposal") as write:
+                with self.assertRaisesRegex(driver.DriverError, "did not publish its clock"):
+                    driver.fixture_write(run, "new", "Acme review", 1)
+                write.assert_not_called()
+            self.assertFalse((root / "write-new.json").exists())
+
     def test_published_action_failure_identifies_the_recoverable_sequence(self):
         for error in (subprocess.TimeoutExpired("identity", 5), OSError("read failed"),
                       KeyboardInterrupt()):
@@ -370,7 +399,8 @@ class FixtureWriteRecovery(unittest.TestCase):
             cli.parent.mkdir(parents=True)
             cli.touch()
             run = Mock(root=root)
-            run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0}
+            run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0,
+                                     "fixtureNow": "2030-06-01T02:03:04.000Z"}
             with patch.object(driver, "ROOT", root), \
                     patch.object(driver, "write_fixture_proposal", return_value="AC-24") as write, \
                     patch.object(driver, "action", side_effect=[driver.DriverError("refresh wait"),

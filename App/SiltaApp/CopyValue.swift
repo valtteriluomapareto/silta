@@ -56,11 +56,8 @@ struct CopyValue: View {
   }
 
   private func copy() {
-    copied = Self.writeToPasteboard(value)
-  }
-
-  static func writeToPasteboard(_ value: String) -> Bool {
-    NSPasteboard.general.clearContents()
-    return NSPasteboard.general.setString(value, forType: .string)
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    copied = pasteboard.setString(value, forType: .string)
   }
 }

@@ -197,12 +197,12 @@ The same ID cannot execute another CLI write, including after an ambiguous inter
 
 | Mechanism | Failure it prevents | Tests |
 |---|---|---|
-| Per-run client lock and mailbox preflight | Two drivers can race to reserve a sequence, or a new CLI write can change the data while an earlier action is still running. | `test_client_lock_refuses_a_second_driver`, `test_new_write_does_not_create_intent_with_no_mailbox_or_pending_request` |
+| Per-run client lock and mailbox preflight | Two drivers can race to reserve a sequence, or a new CLI write can change the data while an earlier action is still running. Reject a missing fixture clock before reserving an ID. | `test_client_lock_refuses_a_second_driver`, `test_new_write_does_not_create_intent_with_no_mailbox_or_pending_request`, `test_missing_clock_refuses_without_creating_intent` |
 | Sequenced requests, stored responses and `--seq` recovery | An inspector toggle can run before a timeout or interruption drops the caller's answer. Reading the recorded result preserves the original toggle and copied value. | `test_published_action_failure_identifies_the_recoverable_sequence`, `test_action_waits_for_both_settlement_and_the_response_link` |
 | Separate state settlement and response links | The filesystem can wake the client between the state update and the response link. A settled sequence alone does not give the caller its outcome. | `test_action_waits_for_both_settlement_and_the_response_link`, `mailboxWatcherDrainsFutureRequestAndRefusesStaleRunAtNextSequence` |
 | Write-ID intent before spawning the CLI | The CLI can commit before the caller knows its result. An uncertain ID stays reserved so an ordinary retry cannot add a second task. | `test_intent_survives_interruption_and_never_replays` |
 | Saved ref after the CLI returns | Refresh can fail after a successful write. The same ID and title let the caller retry refresh without rerunning the CLI. | `test_written_receipt_retries_only_refresh_after_failure` |
-| Current selected read and app-write barrier | A version change can arrive before SwiftUI starts the new read, or a user-initiated write can be suspended before refresh. The mailbox and snapshots use the same readiness check. | `refreshObservesAnOutsideWriteAndWaitsForTheCurrentInspector`, `statusStaysBusyUntilProductWriteCompletes` |
+| Current selected read and app-write barrier | The new version can arrive before SwiftUI starts its read. A cancelled retry can leave an older value visible. A product write can be suspended before refresh. The mailbox and snapshots share the readiness check. | `refreshObservesAnOutsideWriteAndWaitsForTheCurrentInspector`, `cancelledRetryDoesNotValidateAValueFromBeforeTheFailure`, `statusStaysBusyUntilProductWriteCompletes` |
 
 The native process check uses the effective UID, executable, working directory and
 subsecond start time to keep stop and capture tied to the owned run. The write driver
