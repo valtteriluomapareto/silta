@@ -84,6 +84,45 @@ struct TaskApprovalRegressionTests {
     }
   }
 
+  @Test func foreignDropCanReplayAnApprovedSecretReasonFromAFile() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try #require(
+        try Self.run(["task", "add", "Acme proposal"], in: scratch, as: Self.other)
+          .termination == .exit(0))
+      let reason = "Pwd=" + "acme-value"
+      let file = scratch.appending(path: "reason.md")
+      try Data(reason.utf8).write(to: file)
+      let result = try Self.run(
+        [
+          "--ws", "acme", "task", "drop", "AC-1", "-F", file.path, "--allow-secret",
+          "--approved", "Keep the Acme reason", "--json",
+        ], in: scratch)
+      #expect(result.termination == .exit(6))
+      let error = try Self.error(result)
+      let next = try #require((error["next"] as? [String])?.first)
+      let expected =
+        "silta --ws 'acme' task triage --drop AC-1 --allow-secret -F -"
+        + " --approved \"<the human's words>\""
+      withKnownIssue("#259: foreign proposal retry loses stdin and consent flags") {
+        #expect(next == expected)
+      }
+      guard next == expected else { return }
+      let retry =
+        shellWord(try SiltaBinary.url().path)
+        + String(next.dropFirst("silta".count))
+        .replacingOccurrences(of: "<the human's words>", with: "Drop it and retain its reason")
+        + " < " + shellWord(file.path)
+      let replay = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", retry], in: scratch, environment: TaskCommandTests.actor)
+      #expect(replay.termination == .exit(0))
+      let body = try store.read { try String.fetchOne($0, sql: "SELECT result_md FROM task") }
+      let audit = try store.read { try String.fetchAll($0, sql: "SELECT command FROM approval") }
+      #expect(body == reason)
+      #expect(audit == ["silta task triage --drop 'AC-1' --allow-secret -F <file>"])
+    }
+  }
+
   @Test func approvalRowsNameTheTasksTheyCreated() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
