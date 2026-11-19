@@ -23,7 +23,7 @@ struct SiltaCommand: ParsableCommand {
 
   static let configuration = CommandConfiguration(
     commandName: "silta",
-    abstract: "Share a local workspace and task backlog with coding agents.",
+    abstract: "A local context hub and backlog for coding agents.",
     discussion: "Run without a command to see your workspace and inbox count.\n"
       + "Commands marked human-only need your approval when an agent runs them.\n"
       + "Read the human inbox: silta --ws acme inbox --for me",

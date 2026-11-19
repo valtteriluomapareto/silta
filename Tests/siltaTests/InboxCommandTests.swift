@@ -62,7 +62,7 @@ struct InboxCommandTests {
       let help = try SiltaBinary.run(["inbox", "--help"], in: scratch)
       #expect(
         help.termination == .exit(0)
-          && help.stdout.contains("Human inboxes include grouped blockers"))
+          && help.stdout.contains("Use --for me for the human's inbox"))
       let schema = try SiltaBinary.run(["schema", "inbox", "--json"], in: scratch)
       #expect(schema.termination == .exit(0) && schema.stdout.contains("remaining"))
     }

@@ -5,7 +5,7 @@ struct InboxCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "inbox", abstract: "See questions, proposals and other work that needs attention.",
     discussion: "Use --for me for the human's inbox. The default is the caller's inbox.\n"
-      + "The human inbox shows local blockers, questions, proposals and tracker pointers.\n"
+      + "See task and document proposals, questions and grouped blockers.\n"
       + "Reading leaves items in place. Check trackers for current status.\n"
       + "See `silta guide questions` for relay and approval rules.\n"
       + "Read pending attention: silta inbox")

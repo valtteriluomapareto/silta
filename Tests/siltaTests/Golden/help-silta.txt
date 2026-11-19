@@ -1,6 +1,6 @@
 ### silta
 
-OVERVIEW: Share a local workspace and task backlog with coding agents.
+OVERVIEW: A local context hub and backlog for coding agents.
 
 Run without a command to see your workspace and inbox count.
 Commands marked human-only need your approval when an agent runs them.
