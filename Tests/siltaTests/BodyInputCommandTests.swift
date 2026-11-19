@@ -1,4 +1,5 @@
 import Foundation
+import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -7,8 +8,9 @@ struct BodyInputCommandTests {
   static let maximumBytes = 65_536
   static let originalPlan = "- [ ] Acme original"
 
-  static func setupPlan(in scratch: URL) throws {
-    _ = try TaskCommandTests.setup(scratch)
+  @discardableResult
+  static func setupPlan(in scratch: URL) throws -> DatabaseStore {
+    let store = try TaskCommandTests.setup(scratch)
     let opts = TaskCommandTests.actor
     let added = try SiltaBinary.run(
       ["task", "add", "Acme body", "--start"], in: scratch, environment: opts)
@@ -16,6 +18,7 @@ struct BodyInputCommandTests {
     let planned = try SiltaBinary.run(
       ["task", "plan", "AC-1", "-m", originalPlan], in: scratch, environment: opts)
     try #require(planned.termination == .exit(0))
+    return store
   }
 
   static func oversizedPlan() -> Data {
