@@ -75,6 +75,42 @@ class SplitSwiftTests(unittest.TestCase):
         self.assertEqual(code.count("UUID()"), 1)
 
 
+    def test_nested_interpolation_keeps_code_and_literal_offsets(self) -> None:
+        raw = (
+            'let value = "\\(render(") \\(Date())", /* inside */ UUID()))"\n'
+            r'let escaped = "\\(Date())"' "\n"
+            r'let raw = ###"\#(Date()) \###(UUID())"###' "\n"
+            'let last = Date()\n'
+        )
+        literals = []
+        code, comments = split_swift(raw, literals)
+        self.assertEqual(len(code), len(raw))
+        self.assertEqual(code.count("\n"), raw.count("\n"))
+        self.assertEqual([line for line, _ in comments], [1])
+        self.assertEqual(code.count("Date()"), 2)
+        self.assertEqual(code.count("UUID()"), 2)
+        self.assertEqual(code.splitlines()[-1], "let last = Date()")
+        self.assertEqual(len(literals), 3)
+        for offset, literal in literals:
+            self.assertEqual(raw[offset:offset + len(literal)], literal)
+
+
+    def test_regex_and_division_keep_following_interpolation_code(self) -> None:
+        for expr in ("choose(#/[)]/#) + later()", "choose(/[)]/) + later()", "total / later()"):
+            with self.subTest(expr=expr):
+                raw = 'let value = "\\(' + expr + ')"'
+                code, _ = split_swift(raw)
+                self.assertIn("later()", code)
+                self.assertEqual(len(code), len(raw))
+
+
+    def test_regex_at_start_of_later_interpolation(self) -> None:
+        raw = r'let value = "\(first()) then \(/[)]/.firstMatch(in: input) != nil && later())"'
+        code, _ = split_swift(raw)
+        self.assertIn("first()", code)
+        self.assertIn("later()", code)
+
+
 class CoreBoundaryTests(GuardTestCase):
     def test_clean_core_passes(self) -> None:
         self.tree.write("Sources/SiltaCore/Task.swift", "import Foundation\n// import SwiftUI is banned\n")
@@ -90,6 +126,12 @@ class CoreBoundaryTests(GuardTestCase):
             "@preconcurrency import AppKit\nimport struct ArgumentParser.Flag\n",
         )
         self.assertEqual(len(check_core_boundary.check(self.tree.root)), 2)
+
+    def test_access_level_imports_fail(self) -> None:
+        for spelling in ("package import AppKit", "public import SwiftUI", "internal import os"):
+            with self.subTest(spelling=spelling):
+                self.tree.write("Sources/SiltaCore/A.swift", spelling + "\n")
+                self.assertEqual(len(check_core_boundary.check(self.tree.root)), 1)
 
     def test_cli_target_may_import_argument_parser(self) -> None:
         self.tree.write("Sources/silta/Main.swift", "import ArgumentParser\n")
@@ -130,6 +172,14 @@ class CoreHygieneTests(GuardTestCase):
         self.tree.write("Sources/SiltaCore/A.swift", "print(1)\ndebugPrint(2)\ndump(3)\nNSLog(\"x\")\n")
         self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 4)
 
+    def test_qualified_and_c_output_calls_fail(self) -> None:
+        for spelling in ("Swift.print(1)", "FileHandle.standardError.write(bytes)", "fputs(text, stderr)"):
+            with self.subTest(spelling=spelling):
+                self.tree.write("Sources/SiltaCore/A.swift", spelling + "\n")
+                self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 1)
+        self.tree.write("Sources/SiltaCore/A.swift", "log.print(value)\nFileHandle.nullDevice.write(bytes)\n")
+        self.assertEqual(check_core_hygiene.check(self.tree.root), [])
+
     def test_cli_may_print(self) -> None:
         self.tree.write("Sources/silta/Main.swift", "print(1)\nvar x = 0\n")
         self.assertEqual(check_core_hygiene.check(self.tree.root), [])
@@ -154,6 +204,12 @@ class CodedErrorsTests(GuardTestCase):
         )
         self.tree.write("Sources/silta/Main.swift", "enum CLIError: Error {}\n")
         self.assertEqual(len(check_coded_errors.check(self.tree.root)), 7)
+
+    def test_qualified_foundation_error_conformances_fail(self) -> None:
+        for conformance in ("Foundation.LocalizedError", "CustomNSError", "Foundation.CustomNSError"):
+            with self.subTest(conformance=conformance):
+                self.tree.write("Sources/SiltaCore/A.swift", f"enum Example: {conformance} {{}}\n")
+                self.assertEqual(len(check_coded_errors.check(self.tree.root)), 1)
 
     def test_marker_and_test_support_pass(self) -> None:
         self.tree.write("Sources/SiltaCore/A.swift", "public protocol CodedError: Error {}  // guard:allow-error root\n")
@@ -187,6 +243,18 @@ class CoreDeterminismTests(GuardTestCase):
         )
         self.assertEqual(len(check_core_determinism.check(self.tree.root)), 3)
 
+    def test_alternate_clock_and_id_spellings_fail(self) -> None:
+        for spelling in (
+            "let time: Date = .now", "let time = Date.init()", "let id = UUID.init()",
+            'let time = "\\(Date())"', r'let id = #"\#(UUID())"#',
+        ):
+            with self.subTest(spelling=spelling):
+                self.tree.write("Sources/SiltaCore/A.swift", spelling + "\n")
+                self.assertEqual(len(check_core_determinism.check(self.tree.root)), 1)
+        self.tree.write("Sources/SiltaCore/A.swift", "let time: Date = clock.now()\n"
+                        "let epoch = Date(timeIntervalSince1970: 0)\n")
+        self.assertEqual(check_core_determinism.check(self.tree.root), [])
+
     def test_marker_allows_the_system_seam(self) -> None:
         self.tree.write(
             "Sources/SiltaCore/SystemClock.swift",
@@ -207,6 +275,10 @@ class TestWaitsTests(GuardTestCase):
             "DispatchQueue.main.asyncAfter(deadline: .now()) {}\n",
         )
         self.assertEqual(len(check_test_waits.check(self.tree.root)), 4)
+
+    def test_constructed_wall_clock_sleep_fails(self) -> None:
+        self.tree.write("Tests/A.swift", "try await ContinuousClock().sleep(for: .seconds(1))\n")
+        self.assertEqual(len(check_test_waits.check(self.tree.root)), 1)
 
     def test_marker_allows_a_justified_wait(self) -> None:
         self.tree.write("Tests/Stress/A.swift", "usleep(100) // guard:allow-wait real process race\n")
@@ -231,16 +303,44 @@ class NoPlanRefsTests(GuardTestCase):
         self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), 5)
 
 
+    def test_bare_slice_ids_fail(self) -> None:
+        slices = ["S12a", "FR5", "A6b", "B1", "C1a", "K2", "DF3-a"]
+        self.tree.write("Sources/SiltaCore/A.swift", "".join(f"// {name} explains this.\n" for name in slices)
+                        + "// D29 and spec §20. Fixture XYZ12.\n")
+        self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), len(slices))
+
+
 class DocsLinksTests(GuardTestCase):
     def test_resolving_links_pass(self) -> None:
-        self.tree.write("docs/a.md", "[b](b.md) [web](https://example.com) [anchor](#x) `[c](missing.md)`\n")
+        self.tree.write("docs/a.md", "# X\n[b](b.md) [web](https://example.com) [anchor](#x) `[c](missing.md)`\n")
         self.tree.write("docs/b.md", "[up](../README.md#top)\n")
-        self.tree.write("README.md", "```\n[ignored](nowhere.md)\n```\n")
+        self.tree.write("README.md", "# Top\n```\n[ignored](nowhere.md)\n```\n")
         self.assertEqual(check_docs_links.check(self.tree.root), [])
 
     def test_broken_link_fails(self) -> None:
         self.tree.write("docs/a.md", "See [missing](missing.md).\n")
         self.assertEqual(len(check_docs_links.check(self.tree.root)), 1)
+
+
+    def test_resolves_headings_and_checks_missing_fragments(self) -> None:
+        self.tree.write("docs/a.md",
+                        "## 5.1 Ref grammar (`Silta`)\n"
+                        "[same here](#51-ref-grammar-silta) [broken here](#absent)\n"
+                        "[other here](b.md#heading-1) [broken other](b.md#fenced)\n")
+        self.tree.write("docs/b.md", "# Heading\n# Heading\n~~~\n# Fenced\n~~~\n")
+        errors = check_docs_links.check(self.tree.root)
+        self.assertEqual(len(errors), 2)
+        self.assertIn("docs/a.md:2: broken link to #absent", errors)
+        self.assertIn("docs/a.md:3: broken link to b.md#fenced", errors)
+
+
+    def test_real_setext_and_explicit_anchors_ignore_lookalikes(self) -> None:
+        self.tree.write("docs/a.md",
+                        "# Topic\n---\n\nSetext title\n------------\n\n"
+                        '<a id="real"></a>\n`<a id="fake"></a>`\n'
+                        "[setext](#setext-title) [real](#real) [code](#fake) [rule](#topic-1)\n")
+        errors = check_docs_links.check(self.tree.root)
+        self.assertEqual([error.rsplit(" ", 1)[-1] for error in errors], ["#fake", "#topic-1"])
 
 
 class PlansBoardTests(GuardTestCase):
@@ -299,6 +399,42 @@ class PackageFeaturesTests(GuardTestCase):
                                        '.testTarget(name: \"SiltaCoreTests\")')
         self.tree.write("Package.swift", self.SETTINGS + targets)
         self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+
+    def test_one_target_with_empty_or_incomplete_settings_fails(self) -> None:
+        original = '.testTarget(name: "SiltaCoreTests", swiftSettings: settings)'
+        for bad_settings in ('[]', '[.enableUpcomingFeature("ExistentialAny")]', 'otherSettings'):
+            with self.subTest(settings=bad_settings):
+                targets = self.TARGETS.replace(
+                    original, f'.testTarget(name: "SiltaCoreTests", swiftSettings: {bad_settings})')
+                self.tree.write("Package.swift", self.SETTINGS + targets)
+                self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+
+    def test_nested_swift_settings_is_not_the_target_argument(self) -> None:
+        targets = self.TARGETS.replace(
+            '.testTarget(name: "SiltaCoreTests", swiftSettings: settings)',
+            '.testTarget(name: "SiltaCoreTests", dependencies: [local(swiftSettings: settings)], '
+            'swiftSettings: [])',
+        )
+        self.tree.write("Package.swift", self.SETTINGS + targets)
+        self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+
+    def test_every_native_target_configuration_needs_all_feature_flags(self) -> None:
+        relative = "App/SiltaApp.xcodeproj/project.pbxproj"
+        project = (GUARDS_DIR.parents[1] / relative).read_text(encoding="utf-8")
+        self.tree.write(relative, project)
+        self.assertEqual(check_package_features.check(self.tree.root), [])
+        assignments = list(re.finditer(r'OTHER_SWIFT_FLAGS\s*=\s*"[^"]*";', project))
+        self.assertTrue(assignments)
+        for assignment in assignments:
+            for replacement in (
+                assignment.group().replace("-enable-upcoming-feature ExistentialAny ", ""),
+                assignment.group().replace("ExistentialAny", "ExistentialAny-extra"),
+                "",
+            ):
+                with self.subTest(offset=assignment.start(), replacement=bool(replacement)):
+                    changed = project[:assignment.start()] + replacement + project[assignment.end():]
+                    self.tree.write(relative, changed)
+                    self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
 
     def test_missing_language_mode_fails(self) -> None:
         self.tree.write("Package.swift", self.SETTINGS + self.TARGETS.replace("swiftLanguageModes: [.v6], ", ""))

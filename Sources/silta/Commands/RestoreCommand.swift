@@ -47,13 +47,14 @@ struct RestoreCommand: OutputCommand {
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let environment = context.environment
-    if dir == "~" || dir.hasPrefix("~/") {
+    if dir.utf8.first == 0x7E {
       throw UsageError.invalid(
-        message: "\(dir) starts with an unexpanded ~; pass an absolute path",
+        message: "The restore directory starts with an unexpanded ~. Pass an absolute path.",
         command: "silta restore")
     }
     let directory = URL(filePath: dir, directoryHint: .isDirectory, relativeTo: .currentDirectory())
       .standardizedFileURL
+    try RestoreService.validateManifestPrefix(manifest, directory: directory)
     let approval =
       dryRun
       ? nil
@@ -121,7 +122,7 @@ struct RestoreCommand: OutputCommand {
   private static func recoveryLines(_ raw: RestoreReport, directory: String) -> [String] {
     let report = raw.presented
     let scopeIsSafe = SecretGuard.matches(in: raw.workspace).isEmpty
-    let pathIsSafe = SecretGuard.matches(in: directory).isEmpty
+    let pathIsSafe = RestoreService.canNameInRecovery(directory)
     var lines: [String] = []
     if let snapshot = report.snapshot {
       let recovery =

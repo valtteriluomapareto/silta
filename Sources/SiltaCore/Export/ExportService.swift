@@ -74,7 +74,7 @@ package enum ExportService {
     try store.initialize()
     let lock = try exportLock(home: home, clock: clock)
     defer { withExtendedLifetime(lock) {} }
-    return try write(workspace: slug, to: root, store: store, moves: ExportMoves())
+    return try write(workspace: slug, to: root, store: store, moves: ExportMoves()).result
   }
 
   static func export(
@@ -83,7 +83,7 @@ package enum ExportService {
     try store.initialize()
     let lock = try exportLock(home: home, clock: SystemClock())
     defer { withExtendedLifetime(lock) {} }
-    return try write(workspace: slug, to: root, store: store, moves: moves)
+    return try write(workspace: slug, to: root, store: store, moves: moves).result
   }
 
   static func exportLock(home: URL, clock: any Clock) throws -> BoundedFileLock {
@@ -95,18 +95,18 @@ package enum ExportService {
   /// The caller holds the export lock, including through any Git operation.
   static func write(
     workspace slug: String, to root: URL, store: DatabaseStore, moves: ExportMoves
-  ) throws -> ExportResult {
+  ) throws -> (result: ExportResult, paths: [String]) {
     let root = root.standardizedFileURL
-    let target = root.appending(path: slug, directoryHint: .isDirectory)
     let failed = ExportError.unwritable(path: root.path, workspace: slug)
     let (files, repos) = try store.read { db in
       (
-        try ExportTree.render(db, workspace: slug),
+        try ExportSnapshot.read(db, workspace: slug).publicationFiles(workspace: slug),
         try Row.fetchAll(
           db,
           sql: "SELECT r.slug, p.path FROM repo_path p JOIN repo r ON r.id=p.repo_id ORDER BY r.id")
       )
     }
+    let target = root.appending(path: slug, directoryHint: .isDirectory)
     let planned = try canonical(target, failed: failed)
     for repo in repos {
       let path = URL(filePath: repo["path"])
@@ -145,7 +145,7 @@ package enum ExportService {
     }
     var result = ExportResult(workspace: slug, path: target.path, files: files.count)
     result.leftovers = crashed + kept
-    return result
+    return (result, Array(files.keys))
   }
 
   /// Writes `files` into a work directory of its own next to `target`, created with a
@@ -154,7 +154,7 @@ package enum ExportService {
   /// isn't. Nothing else is removed. A volume without an atomic swap (exFAT, SMB) moves
   /// the previous tree aside first and puts it back on failure; when even that fails,
   /// the work directory is kept and `previousKept` names it.
-  static func publish(
+  private static func publish(
     _ files: [String: Data], to target: URL, prefix: String, workspace: String,
     moves: ExportMoves
   ) throws -> [ExportLeftover] {
@@ -301,8 +301,7 @@ package enum ExportService {
         unreadable == base ? "it can't be read" : "it holds an entry it can't read (\(unreadable))")
     }
     guard let first = present.min(by: ExportSnapshot.byteOrder) else { return }
-    let manifestPath = target.appending(path: ExportFormat.manifestFile).path
-    let data = FileManager.default.contents(atPath: manifestPath)
+    let data = readManifest(in: target)
     if data == nil, present.contains(ExportFormat.manifestFile) {
       throw refused("its manifest.json can't be read")
     }
@@ -312,6 +311,19 @@ package enum ExportService {
     if let extra = present.subtracting(listed).min(by: ExportSnapshot.byteOrder) {
       throw refused("it holds \(extra)")
     }
+  }
+
+  private static func readManifest(in target: URL) -> Data? {
+    let directory = open(target.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+    guard directory >= 0 else { return nil }
+    defer { close(directory) }
+    let descriptor = openat(
+      directory, ExportFormat.manifestFile, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+    guard descriptor >= 0 else { return nil }
+    let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    var info = stat()
+    guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return nil }
+    return try? handle.readToEnd()  // Ownership check refuses an unreadable manifest.
   }
 
   /// The canonical form of `url`, whose tail may not exist yet, comparable with the

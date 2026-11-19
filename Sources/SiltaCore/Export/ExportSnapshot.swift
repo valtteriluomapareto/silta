@@ -91,6 +91,37 @@ package struct ExportSnapshot: Equatable, Sendable {
     package var rows: [ExportRow]
   }
 
+  /// The first malformed workspace or section identifier, without its stored value.
+  func invalidIdentifier() -> String? {
+    func valid(_ row: ExportRow, _ key: String) -> Bool {
+      WorkspaceConfig.isValidIdentifier(row.value(key) ?? "")
+    }
+    if !valid(workspace, "slug") { return "workspace slug" }
+    if !valid(workspace, "task_prefix") { return "task prefix" }
+    for (section, format) in zip(sections, ExportFormat.sections)
+    where ["app", "repo", "service", "topic"].contains(format.table) {
+      if section.rows.contains(where: { !valid($0, "slug") }) {
+        return "\(format.table) slug"
+      }
+    }
+    return nil
+  }
+
+  /// Validates stored identifiers and output paths before a workspace can be published.
+  func publicationFiles(workspace slug: String) throws -> [String: Data] {
+    guard WorkspaceConfig.isValidIdentifier(slug) else {
+      throw ExportError.invalidExport(reason: "the workspace slug is not an identifier")
+    }
+    if let field = invalidIdentifier() {
+      throw ExportError.invalidExport(reason: "the \(field) is not an identifier")
+    }
+    let files = try files()
+    guard files.keys.allSatisfy(ExportDurability.isRelativeFilePath) else {
+      throw ExportError.invalidExport(reason: "a generated file path is outside the tree")
+    }
+    return files
+  }
+
   /// The tree's files keyed by relative path, `manifest.json` included.
   package func files() throws -> [String: Data] {
     if format == "1",

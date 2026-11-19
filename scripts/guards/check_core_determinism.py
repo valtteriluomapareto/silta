@@ -15,10 +15,10 @@ from swift_source import run, split_swift, swift_files
 CORE_DIR = "Sources/SiltaCore"
 MARKER = "guard:allow-nondeterminism"
 PATTERNS = {
-    "Date()": re.compile(r"\bDate\(\s*\)"),
-    "Date.now": re.compile(r"\bDate\.now\b"),
-    "Date(timeIntervalSinceNow:)": re.compile(r"\bDate\(\s*timeIntervalSinceNow:"),
-    "UUID()": re.compile(r"\bUUID\(\s*\)"),
+    "Date()": re.compile(r"\bDate\s*(?:\.\s*init\s*)?\(\s*\)"),
+    "Date.now": re.compile(r"\bDate\s*(?:=\s*)?\.\s*now\b"),
+    "Date(timeIntervalSinceNow:)": re.compile(r"\bDate\s*(?:\.\s*init\s*)?\(\s*timeIntervalSinceNow:"),
+    "UUID()": re.compile(r"\bUUID\s*(?:\.\s*init\s*)?\(\s*\)"),
 }
 
 

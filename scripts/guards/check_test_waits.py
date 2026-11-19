@@ -19,6 +19,7 @@ PATTERNS = {
     "Task.sleep": re.compile(r"\bTask\.sleep\b"),
     "sleep()/usleep()": re.compile(r"(?<![\w.])u?sleep\("),
     "Thread.sleep": re.compile(r"\bThread\.sleep\b"),
+    "wall clock sleep": re.compile(r"\b(?:ContinuousClock|SuspendingClock)\s*\(\s*\)\s*\.\s*sleep\b"),
     "asyncAfter": re.compile(r"\.asyncAfter\("),
 }
 
