@@ -2017,7 +2017,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - Refs follow §5.1.
 - Human-readable text and quiet views of stored content mask secrets before
   replacing terminal control characters with spaces. Multiline bodies preserve
-  linefeeds and tabs, with CRLF displayed as LF. Inline fields stay on one line.
+  tabs and display CRLF, CR and Unicode line and paragraph separators as LF.
+  Inline fields stay on one line.
   Structured JSON values, edit documents and exports use their existing data
   contracts. The brief quotes every stored block-reason line in both projections,
   before its generated recovery commands.
