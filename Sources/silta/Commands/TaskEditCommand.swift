@@ -36,6 +36,10 @@ struct TaskEditCommand: OutputCommand {
   @Flag(help: "Retain secrets with human approval.")
   var allowSecret = false
 
+  func validate() throws {
+    if file == nil && !print { try TerminalEditor.validate() }
+  }
+
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let service = TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved,
@@ -83,14 +87,10 @@ struct TaskEditCommand: OutputCommand {
     }
     do {
       try original.write(to: path, atomically: true, encoding: .utf8)
-      let process = Process()
-      process.executableURL = URL(filePath: "/bin/sh")
-      let editor = ProcessInfo.processInfo.environment["EDITOR"] ?? "vi"
-      process.arguments = ["-c", "exec " + editor + " \"$1\"", "silta-editor", path.path]
-      try process.run()
-      process.waitUntilExit()
-      guard process.terminationStatus == 0 else { return nil }
+      guard try TerminalEditor.run(path, command: "silta task edit") == 0 else { return nil }
       return try read(path.path)
+    } catch let error as any CodedError {
+      throw error
     } catch { throw TaskError.input }
   }
 

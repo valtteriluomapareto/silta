@@ -1,0 +1,1 @@
+{"error":{"code":"conflict","message":"Workspace configuration changed while editing. Review the current configuration. The edited YAML is kept at <buffer>.","next":["silta --ws 'acme' ws show"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

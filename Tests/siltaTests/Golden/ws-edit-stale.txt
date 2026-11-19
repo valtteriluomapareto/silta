@@ -1,0 +1,2 @@
+error: Workspace configuration changed while editing. Review the current configuration. The edited YAML is kept at <buffer>. [conflict]
+next: silta --ws 'acme' ws show

@@ -1,0 +1,1 @@
+{"error":{"code":"usage","message":"Editing needs terminal input and terminal stderr. Supply -F <file> or -F - for stdin.","next":["silta ws edit --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

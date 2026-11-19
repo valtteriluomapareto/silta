@@ -1,0 +1,2 @@
+error: The editor could not be started; check EDITOR. [env]
+ask human: silta ws edit --help

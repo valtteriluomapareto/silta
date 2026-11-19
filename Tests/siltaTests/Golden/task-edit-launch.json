@@ -1,0 +1,1 @@
+{"error":{"code":"env","message":"The editor could not be started; check EDITOR.","next":["silta --ws 'acme' task edit --help"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
