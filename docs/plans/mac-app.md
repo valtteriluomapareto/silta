@@ -107,17 +107,19 @@ the human copies.
   Sea glass card beside the content (`seaInspector`), not a system `.inspector` column,
   so it shares the window's shore. Dragging the gap before it resizes it between 300
   and 500 pt (double-click resets); the width is remembered, and at the minimum window
-  width the Board lanes scroll sideways. Debug control runs pin 340 pt. The content
+  width the Board lanes scroll sideways. Automated control runs (snapshots, driver runs)
+  pin 340 pt; a hand-launched fixture keeps the human's width. The content
   starts with one large title and its count line (`navigationTitle` still names the
   window). The app accent is tide `#0B6E8E`, from the asset catalog.
 - **Appearance:** System, Light or Dark, from View ▸ Appearance or Settings (⌘,),
-  stored in defaults and applied app-wide from launch. Debug control runs keep
-  `-SiltaDark`'s choice.
+  stored in defaults and applied app-wide from launch. Automated control runs keep the
+  launch flags' choice; a fixture launched with `-SiltaDark` starts in dark.
 - **Discussion (Paper "Discussion v1"):** the task inspector groups posts into threads:
   a root keeps its author's rail and its replies sit inside it. More than two replies
   fold to the newest. A post over four lines clamps with Show more. Resolved threads,
-  which Core's normal read only counts, come from the timeline and fold to one line.
-  Reply opens a box inside the thread that posts with `replyTo`.
+  which Core's normal read only counts, come from one Core read with it and fold to one
+  line. Reply opens a box inside the thread that posts with `replyTo`; on an open
+  question to the human it answers instead.
 - **Sea glass surfaces:** an opaque shore gradient is the window background, under the
   system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
   Reduce Transparency makes them opaque and drops the gradient's glows; Increase
