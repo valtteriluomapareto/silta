@@ -118,9 +118,11 @@ extension View {
     HStack(alignment: .top, spacing: 0) {
       frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       if isPresented {
-        InspectorResizeHandle(width: width)
-        inspector().frame(width: SeaInspectorMetrics.clamped(width.wrappedValue))
-          .padding(.bottom, 12)
+        HStack(alignment: .top, spacing: 0) {
+          InspectorResizeHandle(width: width)
+          inspector().frame(width: SeaInspectorMetrics.clamped(width.wrappedValue))
+            .padding(.bottom, 12)
+        }.transition(.move(edge: .trailing).combined(with: .opacity))
       }
     }.animation(.smooth(duration: 0.2), value: isPresented)
   }
@@ -137,6 +139,12 @@ enum SeaInspectorMetrics {
   static func clamped(_ width: Double) -> Double {
     min(max(width, range.lowerBound), range.upperBound)
   }
+
+  /// The width after dragging the handle by `translation` from `start`: the card sits
+  /// on the trailing side, so dragging left widens it.
+  static func resized(from start: Double, translation: Double) -> Double {
+    clamped(clamped(start) - translation)
+  }
 }
 
 /// The 12 pt gap before the inspector card: drag to resize, double-click to reset.
@@ -148,11 +156,11 @@ private struct InspectorResizeHandle: View {
     Color.clear.frame(width: 12).frame(maxHeight: .infinity).contentShape(Rectangle())
       .pointerStyle(.columnResize)
       .gesture(
-        DragGesture(minimumDistance: 1, coordinateSpace: .global)
+        DragGesture(minimumDistance: 3, coordinateSpace: .global)
           .onChanged { value in
-            let origin = start ?? SeaInspectorMetrics.clamped(width)
+            let origin = start ?? width
             start = origin
-            width = SeaInspectorMetrics.clamped(origin - value.translation.width)
+            width = SeaInspectorMetrics.resized(from: origin, translation: value.translation.width)
           }
           .onEnded { _ in start = nil }
       )

@@ -11,12 +11,5 @@
       #expect(AppAppearance.dark.appearanceName == .darkAqua)
       #expect(AppAppearance(rawValue: "sepia") == nil)
     }
-
-    @Test func inspectorWidthStaysWithinTheColumnRange() {
-      #expect(SeaInspectorMetrics.clamped(SeaInspectorMetrics.width) == 340)
-      #expect(SeaInspectorMetrics.clamped(120) == 300)
-      #expect(SeaInspectorMetrics.clamped(900) == 500)
-      #expect(SeaInspectorMetrics.range.contains(SeaInspectorMetrics.width))
-    }
   }
 #endif

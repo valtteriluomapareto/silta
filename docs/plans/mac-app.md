@@ -107,12 +107,12 @@ the human copies.
   Sea glass card beside the content (`seaInspector`), not a system `.inspector` column,
   so it shares the window's shore. Dragging the gap before it resizes it between 300
   and 500 pt (double-click resets); the width is remembered, and at the minimum window
-  width the Board lanes scroll sideways. Debug control runs pin 340 pt.
+  width the Board lanes scroll sideways. Debug control runs pin 340 pt. The content
+  starts with one large title and its count line (`navigationTitle` still names the
+  window). The app accent is tide `#0B6E8E`, from the asset catalog.
 - **Appearance:** System, Light or Dark, from View ▸ Appearance or Settings (⌘,),
-  stored in defaults and applied app-wide. Debug control runs keep `-SiltaDark`'s
-  choice. The content starts with one large title and its count
-  line (`navigationTitle` still names the window). The app accent is tide `#0B6E8E`,
-  from the asset catalog.
+  stored in defaults and applied app-wide from launch. Debug control runs keep
+  `-SiltaDark`'s choice.
 - **Sea glass surfaces:** an opaque shore gradient is the window background, under the
   system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
   Reduce Transparency makes them opaque and drops the gradient's glows; Increase

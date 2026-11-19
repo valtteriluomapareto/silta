@@ -44,6 +44,10 @@ struct SiltaApp: App {
       }
     #endif
     _model = State(initialValue: Self.makeModel())
+    Self.apply(
+      AppAppearance(
+        rawValue: UserDefaults.standard.string(forKey: AppAppearance.storageKey) ?? "")
+        ?? .system)
   }
 
   private static func makeModel() -> AppModel {
@@ -103,13 +107,14 @@ struct SiltaApp: App {
           ForEach(AppAppearance.allCases) { Text($0.title).tag($0) }
         }.pickerStyle(.radioGroup)
       }.padding(20).frame(width: 320)
+        .onChange(of: appearance) { applyAppearance() }
     }
   }
 
   #if DEBUG
     /// A control run shares the installed app's defaults, so it pins the inspector width
-    /// in the volatile argument domain: fixture captures stay deterministic and the
-    /// human's stored width is never read or written over.
+    /// in the volatile argument domain: fixture captures stay deterministic and never
+    /// read the human's stored width.
     private static func pinPreferencesForControl() {
       let defaults = UserDefaults.standard
       var pinned = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
@@ -124,13 +129,16 @@ struct SiltaApp: App {
     #if DEBUG
       if control != nil { return }
     #endif
+    Self.apply(appearance)
+  }
+
+  private static func apply(_ appearance: AppAppearance) {
     NSApplication.shared.appearance = appearance.appearanceName.flatMap(NSAppearance.init(named:))
   }
 
   private var mainWindow: some Scene {
     Window("Silta", id: "main") {
       AppShellView(model: model)
-        .onAppear { applyAppearance() }
         .onChange(of: appearance) { applyAppearance() }
         #if DEBUG
           .background {
