@@ -31,7 +31,9 @@
       do {
         try FileManager.default.createDirectory(
           at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        NSApplication.shared.appearance = NSAppearance(named: options.dark ? .darkAqua : .aqua)
+        if options.isAutomated || options.dark {
+          NSApplication.shared.appearance = NSAppearance(named: options.dark ? .darkAqua : .aqua)
+        }
         await model.refresh().value
         try options.route.apply(to: model)
         if model.boardSelection != nil { await model.loadTaskDetail() }
