@@ -144,6 +144,35 @@ struct GitRunnerTests {
     }
   }
 
+  @Test func boundedCaptureKeepsIndependentStreamPrefixes() async throws {
+    try await withScratchDirectory { scratch in
+      let script = scratch.appending(path: "git")
+      let source = """
+        #!/bin/sh
+        /usr/bin/awk 'BEGIN {
+          for (i=0; i<60000; i++) {
+            print "stdout"
+            print "stderr" > "/dev/stderr"
+          }
+        }'
+        exit 7
+        """
+      try Data(source.utf8).write(to: script)
+      try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
+      let limit = 128 * 1024
+      let request = GitRequest(
+        arguments: [], directory: scratch, capture: .init(byteLimit: limit, skipLines: 30_000))
+      let result = try await SystemGitRunner(executable: script.path).run(request)
+      #expect(result.termination == .exit(7))
+      #expect(result.stdout.count == limit)
+      #expect(result.stderr.count == limit)
+      #expect(result.stdout.starts(with: "stdout\n".utf8))
+      #expect(result.stderr.starts(with: "stderr\n".utf8))
+      #expect(result.stdoutTruncated)
+      #expect(result.stdoutSkippedLines == 30_000)
+    }
+  }
+
   @Test func deadlinesAreExplicitAndSpawnFailuresAreCoded() async throws {
     try await withScratchDirectory { scratch in
       #expect(GitRequest(arguments: ["fetch"], directory: scratch).timeout == 10)
@@ -192,7 +221,8 @@ struct GitRunnerTests {
     }
   }
 
-  @Test func descendantOutputDescriptorsDoNotDelayReturn() async throws {
+  @Test(arguments: [false, true])
+  func descendantOutputDescriptorsDoNotDelayReturn(bounded: Bool) async throws {
     try await withScratchDirectory { scratch in
       let fifo = scratch.appending(path: "hold")
       try #require(mkfifo(fifo.path, 0o600) == 0)
@@ -202,7 +232,9 @@ struct GitRunnerTests {
       try Data(source.utf8).write(to: script)
       try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
       let result = try await SystemGitRunner(executable: script.path).run(
-        GitRequest(arguments: [fifo.path, pidFile.path], directory: scratch))
+        GitRequest(
+          arguments: [fifo.path, pidFile.path], directory: scratch,
+          capture: bounded ? .init(byteLimit: 1024) : nil))
       let text = try String(contentsOf: pidFile, encoding: .utf8)
       let descendant = try #require(Int32(text))
       defer { kill(descendant, SIGKILL) }

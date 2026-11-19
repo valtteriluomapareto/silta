@@ -52,6 +52,8 @@ They're summarised here so every decision has one index.
   - ↳ update (D39): with `proposals: ask`, an agent's unsolicited task needs the
     human's go-ahead in chat instead of triage.
 - **D6: Silta resolves "where am I"** from cwd, branch, upstream and claimed task.
+  - ↳ 2026-11-19: An unborn branch uses its branch name with an empty JSON head.
+    The existing field types and pre-distance selection rules are retained (§7).
 - **D7: Code access is read-only**, through `git show`, `grep` and `log` on
   configured refs.
 - **D8: Truth (`silta.db`) and derived data (`index.db`) live in separate files.**

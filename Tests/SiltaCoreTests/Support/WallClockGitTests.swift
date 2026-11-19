@@ -9,7 +9,8 @@ import Testing
 /// machine can delay the child past a one-second deadline before it prints its marker.
 @Suite(.tags(.deadline), .enabled(if: deadlineTestsEnabled()), .serialized, .timeLimit(.minutes(1)))
 struct WallClockGitTests {
-  @Test func timeoutKillsAChildIgnoringTermination() async throws {
+  @Test(arguments: [false, true])
+  func timeoutKillsAChildIgnoringTermination(bounded: Bool) async throws {
     try await withScratchDirectory { scratch in
       let fifo = scratch.appending(path: "hold")
       try #require(mkfifo(fifo.path, 0o600) == 0)
@@ -20,9 +21,18 @@ struct WallClockGitTests {
         to: script)
       try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
       let result = try await SystemGitRunner(executable: script.path, killAfter: 0.01).run(
-        GitRequest(arguments: [fifo.path], directory: scratch, timeout: 1))
+        GitRequest(
+          arguments: [fifo.path], directory: scratch, timeout: 1,
+          capture: bounded ? .init(byteLimit: 4, skipLines: 100_000) : nil))
       #expect(result.termination == .timedOut)
-      #expect(result.stdout == Data("ready".utf8))
+      if bounded {
+        #expect(result.stdout == Data("read".utf8))
+        #expect(result.stdoutTruncated)
+        #expect(result.stdoutSkippedLines == 0)
+      } else {
+        #expect(result.stdout == Data("ready".utf8))
+        #expect(!result.stdoutTruncated)
+      }
     }
   }
 }

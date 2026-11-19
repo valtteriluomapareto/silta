@@ -5,6 +5,99 @@ import Testing
 
 /// Regressions for code reads: regex flavour, bounds, decoding, attributes, refs and paths.
 extension CodeCommandTests {
+  @Test(arguments: [true, false])
+  func grepAndLogRequireTheConfiguredAppDirectory(grep: Bool) throws {
+    try withScratchDirectory { scratch in
+      _ = try setup(scratch)
+      let verb = grep ? "grep" : "log"
+      let pattern = grep ? ["noAcmeMatch"] : []
+      let missing = try SiltaBinary.run(
+        ["--json", "code", verb, "console@origin/portal"] + pattern, in: scratch)
+      #expect(missing.termination == .exit(2))
+      Golden.forTests().check(missing.stdout, "code-app-subpath-missing.json")
+      let text = try SiltaBinary.run(
+        ["code", verb, "console@origin/portal"] + pattern, in: scratch)
+      #expect(text.termination == .exit(2))
+      Golden.forTests().check(text.stderr, "code-app-subpath-missing.txt")
+      let present = try SiltaBinary.run(
+        ["--json", "code", verb, "console"] + (grep ? pattern : ["no-such-path"]), in: scratch)
+      #expect(present.termination == .exit(0))
+      #expect(try envelope(present.stdout)["output"] as? String == "")
+    }
+  }
+
+  @Test func aFileCannotBeTheAppSubpath() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let subpath = repo.appending(path: "apps/console")
+      try FileManager.default.removeItem(at: subpath)
+      try Data("Acme file\n".utf8).write(to: subpath)
+      try commitAll(repo, scratch)
+      for arguments in [["show", "."], ["grep", "Acme"], ["log"], ["ls"]] {
+        let result = try SiltaBinary.run(
+          ["--json", "code", arguments[0], "console@HEAD"] + arguments.dropFirst(), in: scratch)
+        #expect(result.termination == .exit(2))
+        Golden.forTests().check(result.stdout, "code-app-subpath-missing.json")
+      }
+    }
+  }
+
+  @Test(arguments: ["../x", "/x"])
+  func workspaceEditRejectsUnreadableSubpaths(path: String) throws {
+    try withScratchDirectory { scratch in
+      _ = try setup(scratch)
+      let before = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
+      try #require(before.termination == .exit(0))
+      let file = scratch.appending(path: "workspace.yaml")
+      let yaml = """
+        workspace: {slug: acme, name: Acme, task_prefix: AC}
+        repos: [{slug: platform}]
+        apps:
+          - {slug: console, repo: platform, ref: origin/api, subpath: \(path)}
+        """
+      try Data(yaml.utf8).write(to: file)
+      let result = try SiltaBinary.run(
+        ["--ws", "acme", "--json", "ws", "edit", "-F", file.path, "--approved", "Edit Acme"],
+        in: scratch, environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      let after = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
+      #expect(result.termination == .exit(1))
+      Golden.forTests().check(result.stdout, "ws-edit-subpath-invalid.json")
+      let text = try SiltaBinary.run(
+        ["--ws", "acme", "ws", "edit", "-F", file.path, "--approved", "Edit Acme"],
+        in: scratch, environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      #expect(text.termination == .exit(1))
+      Golden.forTests().check(text.stderr, "ws-edit-subpath-invalid.txt")
+      #expect(after.stdout == before.stdout)
+    }
+  }
+
+  @Test func oversizedGitReadsKeepLateLineSelection() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let path = "oversized.txt"
+      let largeLine = String(repeating: "é", count: 1_100_000)
+      let file = "Acme start\nAcme \(largeLine)\nAcme end\n"
+      try Data(file.utf8).write(to: repo.appending(path: "apps/console/" + path))
+      try commitAll(repo, scratch)
+      let show = try SiltaBinary.run(
+        ["--json", "code", "show", "console@HEAD", path], in: scratch)
+      let grep = try SiltaBinary.run(
+        ["--json", "code", "grep", "console@HEAD", "Acme", "--", path], in: scratch)
+      for result in [show, grep] {
+        try #require(result.termination == .exit(0))
+        let value = try #require(try envelope(result.stdout)["output"] as? String)
+        let cutoff = try warnings(result.stdout)["output_truncated"]
+        #expect(value.utf8.count <= 1_048_576)
+        #expect(!value.contains("�"))
+        #expect(cutoff != nil)
+      }
+      let late = try SiltaBinary.run(
+        ["--json", "code", "show", "console@HEAD", path, "--lines", "3"], in: scratch)
+      #expect(try envelope(late.stdout)["output"] as? String == "Acme end\n")
+      #expect(try warnings(late.stdout)["lines_past_eof"] == nil)
+    }
+  }
+
   @Test func grepUsesExtendedRegularExpressions() throws {
     try withScratchDirectory { scratch in
       _ = try setup(scratch)

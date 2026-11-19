@@ -457,7 +457,9 @@ symlinks resolved, case-folded on case-insensitive volumes.
 4. **Human override** for the canonical worktree toplevel (`worktree_override`),
    only when its app remains among the filtered candidates.
 5. **Task link.** A task claimed by this session, or the task whose `branch` equals
-   the current branch, gives its `app_id`.
+   the current branch, gives its `app_id`. Older task rows can match Git's previous
+   branch abbreviation after exact matches, provided the abbreviation names
+   no other local branch.
 6. **Exact ref.** The current branch equals an app's `ref` or `prod_ref`, ignoring
    `origin/`.
 7. **Upstream.** `git rev-parse --abbrev-ref @{upstream}` equals an app ref. Otherwise
@@ -476,6 +478,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 | Case | Result |
 |---|---|
 | Detached HEAD | Rules 4–5, then 8 against the HEAD sha. `branch: null` |
+| Unborn branch | Normal selection through rule 5. Otherwise report low confidence and the candidates. |
 | Shallow or partial clone where `rev-list` fails | `low`, reason `shallow` |
 | A candidate ref missing locally (`origin/x` not fetched) | Skipped in rules 6–8; configured candidate retained, warning `ref_missing` |
 | Worktree of an unregistered repo | `unregistered` |
@@ -488,7 +491,9 @@ symlinks resolved, case-folded on case-insensitive volumes.
  "head":"3f9a1c2000000000000000000000000000000000","confidence":"high","reason":"upstream","candidates":[…]}
 ```
 
-- `head` is the full commit SHA, not an abbreviation. `reason` is one of
+- `branch` is the full branch name within `refs/heads/`, including any embedded
+  slashes. `head` is the full commit SHA. On an unborn branch `head` is an empty
+  string in JSON and text shows `head: (no commits)`. `reason` is one of
   `explicit`, `single`, `override`, `task`, `exact_ref`, `upstream`, `reflog`,
   `distance`, `non_app_ref`, `shallow` or `unresolved`.
 - Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
@@ -1233,7 +1238,9 @@ silta code ls   <app>[@<ref>] [<dir>]
   directory, with a trailing `/` on directories. No matches in grep or log are an
   empty success. Missing show/ls paths are `not_found`, and so are `show` on a
   directory and `ls` on a file, whose `next` is the matching command. A configured
-  subpath missing at the commit is `not_found` and names the subpath.
+  subpath that is absent or is not a directory at the selected commit is
+  `not_found` for all four commands. The error names the subpath and points to
+  the workspace configuration.
 - Names containing control characters, quotes or backslashes are double-quoted
   with backslash escapes. Other names, including Unicode, display literally.
 - `grep` patterns are extended regular expressions (`git grep -E`); an invalid one
@@ -1249,7 +1256,11 @@ silta code ls   <app>[@<ref>] [<dir>]
 - Output is bounded: `show` without `--lines` prints at most 400 lines, and `grep`
   at most 200 matching lines. A cut adds an `output_truncated` warning that says how
   much was cut and how to narrow the read (`--lines A-B` for show; a pathspec or a
-  narrower pattern for grep).
+  narrower pattern for grep). Git content reads capture at most 1 MiB per output
+  stream in memory. When the byte ceiling cuts the result, Silta prints complete
+  records within that bound. The `output_truncated` warning reports the byte
+  limit and how to narrow the read. `show --lines` applies the cap starting at
+  the requested line. Git can write the full streams to temporary disk.
 - A git call over its 10 s timeout is `env` with `next_by: agent`: narrow the read
   (a path, pathspec, pattern or `--lines`) and retry.
 - When the repo hasn't been fetched for 24 h, output warns (`ref_stale`): "fetched N h
@@ -2959,6 +2970,8 @@ New service slugs and edge kinds must be identifiers (letters/digits with intern
 `_` or `-`). Workspace edits retain the bytes and identities of existing service
 slugs and edge kinds. The service slug requirement applies to text exports and restores
 (§15).
+An app's `subpath` must be relative to the repository root and contain neither a
+`..` component nor a NUL byte. `ws edit` refuses invalid subpaths before writing.
 Existing non-doc links also protect app, edge, service and topic targets from removal.
 Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-local
 repo paths are excluded from this view. A `workspace` change-log event invalidates

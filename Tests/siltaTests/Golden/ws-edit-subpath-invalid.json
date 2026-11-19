@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"line 4: subpath must be relative, without .. components or NUL","next":["silta ws show 'acme'","silta ws edit --help"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

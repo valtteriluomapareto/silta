@@ -28,13 +28,23 @@ struct TaskGit: Sendable {
     else { throw TaskError.foreignRepo }
     let root = try await value(
       ["rev-parse", "--show-toplevel"], directory: directory, runner: runner)
-    let branch = try await value(
-      ["rev-parse", "--abbrev-ref", "HEAD"], directory: directory, runner: runner)
+    let branch = try await branchName(directory, runner: runner)
     guard completion else { return TaskGit(branch: branch, worktree: root) }
     let commit = try await commitValue(sha, directory: directory, runner: runner)
     guard commit.wholeMatch(of: /[a-f0-9]{40}|[a-f0-9]{64}/) != nil else { throw TaskError.git }
     let status = try await value(["status", "--porcelain"], directory: directory, runner: runner)
     return TaskGit(branch: branch, worktree: root, sha: commit, dirty: !status.isEmpty)
+  }
+
+  private static func branchName(_ directory: URL, runner: any GitRunner) async throws -> String {
+    let name = try await value(
+      ["rev-parse", "--abbrev-ref", "HEAD"], directory: directory, runner: runner)
+    guard name.utf8.starts(with: "heads/".utf8) || name.utf8.starts(with: gitBranchPrefix.utf8)
+    else { return name }
+    let ref = try await value(
+      ["symbolic-ref", "--quiet", "HEAD"], directory: directory, runner: runner)
+    guard let branch = gitBranchName(in: ref) else { throw TaskError.git }
+    return branch
   }
 
   private static func commitValue(
