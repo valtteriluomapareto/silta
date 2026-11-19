@@ -159,6 +159,44 @@
       #expect(await actions.perform(.refresh) == .refused(.readFailed))
     }
 
+    @Test func cancelledRetryDoesNotValidateAValueFromBeforeTheFailure() async throws {
+      let fixture = try FixtureLaunch.prepare()
+      defer {
+        try? FileManager.default.removeItem(  // cleanup
+          at: fixture.home.deletingLastPathComponent())
+      }
+      let reader = try AppReader(home: fixture.home, user: fixture.user, now: { fixture.now })
+      let old = try reader.task("AC-9", workspace: "acme")
+      let detail = TaskDetailModel()
+      await detail.load(workspace: "acme", ref: "AC-9", version: 2) { old }
+      await detail.load(workspace: "acme", ref: "AC-9", version: 3) {
+        throw AppLoadFailure(message: "Failed to load the current task")
+      }
+      #expect(detail.phase(workspace: "acme", ref: "AC-9", version: 3) == .failed)
+      let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+      let hold = AsyncStream<Void>.makeStream()
+      defer {
+        entered.continuation.finish()
+        hold.continuation.finish()
+      }
+      let retry = Task {
+        await detail.load(workspace: "acme", ref: "AC-9", version: 3) {
+          entered.continuation.yield(())
+          var iterator = hold.stream.makeAsyncIterator()
+          _ = await iterator.next()
+          return old
+        }
+      }
+      var reads = entered.stream.makeAsyncIterator()
+      _ = await reads.next()
+      retry.cancel()
+      await retry.value
+      #expect(detail.value?.ref == old.ref)
+      withKnownIssue("A cancelled retry can treat the retained value as the failed version") {
+        #expect(detail.phase(workspace: "acme", ref: "AC-9", version: 3) == .loading)
+      }
+    }
+
     private func wire(_ fields: [String: Any], run: String = "current", seq: Any = 1) throws
       -> ControlRequest
     {
