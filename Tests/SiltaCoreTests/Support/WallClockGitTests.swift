@@ -26,11 +26,9 @@ struct WallClockGitTests {
           capture: bounded ? .init(byteLimit: 4, skipLines: 100_000) : nil))
       #expect(result.termination == .timedOut)
       if bounded {
-        withKnownIssue("#264: timed-out reads continue scanning for later lines") {
-          #expect(result.stdout == Data("read".utf8))
-          #expect(result.stdoutTruncated)
-          #expect(result.stdoutSkippedLines == 0)
-        }
+        #expect(result.stdout == Data("read".utf8))
+        #expect(result.stdoutTruncated)
+        #expect(result.stdoutSkippedLines == 0)
       } else {
         #expect(result.stdout == Data("ready".utf8))
         #expect(!result.stdoutTruncated)

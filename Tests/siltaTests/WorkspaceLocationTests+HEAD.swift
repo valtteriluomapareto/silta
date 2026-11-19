@@ -46,13 +46,19 @@ extension WorkspaceLocationTests {
         try $0.database.execute(sql: "UPDATE task SET branch='heads/team/acme' WHERE seq=2")
       }
       let legacy = try whereFromAnotherSession()
-      withKnownIssue("#264: tag ambiguity loses branch task evidence") {
-        #expect(stored == "team/acme")
-        #expect(canonical.contains("\"reason\":\"task\""))
-        #expect(legacy.contains("\"reason\":\"task\""))
-      }
+      #expect(stored == "team/acme")
+      #expect(canonical.contains("\"reason\":\"task\""))
+      #expect(legacy.contains("\"reason\":\"task\""))
       try Self.git(
         ["update-ref", "refs/heads/heads/team/acme", "HEAD"], in: repo, scratch: scratch)
+      #expect(try !whereFromAnotherSession().contains("\"reason\":\"task\""))
+
+      try store.write {
+        try $0.database.execute(sql: "UPDATE task SET branch='refs/heads/team/acme' WHERE seq=2")
+      }
+      #expect(try whereFromAnotherSession().contains("\"reason\":\"task\""))
+      try Self.git(
+        ["update-ref", "refs/heads/refs/heads/team/acme", "HEAD"], in: repo, scratch: scratch)
       #expect(try !whereFromAnotherSession().contains("\"reason\":\"task\""))
     }
   }
@@ -63,10 +69,8 @@ extension WorkspaceLocationTests {
       let name = "\u{0301}acme"
       try Self.git(["switch", "-qc", name], in: repo, scratch: scratch)
       let result = try Self.run(["where", "--json"], scratch, repo)
-      withKnownIssue("#264: branch names use Git byte offsets") {
-        #expect(result.termination == .exit(0))
-        #expect(result.stdout.contains("\"branch\":\"\(name)\""))
-      }
+      #expect(result.termination == .exit(0))
+      #expect(result.stdout.contains("\"branch\":\"\(name)\""))
     }
   }
 

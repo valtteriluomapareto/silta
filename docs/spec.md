@@ -457,7 +457,9 @@ symlinks resolved, case-folded on case-insensitive volumes.
 4. **Human override** for the canonical worktree toplevel (`worktree_override`),
    only when its app remains among the filtered candidates.
 5. **Task link.** A task claimed by this session, or the task whose `branch` equals
-   the current branch, gives its `app_id`.
+   the current branch, gives its `app_id`. Older task rows can match Git's previous
+   branch abbreviation after exact matches, provided the abbreviation names
+   no other local branch.
 6. **Exact ref.** The current branch equals an app's `ref` or `prod_ref`, ignoring
    `origin/`.
 7. **Upstream.** `git rev-parse --abbrev-ref @{upstream}` equals an app ref. Otherwise
@@ -1256,9 +1258,9 @@ silta code ls   <app>[@<ref>] [<dir>]
   much was cut and how to narrow the read (`--lines A-B` for show; a pathspec or a
   narrower pattern for grep). Git content reads capture at most 1 MiB per output
   stream in memory. When the byte ceiling cuts the result, Silta prints complete
-  records within that bound and warns with `output_truncated`. The warning gives
-  no total record count. For `show --lines`, the reader skips preceding lines
-  before applying the cap. Temporary disk usage by Git capture is separate.
+  records within that bound. The `output_truncated` warning reports the byte
+  limit and how to narrow the read. `show --lines` applies the cap starting at
+  the requested line. Git can write the full streams to temporary disk.
 - A git call over its 10 s timeout is `env` with `next_by: agent`: narrow the read
   (a path, pathspec, pattern or `--lines`) and retry.
 - When the repo hasn't been fetched for 24 h, output warns (`ref_stale`): "fetched N h

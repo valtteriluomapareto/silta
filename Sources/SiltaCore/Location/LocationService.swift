@@ -31,7 +31,7 @@ package struct LocationService {
     let git = context.git
     let candidates = context.candidates
     let (branch, head) = try await git.headState()
-    let current = try currentTask(selectedTask, context: context, app: app, branch: branch)
+    let current = try await currentTask(selectedTask, context: context, app: app, branch: branch)
     var result = LocationResult(
       path: context.path.path, worktree: context.root.path,
       workspace: repo.workspace, repo: repo.slug, branch: branch,
@@ -86,12 +86,23 @@ package struct LocationService {
   private func currentTask(
     _ explicit: TaskDetails?, context: LocationContext,
     app: String?, branch: String?
-  ) throws -> TaskDetails? {
+  ) async throws -> TaskDetails? {
     if let explicit { return explicit }
-    return try environment.db.read { db in
+    func lookup(_ branches: [String], in db: Database) throws -> TaskDetails? {
       try CurrentTaskSelector.select(
-        context, app: app, actor: environment.actor.description,
-        branch: branch, in: db)
+        context, app: app, actor: environment.actor.description, branches: branches, in: db)
+    }
+    let names = branch.map { [$0] } ?? []
+    let legacy = branch.map { ["heads/" + $0, gitBranchPrefix + $0] } ?? []
+    let (current, hasLegacy) = try environment.db.read { db in
+      let current = try lookup(names, in: db)
+      guard current == nil, !legacy.isEmpty else { return (current, false) }
+      return (nil, try lookup(legacy, in: db) != nil)
+    }
+    guard hasLegacy, let spelling = try await context.git.legacyBranchSpelling(in: legacy)
+    else { return current }
+    return try environment.db.read { db in
+      try lookup(names, in: db) ?? lookup([spelling], in: db)
     }
   }
 

@@ -29,13 +29,14 @@ package struct GitRequest: Equatable, Sendable {
 
 /// Bounds the retained bytes of each stream after skipping requested stdout lines.
 package struct GitCapture: Equatable, Sendable {
-  /// Per-stream byte limit. Must be positive and less than `Int.max`.
+  /// Maximum retained bytes per stream.
   package let byteLimit: Int
   /// Number of LF-delimited stdout lines to discard before capturing a prefix.
   package let skipLines: Int
 
   /// Returns a bounded capture request, optionally starting at a later stdout line.
   package init(byteLimit: Int, skipLines: Int = 0) {
+    precondition(byteLimit > 0, "Git capture needs a positive byte limit")
     self.byteLimit = byteLimit
     self.skipLines = skipLines
   }
@@ -62,7 +63,7 @@ package struct GitResult: Equatable, Sendable {
 
   /// Whether stdout contains only a prefix of the requested window.
   package let stdoutTruncated: Bool
-  /// Number of lines discarded before capture, at most the actual line count.
+  /// Number of lines discarded before capture. A timed-out read captures its initial prefix.
   package let stdoutSkippedLines: Int
 
   /// Creates a captured result without decoding or combining its streams.
