@@ -37,6 +37,9 @@ struct TaskTriageCommandTests {
         JSONSerialization.jsonObject(with: Data(refused.stdout.utf8)) as? [String: Any])
       let error = try #require(envelope["error"] as? [String: Any])
       let next = try #require((error["next"] as? [String])?.first)
+      withKnownIssue("#259: inline triage retry asks for a file instead of reusable stdin") {
+        #expect(next.contains(" -F - "))
+      }
       let file = scratch.appending(path: "why.md")
       try ("Pwd=" + "acme-secret").write(to: file, atomically: true, encoding: .utf8)
       let command = shellWord(try SiltaBinary.url().path) + String(next.dropFirst(5))
@@ -44,7 +47,7 @@ struct TaskTriageCommandTests {
         .replacingOccurrences(
           of: "<the human's words>", with: "Accept the first and drop the second")
       let result = try SiltaBinary.runProcess(
-        URL(filePath: "/bin/sh"), ["-c", replay],
+        URL(filePath: "/bin/sh"), ["-c", replay + " < " + shellWord(file.path)],
         in: scratch, environment: TaskCommandTests.actor)
       #expect(result.termination == .exit(0))
       try Self.checkRows(store)

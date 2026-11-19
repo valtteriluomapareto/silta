@@ -89,6 +89,10 @@ struct CommentHandoffTests {
       Golden.forTests().check(
         json ? result.stdout : result.stderr,
         "comment-body-required.\(json ? "json" : "txt")")
+      let report = json ? result.stdout : result.stderr
+      withKnownIssue("#259: a missing comment body hint can post a literal placeholder") {
+        #expect(report.contains("silta --ws 'acme' comment --help"))
+      }
     }
   }
 
