@@ -74,6 +74,7 @@ synthetic certification and must fail the four actual policy-control replays.
 The script writes
 `planted-faults.json` in the report directory. Do not run source mutations in
 parallel with verification or another agent editing this checkout.
+The offline suite checks that every declared mutation matches once and compiles in memory.
 
 [Run-profile tests](../../Evals/tests/test_profiles.py) drive the actual default
 live CLI using explicit fake executables. They execute the real installer and
@@ -307,8 +308,8 @@ For filesystem reads, the runner records the trial repository and backend roots.
 Only native per-call cwd anchors relative inputs; launch cwd is provenance, not a
 fallback. Explicit inputs, sequential Git `-C` bases and implicit recursive inputs
 are normalized lexically against that context without filesystem probing.
-Inputs inside the trial repository are allowed; backend inputs are violations;
-ancestors, other foreign scopes and missing context require shell-trace review.
+Reads inside the trial repository and sibling backend are allowed. The report measures observed backend reads.
+Ancestors, other foreign scopes and missing context require shell-trace review.
 Directory-changing shell programs remain opaque. Historical pilot streams lack
 native cwd, so their filesystem reads require review rather than a guessed base.
 Only exact `sh`/`bash`/`zsh -c` or `-lc` wrappers are recursively decoded within
@@ -378,8 +379,15 @@ Reports contain per-variant check results and evidence links, pass rate over thr
 repeats, all-repeats success, total Silta calls, `ctx_calls` (brief/task show/code
 show/grep and SessionStart), usage errors and observed forbidden attempts. Usage counts include actual tool-result
 `[usage]` diagnostics for parse failures that occur before command logging.
-Native token usage is included when available; missing cost is unknown, never zero.
-Setup/installer/control calls do not inflate these metrics.
+Native model token usage and cost are included when available. The report sums
+elapsed native launch time across phases, excluding setup and operator input. It
+counts a recovery when a recorded Silta refusal matches the command log and
+the next attributable call follows its concrete agent-owned command. The
+comparison preserves scope, authorization and action and ignores presentation
+flags. Brief and task-show output estimates use one token per four captured
+characters for matched successful calls. Missing timing, sequencing and
+output evidence is reported as unknown.
+Setup, installer and control calls are outside these metrics.
 
 ## Attach the report to issue #18
 

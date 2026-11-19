@@ -2812,10 +2812,10 @@ approval words came from a human; those checks require the live runs above.
 |---|---|
 | Success | All checks pass. Reported as pass rate and pass^k over N repeats (default 3) |
 | silta calls | Number of `silta` commands, and the number with `usage` errors (wrong flags or refs) |
-| Error recovery | Errors where the agent's next call followed the `next` hint |
+| Error recovery | Log-attributed Silta refusals whose next native call followed a concrete agent-owned `next` command |
 | Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files the repo's instructions don't require (no fixture repo requires one, so any new plan file counts) |
-| Cost | Tokens, cost and wall time, where the harness reports them |
-| Brief use | Calls to `brief`/`task show` and their output tokens, which shows whether the budget is right |
+| Cost | Model tokens and cost where reported, plus elapsed native launch time across observed trial phases |
+| Brief use | Calls to `brief`/`task show` and an estimate of one token per four captured output characters for matched successful calls |
 
 The [eval procedure](dogfood/agent-evals.md) gives exact offline and maintainer-only
 live commands. Deterministic stub replays prove the runner and graders; they do not
@@ -2823,7 +2823,7 @@ satisfy live-model acceptance. Each policy scenario includes the variants and co
 in SI-36/2. Tool transcripts establish observed attempts; a bound human evidence
 review is required for semantic choices and opaque or transient file access.
 Unreviewed live trials cannot pass. Setup/control calls are excluded from agent
-metrics. `ctx_calls` counts brief, task-show and code-show/grep calls, including
+metrics. A measurement is unknown where the capture lacks enough evidence. `ctx_calls` counts brief, task-show and code-show/grep calls, including
 SessionStart briefs.
 
 The report is a static HTML page in `results/<run-id>/report.html`: a matrix with
