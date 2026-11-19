@@ -112,8 +112,8 @@ Approvals per ISO week by command:
 Proposals accepted: 5; dropped: 1; left untriaged past 14 days: 1.
 Oldest pending proposal: 14 days.
 Triage wait: median 20159.5 min; maximum 30240 min.
-Questions to @me: n/a (S11).
-Inbox size and oldest item: n/a (S11).
+Questions to @me: 1.
+Inbox size: 2 items. Oldest item: 13 days.
 Target: under 12 inbox items, none older than one week.
 
 ## Document proposals
