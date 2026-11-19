@@ -20,7 +20,7 @@ struct AgentInstallPlanRuleTests {
   func olderPlanRuleIsStaleAndUpgradesOnlyItsBlock(_ harness: String, _ path: String) throws {
     try withScratchDirectory { scratch in
       let env = try AgentHealthTests.setup(scratch)
-      let settings = try? AgentsInstallTests.read(".claude/settings.json", in: scratch)  // absent is fine
+      let settings = try AgentsInstallTests.read(".claude/settings.json", in: scratch)
       let older =
         Self.userText + AgentInstallSkillStubTests.ownedBlock(Self.olderInstructions)
       try AgentsInstallTests.write(older, path, in: scratch)
@@ -45,8 +45,7 @@ struct AgentInstallPlanRuleTests {
       let updated = try AgentsInstallTests.read(path, in: scratch)
       #expect(updated.hasPrefix(Self.userText))
       #expect(!updated.contains("never create repo plan files or tracker items"))
-      let after = try? AgentsInstallTests.read(".claude/settings.json", in: scratch)  // absent is fine
-      #expect(after == settings)
+      #expect(try AgentsInstallTests.read(".claude/settings.json", in: scratch) == settings)
       let current = try AgentHealthTests.check(id, in: AgentHealthTests.checks(scratch, env))
       #expect(current["status"] as? String == "pass")
     }

@@ -1472,12 +1472,12 @@ the rules gets one conditional sentence, and `brief` names the workspace's non-d
 settings (D39). It covers:
 - **When to use silta.** Cross-repo work, another app or backend, branch-as-app repos,
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
-  Not for trivial single-repo edits. Keep plans and results in Silta, never in PLAN.md or other repo plan files, and never
-  create tracker items yourself. Exception: when the repository's own instructions require
-  a plan file, write it where they say; the Silta task plan then holds that file's path
-  and branch or PR, plus the steps to tick, not a copy (D51). A conditional repo rule,
-  such as plans in `docs/plans/` only for multi-slice work, requires a file only when
-  its condition holds.
+  Not for trivial single-repo edits. Keep plans and results in Silta, never in PLAN.md
+  or other repo plan files, and never create tracker items yourself. Exception: when
+  the repository's own instructions require a plan file, write it where they say; the
+  Silta task plan then holds that file's path and branch or PR, plus the steps to tick,
+  not a copy (D51). A conditional repo rule, such as plans in `docs/plans/` only for
+  multi-slice work, requires a file only when its condition holds.
 - **Session start.** If the hook already printed the brief, don't run it again. Once a
   task is chosen, run `silta brief --task AC-n`. Teach the [workspace selection
   precedence](#16-cli): explicit workspace, registered repository location, then the
