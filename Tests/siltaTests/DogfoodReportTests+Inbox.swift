@@ -12,10 +12,8 @@ extension DogfoodReportTests {
       let result = try Self.run(
         ["--since", "2023-11-25"], scratch: scratch, tools: Self.tools(scratch))
       #expect(result.termination == .exit(0))
-      withKnownIssue("#267: the report omits capped inbox measurements") {
-        #expect(result.stdout.contains("Questions to @me: at least 12."))
-        #expect(result.stdout.contains("Inbox size: 14 items. Oldest item: unknown."))
-      }
+      #expect(result.stdout.contains("Questions to @me: at least 12."))
+      #expect(result.stdout.contains("Inbox size: 14 items. Oldest item: unknown."))
       #expect(!result.stdout.contains("Acme inbox private"))
     }
   }
@@ -25,15 +23,13 @@ extension DogfoodReportTests {
       let store = try Self.setup(scratch)
       try store.write {
         try $0.database.execute(
-          sql: "UPDATE task SET external_ref='gh:acme/silta#4' WHERE uid='silta-task-4'")
+          sql: "UPDATE task SET external_ref='gh:acme/silta#12' WHERE uid='silta-task-12'")
       }
       let result = try Self.run(
         ["--since", "2023-11-25"], scratch: scratch, tools: Self.tools(scratch))
       #expect(result.termination == .exit(0))
-      withKnownIssue("#267: the report omits undated inbox measurements") {
-        #expect(result.stdout.contains("Questions to @me: 1."))
-        #expect(result.stdout.contains("Inbox size: 3 items. Oldest item: unknown."))
-      }
+      #expect(result.stdout.contains("Questions to @me: 1."))
+      #expect(result.stdout.contains("Inbox size: 3 items. Oldest item: unknown."))
     }
   }
 
@@ -66,15 +62,13 @@ extension DogfoodReportTests {
           """, in: tools)
       let result = try Self.run(
         ["--ws", "silta", "--since", "2023-11-14"], scratch: scratch, tools: tools)
-      withKnownIssue("#267: the report publishes without collecting the inbox") {
-        #expect(result.termination == .exit(1) && result.stdout.isEmpty)
-        #expect(
-          result.stderr.contains(
-            failure == "exit" ? "human inbox read failed" : "invalid human inbox"))
-        #expect(
-          !FileManager.default.fileExists(
-            atPath: scratch.appending(path: "silta-home/reports").path))
-      }
+      #expect(result.termination == .exit(1) && result.stdout.isEmpty)
+      #expect(
+        result.stderr.contains(
+          failure == "exit" ? "human inbox read failed" : "invalid human inbox"))
+      #expect(
+        !FileManager.default.fileExists(
+          atPath: scratch.appending(path: "silta-home/reports").path))
     }
   }
 

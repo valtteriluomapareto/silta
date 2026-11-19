@@ -19,9 +19,7 @@ struct DogfoodReportTests {
       let tools = try Self.tools(scratch)
       let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
       #expect(result.termination == .exit(0))
-      withKnownIssue("#267: the report omits human inbox load") {
-        Golden.forTests().check(result.stdout, "dogfood-report.md")
-      }
+      Golden.forTests().check(result.stdout, "dogfood-report.md")
       #expect(
         !result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply")
           && !result.stdout.contains("Acme inbox private"))
@@ -52,9 +50,7 @@ struct DogfoodReportTests {
       let next = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
       #expect(next.termination == .exit(0))
       #expect(!next.stdout.contains("Warning:"))
-      withKnownIssue("#267: the report omits human inbox load") {
-        Golden.forTests().check(next.stdout, "dogfood-report.md")
-      }
+      Golden.forTests().check(next.stdout, "dogfood-report.md")
     }
   }
 
@@ -89,6 +85,7 @@ struct DogfoodReportTests {
             case "$*" in
               *'task ls'*) echo '{"ok":true,"data":{"tasks":[]}}';;
               *schema*) echo '{"ok":true,"data":{"commands":[]}}';;
+              *' inbox '*) echo '{"ok":true,"data":{"items":[],"remaining":0}}';;
             esac
             """, in: tools)
         try FileManager.default.removeItem(at: scratch.appending(path: "silta-home/silta.db"))
@@ -102,6 +99,9 @@ struct DogfoodReportTests {
         ["--since", "2023-11-14"], scratch: scratch, tools: tools)
       #expect(result.termination != .exit(0) && result.stdout.isEmpty)
       #expect(!result.stderr.contains("Acme foreign"))
+      if failure == "sqlite" {
+        #expect(result.stderr.contains("approval metadata read failed"))
+      }
     }
   }
 
@@ -126,10 +126,8 @@ struct DogfoodReportTests {
       #expect(result.stdout.contains("## Calls\n\nNone.\n"))
       #expect(result.stdout.contains("## Warnings\n\nNone.\n"))
       #expect(result.stdout.contains("Open dogfood tasks:\n\nNone.\n"))
-      withKnownIssue("#267: the report omits zero inbox measurements") {
-        #expect(result.stdout.contains("Questions to @me: 0."))
-        #expect(result.stdout.contains("Inbox size: 0 items. Oldest item: none."))
-      }
+      #expect(result.stdout.contains("Questions to @me: 0."))
+      #expect(result.stdout.contains("Inbox size: 0 items. Oldest item: none."))
     }
   }
 
@@ -276,6 +274,8 @@ extension DogfoodReportTests {
       try seedTasks(tx)
       try seedEvents(tx)
       try seedApprovals(tx)
+      try tx.database.execute(
+        sql: "UPDATE task SET created_at='2023-11-17T00:00:00.000Z' WHERE uid='silta-task-6'")
       try seedInboxQuestions(1...1, in: tx)
     }
     return store
@@ -304,9 +304,7 @@ extension DogfoodReportTests {
           """,
         arguments: [
           "silta-task-\(seq)", seq, seq == 4 ? "Acme command repair" : "Acme \(seq)",
-          status, result, Self.actor,
-          seq == 6 ? "2023-11-17T00:00:00.000Z" : "2023-11-01T00:00:00.000Z",
-          "2023-11-30T00:00:00.000Z",
+          status, result, Self.actor, "2023-11-01T00:00:00.000Z", "2023-11-30T00:00:00.000Z",
         ])
     }
     try tx.database.execute(sql: "UPDATE task SET archive_override='archived' WHERE seq=1")
