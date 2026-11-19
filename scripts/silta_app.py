@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / ".build/app"
 APP = BUILD / "DerivedData/Build/Products/Debug/SiltaApp.app/Contents/MacOS/SiltaApp"
 STATE = {
-    "snapshotVersion": None, "run": None, "revision": None, "fixture": None,
+    "snapshotVersion": None, "run": None, "revision": None, "fixture": None, "fixtureNow": None,
     "appearance": None, "screen": None, "route": None, "inspectorOpen": None,
     "selection": {"kind": None, "ref": None, "view": None},
     "counts": {"lanes": {}, "sidebar": {"waiting": None, "claimed": None, "apps": {}}},
@@ -226,7 +226,10 @@ def launch(args):
         if process is None:
             raise DriverError("Fixture exited during startup.")
         run = Run(root, {"process": process})
-        state = run.wait(READY, args.timeout)
+        state = run.wait([], args.timeout, lambda current: not unmet(current, READY)
+                         or current["refresh"]["phase"] == "failed")
+        if state["refresh"]["phase"] == "failed":
+            raise DriverError("The initial fixture view failed to load.")
         run.record["run"] = state["run"]
         atomic_json(root / "driver.json", run.record)
         print(root, flush=True)
@@ -335,7 +338,8 @@ def mailbox_state(run):
 def recovery_error(error, sequence):
     detail = str(error) or "Interrupted while reading the action result."
     return DriverError(f"{detail}\nAction {sequence} may have run. Repeat with --seq {sequence} "
-                       "to read its result without replaying it.")
+                       "to read its result without replaying it. If it stays pending, "
+                       "stop and relaunch the fixture.")
 
 
 def action(run, fields, timeout, sequence=None):
@@ -407,9 +411,13 @@ def write_fixture_proposal(run, title):
         for path in data.rglob("*")
     ):
         raise DriverError("Fixture store must be an isolated directory with ordinary files.")
+    state = run.read()
+    clock = state.get("fixtureNow") if state else None
+    if not isinstance(clock, str) or re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z", clock) is None:
+        raise DriverError("The fixture did not publish its clock. Rebuild and launch a fresh run.")
     environment = {"PATH": "/usr/bin:/bin", "HOME": str(run.root), "USER": "acme",
                    "SILTA_HOME": str(data), "SILTA_ACTOR": "agent:codex:control",
-                   "SILTA_NOW": "2026-11-16T12:00:00.000Z", "TZ": "UTC"}
+                   "SILTA_NOW": clock, "TZ": "UTC"}
     command = [cli, "--ws", "acme", "task", "add", "--quiet", "--", title]
     result = subprocess.run(command, env=environment, cwd=run.root, stdin=subprocess.DEVNULL,
                             capture_output=True, text=True, timeout=15)

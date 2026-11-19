@@ -135,10 +135,10 @@ Use a short `task plan` and implementation reviews following
 [persona-review skill](../../skills/persona-review/SKILL.md). Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
 No planted faults except for guard tests. Split only when a diff substantially
 exceeds about 1,000 lines. Add navigation, observable state and development hooks
-only when a screen needs them. The minimal [control support](mac-app-control.md)
-provides isolated fixtures, versioned model state and offscreen root PNGs. The
-terminal driver waits on model state and can capture a real owned window when
-Screen Recording and the window session permit. Live actions are a separate slice.
+only when a screen needs them. The [control-plane guide](../mac-app-control.md)
+covers isolated fixtures, versioned model state and offscreen root PNGs. The
+terminal driver can also exercise shared UI handlers and capture an owned window
+when Screen Recording and the window session permit.
 Merge main only for a conflict or a needed landed change. After merging, submit
 the task and report which tasks the maintainer can close; do not mark them done.
 

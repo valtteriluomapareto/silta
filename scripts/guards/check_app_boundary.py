@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from swift_source import run, split_swift, swift_files
 
-ALLOWED = {"SiltaAppSupport", "SwiftUI", "AppKit", "Foundation", "Observation", "Combine", "Synchronization", "Darwin", "Dispatch", "CoreFoundation"}
+ALLOWED = {"SiltaAppSupport", "SwiftUI", "AppKit", "Foundation", "Observation", "Combine", "Synchronization", "Darwin"}
 IMPORT = re.compile(r"\bimport\s+(?:(?:class|struct|enum|protocol|func|var|let|typealias)\s+)?([A-Za-z_]\w*)")
 
 

@@ -34,10 +34,10 @@
         NSApplication.shared.appearance = NSAppearance(named: options.dark ? .darkAqua : .aqua)
         await model.refresh().value
         try options.route.apply(to: model)
-        if model.boardSelection != nil { await model.loadTaskDetail() }
-        if model.route == .docs { await model.loadDocuments() }
-        if model.route == .workspace { await model.loadWorkspaceDocuments() }
         if let output = options.snapshot {
+          if model.boardSelection != nil { await model.loadTaskDetail() }
+          if model.route == .docs { await model.loadDocuments() }
+          if model.route == .workspace { await model.loadWorkspaceDocuments() }
           try await snapshot(model: model, to: output)
           try publish()
           FileHandle.standardOutput.write(Data((output.path + "\n" + stateURL.path + "\n").utf8))

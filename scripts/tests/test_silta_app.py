@@ -166,6 +166,30 @@ class OwnedRuns(unittest.TestCase):
                 child.terminate.assert_called_once()
                 child.wait.assert_called_once_with(timeout=2)
 
+    def test_failed_initial_read_stops_launch_without_handing_off_the_run(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            app = root / "SiltaApp"
+            app.touch()
+            child = Mock(pid=10, poll=Mock(return_value=None))
+            failed = {"idle": True, "refresh": {"phase": "failed"}}
+
+            def wait(conditions, timeout, ready):
+                self.assertEqual(conditions, [])
+                self.assertTrue(ready(failed))
+                return failed
+
+            run = Mock(wait=wait)
+            with patch.object(driver, "APP", app), patch.object(driver, "native_tool"), \
+                    patch.object(driver.tempfile, "mkdtemp", return_value=str(root)), \
+                    patch.object(driver.subprocess, "Popen", return_value=child), \
+                    patch.object(driver, "identity", return_value={"pid": 10}), \
+                    patch.object(driver, "Run", return_value=run):
+                with self.assertRaisesRegex(driver.DriverError, "initial fixture view failed"):
+                    driver.launch(SimpleNamespace(route="board", dark=False, timeout=1))
+            child.terminate.assert_called_once()
+            self.assertFalse((root / "driver.json").exists())
+
     def test_shot_publishes_png_and_correlated_state_only_after_postcheck(self):
         with tempfile.TemporaryDirectory() as root:
             output = Path(root) / "window.png"
@@ -256,6 +280,16 @@ class FixtureCLI(unittest.TestCase):
 
 
 class FixtureWriteRecovery(unittest.TestCase):
+    def test_client_lock_refuses_a_second_driver(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            run = SimpleNamespace(root=Path(scratch))
+            with driver.client_lock(run):
+                with self.assertRaisesRegex(driver.DriverError, "Another client"):
+                    with driver.client_lock(run):
+                        self.fail("The second client acquired the same lock")
+            with driver.client_lock(run):
+                self.assertTrue((run.root / "client.lock").is_file())
+
     def test_intent_survives_interruption_and_never_replays(self):
         with tempfile.TemporaryDirectory() as root:
             record = Path(root) / "write.json"
@@ -321,6 +355,10 @@ class FixtureWriteRecovery(unittest.TestCase):
                 run.wait.side_effect = None
                 driver.atomic_json(root / "res-1.json", {"version": 1, "run": "owned", "seq": 1,
                                                          "outcome": "accepted"})
+                with self.assertRaisesRegex(driver.DriverError, "different request"):
+                    driver.action(run, {"action": "refresh"}, 1, sequence=1)
+                run.read.return_value = {"run": "owned", "seq": 1, "settledSeq": 0}
+                self.assertEqual(driver.action(run, fields, 1)["outcome"], "accepted")
                 self.assertEqual(driver.action(run, fields, 1, sequence=1)["outcome"], "accepted")
                 self.assertEqual((root / "req-1.json").read_bytes(), original)
                 self.assertFalse((root / "req-2.json").exists())

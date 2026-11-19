@@ -2240,6 +2240,10 @@ last displayed value, and an older failure cannot settle a newer read. Native
 views import only `SiltaAppSupport` and Apple frameworks; document formatting uses
 Foundation Markdown and SwiftUI. These projections do not change CLI JSON.
 
+The Debug app's [control plane](mac-app-control.md) runs against an isolated
+fixture. Its windowed actions delegate to the app's handlers, and their copy
+results stay in the run's private response files.
+
 **Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
 

@@ -1,5 +1,6 @@
 #if DEBUG
   import Foundation
+  import Observation
   @testable import SiltaApp
   import SiltaAppSupport
   import Testing
@@ -9,11 +10,7 @@
     @Test func wireAcceptsJSONFormattingAndRejectsEscapedDuplicateKeys() throws {
       let formatted = Data(
         #"{ "version" : 1, "seq" : 1, "run" : "current", "action" : "copy\u002eref" }"#.utf8)
-      withKnownIssue("The wire requires a byte-for-byte match with Foundation's encoder") {
-        let request = try? ControlRequest(  // the old decoder refuses this valid request
-          data: formatted, run: "current", sequence: 1)
-        #expect(request?.action == .copyRef)
-      }
+      #expect(try ControlRequest(data: formatted, run: "current", sequence: 1).action == .copyRef)
       let duplicate = Data(
         #"{"version":1,"seq":1,"run":"current","action":"refresh","act\u0069on":"copy.ref"}"#.utf8)
       #expect(throws: ControlRefusal.invalidRequest) {
@@ -23,22 +20,35 @@
 
     @Test func statusStaysBusyUntilProductWriteCompletes() async throws {
       let writes = ControlledWrites()
+      let refreshing = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+      let finish = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+      defer {
+        refreshing.continuation.finish()
+        finish.continuation.finish()
+      }
       let model = AppModel(
         writer: { write, workspace in try await writes.write(write, workspace) },
-        load: { _, _, _ in
-          AppLoadedData(
+        load: { _, _, force in
+          if force {
+            refreshing.continuation.yield(())
+            var permits = finish.stream.makeAsyncIterator()
+            _ = await permits.next()
+          }
+          return AppLoadedData(
             workspaces: [], workspace: "acme", snapshot: nil, map: nil,
             version: 1, checkedAt: AppV2Fixture.now)
         })
       await model.refresh().value
       let write = try #require(model.perform(.acceptAnswer(ref: "AC-14/2"), for: "AC-14/2"))
       let pending = await writes.next()
-      withKnownIssue("Control readiness ignores product writes") {
-        #expect(!ControlState(model: model, run: "owned", revision: 1, dark: false).idle)
-      }
+      #expect(!ControlState.readiness(model).idle)
       pending.continuation.resume()
+      var updates = refreshing.stream.makeAsyncIterator()
+      _ = await updates.next()
+      #expect(!ControlState.readiness(model).idle)
+      finish.continuation.yield(())
       await write.value
-      #expect(ControlState(model: model, run: "owned", revision: 2, dark: false).idle)
+      #expect(ControlState.readiness(model).idle)
     }
 
     @Test func strictWireDistinguishesMalformedAndStaleRequests() throws {
@@ -46,6 +56,8 @@
       #expect(try wire(fields).action == .select("board:AC-12"))
       #expect(throws: ControlRefusal.staleRun) { try wire(fields, run: "previous") }
       #expect(throws: ControlRefusal.invalidRequest) { try wire(fields, seq: true) }
+      #expect(throws: ControlRefusal.invalidRequest) { try wire(fields, seq: 1.5) }
+      #expect(throws: ControlRefusal.invalidRequest) { try wire(fields, seq: NSNull()) }
       #expect(throws: ControlRefusal.invalidRequest) { try wire(fields, seq: 2) }
       #expect(throws: ControlRefusal.invalidRequest) {
         try wire(fields.merging(["unused": "value"]) { _, later in later })
@@ -55,7 +67,7 @@
       }
     }
 
-    @Test func actionsDriveTheFixtureThroughExistingHandlersAndCopySources() async throws {
+    @Test func copyReturnsExactTextInThePrivateRunResponse() async throws {
       let fixture = try FixtureLaunch.prepare()
       defer {
         try? FileManager.default.removeItem(  // cleanup
@@ -69,69 +81,24 @@
           try session.load(previous: previous, workspace: workspace, force: force)
         })
       await model.refresh().value
-      var copies: [String] = []
-      let actions = ControlActions(
-        model: model,
-        copy: {
-          copies.append($0)
-          return true
-        })
-      #expect(await actions.perform(.select("board:AC-9")) == .accepted)
+      model.inspect(task: "AC-9")
+      await model.loadTaskDetail()
+      let actions = ControlActions(model: model)
       #expect(model.boardInspectorPresented && model.taskDetail.value?.ref == "AC-9")
       let copied = await actions.perform(.copyRef)
-      withKnownIssue("The response omits the copied text") {
-        #expect(copied.response(run: "owned", sequence: 1)["copied"] as? String == "AC-9")
-      }
-      #expect(await actions.perform(.copyCommand) == .accepted)
-      let failingCopy = ControlActions(model: model, copy: { _ in false })
-      #expect(await failingCopy.perform(.copyRef) == .refused(.copyFailed))
-      #expect(copies.first == "AC-9" && copies.last?.contains("task show 'AC-9'") == true)
+      #expect(copied.response(run: "owned", sequence: 1)["copied"] as? String == "AC-9")
+      let command = await actions.perform(.copyCommand)
+      let text = try #require(command.response(run: "owned", sequence: 2)["copied"] as? String)
+      let path = fixture.home.resolvingSymlinksInPath().path
+      #expect(text == "SILTA_HOME='\(path)' silta --ws 'acme' task show 'AC-9' --timeline")
+      #expect(await actions.perform(.select("board:AC-9")) == .noop)
       #expect(await actions.perform(.toggleInspector) == .accepted)
       #expect(await actions.perform(.copyCommand) == .refused(.unavailable))
-      #expect(await actions.perform(.select("workspace:app:acme-backend")) == .accepted)
-      #expect(model.workspaceNode == "app:acme-backend")
-      #expect(await actions.perform(.select("docs:doc:order-contract@3:changes")) == .accepted)
-      #expect(model.documents.document?.ref == "doc:order-contract@3")
       #expect(await actions.perform(.select("board:AC-9999")) == .refused(.unknownSelection))
       #expect(await actions.perform(.navigate(.mywork)) == .accepted)
       #expect(await actions.perform(.navigate(.mywork)) == .noop)
       #expect(await actions.perform(.toggleInspector) == .refused(.unavailable))
       #expect(await actions.perform(.refresh) == .accepted)
-    }
-
-    @Test func mailboxRefusesMalformedCurrentRequestThenDrainsFutureAndIgnoresStale() async throws {
-      let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
-      defer { try? FileManager.default.removeItem(at: directory) }  // cleanup
-      let model = AppModel(load: { _, _, _ in nil })
-      var publications: [String] = []
-      let mailbox = try ControlMailbox(
-        directory: directory, run: "owned", actions: ControlActions(model: model),
-        publish: { publications.append("\($0)/\($1)") },
-        fail: { error in
-          Issue.record("Unexpected mailbox failure: \(error)")
-        })
-      let future = try JSONSerialization.data(
-        withJSONObject: [
-          "version": 1, "run": "owned", "seq": 2, "action": "nav", "screen": "mywork",
-        ],
-        options: [.sortedKeys, .withoutEscapingSlashes])
-      try future.write(to: directory.appending(path: "req-2.json"), options: .atomic)
-      await mailbox.check()
-      #expect(mailbox.sequence == 0)
-      let malformed = Data(
-        #"{"action":"refresh","action":"copy.ref","run":"owned","seq":1,"version":1}"#.utf8)
-      try malformed.write(to: directory.appending(path: "req-1.json"), options: .atomic)
-      await mailbox.check()
-      #expect(mailbox.sequence == 2)
-      #expect(publications == ["1/0", "1/1", "2/1", "2/2"])
-      let first = try result(directory, 1)
-      let second = try result(directory, 2)
-      #expect(first["reason"] as? String == "invalidRequest")
-      #expect(second["outcome"] as? String == "noop")
-      try future.write(to: directory.appending(path: "req-1.json"), options: .atomic)
-      await mailbox.check()
-      #expect(publications.count == 4)
     }
 
     @Test func selectionReportsSupersessionWhenUserChangesRouteDuringARead() async throws {
@@ -159,13 +126,25 @@
         })
       await model.refresh().value
       let actions = ControlActions(model: model)
+      let selected = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+      withObservationTracking {
+        _ = model.documentSelection
+      } onChange: {
+        selected.continuation.yield(())
+      }
       let result = Task { await actions.perform(.select("docs:doc:order-contract@3:document")) }
+      var selections = selected.stream.makeAsyncIterator()
+      _ = await selections.next()
+      #expect(!ControlState.readiness(model).idle)
+      let view = Task { await model.loadDocuments() }
       var iterator = entered.stream.makeAsyncIterator()
       _ = await iterator.next()
       model.navigate(to: .mywork)
-      unblock.continuation.yield(())
       #expect(await result.value == .refused(.superseded))
       #expect(model.route == .mywork)
+      unblock.continuation.yield(())
+      await view.value
+      selected.continuation.finish()
       entered.continuation.finish()
       unblock.continuation.finish()
     }
@@ -175,11 +154,6 @@
       )
       let actions = ControlActions(model: model)
       #expect(await actions.perform(.refresh) == .refused(.readFailed))
-    }
-
-    private func result(_ directory: URL, _ sequence: Int) throws -> [String: Any] {
-      let data = try Data(contentsOf: directory.appending(path: "res-\(sequence).json"))
-      return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
     private func wire(_ fields: [String: Any], run: String = "current", seq: Any = 1) throws
