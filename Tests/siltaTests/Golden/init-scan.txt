@@ -1,3 +1,5 @@
-Initialized workspace acme.
-next: silta ws use 'acme'
-ask human: silta ws edit 'acme' -F <file> --approved "<the human's words>"
+Workspace acme.
+Repositories: acme-detached, acme-missing-remote, acme-platform, acme-shallow
+Apps: acme-detached, acme-detached-api, acme-detached-portal, acme-platform, acme-platform-api, acme-platform-portal
+Ask the human before editing the workspace configuration.
+next: silta --ws 'acme' ws show

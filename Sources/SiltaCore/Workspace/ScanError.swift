@@ -70,13 +70,25 @@ package enum ScanError: CodedError, Equatable {
   /// Another workspace already binds the clone's path.
   case repoPathTaken(repo: String, path: String, workspace: String)
 
+  /// The requested clones overlap workspace configuration and need scoped recovery.
+  case registeredWorkspaces([String], roots: [String]?)
+
+  /// The derived workspace name is already in use without a verified repo match.
+  case unverifiedWorkspace(String)
+
+  /// The named directory can't be read.
+  case unreadableRoot(String)
+
   /// A clone's slug is `none`, the word that means non-code work.
   case reservedSlug(path: String)
 
   package var code: ErrorCode {
     switch self {
     case .invalidSlug, .invalidPrefix: .invalid
-    case .slugExists, .prefixTaken, .repoPathTaken, .reservedSlug: .conflict
+    case .slugExists, .prefixTaken, .repoPathTaken, .reservedSlug, .registeredWorkspaces,
+      .unverifiedWorkspace:
+      .conflict
+    case .unreadableRoot: .env
     }
   }
 
@@ -119,6 +131,17 @@ package enum ScanError: CodedError, Equatable {
       return "Repo \(repo.debugDescription) is already registered to workspace "
         + "\(workspace.debugDescription); scan a clone that belongs to this workspace, or rescan "
         + "the one that holds it."
+    case .registeredWorkspaces(let workspaces, let roots):
+      let names = workspaces.map(\.debugDescription).joined(separator: ", ")
+      return roots == nil
+        ? "Existing registrations in \(names) overlap this scan. Inspect them and ask the human to choose."
+        : "The clones match workspace \(names). Scan them in that workspace."
+    case .unverifiedWorkspace(let workspace):
+      return "Workspace \(workspace.debugDescription) already exists. Inspect its "
+        + "repository configuration before choosing a scan target."
+    case .unreadableRoot(let path):
+      return
+        "Cannot read scan directory \(path.debugDescription). Choose an existing readable directory."
     case .reservedSlug(let path):
       return "Clone at \(path.debugDescription) has the repo slug \(TaskDraft.noneApp), which "
         + "means non-code work in --app \(TaskDraft.noneApp); give the clone's directory a "
@@ -142,8 +165,21 @@ package enum ScanError: CodedError, Equatable {
       return [command(roots: roots, ScanChoice.slug(choice), "--prefix <prefix>")]
     case .repoPathTaken(_, let path, let workspace):
       return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(path))"]
-    case .reservedSlug: return ["silta init --help"]
+    case .registeredWorkspaces(let workspaces, let roots):
+      if let roots, let workspace = workspaces.first {
+        return ["silta --ws \(shellWord(workspace)) init --scan \(roots.scanArguments)"]
+      }
+      return workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
+    case .unverifiedWorkspace(let workspace):
+      return ["silta --ws " + shellWord(workspace) + " ws show"]
+    case .reservedSlug, .unreadableRoot: return ["silta init --help"]
     }
+  }
+
+  /// The caller can choose a readable scan root.
+  package var nextBy: NextBy {
+    if case .unreadableRoot = self { return .agent }
+    return code.nextBy
   }
 
   /// A scan command followed by the naming options the caller already gave.

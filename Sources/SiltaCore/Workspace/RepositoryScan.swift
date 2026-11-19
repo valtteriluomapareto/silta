@@ -5,6 +5,12 @@ import GRDB
 /// What a scan bound: the workspace it created or refreshed.
 package struct ScanOutcome: Sendable {
   package let workspace: String
+  /// Slugs of the configured repositories bound by the scan.
+  package let repositories: [String]
+  /// Configured apps on those repositories.
+  package let apps: [String]
+  /// Skipped child directories or generated app stubs.
+  package let warnings: [OutputWarning]
 }
 
 /// How a scan treats an existing workspace.
@@ -30,24 +36,34 @@ package enum RepositoryScan {
   ) async throws -> ScanOutcome {
     guard let first = roots.first else { throw RepoError.scan }
     let paths = roots.map(\.path)
+    let readable = try roots.map(readableRoot)
     let directory = first.standardizedFileURL.lastPathComponent
     let naming = try naming(target, directory: directory, roots: paths)
-    let discovered = try await discover(roots, git: git)
+    let (repos, skipped) = try await discover(Array(zip(paths, readable)), git: git)
+    if repos.isEmpty, let firstSkipped = skipped.first {
+      throw ScanError.unreadableRoot(firstSkipped)
+    }
     let request = ScanRequest(
       target: target, choice: ScanChoice(target), slug: naming.slug,
-      chosenPrefix: naming.prefix, directory: directory, roots: paths, repos: discovered,
-      identity: identity)
-    let workspace = try store.write { tx in
+      chosenPrefix: naming.prefix, directory: directory, roots: paths, repos: repos,
+      skipped: skipped, identity: identity)
+    return try store.write { tx in
       try apply(tx, request: request)
     }
-    return ScanOutcome(workspace: workspace)
   }
 
   /// Creates or refreshes the workspace and binds every discovered clone in one write.
-  private static func apply(_ tx: StorageTransaction, request: ScanRequest) throws -> String {
+  private static func apply(_ tx: StorageTransaction, request: ScanRequest) throws -> ScanOutcome {
     do {
       let db = tx.database
       let existing = try existingWorkspace(request.slug, in: db)
+      if let reserved = request.repos.first(where: { $0.slug == TaskDraft.noneApp }) {
+        throw ScanError.reservedSlug(path: reserved.path.path)
+      }
+      guard Set(request.repos.map(\.slug)).count == request.repos.count else {
+        throw RepoError.duplicateSlug
+      }
+      let bindings = try implicitBindings(request, workspace: existing?["slug"], in: db)
       if case .named(let chosenSlug, _) = request.target, let existing {
         throw ScanError.slugExists(
           request.slug, chosen: chosenSlug != nil, workspace: existing["slug"] as String,
@@ -55,23 +71,25 @@ package enum RepositoryScan {
       }
       if case .rescan = request.target, existing == nil { throw WorkspaceError.notFound }
       let workspace = existing.map { $0["slug"] as String } ?? request.slug
-      if let reserved = request.repos.first(where: { $0.slug == TaskDraft.noneApp }) {
-        throw ScanError.reservedSlug(path: reserved.path.path)
-      }
-      guard Set(request.repos.map(\.slug)).count == request.repos.count else {
-        throw RepoError.duplicateSlug
-      }
       let repos = request.repos
+      var warnings = request.skipped.map {
+        OutputWarning(
+          code: "scan_skipped", message: "Skipped unreadable directory \($0.debugDescription).")
+      }
       if existing == nil {
         let prefix = try creationPrefix(request, in: db)
+        let (apps, skippedApps) = generatedApps(repos)
+        warnings += skippedApps
         let config = try configuration(
           slug: workspace, name: name(request.target, directory: request.directory), prefix: prefix,
-          repos: repos)
+          repos: repos, apps: apps)
         try config.apply(in: tx, ids: request.identity.ids, at: request.identity.date)
       }
-      try registerPaths(repos, workspace: workspace, in: db)
+      let (registered, apps) = try registerPaths(
+        repos, workspace: workspace, bindings: bindings, in: db)
       if let existing { try tx.recordChange(kind: "workspace", rowID: existing["id"] as Int64) }
-      return workspace
+      return ScanOutcome(
+        workspace: workspace, repositories: registered, apps: apps, warnings: warnings)
     } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
       throw WorkspaceError.conflict
     }
@@ -83,32 +101,94 @@ package enum RepositoryScan {
       db, sql: "SELECT id,slug FROM workspace WHERE lower(slug)=lower(?)", arguments: [slug])
   }
 
+  private static func implicitBindings(
+    _ request: ScanRequest, workspace: String?, in db: Database
+  ) throws -> [String: ScanRegistration] {
+    if case .rescan = request.target { return [:] }
+    let paths = request.repos.map { $0.path.path }
+    let matches = try request.repos.map {
+      try ScanRegistration.matching(path: $0.path.path, origin: $0.remote, in: db)
+    }
+    let recovery = ScanRegistration.recovery(matches, paths: paths, roots: request.roots)
+    if case .derived = request.target, let workspace, !paths.isEmpty {
+      if let bindings = derivedBindings(matches, paths: paths, workspace: workspace) {
+        return bindings
+      }
+      if recovery == nil { throw ScanError.unverifiedWorkspace(workspace) }
+    }
+    guard let recovery else { return [:] }
+    if paths.count == 1, let path = paths.first, let match = matches.first?.first,
+      matches.first?.count == 1, match.path == path,
+      match.workspace.lowercased() != request.slug.lowercased()
+    {
+      throw ScanError.repoPathTaken(repo: match.repo, path: path, workspace: match.workspace)
+    }
+    throw recovery
+  }
+
+  private static func derivedBindings(
+    _ matches: [[ScanRegistration]], paths: [String], workspace: String
+  ) -> [String: ScanRegistration]? {
+    guard let rows = ScanRegistration.identities(matches),
+      zip(rows, paths).allSatisfy({ binding, path in
+        binding.workspace == workspace
+          && (binding.path == path
+            || binding.path.map { !FileManager.default.fileExists(atPath: $0 + "/.git") } == true)
+      })
+    else { return nil }
+    return Dictionary(uniqueKeysWithValues: zip(paths, rows))
+  }
+
   /// Binds each clone to its repo row, after refusing a path another workspace holds.
   private static func registerPaths(
-    _ repos: [DiscoveredRepo], workspace: String, in db: Database
-  ) throws {
-    for repo in repos {
-      if let holder = try pathHolder(repo.path.path, excluding: workspace, in: db) {
-        throw ScanError.repoPathTaken(
-          repo: holder.repo, path: repo.path.path, workspace: holder.workspace)
+    _ repos: [DiscoveredRepo], workspace: String, bindings: [String: ScanRegistration],
+    in db: Database
+  ) throws -> (repositories: [String], apps: [String]) {
+    let matches = try repos.map { repo in
+      let path = repo.path.path
+      if let holder = try pathHolder(path, excluding: workspace, in: db) {
+        throw ScanError.repoPathTaken(repo: holder.repo, path: path, workspace: holder.workspace)
       }
-      guard
-        let id = try Int64.fetchOne(
-          db,
-          sql: """
-            SELECT repo.id
-            FROM repo
-            JOIN workspace ON workspace.id=repo.workspace_id
-            WHERE workspace.slug=? AND repo.slug=?
-            """, arguments: [workspace, repo.slug])
-      else { throw RepoError.configuration(repo: repo.slug, workspace: workspace) }
+      if let binding = bindings[path] { return (id: binding.id, slug: binding.repo) }
+      return try registeredRepo(repo, workspace: workspace, in: db)
+    }
+    guard Set(matches.map(\.id)).count == matches.count else {
+      throw ScanError.registeredWorkspaces([workspace], roots: nil)
+    }
+    var apps: [String] = []
+    for (repo, match) in zip(repos, matches) {
+      apps += try String.fetchAll(
+        db, sql: "SELECT slug FROM app WHERE repo_id=?", arguments: [match.id])
       try db.execute(
         sql: """
           INSERT INTO repo_path(repo_id,path)
           VALUES(?,?)
           ON CONFLICT(repo_id) DO UPDATE SET path=excluded.path
-          """, arguments: [id, repo.path.path])
+          """, arguments: [match.id, repo.path.path])
     }
+    return (matches.map(\.slug).sorted(), apps.sorted())
+  }
+
+  private static func registeredRepo(_ repo: DiscoveredRepo, workspace: String, in db: Database)
+    throws -> (id: Int64, slug: String)
+  {
+    let matches = try ScanRegistration.matching(path: repo.path.path, origin: repo.remote, in: db)
+      .filter { $0.workspace == workspace }
+    if matches.count == 1, let match = matches.first, match.isIdentity,
+      match.path == nil || match.path == repo.path.path
+    {
+      return (match.id, match.repo)
+    }
+    guard
+      let row = try Row.fetchOne(
+        db,
+        sql: """
+          SELECT repo.id, repo.slug
+          FROM repo JOIN workspace ON workspace.id=repo.workspace_id
+          WHERE workspace.slug=? AND repo.slug=?
+          """, arguments: [workspace, repo.slug])
+    else { throw RepoError.configuration(repo: repo.slug, workspace: workspace) }
+    return (row["id"], row["slug"])
   }
 }
 
@@ -205,59 +285,145 @@ extension RepositoryScan {
     ).map { (repo: $0["repo"] as String, workspace: $0["workspace"] as String) }
   }
 
-  private static func discover(_ roots: [URL], git: any GitRunner) async throws -> [DiscoveredRepo]
+  private static func discover(_ roots: [(String, URL)], git: any GitRunner) async throws
+    -> (repos: [DiscoveredRepo], skipped: [String])
   {
     var candidates: Set<String> = []
-    for root in roots { try walk(canonical(root), depth: 0, into: &candidates) }
+    var skipped: [String] = []
+    for (path, directory) in roots {
+      do {
+        try walk(directory, depth: 0, into: &candidates, skipped: &skipped)
+      } catch { throw ScanError.unreadableRoot(path) }
+    }
     var found: [String: DiscoveredRepo] = [:]
     for candidate in candidates.sorted() {
       let directory = URL(filePath: candidate)
-      let worktrees = try await output(
-        ["worktree", "list", "--porcelain", "-z"], in: directory, git: git)
-      guard let entry = worktrees.split(separator: "\0").first, entry.hasPrefix("worktree ") else {
-        throw RepoError.scan
-      }
-      let main = try canonical(URL(filePath: String(entry.dropFirst(9))))
+      let main = try await mainClone(directory, git: git)
       if found[main.path] != nil { continue }
-      let remote: GitResult
-      do {
-        remote = try await git.run(
-          .init(arguments: ["remote", "get-url", "origin"], directory: main))
-      } catch { throw RepoError.scan }
-      let url: String?
-      switch remote.termination {
-      case .exit(0):
-        guard let decoded = String(data: remote.stdout, encoding: .utf8) else {
-          throw RepoError.scan
-        }
-        url = decoded.trimmingCharacters(in: .newlines)
-      case .exit(2): url = nil
-      default: throw RepoError.scan
-      }
+      let url = try await cloneOrigin(main, git: git)
       let refs = try await output(
         ["for-each-ref", "--format=%(refname:short)", "refs/remotes"], in: main, git: git)
       found[main.path] = DiscoveredRepo(
         path: main, slug: suggestedSlug(main.lastPathComponent), remote: url,
         refs: refs.split(separator: "\n").map(String.init))
     }
-    return found.values.sorted { $0.path.path < $1.path.path }
+    return (found.values.sorted { $0.path.path < $1.path.path }, Array(Set(skipped)).sorted())
   }
 
-  private static func walk(_ directory: URL, depth: Int, into paths: inout Set<String>) throws {
+  private static func mainClone(_ directory: URL, git: any GitRunner) async throws -> URL {
+    let worktrees = try await output(
+      ["worktree", "list", "--porcelain", "-z"], in: directory, git: git)
+    guard let entry = worktrees.split(separator: "\0").first, entry.hasPrefix("worktree ") else {
+      throw RepoError.scan
+    }
+    return try canonical(URL(filePath: String(entry.dropFirst(9))))
+  }
+
+  private static func cloneOrigin(_ directory: URL, git: any GitRunner) async throws -> String? {
+    let result: GitResult
+    do {
+      result = try await git.run(
+        .init(arguments: ["remote", "get-url", "origin"], directory: directory))
+    } catch { throw RepoError.scan }
+    if result.termination == .exit(2) { return nil }
+    guard result.termination == .exit(0), let text = String(data: result.stdout, encoding: .utf8)
+    else { throw RepoError.scan }
+    return text.trimmingCharacters(in: .newlines)
+  }
+
+}
+
+extension RepositoryScan {
+  /// Gives first-run instructions scoped to a Git checkout when one is present.
+  package static func firstScanCommand(in directory: URL, git: any GitRunner) async -> String {
+    do {
+      let raw = try await output(["rev-parse", "--show-toplevel"], in: directory, git: git)
+      let path = raw.trimmingCharacters(in: .newlines)
+      let root = try canonical(URL(filePath: path))
+      let current = try canonical(directory)
+      let argument = current.path == root.path ? "." : shellWord(root.path)
+      let derived = root.lastPathComponent.lowercased()
+      let needsSlug = !WorkspaceConfig.isValidIdentifier(derived)
+      let slug = needsSlug ? suggestedSlug(derived) : derived
+      var command = "silta init --scan " + argument
+      if needsSlug { command += " --slug " + shellWord(slug) }
+      if !WorkspaceConfig.isValidIdentifier(String(slug.prefix(2))) {
+        let prefix = slug.replacing(/[^a-z0-9]/, with: "").prefix(2).uppercased()
+        command += " --prefix " + shellWord(prefix)
+      }
+      return command
+    } catch {
+      return "silta init --help"
+    }
+  }
+
+  /// Finds existing declarations for an unregistered checkout without writing storage.
+  static func repair(
+    _ root: URL, workspace: String?, store: DatabaseStore, git: any GitRunner
+  ) async throws -> ScanError? {
+    guard FileManager.default.fileExists(atPath: store.path) else { return nil }
+    let hasPathless = try store.read {
+      try Bool.fetchOne(
+        $0,
+        sql: """
+          SELECT EXISTS(
+            SELECT 1 FROM repo LEFT JOIN repo_path ON repo_path.repo_id=repo.id
+            WHERE repo_path.repo_id IS NULL AND repo.remote_url<>''
+          )
+          """) ?? false
+    }
+    guard hasPathless else { return nil }
+    let main: URL
+    let origin: String?
+    do {
+      main = try await mainClone(root, git: git)
+      origin = try await cloneOrigin(main, git: git)
+    } catch {
+      return nil
+    }
+    let found = try store.read {
+      try ScanRegistration.matching(path: main.path, origin: origin, in: $0).filter {
+        workspace == nil || $0.workspace == workspace
+      }
+    }
+    guard found.contains(where: { $0.path == nil }) else { return nil }
+    return ScanRegistration.recovery([found], paths: [main.path], roots: [main.path])
+  }
+
+  private static func walk(
+    _ directory: URL, depth: Int, into paths: inout Set<String>, skipped: inout [String]
+  ) throws {
     let fm = FileManager.default
+    try requireReadable(directory)
     if fm.fileExists(atPath: directory.appending(path: ".git").path) {
       paths.insert(directory.path)
       return
     }
     guard depth < 2 else { return }
+    let children = try fm.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: [.isDirectoryKey], options: [])
+    for child in children {
+      do {
+        guard try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
+        else { continue }
+        try walk(canonical(child), depth: depth + 1, into: &paths, skipped: &skipped)
+      } catch { skipped.append(child.path) }
+    }
+  }
+
+  private static func readableRoot(_ root: URL) throws -> URL {
     do {
-      let children = try fm.contentsOfDirectory(
-        at: directory, includingPropertiesForKeys: [.isDirectoryKey], options: [])
-      for child in children
-      where try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
-        try walk(canonical(child), depth: depth + 1, into: &paths)
-      }
-    } catch { throw RepoError.scan }
+      let directory = try canonical(root)
+      try requireReadable(directory)
+      return directory
+    } catch { throw ScanError.unreadableRoot(root.path) }
+  }
+
+  private static func requireReadable(_ directory: URL) throws {
+    let fm = FileManager.default
+    guard try directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true,
+      fm.isReadableFile(atPath: directory.path), fm.isExecutableFile(atPath: directory.path)
+    else { throw RepoError.scan }
   }
 
   private static func canonical(_ url: URL) throws -> URL {
@@ -280,8 +446,30 @@ extension RepositoryScan {
     } catch { throw RepoError.scan }
   }
 
+  private static func generatedApps(_ repos: [DiscoveredRepo])
+    -> (apps: [[String: String]], warnings: [OutputWarning])
+  {
+    var apps: [[String: String]] = []
+    var warnings: [OutputWarning] = []
+    var used: Set<String> = []
+    for var app in repos.flatMap(\.apps) {
+      guard let raw = app["slug"] else { continue }
+      let slug = suggestedSlug(raw)
+      if WorkspaceConfig.reservedAppSlug(slug) || !used.insert(slug).inserted {
+        warnings.append(
+          .init(
+            code: "scan_skipped_app",
+            message: "Skipped reserved or duplicate generated app \(slug.debugDescription)."))
+      } else {
+        app["slug"] = slug
+        apps.append(app)
+      }
+    }
+    return (apps, warnings)
+  }
+
   private static func configuration(
-    slug: String, name: String, prefix: String, repos: [DiscoveredRepo]
+    slug: String, name: String, prefix: String, repos: [DiscoveredRepo], apps: [[String: String]]
   ) throws -> WorkspaceConfig {
     let document: [String: Any] = [
       "workspace": [
@@ -292,7 +480,7 @@ extension RepositoryScan {
         row["remote"] = repo.remote
         return row
       },
-      "apps": repos.flatMap(\.apps),
+      "apps": apps,
     ]
     return try WorkspaceConfig.parse(WorkspaceConfig.json(document))
   }
@@ -313,6 +501,8 @@ private struct ScanRequest: Sendable {
   let roots: [String]
 
   let repos: [DiscoveredRepo]
+
+  let skipped: [String]
 
   let identity: (ids: any IDGenerator, date: Date)
 }

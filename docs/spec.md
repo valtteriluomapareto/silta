@@ -447,7 +447,11 @@ symlinks resolved, case-folded on case-insensitive volumes.
 
 1. **Repo.** Run `git rev-parse --path-format=absolute --git-common-dir` and match
    against `repo_path`. No match → `unregistered` (exit 2; `brief --hook` prints
-   nothing).
+   nothing). If an unbound configuration declares the clone's exact network origin
+   or absolute local origin, `where` offers a workspace-scoped scan of the canonical main clone when the
+   match is unique. Competing declarations offer read-only inspection of each
+   matching workspace so the human can choose. A matching relative origin also
+   needs inspection because it depends on the clone's location.
 2. **Candidates** are the repo's apps.
    - If the cwd is under an app's `subpath`, only the subpath apps are candidates.
    - Otherwise subpath apps are dropped, which leaves one primary app per ref.
@@ -2212,6 +2216,14 @@ to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is r
 `none` is refused, because that word means non-code work, and the conflict names its path.
 The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
+An empty `ws ls` prints a scan command from a Git checkout or `silta init --help`
+elsewhere. The command supplies valid naming options when the checkout name
+would give an invalid workspace slug or task prefix. Its JSON includes `next` and
+`next_by` for the empty list.
+A successful scan lists the workspace and its sorted registered repository and app
+slugs. Text tells a human how to open the workspace editor and tells agents to ask
+before editing. Text and JSON give one read-only, workspace-scoped `ws show` next.
+A bare `init` prepares the database and points to scan help.
 
 ## 17. Storage, concurrency, technology
 
@@ -2491,7 +2503,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   Ownership is checked
   with the installer parsers and compared to current expected content. Missing or
   stale pieces warn, damaged ownership/unreadable files fail, and absent optional
-  hooks are skipped. No content is repaired. Every non-pass install check has `next`.
+  hooks are skipped. Warnings and failures carry `next`. Hook evidence for an
+  absent optional hook is skipped, including SessionStart propagation when its hook
+  is absent. Damaged retained logs still have a diagnostic when both hooks are
+  absent. Evidence warnings for installed hooks ask the human to run an ordinary
+  Claude Code session in a registered repo before repeating the install check.
   Hook evidence reports the latest timestamp, exit code and milliseconds per event;
   error codes and warnings prevent an exit-0 pass. Propagation requires an ordinary
   command after the latest successful SessionStart, in the same actor session, with
@@ -2514,8 +2530,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   No harness is launched, even for `--version`: recognized native
   Claude `claude/versions/X` and Homebrew `Caskroom/codex/X/bin/codex` or
   `Cellar/opencode/X/bin/opencode` paths supply metadata-derived versions. Unsupported
-  layouts and missing executables are unknown. Drift from D42 warns with human-owned
-  live-acceptance next; unknown metadata suggests a human-owned manual version check.
+  layouts and missing executables are unknown. Drift from D42 or unknown metadata
+  warns and offers a human-owned manual version check.
   Metadata agreement does not prove runtime behavior. Doctor appends its ordinary
   command log without pruning old evidence; supported fixes remain separate.
 
@@ -2989,14 +3005,17 @@ does. Its task prefix is the slug's first two letters uppercased unless `--prefi
 names another; a message about a derived prefix names where it came from, the slug when
 `--slug` was given and the directory otherwise. Chosen values keep their case and use the
 identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
-naming options refreshes an existing workspace, so a stored prefix that the directory
-cannot derive stays, and it finds that workspace by slug without regard to case, as does
-`--ws`. When `--slug` or `--prefix` is given and that slug already names a workspace, the
-scan is refused, saying that a rescan only refreshes the repos already registered there;
-with `--slug` it offers another slug first and the rescan second, with `--prefix` alone
-the rescan first and another slug second. Slug and prefix clashes compare
-case-insensitively. Every refusal's `next` repeats the naming options already given, so
-following it never lands on a different workspace. Options without `--scan` are refused.
+naming options can refresh an existing workspace of the same slug when the clones
+all match its registered repos, preserving its prefix. Slug and prefix clashes compare case-insensitively, as does `--ws`.
+An exact clone binding, exact network origin, or exact absolute local origin
+is evidence of existing configuration. A matching relative local origin or a
+workspace name alone calls for inspection before selecting a target. Before creating a workspace, a scan checks all clone paths together.
+A unique match to one workspace and one distinct repo per clone offers a scoped
+rescan when the repo paths agree or are unbound. If the scan includes competing
+registrations, a different bound clone, or a mix of registered and unfamiliar
+clones, the user inspects the matching workspaces and chooses what to scan.
+Existing workspace data is preserved. A naming conflict with no repository match
+still offers the applicable naming option. Options without `--scan` are refused.
 `--slug` and `--prefix` are invalid with `--ws`, which rescans. A directory name that is
 not a valid workspace slug, or does not yield a valid prefix, fails with an error that
 names `--slug` or `--prefix` as the fix and carries the scanned roots in a runnable
@@ -3011,12 +3030,16 @@ clone whose directory name normalizes to it is refused: the conflict names the c
 path and asks for a different directory name rather than renaming it. Nothing is written
 and no stored path moves. A task prefix another workspace holds, or
 a clone path another workspace already binds, is a conflict that names the holder and a
-command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
-or master provides a default app when its ref is not already represented.
-Worktrees and path aliases resolve to one canonical main clone. Initial scans create
-configuration; rescans only refresh local paths for registered repo slugs and preserve
-edited configuration. `--ws` targets an existing workspace for path rebinding.
-Scan success names the human edit command and explicit workspace selection.
+command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref. Main
+or master provides a default app when its ref is not already represented. Stub
+slugs use repo normalization while refs keep their exact spelling. Reserved or
+duplicate generated slugs are skipped with a warning. Worktrees and path aliases
+resolve to one canonical main clone. Initial scans create configuration. A scoped
+rescan refreshes paths by exact binding, unique unbound origin, or registered repo
+slug and preserves edited configuration. Named scan roots must be readable
+directories. An unreadable descendant is skipped with a warning when other
+clones can be registered. If unreadable descendants leave no clones, the scan
+reports the first unreadable path.
 
 `repo fetch [repo]` preflights selected local paths, then fetches sequentially with a
 60-second deadline per clone. It stops on the first failure; earlier successful fetches
