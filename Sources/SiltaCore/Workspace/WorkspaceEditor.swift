@@ -21,10 +21,12 @@ package enum WorkspaceEditor {
   package static func apply(
     _ input: @autoclosure () throws -> String, slug: String?, store: DatabaseStore, actor: ActorID,
     identity: (ids: any IDGenerator, date: Date), approved: String? = nil,
-    prepared: Result<String?, any Error>? = nil
+    prepared: Result<String?, any Error>? = nil, retryFromStdin: Bool = false
   ) throws -> String? {
-    let command = approvalCommand(slug) + " -F <file>"
-    let approval = try actor.requireHuman(command: command, approved: approved)
+    let base = approvalCommand(slug)
+    let command = base + " -F <file>"
+    let retry = retryFromStdin ? base + " -F -" : command
+    let approval = try actor.requireHuman(command: retry, approved: approved)
     let captured = Result { try capture(slug: slug, store: store, prepared: prepared) }
     let text = try input()
     let baseline = try captured.get()

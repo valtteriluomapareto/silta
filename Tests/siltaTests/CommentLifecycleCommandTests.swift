@@ -128,10 +128,7 @@ extension CommentLifecycleCommandTests {
       #expect(result.termination == .exit(3))
       let error = try TaskStateRegressionTests.error(result)
       let next = try #require((error["next"] as? [String])?.first)
-      withKnownIssue("#259: thread lifecycle loses stdin on retry") {
-        #expect(next.contains(" --allow-secret -F - "))
-      }
-      guard next.contains(" --allow-secret -F - ") else { return }
+      #expect(next.contains(" --allow-secret -F - "))
       let text = try run(false)
       #expect(text.termination == .exit(3) && text.stderr.contains("ask human: " + next))
       let retry =

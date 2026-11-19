@@ -40,6 +40,7 @@ struct NextCommandTests {
       "--approved=\(approval) --ws=\(workspace)",
     ] {
       #expect(Self.commandPath("silta \(globals) task nope", groups: groups) == "silta task nope")
+      #expect(Self.commandPath("silta \(globals) task nope2", groups: groups) == "silta task nope2")
       #expect(
         Self.commandPath("silta \(globals) task show lowercase", groups: groups)
           == "silta task show")
@@ -107,7 +108,7 @@ struct NextCommandTests {
     }
     var command = "silta"
     for word in remaining {
-      guard groups.contains(command), word.wholeMatch(of: /[a-z][a-z-]*/) != nil else { break }
+      guard groups.contains(command), word.wholeMatch(of: /[a-z][a-z0-9-]*/) != nil else { break }
       command += " " + word
     }
     return command

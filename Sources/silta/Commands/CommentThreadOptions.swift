@@ -15,7 +15,7 @@ struct CommentThreadOptions: ParsableArguments {
     let explanation = try body.readContent(command: action.command(refs, workspace: workspace))
     let result = try TaskService(
       environment: context.environment, workspace: workspace,
-      approved: global.approved, bodyFlag: body.flag
+      approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
     ).updateComments(refs, action: action, explanation: explanation, allowSecret: body.allowSecret)
     return CommentOutput.mutation(result).reporting(workspace)
   }

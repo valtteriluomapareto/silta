@@ -104,10 +104,7 @@ struct TaskApprovalRegressionTests {
       let expected =
         "silta --ws 'acme' task triage --drop AC-1 --allow-secret -F -"
         + " --approved \"<the human's words>\""
-      withKnownIssue("#259: foreign proposal retry loses stdin and consent flags") {
-        #expect(next == expected)
-      }
-      guard next == expected else { return }
+      #expect(next == expected)
       let retry =
         shellWord(try SiltaBinary.url().path)
         + String(next.dropFirst("silta".count))

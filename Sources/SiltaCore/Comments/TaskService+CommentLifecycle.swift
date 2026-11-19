@@ -24,9 +24,10 @@ extension TaskService {
       result.unchanged = targets.filter { !Self.commentChanges($0.1, action: action) }
         .map { "\($0.0.ref)/\($0.1["seq"] as Int)" }
       if changed.isEmpty { return result }
+      let flag = retryBodyFlag ?? "-F <file>"
       let consent = try approval(
         required: allowSecret,
-        command: scopedCommand(command, workspace: slug) + " --allow-secret -F <file>")
+        command: scopedCommand(command, workspace: slug) + " --allow-secret " + flag)
       let safe = try checkedExplanation(
         explanation, allowSecret: allowSecret, command: scopedCommand(command, workspace: slug),
         emptyRecovery: explanationRecovery(

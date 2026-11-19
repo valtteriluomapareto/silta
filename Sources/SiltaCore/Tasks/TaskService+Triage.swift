@@ -12,9 +12,9 @@ extension TaskService {
     }
     if let priority = batch.priority { try Self.validatePriority(priority) }
     let slug = try selected()
-    let at = environment.clock.now()
+    let preflightAt = environment.clock.now()
     let (beforeAccept, beforeDrop) = try environment.db.read {
-      try triageTasks(batch, workspace: slug, at: at, in: $0)
+      try triageTasks(batch, workspace: slug, at: preflightAt, in: $0)
     }
     let command = batch.command
     let flag = retryBodyFlag ?? (batch.why == nil ? nil : "-F -")
@@ -23,6 +23,7 @@ extension TaskService {
     let why = try readBody?() ?? batch.why
     let content = try checked(
       why ?? "Dropped in triage.", allow: batch.allowSecret, command: retry)
+    let at = environment.clock.now()
     return try environment.db.write { tx in
       let (accepted, dropped) = try triageTasks(batch, workspace: slug, at: at, in: tx.database)
       try verifyTriageIdentity(beforeAccept + beforeDrop, accepted + dropped)

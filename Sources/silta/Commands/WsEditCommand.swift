@@ -34,7 +34,6 @@ struct WsEditCommand: WorkspaceArgumentCommand {
   }
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
-    if file == "-" { try authorize(context) }
     let environment = context.environment
     let workspace = workspace ?? global.ws
     let identity = (environment.ids, environment.clock.now())
@@ -42,7 +41,8 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     if let file {
       selected = try WorkspaceEditor.apply(
         try read(file), slug: workspace, store: environment.db, actor: environment.actor,
-        identity: identity, approved: global.approved, prepared: environment.workspaceSelection)
+        identity: identity, approved: global.approved, prepared: environment.workspaceSelection,
+        retryFromStdin: file == "-")
     } else {
       selected = try WorkspaceEditor.edit(
         slug: workspace, store: environment.db, actor: environment.actor,

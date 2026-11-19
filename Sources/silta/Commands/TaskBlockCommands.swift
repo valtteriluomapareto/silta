@@ -38,7 +38,7 @@ struct TaskBlockCommand: OutputCommand {
         command: input.command(ref), approved: global.approved) ?? ""
     let result = try TaskService(
       environment: context.environment, workspace: global.ws,
-      approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
+      approved: global.approved, bodyFlag: body.flag
     ).block(ref, input)
     var lines = ["\(result.ref) \(result.status)"]
     if let waiting = result.waiting { lines += TaskOutput.waitingLines(waiting) }

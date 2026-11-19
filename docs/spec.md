@@ -562,8 +562,8 @@ symlinks resolved, case-folded on case-insensitive volumes.
 
 Under `proposals: ask`, every agent write that would create a `proposed` task is
 human-only: `task add`, `--parent` on a task the agent doesn't claim, and
-`from-plan`, with or without `--split`. `human_only` names the setting, and `next`
-uses `-F -` when the body came from stdin or inline text. Supply the body again on
+`from-plan`, with or without `--split`. `human_only` names the setting. The
+`task add` retry uses `-F -` for stdin or inline text. Supply the body again on
 stdin. A human's request in chat for the
 write is its go-ahead. Proposals that already exist when the setting changes stay in
 triage, or leave the inbox after 14 days as usual.

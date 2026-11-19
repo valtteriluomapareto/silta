@@ -103,6 +103,23 @@ struct TaskOrganizationTests {
     }
   }
 
+  @Test func triageRecordsWriteTimeAfterReadingInput() async throws {
+    try await withScratchDirectory { home in
+      let clock = FakeClock(now: TaskServiceTests.now)
+      let service = try Self.service(home, clock: clock)
+      _ = try await Self.add(service, directory: home)
+      var batch = TaskTriage()
+      batch.drop = ["AC-1"]
+      _ = try service.triage(batch) {
+        clock.advance(milliseconds: 1_000)
+        return "Acme reason"
+      }
+      let task = try service.show("AC-1")
+      let writeTime = TaskService.timestamp(clock.now())
+      #expect(task.updatedAt == writeTime && task.closedAt == writeTime)
+    }
+  }
+
   @Test func triageHumanGateSecretsAndForeignClaims() async throws {
     try await withScratchDirectory { home in
       let approved = try Self.service(home)

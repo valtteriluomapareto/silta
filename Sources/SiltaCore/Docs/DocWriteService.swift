@@ -169,8 +169,15 @@ package struct DocWriteService {
   }
 
   func safeScopeAndIdentity(_ request: DocEditRequest, workspace: String?) -> Bool {
-    (workspace.map { SecretGuard.matches(in: $0).isEmpty } ?? true)
-      && DocService.safeReference("doc:" + request.slug)
+    guard workspace.map({ SecretGuard.matches(in: $0).isEmpty }) ?? true,
+      DocService.safeReference("doc:" + request.slug)
+    else { return false }
+    guard request.retryFromStdin else { return true }
+    let metadata = [request.title, request.kind].compactMap { $0 } + (request.about ?? [])
+    let disallowed = CharacterSet.controlCharacters.union(.newlines)
+    return metadata.allSatisfy {
+      DocService.safeReference($0) && $0.rangeOfCharacter(from: disallowed) == nil
+    }
   }
 
   func readCommand(workspace: String?) -> String {
@@ -195,11 +202,13 @@ package struct DocWriteService {
   }
   private func flags(_ request: DocEditRequest, stdin: Bool = false) -> String {
     let body = request.keepBody ? " --keep-body" : stdin ? " -F -" : " -F <file>"
-    return body
-      + (request.title == nil ? "" : " --title <title>")
-      + (request.kind == nil ? "" : " --kind <kind>")
-      + (request.about == nil ? "" : " --about <ref>")
-      + (request.allowSecret ? " --allow-secret" : "")
+    let title = request.title.map { stdin ? " --title=" + shellWord($0) : " --title <title>" } ?? ""
+    let kind = request.kind.map { " --kind " + (stdin ? shellWord($0) : "<kind>") } ?? ""
+    let about =
+      request.about.map { refs in
+        stdin ? refs.map { " --about " + shellWord($0) }.joined() : " --about <ref>"
+      } ?? ""
+    return body + title + kind + about + (request.allowSecret ? " --allow-secret" : "")
   }
 
 }

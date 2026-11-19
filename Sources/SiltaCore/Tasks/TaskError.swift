@@ -16,7 +16,7 @@ package enum TaskError: CodedError, Equatable {
   case proposal(String, human: Bool)
 
   /// An agent needs human triage to drop another actor's proposal.
-  case foreignProposalDrop(String, retryBodyFlag: String?)
+  case foreignProposalDrop(String, allowSecret: Bool)
 
   /// The proposal reference identifies a different task after approval preparation.
   case triageChanged(String)
@@ -154,10 +154,10 @@ package enum TaskError: CodedError, Equatable {
       ["silta task triage --accept \(ref)" + (human ? "" : " --approved \"<the human's words>\"")]
     case .blockedPromotion(let ref, let ready):
       [ready ? "silta task unblock \(ref)" : "silta task show \(ref)"]
-    case .foreignProposalDrop(let ref, let flag):
+    case .foreignProposalDrop(let ref, let allowSecret):
       [
-        "silta task triage --drop \(ref)" + (flag.map { " " + $0 } ?? "")
-          + " --approved \"<the human's words>\""
+        "silta task triage --drop \(ref)" + (allowSecret ? " --allow-secret" : "")
+          + " -F - --approved \"<the human's words>\""
       ]
     case .triageChanged(let ref), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
