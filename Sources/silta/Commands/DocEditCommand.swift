@@ -32,9 +32,11 @@ struct DocEditCommand: OutputCommand {
   @Flag(help: "Retain detected secrets (human-only).") var allowSecret = false
 
   var request: DocEditRequest {
-    DocEditRequest(
+    var request = DocEditRequest(
       slug: slug, title: title, kind: kind, about: about.isEmpty ? nil : about,
       allowSecret: allowSecret, keepBody: keepBody)
+    request.retryFromStdin = file == "-"
+    return request
   }
 
   func authorize(_ context: CommandContext) throws {

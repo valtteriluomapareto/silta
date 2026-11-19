@@ -499,7 +499,8 @@ symlinks resolved, case-folded on case-insensitive volumes.
 - Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
 - Outside Git, `where` returns `unregistered` with carry-on guidance and harmless
   help, without suggesting a scan of the input directory. An unregistered Git
-  repository instead gets a scan command for its canonical toplevel.
+  repository gets a scan command for its canonical toplevel. With an explicit
+  existing workspace, the unregistered result points to that workspace's YAML.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
@@ -562,7 +563,8 @@ symlinks resolved, case-folded on case-insensitive volumes.
 Under `proposals: ask`, every agent write that would create a `proposed` task is
 human-only: `task add`, `--parent` on a task the agent doesn't claim, and
 `from-plan`, with or without `--split`. `human_only` names the setting, and `next`
-uses `-F <file>` when the body came from stdin. A human's request in chat for the
+uses `-F -` when the body came from stdin or inline text. Supply the body again on
+stdin. A human's request in chat for the
 write is its go-ahead. Proposals that already exist when the setting changes stay in
 triage, or leave the inbox after 14 days as usual.
 
@@ -593,7 +595,9 @@ going until the list is empty or the human stops it.
 
 **Triage (D37, D38)** is human-only and batched, so one answer is one command:
 `task triage --accept <ref>… --drop <ref>… [--priority n] [-m <why>]`.
-- It is all or nothing: a bad ref fails the whole call, and the error names it.
+- Silta checks the full batch before asking for approval or reading the drop reason.
+  A bad ref fails the whole call and the error names it. Silta rechecks the same
+  proposals when applying the decisions and recording the approval.
 - `--priority` sets the accepted tasks' priority; without it they keep their own. `-m`
   is the result stored on the dropped ones, "Dropped in triage." by default.
 - A proposal nobody triaged leaves the inbox 14 days after `created_at`, which means
@@ -1327,7 +1331,8 @@ silta code ls   <app>[@<ref>] [<dir>]
     can be read back, exported, counted and tied to what it changed.
   - Without `--approved`, an agent gets `human_only` (exit 3). The message says the
     command needs the human's go-ahead; `next` is the same command with
-    `--approved "<the human's words>"`.
+    `--approved "<the human's words>"`. If the retry uses `-F -`, supply the original body
+    again on stdin.
   - `--approved` on a command that doesn't need it warns `approval_unused` and stores
     nothing. A `--dry-run` records nothing, so it needs no approval, `--allow-secret`
     included, and its `--approved` warns `approval_unused`, saying a dry run records

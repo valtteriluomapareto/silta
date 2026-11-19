@@ -38,7 +38,7 @@ struct TaskBlockCommand: OutputCommand {
         command: input.command(ref), approved: global.approved) ?? ""
     let result = try TaskService(
       environment: context.environment, workspace: global.ws,
-      approved: global.approved, bodyFlag: body.flag
+      approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
     ).block(ref, input)
     var lines = ["\(result.ref) \(result.status)"]
     if let waiting = result.waiting { lines += TaskOutput.waitingLines(waiting) }
@@ -78,7 +78,7 @@ struct TaskUnblockCommand: OutputCommand {
       actor: context.environment.actor, command: command, approved: global.approved)
     let result = try TaskService(
       environment: context.environment, workspace: global.ws,
-      approved: global.approved, bodyFlag: body.flag
+      approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
     ).unblock(refs, why: why, allowSecret: body.allowSecret)
     let tasks = result.tasks
     return CommandOutput(

@@ -84,7 +84,7 @@ extension TaskService {
     if task.status == "proposed" {
       if !dropped { throw TaskError.proposal(task.ref, human: environment.actor.isHuman) }
       if !environment.actor.isHuman && task.createdBy != environment.actor.description {
-        throw TaskError.proposal(task.ref, human: false)
+        throw TaskError.foreignProposalDrop(task.ref, retryBodyFlag: retryBodyFlag)
       }
       return
     }
@@ -115,7 +115,8 @@ extension TaskService {
     let review = try gate(task, in: db)
     guard review.unmet else { return (review.warnings, nil) }
     guard commit.force else { throw TaskError.gate(task.ref) }
-    return (review.warnings, try approval(required: true, command: command + " -F <file>"))
+    let retry = command + " " + (retryBodyFlag ?? "-F <file>")
+    return (review.warnings, try approval(required: true, command: retry))
   }
 
   /// The review gate's warnings, and whether an unmet `human` gate refuses completion.

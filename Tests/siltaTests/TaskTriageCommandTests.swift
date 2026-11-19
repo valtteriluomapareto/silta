@@ -6,7 +6,8 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskTriageCommandTests {
-  @Test func approvalRetryRetainsBothSetsPriorityWorkspaceAndSecretOption() throws {
+  @Test(arguments: [false, true])
+  func approvalRetryRetainsBothSetsPriorityWorkspaceAndSecretOption(stdin: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
       for title in ["Acme first", "Acme second"] {
@@ -24,10 +25,11 @@ struct TaskTriageCommandTests {
             UPDATE meta SET value='beta' WHERE key='current_workspace';
             """)
       }
-      let args = [
-        "--ws", "acme", "task", "triage", "--accept", "AC-1", "--drop", "AC-2",
-        "--priority", "3", "--allow-secret", "-m", ("Pwd=" + "acme-secret"),
-      ]
+      let args =
+        [
+          "--ws", "acme", "task", "triage", "--accept", "AC-1", "--drop", "AC-2",
+          "--priority", "3", "--allow-secret",
+        ] + (stdin ? ["-F", "-"] : ["-m", "Pwd=" + "acme-secret"])
       let refused = try SiltaBinary.run(
         args + ["--json"], in: scratch,
         environment: TaskCommandTests.actor)
@@ -37,15 +39,12 @@ struct TaskTriageCommandTests {
         JSONSerialization.jsonObject(with: Data(refused.stdout.utf8)) as? [String: Any])
       let error = try #require(envelope["error"] as? [String: Any])
       let next = try #require((error["next"] as? [String])?.first)
-      withKnownIssue("#259: inline triage retry asks for a file instead of reusable stdin") {
-        #expect(next.contains(" -F - "))
-      }
+      #expect(next.contains(" -F - "))
       let file = scratch.appending(path: "why.md")
       try ("Pwd=" + "acme-secret").write(to: file, atomically: true, encoding: .utf8)
       let command = shellWord(try SiltaBinary.url().path) + String(next.dropFirst(5))
-      let replay = command.replacingOccurrences(of: "<file>", with: shellWord(file.path))
-        .replacingOccurrences(
-          of: "<the human's words>", with: "Accept the first and drop the second")
+      let replay = command.replacingOccurrences(
+        of: "<the human's words>", with: "Accept the first and drop the second")
       let result = try SiltaBinary.runProcess(
         URL(filePath: "/bin/sh"), ["-c", replay + " < " + shellWord(file.path)],
         in: scratch, environment: TaskCommandTests.actor)
@@ -64,6 +63,7 @@ struct TaskTriageCommandTests {
       #expect(approvals == 1)
       let audit = try #require(try String.fetchOne(db, sql: "SELECT command FROM approval"))
       #expect(audit.contains("--allow-secret"))
+      #expect(audit.hasSuffix(" -F <file>"))
       #expect(!audit.contains("acme-secret"))
     }
   }

@@ -21,19 +21,31 @@ struct TaskBody: ParsableArguments {
     message != nil ? "-m <text>" : file != nil ? "-F <file>" : nil
   }
 
+  /// Replays inline or stdin text through stdin without putting the body in a command.
+  var retryFlag: String? {
+    if message != nil || file == "-" { return "-F -" }
+    return flag
+  }
+
   func read(actor: ActorID, command: String, approved: String? = nil) throws -> String? {
     if allowSecret {
-      try actor.requireHuman(command: command + " --allow-secret -F <file>", approved: approved)
+      try actor.requireHuman(
+        command: command + " --allow-secret " + (retryFlag ?? "-F <file>"), approved: approved)
     }
     return try readContent(command: command)
+  }
+
+  /// Validates input selection before a gated command asks for approval.
+  func validateChoice(command: String) throws {
+    guard message == nil || file == nil else {
+      throw UsageError.invalid(message: "Use either -m or -F, not both.", command: command)
+    }
   }
 
   /// Reads content without consent checks; state-dependent writers gate their changed
   /// transaction instead of asking for permission for a no-op.
   func readContent(command: String) throws -> String? {
-    guard message == nil || file == nil else {
-      throw UsageError.invalid(message: "Use either -m or -F, not both.", command: command)
-    }
+    try validateChoice(command: command)
     guard let file else { return message }
     do {
       let data =

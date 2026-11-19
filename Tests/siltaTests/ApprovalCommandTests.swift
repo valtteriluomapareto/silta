@@ -335,7 +335,7 @@ extension ApprovalCommandTests {
       let noSHA = try SiltaBinary.run(
         ["task", "done", "AC-1", "--force", "--no-sha", "-m", "Acme done", "--json"], in: scratch,
         environment: TaskCommandTests.actor)
-      #expect(noSHA.termination == .exit(3) && noSHA.stdout.contains("--force --no-sha -F <file>"))
+      #expect(noSHA.termination == .exit(3) && noSHA.stdout.contains("--force --no-sha -F -"))
     }
   }
 }

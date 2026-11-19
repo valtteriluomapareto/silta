@@ -26,7 +26,15 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     if file == nil { try TerminalEditor.validate() }
   }
 
+  func authorize(_ context: CommandContext) throws {
+    let target = (workspace ?? global.ws).map { " " + shellWord($0) } ?? ""
+    let input = file == "-" ? " -F -" : " -F <file>"
+    try context.environment.actor.requireHuman(
+      command: "silta ws edit" + target + input, approved: global.approved)
+  }
+
   func execute(_ context: CommandContext) throws -> CommandOutput {
+    if file == "-" { try authorize(context) }
     let environment = context.environment
     let workspace = workspace ?? global.ws
     let identity = (environment.ids, environment.clock.now())

@@ -75,6 +75,34 @@ struct TaskOrganizationTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func triageRechecksTheBatchAfterReadingInput(replaced: Bool) async throws {
+    try await withScratchDirectory { home in
+      let service = try Self.service(home)
+      _ = try await Self.add(service, directory: home)
+      _ = try await Self.add(service, directory: home)
+      var batch = TaskTriage()
+      batch.accept = ["AC-1"]
+      batch.drop = ["AC-2"]
+      let before = try Self.counts(service)
+      let expected: TaskError =
+        replaced
+        ? .triageChanged("AC-2") : .transition("AC-2", status: "todo")
+      #expect(throws: expected) {
+        _ = try service.triage(batch) {
+          try service.environment.db.write { tx in
+            let mutation = replaced ? "uid='acme-replacement'" : "status='todo'"
+            try tx.database.execute(sql: "UPDATE task SET \(mutation) WHERE seq=2")
+          }
+          return "Acme reason"
+        }
+      }
+      #expect(try service.show("AC-1").status == "proposed")
+      #expect(try service.show("AC-2").status == (replaced ? "proposed" : "todo"))
+      #expect(try Self.counts(service) == before)
+    }
+  }
+
   @Test func triageHumanGateSecretsAndForeignClaims() async throws {
     try await withScratchDirectory { home in
       let approved = try Self.service(home)

@@ -76,9 +76,7 @@ struct WhereOutputTests {
       #expect(result.termination == .exit(2))
       let error = try TaskStateRegressionTests.error(result)
       let next = try #require(error["next"] as? [String])
-      withKnownIssue("#259: a rescan cannot register a repository missing from the workspace") {
-        #expect(next == ["silta --ws 'acme' ws show"])
-      }
+      #expect(next == ["silta --ws 'acme' ws show"])
     }
   }
 

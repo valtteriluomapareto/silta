@@ -2,31 +2,13 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-/// Every `silta …` an error tells the caller to run must exist (spec §16), or be
-/// planned in a slice. The error goldens hold every coded error's text form.
+/// Checks command names in text and JSON recovery hints against the live CLI schema.
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct NextCommandTests {
-  /// Commands that errors may name before their slice ships. Remove each when it lands.
-  static let planned: [String: String] = [:]
-
   @Test func everySuggestedCommandExists() throws {
-    let tests = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-    var suggested: Set<String> = []
-    for target in ["SiltaCoreTests", "siltaTests"] {
-      let golden = tests.appending(path: "\(target)/Golden")
-      for name in try FileManager.default.contentsOfDirectory(atPath: golden.path)
-      // error-codes.txt renders synthetic sample errors, one per code.
-      where name.hasSuffix(".txt") && name != "error-codes.txt" {
-        let text = try String(contentsOf: golden.appending(path: name), encoding: .utf8)
-        for line in text.split(separator: "\n") {
-          for prefix in ["next: silta", "ask human: silta"] where line.hasPrefix(prefix) {
-            // The command words, up to the first flag, placeholder or argument value.
-            let words = line.dropFirst(prefix.count - "silta".count).split(separator: " ")
-              .prefix { $0.allSatisfy { $0.isLowercase || $0 == "-" } && !$0.hasPrefix("-") }
-            suggested.insert(words.joined(separator: " "))
-          }
-        }
-      }
+    let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    let hints = try ["SiltaCoreTests", "siltaTests"].flatMap { target in
+      try Self.hints(in: root.appending(path: "\(target)/Golden"))
     }
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(["schema", "--json"], in: scratch)
@@ -35,13 +17,99 @@ struct NextCommandTests {
       let data = try #require(envelope["data"] as? [String: Any])
       let commands = try #require(data["commands"] as? [[String: Any]])
       let known = Set(commands.compactMap { $0["name"] as? String } + ["silta"])
+      let groups = Set(
+        known.compactMap { command in
+          command.lastIndex(of: " ").map { String(command[..<$0]) }
+        })
+      let suggested = Set(hints.compactMap { Self.commandPath($0, groups: groups) })
       #expect(suggested.count >= 4, "too few suggestions found: \(suggested)")
       for command in suggested {
-        let exists =
-          known.contains(command)
-          || Self.planned.keys.contains { command == $0 || command.hasPrefix($0 + " ") }
-        #expect(exists, "\(command) is suggested but doesn't exist")
+        #expect(
+          known.contains(command) || groups.contains(command),
+          "\(command) is suggested but doesn't exist")
       }
     }
+  }
+
+  @Test func quotedGlobalValuesAndLowercaseArgumentsStayOutsideTheCommand() {
+    let groups: Set<String> = ["silta", "silta task"]
+    let workspace = "'Acme'\\''s workspace'"
+    let approval = "\"Review Acme's proposal\""
+    for globals in [
+      "--ws \(workspace) --approved \(approval)",
+      "--approved=\(approval) --ws=\(workspace)",
+    ] {
+      #expect(Self.commandPath("silta \(globals) task nope", groups: groups) == "silta task nope")
+      #expect(
+        Self.commandPath("silta \(globals) task show lowercase", groups: groups)
+          == "silta task show")
+    }
+  }
+
+  private static func hints(in directory: URL) throws -> [String] {
+    let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    return try names.flatMap { name -> [String] in
+      // These goldens deliberately use synthetic sample commands.
+      guard !["error-codes.txt", "error-codes.json"].contains(name) else { return [] }
+      let file = directory.appending(path: name)
+      switch file.pathExtension {
+      case "txt":
+        return try textHints(from: file)
+      case "json":
+        return try jsonHints(from: file)
+      default:
+        return []
+      }
+    }
+  }
+
+  private static func textHints(from file: URL) throws -> [String] {
+    let contents = try String(contentsOf: file, encoding: .utf8)
+    return contents.split(separator: "\n").compactMap { line in
+      let prefixes = ["next: ", "ask human: "]
+      return prefixes.first { line.hasPrefix($0) }.map { String(line.dropFirst($0.count)) }
+    }
+  }
+
+  private static func jsonHints(from file: URL) throws -> [String] {
+    let contents = try String(contentsOf: file, encoding: .utf8)
+    let bytes = Data(contents.utf8)
+    if let value = try? JSONSerialization.jsonObject(with: bytes) {  // NDJSON uses the fallback.
+      return nestedHints(value)
+    }
+    return try contents.split(separator: "\n").flatMap { line in
+      try nestedHints(JSONSerialization.jsonObject(with: Data(line.utf8)))
+    }
+  }
+
+  private static func nestedHints(_ value: Any) -> [String] {
+    if let object = value as? [String: Any] {
+      return (object["next"] as? [String] ?? []) + object.values.flatMap(nestedHints)
+    }
+    if let list = value as? [Any] { return list.flatMap(nestedHints) }
+    return []
+  }
+
+  private static func commandPath(_ hint: String, groups: Set<String>) -> String? {
+    // Preserve shell-quoted words and escaped quotes as one token. Hints are data.
+    let words = hint.matches(of: /(?:'[^']*'|"(?:\\.|[^"\\])*"|\\.|[^\s"'\\])+/).map(\.output)
+    guard words.first == "silta" else { return nil }
+    var remaining = words.dropFirst()
+    while let option = remaining.first {
+      let flag = option.split(separator: "=", maxSplits: 1).first
+      if flag == "--ws" || flag == "--approved" {
+        remaining = remaining.dropFirst(option.contains("=") ? 1 : 2)
+      } else if ["--json", "--quiet", "--verbose", "--deterministic"].contains(option) {
+        remaining = remaining.dropFirst()
+      } else {
+        break
+      }
+    }
+    var command = "silta"
+    for word in remaining {
+      guard groups.contains(command), word.wholeMatch(of: /[a-z][a-z-]*/) != nil else { break }
+      command += " " + word
+    }
+    return command
   }
 }

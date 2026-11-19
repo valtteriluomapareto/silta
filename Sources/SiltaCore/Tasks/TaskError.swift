@@ -15,6 +15,12 @@ package enum TaskError: CodedError, Equatable {
   /// A proposal needs triage first; a human runs it, an agent asks the human.
   case proposal(String, human: Bool)
 
+  /// Only human triage can drop a proposal created by another actor.
+  case foreignProposalDrop(String, retryBodyFlag: String?)
+
+  /// The proposal reference identifies a different task after approval preparation.
+  case triageChanged(String)
+
   /// The requested transition is not valid from the current status.
   case transition(String, status: String)
 
@@ -76,7 +82,8 @@ package enum TaskError: CodedError, Equatable {
     case .notFound: .notFound
     case .invalid, .foreignRepo, .outsideAppRepo, .input, .step: .invalid
     case .claimed: .claimed
-    case .proposal, .transition, .changed, .blockedPromotion: .conflict
+    case .proposal, .foreignProposalDrop, .triageChanged, .transition, .changed, .blockedPromotion:
+      .conflict
     case .git, .repository: .env
     case .gate: .gate
     case .staleRev: .staleRev
@@ -112,6 +119,9 @@ package enum TaskError: CodedError, Equatable {
       human
         ? "Proposal \(ref) needs triage first."
         : "Proposal \(ref) needs human triage; ask in chat before accepting it."
+    case .foreignProposalDrop(let ref, _):
+      "Another actor proposed \(ref). Ask the human to drop it through triage."
+    case .triageChanged(let ref): "\(ref) identifies a different task. Re-read it before triage."
     case .transition(let ref, let status): "\(ref) cannot make this transition from \(status)."
     case .repository:
       "Task repository is not registered locally or its .git marker is missing; "
@@ -144,7 +154,12 @@ package enum TaskError: CodedError, Equatable {
       ["silta task triage --accept \(ref)" + (human ? "" : " --approved \"<the human's words>\"")]
     case .blockedPromotion(let ref, let ready):
       [ready ? "silta task unblock \(ref)" : "silta task show \(ref)"]
-    case .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
+    case .foreignProposalDrop(let ref, let flag):
+      [
+        "silta task triage --drop \(ref)" + (flag.map { " " + $0 } ?? "")
+          + " --approved \"<the human's words>\""
+      ]
+    case .triageChanged(let ref), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]
     case .notFound(let what):
@@ -161,6 +176,9 @@ package enum TaskError: CodedError, Equatable {
   /// An agent's proposal refusal needs the human's words for triage; every other case
   /// follows its code.
   package var nextBy: NextBy {
-    if case .proposal(_, human: false) = self { .human } else { code.nextBy }
+    switch self {
+    case .proposal(_, human: false), .foreignProposalDrop: .human
+    default: code.nextBy
+    }
   }
 }

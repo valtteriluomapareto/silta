@@ -36,16 +36,14 @@ struct TaskApprovalRegressionTests {
         (["--accept", "AC-1", "--priority", "9"], (1, "invalid")),
         (["--accept", "AC-999"], (2, "not_found")),
         (["--accept", "AC-1", "AC-2"], (6, "conflict")),
-        (["--accept", "AC-1", "--drop", "ac-1"], (1, "invalid")),
+        (["--accept", "AC-1", "--drop", "task:AC-1"], (1, "invalid")),
         (["--accept", "AC-1", "-m", "Acme body"], (1, "invalid")),
       ]
       for (decisions, (exit, code)) in cases {
         let result = try Self.run(["task", "triage"] + decisions + unreadable, in: scratch)
         let actual = try Self.error(result)["code"] as? String
-        withKnownIssue("#259: triage asks for approval before validating the batch") {
-          #expect(result.termination == .exit(exit), "\(decisions)")
-          #expect(actual == code, "\(decisions)")
-        }
+        #expect(result.termination == .exit(exit), "\(decisions)")
+        #expect(actual == code, "\(decisions)")
       }
       let valid = try Self.run(
         ["task", "triage", "--accept", "AC-1"] + unreadable, in: scratch)
@@ -67,18 +65,20 @@ struct TaskApprovalRegressionTests {
       try #require(
         try Self.run(["task", "add", "Acme proposal"], in: scratch, as: Self.other)
           .termination == .exit(0))
-      let result = try Self.run(
-        ["task", "drop", "AC-1", "-m", "Acme reason", "--json"], in: scratch)
+      let arguments = ["--ws", "acme", "task", "drop", "AC-1", "-m", "Acme reason"]
+      let result = try Self.run(arguments + ["--json"], in: scratch)
       #expect(result.termination == .exit(6))
       let error = try Self.error(result)
       #expect(error["next_by"] as? String == "human")
+      Golden.forTests().check(result.stdout, "task-drop-foreign-proposal.json")
+      let text = try Self.run(arguments, in: scratch)
+      #expect(text.termination == .exit(6))
+      Golden.forTests().check(text.stderr, "task-drop-foreign-proposal.txt")
       let next = try #require(error["next"] as? [String])
-      withKnownIssue("#259: an unauthorized drop offers to accept the proposal") {
-        #expect(
-          next.contains {
-            $0.contains("triage --drop AC-1") && $0.contains("--approved")
-          })
-      }
+      #expect(
+        next.contains {
+          $0.contains("triage --drop AC-1") && $0.contains("--approved")
+        })
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT status FROM task") } == "proposed")
     }

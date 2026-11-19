@@ -12,6 +12,8 @@ package struct DocEditRequest {
   package var allowSecret: Bool
   /// Copies the accepted owned body, mutually exclusive with supplied input.
   package var keepBody: Bool
+  /// The caller can resupply the input on stdin when retrying.
+  package var retryFromStdin = false
 
   /// Captures metadata without input or storage I/O. Validation follows authorization.
   package init(

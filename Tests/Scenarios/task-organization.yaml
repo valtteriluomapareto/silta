@@ -35,3 +35,12 @@ steps:
   - args: [task, show, AC-1, --json]
     env: {SILTA_ACTOR: 'agent:codex:later'}
     expect: {exit: 0, json: {data.title: Acme idea, data.priority: 1, data.external_ref: 'ado:42'}}
+  - args: [task, triage, --accept, AC-999, -F, absent.md, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 2, code: not_found}
+  - args: [task, add, Acme follow-up, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 0, json: {data.ref: AC-3, data.status: proposed}}
+  - args: [task, triage, --accept, AC-3, -F, absent.md, --json]
+    env: {SILTA_ACTOR: 'agent:codex:later'}
+    expect: {exit: 3, code: human_only, json: {error.next_by: human}}

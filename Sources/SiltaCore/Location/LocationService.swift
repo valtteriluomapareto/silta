@@ -175,9 +175,9 @@ package struct LocationService {
   }
 
   private func unregistered(path: URL, workspace: String?) -> CommandFailure {
-    let selection = workspace.map { " --ws " + shellWord($0) } ?? ""
-    return CommandFailure(
-      error: LocationError.unregistered,
-      next: ["silta" + selection + " init --scan " + shellWord(path.path)])
+    let next =
+      workspace.map { "silta --ws " + shellWord($0) + " ws show" }
+      ?? ("silta init --scan " + shellWord(path.path))
+    return CommandFailure(error: LocationError.unregistered, next: [next])
   }
 }

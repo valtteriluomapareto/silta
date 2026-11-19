@@ -190,11 +190,12 @@ package struct DocWriteService {
     }
     let base =
       "silta doc edit " + shellWord("doc:" + request.slug)
-      + flags(request)
+      + flags(request, stdin: request.retryFromStdin)
     return workspace.map { workspaceCommand(base, workspace: $0) } ?? base
   }
-  private func flags(_ request: DocEditRequest) -> String {
-    (request.keepBody ? " --keep-body" : " -F <file>")
+  private func flags(_ request: DocEditRequest, stdin: Bool = false) -> String {
+    let body = request.keepBody ? " --keep-body" : stdin ? " -F -" : " -F <file>"
+    return body
       + (request.title == nil ? "" : " --title <title>")
       + (request.kind == nil ? "" : " --kind <kind>")
       + (request.about == nil ? "" : " --about <ref>")

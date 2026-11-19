@@ -46,7 +46,7 @@ struct TaskRecoveryTests {
         ),
         (
           ["task", "done", "AC-1", "--force", "-m", "Acme done"], TaskCommandTests.actor,
-          "silta --ws 'acme' task done 'AC-1' --force -F <file>"
+          "silta --ws 'acme' task done 'AC-1' --force -F -"
         ),
       ] {
         let result = try SiltaBinary.run(

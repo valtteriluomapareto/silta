@@ -12,21 +12,24 @@ extension TaskService {
     let command =
       "silta task edit " + shellWord(ref)
       + (allowSecret ? " --allow-secret" : "")
+    let retry = command + " " + (retryBodyFlag ?? "-F <file>")
     let slug = try selected()
     let before = try show(ref)
     try validateClaim(before, workspace: slug, at: environment.clock.now())
     let needed = allowSecret || before.claimedBy != environment.actor.description
-    _ = try approval(required: needed, command: command + " -F <file>")
+    _ = try approval(required: needed, command: retry)
     let original = TaskEditDocument(before)
     guard let text = try input(original.render()) else { return (receipt(before), false) }
     let parsed = try TaskEditDocument.parse(text, from: before)
     if parsed == original {
-      return try unchangedEdit(before, allowSecret: allowSecret, command: command)
+      return try unchangedEdit(before, allowSecret: allowSecret, retry: retry)
     }
     try keepsBodies(parsed, original)
     let safe = try zip(parsed.values, original.values).map { value, old in
       value.utf8.elementsEqual(old.utf8)
-        ? (value, false) : try checked(value, allow: allowSecret, command: command + " -F <file>")
+        ? (value, false)
+        : try checked(
+          value, allow: allowSecret, command: retry)
     }
     let content = safeDocument(safe.map(\.0), from: before)
     let redacted = safe.contains { $0.1 }
@@ -35,7 +38,8 @@ extension TaskService {
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, workspace: slug, at: at)
       let required = allowSecret || task.claimedBy != environment.actor.description
-      let approval = try approval(required: required, command: command + " -F <file>")
+      let approval = try approval(
+        required: required, command: retry)
       try Self.compareEdit(task, before)
       guard content != original else { return (receipt(task), false) }
       try applyEdit(content, task: task, redacted: redacted, at: at, in: tx)
@@ -48,7 +52,7 @@ extension TaskService {
     }
   }
 
-  private func unchangedEdit(_ before: TaskDetails, allowSecret: Bool, command: String) throws
+  private func unchangedEdit(_ before: TaskDetails, allowSecret: Bool, retry: String) throws
     -> (result: TaskResult, approvalUsed: Bool)
   {
     let slug = try selected()
@@ -57,7 +61,7 @@ extension TaskService {
       let task = try Self.lookup(before.ref, workspace: slug, in: db)
       try validateClaim(task, workspace: slug, at: at)
       let required = allowSecret || task.claimedBy != environment.actor.description
-      _ = try approval(required: required, command: command + " -F <file>")
+      _ = try approval(required: required, command: retry)
       try Self.compareEdit(task, before)
       return (receipt(task), false)
     }
