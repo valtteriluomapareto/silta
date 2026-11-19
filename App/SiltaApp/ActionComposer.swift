@@ -10,6 +10,7 @@ struct ActionComposer: View {
   let sendTitle: String
   let command: AppCommand?
   var caption: String?
+  var cancel: (() -> Void)?
   let send: () -> Void
   @FocusState private var focused: Bool
 
@@ -47,6 +48,10 @@ struct ActionComposer: View {
             .lineLimit(1)
         }
         Spacer(minLength: 0)
+        if let cancel {
+          Button("Cancel", action: cancel).buttonStyle(.plain).font(.system(size: 13))
+            .foregroundStyle(Color("SecondaryInk")).keyboardShortcut(.cancelAction)
+        }
         if let command {
           CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
         }

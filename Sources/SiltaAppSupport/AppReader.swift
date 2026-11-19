@@ -24,6 +24,9 @@ public struct AppReader: Sendable {
     }
   }
 
+  /// The human the app acts as, such as `human:acme`.
+  public var human: String { environment.human.description }
+
   /// Lists workspaces without writing selection or command logs.
   public func workspaces() throws -> [AppWorkspace] {
     try Self.checked(home: environment.home.url) {
