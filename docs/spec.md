@@ -2553,7 +2553,7 @@ read metadata only and do not log or publish document content.
 | Migration | From a checked-in DB of every previous schema | Plus an older binary meeting a newer schema → exit 9 |
 | Scenarios | §20.1 | Run in `scripts/verify.sh full`, which CI runs on every PR |
 | Agent evals | §21 | Run on demand and before releases, not in every CI run |
-| Repository guards | `scripts/run-guards.sh`: core boundary, core determinism, core hygiene, `try?` reasons, coded errors, test waits, plan references in comments, package features, package graph, docs links, plans board | Each guard has a self-test that plants a violation (D17) |
+| Repository guards | `scripts/run-guards.sh`: app boundary, control release, app pins, core boundary, core determinism, core hygiene, `try?` reasons, coded errors, test waits, plan references in comments, package features, package graph, docs links, plans board | Each guard has a self-test that plants a violation (D17) |
 
 ### 20.1 Scripting contract and scenario runs
 

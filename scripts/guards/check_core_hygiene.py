@@ -21,7 +21,10 @@ MARKER = "guard:allow-global"
 MODIFIERS = r"(?:(?:public|package|internal|fileprivate|private|nonisolated(?:\(unsafe\))?|@\w+)\s+)*"
 STATIC_VAR = re.compile(r"\b(?:static|class)\s+" + MODIFIERS + r"var\b")
 TOP_LEVEL_VAR = re.compile(r"^" + MODIFIERS + r"var\b")
-OUTPUT = re.compile(r"(?<![\w.])(print|debugPrint|dump|NSLog)\s*\(")
+OUTPUT = re.compile(
+    r"(?<![\w.])(?:(?:Swift|Foundation|Darwin)\s*\.\s*)?"
+    r"(print|debugPrint|dump|NSLog|fputs|FileHandle\s*\.\s*standard(?:Error|Output)\s*\.\s*write)\s*\("
+)
 
 
 def is_stored(code_line: str) -> bool:

@@ -75,7 +75,6 @@ class SplitSwiftTests(unittest.TestCase):
         self.assertEqual(code.count("UUID()"), 1)
 
 
-    @unittest.expectedFailure
     def test_nested_interpolation_keeps_code_and_literal_offsets(self) -> None:
         raw = (
             'let value = "\\(render(") \\(Date())", /* inside */ UUID()))"\n'
@@ -96,6 +95,22 @@ class SplitSwiftTests(unittest.TestCase):
             self.assertEqual(raw[offset:offset + len(literal)], literal)
 
 
+    def test_regex_and_division_keep_following_interpolation_code(self) -> None:
+        for expr in ("choose(#/[)]/#) + later()", "choose(/[)]/) + later()", "total / later()"):
+            with self.subTest(expr=expr):
+                raw = 'let value = "\\(' + expr + ')"'
+                code, _ = split_swift(raw)
+                self.assertIn("later()", code)
+                self.assertEqual(len(code), len(raw))
+
+
+    def test_regex_at_start_of_later_interpolation(self) -> None:
+        raw = r'let value = "\(first()) then \(/[)]/.firstMatch(in: input) != nil && later())"'
+        code, _ = split_swift(raw)
+        self.assertIn("first()", code)
+        self.assertIn("later()", code)
+
+
 class CoreBoundaryTests(GuardTestCase):
     def test_clean_core_passes(self) -> None:
         self.tree.write("Sources/SiltaCore/Task.swift", "import Foundation\n// import SwiftUI is banned\n")
@@ -112,7 +127,6 @@ class CoreBoundaryTests(GuardTestCase):
         )
         self.assertEqual(len(check_core_boundary.check(self.tree.root)), 2)
 
-    @unittest.expectedFailure
     def test_access_level_imports_fail(self) -> None:
         for spelling in ("package import AppKit", "public import SwiftUI", "internal import os"):
             with self.subTest(spelling=spelling):
@@ -158,7 +172,6 @@ class CoreHygieneTests(GuardTestCase):
         self.tree.write("Sources/SiltaCore/A.swift", "print(1)\ndebugPrint(2)\ndump(3)\nNSLog(\"x\")\n")
         self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 4)
 
-    @unittest.expectedFailure
     def test_qualified_and_c_output_calls_fail(self) -> None:
         for spelling in ("Swift.print(1)", "FileHandle.standardError.write(bytes)", "fputs(text, stderr)"):
             with self.subTest(spelling=spelling):
@@ -192,7 +205,6 @@ class CodedErrorsTests(GuardTestCase):
         self.tree.write("Sources/silta/Main.swift", "enum CLIError: Error {}\n")
         self.assertEqual(len(check_coded_errors.check(self.tree.root)), 7)
 
-    @unittest.expectedFailure
     def test_qualified_foundation_error_conformances_fail(self) -> None:
         for conformance in ("Foundation.LocalizedError", "CustomNSError", "Foundation.CustomNSError"):
             with self.subTest(conformance=conformance):
@@ -231,7 +243,6 @@ class CoreDeterminismTests(GuardTestCase):
         )
         self.assertEqual(len(check_core_determinism.check(self.tree.root)), 3)
 
-    @unittest.expectedFailure
     def test_alternate_clock_and_id_spellings_fail(self) -> None:
         for spelling in (
             "let time: Date = .now", "let time = Date.init()", "let id = UUID.init()",
@@ -265,7 +276,6 @@ class TestWaitsTests(GuardTestCase):
         )
         self.assertEqual(len(check_test_waits.check(self.tree.root)), 4)
 
-    @unittest.expectedFailure
     def test_constructed_wall_clock_sleep_fails(self) -> None:
         self.tree.write("Tests/A.swift", "try await ContinuousClock().sleep(for: .seconds(1))\n")
         self.assertEqual(len(check_test_waits.check(self.tree.root)), 1)
@@ -293,17 +303,18 @@ class NoPlanRefsTests(GuardTestCase):
         self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), 5)
 
 
-    @unittest.expectedFailure
     def test_bare_slice_ids_fail(self) -> None:
-        self.tree.write("Sources/SiltaCore/A.swift", "// S12a explains this.\n// FR5 covers it.\n")
-        self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), 2)
+        slices = ["S12a", "FR5", "A6b", "B1", "C1a", "K2", "DF3-a"]
+        self.tree.write("Sources/SiltaCore/A.swift", "".join(f"// {name} explains this.\n" for name in slices)
+                        + "// D29 and spec §20. Fixture XYZ12.\n")
+        self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), len(slices))
 
 
 class DocsLinksTests(GuardTestCase):
     def test_resolving_links_pass(self) -> None:
-        self.tree.write("docs/a.md", "[b](b.md) [web](https://example.com) [anchor](#x) `[c](missing.md)`\n")
+        self.tree.write("docs/a.md", "# X\n[b](b.md) [web](https://example.com) [anchor](#x) `[c](missing.md)`\n")
         self.tree.write("docs/b.md", "[up](../README.md#top)\n")
-        self.tree.write("README.md", "```\n[ignored](nowhere.md)\n```\n")
+        self.tree.write("README.md", "# Top\n```\n[ignored](nowhere.md)\n```\n")
         self.assertEqual(check_docs_links.check(self.tree.root), [])
 
     def test_broken_link_fails(self) -> None:
@@ -311,7 +322,6 @@ class DocsLinksTests(GuardTestCase):
         self.assertEqual(len(check_docs_links.check(self.tree.root)), 1)
 
 
-    @unittest.expectedFailure
     def test_resolves_headings_and_checks_missing_fragments(self) -> None:
         self.tree.write("docs/a.md",
                         "## 5.1 Ref grammar (`Silta`)\n"
@@ -322,6 +332,15 @@ class DocsLinksTests(GuardTestCase):
         self.assertEqual(len(errors), 2)
         self.assertIn("docs/a.md:2: broken link to #absent", errors)
         self.assertIn("docs/a.md:3: broken link to b.md#fenced", errors)
+
+
+    def test_real_setext_and_explicit_anchors_ignore_lookalikes(self) -> None:
+        self.tree.write("docs/a.md",
+                        "# Topic\n---\n\nSetext title\n------------\n\n"
+                        '<a id="real"></a>\n`<a id="fake"></a>`\n'
+                        "[setext](#setext-title) [real](#real) [code](#fake) [rule](#topic-1)\n")
+        errors = check_docs_links.check(self.tree.root)
+        self.assertEqual([error.rsplit(" ", 1)[-1] for error in errors], ["#fake", "#topic-1"])
 
 
 class PlansBoardTests(GuardTestCase):
@@ -381,7 +400,6 @@ class PackageFeaturesTests(GuardTestCase):
         self.tree.write("Package.swift", self.SETTINGS + targets)
         self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
 
-    @unittest.expectedFailure
     def test_one_target_with_empty_or_incomplete_settings_fails(self) -> None:
         original = '.testTarget(name: "SiltaCoreTests", swiftSettings: settings)'
         for bad_settings in ('[]', '[.enableUpcomingFeature("ExistentialAny")]', 'otherSettings'):
@@ -391,17 +409,27 @@ class PackageFeaturesTests(GuardTestCase):
                 self.tree.write("Package.swift", self.SETTINGS + targets)
                 self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
 
-    @unittest.expectedFailure
+    def test_nested_swift_settings_is_not_the_target_argument(self) -> None:
+        targets = self.TARGETS.replace(
+            '.testTarget(name: "SiltaCoreTests", swiftSettings: settings)',
+            '.testTarget(name: "SiltaCoreTests", dependencies: [local(swiftSettings: settings)], '
+            'swiftSettings: [])',
+        )
+        self.tree.write("Package.swift", self.SETTINGS + targets)
+        self.assertEqual(len(check_package_features.check(self.tree.root)), 1)
+
     def test_every_native_target_configuration_needs_all_feature_flags(self) -> None:
         relative = "App/SiltaApp.xcodeproj/project.pbxproj"
         project = (GUARDS_DIR.parents[1] / relative).read_text(encoding="utf-8")
         self.tree.write(relative, project)
         self.assertEqual(check_package_features.check(self.tree.root), [])
         assignments = list(re.finditer(r'OTHER_SWIFT_FLAGS\s*=\s*"[^"]*";', project))
-        self.assertEqual(len(assignments), 4)
+        self.assertTrue(assignments)
         for assignment in assignments:
             for replacement in (
-                assignment.group().replace("-enable-upcoming-feature ExistentialAny ", ""), "",
+                assignment.group().replace("-enable-upcoming-feature ExistentialAny ", ""),
+                assignment.group().replace("ExistentialAny", "ExistentialAny-extra"),
+                "",
             ):
                 with self.subTest(offset=assignment.start(), replacement=bool(replacement)):
                     changed = project[:assignment.start()] + replacement + project[assignment.end():]

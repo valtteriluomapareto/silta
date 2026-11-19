@@ -27,7 +27,7 @@ export PATH="$(paste -sd: "$silta_tools/path"):$PATH"
 
 | Command | What it does | What it doesn't prove |
 |---|---|---|
-| `scripts/run-guards.sh` | Guard self-tests, then the repository guards: core boundary, determinism, test waits, plan references, core hygiene, `try?` reasons, coded errors, package features, package graph, docs links, plans board | That the code builds or behaves |
+| `scripts/run-guards.sh` | Guard self-tests, then the repository guards: app boundary, control release, app pins, core boundary, determinism, test waits, plan references, core hygiene, `try?` reasons, coded errors, package features, package graph, docs links, plans board | That the code builds or behaves |
 | `python3 -B -m unittest discover -s scripts/tests` | Guard self-tests: each guard passes a clean tree and fails a planted violation | — |
 | `scripts/lint-check.sh` | swift-format and SwiftLint in `--strict` mode, no changes | Behaviour |
 | `scripts/lint-fix.sh` | Apply swift-format and SwiftLint fixes | — |
