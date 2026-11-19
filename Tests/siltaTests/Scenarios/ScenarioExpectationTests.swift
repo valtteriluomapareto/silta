@@ -57,6 +57,16 @@ struct ScenarioExpectationTests {
     }
   }
 
+  @Test(arguments: [
+    "steps: []",
+    "steps:\n  - args: [schema, --json]\n    expect: {exit: 0, json: {}}",
+  ])
+  func scenariosCannotPassWithoutADeclaredStepOrWithAnEmptyJsonMatcher(yaml: String) {
+    withKnownIssue("#263: an empty scenario declaration can omit required checks") {
+      #expect(throws: ScenarioFailure.self) { try Scenario.decode(yaml) }
+    }
+  }
+
   @Test func transcriptKeepsStderr() throws {
     try withScratchDirectory { scratch in
       let file = scratch.appending(path: "stderr.yaml")
