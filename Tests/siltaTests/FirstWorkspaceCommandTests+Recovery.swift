@@ -11,7 +11,7 @@ extension FirstWorkspaceCommandTests {
       let repo = scratch.appending(path: directory)
       try InitCommandTests.makeRepo(repo, in: scratch)
       let listed = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch, cwd: repo)
-      let data = try TaskStateRegressionTests.data(listed)
+      let data = try TaskStateCommandTests.data(listed)
       let next = try #require((data["next"] as? [String])?.first)
       let result = try Self.replay(next, in: scratch, cwd: repo, json: true)
       let payload = try GuideContractTests.object(result.stdout)["data"] as? [String: Any]
@@ -40,7 +40,7 @@ extension FirstWorkspaceCommandTests {
       try FileManager.default.moveItem(at: original, to: moved)
       let result = try SiltaBinary.run(
         ["init", "--scan", ".", "--json"], in: scratch, cwd: newRoot)
-      let receipt = try TaskStateRegressionTests.data(result)
+      let receipt = try TaskStateCommandTests.data(result)
       let located = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: moved)
       let untouched = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: other)
       let movedData = try GuideContractTests.object(located.stdout)["data"] as? [String: Any]
@@ -68,7 +68,7 @@ extension FirstWorkspaceCommandTests {
       }
       for args in [["where"], ["init", "--scan", "."]] {
         let result = try SiltaBinary.run(args + ["--json"], in: scratch, cwd: repo)
-        let error = try TaskStateRegressionTests.error(result)
+        let error = try TaskStateCommandTests.error(result)
         #expect(error["next"] as? [String] == ["silta --ws 'acme' ws show"])
       }
       let scoped = try SiltaBinary.run(

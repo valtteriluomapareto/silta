@@ -10,7 +10,7 @@ struct AgentInstallPrivacyTests {
 
   static func check(_ result: CLIResult, exit: Int32 = 0) {
     #expect(result.termination == .exit(exit))
-    #expect(!(result.stdout + result.stderr).contains(AgentInstallRoundOneTests.sentinel))
+    #expect(!(result.stdout + result.stderr).contains(AgentInstallOwnershipTests.sentinel))
     #expect(!(result.stdout + result.stderr).contains("Acme-private-metadata"))
   }
 
@@ -20,7 +20,7 @@ struct AgentInstallPrivacyTests {
     else { return }
     for case let file as URL in files where file.pathExtension == "jsonl" {
       let log = try String(contentsOf: file, encoding: .utf8)
-      #expect(!log.contains(AgentInstallRoundOneTests.sentinel))
+      #expect(!log.contains(AgentInstallOwnershipTests.sentinel))
       #expect(!log.contains("Acme-private-metadata"))
     }
   }
@@ -32,7 +32,7 @@ struct AgentInstallPrivacyTests {
       }
       let owned = try AgentsInstallTests.read(path, in: scratch)
       try AgentsInstallTests.write(
-        AgentInstallRoundOneTests.sentinel + owned + AgentInstallRoundOneTests.sentinel,
+        AgentInstallOwnershipTests.sentinel + owned + AgentInstallOwnershipTests.sentinel,
         path, in: scratch)
     }
   }
@@ -40,7 +40,7 @@ struct AgentInstallPrivacyTests {
   @Test(arguments: modes)
   func successOutputsContainOnlyOwnedSpans(flags: [String]) throws {
     try withScratchDirectory { scratch in
-      let original = try AgentInstallRoundOneTests.seeded(scratch)
+      let original = try AgentInstallOwnershipTests.seeded(scratch)
       try Self.wrapInstructions(in: scratch)
       Self.check(try AgentsInstallTests.run(["install"] + flags, in: scratch))
       Self.check(try AgentsInstallTests.run(["install", "--dry-run"] + flags, in: scratch))
@@ -77,8 +77,8 @@ struct AgentInstallPrivacyTests {
         try AgentsInstallTests.run(["uninstall", "--apply", removalToken] + flags, in: scratch))
       #expect(
         try AgentsInstallTests.read(".codex/config.toml", in: scratch).hasSuffix(
-          "\n[private]\napi_key = \"\(AgentInstallRoundOneTests.sentinel)\"\n"))
-      #expect(original.contains(AgentInstallRoundOneTests.sentinel))
+          "\n[private]\napi_key = \"\(AgentInstallOwnershipTests.sentinel)\"\n"))
+      #expect(original.contains(AgentInstallOwnershipTests.sentinel))
       try Self.checkLogs(scratch)
     }
   }
@@ -97,7 +97,7 @@ struct AgentInstallPrivacyTests {
     } else if failure == "metadata" {
       try AgentInstallMetadataTests.protect("xattr", in: scratch)
     } else if failure == "utf8" {
-      try (Data([0xff]) + Data(AgentInstallRoundOneTests.sentinel.utf8)).write(
+      try (Data([0xff]) + Data(AgentInstallOwnershipTests.sentinel.utf8)).write(
         to: scratch.appending(path: "home/.codex/config.toml"))
     }
   }
@@ -107,7 +107,7 @@ struct AgentInstallPrivacyTests {
     ["stale", "edited", "invalid", "io", "utf8", "metadata", "busy", "override", "toml"])
   func failuresDoNotExposePrivateConfiguration(flags: [String], failure: String) throws {
     try withScratchDirectory { scratch in
-      _ = try AgentInstallRoundOneTests.seeded(scratch)
+      _ = try AgentInstallOwnershipTests.seeded(scratch)
       var environment =
         failure == "io"
         ? ["SILTA_HOME": scratch.appending(path: "silta-home/failure").path] : [:]

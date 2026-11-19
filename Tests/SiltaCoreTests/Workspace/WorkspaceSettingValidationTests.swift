@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.timeLimit(.minutes(1)))
-struct WorkspaceSettingsRegressionTests {
+struct WorkspaceSettingValidationTests {
   static let gloss =
     "review_gate must be none, any or human. "
     + "none: no gate; any: warn if latest review requests changes; "

@@ -6,7 +6,7 @@ import Testing
 
 /// State-machine, permanence and approval rules of the task commands, from the outside.
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
-struct TaskStateRegressionTests {
+struct TaskStateCommandTests {
   static let other = ["SILTA_ACTOR": "agent:codex:other"]
 
   static func run(
@@ -206,7 +206,7 @@ struct TaskStateRegressionTests {
 
 }
 
-extension TaskStateRegressionTests {
+extension TaskStateCommandTests {
   @Test func listSummaryKeepsLinksAndArchived() throws {
     try withScratchDirectory { scratch in
       _ = try TaskCommandTests.setup(scratch)

@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.timeLimit(.minutes(1)))
-struct TaskPlanReviewRegressionTests {
+struct TaskPlanIntegrityTests {
   static let secretPlan = "- [ ] Ship\nPwd=" + "acme-value"
 
   static func humanPlan(_ home: URL) async throws -> TaskService {
@@ -68,7 +68,7 @@ struct TaskPlanReviewRegressionTests {
   }
 }
 
-extension TaskPlanReviewRegressionTests {
+extension TaskPlanIntegrityTests {
   @Test func humanTickRetainsPlanAndImmutableSnapshot() async throws {
     try await withScratchDirectory { home in
       let service = try await Self.humanPlan(home)

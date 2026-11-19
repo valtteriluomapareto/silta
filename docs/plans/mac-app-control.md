@@ -4,7 +4,8 @@ Status: active
 
 ## Goal
 
-Validate the running app with an isolated Debug fixture. C1a shipped in #214.
+Validate the running app with an isolated Debug fixture. The shipped fixture
+launch, capture and action-driver slices are listed below.
 The [Mac app plan](mac-app.md#validation) explains what each validation layer proves.
 
 ## Fixture and offscreen output
@@ -189,14 +190,12 @@ Copy actions write only to the clipboard and the mailbox never executes copied c
 | Slice | Scope | Status |
 |---|---|---|
 | C1a / SI-152 / #178 | Isolated v2 launch, route selection, state JSON and offscreen PNG | Shipped in #214, with additional screens and snapshot parts in later PRs |
-| C1b / SI-153 / #178 | Driver, predicate waits, owned real-window capture and cleanup | Implemented in C1b |
-| C2 / SI-147 / #179 | Mailbox, shared UI handlers, sequence barriers, copy and fixture-write refresh | Implemented in C2 |
+| C1b / SI-153 / #178 | Driver, predicate waits, owned real-window capture and cleanup | Shipped in #245 |
+| C2 / SI-147 / #179 | Mailbox, shared UI handlers, sequence barriers, copy and fixture-write refresh | Shipped in #246 |
 
 Neither C1b nor C2 blocks screen PRs. Add fixture variants, state fields, routes
 and actions as screens need them. Keep one slice per PR and no grandchildren tasks.
 
-SI-146 remains the C1 implementation parent, doing and out of review until its
-implementation parts are complete. SI-152 and SI-153 track those parts; plan-only
-PR #186 belongs to SI-159. Give future plan-only PRs their own task. After merging
-an app PR, submit its task and report it ready for the human to close; never run
-`task done` or dogfood-finish for it.
+SI-146 tracks C1. SI-152 and SI-153 track its implementation parts, and plan-only
+PR #186 belongs to SI-159. Follow the [dogfooding workflow](../../AGENTS.md#dogfooding)
+for plan-only subtasks, submission before merge and completion after merge.

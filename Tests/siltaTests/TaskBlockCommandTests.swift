@@ -78,7 +78,7 @@ struct TaskBlockPrivacyCommandTests {
       let start = try run(["task", "start", "AC-1"])
       let unblock = try run(["task", "unblock", "AC-1"])
       #expect(start.termination == .exit(6) && unblock.termination == .exit(3))
-      let raw = try TaskStateRegressionTests.data(run(["task", "show", "AC-1", "--json"]))
+      let raw = try TaskStateCommandTests.data(run(["task", "show", "AC-1", "--json"]))
       let waiting = try #require(raw["waiting"] as? [String: Any])
       #expect(waiting["on"] as? [String] == [target])
       #expect(
@@ -91,7 +91,7 @@ struct TaskBlockPrivacyCommandTests {
         ("start", start, "blocked", "agent"), ("unblock", unblock, "human_only", "human"),
       ] {
         let receipt = try run(["task", action, "AC-1", "--json"])
-        let error = try TaskStateRegressionTests.error(receipt)
+        let error = try TaskStateCommandTests.error(receipt)
         #expect(receipt.termination == text.termination)
         #expect(error["code"] as? String == code && error["next_by"] as? String == actor)
         #expect((error["message"] as? String)?.contains(displayed) == true)

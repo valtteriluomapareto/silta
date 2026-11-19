@@ -139,10 +139,13 @@ quietly diverge.
 | `scripts/` | The verify ladder, lint, fixtures and dogfood scripts; `guards/` holds the repository guards, `tests/` their self-tests, and `ci/` the CI-only steps. Each script's header says how to run it |
 
 - **Folders by feature** inside `SiltaCore`: `Agents/`, `Brief/`, `Code/`,
-  `Comments/`, `Doctor/`, `Location/`, `Output/`, `Policy/`, `Storage/`, `Support/`,
-  `Tasks/`, `Workspace/`. A slice should touch mostly one folder.
-- **GRDB record conformances** live in `Storage/Records/` as extensions. Domain
-  types never import GRDB (D11).
+  `Comments/`, `Control/`, `Docs/`, `Doctor/`, `Export/`, `Location/`,
+  `Output/`, `Policy/`, `Sessions/`, `Storage/`, `Support/`, `Tasks/`
+  and `Workspace/`.
+- **Persistence** follows [D11](decisions.md#technology). Domain types stay free
+  of GRDB. Shared persistence and migrations live in `Storage/`. Feature-specific
+  record extensions and queries can live in `Storage/Records/` or in files beside
+  their feature whose storage responsibility is explicit.
 - **One primary type per file**, with the file named after it. Small private helpers
   may share the file.
 - **CLI commands** are named `<Noun><Verb>Command`, e.g. `TaskAddCommand`,
@@ -151,9 +154,9 @@ quietly diverge.
   feature folders. `siltaTests` is flat, because `Sources/silta` has no feature
   folders; its files group by name prefix (`Task…`, `Brief…`, `Where…`). Test types
   are named `<Subject>Tests`.
-- **Test files are named after their subject**, not after a review round or a
-  regression (`BriefRoundOneTests`, `TaskInputRegressionTests`). A split file of one
-  suite is `<Suite>+<Topic>.swift`, like `BriefCommandTests+Fixture.swift`.
+- **Test files are named after their subject**, for example `TaskInputCommandTests`.
+  A split file of one suite is `<Suite>+<Topic>.swift`, like
+  `BriefCommandTests+Fixture.swift`.
 
 ## 6. Tests (D26)
 

@@ -74,7 +74,7 @@ struct WhereOutputTests {
       let repo = scratch.appending(path: "fixtures/acme-detached")
       let result = try fixture.run(["--ws", "acme"], repo, scratch)
       #expect(result.termination == .exit(2))
-      let error = try TaskStateRegressionTests.error(result)
+      let error = try TaskStateCommandTests.error(result)
       let next = try #require(error["next"] as? [String])
       #expect(next == ["silta --ws 'acme' ws show"])
     }

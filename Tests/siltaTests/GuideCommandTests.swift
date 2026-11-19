@@ -20,9 +20,7 @@ struct GuideCommandTests {
         SiltaBinary.run(["guide", "human", "--json"], in: scratch))
       try #require(text.termination == .exit(0))
       #expect(json["text"] as? String == text.stdout)
-      withKnownIssue("#266: guide human omits accepted-document write gates") {
-        #expect(text.stdout.contains("`doc edit`") && text.stdout.contains("`doc archive`"))
-      }
+      #expect(text.stdout.contains("`doc edit`") && text.stdout.contains("`doc archive`"))
     }
   }
 

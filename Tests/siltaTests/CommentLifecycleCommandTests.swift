@@ -125,7 +125,7 @@ extension CommentLifecycleCommandTests {
       }
       let result = try run(true)
       #expect(result.termination == .exit(3))
-      let error = try TaskStateRegressionTests.error(result)
+      let error = try TaskStateCommandTests.error(result)
       let next = try #require((error["next"] as? [String])?.first)
       #expect(next.contains(" --allow-secret -F - "))
       let text = try run(false)

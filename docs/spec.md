@@ -30,10 +30,11 @@ models act most reliably on ordinary words.
 
 | Thing | Value |
 |---|---|
-| Product / app | Silta, `Silta.app` |
+| Product / development app | Silta, `Silta Dev.app` |
 | CLI | `silta` |
-| Bundle id, OSLog subsystem | `com.valtteriluoma.silta` |
-| Change notification | `com.valtteriluoma.silta.changed` |
+| Development app bundle ID | `fi.silta.mac.dev` |
+| Planned distribution bundle ID and OSLog subsystem | `com.valtteriluoma.silta` |
+| Planned M5 change notification | `com.valtteriluoma.silta.changed` |
 | Data directory | `~/.silta` (override: `SILTA_HOME`) |
 | Environment variables | `SILTA_HOME`, `SILTA_ACTOR`, `SILTA_SESSION`; for tests and scenarios: `SILTA_NOW`, `SILTA_ID_SEED`, `SILTA_SLOW_TESTS` (§20.1) |
 | Copyright | Valtteri Luoma |
@@ -142,8 +143,9 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
 - **One core, thin front-ends.** All rules live in `SiltaCore`, including brief
   rendering (text and JSON), because the hook, the CLI and the app all use it. The
   front-ends parse input, call a service with an actor, and render the result.
-- **Engine-free domain.** Domain types don't import GRDB. Record conformances live in
-  the storage layer as extensions, which keeps a later Postgres port possible.
+- **Engine-free domain.** Domain types stay free of GRDB and migrations stay
+  centralized. Storage can use feature-local record extensions and queries in
+  explicit persistence files. See [D11](decisions.md#technology).
 - **The database is the integration point.** The CLI and the app never talk to each
   other, and agents don't need the app running.
 - **One version.** From M5 the CLI ships inside the app bundle
@@ -225,7 +227,8 @@ reference each other by **foreign keys**; strings appear only for external thing
 
 ```sql
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-  -- 'min_writer_version', 'change_seq', 'last_backup_day'
+  -- 'min_writer_version', 'change_seq', 'last_backup_day', 'current_workspace'
+  -- current_workspace is the fallback workspace slug saved by ws use.
 
 CREATE TABLE workspace (
   id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -319,9 +322,10 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
   UNIQUE (task_id, rev));
 
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
-  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | discussion | secret_redacted
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | handoff | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
+  -- handoff: the comment ref when no claim was released.
   -- discussion: 'resolved <root-ref>', 'reopened <root-ref>' or 'accepted <answer-ref>', once per change.
   -- A comment's secret_redacted event body is that comment's ref, never its content.
 CREATE INDEX task_event_task ON task_event(task_id, kind);
@@ -1563,7 +1567,7 @@ settings (D39). It covers:
   `--reply-to`, naming the change and proving test. Authors do not resolve findings
   unless assigned that responsibility. M2 (not yet available): `inbox` → `inbox take`
   → `task diff` → one `task review` with a lines file → replies → batch `comment resolve`.
-  The current guide labels that future workflow unavailable.
+  The guide covers shipped commands. This spec carries the future workflow.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
   `--steal`, `where --set/--unset`, `task promote` or `--allow-secret` on your own initiative, only
   with the human's words through `--approved`. Never create tracker items, or plan
@@ -1694,7 +1698,7 @@ JSON contains compact `location` metadata, `settings`, optional `current_task`, 
 `sections` (`id` and trimmed `text`), `more` commands and a `truncated` boolean.
 Absent location app and branch values encode as `null`. Settings contains only
 supported non-default typed keys (`proposals`, `review_gate`, `archive_after_days`,
-`stale_days`). Unsupported keys or values are omitted and produce a per-key
+`stale_days`, `ask_about`). Unsupported keys or values are omitted and produce a per-key
 `setting_unsupported` warning with a secret-masked preview of at most 160 characters
 plus an ellipsis. Text includes a protected “settings unsupported” hint naming at
 most eight keys (40 characters each) and asking the human; further keys are counted. A malformed settings
@@ -2288,17 +2292,16 @@ Every CLI call is its own short-lived process, and several agents run at once.
 
 Swift 6.4 is installed and matches the existing personal projects (photo-export,
 poimi): Swift 6 language mode, Swift Testing, a pure domain package with a boundary
-script, swiftlint and swift-format. The SwiftUI app (M5) links the same `SiltaCore`.
+script, swiftlint and swift-format. The native SwiftUI app uses the same `SiltaCore` through `SiltaAppSupport`.
 
 Rust would win only if:
 - Windows teammates must run `silta` themselves, or
 - Turso becomes required.
 
-**Layout.** One Swift package (swift-tools 6.2, Swift 6 mode, macOS 15+) with the
-`SiltaCore`, `silta` and `SiltaTestSupport` targets and the `SiltaCoreTests` and
-`siltaTests` test targets. What each target and folder holds is in
-[coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). The repository also contains `Evals/`, the agent evaluation suite (§21, S16),
-and the native `App/SiltaApp.xcodeproj` viewer with `SiltaAppSupport` and its tests.
+**Layout.** The Swift package uses Swift tools 6.2, Swift 6 mode and a macOS 15
+deployment floor. [Coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25)
+maps the targets and folders, including the native `App/SiltaApp.xcodeproj` project
+and `Evals/` (§21).
 
 **Native viewer.** The app owns its route, typed task/connection/document selection
 and each route's inspector flag. Its Docs reader has a separate loader keyed on
@@ -2315,7 +2318,8 @@ These projections do not change CLI JSON.
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
 
 **Distribution:**
-- Before M5: `swift build -c release`, copied to `~/.local/bin/silta`.
+- For development, the [combined installer](getting-started.md#2-install-the-cli)
+  builds Silta Dev and the CLI and installs them separately.
 - From M5: the CLI is embedded in `Silta.app` (`com.valtteriluoma.silta`), signed with
   your personal Developer ID team, as Photo Export's GitHub release is. It's not
   sandboxed, because it runs `git` in arbitrary repos.
@@ -2869,7 +2873,7 @@ steps, questions, handoffs and results.
 
 | Stage | Starts after | What Silta is used for |
 |---|---|---|
-| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the slice's task by the issue's `url:` link in `silta task ls --proposed --promoted --archived --json` (imported tasks are proposals until the human triages them, promoted tasks are hidden otherwise, and closed tasks archive after 14 days) and runs `silta task start <ref>`; a `proposed` task first needs the human's `task triage --accept`. Only if no task links the issue, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, ticking each step as it finishes, and runs `task submit <ref>` when its PR is open for review. The PR description ends with the draft result and its `Friction:` line. Whoever merges the PR pulls `main` and finishes the task from the main checkout with `task done <ref> --sha <squash commit> -F -` and a heredoc, never a result file in the repo, then posts the result on the issue and closes it (D41). |
+| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | One task per slice in the `silta` workspace, linked to its issue. See the [current dogfooding workflow](../AGENTS.md#dogfooding) for claiming, submitting and finishing it (D41). |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
 | **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
 | **DF3: a real second workspace** | S13 and S11's inbox ([DF3 plan](plans/df3-real-workspace.md)) | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |

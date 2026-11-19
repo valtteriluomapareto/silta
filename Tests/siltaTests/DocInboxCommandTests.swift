@@ -14,11 +14,11 @@ struct DocInboxCommandTests {
       let result = try run(args + (json ? ["--json"] : []), scratch)
       #expect(result.termination == .exit(0) && result.stderr.isEmpty)
       Golden.forTests().check(result.stdout, "inbox-docs.\(json ? "json" : "txt")")
-      let data = try TaskStateRegressionTests.data(run(args + ["--json"], scratch))
+      let data = try TaskStateCommandTests.data(run(args + ["--json"], scratch))
       let items = try #require(data["items"] as? [[String: Any]])
       let group = try #require(items.first?["doc_proposal"] as? [String: Any])
       #expect(group["total"] as? Int == 3 && group["omitted"] as? Int == 1)
-      let schema = try TaskStateRegressionTests.data(run(["schema", "inbox", "--json"], scratch))
+      let schema = try TaskStateCommandTests.data(run(["schema", "inbox", "--json"], scratch))
       let commands = try #require(schema["commands"] as? [[String: Any]])
       #expect(ShapeCheck.violations(of: data, against: try #require(commands.first?["data"])) == [])
       let next = try #require(items.first?["next"] as? [String])
@@ -40,7 +40,7 @@ struct DocInboxCommandTests {
   @Test func schemaAndHelpNameConcreteDocumentGroups() throws {
     try withScratchDirectory { scratch in
       #expect(try run(["inbox", "--help"], scratch).stdout.contains("document proposals"))
-      let data = try TaskStateRegressionTests.data(run(["schema", "inbox", "--json"], scratch))
+      let data = try TaskStateCommandTests.data(run(["schema", "inbox", "--json"], scratch))
       let commands = try #require(data["commands"] as? [[String: Any]])
       let shape = try #require(commands.first?["data"] as? [String: Any])
       let object = try #require(shape["object"] as? [String: Any])

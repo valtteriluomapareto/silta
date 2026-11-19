@@ -4,7 +4,7 @@ import GRDB
 import SiltaTestSupport
 import Testing
 
-struct DoctorRoundTwoTests {
+struct DoctorRecoveryTests {
   private let now = StorageSchemaTests.instant
 
   private func inspect(_ home: URL) async -> DoctorReport {

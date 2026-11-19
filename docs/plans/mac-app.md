@@ -1,4 +1,4 @@
-# Silta for Mac: a read-only viewer
+# Silta for Mac: views and navigation
 
 Status: active
 
@@ -6,9 +6,9 @@ Status: active
 
 A native macOS 26 app shows the human what waits on them, what agents are doing, the
 workspace map and its docs. It is the human's own surface (D38), built the way spec
-§4.1 and §17 describe the M5 app: it links `SiltaCore` and reads through the same
-services as the CLI. The first version is read-only. Each action is a ref or a command
-the human copies.
+§4.1 and §17 describe the app. It links `SiltaCore` and uses the same services as
+the CLI. This plan covers reading, navigation and copyable refs and commands.
+The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
 
 ## Inputs
 
@@ -153,17 +153,16 @@ the human copies.
 
 Delivery order is My work, Board, Workspace, then Docs: one screen per PR. A6a is the
 one cross-screen exception, because it restyles the shared shell.
-Use a short `task plan` and implementation reviews following
-[AGENTS.md Reviews](../../AGENTS.md#dogfooding) and the
-[persona-review skill](../../skills/persona-review/SKILL.md). Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
+Follow the [workflow](../../AGENTS.md#workflow) and [review rules](../../AGENTS.md#reviews).
+Use the test-first flow for logic and view-model tests for SwiftUI layout.
 No planted faults except for guard tests. Split only when a diff substantially
 exceeds about 1,000 lines. Add navigation, observable state and development hooks
 only when a screen needs them. The minimal [control support](mac-app-control.md)
 provides isolated fixtures, versioned model state and offscreen root PNGs. The
 terminal driver waits on model state and can capture a real owned window when
-Screen Recording and the window session permit. Live actions are a separate slice.
-Merge main only for a conflict or a needed landed change. After merging, submit
-the task and report which tasks the maintainer can close; do not mark them done.
+Screen Recording and the window session permit. The control plan also covers
+live fixture actions. Follow the [dogfooding workflow](../../AGENTS.md#dogfooding)
+to submit the task before merge and finish it after merge.
 
 ## Validation
 

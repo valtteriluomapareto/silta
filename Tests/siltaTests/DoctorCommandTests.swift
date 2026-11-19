@@ -72,7 +72,7 @@ struct DoctorCommandTests {
       try Data("{broken\n".utf8).write(to: file)
       let result = try SiltaBinary.run(
         ["doctor", "--install", "--json"], in: scratch, environment: environment)
-      let data = try TaskStateRegressionTests.data(result)
+      let data = try TaskStateCommandTests.data(result)
       let checks = try #require(data["checks"] as? [[String: Any]])
       for id in ["install.claude.session_start", "install.claude.last_stop"] {
         #expect(try AgentHealthTests.check(id, in: checks)["status"] as? String == "skipped")

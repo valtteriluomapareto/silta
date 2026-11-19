@@ -6,7 +6,7 @@ import Testing
 
 /// Refusals that name what they refer to and point at a command the caller can run.
 @Suite(.timeLimit(.minutes(1)))
-struct TaskOutputRegressionTests {
+struct TaskDiagnosticTests {
   private static func json(_ error: any CodedError) throws -> [String: Any] {
     let line = OutputRouter.render(.failure(error), mode: OutputMode(json: true)).stdout
     let object = try #require(

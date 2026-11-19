@@ -231,7 +231,7 @@ extension ApprovalCommandTests {
           ["ws", "edit", "-F", path, "--approved", "Apply.", "--json"], in: scratch,
           environment: TaskCommandTests.actor)
         #expect(result.termination == .exit(1))
-        let error = try TaskStateRegressionTests.error(result)
+        let error = try TaskStateCommandTests.error(result)
         #expect(error["code"] as? String == "invalid")
         #expect(error["next"] as? [String] == ["silta --ws 'acme' ws edit --help"])
         #expect(error["next_by"] as? String == "agent")

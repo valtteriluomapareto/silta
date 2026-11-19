@@ -57,7 +57,7 @@ struct ProposalCommandTests {
       try "Acme detail".write(to: file, atomically: true, encoding: .utf8)
       let next: String
       if json {
-        let error = try TaskStateRegressionTests.error(result)
+        let error = try TaskStateCommandTests.error(result)
         next = try #require((error["next"] as? [String])?.first)
       } else {
         let prefix = "ask human: "
@@ -133,8 +133,8 @@ struct ProposalCommandTests {
         "--json",
       ])
       #expect(approved.termination == .exit(0))
-      #expect(try TaskStateRegressionTests.data(approved)["status"] as? String == "todo")
-      #expect(try TaskStateRegressionTests.warnings(approved) == ["approval_unused"])
+      #expect(try TaskStateCommandTests.data(approved)["status"] as? String == "todo")
+      #expect(try TaskStateCommandTests.warnings(approved) == ["approval_unused"])
       #expect(try count("approval") == 0)
       let handoff = try run(["comment", "AC-1", "--kind", "handoff", "-m", "Paused."])
       #expect(handoff.termination == .exit(0))

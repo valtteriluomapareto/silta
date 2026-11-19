@@ -183,7 +183,7 @@ extension WorkspaceLocationTests {
       let missingFile = try Self.run(
         ["ws", "edit", "-F", "missing", "--approved", "Edit workspace", "--json"], scratch, repo)
       #expect(missingFile.termination == .exit(1))
-      let invalidInput = try TaskStateRegressionTests.error(missingFile)
+      let invalidInput = try TaskStateCommandTests.error(missingFile)
       #expect(invalidInput["code"] as? String == "invalid")
       #expect(invalidInput["next"] as? [String] == ["silta ws edit --help"])
       #expect(try Self.lastLog(scratch)["workspace"] == nil)

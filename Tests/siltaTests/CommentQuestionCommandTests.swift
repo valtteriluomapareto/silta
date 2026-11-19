@@ -48,14 +48,14 @@ struct CommentQuestionCommandTests {
       let reply = try run(
         ["comment", "AC-1", "--reply-to", "AC-1/2", "-m", "Thanks @me.", "--json"], third)
       #expect(reply.termination == .exit(0))
-      #expect(try TaskStateRegressionTests.data(reply)["reply_to"] as? String == "AC-1/1")
-      #expect(try TaskStateRegressionTests.data(reply)["mentions"] as? [String] == ["human:acme"])
+      #expect(try TaskStateCommandTests.data(reply)["reply_to"] as? String == "AC-1/1")
+      #expect(try TaskStateCommandTests.data(reply)["mentions"] as? [String] == ["human:acme"])
       try Self.checkPrivateLogs(scratch)
     }
   }
 
   static func checkAnswer(_ answer: CLIResult) throws {
-    let value = try TaskStateRegressionTests.data(answer)
+    let value = try TaskStateCommandTests.data(answer)
     #expect(value["reply_to"] as? String == "AC-1/1")
     #expect(value["from"] as? String == "note:notes/acme.md")
     #expect(value["mentions"] as? [String] == ["agent:codex:acme"])

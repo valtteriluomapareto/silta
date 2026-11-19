@@ -74,14 +74,14 @@ struct CommentCorrectionCommandTests {
         (failure["error"] as? [String: Any])?["next"] as? [String] == [
           "silta --ws 'acme' task show 'AC-1' --timeline"
         ])
-      let data = try TaskStateRegressionTests.data(run(["task", "show", "AC-1", "--json"]))
+      let data = try TaskStateCommandTests.data(run(["task", "show", "AC-1", "--json"]))
       let posts = try #require(data["comments"] as? [[String: Any]])
       #expect(posts.first?["answered"] as? Bool == true)
       _ = try run(["comment", "accept", "AC-1/2"])
       let shown = try run(["task", "show", "AC-1"])
       #expect(shown.stdout.contains("1 resolved thread (see --timeline)"))
       Golden.forTests().check(shown.stdout, "task-show-resolved.txt")
-      let resolved = try TaskStateRegressionTests.data(run(["task", "show", "AC-1", "--json"]))
+      let resolved = try TaskStateCommandTests.data(run(["task", "show", "AC-1", "--json"]))
       #expect(resolved["resolved_threads"] as? Int == 1)
       let wrong = try run(["comment", "delete", "AC-1/2", "--json"], foreign: true)
       #expect(!wrong.stdout.contains("comment resolve"))
@@ -131,7 +131,7 @@ extension CommentCorrectionCommandTests {
           + (file ? ["-F", path.path] : ["-m", body]), in: scratch,
         environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(0))
-      let data = try TaskStateRegressionTests.data(result)
+      let data = try TaskStateCommandTests.data(result)
       #expect(data["body"] as? String == body && data["mentions"] as? [String] == [])
     }
   }

@@ -6,21 +6,21 @@ import Testing
 
 /// When task commands need the human's go-ahead, and what their approval rows record.
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
-struct TaskApprovalRegressionTests {
-  static let other = TaskStateRegressionTests.other
+struct TaskApprovalCommandTests {
+  static let other = TaskStateCommandTests.other
 
   private static func run(
     _ arguments: [String], in scratch: URL, as actor: [String: String] = TaskCommandTests.actor
   ) throws -> CLIResult {
-    try TaskStateRegressionTests.run(arguments, in: scratch, as: actor)
+    try TaskStateCommandTests.run(arguments, in: scratch, as: actor)
   }
 
   private static func error(_ result: CLIResult) throws -> [String: Any] {
-    try TaskStateRegressionTests.error(result)
+    try TaskStateCommandTests.error(result)
   }
 
   private static func warnings(_ result: CLIResult) throws -> [String] {
-    try TaskStateRegressionTests.warnings(result)
+    try TaskStateCommandTests.warnings(result)
   }
 
   @Test func triageStateAndInputShapeComeBeforeApprovalOrBodyReads() throws {

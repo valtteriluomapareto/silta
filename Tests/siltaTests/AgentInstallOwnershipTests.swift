@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-struct AgentInstallRoundOneTests {
+struct AgentInstallOwnershipTests {
   static let sentinel = "Acme-private-round-one-sentinel"
   static let path = ".codex/config.toml"
 

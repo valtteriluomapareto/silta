@@ -31,9 +31,9 @@ Silta is usable every day:
 - **GitHub** records the same dependencies as "blocked by" links, and the slices are
   sub-issues of #1.
 
-**How to work a slice:** pick any open slice whose blockers are closed. Record its
-plan in the place required by the current [dogfooding stage](../../AGENTS.md#dogfooding)
-and get it reviewed (`skills/persona-review`) before coding.
+**How to work a slice:** pick an open slice whose blockers are closed. Follow the
+[workflow](../../AGENTS.md#workflow) for planning and review and the current
+[dogfooding stage](../../AGENTS.md#dogfooding) for recording the work.
 
 **Shared files** need coordination, and their owner is named:
 - `Package.swift`: S1

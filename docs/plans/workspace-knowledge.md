@@ -314,8 +314,8 @@ Then move the lasting rules into spec §5.1, §6, §9, §12, §15 and Appendix A
 - Reviews of task diffs, line comments, review requests and the review gate: their
   own plan after this one.
 - Indexing external sources, `silta search` and `[[ref]]` parsing (M3).
-- `agent_doc_writes: direct`, a changes digest and `doc revert`: until DF3 shows
-  review fatigue. The setting stays at `propose`.
+- Direct agent writes to accepted docs, a changes digest and `doc revert` are
+  deferred pending DF3 evidence. See the [workspace document policy](../spec.md#9-docs).
 - Docs attached to environments; environment runbooks attach to their app.
 - Map proposals (`ws propose`): deferred until DF3's E5 shows map gaps waiting on
   an absent human. The map changes through `ws edit` as today.

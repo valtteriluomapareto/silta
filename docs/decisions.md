@@ -46,11 +46,16 @@ They're summarised here so every decision has one index.
       failure leaves an unflushed name. No preparation provenance or recursive
       directory cleanup is needed.
 - **D4: CLI only, `--json` everywhere.** No MCP server and no daemon.
+  - ↳ update (2026-11-19): The native development app gives the human a second
+    front-end to the same Core services (D50).
 - **D5: Agent writes are gated.** Unsolicited tasks start as `proposed`, doc edits are
   proposals, and some commands are human-only. Since D38, an agent runs those with
   the human's quoted go-ahead.
   - ↳ update (D39): with `proposals: ask`, an agent's unsolicited task needs the
     human's go-ahead in chat instead of triage.
+  - ↳ update (2026-11-19): Agents submit document changes with `doc propose`.
+    Accepting revisions, editing accepted docs and archiving docs use the existing
+    human gate. See [workspace document policy](spec.md#9-docs) and D38.
 - **D6: Silta resolves "where am I"** from cwd, branch, upstream and claimed task.
   - ↳ 2026-11-19: An unborn branch uses its branch name with an empty JSON head.
     The existing field types and pre-distance selection rules are retained (§7).
@@ -70,6 +75,12 @@ They're summarised here so every decision has one index.
   - Targets: `SiltaCore` (library), `silta` (executable), and later `SiltaApp`.
   - macOS 15+.
   - Domain types don't import GRDB; record conformances live in the storage layer.
+  - ↳ update (2026-11-19): Domain types remain free of GRDB, and migrations stay
+    centralized in `SiltaCore/Storage/`. Feature-specific persistence may live
+    next to the feature in files with an explicit storage responsibility.
+    Silta Dev uses the same Core. See the
+    [development installer requirements](getting-started.md#1-requirements) for
+    the combined build and [spec §17](spec.md#17-storage-concurrency-technology) for the package floor.
 - **D12: SQLite through GRDB**, using the system SQLite.
   - Need (2026-11-02): many short-lived Swift writer processes with full-text search.
     PostgreSQL offers Finnish search and sharing but needs a server; it is the planned
@@ -618,6 +629,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     prompts; S7 needed eight relays and no decisions. Such a run never uses
     `--approved`: relayed words don't count (D38), so it names human-only commands
     and the coordinating agent asks for them in chat and runs them itself.
+  - ↳ update (2026-11-19): The [current merge workflow](../AGENTS.md#dogfooding)
+    applies to app and CLI slices. It covers finishing from the verified merge and
+    using a separate task for a plan-only PR.
 
 ## Agent harness evidence (2026-11-05)
 

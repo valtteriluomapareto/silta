@@ -1,11 +1,12 @@
 # Building Silta with Silta
 
 Setup was completed with the maintainer on 2026-11-04, which started DF0. Rerun
-these steps only for a new machine or a fresh `~/.silta`. The maintainer does not
-run CLI commands.
+these steps only for a new machine or a fresh `~/.silta`. The maintainer normally
+works through an agent during repository dogfooding.
 
-The scripts need `/usr/bin/jq`, which ships with macOS 15 or later. The import
-also needs `gh` 2.48 or later, for `gh api --slurp`.
+Follow the [development installer requirements](../getting-started.md#1-requirements).
+The scripts use system `jq`. Issue import also needs `gh` 2.48 or later for
+`gh api --slurp`.
 
 ## Setup with an agent
 

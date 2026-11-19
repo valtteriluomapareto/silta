@@ -54,7 +54,7 @@ struct WorkspaceCommandTests {
         #expect(shown.stdout.contains("acme\tAcme Projects  Work Team\tAC\n"))
       }
       let result = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
-      let data = try TaskStateRegressionTests.data(result)
+      let data = try TaskStateCommandTests.data(result)
       let workspaces = try #require(data["workspaces"] as? [[String: Any]])
       #expect(workspaces.first?["name"] as? String == name)
     }

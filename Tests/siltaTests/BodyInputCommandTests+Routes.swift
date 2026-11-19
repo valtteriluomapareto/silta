@@ -114,7 +114,7 @@ extension BodyInputCommandTests {
         ["--ws", "acme", "ws", "edit", "-F", source.path, "--json"],
         in: scratch, environment: TaskCommandTests.fixed)
       #expect(result.termination == .exit(3))
-      #expect(try TaskStateRegressionTests.error(result)["code"] as? String == "human_only")
+      #expect(try TaskStateCommandTests.error(result)["code"] as? String == "human_only")
       #expect(try Self.storedInput(in: store) == before)
     }
   }
@@ -133,7 +133,7 @@ extension BodyInputCommandTests {
           Route.docEdit.arguments(source.path) + ["--json"], in: scratch,
           environment: TaskCommandTests.fixed)
         #expect(result.termination == .exit(1))
-        let error = try TaskStateRegressionTests.error(result)
+        let error = try TaskStateCommandTests.error(result)
         #expect(error["message"] as? String == message)
         #expect(try Self.storedInput(in: store) == before)
       }
@@ -174,7 +174,7 @@ extension BodyInputCommandTests {
           command + ["--json"], in: scratch, environment: TaskCommandTests.fixed)
         let text = try SiltaBinary.run(command, in: scratch, environment: TaskCommandTests.fixed)
         #expect(json.termination == .exit(1) && text.termination == .exit(1))
-        let error = try TaskStateRegressionTests.error(json)
+        let error = try TaskStateCommandTests.error(json)
         #expect(error["code"] as? String == "invalid")
         #expect(error["next"] as? [String] == [help])
         #expect(text.stderr.contains("next: " + help))

@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
-struct TaskPlanDeleteRegressionTests {
+struct TaskPlanSourceSafetyTests {
   @Test(arguments: [":(literal)plan.md", "plan[1].md", ":(glob)plan[ab].md"])
   func trackedPathspecNamesSurviveWithoutWrites(name: String) throws {
     try withScratchDirectory { scratch in
@@ -71,7 +71,7 @@ struct TaskPlanDeleteRegressionTests {
   }
 }
 
-extension TaskPlanDeleteRegressionTests {
+extension TaskPlanSourceSafetyTests {
   @Test func earlyHumanOnlyRetryPreservesRevisionWithoutReadingTheFile() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
@@ -96,7 +96,7 @@ extension TaskPlanDeleteRegressionTests {
   }
 }
 
-extension TaskPlanDeleteRegressionTests {
+extension TaskPlanSourceSafetyTests {
   // A tick adds no text, so --allow-secret has nothing to allow.
   @Test func tickRefusesAllowSecretBeforeStorage() throws {
     try withScratchDirectory { scratch in
@@ -119,7 +119,7 @@ extension TaskPlanDeleteRegressionTests {
   }
 }
 
-extension TaskPlanDeleteRegressionTests {
+extension TaskPlanSourceSafetyTests {
   @Test func nestedSeparateGitMetadataSurvivesWithoutWrites() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
@@ -148,7 +148,7 @@ extension TaskPlanDeleteRegressionTests {
   }
 }
 
-extension TaskPlanDeleteRegressionTests {
+extension TaskPlanSourceSafetyTests {
   @Test func nestedTrackedSourceSurvivesAnEnclosingWorktreeImport() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
