@@ -68,9 +68,7 @@ package enum TaskError: CodedError, Equatable {
 
   /// `what` as a message shows it: secrets masked, control characters as spaces.
   package static func shown(_ what: String) -> String {
-    SecretGuard.redacted(what).unicodeScalars.map {
-      CharacterSet.controlCharacters.contains($0) ? " " : String($0)
-    }.joined()
+    HumanText.line(what)
   }
 
   /// Maps task failures to the scripting contract.
@@ -94,7 +92,7 @@ package enum TaskError: CodedError, Equatable {
   package var message: String {
     switch self {
     case .blocked(let ref, let waiting):
-      "\(ref) is blocked, waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d."
+      "\(ref) is blocked, waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.map(HumanText.line).joined(separator: ", ")) for \(waiting.ageDays) d."
         + (waiting.dropped.isEmpty ? "" : " Blocker dropped: re-plan.")
     case .promoted(let ref, let external): "\(ref) is read-only; work in tracker \(external)."
     case .blockedPromotion(let ref, _): "\(ref) is blocked; unblock it before promoting it."
@@ -130,7 +128,7 @@ package enum TaskError: CodedError, Equatable {
     case .git: "Git could not report the task's worktree or commit; ask a human to check git."
     case .foreignRepo: "Use a worktree and commit from the task's registered repository."
     case .outsideAppRepo(let app, let repo, let origin):
-      "App \(app) lives in \(repo)"
+      "App \(app) lives in \(HumanText.line(repo))"
         + (origin.map { " (\($0))" } ?? "")
         + "; run this from that repository, or pass --app none for non-code work."
     case .gate: "A human approval is required; ask a human to approve or use done --force."

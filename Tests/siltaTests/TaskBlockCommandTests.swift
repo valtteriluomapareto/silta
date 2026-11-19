@@ -57,6 +57,51 @@ struct TaskBlockCommandTests {
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct TaskBlockPrivacyCommandTests {
+  @Test func storedBlockerLabelsStayWithinTheirDisplayLine() throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      func run(_ args: [String], later: Bool = false) throws -> CLIResult {
+        var environment = TaskBlockCommandTests.environment
+        if later { environment["SILTA_NOW"] = "2023-11-19T22:13:20.000Z" }
+        return try SiltaBinary.run(["--ws", "acme"] + args, in: scratch, environment: environment)
+      }
+      let target = "url:https://acme.example/check\u{2028}one"
+      let displayed = "url:https://acme.example/check one"
+      try #require(run(["task", "add", "Acme work", "--start"]).termination == .exit(0))
+      try #require(
+        run([
+          "task", "block", "AC-1", "--on", target, "--follow-up", "2023-11-15",
+          "-m", "Awaiting Acme’s answer",
+        ]).termination == .exit(0))
+      let show = try run(["task", "show", "AC-1"])
+      let inbox = try run(["inbox", "--for", "me"], later: true)
+      let start = try run(["task", "start", "AC-1"])
+      let unblock = try run(["task", "unblock", "AC-1"])
+      #expect(start.termination == .exit(6) && unblock.termination == .exit(3))
+      let raw = try TaskStateRegressionTests.data(run(["task", "show", "AC-1", "--json"]))
+      let waiting = try #require(raw["waiting"] as? [String: Any])
+      #expect(waiting["on"] as? [String] == [target])
+      #expect(
+        show.stdout.contains("Waiting on " + displayed)
+          && inbox.stdout.contains("waiting on: " + displayed)
+          && start.stderr.contains("waiting on " + displayed)
+          && unblock.stderr.contains(displayed)
+          && !(show.stdout + inbox.stdout + start.stderr + unblock.stderr).contains("\u{2028}"))
+      for (action, text, code, actor) in [
+        ("start", start, "blocked", "agent"), ("unblock", unblock, "human_only", "human"),
+      ] {
+        let receipt = try run(["task", action, "AC-1", "--json"])
+        let error = try TaskStateRegressionTests.error(receipt)
+        #expect(receipt.termination == text.termination)
+        #expect(error["code"] as? String == code && error["next_by"] as? String == actor)
+        #expect((error["message"] as? String)?.contains(displayed) == true)
+        let next = try #require(error["next"] as? [String])
+        let prefix = actor == "human" ? "ask human: " : "next: "
+        #expect(text.stderr.hasSuffix(next.map { prefix + $0 + "\n" }.joined()))
+      }
+    }
+  }
+
   @Test func explicitWorkspaceFileInputAndSafeOutput() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)

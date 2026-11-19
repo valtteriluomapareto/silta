@@ -33,7 +33,8 @@ package enum ActorError: CodedError {
       if open.isEmpty {
         return gone.isEmpty ? "\(ref) waits on an answer" : "\(ref) has \(gone)"
       }
-      return "\(ref) waits on \(open.joined(separator: ", "))" + (gone.isEmpty ? "" : " (\(gone))")
+      return "\(ref) waits on \(open.map(HumanText.line).joined(separator: ", "))"
+        + (gone.isEmpty ? "" : " (\(gone))")
     }
   }
 

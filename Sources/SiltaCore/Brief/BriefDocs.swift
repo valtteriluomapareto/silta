@@ -88,14 +88,10 @@ struct BriefDocs {
     """
 
   private static func summary(_ body: String) -> String {
-    let lines = SecretGuard.redacted(body).split(whereSeparator: \.isNewline).map {
+    let lines = HumanText.body(body).split(whereSeparator: \.isNewline).map {
       $0.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     let first = lines.first { !$0.isEmpty && $0.firstMatch(of: /^#{1,6}(?:\s|$)/) == nil } ?? ""
-    let line = first.map { character in
-      character.unicodeScalars.allSatisfy { CharacterSet.controlCharacters.contains($0) }
-        ? " " : String(character)
-    }.joined()
-    return String(line.prefix(120))
+    return String(first.replacingOccurrences(of: "\t", with: " ").prefix(120))
   }
 }

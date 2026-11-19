@@ -31,6 +31,29 @@ struct WorkspaceCommandTests {
     }
   }
 
+  @Test func workspaceNamesStayWithinTheirTerminalColumn() throws {
+    try withScratchDirectory { scratch in
+      let store = DatabaseStore(
+        home: scratch.appending(path: "silta-home"),
+        clock: FakeClock(now: Date(timeIntervalSince1970: 1_700_000_000)), jitter: { 0 })
+      let name = "Acme\u{1b}Projects\u{7}\u{2028}Work\tTeam"
+      try store.write {
+        try $0.database.execute(
+          sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme',?,'AC')",
+          arguments: [name])
+      }
+      for flags in [[], ["--quiet"]] {
+        let shown = try SiltaBinary.run(["ws", "ls"] + flags, in: scratch)
+        #expect(shown.termination == .exit(0))
+        #expect(shown.stdout.contains("acme\tAcme Projects  Work Team\tAC\n"))
+      }
+      let result = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      let data = try TaskStateRegressionTests.data(result)
+      let workspaces = try #require(data["workspaces"] as? [[String: Any]])
+      #expect(workspaces.first?["name"] as? String == name)
+    }
+  }
+
   @Test func unapprovedAgentCannotReadWorkspaceInput() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(

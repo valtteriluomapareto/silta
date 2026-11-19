@@ -16,8 +16,9 @@ extension DocProposalPreviewGroup {
     var lines: [String] = []
     for member in members {
       lines += [
-        "> ref: " + member.ref, "> title: " + member.title, "> kind: " + member.kind,
-        "> why: " + member.why, "> source: " + member.sourceTask, "> " + member.summary,
+        "> ref: " + HumanText.line(member.ref), "> title: " + HumanText.line(member.title),
+        "> kind: " + HumanText.line(member.kind), "> why: " + HumanText.line(member.why),
+        "> source: " + HumanText.line(member.sourceTask), "> " + HumanText.line(member.summary),
       ]
     }
     if omitted > 0 {

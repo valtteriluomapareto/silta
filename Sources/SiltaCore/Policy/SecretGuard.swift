@@ -58,10 +58,14 @@ package enum SecretGuard {
     redacted(text, matches: matches(in: text))
   }
 
-  static func redacted(_ text: String, matches: [SecretMatch]) -> String {
+  static func redacted(
+    _ text: String, matches: [SecretMatch], preservingLineFeeds: Bool = false
+  ) -> String {
     var output = text
     for match in matches.reversed() {
-      output.replaceSubrange(match.range, with: match.replacement)
+      let breaks = preservingLineFeeds ? text[match.range].utf8.count { $0 == 10 } : 0
+      output.replaceSubrange(
+        match.range, with: match.replacement + String(repeating: "\n", count: breaks))
     }
     return output
   }

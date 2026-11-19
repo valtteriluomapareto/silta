@@ -1,6 +1,8 @@
 #if DEBUG
   import Foundation
   @testable import SiltaApp
+  import SwiftUI
+  import Synchronization
   @testable import SiltaAppSupport
   import Testing
 
@@ -134,6 +136,49 @@
       ] {
         #expect(lines.contains { $0.text == value && $0.kind == kind })
       }
+    }
+
+    @Test func markdownLinksShowAndProtectTheirActualDestinations() throws {
+      let address = "https://example.test/docs?q=one"
+      let source = """
+        [Local reference](file:///acme/inert)
+
+        [**Acme** documentation](\(address))
+
+        [Relative reference](/acme/notes)
+
+        `[Sample](https://example.test/sample)`
+        """
+      let blocks = MarkdownContent(source).blocks
+      let local = try #require(blocks.first { String($0.text.characters) == "Local reference" })
+      #expect(local.text.runs.compactMap(\.link).isEmpty)
+      let relative = try #require(
+        blocks.first { String($0.text.characters) == "Relative reference" })
+      #expect(relative.text.runs.compactMap(\.link).isEmpty)
+      let allowed = try #require(
+        blocks.first { String($0.text.characters).hasPrefix("Acme documentation") })
+      #expect(Set(allowed.text.runs.compactMap { $0.link?.absoluteString }) == [address])
+      #expect(String(allowed.text.characters) == "Acme documentation (\(address))")
+      let sample = try #require(blocks.first { String($0.text.characters).hasPrefix("[Sample]") })
+      #expect(sample.text.runs.compactMap(\.link).isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func sharedLinkActionChecksTheActualDestination() async throws {
+      let opened = Mutex<[URL]>([])
+      let action = DocumentMarkdown.linkAction { url in
+        opened.withLock { $0.append(url) }
+        return .handled
+      }
+      let accepted = ["https://example.test/docs", "http://example.test/read"]
+      let rejected = ["file:///acme/inert", "acme:reference", "https:reference", "/acme/notes"]
+      for address in accepted + rejected {
+        let url = try #require(URL(string: address))
+        let handled = await withCheckedContinuation { continuation in
+          action(url) { continuation.resume(returning: $0) }
+        }
+        #expect(handled == accepted.contains(address))
+      }
+      #expect(opened.withLock { $0.map(\.absoluteString) } == accepted)
     }
 
     @Test func markdownTablesAndDiffRemainReadable() {

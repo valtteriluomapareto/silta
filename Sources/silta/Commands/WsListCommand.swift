@@ -27,7 +27,8 @@ struct WsListCommand: OutputCommand {
       return CommandOutput(
         text: text, quiet: text, data: WsListData(workspaces: [], next: [next], nextBy: "agent"))
     }
-    let text = workspaces.map { "\($0.slug)\t\($0.name)\t\($0.taskPrefix)" }.joined(separator: "\n")
+    let text = workspaces.map { "\($0.slug)\t\(HumanText.line($0.name))\t\($0.taskPrefix)" }.joined(
+      separator: "\n")
     return CommandOutput(
       text: text, quiet: text, data: WsListData(workspaces: workspaces, next: nil, nextBy: nil))
   }

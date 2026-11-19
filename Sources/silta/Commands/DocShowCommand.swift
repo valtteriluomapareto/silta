@@ -27,7 +27,7 @@ struct DocShowCommand: OutputCommand {
       .show(
         ref, revision: rev, lines: lines, diff: diff, comments: comments, offset: offset,
         limit: limit)
-    return CommandOutput(text: result.output, quiet: result.output, data: result).reporting(
-      workspace)
+    let text = HumanText.framed(result.output)
+    return CommandOutput(text: text, quiet: text, data: result).reporting(workspace)
   }
 }

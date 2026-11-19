@@ -35,12 +35,36 @@ nonisolated struct MarkdownContent {
         }
         let prefix = ordinal.map { kinds.contains(.orderedList) ? "\($0)." : "•" }
         return Block(
-          id: offset, text: AttributedString(parsed[range]), header: header,
+          id: offset, text: Self.checkedLinks(AttributedString(parsed[range])), header: header,
           code: code, prefix: prefix)
       }
     } catch {
       blocks = [Block(id: 0, text: AttributedString(source), header: nil, code: false, prefix: nil)]
     }
+  }
+
+  /// Returns the exact absolute destination accepted by rendering and activation.
+  static func destination(for url: URL) -> String? {
+    guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+      let host = url.host(), !host.isEmpty
+    else { return nil }
+    return url.absoluteString
+  }
+
+  private static func checkedLinks(_ text: AttributedString) -> AttributedString {
+    var output = AttributedString()
+    for (url, range) in text.runs[\.link] {
+      var run = AttributedString(text[range])
+      if let url {
+        if let destination = destination(for: url) {
+          run.append(AttributedString(" (\(destination))"))
+        } else {
+          run.link = nil
+        }
+      }
+      output.append(run)
+    }
+    return output
   }
 
   private static func readableTables(_ source: String) -> String {

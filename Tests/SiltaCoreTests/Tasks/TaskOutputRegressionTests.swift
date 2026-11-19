@@ -14,6 +14,18 @@ struct TaskOutputRegressionTests {
     return try #require(object["error"] as? [String: Any])
   }
 
+  @Test func wrongRepositoryDiagnosticKeepsItsClonePathOnOneLine() throws {
+    let error = TaskError.outsideAppRepo(
+      "api", repo: "/acme/Local\u{2028}Work/api", origin: "inherited from AC-3")
+    let text = OutputRouter.render(.failure(error), mode: OutputMode(json: false))
+    let json = try Self.json(error)
+    #expect(
+      text.stderr.contains("App api lives in /acme/Local Work/api (inherited from AC-3)")
+        && (json["message"] as? String)?.contains("/acme/Local Work/api") == true)
+    #expect(text.exitCode == 1 && json["code"] as? String == "invalid")
+    #expect(json["next"] as? [String] == error.next)
+  }
+
   @Test func notFoundNamesTheRefAndItsRole() async throws {
     try await withScratchDirectory { home in
       let service = try TaskOrganizationTests.service(home)
