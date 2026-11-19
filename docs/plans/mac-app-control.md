@@ -40,7 +40,9 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
   AppSidebar. With Board or Workspace's inspector open, it writes `inspector.png`
   from the real task, connection, app or service inspector. These filenames are reserved;
   choose a different name for the root PNG. Parts use the same model and logical
-  height, at 240 and 360 points wide, with active control appearance.
+  height, at 240 and 340 points wide, with active control appearance. The inspector is
+  a card inside the detail column, so the root PNG shows it too; `inspector.png` keeps
+  it on its own for close reading.
 - Render the real AppShellView in an offscreen NSHostingView, using
   `bitmapImageRepForCachingDisplay` and `cacheDisplay`. Do not use ImageRenderer:
   it cannot draw the native split view, lists or inspectors. This path shows

@@ -27,8 +27,7 @@ struct NodeInspector: View {
           ContentUnavailableView("Select an app or a service", systemImage: "sidebar.right")
         }
       }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
-    }.seaPane().padding(10).foregroundStyle(Color("Ink"))
-      .background { ShoreBackground() }
+    }.seaPane().foregroundStyle(Color("Ink"))
   }
 
   @ViewBuilder private func appDetail(_ app: AppMapApp) -> some View {

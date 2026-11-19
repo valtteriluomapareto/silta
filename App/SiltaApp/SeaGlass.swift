@@ -107,3 +107,24 @@ struct SeaSegments<Value: Hashable>: View {
       .accessibilityElement(children: .contain).accessibilityLabel(label)
   }
 }
+
+extension View {
+  /// Shows an inspector as a Sea glass card beside the content, inside the window's
+  /// shore, rather than as a system inspector column with its own background.
+  func seaInspector<Inspector: View>(
+    isPresented: Bool, @ViewBuilder inspector: () -> Inspector
+  ) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      if isPresented {
+        inspector().frame(width: SeaInspectorMetrics.width).padding(.bottom, 12)
+          .transition(.move(edge: .trailing).combined(with: .opacity))
+      }
+    }.animation(.smooth(duration: 0.2), value: isPresented)
+  }
+}
+
+/// The inspector card's fixed width, from the Paper design.
+enum SeaInspectorMetrics {
+  static let width: CGFloat = 340
+}
