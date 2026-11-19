@@ -114,7 +114,10 @@ nonisolated struct WorkspaceMapGeometry {
       let left = lastColumn[source] == true
       let side = left ? from.minX : from.maxX
       let start = CGPoint(x: side, y: from.midY - 20 - slot * min(6, 18 / spacing))
-      let out = 12 + CGFloat(stacked - 1) * Self.dropPitch + slot * min(8, 18 / spacing)
+      // Clamped so a very tall column still drops inside its gap.
+      let out = min(
+        12 + CGFloat(stacked - 1) * Self.dropPitch + slot * min(8, 18 / spacing),
+        Self.columnGap - 24)
       let gap = CGPoint(x: left ? side - out : side + out, y: start.y)
       let down = CGPoint(x: gap.x, y: floor)
       return [.line(start, gap), .line(gap, down), bend(from: down)]

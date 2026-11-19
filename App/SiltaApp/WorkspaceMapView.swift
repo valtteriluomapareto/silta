@@ -33,7 +33,7 @@ struct WorkspaceMapView: View {
             if let point = geometry.route(
               from: edge.connection.source, to: edge.connection.target, back: edge.back,
               lane: edge.lane, lanes: edge.lanes
-            ).labelPoint(toService: edge.toService) {
+            ).labelPoint(toService: edge.toService, lane: edge.lane, lanes: edge.lanes) {
               label(edge, content: content).position(point)
             }
           }
@@ -225,10 +225,15 @@ struct WorkspaceMapView: View {
 }
 
 extension [WorkspaceMapGeometry.Curve] {
-  /// Where an edge's label sits: the middle of its middle segment, or of the final bend
-  /// for a line to a service, so labels of one app's lines don't stack in its gap.
-  func labelPoint(toService: Bool = false) -> CGPoint? {
+  /// Where an edge's label sits: the middle of its middle segment. A line to a service
+  /// labels its final bend; one that drops down a column gap labels its drop instead,
+  /// staggered by slot, so the labels of one app's lines don't stack.
+  func labelPoint(toService: Bool = false, lane: Int = 0, lanes: Int = 1) -> CGPoint? {
     guard let last else { return nil }
-    return toService ? last.midpoint : self[count / 2].midpoint
+    guard toService else { return self[count / 2].midpoint }
+    guard count == 3 else { return last.midpoint }
+    let drop = self[1]
+    let share = CGFloat(lane + 1) / CGFloat(lanes + 1)
+    return CGPoint(x: drop.start.x, y: drop.start.y + (drop.end.y - drop.start.y) * share)
   }
 }

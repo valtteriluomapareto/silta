@@ -340,6 +340,7 @@
       }
       var starts: Set<String> = []
       var labels: Set<String> = []
+      var points: [(AppConnection, CGPoint)] = []
       for edge in content.edges where edge.toService {
         let curves = geometry.route(
           from: edge.connection.source, to: edge.connection.target, back: false,
@@ -347,7 +348,10 @@
         let start = "\(curves[0].start)"
         #expect(
           !others.contains(start) && starts.insert(start).inserted, "\(edge.connection.attachment)")
-        if let label = curves.labelPoint(toService: true) { labels.insert("\(label)") }
+        if let label = curves.labelPoint(toService: true, lane: edge.lane, lanes: edge.lanes) {
+          labels.insert("\(label)")
+          points.append((edge.connection, label))
+        }
         for curve in curves {
           for step in 0...20 {
             let point = Self.point(curve, at: CGFloat(step) / 20)
@@ -363,6 +367,14 @@
         }
       }
       #expect(labels.count == content.edges.filter(\.toService).count)
+      // Labels shown together, for one selected app or one selected service, keep apart.
+      for (one, first) in points {
+        for (other, second) in points where one.attachment < other.attachment {
+          guard one.source == other.source || one.target == other.target else { continue }
+          let apart = abs(first.x - second.x) >= 48 || abs(first.y - second.y) >= 18
+          #expect(apart, "\(one.attachment) and \(other.attachment) labels overlap")
+        }
+      }
     }
   }
 #endif

@@ -49,9 +49,9 @@ public struct AppMapLayout: Equatable, Sendable {
       }
     }
     let serviceColumn = (column.values.max() ?? -1) + 1
-    let services = map.services.map { "service:" + $0.slug }.sorted()
+    let services = map.services.map(\.key).sorted()
     var attachments = Dictionary(uniqueKeysWithValues: map.apps.map { ($0.slug, $0.attachment) })
-    for service in map.services { attachments["service:" + service.slug] = service.attachment }
+    for service in map.services { attachments[service.key] = service.attachment }
     for service in services { column[service] = serviceColumn }
 
     var callers: [String: Set<String>] = [:]

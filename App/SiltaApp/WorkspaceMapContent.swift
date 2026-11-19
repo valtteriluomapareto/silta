@@ -89,7 +89,7 @@ nonisolated struct WorkspaceMapContent {
     }
     for service in map.services
     where matches([service.slug, service.name, service.summary ?? "", service.attachment]) {
-      kept.insert("service:" + service.slug)
+      kept.insert(service.key)
     }
     for edge in map.connections
     where matches([edge.attachment, edge.target, edge.kind, edge.summary] + edge.codeReferences) {

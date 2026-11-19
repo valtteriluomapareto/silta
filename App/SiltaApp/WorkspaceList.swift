@@ -142,11 +142,15 @@ struct WorkspaceList: View {
           }
           FlowLayout(spacing: 6) {
             ForEach(row.uses, id: \.attachment) { edge in
-              connectionButton(edge, name: String(edge.target.dropFirst("service:".count)))
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .overlay(
-                  RoundedRectangle(cornerRadius: 7).strokeBorder(
-                    Color("Ink").opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
+              connectionButton(
+                edge,
+                name: map.services.first { $0.key == edge.target }?.name
+                  ?? String(edge.target.dropFirst("service:".count))
+              )
+              .padding(.horizontal, 8).padding(.vertical, 3)
+              .overlay(
+                RoundedRectangle(cornerRadius: 7).strokeBorder(
+                  Color("Ink").opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
             }
           }
         }
