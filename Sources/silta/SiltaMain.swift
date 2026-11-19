@@ -262,6 +262,9 @@ enum SiltaMain {
       }
     }
     let suffix = target.map { " " + shellWord($0) } ?? ""
+    if case .invalid(_, true) = error as? WorkspaceError {
+      return (target == nil ? [] : ["silta ws show" + suffix]) + error.next
+    }
     let repair = "silta ws edit" + suffix + " -F <file> --approved \"<the human's words>\""
     if target != nil, error.code == .invalid || error.code == .conflict {
       return ["silta ws show" + suffix, repair]

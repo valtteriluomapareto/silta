@@ -2,8 +2,9 @@ import Foundation
 
 /// Configuration failures include every validation problem from one document.
 package enum WorkspaceError: CodedError {
-  /// The YAML document does not meet the workspace contract.
-  case invalid([String])
+  /// The YAML document does not meet the workspace contract. An invalid subpath
+  /// can be diagnosed from read-only commands.
+  case invalid([String], hasInvalidSubpath: Bool = false)
 
   /// A safely rendered stored value cannot be used for the requested policy.
   case setting(String, key: String, value: String)
@@ -47,7 +48,7 @@ package enum WorkspaceError: CodedError {
   /// Explains the failure without exposing database diagnostics.
   package var message: String {
     switch self {
-    case .invalid(let problems): problems.joined(separator: "; ")
+    case .invalid(let problems, _): problems.joined(separator: "; ")
     case .setting(let workspace, let key, let value):
       "Workspace \(TaskError.shown(workspace)) setting \(key) has invalid stored value \(Self.preview(value))."
     case .unknownSetting(let workspace, let key, let value):
@@ -76,6 +77,7 @@ package enum WorkspaceError: CodedError {
     case .docAttachments(_, _, _, let commands, _): commands
     case .notFound, .unknown: ["silta ws ls"]
     case .ambiguous(let workspaces): workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
+    case .invalid(_, true): ["silta ws edit --help"]
     case .input: ["silta ws edit -F <file>"]
     default: ["silta ws edit"]
     }

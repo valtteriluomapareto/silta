@@ -16,6 +16,13 @@ package enum CodeRead: Sendable {
   static let showLimit = 400
   /// `grep` prints at most this many matching lines (spec §10).
   static let grepLimit = 200
+  static let byteLimit = 1024 * 1024
+
+  func contentCapture() throws -> GitCapture {
+    guard case .show(_, let lines) = self else { return .init(byteLimit: Self.byteLimit) }
+    return try .init(
+      byteLimit: Self.byteLimit, skipLines: (lineRange(lines)?.lowerBound ?? 1) - 1)
+  }
 
   var verb: String {
     switch self {
@@ -36,9 +43,7 @@ package enum CodeRead: Sendable {
   func validate(subpath: String = "") throws {
     let command = "silta code \(verb)"
     for value in [path, subpath] {
-      guard !value.hasPrefix("/"), !value.contains("\0"),
-        !value.split(separator: "/").contains("..")
-      else {
+      guard isGitRelativePath(value) else {
         throw CodeError.invalid("Use an app-relative path without .. components.", command: command)
       }
     }
@@ -100,57 +105,6 @@ package enum CodeRead: Sendable {
     return ["--attr-source=" + sha] + read
   }
 
-  /// Formats git's output and says when it was cut or a line selection ran past the end.
-  func formatted(_ text: String, sha: String, subpath: String, unreadable: CodeError) throws
-    -> (output: String, warnings: [OutputWarning])
-  {
-    switch self {
-    case .grep:
-      return try grepOutput(text, sha: sha, subpath: Self.normalized(subpath), unreadable)
-    case .list:
-      let output = text.split(separator: "\0").map { entry in
-        let fields = entry.split(separator: "\t", maxSplits: 1)
-        let tree = fields.first?.split(separator: " ").dropFirst().first == "tree"
-        return Self.shownPath(String(fields.last ?? "") + (tree ? "/" : "")) + "\n"
-      }
-      return (output.joined(), [])
-    case .log: return (text, [])
-    case .show(let path, let selection):
-      let lines = text.components(separatedBy: "\n")
-      let count = text.isEmpty ? 0 : text.utf8.last == 10 ? lines.count - 1 : lines.count
-      let range: ClosedRange<Int>
-      let warnings: [OutputWarning]
-      if let selected = try lineRange(selection) {
-        range = selected
-        warnings =
-          selected.upperBound <= count
-          ? []
-          : [
-            .init(
-              code: "lines_past_eof",
-              message:
-                "\(path.debugDescription) has \(count) line\(count == 1 ? "" : "s"); "
-                + "--lines \(selection ?? "") goes past the end.")
-          ]
-      } else if count > Self.showLimit {
-        range = 1...Self.showLimit
-        warnings = [
-          .init(
-            code: "output_truncated",
-            message:
-              "Output cut after \(Self.showLimit) of \(count) lines; "
-              + "read the rest with --lines \(Self.showLimit + 1)-\(count).")
-        ]
-      } else {
-        return (text, [])
-      }
-      let output = lines.prefix(count).enumerated().filter { range.contains($0.offset + 1) }.map {
-        $0.element + ($0.offset < lines.count - 1 ? "\n" : "")
-      }
-      return (output.joined(), warnings)
-    }
-  }
-
   /// Repeats this read for `target` as a shell-quoted command.
   ///
   /// A literal path may begin with `-`, and an option after `--` would be read as a
@@ -173,7 +127,9 @@ package enum CodeRead: Sendable {
   }
 
   static func normalized(_ path: String) -> String {
-    path.split(separator: "/").filter { $0 != "." }.joined(separator: "/")
+    path.utf8.split(separator: 47)
+      .filter { !$0.elementsEqual([46]) }
+      .map { Self.text($0) }.joined(separator: "/")
   }
 
   /// Decodes committed bytes as UTF-8, replacing invalid sequences with U+FFFD, so a
@@ -201,9 +157,9 @@ package enum CodeRead: Sendable {
   }
 
   private func grepOutput(
-    _ text: String, sha: String, subpath: String, _ unreadable: CodeError
+    _ result: GitResult, sha: String, subpath: String, _ unreadable: CodeError
   ) throws -> (output: String, warnings: [OutputWarning]) {
-    let bytes = Array(text.utf8)
+    let bytes = result.stdout
     let prefix = sha + ":" + (subpath.isEmpty ? "" : subpath + "/")
     var offset = 0
     var output = ""
@@ -211,8 +167,12 @@ package enum CodeRead: Sendable {
     while offset < bytes.count {
       guard let pathEnd = bytes[offset...].firstIndex(of: 0),
         let numberEnd = bytes[(pathEnd + 1)...].firstIndex(of: 0)
-      else { throw unreadable }
+      else {
+        if result.stdoutTruncated { break }
+        throw unreadable
+      }
       let lineEnd = bytes[(numberEnd + 1)...].firstIndex(of: 10) ?? bytes.count
+      if result.stdoutTruncated, lineEnd == bytes.count { break }
       let path = CodeRead.text(bytes[offset..<pathEnd])
       guard path.hasPrefix(prefix) else { throw unreadable }
       matches += 1
@@ -225,6 +185,7 @@ package enum CodeRead: Sendable {
       }
       offset = lineEnd + 1
     }
+    if result.stdoutTruncated { return (output, [byteWarning]) }
     guard matches > Self.grepLimit else { return (output, []) }
     return (
       output,
@@ -236,5 +197,87 @@ package enum CodeRead: Sendable {
             + "narrow it with a pathspec or a narrower pattern.")
       ]
     )
+  }
+}
+
+extension CodeRead {
+  /// Formats complete records, distinguishing a capture limit from real EOF.
+  func formatted(_ result: GitResult, sha: String, subpath: String, unreadable: CodeError) throws
+    -> (output: String, warnings: [OutputWarning])
+  {
+    switch self {
+    case .grep:
+      return try grepOutput(result, sha: sha, subpath: Self.normalized(subpath), unreadable)
+    case .list:
+      let entries = Self.completeRecords(result, delimiter: 0).split(separator: "\0")
+      let output = entries.map { entry in
+        let fields = entry.split(separator: "\t", maxSplits: 1)
+        let tree = fields.first?.split(separator: " ").dropFirst().first == "tree"
+        return Self.shownPath(String(fields.last ?? "") + (tree ? "/" : "")) + "\n"
+      }
+      return (output.joined(), result.stdoutTruncated ? [byteWarning] : [])
+    case .log:
+      return (
+        Self.completeRecords(result, delimiter: 10),
+        result.stdoutTruncated ? [byteWarning] : []
+      )
+    case .show:
+      return try showOutput(result)
+    }
+  }
+
+  private func showOutput(_ result: GitResult) throws -> (String, [OutputWarning]) {
+    guard case .show(let path, let selection) = self else { return ("", []) }
+    let text = Self.completeRecords(result, delimiter: 10)
+    let lines = text.components(separatedBy: "\n")
+    let count = text.isEmpty ? 0 : text.utf8.last == 10 ? lines.count - 1 : lines.count
+    let end = result.stdoutSkippedLines + count
+    if let range = try lineRange(selection) {
+      let warnings: [OutputWarning]
+      if range.upperBound <= end {
+        warnings = []
+      } else if result.stdoutTruncated {
+        warnings = [byteWarning]
+      } else {
+        warnings = [
+          .init(
+            code: "lines_past_eof",
+            message:
+              "\(path.debugDescription) has \(end) line\(end == 1 ? "" : "s"); "
+              + "--lines \(selection ?? "") goes past the end.")
+        ]
+      }
+      let output = lines.prefix(count).enumerated().filter {
+        range.contains(result.stdoutSkippedLines + $0.offset + 1)
+      }.map { $0.element + ($0.offset < lines.count - 1 ? "\n" : "") }
+      return (output.joined(), warnings)
+    }
+    let output =
+      count > Self.showLimit ? lines.prefix(Self.showLimit).joined(separator: "\n") + "\n" : text
+    if result.stdoutTruncated { return (output, [byteWarning]) }
+    guard count > Self.showLimit else { return (output, []) }
+    let warning = OutputWarning(
+      code: "output_truncated",
+      message:
+        "Output cut after \(Self.showLimit) of \(count) lines; "
+        + "read the rest with --lines \(Self.showLimit + 1)-\(count).")
+    return (output, [warning])
+  }
+
+  private static func completeRecords(_ result: GitResult, delimiter: UInt8) -> String {
+    guard result.stdoutTruncated else { return text(result.stdout) }
+    guard let last = result.stdout.lastIndex(of: delimiter) else { return "" }
+    return text(result.stdout[...last])
+  }
+
+  private var byteWarning: OutputWarning {
+    let hint: String
+    switch self {
+    case .show: hint = "Choose a smaller or later range with --lines A-B."
+    case .grep: hint = "Narrow it with a pathspec or a narrower pattern."
+    case .log: hint = "Use a smaller -n or specify a path."
+    case .list: hint = "Specify a subdirectory."
+    }
+    return .init(code: "output_truncated", message: "Git output exceeded 1 MiB. " + hint)
   }
 }

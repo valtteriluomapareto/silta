@@ -112,7 +112,8 @@ package struct CodeService {
   ) async throws -> (output: String, warnings: [OutputWarning]) {
     try await requirePath(operation, sha: sha, selection: selection, target: target)
     let result = try await run(
-      operation.arguments(sha: sha, subpath: selection.subpath), selection, operation)
+      operation.arguments(sha: sha, subpath: selection.subpath), selection, operation,
+      capture: operation.contentCapture())
     if result.termination != .exit(0) {
       switch operation {
       case .grep where result.termination == .exit(1): break
@@ -122,7 +123,7 @@ package struct CodeService {
       }
     }
     return try operation.formatted(
-      CodeRead.text(result.stdout), sha: sha, subpath: selection.subpath,
+      result, sha: sha, subpath: selection.subpath,
       unreadable: failure(selection))
   }
 
@@ -130,14 +131,28 @@ package struct CodeService {
   private func requirePath(
     _ operation: CodeRead, sha: String, selection: Selection, target: String
   ) async throws {
-    let path = CodeRead.normalized(selection.subpath + "/" + operation.path)
+    let subpath = CodeRead.normalized(selection.subpath)
+    guard
+      try await kind(of: subpath, sha: sha, selection: selection, operation: operation)
+        == "tree"
+    else {
+      throw CodeError.notFound(
+        "App subpath \(selection.subpath.debugDescription) not found at selected commit.",
+        next: ["silta --ws \(shellWord(workspace)) ws show"])
+    }
+    let leaf = CodeRead.normalized(operation.path)
     let expected: Substring
     switch operation {
     case .show: expected = "blob"
-    case .list where !path.isEmpty: expected = "tree"
+    case .list where !leaf.isEmpty: expected = "tree"
     default: return
     }
-    let found = try await kind(of: path, sha: sha, selection: selection, operation: operation)
+    let path = subpath.isEmpty ? leaf : subpath + "/" + leaf
+    let found =
+      leaf.isEmpty
+      ? "tree"
+      : try await kind(
+        of: path, sha: sha, selection: selection, operation: operation)
     guard found != expected else { return }
     let shown = operation.path.debugDescription
     let other = { (read: CodeRead) in
@@ -153,17 +168,8 @@ package struct CodeService {
         "Path \(shown) is a file at the selected commit.",
         next: [other(.show(operation.path, lines: nil))])
     default:
-      let subpath = CodeRead.normalized(selection.subpath)
-      guard !subpath.isEmpty,
-        try await kind(of: subpath, sha: sha, selection: selection, operation: operation)
-          != "tree"
-      else {
-        throw CodeError.notFound(
-          "Path \(shown) not found at selected commit.", next: [other(.list(nil))])
-      }
       throw CodeError.notFound(
-        "App subpath \(selection.subpath.debugDescription) not found at selected commit.",
-        next: ["silta --ws \(shellWord(workspace)) ws show"])
+        "Path \(shown) not found at selected commit.", next: [other(.list(nil))])
     }
   }
 
@@ -195,14 +201,16 @@ package struct CodeService {
   /// read even beside an explicit `--format`, and an invalid value fails the read, so it
   /// is pinned.
   private func run(
-    _ arguments: [String], _ selection: Selection, _ operation: CodeRead
+    _ arguments: [String], _ selection: Selection, _ operation: CodeRead,
+    capture: GitCapture? = nil
   ) async throws -> GitResult {
     let result: GitResult
     do {
       result = try await git.run(
         .init(
           arguments: ["--no-pager", "-c", "format.pretty=medium"] + arguments,
-          directory: URL(filePath: selection.path, directoryHint: .isDirectory)))
+          directory: URL(filePath: selection.path, directoryHint: .isDirectory),
+          capture: capture))
     } catch { throw failure(selection) }
     switch result.termination {
     case .exit: return result

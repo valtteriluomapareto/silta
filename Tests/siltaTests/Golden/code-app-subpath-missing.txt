@@ -1,0 +1,2 @@
+error: App subpath "apps/console" not found at selected commit. [not_found]
+next: silta --ws 'acme' ws show
