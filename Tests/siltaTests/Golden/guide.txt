@@ -1,5 +1,5 @@
 # When to use Silta
-Use Silta for cross-repo work, another app or backend, branch-as-app repos, plans, handoffs, review requests and meeting decisions. Trivial single-repo edits need no task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; never create tracker items yourself.
+Use Silta for cross-repo work, another app or backend, branch-as-app repos, plans, handoffs, review requests and meeting decisions. Trivial single-repo edits need no task. Keep plans and results in Silta, never in PLAN.md or other repo plan files, and never create tracker items yourself. Exception: when the repository's own instructions require a plan file, write it where they say; that file is the plan of record, and the Silta task plan holds its path and branch or PR plus a short checklist of steps to tick, not its full text. A conditional rule, such as plans in a plans folder only for work that spans several slices, requires a file only when its condition holds.
 
 # Session start
 If the hook already printed a brief, do not run it again. Otherwise run `silta brief`. Once you choose a task, run `silta --ws acme brief --task AC-12`, then `silta --ws acme task start AC-12`. Replace acme with the workspace from your brief. Text is the default; use --json only to parse output.
@@ -15,7 +15,7 @@ silta --ws acme code grep platform-api -- 'Auth'
 silta --ws acme code show platform-api -- 'src/Auth.swift'
 ```
 
-Use task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved. Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files.
+Use task add for a new task, task plan for a chosen task's checklist, and from-plan to import an existing Markdown plan. An agent's import is proposed, counts against the two-proposal cap and needs triage unless the human asked for it in this chat; then pass their words as --approved. Preview imports before writing; imports keep the source by default. --delete is not human-only; it removes only an unchanged untracked source after commit and refuses harness files. Don't import or --delete a plan file the repository's instructions require; point the task plan at it.
 ```sh
 silta --ws acme task add --start 'Implement Acme sign-in' --app platform-api
 silta --ws acme task plan AC-12 -F - <<'PLAN'
@@ -94,7 +94,7 @@ silta --ws acme task start AC-12
 Use `silta --ws acme task submit AC-12` to request review. Read discussion with `silta --ws acme task show AC-12`. Reply to the actual finding ref with `silta --ws acme comment AC-12 --reply-to AC-12/3 -m 'Changed the validation; SignInTests proves it.'`, naming what changed and the proving test. Do not resolve review threads yourself unless assigned that responsibility. Post findings as roots, not replies to a handoff; closed code spans and fences are examples, not mentions.
 
 # Refusals
-Read the error's code, next_by and next commands. A command's next_by can override the code default. Never use --force, --steal, `where --set/--unset`, `task promote` or --allow-secret on your own initiative; name the exact command, wait for the human's reply in this chat, then pass their words through --approved. Never create tracker items or repo plan files. With no human in this chat, see `silta guide human`.
+Read the error's code, next_by and next commands. A command's next_by can override the code default. Never use --force, --steal, `where --set/--unset`, `task promote` or --allow-secret on your own initiative; name the exact command, wait for the human's reply in this chat, then pass their words through --approved. Never create tracker items, or plan files the repository's instructions don't require. With no human in this chat, see `silta guide human`.
   usage  exit 1, next by agent: Read `silta <cmd> --help` and fix the call
   invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call
   not_found  exit 2, next by agent: Check the ref, or carry on without silta
