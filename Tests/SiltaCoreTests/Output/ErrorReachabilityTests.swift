@@ -27,6 +27,12 @@ extension UsageError: ErrorExamples {
   }
 }
 
+extension BodyInputError: ErrorExamples {
+  static var examples: [BodyInputError] {
+    [.unreadable, .notRegular, .tooLarge(65_536), .invalidUTF8]
+  }
+}
+
 extension CommentError: ErrorExamples {
   static var examples: [CommentError] {
     [
@@ -284,7 +290,8 @@ extension ExportGitFailure: ErrorExamples {
 struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
-    UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
+    UsageError.self, BodyInputError.self, InternalError.self, SchemaError.self, SeamError.self,
+    SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
     ScanError.self, CommentError.self, DocError.self,
     CodeError.self, LocationError.self,
