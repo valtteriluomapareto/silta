@@ -38,7 +38,11 @@ silta where
 
 The scan registers repositories and discovers likely apps, but those apps still need
 descriptions and may still need production refs. The workspace is selected from a
-registered repository you enter; use `--ws acme` when working outside one.
+registered repository you enter. Use `--ws acme` when working outside one.
+The scan lists the registered repo and app names and prints a command to inspect them.
+For a single clone, you can start with `silta ws ls` inside it and run the scan command
+it prints. If Silta finds a matching workspace with an unbound repo, follow its scoped
+rescan command. If it lists several candidates, inspect their configuration first.
 
 ## 4. Connect your agents
 
@@ -70,8 +74,10 @@ Check the installation:
 silta doctor --install
 ```
 
-The path, hook, skill and instructions rows should pass; version and session rows can warn
-until you've run a session. Warnings for harnesses you do not use are expected.
+The rows for the installed path, hooks, skills and instructions should pass. With
+Claude SessionStart installed, open a normal session in a registered repo, run
+`silta brief`, then rerun the install check. Doctor skips evidence for optional hooks
+you left out. Version metadata can warn when a harness uses an unrecognized layout.
 
 ## 5. Describe the apps and their connections
 

@@ -2,6 +2,26 @@ import SiltaTestSupport
 import Testing
 
 extension AgentHealthTests {
+  @Test func installedSessionStartDoesNotRequireAnUninstalledStop() throws {
+    try withScratchDirectory { scratch in
+      let env = try Self.setup(scratch, stop: false)
+      let checks = try Self.checks(scratch, env)
+      #expect(try Self.check("install.hook", in: checks)["status"] as? String == "pass")
+      #expect(try Self.check("install.claude.stop", in: checks)["status"] as? String == "skipped")
+      #expect(
+        try Self.check("install.claude.session_start", in: checks)["status"] as? String == "warning"
+      )
+      let stop = try Self.check("install.claude.last_stop", in: checks)
+      #expect(stop["status"] as? String == "skipped")
+      #expect(stop["next"] as? [String] == [])
+      try Self.logs(Self.healthyHistory(), scratch)
+      let later = try Self.checks(scratch, env)
+      #expect(
+        try Self.check("install.claude.last_stop", in: later)["status"] as? String == "skipped")
+      #expect(try Self.check("install.claude.session", in: later)["status"] as? String == "pass")
+    }
+  }
+
   @Test func installMessagesNeverRepeatTheCheckID() throws {
     try withScratchDirectory { scratch in
       let env = try Self.setup(scratch)

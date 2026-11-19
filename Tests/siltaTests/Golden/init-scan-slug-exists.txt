@@ -1,3 +1,2 @@
-error: Workspace "work" already exists; choose another --slug, or rescan it to refresh only the repos already registered there. [conflict]
-next: silta init --scan '<scratch>/acme' --slug <another-slug>
-next: silta init --scan '<scratch>/acme' --ws 'work'
+error: The clones match workspace "work". Scan them in that workspace. [conflict]
+next: silta --ws 'work' init --scan '<scratch>/acme'

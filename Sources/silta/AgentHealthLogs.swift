@@ -19,7 +19,7 @@ enum AgentHealthLogs {
     }
   }
 
-  static func inspect(home: URL, at now: Date) -> [DoctorCheck] {
+  static func inspect(home: URL, at now: Date, sessionStart: Bool, stop: Bool) -> [DoctorCheck] {
     var entries: [Entry] = []
     var problem: EvidenceProblem?
     do { entries = try read(home: home, at: now) } catch let failure as EvidenceProblem {
@@ -29,12 +29,13 @@ enum AgentHealthLogs {
         path: home.appending(path: "log"), reason: "Retained log inventory cannot be inspected.")
     }
     let complete = problem == nil
-    let next = problem?.next(home: home) ?? [AgentHealth.acceptance]
+    let next = problem?.next(home: home) ?? ["silta doctor --install"]
     let detail = problem.map { " " + $0.reason + " Evidence: " + $0.path.path + "." } ?? ""
     var checks = [
-      ("silta agents session-start", "install.claude.session_start", "SessionStart"),
-      ("silta agents stop", "install.claude.last_stop", "Stop"),
-    ].map { command, id, label in
+      (sessionStart, "silta agents session-start", "install.claude.session_start", "SessionStart"),
+      (stop, "silta agents stop", "install.claude.last_stop", "Stop"),
+    ].map { installed, command, id, label in
+      guard installed else { return skipped(id, label: label) }
       let entry = entries.last { $0.command == command }
       let event =
         entry.map {
@@ -46,11 +47,32 @@ enum AgentHealthLogs {
         id: id, status: complete && entry?.healthy == true ? .pass : .warning,
         message: event
           + (complete ? "" : " Retained log evidence is incomplete or invalid; health is unknown.")
-          + detail,
+          + detail
+          + (complete && entry?.healthy != true ? sessionAdvice(stopping: label == "Stop") : ""),
         next: complete && entry?.healthy == true ? [] : next, nextBy: .human)
     }
-    checks.append(propagation(entries, complete: complete, detail: detail, next: next))
+    let applicable = stop ? entries : entries.filter { $0.command != "silta agents stop" }
+    checks.append(
+      sessionStart
+        ? propagation(applicable, complete: complete, detail: detail, next: next)
+        : skipped("install.claude.session", label: "SessionStart"))
+    if !sessionStart && !stop, let problem {
+      checks.append(
+        DoctorCheck(
+          id: "install.log", status: .warning,
+          message: "Retained log evidence is incomplete or invalid." + detail,
+          next: problem.next(home: home), nextBy: .human))
+    }
     return checks
+  }
+
+  private static func sessionAdvice(stopping: Bool) -> String {
+    let open = " Open a normal Claude Code session in a registered repo and run silta brief"
+    return open + (stopping ? ", then end the session after Claude finishes a turn." : ".")
+  }
+
+  private static func skipped(_ id: String, label: String) -> DoctorCheck {
+    DoctorCheck(id: id, status: .skipped, message: "Claude \(label): no installed hook to check.")
   }
 
   private static func propagation(
@@ -77,7 +99,8 @@ enum AgentHealthLogs {
         ? "Claude SILTA_SESSION propagation observed in an ordinary command "
           + "in the latest hook session."
         : "Claude SILTA_SESSION propagation not established in the latest hook session "
-          + "(missing, legacy, mismatched or incomplete evidence).") + detail,
+          + "(missing, legacy, mismatched or incomplete evidence).")
+        + detail + (complete && !observed ? sessionAdvice(stopping: false) : ""),
       next: observed ? [] : next, nextBy: .human)
   }
 
