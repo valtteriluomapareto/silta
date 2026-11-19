@@ -54,7 +54,7 @@ struct DocFinalRecoveryTests {
         run(
           [
             "edit", "rules", "--title=-----BEGIN PRIVATE KEY-----", "--keep-body",
-            "--approved", "Retitle Acme",
+            "--allow-secret", "--approved", "Retain Acme fixture metadata",
           ], scratch, repo
         ).termination == .exit(0))
       try "Proposed Acme rule.\n".write(to: file, atomically: true, encoding: .utf8)
@@ -67,7 +67,11 @@ struct DocFinalRecoveryTests {
       let diff = try run(["show", "doc:rules@3", "--diff"], scratch, repo)
       #expect(diff.termination == .exit(0))
       #expect(!diff.stdout.contains("private Acme material"))
-      #expect(diff.stdout.contains("[REDACTED:private_key]"))
+      #expect(!diff.stdout.contains("PRIVATE KEY"))
+      let full = try run(["show", "doc:rules@3"], scratch, repo)
+      #expect(full.termination == .exit(0))
+      #expect(full.stdout.contains("[REDACTED:private_key]"))
+      #expect(!full.stdout.contains("private Acme material"))
     }
   }
 

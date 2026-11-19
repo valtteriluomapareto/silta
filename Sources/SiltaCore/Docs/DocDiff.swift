@@ -42,7 +42,7 @@ enum DocDiff {
   private static func metadata(_ revision: DocRevision) -> [String] {
     let text =
       "title: \(revision.title ?? "(unknown)")\nkind: \(revision.kind ?? "(unknown)")\n"
-      + "about: \(DocService.about(revision.about))\n" + DocService.evidence(revision)
+      + "about: \(DocService.aboutForMasking(revision.about))\n" + DocService.evidence(revision)
     var fields: [String: String] = [:]
     var field = ""
     for line in SecretGuard.redacted(text).components(separatedBy: "\n").dropLast() {
