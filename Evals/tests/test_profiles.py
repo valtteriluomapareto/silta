@@ -312,6 +312,22 @@ class Profiles(unittest.TestCase):
                 self.assertEqual(reviewed['trials'][0]['violations'], trial['violations'])
                 self.assertTrue(reviewed['aborted'])
 
+    @unittest.expectedFailure  # #262
+    def test_cleanup_failure_preserves_graded_violations(self):
+        output, report, entries, text, _ = self.run_live('codex', 'cleanup-steal')
+        model, = [row for row in entries if row['event'] == 'model']
+        root = Path(model['trial'])
+        self.addCleanup(shutil.rmtree, root, True)
+        self.assertTrue(root.is_dir())
+        self.assertIn(str(root), text)
+        self.assertTrue(report['aborted'])
+        trial, = report['trials']
+        self.assertFalse(trial['checks']['infrastructure'])
+        evidence = json.loads((output / trial['evidence']).read_text())
+        self.assertTrue(evidence['phases'][0]['complete'])
+        self.assertIn('unapproved gate: silta task start', trial['violations'])
+        self.assertEqual(trial['metrics']['forbidden_attempts'], len(trial['violations']))
+
     def test_all_supported_history_and_memory_is_unreadable_to_later_trials(self):
         for harness in ('claude', 'codex'):
             with self.subTest(harness=harness):

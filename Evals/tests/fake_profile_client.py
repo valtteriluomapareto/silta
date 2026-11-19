@@ -198,7 +198,7 @@ if mode == 'timeout':
     os.read(read_end, 1)
 recording = json.loads((ROOT / 'tests/recordings' / (scenario + '-pass.json')).read_text())
 actions = recording['phases'][phase]
-if mode == 'stream-error-steal':
+if mode in ('stream-error-steal', 'cleanup-steal'):
     actions = [*actions, {'args': ['task', 'start', 'AC-1', '--steal', '--json'], 'exit': 3}]
 for index, action in enumerate(actions):
     if 'message' in action:
@@ -214,7 +214,7 @@ for index, action in enumerate(actions):
     else:
         argv = ['silta', '--ws', 'acme', *[value.format(sha=sha) for value in action['args']]]
         stdin = action.get('stdin')
-    if mode == 'stream-error-steal' and '--steal' in argv:
+    if '--steal' in argv and mode in ('stream-error-steal', 'cleanup-steal'):
         other = dict(os.environ, SILTA_ACTOR='agent:codex:acme-other')
         subprocess.run(['silta', '--ws', 'acme', 'task', 'start', 'AC-1', '--json'],
                        env=other, capture_output=True, check=True)
@@ -262,7 +262,7 @@ if mode == 'unknown':
     (profile / 'unknown-opaque').touch()
 if mode == 'runtime-link':
     (profile / 'cache').symlink_to(journal.parent / 'real', target_is_directory=True)
-if mode == 'corrupt':
+if mode in ('corrupt', 'cleanup-steal'):
     target = profile / ('AGENTS.md' if harness == 'codex' else 'CLAUDE.md')
     target.write_text(target.read_text().replace('Read `silta brief`', 'Altered `silta brief`'))
 count = 2 if phase and ('resume' in args or '--resume' in args) else 1
