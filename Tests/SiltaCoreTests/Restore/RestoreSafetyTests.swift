@@ -51,12 +51,10 @@ struct RestoreSafetyTests {
       }
       #expect(try RestoreSupport.dump(store) == dump)
       let report = try RestoreSupport.restore(tree, into: store, home: home, dryRun: true)
-      withKnownIssue("#253: An 11-digit matching manifest prefix is accepted.") {
-        #expect(throws: ExportError.self) {
-          try RestoreSupport.restore(
-            tree, into: store, home: home, dryRun: true,
-            manifest: String(report.manifestSHA256.prefix(11)))
-        }
+      #expect(throws: ExportError.self) {
+        try RestoreSupport.restore(
+          tree, into: store, home: home, dryRun: true,
+          manifest: String(report.manifestSHA256.prefix(11)))
       }
       _ = try RestoreSupport.restore(
         tree, into: store, home: home, manifest: String(report.manifestSHA256.prefix(12)))

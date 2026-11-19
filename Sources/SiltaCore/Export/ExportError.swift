@@ -10,6 +10,10 @@ package enum ExportError: CodedError, Equatable {
   case insideRepo(path: String, repo: String, workspace: String)
   /// The workspace holds data this binary can't export yet.
   case unsupported(String)
+  /// A stored workspace, map identifier or generated file path is invalid.
+  case invalidExport(reason: String)
+  /// A workspace or map identifier in the tree cannot be restored.
+  case invalidRestoreIdentifier(field: String)
   /// The tree uses a canonical format version newer than this reader supports.
   case newerFormat
   /// The tree could not be written under the root.
@@ -26,6 +30,8 @@ package enum ExportError: CodedError, Equatable {
   case otherWorkspace(tree: String, given: String, directory: String)
   /// The tree clashes with another workspace in this database.
   case restoreConflict(String)
+  /// The supplied manifest prefix has invalid length or characters.
+  case invalidManifest(directory: String)
   /// The tree's manifest is not the one the human approved.
   case manifestChanged(approved: String, directory: String)
   /// Git preflight refused before the export write.
@@ -40,7 +46,9 @@ package enum ExportError: CodedError, Equatable {
     switch self {
     case .busy: .busy
     case .notAnExport, .restoreConflict, .manifestChanged: .conflict
-    case .insideRepo, .invalidTree, .notATree, .otherWorkspace, .notWorkTree: .invalid
+    case .insideRepo, .invalidExport, .invalidTree, .notATree, .otherWorkspace, .notWorkTree,
+      .invalidManifest, .invalidRestoreIdentifier:
+      .invalid
     case .unsupported, .newerFormat, .unwritable, .previousKept, .gitFailed,
       .publicationUnconfirmed:
       .env
@@ -51,9 +59,11 @@ package enum ExportError: CodedError, Equatable {
   /// is the agent's.
   package var nextBy: NextBy {
     switch self {
-    case .notATree(_, _, .some), .otherWorkspace, .manifestChanged, .notWorkTree, .busy: .agent
+    case .notATree(_, _, .some), .otherWorkspace, .invalidManifest, .manifestChanged,
+      .notWorkTree, .busy, .invalidExport, .invalidRestoreIdentifier:
+      .agent
     case .invalidTree(_, let workspace)
-    where workspace.map({ !SecretGuard.matches(in: $0).isEmpty }) == true:
+    where workspace.map({ !Self.safeWorkspace($0) }) == true:
       .agent
     default: .human
     }
@@ -83,6 +93,8 @@ package enum ExportError: CodedError, Equatable {
         + "so export changed nothing."
     case .unsupported(let what):
       "This workspace has \(what), which this version of silta can't export; nothing was written."
+    case .invalidExport(let reason):
+      "Cannot export this workspace: \(reason). Nothing was written."
     case .newerFormat:
       "This export uses a newer format than this version of silta can read; nothing was changed."
     case .unwritable(let path, _):
@@ -91,6 +103,9 @@ package enum ExportError: CodedError, Equatable {
       "The new export could not replace \(target), and the previous export could not be "
         + "moved back; it is kept at \(path), next to the new tree. Move it back only while "
         + "\(target) is absent; if another export has put a tree there since, keep that one."
+    case .invalidRestoreIdentifier(let field):
+      "Cannot restore this workspace: the \(field) is not an identifier. "
+        + "Check the source workspace before exporting again."
     case .invalidTree(let reason, _):
       "Not an unchanged silta export tree: \(SecretGuard.redacted(reason)). Nothing was restored."
     case .notATree(let path, let reason, _):
@@ -99,6 +114,8 @@ package enum ExportError: CodedError, Equatable {
       "The tree holds workspace \(tree), not \(given); nothing was restored."
     case .restoreConflict(let reason):
       "The tree clashes with this database: \(SecretGuard.redacted(reason)). Nothing was restored."
+    case .invalidManifest:
+      "--manifest needs 12 to 64 hexadecimal digits from the restore dry run."
     case .manifestChanged(let approved, _):
       "The tree is not the one approved (manifest \(approved)); it changed since the dry run. "
         + "Nothing was restored."
@@ -131,7 +148,7 @@ package enum ExportError: CodedError, Equatable {
       ["[ ! -e \(shellWord(target)) ] && mv \(shellWord(path)) \(shellWord(target))"]
     case .unsupported, .newerFormat: ["update silta"]
     case .invalidTree(_, let workspace)
-    where workspace.map({ !SecretGuard.matches(in: $0).isEmpty }) == true:
+    where workspace.map({ !Self.safeWorkspace($0) }) == true:
       ["silta ws ls"]
     case .invalidTree(_, let workspace):
       [
@@ -149,9 +166,15 @@ package enum ExportError: CodedError, Equatable {
         ]
     case .otherWorkspace(let tree, _, let directory):
       [workspaceCommand("silta restore " + shellWord(directory) + " --dry-run", workspace: tree)]
-    case .restoreConflict: ["silta ws ls"]
-    case .manifestChanged(_, let directory):
-      ["silta restore " + shellWord(directory) + " --dry-run"]
+    case .restoreConflict, .invalidExport, .invalidRestoreIdentifier: ["silta ws ls"]
+    case .invalidManifest(let directory), .manifestChanged(_, let directory):
+      RestoreService.canNameInRecovery(directory)
+        ? ["silta restore " + shellWord(directory) + " --dry-run"]
+        : ["silta ws ls"]
     }
+  }
+
+  private static func safeWorkspace(_ slug: String) -> Bool {
+    WorkspaceConfig.isValidIdentifier(slug) && SecretGuard.matches(in: slug).isEmpty
   }
 }

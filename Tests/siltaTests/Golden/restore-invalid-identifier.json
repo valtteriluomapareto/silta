@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"Cannot restore this workspace: the service slug is not an identifier. Check the source workspace before exporting again.","next":["silta ws ls"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

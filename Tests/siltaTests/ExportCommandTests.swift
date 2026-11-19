@@ -200,21 +200,13 @@ struct ExportCommandTests {
       for to in ["~/notes", "~", "~acme/notes", "~acme"] {
         let result = try SiltaBinary.run(
           ["--ws", "acme", "export", "--to", to, "--json"], in: scratch)
-        let verify = {
-          #expect(result.termination == .exit(1))
-          #expect(result.stdout.contains(#""code":"invalid""#))
-        }
-        if to.hasPrefix("~acme") {
-          withKnownIssue("#253: Named tilde paths are accepted.", verify)
-        } else {
-          verify()
-        }
+        #expect(result.termination == .exit(1))
+        #expect(result.stdout.contains(#""code":"invalid""#))
+        #expect(result.stdout.contains("unexpanded ~"))
       }
       let children = try FileManager.default.contentsOfDirectory(
         atPath: scratch.appending(path: "work").path)
-      withKnownIssue("#253: A named tilde path publishes an export.") {
-        #expect(children.isEmpty)
-      }
+      #expect(children.isEmpty)
     }
   }
 

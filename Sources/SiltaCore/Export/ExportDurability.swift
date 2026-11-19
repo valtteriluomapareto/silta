@@ -26,13 +26,20 @@ enum ExportDurability {
     guard fsync(descriptor) == 0 else { throw StorageError.ioFailure }
   }
 
+  /// Each generated file is a relative path with an ordinary name at every level.
+  static func isRelativeFilePath(_ path: String) -> Bool {
+    path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy {
+      !$0.isEmpty && $0 != "." && $0 != ".." && !$0.utf8.contains(0)
+    }
+  }
+
   static func stage(_ files: [String: Data], tree: URL, moves: ExportMoves) throws {
     var directories: Set<URL> = [tree]
     for path in files.keys.sorted() {
       let file = tree.appending(path: path)
       try moves.sync(file)
       var parent = file.deletingLastPathComponent()
-      while parent.path.hasPrefix(tree.path + "/") {
+      for _ in path.split(separator: "/").dropFirst() {
         directories.insert(parent)
         parent = parent.deletingLastPathComponent()
       }

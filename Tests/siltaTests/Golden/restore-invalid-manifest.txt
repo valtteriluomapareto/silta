@@ -1,0 +1,2 @@
+error: --manifest needs 12 to 64 hexadecimal digits from the restore dry run. [invalid]
+next: silta restore '<scratch>/work/tree/acme' --dry-run

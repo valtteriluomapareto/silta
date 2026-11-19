@@ -114,11 +114,7 @@ struct RestoreCommandTests {
       let result = try SiltaBinary.run(["restore", path, "--dry-run", "--json"], in: scratch)
       #expect(result.termination == .exit(1))
       #expect(result.stdout.contains(#""code":"invalid""#))
-      if path.hasPrefix("~acme") {
-        withKnownIssue("#253: Named tilde paths are interpreted as filesystem paths.") {
-          #expect(result.stdout.contains("unexpanded ~"))
-        }
-      }
+      #expect(result.stdout.contains("unexpanded ~"))
     }
   }
 
@@ -127,16 +123,12 @@ struct RestoreCommandTests {
     try withScratchDirectory { scratch in
       let args = ["restore", "tree/acme", "--manifest", manifest] + (json ? ["--json"] : [])
       let result = try SiltaBinary.run(args, in: scratch)
-      withKnownIssue("#253: Malformed manifest arguments ask for approval.") {
-        #expect(result.termination == .exit(1))
-        let output = json ? result.stdout : result.stderr
-        #expect(output.contains("12 to 64 hexadecimal digits"))
-        if json {
-          #expect(result.stderr.isEmpty)
-          #expect(result.stdout.contains(#""code":"invalid""#))
-          #expect(result.stdout.contains(#""next_by":"agent""#))
-        }
-      }
+      #expect(result.termination == .exit(1))
+      let output = json ? result.stdout : result.stderr
+      #expect(json ? result.stderr.isEmpty : result.stdout.isEmpty)
+      Golden.forTests().check(
+        Self.masked(output, scratch),
+        json ? "restore-invalid-manifest.json" : "restore-invalid-manifest.txt")
     }
   }
 
