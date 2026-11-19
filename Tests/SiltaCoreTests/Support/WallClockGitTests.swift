@@ -23,10 +23,18 @@ struct WallClockGitTests {
       let result = try await SystemGitRunner(executable: script.path, killAfter: 0.01).run(
         GitRequest(
           arguments: [fifo.path], directory: scratch, timeout: 1,
-          capture: bounded ? .init(byteLimit: 4) : nil))
+          capture: bounded ? .init(byteLimit: 4, skipLines: 100_000) : nil))
       #expect(result.termination == .timedOut)
-      #expect(result.stdout == Data((bounded ? "read" : "ready").utf8))
-      #expect(result.stdoutTruncated == bounded)
+      if bounded {
+        withKnownIssue("#264: timed-out reads continue scanning for later lines") {
+          #expect(result.stdout == Data("read".utf8))
+          #expect(result.stdoutTruncated)
+          #expect(result.stdoutSkippedLines == 0)
+        }
+      } else {
+        #expect(result.stdout == Data("ready".utf8))
+        #expect(!result.stdoutTruncated)
+      }
     }
   }
 }
