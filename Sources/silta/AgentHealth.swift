@@ -3,10 +3,6 @@ import SiltaCore
 
 /// Harness-specific inspection stays beside the installer; no harness is executed.
 enum AgentHealth {
-  static let acceptance =
-    "Read docs/dogfood/agents-acceptance.md in a Silta checkout "
-    + "and rerun the affected live checks in isolated homes."
-
   static func inspect(home: URL, at now: Date, environment: [String: String]) -> [DoctorCheck] {
     let user = environment["HOME"] ?? "."
     let claude =
@@ -22,11 +18,11 @@ enum AgentHealth {
           : "silta is executable on PATH; hook-shell PATH may differ.",
         next: executable == nil ? ["command -v silta", "silta agents install --help"] : []))
     checks += ownedPieces(home: home, user: user, claude: claude, codex: codex)
-    checks += [
-      hook(root: claude, event: "SessionStart", id: "install.hook", user: user),
-      hook(root: claude, event: "Stop", id: "install.claude.stop", user: user),
-    ]
-    checks += AgentHealthLogs.inspect(home: home, at: now)
+    let start = hook(root: claude, event: "SessionStart", id: "install.hook", user: user)
+    let stop = hook(root: claude, event: "Stop", id: "install.claude.stop", user: user)
+    checks += [start, stop]
+    checks += AgentHealthLogs.inspect(
+      home: home, at: now, sessionStart: start.status != .skipped, stop: stop.status != .skipped)
     checks += versions(environment)
     let order = [
       "install.path", "install.hook", "install.skill", "install.codex_root",
@@ -208,7 +204,7 @@ enum AgentHealth {
     }
     return DoctorCheck(
       id: "install.\(name).version", status: matches ? .pass : .warning,
-      message: message, next: matches ? [] : version == nil ? ["\(name) --version"] : [acceptance],
+      message: message, next: matches ? [] : ["\(name) --version"],
       nextBy: .human)
   }
 }

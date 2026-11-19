@@ -12,9 +12,13 @@ extension AgentHealthTests {
         try Self.check("install.claude.session_start", in: checks)["status"] as? String == "warning"
       )
       let stop = try Self.check("install.claude.last_stop", in: checks)
-      withKnownIssue("#260: doctor requires evidence for an uninstalled optional Stop hook") {
-        #expect(stop["status"] as? String == "skipped")
-      }
+      #expect(stop["status"] as? String == "skipped")
+      #expect(stop["next"] as? [String] == [])
+      try Self.logs(Self.healthyHistory(), scratch)
+      let later = try Self.checks(scratch, env)
+      #expect(
+        try Self.check("install.claude.last_stop", in: later)["status"] as? String == "skipped")
+      #expect(try Self.check("install.claude.session", in: later)["status"] as? String == "pass")
     }
   }
 

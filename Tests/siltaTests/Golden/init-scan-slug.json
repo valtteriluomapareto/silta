@@ -1,1 +1,1 @@
-{"data":{"next":["silta ws edit 'work' -F <file> --approved \"<the human's words>\""],"next_by":"human","workspace":"work"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"apps":["acme-detached","acme-detached-api","acme-detached-portal","acme-platform","acme-platform-api","acme-platform-portal"],"next":["silta --ws 'work' ws show"],"next_by":"agent","repositories":["acme-detached","acme-missing-remote","acme-platform","acme-shallow"],"workspace":"work"},"ok":true,"schema":1,"warnings":[]}

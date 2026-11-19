@@ -171,6 +171,12 @@ package struct LocationService {
         path: path, root: root, repo: repo, git: git, candidates: candidates,
         refs: refs, warnings: warnings, displayRoot: displayRoot)
     }
+    if let recovery = try await RepositoryScan.repair(
+      root, workspace: workspace, store: environment.db, git: environment.git)
+    {
+      throw CommandFailure(
+        error: LocationError.unregistered, next: recovery.next, message: recovery.message)
+    }
     throw unregistered(path: root, workspace: workspace)
   }
 

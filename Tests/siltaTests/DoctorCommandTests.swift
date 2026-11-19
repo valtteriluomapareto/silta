@@ -66,6 +66,11 @@ struct DoctorCommandTests {
 
   @Test func invalidLogHasScopedRecoveryInBothOutputModes() throws {
     try withScratchDirectory { scratch in
+      try #require(
+        try AgentsInstallTests.apply(
+          ["install", "--claude", "--stop-hook"], in: scratch, environment: environment
+        )
+        .termination == .exit(0))
       let directory = scratch.appending(path: "silta-home/log")
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
       try Data("{broken\n".utf8).write(to: directory.appending(path: "2023-11-14.jsonl"))

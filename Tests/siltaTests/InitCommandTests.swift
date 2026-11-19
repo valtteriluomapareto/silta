@@ -15,7 +15,7 @@ private struct Refusal {
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct InitCommandTests {
-  @Test func bareInitCreatesOnlyDatabaseAndPointsToHumanEdit() throws {
+  @Test func bareInitCreatesOnlyDatabaseAndPointsToScanHelp() throws {
     try withScratchDirectory { scratch in
       for json in [false, true] {
         let result = try SiltaBinary.run(["init"] + (json ? ["--json"] : []), in: scratch)
@@ -187,7 +187,7 @@ struct InitCommandTests {
     }
   }
 
-  /// The refusal carries the scanned roots and the two ways forward. The roots are
+  /// The refusal carries the scanned roots and the scoped recovery command. The roots are
   /// absolute paths under a random scratch directory, so the golden shows `<scratch>`.
   static func checked(_ text: String, _ name: String, scratch: URL) {
     Golden.forTests().check(
@@ -213,8 +213,7 @@ struct InitCommandTests {
       #expect(try SiltaBinary.run(["ws", "show", "work"], in: scratch).stdout == before.stdout)
       let list = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
       #expect(list.stdout.components(separatedBy: "\"slug\":\"work\"").count == 2)
-      let rescanned = try SiltaBinary.run(
-        ["init", "--scan", "acme", "--ws", "work"], in: scratch, cwd: scratch)
+      let rescanned = try Self.runNext(Self.nextCommand(again.stdout), in: scratch)
       #expect(rescanned.termination == .exit(0))
     }
   }
@@ -230,7 +229,7 @@ struct InitCommandTests {
         ["init", "--scan", fixtures.path, "--prefix", "WK", "--json"], in: scratch)
       #expect(again.termination == .exit(6))
       let next = try Self.nextCommand(again.stdout)
-      #expect(next.hasSuffix("--ws 'acme'"))
+      #expect(next.hasPrefix("silta --ws 'acme' init --scan "))
       let rescanned = try Self.runNext(next, in: scratch)
       #expect(rescanned.termination == .exit(0), "\(rescanned.stderr)")
     }

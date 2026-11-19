@@ -17,10 +17,24 @@ struct FirstWorkspaceCommandTests {
       let listed = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch, cwd: nested)
       #expect(listed.termination == .exit(0))
       let data = try TaskStateRegressionTests.data(listed)
-      let next = data["next"] as? [String] ?? []
-      withKnownIssue("#260: empty workspace listing has no scan next") {
-        #expect(next.first?.hasPrefix("silta init --scan ") == true)
-      }
+      let next = try #require((data["next"] as? [String])?.first)
+      #expect(next.hasPrefix("silta init --scan "))
+      #expect(data["next_by"] as? String == "agent")
+      let text = try SiltaBinary.run(["ws", "ls"], in: scratch, cwd: nested)
+      #expect(text.stdout.contains("next: " + next))
+      let scanned = try Self.replay(next, in: scratch, cwd: nested, json: true)
+      try #require(scanned.termination == .exit(0), "\(scanned.stdout)\(scanned.stderr)")
+      let receipt = try TaskStateRegressionTests.data(scanned)
+      #expect(receipt["workspace"] as? String == "platform")
+      #expect(receipt["repositories"] as? [String] == ["platform"])
+      #expect(receipt["apps"] as? [String] == ["platform"])
+      let inspect = try #require((receipt["next"] as? [String])?.first)
+      #expect(inspect == "silta --ws 'platform' ws show")
+      #expect(try Self.replay(inspect, in: scratch, cwd: nested).termination == .exit(0))
+      let located = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: nested)
+      #expect(try TaskStateRegressionTests.data(located)["workspace"] as? String == "platform")
+      let final = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect((try TaskStateRegressionTests.data(final)["workspaces"] as? [Any])?.count == 1)
     }
   }
 
@@ -42,17 +56,88 @@ struct FirstWorkspaceCommandTests {
         ["init", "--scan", repo.path, "--json"], in: scratch)
       #expect(whereResult.termination == .exit(2))
       #expect(collision.termination == .exit(6))
-      for result in [whereResult, collision] {
+      let hints = try [whereResult, collision].map { result in
         let error = try TaskStateRegressionTests.error(result)
-        let next = try #require((error["next"] as? [String])?.first)
-        withKnownIssue("#260: missing pathless registration recovery") {
-          #expect(next.hasPrefix("silta --ws 'acme' init --scan "))
-        }
+        return try #require((error["next"] as? [String])?.first)
       }
-      #expect(
-        try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 1)
+      #expect(hints.allSatisfy { $0.hasPrefix("silta --ws 'acme' init --scan ") })
       #expect(
         try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 0)
+      let repair = try #require(hints.first)
+      let repaired = try Self.replay(repair, in: scratch, cwd: repo, json: true)
+      try #require(repaired.termination == .exit(0), "\(repaired.stdout)\(repaired.stderr)")
+      let receipt = try TaskStateRegressionTests.data(repaired)
+      #expect(receipt["repositories"] as? [String] == ["declared-platform"])
+      let located = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: repo)
+      #expect(try TaskStateRegressionTests.data(located)["workspace"] as? String == "acme")
+      try store.read { (db: Database) throws in
+        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM workspace") == 1)
+        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM repo_path") == 1)
+        #expect(try String.fetchOne(db, sql: "SELECT uid FROM repo") == "acme-existing-repo")
+      }
+    }
+  }
+
+  @Test func competingWorkspaceDeclarationsOnlyOfferInspection() throws {
+    try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "renamed-platform")
+      try InitCommandTests.makeRepo(repo, in: scratch)
+      try InitCommandTests.git(["remote", "add", "origin", Self.origin], in: scratch, cwd: repo)
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO workspace(uid, slug, name, task_prefix)
+            VALUES ('other-workspace', 'other', 'Other', 'OT');
+            INSERT INTO repo(uid,workspace_id,slug,remote_url)
+            SELECT slug || '-platform',id,'declared-platform',? FROM workspace
+            """, arguments: [Self.origin])
+      }
+      let expected = ["silta --ws 'acme' ws show", "silta --ws 'other' ws show"]
+      for (args, code, exit) in [
+        (["where"], "unregistered", 2), (["init", "--scan", "."], "conflict", 6),
+      ] {
+        let refusal = try SiltaBinary.run(args + ["--json"], in: scratch, cwd: repo)
+        #expect(refusal.termination == .exit(Int32(exit)))
+        let error = try TaskStateRegressionTests.error(refusal)
+        #expect(error["code"] as? String == code)
+        let hints = try #require(error["next"] as? [String])
+        #expect(hints == expected)
+        for hint in hints {
+          #expect(try Self.replay(hint, in: scratch, cwd: repo).termination == .exit(0))
+        }
+      }
+      try store.read { (db: Database) throws in
+        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM workspace") == 2)
+        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM repo_path") == 0)
+      }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func partialOrRepeatedRepoMatchPreservesBindings(sameOrigin: Bool) throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "renamed")
+      let platform = root.appending(path: "platform")
+      let other = root.appending(path: "other")
+      try InitCommandTests.makeRepo(platform, in: scratch)
+      try InitCommandTests.makeRepo(other, in: scratch)
+      try InitCommandTests.git(
+        ["remote", "add", "origin", Self.origin], in: scratch, cwd: platform)
+      if sameOrigin {
+        try InitCommandTests.git(["remote", "add", "origin", Self.origin], in: scratch, cwd: other)
+      }
+      let first = try SiltaBinary.run(
+        ["init", "--scan", platform.path, "--slug", "acme"], in: scratch)
+      try #require(first.termination == .exit(0))
+      let result = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
+      #expect(result.termination == .exit(6))
+      let hints = try TaskStateRegressionTests.error(result)["next"] as? [String]
+      #expect(hints == ["silta --ws 'acme' ws show"])
+      let located = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: platform)
+      #expect(try TaskStateRegressionTests.data(located)["workspace"] as? String == "acme")
+      let final = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect((try TaskStateRegressionTests.data(final)["workspaces"] as? [Any])?.count == 1)
     }
   }
 
@@ -65,12 +150,39 @@ struct FirstWorkspaceCommandTests {
         ["init", "--scan", repo.path, missing.path, "--json"], in: scratch)
       #expect(result.termination == .exit(9))
       let error = try TaskStateRegressionTests.error(result)
-      withKnownIssue("#260: scan failure omits its missing root") {
-        #expect((error["message"] as? String)?.contains(missing.path) == true)
-      }
+      #expect((error["message"] as? String)?.contains(missing.path) == true)
       #expect(
         !FileManager.default.fileExists(
           atPath: scratch.appending(path: "silta-home/silta.db").path))
     }
+  }
+
+  @Test func unreadableChildWarnsWhileItsSiblingIsRegistered() throws {
+    try withScratchDirectory { scratch in
+      let root = scratch.appending(path: "acme")
+      let hidden = root.appending(path: "unreadable")
+      try InitCommandTests.makeRepo(root.appending(path: "platform"), in: scratch)
+      try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: false)
+      try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: hidden.path)
+      defer {
+        try? FileManager.default.setAttributes(
+          [.posixPermissions: 0o700], ofItemAtPath: hidden.path)  // Restore directory access.
+      }
+      let result = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
+      try #require(result.termination == .exit(0))
+      #expect(
+        try TaskStateRegressionTests.data(result)["repositories"] as? [String] == ["platform"])
+      #expect(try TaskStateRegressionTests.warnings(result) == ["scan_skipped"])
+      #expect(result.stdout.contains(hidden.path))
+    }
+  }
+
+  static func replay(_ hint: String, in scratch: URL, cwd: URL, json: Bool = false) throws
+    -> CLIResult
+  {
+    let binary = shellWord(try SiltaBinary.url().path)
+    let command = binary + (json ? " --json" : "") + String(hint.dropFirst("silta".count))
+    return try SiltaBinary.runProcess(
+      URL(filePath: "/bin/sh"), ["-c", command], in: scratch, cwd: cwd)
   }
 }
