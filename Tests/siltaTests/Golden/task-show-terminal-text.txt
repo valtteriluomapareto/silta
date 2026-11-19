@@ -4,10 +4,10 @@ Archived: no
 Claimed by: agent:codex:acme
 
 Description:
-Acme café one two	value
+Acme café one two	value
 line two tail
 
 Discussion:
 AC-1/1 question by agent:codex:acme [unresolved] (to human:acme)
 > Acme question one two
-> 	keep café
+> 	keep café

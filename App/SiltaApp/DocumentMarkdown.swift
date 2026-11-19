@@ -27,6 +27,16 @@ struct DocumentMarkdown: View {
           in: RoundedRectangle(cornerRadius: 7))
       }
     }
+    .environment(\.openURL, Self.linkAction())
+  }
+
+  /// Checks the destination again before handing it to the system.
+  static func linkAction(
+    open: @escaping @Sendable (URL) -> OpenURLAction.Result = { .systemAction($0) }
+  ) -> OpenURLAction {
+    OpenURLAction { url in
+      MarkdownContent.destination(for: url) == nil ? .discarded : open(url)
+    }
   }
 
   private func font(_ block: MarkdownContent.Block) -> Font {

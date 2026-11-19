@@ -46,7 +46,9 @@ struct TaskBlockCommand: OutputCommand {
     // The -m is the ask to the parties this call names, not to earlier ones.
     let named = on.filter { $0.hasPrefix("ext:") }
     for party in result.waiting?.on ?? [] where named.contains(party) {
-      lines.append("Silta sends nothing; ask \(party): \(result.waiting?.why ?? "")")
+      lines.append(
+        "Silta sends nothing; ask \(HumanText.line(party)): \(HumanText.line(result.waiting?.why ?? ""))"
+      )
     }
     return CommandOutput(
       text: lines.joined(separator: "\n"), data: result,

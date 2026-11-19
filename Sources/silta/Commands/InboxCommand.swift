@@ -74,7 +74,7 @@ struct InboxCommand: OutputCommand {
       ? "answer to " + (item.replyTo ?? ref)
       : item.kind == "discussion" ? "discussion (\(postKind))" : item.kind
     var lines = ["\(ref) \(label) on \(task) by \(author)"]
-    var body = bodyText
+    var body = HumanText.body(bodyText)
     if body.last?.isNewline == true { body.removeLast() }
     lines += body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
       .map { $0.isEmpty ? ">" : "> " + $0 }
@@ -94,19 +94,22 @@ struct InboxCommand: OutputCommand {
     switch item.kind {
     case "ready": heading = refs + " ready to unblock"
     case "replan": heading = refs + " blocker dropped: re-plan"
-    case "due": heading = (item.target ?? refs) + " follow-up due " + (item.followUpAt ?? "")
+    case "due":
+      heading = HumanText.line(item.target ?? refs) + " follow-up due " + (item.followUpAt ?? "")
     case "proposal": heading = refs + " proposal by " + (item.author ?? "")
     default: heading = refs + " promoted; change it in its tracker"
     }
     var lines = [heading]
     for task in tasks {
-      lines += indented(task.ref + ": " + task.title)
+      lines += indented(task.ref + ": " + HumanText.line(task.title))
       if let on = task.on {
         lines += indented("waiting on: " + (on.isEmpty ? "an answer" : on.joined(separator: ", ")))
       }
-      if let why = task.why { lines += indented("ask: " + why) }
+      if let why = task.why { lines += indented("ask: " + HumanText.body(why)) }
       if let day = task.followUpAt { lines += indented("follow-up: " + day) }
-      if let external = task.externalRef { lines += indented("tracker: " + external) }
+      if let external = task.externalRef {
+        lines += indented("tracker: " + HumanText.line(external))
+      }
     }
     lines += item.next.map { "next: " + $0 }
     return lines.joined(separator: "\n")

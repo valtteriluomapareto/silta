@@ -60,7 +60,7 @@ struct TaskPlanCommand: OutputCommand {
     }
     let text =
       if let step = result.step, let title = result.title {
-        "\(result.ref) step \(step) \(result.done == true ? "done" : "undone"): \(title) "
+        "\(result.ref) step \(step) \(result.done == true ? "done" : "undone"): \(HumanText.line(title)) "
           + "(\(result.stepsDone)/\(result.steps))"
       } else {
         "\(result.ref) plan revision \(result.planRev) "

@@ -3,7 +3,7 @@ import Foundation
 /// Collapses completed runs while preserving original open-step numbering and bodies.
 enum BriefPlan {
   static func section(_ plan: String, ref: String, revision: Int) -> BriefSection {
-    let safe = SecretGuard.redacted(plan)
+    let safe = HumanText.body(plan)
     let boxes = MarkdownPlan.checkboxes(safe)
     let lines = MarkdownPlan.numbered(safe).components(separatedBy: "\n")
     var body = boxes.first.map { lines[..<$0.line].joined(separator: "\n") } ?? safe

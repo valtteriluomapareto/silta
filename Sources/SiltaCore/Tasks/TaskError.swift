@@ -68,9 +68,7 @@ package enum TaskError: CodedError, Equatable {
 
   /// `what` as a message shows it: secrets masked, control characters as spaces.
   package static func shown(_ what: String) -> String {
-    SecretGuard.redacted(what).unicodeScalars.map {
-      CharacterSet.controlCharacters.contains($0) ? " " : String($0)
-    }.joined()
+    HumanText.line(what)
   }
 
   /// Maps task failures to the scripting contract.

@@ -110,7 +110,7 @@ package struct BriefService {
           BriefSection(
             id: "blockers",
             text:
-              error.message + "\n" + waiting.why + "\n" + followUp
+              HumanText.line(error.message) + "\n" + BriefDiscussion.quoted(waiting.why) + followUp
               + next.map { "next: " + $0 + "\n" }.joined()
           ))
       }
@@ -133,7 +133,7 @@ package struct BriefService {
     let marker = "(description trimmed; \(command) task show \(current.ref))\n"
     let text =
       "description:\n"
-      + SecretGuard.redacted(current.description)
+      + HumanText.body(current.description)
       .trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
     return BriefBudget.capped(
       BriefSection(id: "description", text: text, policy: .excerpt(marker: marker)),

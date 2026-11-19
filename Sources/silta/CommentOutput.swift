@@ -48,8 +48,8 @@ enum CommentOutput {
     if post.kind != "question", post.resolvedAt != nil { text += " [" + resolution + "]" }
     if !post.mentions.isEmpty { text += " (to " + post.mentions.joined(separator: ", ") + ")" }
     if post.accepted { text += " [accepted]" }
-    if let source = post.source { text += " (from " + source + ")" }
-    var body = post.body
+    if let source = post.source { text += " (from " + HumanText.line(source) + ")" }
+    var body = HumanText.body(post.body)
     if body.last?.isNewline == true { body.removeLast() }
     text +=
       "\n"

@@ -58,16 +58,17 @@ enum TaskOutput {
   }
 
   static func summary(_ task: TaskDetails) -> String {
-    let tracker = task.externalRef.map { " [read-only: " + $0 + "]" } ?? ""
+    let tracker = task.externalRef.map { " [read-only: " + HumanText.line($0) + "]" } ?? ""
     let parent = task.parent.map { ", parent " + $0 } ?? ""
-    return "\(task.ref) \(task.status) (priority \(task.priority)\(parent)): \(task.title)"
+    return
+      "\(task.ref) \(task.status) (priority \(task.priority)\(parent)): \(HumanText.line(task.title))"
       + tracker
       + (task.waiting.map { "\n" + waitingLines($0).joined(separator: "\n") } ?? "")
   }
 
   static func waitingLines(_ waiting: TaskWaiting) -> [String] {
     var lines = [
-      "Waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d: \(waiting.why)"
+      "Waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d: \(HumanText.line(waiting.why))"
     ]
     if waiting.ready { lines.append("Ready to unblock.") }
     if !waiting.dropped.isEmpty {
@@ -89,15 +90,15 @@ enum TaskOutput {
           + shellWord(workspace) + " task start " + shellWord(task.ref))
     }
     for (heading, text) in [
-      ("Description", task.description),
-      ("Acceptance", task.acceptance),
-      ("Plan (revision \(task.planRev))", MarkdownPlan.numbered(task.plan)),
-      ("Result", task.result ?? ""),
+      ("Description", HumanText.body(task.description)),
+      ("Acceptance", HumanText.body(task.acceptance)),
+      ("Plan (revision \(task.planRev))", MarkdownPlan.numbered(HumanText.body(task.plan))),
+      ("Result", HumanText.body(task.result ?? "")),
     ] where !text.isEmpty {
       lines.append("\n\(heading):\n\(text)")
     }
     if let sha = task.doneSHA { lines.append("Commit: \(sha)") }
-    for link in task.links { lines.append("\(link.rel): \(link.target)") }
+    for link in task.links { lines.append("\(link.rel): \(HumanText.line(link.target))") }
     if let comments = task.comments {
       lines.append("\nDiscussion:")
       lines += comments.map {
@@ -110,7 +111,8 @@ enum TaskOutput {
     }
     for event in task.timeline ?? [] {
       lines.append(
-        "\(event.at) \(event.actor) \(event.kind)" + (event.body.map { ": " + $0 } ?? ""))
+        "\(event.at) \(event.actor) \(event.kind)"
+          + (event.body.map { ": " + HumanText.line($0) } ?? ""))
     }
     return lines.joined(separator: "\n")
   }

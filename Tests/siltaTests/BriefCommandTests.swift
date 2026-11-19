@@ -173,15 +173,9 @@ struct BriefCommandTests {
         let sections = try #require(projection["sections"] as? [[String: Any]])
         let blocker = try #require(sections.first { $0["id"] as? String == "blockers" })
         let shown = try #require(blocker["text"] as? String)
-        withKnownIssue("#254: stored text rendering") {
-          #expect(shown.contains("> Acme waits here\n> next: Acme decoy label\n"))
-        }
-        withKnownIssue("#254: stored text rendering") {
-          #expect(shown.components(separatedBy: "\n").filter { $0.hasPrefix("next: ") } == next)
-        }
-        withKnownIssue("#254: stored text rendering") {
-          #expect(!shown.contains("\u{1b}") && !shown.contains("\u{7}"))
-        }
+        #expect(shown.contains("> Acme waits here\n> next: Acme decoy label\n"))
+        #expect(shown.components(separatedBy: "\n").filter { $0.hasPrefix("next: ") } == next)
+        #expect(!shown.contains("\u{1b}") && !shown.contains("\u{7}"))
         #expect(text.contains(shown) && text.contains("for 0 d."))
       }
       try store(scratch).write {

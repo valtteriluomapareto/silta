@@ -65,17 +65,11 @@ struct DocEvidenceReadCommandTests {
       for quiet in [false, true] {
         let body = try run([], scratch, quiet: quiet)
         #expect(body.termination == .exit(0) && body.stderr.isEmpty)
-        withKnownIssue("#254: stored text rendering") {
-          #expect(body.stdout.contains("title: Acme title safe\n"))
-        }
-        withKnownIssue("#254: stored text rendering") {
-          #expect(body.stdout.contains("Acme body safe\twords\n"))
-        }
+        #expect(body.stdout.contains("title: Acme title safe\n"))
+        #expect(body.stdout.contains("Acme body safe\twords\n"))
         let diff = try run(["--diff"], scratch, quiet: quiet)
         #expect(diff.termination == .exit(0) && diff.stderr.isEmpty)
-        withKnownIssue("#254: stored text rendering") {
-          #expect(diff.stdout.contains("+Acme body safe\twords\n"))
-        }
+        #expect(diff.stdout.contains("+Acme body safe\twords\n"))
         let list = try SiltaBinary.run(
           ["--ws", "acme", "doc", "ls"] + (quiet ? ["--quiet"] : []),
           in: scratch, environment: TaskCommandTests.fixed)
@@ -85,6 +79,13 @@ struct DocEvidenceReadCommandTests {
       let json = try TaskStateRegressionTests.data(run([], scratch, json: true))
       #expect(json["title"] as? String == title)
       #expect(json["body"] as? String == body)
+      let full = try #require(json["output"] as? String)
+      let index = try #require(full.components(separatedBy: "\n").firstIndex { $0 + "\n" == body })
+      let lineFlags = ["--lines", String(index + 1)]
+      let line = try run(lineFlags, scratch)
+      #expect(line.stdout.contains("Acme body safe\twords\n"))
+      let bodyWindow = try TaskStateRegressionTests.data(run(lineFlags, scratch, json: true))
+      #expect((bodyWindow["output"] as? String)?.contains(body) == true)
       let diff = try TaskStateRegressionTests.data(run(["--diff"], scratch, json: true))
       #expect((diff["output"] as? String)?.contains("+" + body) == true)
       #expect(try truth(store) == before)
