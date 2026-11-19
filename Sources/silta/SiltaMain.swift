@@ -302,7 +302,22 @@ extension SiltaMain {
     explicitWorkspace: String?, arguments: [String], context: CommandContext
   ) -> CommandExecution {
     var failure: any Error = error
-    if let coded = failure as? any CodedError {
+    if let body = error as? BodyInputError {
+      let help = commandPath(arguments) + " --help"
+      let workspace = (command as? WsEditCommand)?.workspace ?? command.global.ws
+      let next: [String]
+      if let workspace, WorkspaceConfig.isValidIdentifier(workspace),
+        RestoreService.canNameInRecovery(workspace)
+      {
+        let inspect = (command as? TaskEditCommand).map {
+          "silta task edit " + shellWord($0.ref) + " --print"
+        }
+        next = [inspect, help].compactMap { $0 }.map { workspaceCommand($0, workspace: workspace) }
+      } else {
+        next = [help]
+      }
+      failure = CommandFailure(error: body, next: next)
+    } else if let coded = failure as? any CodedError {
       var recoveryCommand = command
       // Approval hints retain caller selection; operation logs retain captured selection.
       if coded is ActorError { recoveryCommand.global.ws = explicitWorkspace }

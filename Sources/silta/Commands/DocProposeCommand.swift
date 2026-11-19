@@ -36,7 +36,7 @@ struct DocProposeCommand: OutputCommand {
       slug: slug, title: title, about: about.isEmpty ? nil : about, base: base, task: task, why: why
     )
     let input: (() throws -> String)? = file.map { file in
-      { try DocInputFile.read(file, command: "silta doc propose") }
+      { try BodyInput.read(file) }
     }
     let result = try DocProposalService(
       environment: context.environment, workspace: global.ws, approved: global.approved

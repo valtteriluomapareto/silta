@@ -56,7 +56,7 @@ struct TaskEditCommand: OutputCommand {
       ).reporting(context.taskWorkspace(global.ws))
     }
     let result = try service.edit(ref, allowSecret: allowSecret) { original in
-      if let file { return try read(file) }
+      if let file { return try BodyInput.read(file) }
       return try edit(original, environment: context.environment)
     }
     return TaskOutput.receipt(
@@ -65,17 +65,6 @@ struct TaskEditCommand: OutputCommand {
         ? "unchanged" : "edited: " + result.result.changed.joined(separator: ", "),
       approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
-  }
-
-  private func read(_ path: String) throws -> String {
-    do {
-      let data =
-        try path == "-"
-        ? FileHandle.standardInput.readToEnd() ?? Data()
-        : Data(contentsOf: URL(filePath: path))
-      guard let text = String(data: data, encoding: .utf8) else { throw TaskError.input }
-      return text
-    } catch { throw TaskError.input }
   }
 
   private func edit(_ original: String, environment: SiltaEnvironment) throws -> String? {
@@ -88,7 +77,7 @@ struct TaskEditCommand: OutputCommand {
     do {
       try original.write(to: path, atomically: true, encoding: .utf8)
       guard try TerminalEditor.run(path, command: "silta task edit") == 0 else { return nil }
-      return try read(path.path)
+      return try String(contentsOf: path, encoding: .utf8)
     } catch let error as any CodedError {
       throw error
     } catch { throw TaskError.input }

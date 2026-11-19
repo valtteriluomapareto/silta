@@ -117,7 +117,7 @@ full_swift() {
     echo "verify ${mode}: a wall-clock deadline test was skipped" >&2
     exit 1
   fi
-  for suite in WallClockHookTests WallClockGitTests WallClockWhereTests; do
+  for suite in WallClockHookTests WallClockGitTests WallClockWhereTests WallClockBodyInputTests; do
     if ! grep -q "Suite ${suite} passed" "$last_test_log"; then
       echo "verify ${mode}: ${suite} did not run" >&2
       exit 1

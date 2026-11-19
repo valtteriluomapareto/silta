@@ -47,7 +47,7 @@ struct TaskFromPlanCommand: OutputCommand {
       try context.environment.actor.requireHuman(
         command: options.retryCommand + " --allow-secret", approved: global.approved)
     }
-    let text = try read()
+    let text = try BodyInput.read(file)
     let result = try await TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved
     )
@@ -85,16 +85,5 @@ struct TaskFromPlanCommand: OutputCommand {
       data: result, warnings: result.warnings + unused,
       approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
-  }
-
-  private func read() throws -> String {
-    do {
-      let data =
-        try file == "-"
-        ? FileHandle.standardInput.readToEnd() ?? Data()
-        : Data(contentsOf: URL(filePath: file))
-      guard let text = String(data: data, encoding: .utf8) else { throw TaskError.input }
-      return text
-    } catch { throw TaskError.input }
   }
 }

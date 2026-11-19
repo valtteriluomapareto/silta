@@ -47,15 +47,6 @@ struct TaskBody: ParsableArguments {
   func readContent(command: String) throws -> String? {
     try validateChoice(command: command)
     guard let file else { return message }
-    do {
-      let data =
-        try file == "-"
-        ? FileHandle.standardInput.readToEnd() ?? Data()
-        : Data(contentsOf: URL(filePath: file))
-      guard let text = String(data: data, encoding: .utf8) else { throw TaskError.input }
-      return text
-    } catch {
-      throw TaskError.input
-    }
+    return try BodyInput.read(file)
   }
 }
