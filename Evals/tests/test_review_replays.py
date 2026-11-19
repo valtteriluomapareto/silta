@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import shlex
 import shutil
@@ -42,13 +43,13 @@ class ReviewReplays(unittest.TestCase):
             phase, = evidence['phases']
             if harness == 'claude':
                 phase['opaque'] = [
-                    {'name': 'Glob', 'input': {'pattern': '**/PLAN.md'}},
-                    {'name': 'Read', 'input': {'file_path': 'PLAN.md'}},
-                    {'name': 'Grep', 'input': {'pattern': 'TODO.md'}},
-                    {'name': 'TodoWrite', 'input': {'todos': [{'content': 'Read PLAN.md'}]}},
-                    {'name': 'Edit', 'input': {'file_path': 'README.md', 'new_string': 'See PLAN.md'}},
+                    {'type': 'tool_use', 'name': 'Glob', 'input': {'pattern': '**/PLAN.md'}},
+                    {'type': 'tool_use', 'name': 'Read', 'input': {'file_path': 'PLAN.md'}},
+                    {'type': 'tool_use', 'name': 'Grep', 'input': {'pattern': 'TODO.md'}},
+                    {'type': 'tool_use', 'name': 'TodoWrite', 'input': {'todos': [{'content': 'Read PLAN.md'}]}},
+                    {'type': 'tool_use', 'name': 'Edit', 'input': {'file_path': 'README.md', 'new_string': 'See PLAN.md'}},
                 ]
-                write = {'name': 'Write', 'input': {'file_path': 'PLAN.md', 'content': 'Acme plan'}}
+                write = {'type': 'tool_use', 'name': 'Write', 'input': {'file_path': 'PLAN.md', 'content': 'Acme plan'}}
             else:
                 phase['opaque'] = [
                     {'id': 'search', 'type': 'mcp_tool_call', 'arguments': {'pattern': '**/PLAN.md'}},
@@ -62,7 +63,11 @@ class ReviewReplays(unittest.TestCase):
             graded = evals.grade(evidence)
             self.assertFalse(graded['checks']['no_forbidden'])
             self.assertEqual(graded['metrics']['forbidden_attempts'], 1)
-            if harness == 'codex':
+            if harness == 'claude':
+                phase['opaque'].append({'type': 'tool_use', 'name': 'NotebookEdit',
+                                        'input': {'notebook_path': 'notes/plan.ipynb'}})
+                self.assertEqual(evals.grade(evidence)['metrics']['forbidden_attempts'], 2)
+            else:
                 phase['opaque'].extend([write, dict(write, id='another-change')])
                 self.assertEqual(evals.grade(evidence)['metrics']['forbidden_attempts'], 2)
 
@@ -196,24 +201,27 @@ class ReviewReplays(unittest.TestCase):
         client.chmod(0o755)
         output = self.root / 'launcher-output'
         output.mkdir()
-        profile = evals.RunProfile('claude', client, output, evals.isolated_env, evals.execute)
+        shell_env = dict(os.environ, HOME=str(self.root), ZDOTDIR=str(self.root))
+        with patch.dict(os.environ, HOME=str(self.root)):
+            profile = evals.RunProfile('claude', client, output, evals.isolated_env, evals.execute)
         self.addCleanup(shutil.rmtree, profile.root)
         capture = io.StringIO()
         def login(_):
             command = capture.getvalue().split('Sign in once in another terminal:\n', 1)[1].splitlines()[0]
-            run = subprocess.run(['/bin/zsh', '-c', command], cwd=ordinary, capture_output=True, text=True)
+            run = subprocess.run(['/bin/zsh', '-c', command], cwd=ordinary, env=shell_env,
+                                 capture_output=True, text=True)
             self.assertEqual(run.returncode, 0, run.stderr)
             observed = json.loads(run.stdout)
             self.assertEqual(Path(observed['cwd']), profile.root / 'acme-login')
             self.assertFalse(observed['ordinary'])
             self.assertEqual(Path(observed['config']), profile.directory)
-            import os
-            self.assertEqual(observed['home'], os.environ['HOME'] if sys.platform == 'darwin' else str(profile.home))
+            self.assertEqual(observed['home'], str(self.root if sys.platform == 'darwin' else profile.home))
             return 'signed-in'
         with patch('builtins.input', side_effect=login), contextlib.redirect_stdout(capture):
             profile.sign_in()
             profile.instructions()
-        logout = subprocess.run([str(profile.launcher), 'auth', 'logout'], cwd=ordinary, capture_output=True, text=True)
+        logout = subprocess.run([str(profile.launcher), 'auth', 'logout'], cwd=ordinary, env=shell_env,
+                                capture_output=True, text=True)
         self.assertEqual(logout.returncode, 0, logout.stderr)
         self.assertEqual(json.loads(logout.stdout)['args'], ['auth', 'logout'])
         self.assertEqual(Path(json.loads(logout.stdout)['cwd']), profile.root / 'acme-login')
@@ -224,7 +232,8 @@ class ReviewReplays(unittest.TestCase):
         end = text.index('Evals/run.sh --silta', start)
         snippet = text[start:end] + '\nprintf "MODELS=%s,%s\\n" "$eval_claude_model" "$eval_codex_model"\n'
         run = subprocess.run(['/bin/zsh', '-eu', '-c', snippet], input='acme-claude\nacme-codex\n',
-                             text=True, capture_output=True, cwd=self.root)
+                             text=True, capture_output=True, cwd=self.root,
+                             env=dict(os.environ, HOME=str(self.root), ZDOTDIR=str(self.root)))
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn('MODELS=acme-claude,acme-codex', run.stdout)
 

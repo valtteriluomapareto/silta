@@ -258,6 +258,8 @@ class Profiles(unittest.TestCase):
         phase, = evidence['phases']
         self.assertEqual(phase['exit'], exit_code)
         self.assertEqual(phase['tokens'], known_tokens)
+        self.assertGreater(phase['wall_time_s'], 0)
+        self.assertEqual(trial['metrics']['wall_time_s'], phase['wall_time_s'])
         self.assertTrue((output / trial['id'] / 'phase-0.jsonl').is_file())
         self.assertTrue((output / trial['id'] / 'silta.db').is_file())
         self.assertTrue((output / trial['id'] / 'cleanup.json').is_file())

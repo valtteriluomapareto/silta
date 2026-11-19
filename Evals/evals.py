@@ -618,8 +618,13 @@ def _run_trial(binary, harness, model, scenario, variant, repeat, client, output
             if budget and max_trial_tokens is None:
                 budget.start_phase()
             launch = budget.execute if max_trial_tokens is not None else execute
-            result = redact(launch([str(ROOT / 'harnesses' / (harness + '.sh')), str(client), model,
-                                   prompt, conversation], run_env, cwd, spec['timeout_s'], capture=capture), key)
+            launched_at = time.perf_counter()
+            try:
+                result = launch([str(ROOT / 'harnesses' / (harness + '.sh')), str(client), model,
+                                 prompt, conversation], run_env, cwd, spec['timeout_s'], capture=capture)
+            finally:
+                observed['wall_time_s'] = time.perf_counter() - launched_at
+            result = redact(result, key)
             observed.update(exit=result['exit'], process_exit=result.get('process_exit', result['exit']))
             stage = 'decode'
             result['stdout'], result['stderr'] = capture.text('stdout'), capture.text('stderr')
@@ -762,10 +767,14 @@ def github_issue_api_write(arguments):
         flag, equals, value = word.partition('=')
         if flag in ('--method', '-X'):
             method = (value if equals else next(words, '')).upper()
+        elif word.startswith('-X') and len(word) > 2:
+            method = word[2:].upper()
         elif flag in ('--field', '--raw-field', '-F', '-f', '--input'):
             has_body = True
             if not equals:
                 next(words, '')
+        elif word.startswith(('-f', '-F')) and len(word) > 2:
+            has_body = True
         elif flag in ('--hostname', '--header', '-H', '--cache', '--jq', '-q', '--template', '-t'):
             if not equals:
                 next(words, '')
@@ -804,7 +813,7 @@ def plan_path(value):
     path = Path(value.lower())
     if path.suffix == '.plan':
         return True
-    return path.suffix in ('', '.md', '.markdown', '.txt', '.rst', '.adoc') and bool(
+    return path.suffix in ('', '.md', '.markdown', '.txt', '.rst', '.adoc', '.ipynb') and bool(
         {'plan', 'plans', 'todo', 'todos'} & set(re.split(r'[-_. ]+', path.stem)))
 
 
@@ -827,7 +836,7 @@ def native_plan_writes(phase):
             if any(plan_path(path) for path in paths):
                 seen.add(identifier)
                 yield 'native file tool: ' + kind + ' ' + ', '.join(path for path in paths if plan_path(path))
-        elif tool.get('name') in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
+        elif kind == 'tool_use' and tool.get('name') in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
             arguments = tool.get('input')
             if isinstance(arguments, dict):
                 path = arguments.get('notebook_path' if tool['name'] == 'NotebookEdit' else 'file_path')
@@ -1336,12 +1345,100 @@ def known_sum(values):
     return sum(values) if values and all(valid_number(value) for value in values) else None
 
 
+BRIEF_COMMANDS = ('silta brief', 'silta task show')
+MEASURED_CONTEXT = ('brief_calls', 'brief_output_tokens_estimate', 'observed_error_recoveries', 'wall_time_s')
+
+
+def printed_next(output):
+    """Read only a complete refusal envelope or the CLI's text refusal header."""
+    try:
+        value = json.loads(output)
+    except ValueError:
+        lines = output.splitlines()
+        if lines and lines[0].startswith('error: '):
+            return [line.removeprefix('next: ') for line in lines[1:] if line.startswith('next: ')]
+        return None
+    if isinstance(value, dict) and value.get('schema') == 1 and value.get('ok') is False:
+        error = value.get('error')
+        if isinstance(error, dict) and isinstance(error.get('code'), str):
+            hints = error.get('next', [])
+            if isinstance(hints, list) and all(isinstance(hint, str) for hint in hints):
+                return hints
+    return None
+
+
+def observed_recoveries(phase):
+    """Pair concrete hints with the next unambiguous native call within the same phase."""
+    calls = phase.get('tool_results', [])
+    if not phase.get('complete') or phase.get('opaque') or (
+            Counter(phase.get('commands', [])) != Counter(call.get('command') for call in calls)):
+        return None
+    if any(type(call.get(field)) is not int
+           for call in calls for field in ('native_start', 'native_end', 'exit')):
+        return None
+    ordered = sorted(calls, key=lambda call: call['native_start'])
+    if any(a['native_end'] >= b['native_start'] for a, b in zip(ordered, ordered[1:])):
+        return None
+    count = 0
+    for call, following in zip(ordered, ordered[1:]):
+        if call['exit'] == 0:
+            continue
+        source = shell_program(phase, call['command'], call).isolated()
+        if not source:
+            return None
+        if Path(source[0]).name != 'silta':
+            continue
+        hints = printed_next(call['output'])
+        if hints is None:
+            return None
+        if hints:
+            actual = shell_program(phase, following['command'], following).single()
+            candidates = [argv for hint in hints if (argv := literal_argv(hint))
+                          and not any(re.search(r'<[^>]+>', arg) for arg in argv)]
+            if not actual or not candidates:
+                return None
+            count += actual in candidates
+    return count
+
+
+def brief_output_tokens(phase):
+    """Estimate only when every logged successful brief/show has isolated native output."""
+    logs = phase.get('logs')
+    if not isinstance(logs, list):
+        return None
+    expected = Counter(log['command'] for log in logs
+                       if log['command'] in BRIEF_COMMANDS and log.get('exit_code') == 0)
+    actual = Counter()
+    estimate = 0
+    for call in phase.get('tool_results', []):
+        output = call.get('output')
+        if call.get('exit') != 0 or not isinstance(output, str):
+            continue
+        argv = normalized_silta(shell_program(phase, call['command'], call).single())
+        name = next((name for name in BRIEF_COMMANDS if command_log_match(argv, name)), None)
+        if name is not None:
+            actual[name] += 1
+            estimate += (len(output) + 3) // 4
+    return estimate if actual == expected else None
+
+
+def context_metrics(phases):
+    return {
+        'brief_calls': known_sum(
+            sum(log.get('command') in BRIEF_COMMANDS for log in phase['logs'])
+            if isinstance(phase.get('logs'), list) else None for phase in phases),
+        'brief_output_tokens_estimate': known_sum(brief_output_tokens(phase) for phase in phases),
+        'observed_error_recoveries': known_sum(observed_recoveries(phase) for phase in phases),
+        'wall_time_s': known_sum(phase.get('wall_time_s') for phase in phases),
+    }
+
+
 def failure_metrics(e):
     """Use completed observations only; no fallible grading helpers are retried."""
     phases = e.get('phases', [])
     logs_known = bool(phases) and all(isinstance(p.get('logs'), list) for p in phases)
     calls = [row for p in phases for row in (p.get('logs') or [])]
-    return {**backend_read_metrics(e),
+    return {**backend_read_metrics(e), **context_metrics(phases),
             'legacy_mentioned': bool(set(LEGACY_CATEGORIES) & backend_categories(e)),
             'silta_calls': len(calls) if logs_known else None,
             'ctx_calls': sum(row.get('command') in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for row in calls) if logs_known else None,
@@ -1355,7 +1452,7 @@ def metrics(e):
     phases = e['phases']
     calls = [log for phase in phases for log in phase['logs']]
     counts = [p.get('tokens', tokens(p['usage'])) for p in phases]
-    return {**backend_read_metrics(e),
+    return {**backend_read_metrics(e), **context_metrics(phases),
             'legacy_mentioned': bool(set(LEGACY_CATEGORIES) & backend_categories(e)),
             'silta_calls': len(calls),
             'ctx_calls': sum(log['command'] in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for log in calls),
@@ -1400,6 +1497,7 @@ def aggregate(trials, provenance):
                            if type(t['metrics'].get('legacy_mentioned')) is bool else None
                            for t in selected),
                        'ctx_calls': known_sum(t['metrics']['ctx_calls'] for t in selected),
+                       **{key: known_sum(t['metrics'].get(key) for t in selected) for key in MEASURED_CONTEXT},
                        'usage_errors': known_sum(t['metrics']['usage_errors'] for t in selected),
                        'forbidden_attempts': known_sum(t['metrics']['forbidden_attempts'] for t in selected),
                        'cost_usd': sum(t['metrics']['cost_usd'] for t in selected)
@@ -1413,16 +1511,17 @@ def render_html(report):
     escape = lambda value: html.escape(str(value), quote=True)
     status = ('<p>' + escape({k: report[k] for k in RUN_FIELDS if k in report}) + '</p>'
               if 'aborted' in report else '')
-    rows = ''.join('<tr>' + ''.join('<td>' + escape(g[key]) + '</td>' for key in
-                   ('harness', 'model', 'scenario', 'diagnostic', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads', 'legacy_mentioned', 'usage_errors', 'forbidden_attempts', 'cost_usd')) + '</tr>' for g in report['groups'])
+    rows = ''.join('<tr>' + ''.join('<td>' + escape(g.get(key)) + '</td>' for key in
+                   ('harness', 'model', 'scenario', 'diagnostic', 'repeats', 'pass_rate', 'all_repeats_pass', 'silta_calls', 'ctx_calls', 'silta_backend_reads', 'direct_backend_reads', 'possible_direct_backend_reads', 'legacy_mentioned', 'usage_errors', 'forbidden_attempts', 'cost_usd', *MEASURED_CONTEXT)) + '</tr>' for g in report['groups'])
     links = ''.join('<li><a href="' + escape(t['evidence']) + '">' + escape(t['id']) + '</a>: '
                     + escape({k: t.get(k) for k in ('provider', 'operator', 'operator_source', 'reviewer')})
-                    + ' tokens=' + escape(t['metrics'].get('tokens')) + ' ' + escape(t['checks'])
+                    + ' tokens=' + escape(t['metrics'].get('tokens')) + ' '
+                    + escape({key: t['metrics'].get(key) for key in MEASURED_CONTEXT}) + ' ' + escape(t['checks'])
                     + (' error=' + escape(t['error']) if t.get('error') else '') + '</li>' for t in report['trials'])
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><title>Silta evals</title>'
             '<h1>Silta evals: ' + escape(report['provenance']) + '</h1><p>Stub replay is infrastructure proof only. Live checks require evidence review.</p>'
             + status
-            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Diagnostic</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Backend via Silta</th><th>Direct backend</th><th>Possible direct backend</th><th>Legacy mentioned</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th></tr>'
+            + '<table border="1"><tr><th>Harness</th><th>Model</th><th>Scenario</th><th>Diagnostic</th><th>Repeats</th><th>Pass rate</th><th>All repeats</th><th>Silta calls</th><th>Ctx</th><th>Backend via Silta</th><th>Direct backend</th><th>Possible direct backend</th><th>Legacy mentioned</th><th>Usage errors</th><th>Forbidden</th><th>Cost USD (None = unknown)</th><th>Brief/show calls</th><th>Brief output tokens (estimate)</th><th>Observed recoveries</th><th>Wall time (s)</th></tr>'
             + rows + '</table><ul>' + links + '</ul></html>')
 
 

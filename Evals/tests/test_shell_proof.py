@@ -87,12 +87,14 @@ class ShellProof(unittest.TestCase):
             'gh issue comment 1 --body Acme', 'gh issue close 1', 'gh pr create --title Acme',
             'gh api repos/acme/example/issues -f title=Acme',
             'gh api --method PATCH repos/acme/example/issues/1',
+            'gh api -XPOST repos/acme/example/issues',
             'gh api repos/acme/example/issues/1/comments --input acme.json',
             'az boards work-item update --id 1 --title Acme',
         ]
         reads = [
             'gh issue view 1', 'gh pr list', 'gh api repos/acme/example/issues',
             'gh api --method GET repos/acme/example/issues -f state=open',
+            'gh api -XGET repos/acme/example/issues -fstate=open',
             'az boards work-item show --id 1', 'az boards query --wiql Acme',
         ]
         for command in writes + reads:
