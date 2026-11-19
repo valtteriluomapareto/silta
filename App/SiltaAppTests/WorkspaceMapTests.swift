@@ -6,7 +6,7 @@
   import Testing
 
   @MainActor struct WorkspaceMapTests {
-    @Test func geometryCentresColumnsAndRoutesSkipEdgesAroundNodes() throws {
+    @Test func geometryCentresColumnsAndDropsServiceLinesIntoTheRowBelow() throws {
       try fixture { reader in
         let map = try reader.workspaceMap(workspace: "acme")
         let layout = AppMapLayout(map: map)
@@ -14,12 +14,34 @@
         let backend = try #require(geometry.frames["acme-backend"])
         let mobile = try #require(geometry.frames["acme-mobile"])
         let web = try #require(geometry.frames["acme-web"])
+        let push = try #require(geometry.frames["service:push"])
+        let payments = try #require(geometry.frames["service:payments"])
         #expect(backend.midY == (mobile.midY + web.midY) / 2)
-        #expect(abs(geometry.size.width - (32 * 2 + 3 * 176 + 2 * 136)) < 0.5)
-        let skip = geometry.route(from: "acme-mobile", to: "service:push", back: false)
-        #expect(skip.count == 3)
-        let run = skip[1]
-        #expect(!(backend.minY < run.start.y && run.start.y < backend.maxY))
+        #expect(abs(geometry.size.width - (32 * 2 + 2 * 176 + 136)) < 0.5)
+        #expect(push.minY == payments.minY && push.maxX < payments.minX)
+        #expect(push.minY > max(mobile.maxY, web.maxY, backend.maxY))
+        #expect(payments.maxY < geometry.size.height)
+        let label = try #require(geometry.shelfLabel)
+        #expect(label.y > push.maxY && label.x <= push.minX)
+        let drop = geometry.route(from: "acme-backend", to: "service:payments", back: false)
+        #expect(drop.count == 2)
+        #expect(drop[0].start == CGPoint(x: backend.midX, y: backend.maxY))
+        #expect(drop[1].end == CGPoint(x: payments.midX, y: payments.minY))
+        let around = geometry.route(from: "acme-mobile", to: "service:push", back: false)
+        #expect(around.count == 3 && around[0].start.x == mobile.maxX)
+        #expect(around.last?.end == CGPoint(x: push.midX, y: push.minY))
+        for edge in map.connections where edge.target.hasPrefix("service:") {
+          for curve in geometry.route(from: edge.source, to: edge.target, back: false) {
+            for step in 1..<20 {
+              let point = Self.point(curve, at: CGFloat(step) / 20)
+              let hits = geometry.frames.filter { key, frame in
+                key != edge.source && key != edge.target
+                  && frame.insetBy(dx: 1, dy: 1).contains(point)
+              }
+              #expect(hits.isEmpty, "\(edge.attachment) crosses \(hits.keys)")
+            }
+          }
+        }
         #expect(geometry.route(from: "acme-mobile", to: "acme-backend", back: false).count == 1)
         #expect(WorkspaceMapGeometry.fitScale(content: geometry.size, in: geometry.size) == 1)
         #expect(
@@ -81,6 +103,43 @@
       #expect(Set(points.map { "\($0.x),\($0.y)" }).count == points.count)
     }
 
+    @Test func servicesWrapPastTheAppsWidthAndLinesSpreadAcrossTheirApp() throws {
+      let services = (1...8).map { "s\($0)" }
+      let map = AppWorkspaceMap(
+        apps: Self.map(apps: ["api"], edges: []).apps,
+        services: services.map {
+          AppMapService(slug: $0, name: $0, summary: nil, attachment: "service:" + $0)
+        },
+        connections: ["s1", "s2", "s3"].map {
+          AppConnection(
+            attachment: "edge:api/service:\($0)/sdk", source: "api", target: "service:" + $0,
+            kind: "sdk", summary: "", codeReferences: [])
+        })
+      let layout = AppMapLayout(map: map)
+      let geometry = WorkspaceMapGeometry(layout: layout)
+      let first = try #require(geometry.frames["service:s1"])
+      let sixth = try #require(geometry.frames["service:s6"])
+      let seventh = try #require(geometry.frames["service:s7"])
+      let eighth = try #require(geometry.frames["service:s8"])
+      #expect(first.minY == sixth.minY && seventh.minY > first.maxY)
+      #expect(abs((seventh.minX + eighth.maxX) / 2 - (first.minX + sixth.maxX) / 2) < 0.5)
+      #expect(
+        geometry.size.width == sixth.maxX + 32 && geometry.size.height == eighth.maxY + 24 + 32)
+
+      let content = WorkspaceMapContent(
+        map: map, layout: layout, node: nil, connection: nil, search: "")
+      let starts = content.edges.sorted { $0.lane < $1.lane }.map { edge in
+        geometry.route(
+          from: edge.connection.source, to: edge.connection.target, back: edge.back,
+          lane: edge.lane, lanes: edge.lanes
+        )[0].start.x
+      }
+      let api = try #require(geometry.frames["api"])
+      #expect(starts.count == 3 && starts == starts.sorted() && Set(starts).count == 3)
+      #expect(abs(starts[1] - api.midX) < 0.5)
+      #expect(content.edges.allSatisfy { $0.toService && $0.lanes == 3 })
+    }
+
     @Test func fitScaleStaysBetweenSixtyAndOneHundredPercent() {
       #expect(
         WorkspaceMapGeometry.fitScale(
@@ -106,10 +165,27 @@
         #expect(style["edge:acme-mobile/service:push/sdk"] == .strong)
         #expect(style["edge:acme-web/acme-backend/graphql"] == .faded)
         #expect(selected.isFaded("app:acme-web") && !selected.isFaded("app:acme-backend"))
+        let push = try #require(selected.edges.first { $0.connection.target == "service:push" })
+        #expect(selected.showsLabel(push))
+
+        let idle = WorkspaceMapContent(
+          map: map, layout: layout, node: nil, connection: nil, search: "")
+        let quiet = try #require(idle.edges.first { $0.connection.target == "service:push" })
+        let app = try #require(idle.edges.first { $0.connection.target == "acme-backend" })
+        #expect(idle.style(quiet) == .quiet && !idle.showsLabel(quiet))
+        #expect(idle.style(app) == .normal && idle.showsLabel(app))
+        #expect(idle.callers(of: "service:push") == 1)
+        let picked = WorkspaceMapContent(
+          map: map, layout: layout, node: nil, connection: quiet.connection.attachment, search: "")
+        #expect(picked.style(quiet) == .strong && picked.showsLabel(quiet))
+        let service = WorkspaceMapContent(
+          map: map, layout: layout, node: "service:push", connection: nil, search: "")
+        #expect(service.style(quiet) == .strong && service.style(app) == .faded)
 
         let searched = WorkspaceMapContent(
           map: map, layout: layout, node: nil, connection: nil, search: "web shop")
         #expect(!searched.isFaded("app:acme-web") && searched.isFaded("app:acme-mobile"))
+        #expect(searched.style(quiet) == .faded)
 
         let mobile = try #require(layout.node("acme-mobile"))
         #expect(

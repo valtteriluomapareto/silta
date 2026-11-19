@@ -1,46 +1,89 @@
 import SiltaAppSupport
 import SwiftUI
 
-/// Points for a computed map layout: fixed node sizes, a fixed row pitch and columns
-/// centred on the tallest one. The layout never depends on the window size.
+/// Points for a computed map layout: fixed node sizes, a fixed row pitch and app columns
+/// centred on the tallest one. Services sit in rows under the apps, centred, wrapping once
+/// a row is wider than the apps. The layout never depends on the window size.
 nonisolated struct WorkspaceMapGeometry {
   static let appSize = CGSize(width: 176, height: 84)
-  static let serviceSize = CGSize(width: 128, height: 58)
+  static let serviceSize = CGSize(width: 120, height: 52)
   static let columnGap: CGFloat = 136
   static let rowPitch: CGFloat = 112
   static let margin: CGFloat = 32
-
   static let laneGap: CGFloat = 14
+  /// Vertical room between the apps (and their back edges) and the services row: the
+  /// lines down to services bend here.
+  static let shelfGap: CGFloat = 120
+  static let serviceGap: CGFloat = 12
+  static let shelfPitch: CGFloat = 68
+  /// The fewest services a row holds before it wraps, however narrow the apps are.
+  static let minimumPerRow = 6
 
   let frames: [String: CGRect]
   let size: CGSize
-  /// The bottom edge of the lowest node; back edges run below it.
+  /// Where the services row's overline sits, under the last row; nil without services.
+  let shelfLabel: CGPoint?
+  /// The bottom edge of the lowest app; back edges run below it.
   private let bottom: CGFloat
+  private let services: Set<String>
 
   init(layout: AppMapLayout) {
-    let rows = Dictionary(grouping: layout.nodes, by: \.column).mapValues(\.count)
+    let apps = layout.nodes.filter { !$0.isService }
+    let serviceNodes = layout.nodes.filter(\.isService)
+    let rows = Dictionary(grouping: apps, by: \.column).mapValues(\.count)
     let tallest = rows.values.max() ?? 0
+    let columns = (apps.map(\.column).max() ?? -1) + 1
     var frames: [String: CGRect] = [:]
-    for node in layout.nodes {
-      let size = node.isService ? Self.serviceSize : Self.appSize
+    for node in apps {
       let x = Self.margin + CGFloat(node.column) * (Self.appSize.width + Self.columnGap)
       let offset = CGFloat(tallest - (rows[node.column] ?? 0)) * Self.rowPitch / 2
       let centre = Self.margin + offset + CGFloat(node.row) * Self.rowPitch + Self.rowPitch / 2
       frames[node.key] = CGRect(
-        x: x, y: centre - size.height / 2, width: size.width, height: size.height)
+        x: x, y: centre - Self.appSize.height / 2, width: Self.appSize.width,
+        height: Self.appSize.height)
     }
-    self.frames = frames
-    let width =
-      layout.columnCount == 0
-      ? 0
-      : Self.margin * 2 + CGFloat(layout.columnCount) * Self.appSize.width
-        + CGFloat(layout.columnCount - 1) * Self.columnGap
+    let appsWidth =
+      columns == 0
+      ? 0 : CGFloat(columns) * Self.appSize.width + CGFloat(columns - 1) * Self.columnGap
     bottom = frames.values.map(\.maxY).max() ?? Self.margin
     let below: CGFloat =
       layout.backEdges.isEmpty
-      ? 0 : Self.rowPitch / 3 + CGFloat(layout.backEdges.count) * Self.laneGap + Self.margin / 2
-    size = CGSize(
-      width: width, height: Self.margin * 2 + CGFloat(tallest) * Self.rowPitch + below)
+      ? 0 : Self.rowPitch / 3 + CGFloat(layout.backEdges.count) * Self.laneGap
+    let appsBottom = columns == 0 ? 0 : Self.margin + CGFloat(tallest) * Self.rowPitch + below
+
+    let fit = Int(
+      (appsWidth + Self.serviceGap) / (Self.serviceSize.width + Self.serviceGap))
+    let perRow = max(Self.minimumPerRow, fit)
+    let widest = Self.rowWidth(min(perRow, serviceNodes.count))
+    let inner = max(appsWidth, widest)
+    let shelfTop = columns == 0 ? Self.margin + 24 : appsBottom + Self.shelfGap
+    for node in serviceNodes {
+      let line = node.row / perRow
+      let count = min(perRow, serviceNodes.count - line * perRow)
+      let start = Self.margin + (inner - Self.rowWidth(count)) / 2
+      let x = start + CGFloat(node.row % perRow) * (Self.serviceSize.width + Self.serviceGap)
+      frames[node.key] = CGRect(
+        origin: CGPoint(x: x, y: shelfTop + CGFloat(line) * Self.shelfPitch),
+        size: Self.serviceSize)
+    }
+    self.frames = frames
+    services = Set(serviceNodes.map(\.key))
+    let lines = (serviceNodes.count + perRow - 1) / perRow
+    let shelfBottom = shelfTop + CGFloat(lines - 1) * Self.shelfPitch + Self.serviceSize.height
+    shelfLabel =
+      serviceNodes.isEmpty
+      ? nil : CGPoint(x: Self.margin + (inner - widest) / 2, y: shelfBottom + 10)
+    let height =
+      serviceNodes.isEmpty
+      ? (columns == 0 ? 0 : appsBottom + Self.margin)
+      : shelfBottom + 24 + Self.margin
+    size =
+      layout.nodes.isEmpty ? .zero : CGSize(width: inner + Self.margin * 2, height: height)
+  }
+
+  private static func rowWidth(_ count: Int) -> CGFloat {
+    count == 0
+      ? 0 : CGFloat(count) * serviceSize.width + CGFloat(count - 1) * serviceGap
   }
 
   /// The zoom that fits the whole map in the visible area: never above 1, never below
@@ -78,11 +121,42 @@ nonisolated struct WorkspaceMapGeometry {
 
   /// The segments of an edge: one curve between neighbouring columns; across skipped
   /// columns, a straight run through the gap between rows closest to the middle; for a back
-  /// edge, a run through the column gaps and below the lowest node, entering the target
-  /// from its right; for a self-loop, a small loop to the node's right.
-  /// The middle segment carries the label.
-  func route(from source: String, to target: String, back: Bool, lane: Int = 0) -> [Curve] {
+  /// edge, a run through the column gaps and below the lowest app, entering the target
+  /// from its right; for a self-loop, a small loop to the node's right. An edge to a
+  /// service drops from the app's bottom edge, at slot `lane` of `lanes` spread across it,
+  /// straight down to below the lowest app, then bends into the top of the service. An
+  /// app with another app under it leaves from its right side and drops through the
+  /// column gap instead. The middle segment carries the label.
+  func route(
+    from source: String, to target: String, back: Bool, lane: Int = 0, lanes: Int = 1
+  ) -> [Curve] {
     guard let from = frames[source], let to = frames[target] else { return [] }
+    if services.contains(target) {
+      let end = CGPoint(x: to.midX, y: to.minY)
+      let floor = bottom + 16
+      func bend(from point: CGPoint) -> Curve {
+        let middle = (point.y + end.y) / 2
+        return Curve(
+          start: point, control1: CGPoint(x: point.x, y: middle),
+          control2: CGPoint(x: end.x, y: middle), end: end)
+      }
+      let blocked = frames.contains { key, frame in
+        !services.contains(key) && key != source && frame.minY >= from.maxY
+          && frame.minX < from.maxX && frame.maxX > from.minX
+      }
+      if blocked {
+        let step = CGFloat(min(lane, 3)) * 6
+        let start = CGPoint(x: from.maxX, y: from.maxY - 12 - step)
+        let gap = CGPoint(x: from.maxX + 12 + step, y: start.y)
+        let down = CGPoint(x: gap.x, y: floor)
+        return [.line(start, gap), .line(gap, down), bend(from: down)]
+      }
+      let spread = lanes > 1 ? min(20, (from.width - 32) / CGFloat(lanes - 1)) : 0
+      let x = from.midX + (CGFloat(lane) - CGFloat(lanes - 1) / 2) * spread
+      let start = CGPoint(x: x, y: from.maxY)
+      let down = CGPoint(x: x, y: max(floor, start.y))
+      return [.line(start, down), bend(from: down)]
+    }
     if source == target {
       let reach = 44 + CGFloat(lane) * Self.laneGap
       let start = CGPoint(x: from.maxX, y: from.midY - 12)
@@ -112,9 +186,9 @@ nonisolated struct WorkspaceMapGeometry {
     let shift = CGFloat(lane) * Self.laneGap
     let start = CGPoint(x: from.maxX, y: from.midY + shift)
     let end = CGPoint(x: to.minX, y: to.midY + shift)
-    let between = frames.values.filter {
-      $0.minX > from.maxX && $0.maxX < to.minX
-    }.map { $0.insetBy(dx: -8, dy: -10) }
+    let between = frames.filter { key, frame in
+      !services.contains(key) && frame.minX > from.maxX && frame.maxX < to.minX
+    }.values.map { $0.insetBy(dx: -8, dy: -10) }
     guard !between.isEmpty else { return [.bend(start, end)] }
     let goal = (start.y + end.y) / 2
     let candidates =

@@ -25,10 +25,14 @@ struct WorkspaceMapView: View {
                 .position(x: frame.midX, y: frame.midY)
             }
           }
-          ForEach(content.edges, id: \.connection.attachment) { edge in
+          if let point = geometry.shelfLabel {
+            Overline("Services · \(map.services.count)").fixedSize()
+              .offset(x: point.x, y: point.y).accessibilityAddTraits(.isHeader)
+          }
+          ForEach(content.edges.filter(content.showsLabel), id: \.connection.attachment) { edge in
             if let point = geometry.route(
               from: edge.connection.source, to: edge.connection.target, back: edge.back,
-              lane: edge.lane
+              lane: edge.lane, lanes: edge.lanes
             ).labelPoint {
               label(edge, content: content).position(point)
             }
@@ -60,7 +64,7 @@ struct WorkspaceMapView: View {
       for edge in content.edges {
         let curves = geometry.route(
           from: edge.connection.source, to: edge.connection.target, back: edge.back,
-          lane: edge.lane)
+          lane: edge.lane, lanes: edge.lanes)
         guard let last = curves.last else { continue }
         var path = Path()
         path.move(to: curves[0].start)
@@ -69,11 +73,16 @@ struct WorkspaceMapView: View {
         }
         let style = content.style(edge)
         let color = style == .strong ? Color("AccentColor") : Color("Ink").opacity(0.45)
-        let width: CGFloat = style == .strong ? 2.5 : 1.5
+        let width: CGFloat = style == .strong ? 2.5 : edge.toService ? 1.2 : 1.5
         let stroke = StrokeStyle(
           lineWidth: width, lineCap: .round, dash: edge.back ? [5, 4] : [])
         var layer = context
-        layer.opacity = style == .faded ? 0.35 : 1
+        layer.opacity =
+          switch style {
+          case .strong, .normal: 1
+          case .quiet: 0.5
+          case .faded: edge.toService ? 0.2 : 0.35
+          }
         layer.stroke(path, with: .color(color), style: stroke)
         layer.stroke(
           arrowhead(to: last.end, from: last.control2 == last.end ? last.start : last.control2),
@@ -105,7 +114,7 @@ struct WorkspaceMapView: View {
       focused = true
     } label: {
       if node.isService {
-        serviceCard(node)
+        serviceCard(node, callers: content.callers(of: node.key))
       } else if let app = map.apps.first(where: { $0.slug == node.key }) {
         appCard(app)
       }
@@ -162,11 +171,12 @@ struct WorkspaceMapView: View {
     .seaCard(radius: 16)
   }
 
-  private func serviceCard(_ node: AppMapLayout.Node) -> some View {
+  private func serviceCard(_ node: AppMapLayout.Node, callers: Int) -> some View {
     VStack(alignment: .leading, spacing: 2) {
-      Overline("Service")
       Text(String(node.key.dropFirst("service:".count))).font(.system(size: 13, weight: .semibold))
         .lineLimit(1)
+      Text(callers == 1 ? "1 app" : "\(callers) apps").font(.system(size: 11))
+        .foregroundStyle(Color("SecondaryInk"))
     }
     .foregroundStyle(Color("Ink"))
     .padding(.horizontal, 12)

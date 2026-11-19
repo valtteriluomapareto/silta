@@ -38,7 +38,14 @@ the human copies.
   progress, and a task inspector shows the plan, claim,
   properties and discussion.
 - **Workspace:** apps and connections with a connection inspector, read from the
-  workspace model rather than YAML.
+  workspace model rather than YAML. Paper "Map v2":
+  - The map keeps app columns in call order. Services sit in a row under the apps,
+    ordered by their callers' columns, and wrap past the apps' width. Lines to services
+    are faint and unlabelled until an app, service or connection is selected.
+  - The List shows one flat row per app in the same call order, with its open count and
+    the services it uses. Opening a row adds who calls it, what it calls (with doc
+    counts) and how it uses each service. Services follow, most shared first; those used
+    by one app fold into one line.
 - **Docs:** a three-column view with Document, Changes and Comments tabs, a revision
   menu and paging.
 - **Copy:**
