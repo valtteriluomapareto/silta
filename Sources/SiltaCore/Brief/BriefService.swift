@@ -110,7 +110,7 @@ package struct BriefService {
           BriefSection(
             id: "blockers",
             text:
-              HumanText.line(error.message) + "\n" + BriefDiscussion.quoted(waiting.why) + followUp
+              error.message + "\n" + BriefDiscussion.quoted(waiting.why) + followUp
               + next.map { "next: " + $0 + "\n" }.joined()
           ))
       }

@@ -45,9 +45,7 @@ struct WorkspaceCommandTests {
       for flags in [[], ["--quiet"]] {
         let shown = try SiltaBinary.run(["ws", "ls"] + flags, in: scratch)
         #expect(shown.termination == .exit(0))
-        withKnownIssue("#254: the workspace list prints stored controls in a column") {
-          #expect(shown.stdout.contains("acme\tAcme Projects  Work Team\tAC\n"))
-        }
+        #expect(shown.stdout.contains("acme\tAcme Projects  Work Team\tAC\n"))
       }
       let result = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
       let data = try TaskStateRegressionTests.data(result)

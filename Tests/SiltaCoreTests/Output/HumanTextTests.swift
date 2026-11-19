@@ -23,5 +23,8 @@ struct HumanTextTests {
     #expect(seen.contains("[REDACTED:"))
     #expect(!seen.contains("Acme sample identifier"))
     #expect(seen.hasSuffix("Acme remaining paragraph"))
+    let framed = HumanText.framed(body)
+    #expect(framed.hasSuffix("\n\n\nAcme remaining paragraph"))
+    #expect(!framed.contains("Acme sample identifier"))
   }
 }

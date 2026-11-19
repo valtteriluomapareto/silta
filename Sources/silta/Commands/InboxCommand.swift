@@ -103,7 +103,9 @@ struct InboxCommand: OutputCommand {
     for task in tasks {
       lines += indented(task.ref + ": " + HumanText.line(task.title))
       if let on = task.on {
-        lines += indented("waiting on: " + (on.isEmpty ? "an answer" : on.joined(separator: ", ")))
+        lines += indented(
+          "waiting on: "
+            + (on.isEmpty ? "an answer" : on.map(HumanText.line).joined(separator: ", ")))
       }
       if let why = task.why { lines += indented("ask: " + HumanText.body(why)) }
       if let day = task.followUpAt { lines += indented("follow-up: " + day) }

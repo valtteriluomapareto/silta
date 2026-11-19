@@ -3,15 +3,16 @@ import Foundation
 /// Collapses completed runs while preserving original open-step numbering and bodies.
 enum BriefPlan {
   static func section(_ plan: String, ref: String, revision: Int) -> BriefSection {
-    let safe = HumanText.body(plan)
-    let boxes = MarkdownPlan.checkboxes(safe)
-    let lines = MarkdownPlan.numbered(safe).components(separatedBy: "\n")
-    var body = boxes.first.map { lines[..<$0.line].joined(separator: "\n") } ?? safe
+    let boxes = MarkdownPlan.checkboxes(plan)
+    let source = plan.components(separatedBy: "\n")
+    let numbered = HumanText.framed(MarkdownPlan.numbered(plan))
+    let lines = numbered.components(separatedBy: "\n")
+    var body = boxes.first.map { lines[..<$0.line].joined(separator: "\n") } ?? numbered
     if !body.isEmpty, !body.hasSuffix("\n") { body += "\n" }
     func collapsible(_ index: Int) -> Bool {
       guard boxes[index].done else { return false }
       let end = index + 1 < boxes.count ? boxes[index + 1].line : lines.count
-      let nested = Array(lines[(boxes[index].line + 1)..<end])
+      let nested = Array(source[(boxes[index].line + 1)..<end])
       return !MarkdownPlan.visibleLines(nested).contains {
         let line = nested[$0]
         let indentation = line.prefix { $0 == " " || $0 == "\t" }

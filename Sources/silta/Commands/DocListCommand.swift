@@ -26,7 +26,7 @@ struct DocListCommand: OutputCommand {
     let workspace = try context.workspace(global.ws)
     let result = try DocService(workspace: workspace, store: context.environment.db)
       .list(about: about, archived: archived, offset: offset, limit: limit, document: document)
-    let text = HumanText.body(result.output)
+    let text = HumanText.framed(result.output)
     return CommandOutput(text: text, quiet: text, data: result).reporting(workspace)
   }
 }

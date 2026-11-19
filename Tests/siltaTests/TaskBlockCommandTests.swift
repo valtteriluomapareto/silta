@@ -81,13 +81,23 @@ struct TaskBlockPrivacyCommandTests {
       let raw = try TaskStateRegressionTests.data(run(["task", "show", "AC-1", "--json"]))
       let waiting = try #require(raw["waiting"] as? [String: Any])
       #expect(waiting["on"] as? [String] == [target])
-      withKnownIssue("#254: stored blocker labels are printed without a terminal projection") {
-        #expect(
-          show.stdout.contains("Waiting on " + displayed)
-            && inbox.stdout.contains("waiting on: " + displayed)
-            && start.stderr.contains("waiting on " + displayed)
-            && unblock.stderr.contains(displayed)
-            && !(show.stdout + inbox.stdout + start.stderr + unblock.stderr).contains("\u{2028}"))
+      #expect(
+        show.stdout.contains("Waiting on " + displayed)
+          && inbox.stdout.contains("waiting on: " + displayed)
+          && start.stderr.contains("waiting on " + displayed)
+          && unblock.stderr.contains(displayed)
+          && !(show.stdout + inbox.stdout + start.stderr + unblock.stderr).contains("\u{2028}"))
+      for (action, text, code, actor) in [
+        ("start", start, "blocked", "agent"), ("unblock", unblock, "human_only", "human"),
+      ] {
+        let receipt = try run(["task", action, "AC-1", "--json"])
+        let error = try TaskStateRegressionTests.error(receipt)
+        #expect(receipt.termination == text.termination)
+        #expect(error["code"] as? String == code && error["next_by"] as? String == actor)
+        #expect((error["message"] as? String)?.contains(displayed) == true)
+        let next = try #require(error["next"] as? [String])
+        let prefix = actor == "human" ? "ask human: " : "next: "
+        #expect(text.stderr.hasSuffix(next.map { prefix + $0 + "\n" }.joined()))
       }
     }
   }

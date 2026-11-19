@@ -114,14 +114,12 @@ struct DocEvidenceReadCommandTests {
       let continued = try run(["--lines", range], scratch)
       let items = (page.stdout + continued.stdout).split(separator: "\n")
         .filter { $0.hasPrefix("Acme ") }.map(String.init)
-      withKnownIssue("#254: terminal projection changes the selected document lines") {
-        #expect(
-          one.stdout == displayedRow + "\n"
-            && diff.stdout.contains("+" + displayedRow + "\n")
-            && page.stdout.split(separator: "\n").count <= 400
-            && items == [displayedRow] + following,
-          "The terminal page and selected row must keep the JSON line coordinates.")
-      }
+      #expect(
+        one.stdout == displayedRow + "\n"
+          && diff.stdout.contains("+" + displayedRow + "\n")
+          && page.stdout.split(separator: "\n").count <= 400
+          && items == [displayedRow] + following,
+        "The terminal page and selected row must keep the JSON line coordinates.")
       #expect(page.stdout.contains(footer))
     }
   }

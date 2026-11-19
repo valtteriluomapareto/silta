@@ -156,12 +156,10 @@ struct BriefCommandTests {
       let section = try #require(sections.first { $0["id"] as? String == "plan" })
       let text = try #require(section["text"] as? String)
       let expected = "1. [ ] Read - [ ] examples\n2. [ ] Write Acme\n"
-      withKnownIssue("#254: terminal projection introduces an extra numbered step") {
-        #expect(
-          shown.stdout.contains(expected) && brief.stdout.contains(expected)
-            && text.contains(expected),
-          "All three projections must show the same two addressable steps.")
-      }
+      #expect(
+        shown.stdout.contains(expected) && brief.stdout.contains(expected)
+          && text.contains(expected),
+        "All three projections must show the same two addressable steps.")
       let tick = try task(["plan", "AC-1", "--step", "2", "--done"])
       #expect(tick.stdout == "AC-1 step 2 done: Write Acme (1/2)\n")
     }

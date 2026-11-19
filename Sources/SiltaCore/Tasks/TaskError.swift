@@ -92,7 +92,7 @@ package enum TaskError: CodedError, Equatable {
   package var message: String {
     switch self {
     case .blocked(let ref, let waiting):
-      "\(ref) is blocked, waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d."
+      "\(ref) is blocked, waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.map(HumanText.line).joined(separator: ", ")) for \(waiting.ageDays) d."
         + (waiting.dropped.isEmpty ? "" : " Blocker dropped: re-plan.")
     case .promoted(let ref, let external): "\(ref) is read-only; work in tracker \(external)."
     case .blockedPromotion(let ref, _): "\(ref) is blocked; unblock it before promoting it."

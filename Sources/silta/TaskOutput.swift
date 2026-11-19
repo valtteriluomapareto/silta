@@ -68,7 +68,7 @@ enum TaskOutput {
 
   static func waitingLines(_ waiting: TaskWaiting) -> [String] {
     var lines = [
-      "Waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d: \(HumanText.line(waiting.why))"
+      "Waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.map(HumanText.line).joined(separator: ", ")) for \(waiting.ageDays) d: \(HumanText.line(waiting.why))"
     ]
     if waiting.ready { lines.append("Ready to unblock.") }
     if !waiting.dropped.isEmpty {
@@ -92,7 +92,7 @@ enum TaskOutput {
     for (heading, text) in [
       ("Description", HumanText.body(task.description)),
       ("Acceptance", HumanText.body(task.acceptance)),
-      ("Plan (revision \(task.planRev))", MarkdownPlan.numbered(HumanText.body(task.plan))),
+      ("Plan (revision \(task.planRev))", HumanText.framed(MarkdownPlan.numbered(task.plan))),
       ("Result", HumanText.body(task.result ?? "")),
     ] where !text.isEmpty {
       lines.append("\n\(heading):\n\(text)")
