@@ -4,6 +4,7 @@
 |---|---|
 | Agents working in this repo | [`../AGENTS.md`](../AGENTS.md) |
 | New users: what Silta is, install | [`../README.md`](../README.md) |
+| Inbox, proposals, questions and approvals | [`human-guide.md`](human-guide.md) |
 | New users: install to first task in their workspace | [`getting-started.md`](getting-started.md) |
 | Annotated app, repo and edge configuration | [`examples/acme-workspace.yaml`](examples/acme-workspace.yaml) |
 | Contributors (toolchain, commands, workflow) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |

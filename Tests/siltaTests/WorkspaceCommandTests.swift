@@ -19,11 +19,17 @@ struct WorkspaceCommandTests {
         let suffix = json ? ["--json"] : []
         let listed = try SiltaBinary.run(["ws", "ls"] + suffix, in: scratch)
         #expect(listed.termination == .exit(0))
+        if !json {
+          #expect(listed.stdout.hasPrefix("SLUG\tNAME\tTASK PREFIX\n"))
+        }
         Golden.forTests().check(listed.stdout, json ? "ws-ls.json" : "ws-ls.txt")
         let selected = try SiltaBinary.run(["ws", "use", "acme"] + suffix, in: scratch)
         #expect(selected.termination == .exit(0))
         Golden.forTests().check(selected.stdout, json ? "ws-use.json" : "ws-use.txt")
       }
+      let quiet = try SiltaBinary.run(["ws", "ls", "--quiet"], in: scratch)
+      #expect(quiet.termination == .exit(0))
+      #expect(quiet.stdout == "acme\tAcme\tAC\n")
       #expect(
         try store.read {
           try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='current_workspace'")

@@ -1,9 +1,8 @@
 ### silta doctor
 
-OVERVIEW: Diagnose database, git and data across all workspaces without
-repairs.
+OVERVIEW: Check the database, repositories and agent setup without repairs.
 
---ws does not filter; --install skips SQLite and git.
+--install checks agent setup only. Checks are scoped to all workspaces.
 Harness checks are read without launches; broad inspection can update SQLite
 sidecars.
 Snapshot recovery is human-only: stop clients; preserve home WAL/SHM sidecars.

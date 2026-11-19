@@ -4,7 +4,7 @@ import SiltaCore
 
 struct AgentsCommand: ParsableCommand {
   static let configuration = CommandConfiguration(
-    commandName: "agents", abstract: "Preview and safely apply harness integration.",
+    commandName: "agents", abstract: "Manage Silta setup for coding agents.",
     subcommands: [
       AgentsInstallCommand.self, AgentsUninstallCommand.self, AgentsSessionStartCommand.self,
       AgentsStopCommand.self,
@@ -103,7 +103,7 @@ struct AgentInstallOptions: ParsableArguments {
 
 struct AgentsInstallCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "install", abstract: "Preview owned harness edits; confirm with --apply <token>.",
+    commandName: "install", abstract: "Preview or apply Silta setup for coding agents.",
     discussion: "Defaults to Claude and Codex; preview exactly what --apply will write.\n"
       + "Retains unrelated content and file modes; refuses unsafe or ambiguous roots.\n"
       + "Replacements are atomic per file, not across files; failures list paths.\n"
@@ -147,7 +147,7 @@ struct AgentUninstallOptions: ParsableArguments {
 
 struct AgentsUninstallCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "uninstall", abstract: "Preview removal of selected, unedited Silta ownership.",
+    commandName: "uninstall", abstract: "Preview or remove Silta settings for coding agents.",
     discussion: "Previews removal of only owned, unedited Silta content.\n"
       + "Defaults to Claude and Codex; --claude or --codex selects one.\n"
       + "Unrelated settings and hooks remain untouched.\n"

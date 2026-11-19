@@ -60,7 +60,7 @@ struct TaskBlockCommand: OutputCommand {
 struct TaskUnblockCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "unblock",
-    abstract: "Return a blocked batch to todo; an open blocker needs the human's go-ahead.")
+    abstract: "Return blocked tasks to todo (human-only unless every task is ready).")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
 

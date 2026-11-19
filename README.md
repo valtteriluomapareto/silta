@@ -65,6 +65,7 @@ Data lives in `~/.silta`, or in `SILTA_HOME` when set. Follow
 
 ## Learn more
 
+- The [human's guide](docs/human-guide.md) covers the inbox, proposals, questions and approvals.
 - `silta --help` lists commands; each command has its own `--help`.
 - `silta guide` and `silta schema` are the agent manuals.
 - Agents contributing to Silta start at [`AGENTS.md`](AGENTS.md); humans at

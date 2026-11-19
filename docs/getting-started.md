@@ -108,6 +108,9 @@ silta task ls
 silta inbox --for me
 ```
 
+Follow the [human's guide](human-guide.md) to handle inbox items, proposals,
+questions and approval requests.
+
 ## 7. Undo the agent integration
 
 Preview removal, then apply the token from that preview:

@@ -129,7 +129,7 @@ struct TaskOutputCommandTests {
       let plan = scratch.appending(path: "plan.md")
       try "# Acme import\n\n- First\n".write(to: plan, atomically: true, encoding: .utf8)
       for arguments in [
-        ["task", "edit", "AC-1", "--print"], ["ws", "ls"], ["ws", "show"],
+        ["task", "edit", "AC-1", "--print"], ["ws", "show"],
         ["task", "from-plan", plan.path, "--dry-run"],
       ] {
         let loud = try Self.run(arguments, in: scratch)

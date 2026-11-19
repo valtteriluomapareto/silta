@@ -1,6 +1,6 @@
 ### silta agents
 
-OVERVIEW: Preview and safely apply harness integration.
+OVERVIEW: Manage Silta setup for coding agents.
 
 USAGE: silta agents [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <subcommand>
 
@@ -17,15 +17,14 @@ OPTIONS:
   -h, --help              Show help information.
 
 SUBCOMMANDS:
-  install                 Preview owned harness edits; confirm with --apply
-                          <token>.
-  uninstall               Preview removal of selected, unedited Silta ownership.
+  install                 Preview or apply Silta setup for coding agents.
+  uninstall               Preview or remove Silta settings for coding agents.
 
   See 'silta help agents <subcommand>' for detailed help.
 
 ### silta agents install
 
-OVERVIEW: Preview owned harness edits; confirm with --apply <token>.
+OVERVIEW: Preview or apply Silta setup for coding agents.
 
 Defaults to Claude and Codex; preview exactly what --apply will write.
 Retains unrelated content and file modes; refuses unsafe or ambiguous roots.
@@ -63,7 +62,7 @@ OPTIONS:
 
 ### silta agents uninstall
 
-OVERVIEW: Preview removal of selected, unedited Silta ownership.
+OVERVIEW: Preview or remove Silta settings for coding agents.
 
 Previews removal of only owned, unedited Silta content.
 Defaults to Claude and Codex; --claude or --codex selects one.
