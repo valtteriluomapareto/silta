@@ -2107,7 +2107,7 @@ arguments.
   output was turned on explicitly.
 - `--quiet` hides a write's receipt text. It still prints data: the refs a write
   created (`task add`; `task from-plan`, one per line, and a `--dry-run`'s preview),
-  and the whole output of reads (`task ls`, `task show`, `task edit --print`, `ws
+  and the data from reads (`task ls`, `task show`, `task edit --print`, `ws
   ls`, `ws show`, `schema`, `guide`). Warnings and errors still show; with `--json` it changes
   nothing.
 - `--json` and `--quiet` may come before or after the subcommand.
@@ -2228,6 +2228,8 @@ to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is r
 `none` is refused, because that word means non-code work, and the conflict names its path.
 The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
+A populated `ws ls` lists workspace slugs, names and task prefixes in tab-separated
+columns. Ordinary text includes the column headings. `--quiet` prints the data rows.
 An empty `ws ls` prints a scan command from a Git checkout or `silta init --help`
 elsewhere. The command supplies valid naming options when the checkout name
 would give an invalid workspace slug or task prefix. Its JSON includes `next` and

@@ -20,9 +20,7 @@ struct WorkspaceCommandTests {
         let listed = try SiltaBinary.run(["ws", "ls"] + suffix, in: scratch)
         #expect(listed.termination == .exit(0))
         if !json {
-          withKnownIssue("#265: the workspace list does not label its text columns") {
-            #expect(listed.stdout.hasPrefix("SLUG\tNAME\tTASK PREFIX\n"))
-          }
+          #expect(listed.stdout.hasPrefix("SLUG\tNAME\tTASK PREFIX\n"))
         }
         Golden.forTests().check(listed.stdout, json ? "ws-ls.json" : "ws-ls.txt")
         let selected = try SiltaBinary.run(["ws", "use", "acme"] + suffix, in: scratch)

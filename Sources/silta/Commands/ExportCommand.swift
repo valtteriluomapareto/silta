@@ -5,7 +5,7 @@ import SiltaCore
 struct ExportCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "export",
-    abstract: "Write one workspace as a deterministic text tree for backup and diff.",
+    abstract: "Save a workspace as text files for backup or comparison.",
     discussion:
       "The tree goes to <root>/<workspace>. It replaces only an absent, empty or previously "
       + "exported directory, never one inside a registered repo. Repo paths and worktrees are "

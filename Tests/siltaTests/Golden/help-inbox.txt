@@ -1,12 +1,12 @@
 ### silta inbox
 
-OVERVIEW: Read current local attention without marking it read.
+OVERVIEW: See questions, proposals and other work that needs attention.
 
-Human inboxes include grouped blockers, task and document proposals, and
-promoted task pointers. Tracker status is not refreshed. --for me means
-human:<USER>, independent of the caller. ask human: is a confirmation
-instruction, not an executable command. See `silta guide questions` for relay
-and approval rules. Reads never clear attention.
+Use --for me for the human's inbox. The default is the caller's inbox.
+The human inbox shows local blockers, questions, proposals and tracker
+pointers.
+Reading leaves items in place. Check trackers for current status.
+See `silta guide questions` for relay and approval rules.
 Read pending attention: silta inbox
 
 USAGE: silta inbox [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--for <for>] [--all]

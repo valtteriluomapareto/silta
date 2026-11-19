@@ -4,7 +4,7 @@ import SiltaCore
 
 struct WsListCommand: OutputCommand {
   static let configuration = CommandConfiguration(
-    commandName: "ls", abstract: "List workspaces; ask in chat before editing configuration.")
+    commandName: "ls", abstract: "List workspace slugs, names and task prefixes.")
 
   static let dataShape = Shape.object([
     "workspaces": .array(
@@ -27,10 +27,11 @@ struct WsListCommand: OutputCommand {
       return CommandOutput(
         text: text, quiet: text, data: WsListData(workspaces: [], next: [next], nextBy: "agent"))
     }
-    let text = workspaces.map { "\($0.slug)\t\(HumanText.line($0.name))\t\($0.taskPrefix)" }.joined(
+    let rows = workspaces.map { "\($0.slug)\t\(HumanText.line($0.name))\t\($0.taskPrefix)" }.joined(
       separator: "\n")
     return CommandOutput(
-      text: text, quiet: text, data: WsListData(workspaces: workspaces, next: nil, nextBy: nil))
+      text: "SLUG\tNAME\tTASK PREFIX\n" + rows, quiet: rows,
+      data: WsListData(workspaces: workspaces, next: nil, nextBy: nil))
   }
 
 }

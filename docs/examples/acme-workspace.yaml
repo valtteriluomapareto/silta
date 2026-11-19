@@ -5,7 +5,7 @@ workspace: { slug: "acme", name: "Acme (example)", task_prefix: "AC" }
 settings:
   review_gate: "none"  # none, any or human approval required before done
   archive_after_days: 14  # days before finished tasks leave normal listings
-  stale_days: 90  # age at which documentation counts as stale
+  stale_days: 90  # stored for future automatic freshness checks
   proposals: "triage"  # triage keeps proposed tasks; ask asks in chat instead
   ask_about: "standard"  # standard or short guidance for agent questions
 
@@ -32,8 +32,6 @@ apps:
   - { slug: "sales", repo: "sales", ref: "origin/main", summary: "New sales portal; replaces platform-legacy." }
   - { slug: "pdf-service", repo: "pdf-service", ref: "origin/main", summary: "PDF rendering: POST /api/pdf/{configId}." }
 
-# Example promotion: master → portal → api, then test → prod via merge branches.
-
 # Reachable app environments, identified by app and name, with their base URL.
 environments:
   - { app: "platform-api", name: "test", url: "https://api.test.acme.example" }
@@ -54,14 +52,15 @@ edges:
   - { from: "platform-api", to: "service:identity-provider", kind: "auth", summary: "Strong authentication" }
   - { from: "mobile", to: "service:push", kind: "sdk", summary: "Push notifications" }
 
-# Search vocabulary: a canonical topic and optional alternative names.
+# Canonical topics and aliases for task and document links and brief filtering.
 topics:
   - { slug: "messaging", aliases: [ "viestit", "messages" ] }
   - { slug: "mobile-auth", aliases: [ "kirjautuminen", "handoff", "nonce" ] }
   - { slug: "reports", aliases: [ "raportit" ] }
   - { slug: "pdf-forms", aliases: [ "lomakkeet" ] }
 
-# External note trees stored for later search. kind, root and include are required; exclude is optional.
+# Note source configuration for future indexing. kind, root and include are required.
+# exclude is optional.
 sources:
   - { kind: "notes", root: "~/notes", include: [ "projects/acme/*.md" ],
       exclude: [ "**/PEOPLE.md", "**/1-1/**" ] }

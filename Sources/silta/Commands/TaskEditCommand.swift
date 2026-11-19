@@ -5,7 +5,7 @@ import SiltaCore
 struct TaskEditCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit",
-    abstract: "Edit task fields; approval is needed unless you hold its claim.",
+    abstract: "Edit a task (human-only unless you hold its claim or use --print).",
     discussion: "`--print` outputs the document; edit it and return it with `-F`.\n"
       + "Order: ## Title, ## Description, ## Acceptance, ## Plan, ## Result.\n"
       + "Each heading is followed by a tilde fence (~~~ or longer) around the value.\n"

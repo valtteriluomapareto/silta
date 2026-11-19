@@ -5,7 +5,7 @@ import SiltaCore
 struct InitCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "init",
-    abstract: "Initialize or scan repos; select with ws use; ws edit is human-only.",
+    abstract: "Initialize Silta or scan local Git repositories into a workspace.",
     discussion: "`init --scan` scans roots and two child levels without fetching.\n"
       + "A new workspace derives its slug and task prefix from the first directory.\n"
       + "Values keep case, use letters, digits, _ or -, and start/end alphanumeric.\n"

@@ -1,6 +1,6 @@
 ### silta export
 
-OVERVIEW: Write one workspace as a deterministic text tree for backup and diff.
+OVERVIEW: Save a workspace as text files for backup or comparison.
 
 The tree goes to <root>/<workspace>. It replaces only an absent, empty or
 previously exported directory, never one inside a registered repo. Repo paths

@@ -17,8 +17,7 @@ OPTIONS:
   -h, --help              Show help information.
 
 SUBCOMMANDS:
-  ls                      List workspaces; ask in chat before editing
-                          configuration.
+  ls                      List workspace slugs, names and task prefixes.
   use                     Set the default workspace outside registered
                           repositories.
   edit                    Edit workspace YAML (human-only).
@@ -54,7 +53,7 @@ OPTIONS:
 
 ### silta ws ls
 
-OVERVIEW: List workspaces; ask in chat before editing configuration.
+OVERVIEW: List workspace slugs, names and task prefixes.
 
 USAGE: silta ws ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
 

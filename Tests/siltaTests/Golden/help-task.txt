@@ -30,8 +30,8 @@ SUBCOMMANDS:
   plan                    Store a plan revision or tick a top-level checkbox.
   from-plan               Import Markdown steps; preview or safely remove the
                           source.
-  edit                    Edit task fields; approval is needed unless you hold
-                          its claim.
+  edit                    Edit a task (human-only unless you hold its claim or
+                          use --print).
   triage                  Accept or drop proposals in one approved batch
                           (human-only).
   archive                 Hide a task from the default backlog.
@@ -41,8 +41,8 @@ SUBCOMMANDS:
   promote                 Record an external tracker and make the task
                           read-only (human-only).
   block                   Record blockers; Silta sends nothing.
-  unblock                 Return a blocked batch to todo; an open blocker needs
-                          the human's go-ahead.
+  unblock                 Return blocked tasks to todo (human-only for
+                          unresolved blockers).
 
   See 'silta help task <subcommand>' for detailed help.
 
@@ -194,7 +194,7 @@ OPTIONS:
 
 ### silta task edit
 
-OVERVIEW: Edit task fields; approval is needed unless you hold its claim.
+OVERVIEW: Edit a task (human-only unless you hold its claim or use --print).
 
 `--print` outputs the document; edit it and return it with `-F`.
 Order: ## Title, ## Description, ## Acceptance, ## Plan, ## Result.
@@ -485,8 +485,7 @@ OPTIONS:
 
 ### silta task unblock
 
-OVERVIEW: Return a blocked batch to todo; an open blocker needs the human's
-go-ahead.
+OVERVIEW: Return blocked tasks to todo (human-only for unresolved blockers).
 
 USAGE: silta task unblock [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [--message <message>] [-F <F>] [--allow-secret] <refs> ...
 
