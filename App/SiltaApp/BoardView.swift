@@ -3,6 +3,7 @@ import SwiftUI
 
 struct BoardView: View {
   @Bindable var model: AppModel
+  @AppStorage(SeaInspectorMetrics.storageKey) private var inspectorWidth = SeaInspectorMetrics.width
 
   var body: some View {
     Group {
@@ -31,7 +32,7 @@ struct BoardView: View {
       }
     }
     .foregroundStyle(Color("Ink"))
-    .seaInspector(isPresented: model.boardInspectorPresented) {
+    .seaInspector(isPresented: model.boardInspectorPresented, width: $inspectorWidth) {
       TaskInspector(model: model)
     }
   }
