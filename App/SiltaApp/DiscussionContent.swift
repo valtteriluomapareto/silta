@@ -2,7 +2,7 @@ import Foundation
 import SiltaAppSupport
 
 /// A task's discussion as threads: each root with its replies, open threads in Core's
-/// order and resolved ones after them.
+/// order and resolved ones after them, oldest first.
 nonisolated struct DiscussionContent {
   struct Thread: Identifiable, Equatable {
     let root: AppComment
@@ -13,9 +13,9 @@ nonisolated struct DiscussionContent {
     var canReply: Bool { !resolved && !root.deleted }
 
     /// An open question to the human, which a reply should answer rather than comment on.
+    /// "Answered" is Core's: only the human's or a recipient's answer counts.
     func asks(_ human: String) -> Bool {
-      root.kind == "question" && root.mentions.contains(human)
-        && !replies.contains { $0.kind == "answer" && !$0.deleted }
+      root.kind == "question" && root.mentions.contains(human) && root.answered != true
     }
 
     /// Replies shown while the thread is folded: all of up to two, else only the newest.
@@ -52,7 +52,7 @@ nonisolated struct DiscussionContent {
   init(comments: [AppComment], resolved: [AppComment]) {
     let threads = Self.threads(comments) + Self.threads(resolved)
     open = threads.filter { !$0.resolved }
-    self.resolved = threads.filter(\.resolved)
+    self.resolved = threads.filter(\.resolved).sorted { $0.root.createdAt < $1.root.createdAt }
   }
 
   /// Groups posts in order: a root starts a thread and its replies join it. A reply whose

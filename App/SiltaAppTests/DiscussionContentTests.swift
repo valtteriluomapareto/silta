@@ -7,12 +7,13 @@
     private func post(
       _ ref: String, _ actor: String = "agent:claude:review", kind: String = "comment",
       replyTo: String? = nil, resolved: Bool = false, deleted: Bool = false,
-      mentions: [String] = []
+      mentions: [String] = [], answered: Bool? = nil, at: String = "2026-11-16T11:00:00.000Z"
     ) -> AppComment {
       AppComment(
         ref: ref, kind: kind, actor: actor, body: "Body of \(ref)\nSecond line",
-        createdAt: "2026-11-16T11:00:00.000Z", replyTo: replyTo, deleted: deleted,
-        resolvedAt: resolved ? "2026-11-16T11:30:00.000Z" : nil, mentions: mentions)
+        createdAt: at, replyTo: replyTo, deleted: deleted,
+        resolvedAt: resolved ? "2026-11-16T11:30:00.000Z" : nil, mentions: mentions,
+        answered: answered)
     }
 
     @Test func repliesJoinTheirRootInOrder() {
@@ -54,14 +55,23 @@
     }
 
     @Test func anOpenQuestionToTheHumanIsAnsweredNotRepliedTo() {
-      let question = post("AC-12/1", kind: "question", mentions: ["human:acme"])
+      let question = post("AC-12/1", kind: "question", mentions: ["human:acme"], answered: false)
       #expect(DiscussionContent.threads([question])[0].asks("human:acme"))
       #expect(!DiscussionContent.threads([question])[0].asks("human:other"))
-      let answered = DiscussionContent.threads([
-        question, post("AC-12/2", "agent:codex:fixture", kind: "answer", replyTo: "AC-12/1"),
-      ])
-      #expect(!answered[0].asks("human:acme"))
+      // An unmentioned agent's answer doesn't count for Core, so the human still answers.
+      let bystander = post("AC-12/2", "agent:claude:other", kind: "answer", replyTo: "AC-12/1")
+      #expect(DiscussionContent.threads([question, bystander])[0].asks("human:acme"))
+      let answered = post(
+        "AC-12/1", kind: "question", mentions: ["human:acme"], answered: true)
+      #expect(!DiscussionContent.threads([answered])[0].asks("human:acme"))
       #expect(!DiscussionContent.threads([post("AC-9/1")])[0].asks("human:acme"))
+    }
+
+    @Test func resolvedThreadsRunOldestFirstEvenWithAPinnedHandoff() {
+      let content = DiscussionContent(
+        comments: [post("AC-9/8", kind: "handoff", resolved: true, at: "2026-11-16T11:50:00.000Z")],
+        resolved: [post("AC-9/3", resolved: true, at: "2026-11-16T10:00:00.000Z")])
+      #expect(content.resolved.map(\.id) == ["AC-9/3", "AC-9/8"])
     }
 
     @Test func aReplyWithoutItsRootStillShows() {

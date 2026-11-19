@@ -5,8 +5,8 @@
   import SiltaTestSupport
   import Testing
 
-  /// Threads the inspector draws: open threads from Core's normal read, resolved ones
-  /// from the timeline, and replies posted into a thread.
+  /// Threads the inspector draws: Core's normal read and the resolved threads it hides,
+  /// from one Core read, and replies posted into a thread.
   @Suite(.blockingTestWork)
   struct AppDiscussionTests {
     @Test func openThreadsKeepRepliesAndResolvedThreadsComeSeparately() throws {
@@ -29,6 +29,7 @@
         let task = try AppWriterTests.reader(scratch).task("AC-12", workspace: "acme")
         #expect(task.resolvedComments.isEmpty)
         #expect(task.comments.first?.mentions == ["human:acme"])
+        #expect(task.comments.first?.answered == false)
       }
     }
 

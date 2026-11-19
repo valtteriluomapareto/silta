@@ -73,7 +73,7 @@ extension AppComment {
       ref: post.ref, kind: post.kind, actor: post.actor, body: post.body,
       createdAt: post.createdAt, replyTo: post.replyTo, accepted: post.accepted,
       deleted: post.deleted, resolvedAt: post.resolvedAt, resolvedBy: post.resolvedBy,
-      mentions: post.mentions)
+      mentions: post.mentions, answered: post.answered)
   }
 }
 

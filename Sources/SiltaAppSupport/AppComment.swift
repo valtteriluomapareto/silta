@@ -22,11 +22,13 @@ public struct AppComment: Equatable, Sendable {
   public let resolvedBy: String?
   /// Complete recipients, such as the actors a question is addressed to.
   public let mentions: [String]
+  /// For a question, whether Core counts it answered (by the human or a recipient).
+  public let answered: Bool?
 
   init(
     ref: String, kind: String, actor: String, body: String, createdAt: String,
     replyTo: String?, accepted: Bool = false, deleted: Bool = false, resolvedAt: String? = nil,
-    resolvedBy: String? = nil, mentions: [String] = []
+    resolvedBy: String? = nil, mentions: [String] = [], answered: Bool? = nil
   ) {
     self.ref = ref
     self.kind = kind
@@ -39,5 +41,6 @@ public struct AppComment: Equatable, Sendable {
     self.resolvedAt = resolvedAt
     self.resolvedBy = resolvedBy
     self.mentions = mentions
+    self.answered = answered
   }
 }
