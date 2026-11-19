@@ -8,11 +8,15 @@ nonisolated struct WorkspaceMapContent {
     let connection: AppConnection
     let back: Bool
     /// Parallel forward connections between the same pair get their own lane; back edges
-    /// each get a lane of their own across the whole map.
+    /// each get a lane of their own across the whole map. An edge to a service takes slot
+    /// `lane` of `lanes` across its app's bottom edge, in services-row order.
     let lane: Int
+    var lanes = 1
+    var toService = false
   }
 
-  enum Style: Equatable { case normal, strong, faded }
+  /// `quiet` is an unselected line to a service: drawn faint and without a label.
+  enum Style: Equatable { case normal, strong, faded, quiet }
 
   let edges: [Edge]
   private let layout: AppMapLayout
@@ -32,7 +36,20 @@ nonisolated struct WorkspaceMapContent {
     self.connection = connection
     var seen: [String: Int] = [:]
     var backLane = 0
+    let order = Dictionary(uniqueKeysWithValues: layout.nodes.map { ($0.key, $0.row) })
+    let toServices = Dictionary(
+      grouping: map.connections.filter { layout.node($0.target)?.isService == true },
+      by: \.source
+    ).mapValues { edges in
+      edges.sorted {
+        (order[$0.target] ?? 0, $0.attachment) < (order[$1.target] ?? 0, $1.attachment)
+      }.map(\.attachment)
+    }
     edges = map.connections.sorted { $0.attachment < $1.attachment }.map { edge in
+      if let slots = toServices[edge.source], let slot = slots.firstIndex(of: edge.attachment) {
+        return Edge(
+          connection: edge, back: false, lane: slot, lanes: slots.count, toService: true)
+      }
       if layout.backEdges.contains(edge.attachment) {
         defer { backLane += 1 }
         return Edge(connection: edge, back: true, lane: backLane)
@@ -72,7 +89,7 @@ nonisolated struct WorkspaceMapContent {
     }
     for service in map.services
     where matches([service.slug, service.name, service.summary ?? "", service.attachment]) {
-      kept.insert("service:" + service.slug)
+      kept.insert(service.key)
     }
     for edge in map.connections
     where matches([edge.attachment, edge.target, edge.kind, edge.summary] + edge.codeReferences) {
@@ -95,7 +112,17 @@ nonisolated struct WorkspaceMapContent {
     if let node, let selected = layout.nodes.first(where: { $0.attachment == node }) {
       return ends.contains(selected.key) ? .strong : .faded
     }
-    return ends.contains { unmatched.contains($0) } ? .faded : .normal
+    if ends.contains(where: { unmatched.contains($0) }) { return .faded }
+    return edge.toService ? .quiet : .normal
+  }
+
+  /// Whether an edge shows its label: always for app-to-app edges, and for a line to a
+  /// service only while it is strong.
+  func showsLabel(_ edge: Edge) -> Bool { !edge.toService || style(edge) == .strong }
+
+  /// The number of distinct apps that call a service.
+  func callers(of service: String) -> Int {
+    Set(map.connections.filter { $0.target == service }.map(\.source)).count
   }
 
   /// The label on an edge: its kind, plus a doc count when it has docs.
