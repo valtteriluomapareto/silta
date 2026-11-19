@@ -1478,8 +1478,8 @@ settings (D39). It covers:
   the repository's own instructions require a plan file, write it where they say; that
   file is the plan of record, and the Silta task plan holds its path and branch or PR
   plus a short checklist of steps to tick, not its full text (D51). A conditional rule,
-  such as plans in docs/plans/ only for work that spans several slices, requires a file
-  only when its condition holds.
+  such as plans in a plans folder only for work that spans several slices, requires a
+  file only when its condition holds.
 - **Session start.** If the hook already printed the brief, don't run it again. Once a
   task is chosen, run `silta brief --task AC-n`. Teach the [workspace selection
   precedence](#16-cli): explicit workspace, registered repository location, then the

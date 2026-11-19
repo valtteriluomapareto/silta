@@ -58,8 +58,8 @@ extension GuideCommand {
         never create tracker items yourself. Exception: when the repository's own instructions \
         require a plan file, write it where they say; that file is the plan of record, and \
         the Silta task plan holds its path and branch or PR plus a short checklist of steps \
-        to tick, not its full text. A conditional rule, such as plans in docs/plans/ only \
-        for work that spans several slices, requires a file only when its condition holds.
+        to tick, not its full text. A conditional rule, such as plans in a plans folder \
+        only for work that spans several slices, requires a file only when its condition holds.
         """ + "\n"),
     Section(
       topic: "start",
