@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"--manifest needs 12 to 64 hexadecimal digits from the restore dry run.","next":["silta restore '<scratch>/work/tree/acme' --dry-run"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

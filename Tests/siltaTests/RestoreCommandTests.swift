@@ -108,12 +108,27 @@ struct RestoreCommandTests {
     }
   }
 
-  @Test(arguments: ["~/out/acme", "~"])
+  @Test(arguments: ["~/out/acme", "~", "~acme/notes", "~acme"])
   func unexpandedTildeIsRefused(_ path: String) throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(["restore", path, "--dry-run", "--json"], in: scratch)
       #expect(result.termination == .exit(1))
       #expect(result.stdout.contains(#""code":"invalid""#))
+      #expect(result.stdout.contains("unexpanded ~"))
+    }
+  }
+
+  @Test(arguments: ["12345678901", "", "123456789abg"], [false, true])
+  func malformedManifestIsRefusedBeforeApproval(_ manifest: String, json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let args = ["restore", "tree/acme", "--manifest", manifest] + (json ? ["--json"] : [])
+      let result = try SiltaBinary.run(args, in: scratch)
+      #expect(result.termination == .exit(1))
+      let output = json ? result.stdout : result.stderr
+      #expect(json ? result.stderr.isEmpty : result.stdout.isEmpty)
+      Golden.forTests().check(
+        Self.masked(output, scratch),
+        json ? "restore-invalid-manifest.json" : "restore-invalid-manifest.txt")
     }
   }
 

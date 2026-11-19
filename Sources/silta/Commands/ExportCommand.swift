@@ -45,9 +45,9 @@ struct ExportCommand: OutputCommand {
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let environment = context.environment
-    if let to, to == "~" || to.hasPrefix("~/") {
+    if to?.utf8.first == 0x7E {
       throw UsageError.invalid(
-        message: "--to \(to) starts with an unexpanded ~; pass an absolute path",
+        message: "--to starts with an unexpanded ~. Pass an absolute path.",
         command: "silta export")
     }
     let workspace = try context.workspace(global.ws)

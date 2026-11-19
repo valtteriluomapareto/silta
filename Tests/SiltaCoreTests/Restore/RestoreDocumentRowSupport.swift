@@ -87,7 +87,7 @@ enum RestoreDocumentRowSupport {
   {
     var draft = DocDraft(slug: slug, body: "A rule after restoring history.")
     draft.title = "Restored policy"
-    draft.about = ["service:push%20service"]
+    draft.about = ["service:push-service"]
     let binding = try DocStoreTests.binding(draft, workspace: 17, store: store)
     return try store.write { tx in
       try DocStore(

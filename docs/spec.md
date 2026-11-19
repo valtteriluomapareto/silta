@@ -1839,14 +1839,16 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq` and the
     document revision allocation stream.
-  - **Refusals, with nothing written:** a database with migrations this binary
-    doesn't know; unknown link kinds.
+  - **Refusals, with nothing written:** a database with unknown migrations,
+    unknown link kinds, invalid workspace or map identifiers, or an invalid
+    generated file path. Every generated file path stays inside the workspace tree.
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
-    from the working directory, and an unexpanded `~` is refused. Export replaces
+    from the working directory. An argument starting with an unexpanded `~` is
+    refused. Export replaces
     `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous
     export: a supported-format manifest naming the workspace, and no file it doesn't list
-    (`.DS_Store` aside; listed files may be missing). Anything else is refused for the
-    human to decide. A target that overlaps a registered repo is refused, so workspace
+    (`.DS_Store` aside; listed files may be missing). The ownership check requires
+    a readable regular manifest file. Anything else is refused for the human to decide. A target that overlaps a registered repo is refused, so workspace
     data never lands in a code repo. Exports are serialised, each reading its
     snapshot under the lock, so the last one written is the latest state. Lock
     acquisition retries for at most five seconds of spacing, then answers `busy`.
@@ -1874,8 +1876,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     export the retained work directory can be empty; the new tree is at the target.
     The tree is owned by export: edits to it are overwritten by the next export.
   - **Git commit.** `--commit` requires an existing Git work tree at the export root,
-    checked before writing. Under the export lock it runs `git add -A -- <workspace>`,
-    checks the staged diff for that path, and commits only that path when it changed.
+    checked before writing. Under the export lock it stages the workspace, checks
+    the staged diff for that path, and commits only that path when it changed.
+    Git treats the pathspec for each of those operations literally.
     Other staged paths remain staged. Git has closed stdin and terminal prompts disabled.
     The receipt's `sha` is present only when this invocation made a commit; an unchanged
     export makes none. Manifest files (and the manifest itself) ignored by Git produce
@@ -1885,17 +1888,20 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace. `<dir>` is the `<root>/<workspace>` that
   holds `manifest.json`; the workspace comes from the tree, and a `--ws` naming
-  another one is refused.
+  another one is refused. An argument starting with an unexpanded `~` is refused.
   - It is human-only, except `--dry-run`: it replaces the workspace's settings, which
     only the human changes (D39). The dry run ends with the command to approve,
-    carrying `--manifest <sha>`, the first 12 hex digits of the manifest's sha256; a run
-    given `--manifest` refuses any other tree, so the human approves the tree they saw.
-    An agent's approved run records its approval, naming that prefix.
+    carrying `--manifest <sha>`, the first 12 hex digits of the manifest's SHA-256.
+    A supplied prefix must have 12 to 64 hexadecimal digits. A mismatched prefix
+    refuses the tree, so the human approves the tree they saw. An agent's approved
+    run records its approval, naming that prefix.
   - It checks the manifest checksums first and refuses partial or tampered trees,
     then everything the form doesn't show: integer values, settings as `ws edit`
     accepts them, unique uids, slugs, aliases, plan revisions and comment seqs,
-    references that resolve inside the tree, no parent cycles. A database of a newer
-    schema is refused, and so is a tree whose uid, task
+    references that resolve inside the tree, and no parent cycles. Workspace, app,
+    repo, service and topic slugs and the task prefix must follow the workspace
+    identifier grammar in all supported export formats. A task sequence must leave
+    room for the next number. A database of a newer schema is refused, and so is a tree whose uid, task
     prefix, row uids or approval uids another workspace holds.
   - The replace happens in one transaction, and nothing is written on failure. The
     workspace keeps its row; its other rows are deleted and the tree's inserted.
@@ -2922,7 +2928,9 @@ items; removing an item cleans its non-pinning doc links in the same transaction
 New app identities cannot use `doc`, `edge` or `service`; retained identities and
 faithful restore preserve those names. Their generic code refs require `code:`.
 New service slugs and edge kinds must be identifiers (letters/digits with internal
-`_` or `-`). Existing service slugs and kinds retain their bytes and identities.
+`_` or `-`). Workspace edits retain the bytes and identities of existing service
+slugs and edge kinds. The service slug requirement applies to text exports and restores
+(§15).
 Existing non-doc links also protect app, edge, service and topic targets from removal.
 Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-local
 repo paths are excluded from this view. A `workspace` change-log event invalidates
