@@ -29,7 +29,11 @@ struct SiltaApp: App {
         if let options = try ControlLaunch.parse(ProcessInfo.processInfo.arguments) {
           let control = try ControlRuntime(options: options)
           self.control = control
-          Self.pinPreferencesForControl()
+          if options.isAutomated {
+            Self.pinPreferencesForControl()
+          } else if !options.dark {
+            Self.apply(Self.storedAppearance)
+          }
           let fixture = control.fixture
           let model = Self.makeReaderModel(
             home: fixture.home, user: fixture.user, now: { fixture.now })
@@ -44,10 +48,12 @@ struct SiltaApp: App {
       }
     #endif
     _model = State(initialValue: Self.makeModel())
-    Self.apply(
-      AppAppearance(
-        rawValue: UserDefaults.standard.string(forKey: AppAppearance.storageKey) ?? "")
-        ?? .system)
+    Self.apply(Self.storedAppearance)
+  }
+
+  private static var storedAppearance: AppAppearance {
+    AppAppearance(rawValue: UserDefaults.standard.string(forKey: AppAppearance.storageKey) ?? "")
+      ?? .system
   }
 
   private static func makeModel() -> AppModel {
@@ -112,9 +118,9 @@ struct SiltaApp: App {
   }
 
   #if DEBUG
-    /// A control run shares the installed app's defaults, so it pins the inspector width
-    /// in the volatile argument domain: fixture captures stay deterministic and never
-    /// read the human's stored width.
+    /// An automated control run shares the installed app's defaults, so it pins the
+    /// inspector width in the volatile argument domain: captures stay deterministic and
+    /// never read the human's stored width.
     private static func pinPreferencesForControl() {
       let defaults = UserDefaults.standard
       var pinned = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
@@ -123,11 +129,11 @@ struct SiltaApp: App {
     }
   #endif
 
-  /// Applies the stored appearance app-wide. A Debug control run keeps the appearance
-  /// its launch flags chose, so fixtures stay deterministic.
+  /// Applies the stored appearance app-wide. An automated Debug control run keeps the
+  /// appearance its launch flags chose, so captures stay deterministic.
   private func applyAppearance() {
     #if DEBUG
-      if control != nil { return }
+      if control?.options.isAutomated == true { return }
     #endif
     Self.apply(appearance)
   }

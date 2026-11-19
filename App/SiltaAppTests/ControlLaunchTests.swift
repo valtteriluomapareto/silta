@@ -17,6 +17,19 @@
       }
     }
 
+    @Test func onlySnapshotAndDriverRunsAreAutomated() throws {
+      let manual = try #require(try ControlLaunch.parse(["-SiltaFixture", "v2"]))
+      #expect(!manual.isAutomated)
+      let driver = try #require(
+        try ControlLaunch.parse([
+          "-SiltaFixture", "v2", "-SiltaRunDirectory", "/private/tmp/silta-app-test",
+        ]))
+      #expect(driver.isAutomated)
+      let snapshot = try #require(
+        try ControlLaunch.parse(["-SiltaSnapshot", "/private/tmp/root.png"]))
+      #expect(snapshot.isAutomated)
+    }
+
     @Test func isolatedSnapshotLaunchAcceptsRouteAppearanceAndSize() throws {
       let arguments = [
         "SiltaApp", "-SiltaSnapshot", "/private/tmp/acme-snapshot.png",
