@@ -45,12 +45,7 @@ struct WhereCommandTests {
       #expect(try run([], alias, scratch).stdout == run([], console, scratch).stdout)
       let unregistered = try run([], scratch.appending(path: "fixtures/acme-detached"), scratch)
       #expect(unregistered.termination == .exit(2))
-      let unregisteredPath = scratch.appending(path: "fixtures/acme-detached").path
-      let normalized = unregistered.stdout.replacingOccurrences(
-        of: unregisteredPath, with: "<path>"
-      )
-      .replacingOccurrences(of: unregisteredPath.lowercased(), with: "<path>")
-      Golden.forTests().check(normalized, "where-unregistered.json")
+      Golden.forTests().check(unregistered.stdout, "where-unregistered.json")
       let outside = try run([], scratch, scratch)
       #expect(outside.termination == .exit(2))
     }

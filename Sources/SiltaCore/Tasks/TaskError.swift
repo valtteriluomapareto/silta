@@ -15,7 +15,7 @@ package enum TaskError: CodedError, Equatable {
   /// A proposal needs triage first; a human runs it, an agent asks the human.
   case proposal(String, human: Bool)
 
-  /// Only human triage can drop a proposal created by another actor.
+  /// An agent needs human triage to drop another actor's proposal.
   case foreignProposalDrop(String, retryBodyFlag: String?)
 
   /// The proposal reference identifies a different task after approval preparation.

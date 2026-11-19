@@ -112,7 +112,7 @@ extension TaskPolicyTests {
         environment: try TaskServiceTests.environment(
           home,
           actor: .agent(tool: "codex", session: "other")))
-      await #expect(throws: TaskError.proposal("AC-1", human: false)) {
+      await #expect(throws: TaskError.foreignProposalDrop("AC-1", retryBodyFlag: nil)) {
         _ = try await rival.close(
           "AC-1", result: "Should not close.", dropped: true, directory: home)
       }
