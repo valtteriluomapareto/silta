@@ -29,7 +29,7 @@ struct WorkspaceSettingsTests {
     } catch let error as WorkspaceError {
       #expect(error.code == .invalid)
       #expect(
-        error.message == "line 2: " + WorkspaceSettingsRegressionTests.gloss
+        error.message == "line 2: " + WorkspaceSettingValidationTests.gloss
       )
     }
   }

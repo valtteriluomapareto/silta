@@ -76,7 +76,7 @@ struct DocEvidenceReadCommandTests {
         #expect(list.termination == .exit(0) && list.stderr.isEmpty)
         #expect(!list.stdout.contains("\u{1b}") && !list.stdout.contains("\u{7}"))
       }
-      let json = try TaskStateRegressionTests.data(run([], scratch, json: true))
+      let json = try TaskStateCommandTests.data(run([], scratch, json: true))
       #expect(json["title"] as? String == title)
       #expect(json["body"] as? String == body)
       let full = try #require(json["output"] as? String)
@@ -84,9 +84,9 @@ struct DocEvidenceReadCommandTests {
       let lineFlags = ["--lines", String(index + 1)]
       let line = try run(lineFlags, scratch)
       #expect(line.stdout.contains("Acme body safe\twords\n"))
-      let bodyWindow = try TaskStateRegressionTests.data(run(lineFlags, scratch, json: true))
+      let bodyWindow = try TaskStateCommandTests.data(run(lineFlags, scratch, json: true))
       #expect((bodyWindow["output"] as? String)?.contains(body) == true)
-      let diff = try TaskStateRegressionTests.data(run(["--diff"], scratch, json: true))
+      let diff = try TaskStateCommandTests.data(run(["--diff"], scratch, json: true))
       #expect((diff["output"] as? String)?.contains("+" + body) == true)
       #expect(try truth(store) == before)
     }
@@ -104,7 +104,7 @@ struct DocEvidenceReadCommandTests {
           sql: "UPDATE doc_rev SET body_md=? WHERE rev=2", arguments: [body])
       }
       let page = try run([], scratch)
-      let raw = try TaskStateRegressionTests.data(run([], scratch, json: true))
+      let raw = try TaskStateCommandTests.data(run([], scratch, json: true))
       let rawLines = try #require(raw["output"] as? String).components(separatedBy: "\n")
       let row = try #require(rawLines.firstIndex(of: storedRow))
       let footer = try #require(rawLines.first { $0.contains("lines omitted; next: ") })

@@ -127,11 +127,11 @@ struct CommentRecoverySafetyTests {
       _ = try Self.run(["comment", "AC-1", "-m", "Foreign write"], in: home, actor: later)
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT claimed_at FROM task") } == boundary)
-      let pending = try TaskStateRegressionTests.data(Self.run(args + ["--json"], in: home))
+      let pending = try TaskStateCommandTests.data(Self.run(args + ["--json"], in: home))
       #expect((pending["items"] as? [Any])?.count == 2)
       let holder = Self.beta.merging(["SILTA_NOW": "2023-11-14T22:13:22.000Z"]) { $1 }
       _ = try Self.run(["comment", "AC-1", "-m", "Addressed"], in: home, actor: holder)
-      let cleared = try TaskStateRegressionTests.data(Self.run(args + ["--json"], in: home))
+      let cleared = try TaskStateCommandTests.data(Self.run(args + ["--json"], in: home))
       #expect((cleared["items"] as? [Any])?.isEmpty == true)
       #expect(text.contains("clears on the claimer's next write to AC-1"))
       #expect(!text.contains("clears on your next write"))
@@ -169,7 +169,7 @@ struct CommentRecoverySafetyTests {
           "comment", "resolve", "AC-1/1", "-m", "Human confirmed v2 in chat.",
         ], in: home)
       #expect(result.termination == .exit(0))
-      let pending = try TaskStateRegressionTests.data(
+      let pending = try TaskStateCommandTests.data(
         Self.run(
           [
             "inbox", "--for", "human:acme", "--json",

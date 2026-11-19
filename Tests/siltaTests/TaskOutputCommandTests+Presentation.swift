@@ -29,7 +29,7 @@ extension TaskOutputCommandTests {
         #expect(inbox.stdout.contains("> Acme question one two\n> \tkeep cafe\u{301}\n"))
         #expect(!inbox.stdout.contains("\u{1b}") && !inbox.stdout.contains("\u{7}"))
       }
-      let detail = try TaskStateRegressionTests.data(run(["task", "show", "AC-1", "--json"]))
+      let detail = try TaskStateCommandTests.data(run(["task", "show", "AC-1", "--json"]))
       let storedDescription = try #require(detail["description"] as? String)
       #expect(storedDescription.utf8.elementsEqual(description.utf8))
       let posts = try #require(detail["comments"] as? [[String: Any]])

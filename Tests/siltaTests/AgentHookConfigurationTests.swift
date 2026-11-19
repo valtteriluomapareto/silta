@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-struct AgentHookRoundOneTests {
+struct AgentHookConfigurationTests {
   @Test(arguments: [
     "missing", "nonexecutable", "failure", "crash", "success", "line", "text", "empty",
   ])

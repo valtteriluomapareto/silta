@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.timeLimit(.minutes(1)))
-struct TaskReviewRegressionTests {
+struct TaskWriteSafetyTests {
   @Test(arguments: ["timeout", "signal", "spawn", "utf8"])
   func explicitSHAOperationalFailuresRemainEnvironmental(failure: String) async throws {
     try await withScratchDirectory { home in

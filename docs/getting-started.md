@@ -5,7 +5,7 @@ The examples call the workspace `acme` and use the task prefix `AC`; substitute 
 
 ## 1. Requirements
 
-- macOS 15 or later.
+- macOS 26 or later for the combined CLI and Silta Dev installer.
 - Xcode 27.1 (Swift 6.4), selected with `xcode-select`.
 - Git, and local clones of the repositories you want to register.
 
@@ -23,8 +23,8 @@ silta --help
 
 Add the `PATH` line to your shell profile if `silta` is not found in a new shell.
 
-The same script installs the read-only Mac app, `~/Applications/Silta Dev.app`, from
-the same commit. Rerun it after pulling `main` to update both.
+The same script installs the native app at `~/Applications/Silta Dev.app`. Rerun
+it after pulling `main` to update both products from the same commit.
 
 ## 3. Register your repositories
 
@@ -47,8 +47,8 @@ rescan command. If it lists several candidates, inspect their configuration firs
 ## 4. Connect your agents
 
 If you use Codex, install it before its agent edits the workspace so it receives the
-writable Silta data root. Codex has no session hooks; your Codex agent runs `silta brief`
-at session start itself. Preview its user-level instructions and writable data root with:
+writable Silta data root. Silta's Codex instructions tell the agent to run
+`silta brief` at session start. Preview those instructions and the writable data root with:
 
 ```sh
 silta agents install --codex

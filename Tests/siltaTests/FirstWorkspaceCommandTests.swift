@@ -16,7 +16,7 @@ struct FirstWorkspaceCommandTests {
       try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
       let listed = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch, cwd: nested)
       #expect(listed.termination == .exit(0))
-      let data = try TaskStateRegressionTests.data(listed)
+      let data = try TaskStateCommandTests.data(listed)
       let next = try #require((data["next"] as? [String])?.first)
       #expect(next.hasPrefix("silta init --scan "))
       #expect(data["next_by"] as? String == "agent")
@@ -24,7 +24,7 @@ struct FirstWorkspaceCommandTests {
       #expect(text.stdout.contains("next: " + next))
       let scanned = try Self.replay(next, in: scratch, cwd: nested, json: true)
       try #require(scanned.termination == .exit(0), "\(scanned.stdout)\(scanned.stderr)")
-      let receipt = try TaskStateRegressionTests.data(scanned)
+      let receipt = try TaskStateCommandTests.data(scanned)
       #expect(receipt["workspace"] as? String == "platform")
       #expect(receipt["repositories"] as? [String] == ["platform"])
       #expect(receipt["apps"] as? [String] == ["platform"])
@@ -32,9 +32,9 @@ struct FirstWorkspaceCommandTests {
       #expect(inspect == "silta --ws 'platform' ws show")
       #expect(try Self.replay(inspect, in: scratch, cwd: nested).termination == .exit(0))
       let located = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: nested)
-      #expect(try TaskStateRegressionTests.data(located)["workspace"] as? String == "platform")
+      #expect(try TaskStateCommandTests.data(located)["workspace"] as? String == "platform")
       let final = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
-      #expect((try TaskStateRegressionTests.data(final)["workspaces"] as? [Any])?.count == 1)
+      #expect((try TaskStateCommandTests.data(final)["workspaces"] as? [Any])?.count == 1)
 
       let human = try SiltaBinary.runProcess(
         URL(filePath: "/usr/bin/script"),
@@ -71,7 +71,7 @@ struct FirstWorkspaceCommandTests {
       #expect(whereResult.termination == .exit(2))
       #expect(collision.termination == .exit(6))
       let hints = try [whereResult, collision].map { result in
-        let error = try TaskStateRegressionTests.error(result)
+        let error = try TaskStateCommandTests.error(result)
         return try #require((error["next"] as? [String])?.first)
       }
       #expect(hints.allSatisfy { $0.hasPrefix("silta --ws 'acme' init --scan ") })
@@ -80,10 +80,10 @@ struct FirstWorkspaceCommandTests {
       let repair = try #require(hints.first)
       let repaired = try Self.replay(repair, in: scratch, cwd: repo, json: true)
       try #require(repaired.termination == .exit(0), "\(repaired.stdout)\(repaired.stderr)")
-      let receipt = try TaskStateRegressionTests.data(repaired)
+      let receipt = try TaskStateCommandTests.data(repaired)
       #expect(receipt["repositories"] as? [String] == ["declared-platform"])
       let located = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: repo)
-      #expect(try TaskStateRegressionTests.data(located)["workspace"] as? String == "acme")
+      #expect(try TaskStateCommandTests.data(located)["workspace"] as? String == "acme")
       try store.read { (db: Database) throws in
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM workspace") == 1)
         #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM repo_path") == 1)
@@ -113,7 +113,7 @@ struct FirstWorkspaceCommandTests {
       ] {
         let refusal = try SiltaBinary.run(args + ["--json"], in: scratch, cwd: repo)
         #expect(refusal.termination == .exit(Int32(exit)))
-        let error = try TaskStateRegressionTests.error(refusal)
+        let error = try TaskStateCommandTests.error(refusal)
         #expect(error["code"] as? String == code)
         let hints = try #require(error["next"] as? [String])
         #expect(hints == expected)
@@ -146,12 +146,12 @@ struct FirstWorkspaceCommandTests {
       try #require(first.termination == .exit(0))
       let result = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
       #expect(result.termination == .exit(6))
-      let hints = try TaskStateRegressionTests.error(result)["next"] as? [String]
+      let hints = try TaskStateCommandTests.error(result)["next"] as? [String]
       #expect(hints == ["silta --ws 'acme' ws show"])
       let located = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: platform)
-      #expect(try TaskStateRegressionTests.data(located)["workspace"] as? String == "acme")
+      #expect(try TaskStateCommandTests.data(located)["workspace"] as? String == "acme")
       let final = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
-      #expect((try TaskStateRegressionTests.data(final)["workspaces"] as? [Any])?.count == 1)
+      #expect((try TaskStateCommandTests.data(final)["workspaces"] as? [Any])?.count == 1)
     }
   }
 
@@ -170,7 +170,7 @@ struct FirstWorkspaceCommandTests {
       #expect(second.termination == .exit(6))
       #expect(old.termination == .exit(0))
       #expect(new.termination == .exit(2))
-      let hints = try TaskStateRegressionTests.error(second)["next"] as? [String]
+      let hints = try TaskStateCommandTests.error(second)["next"] as? [String]
       #expect(hints == ["silta --ws 'acme' ws show"])
     }
   }
@@ -183,7 +183,7 @@ struct FirstWorkspaceCommandTests {
       let result = try SiltaBinary.run(
         ["init", "--scan", repo.path, missing.path, "--json"], in: scratch)
       #expect(result.termination == .exit(9))
-      let error = try TaskStateRegressionTests.error(result)
+      let error = try TaskStateCommandTests.error(result)
       #expect((error["message"] as? String)?.contains(missing.path) == true)
       #expect(
         !FileManager.default.fileExists(
@@ -195,7 +195,7 @@ struct FirstWorkspaceCommandTests {
     try withScratchDirectory { scratch in
       let missing = scratch.appending(path: "Missing Acme")
       let result = try SiltaBinary.run(["init", "--scan", missing.path, "--json"], in: scratch)
-      let error = try TaskStateRegressionTests.error(result)
+      let error = try TaskStateCommandTests.error(result)
       #expect(result.termination == .exit(9) && error["code"] as? String == "env")
       #expect((error["message"] as? String)?.contains(missing.path) == true)
       #expect(error["next"] as? [String] == ["silta init --help"])
@@ -217,8 +217,8 @@ struct FirstWorkspaceCommandTests {
       let result = try SiltaBinary.run(["init", "--scan", root.path, "--json"], in: scratch)
       try #require(result.termination == .exit(0))
       #expect(
-        try TaskStateRegressionTests.data(result)["repositories"] as? [String] == ["platform"])
-      #expect(try TaskStateRegressionTests.warnings(result) == ["scan_skipped"])
+        try TaskStateCommandTests.data(result)["repositories"] as? [String] == ["platform"])
+      #expect(try TaskStateCommandTests.warnings(result) == ["scan_skipped"])
       #expect(result.stdout.contains(hidden.path))
     }
   }

@@ -26,9 +26,9 @@ struct InboxCorrectionCommandTests {
       Golden.forTests().check(refused.stdout, "inbox-self-accept-refused.json")
       #expect(
         try run(["--ws", "acme", "task", "show", "AC-1", "--timeline"]).termination == .exit(0))
-      let own = try TaskStateRegressionTests.data(run(["inbox", "--json"]))
+      let own = try TaskStateCommandTests.data(run(["inbox", "--json"]))
       #expect((own["items"] as? [Any])?.isEmpty == true)
-      let human = try TaskStateRegressionTests.data(run(["inbox", "--for", "me", "--json"]))
+      let human = try TaskStateCommandTests.data(run(["inbox", "--for", "me", "--json"]))
       let pending = try #require(human["items"] as? [[String: Any]])
       #expect(
         pending.first?["next"] as? [String] == ["silta --ws 'acme' task show 'AC-1' --timeline"])
@@ -44,7 +44,7 @@ struct InboxCorrectionCommandTests {
       }
       _ = try run(["task", "add", "Acme proposal"])
       let empty = try run(["inbox", "--for", "me"])
-      let raw = try TaskStateRegressionTests.data(run(["inbox", "--for", "me", "--json"]))
+      let raw = try TaskStateCommandTests.data(run(["inbox", "--for", "me", "--json"]))
       #expect(empty.stdout.contains(Self.scope))
       #expect(raw["scope"] as? String == "local")
       _ = try run(["comment", "AC-1", "--kind", "question", "-m", "Which API?"])
@@ -53,7 +53,7 @@ struct InboxCorrectionCommandTests {
       ])
       let inbox = try run(["inbox", "--for", "me", "--json"])
       let items = try #require(
-        try TaskStateRegressionTests.data(inbox)["items"] as? [[String: Any]])
+        try TaskStateCommandTests.data(inbox)["items"] as? [[String: Any]])
       #expect(items.first?["relayed_by"] as? [String] == ["agent:codex:acme"])
       let next = items.first?["next"] as? [String] ?? []
       #expect(next.contains { $0.hasPrefix("ask human:") })
@@ -64,7 +64,7 @@ struct InboxCorrectionCommandTests {
   @Test func schemaAllowsGroupedItemsAndNamesDiscussionPosts() throws {
     try withScratchDirectory { scratch in
       let output = try SiltaBinary.run(["schema", "inbox", "--json"], in: scratch)
-      let data = try TaskStateRegressionTests.data(output)
+      let data = try TaskStateCommandTests.data(output)
       let commands = try #require(data["commands"] as? [[String: Any]])
       let shape = try #require(commands.first?["data"] as? [String: Any])
       let object = try #require(shape["object"] as? [String: Any])
@@ -103,7 +103,7 @@ struct InboxCorrectionCommandTests {
       try "Decision\n\n".write(to: file, atomically: true, encoding: .utf8)
       _ = try run(["comment", "AC-1", "--kind", "decision", "-F", file.path], foreign)
       let text = try run(["inbox"], owner)
-      let raw = try TaskStateRegressionTests.data(run(["inbox", "--json"], owner))
+      let raw = try TaskStateCommandTests.data(run(["inbox", "--json"], owner))
       let items = try #require(raw["items"] as? [[String: Any]])
       Golden.forTests().check(text.stdout, "inbox-all-kinds.txt")
       #expect(items.map { $0["kind"] as? String } == ["question", "answer", "discussion"])
@@ -111,7 +111,7 @@ struct InboxCorrectionCommandTests {
       #expect(items[2]["post_kind"] as? String == "decision")
       #expect(text.stdout.contains("clears on the claimer's next write to AC-1"))
       for _ in 0..<9 { _ = try run(["comment", "AC-1", "-m", "Context"], foreign) }
-      let twelve = try TaskStateRegressionTests.data(run(["inbox", "--json"], owner))
+      let twelve = try TaskStateCommandTests.data(run(["inbox", "--json"], owner))
       #expect((twelve["items"] as? [Any])?.count == 12)
       #expect(twelve["remaining"] as? Int == 0 && twelve["more"] == nil)
       _ = try run(["comment", "AC-1", "-m", "Omitted"], foreign)

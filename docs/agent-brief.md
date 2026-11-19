@@ -46,7 +46,7 @@ Steps:
    with one row each for: acceptance tests, §9 Simplicity, CodedError, doc comments,
    test-first and planted faults, size budget, shared files.
 5. You may push the branch and open the PR, then run `task submit` as AGENTS.md's
-   dogfooding stage says. Don't merge it.
+   dogfooding stage says. Stop at submission unless the brief assigns you the merge.
 ```
 
 If the plan needs a review, run the persona review on it and reply "go" or with

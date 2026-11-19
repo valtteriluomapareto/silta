@@ -27,9 +27,9 @@ struct InboxGroupCommandTests {
       let result = try run(args + (json ? ["--json"] : []))
       #expect(result.termination == .exit(0))
       Golden.forTests().check(result.stdout, "inbox-groups.\(json ? "json" : "txt")")
-      let data = try TaskStateRegressionTests.data(run(args + ["--json"]))
+      let data = try TaskStateCommandTests.data(run(args + ["--json"]))
       let items = try #require(data["items"] as? [[String: Any]])
-      let schema = try TaskStateRegressionTests.data(run(["schema", "inbox", "--json"]))
+      let schema = try TaskStateCommandTests.data(run(["schema", "inbox", "--json"]))
       let commands = try #require(schema["commands"] as? [[String: Any]])
       #expect(ShapeCheck.violations(of: data, against: try #require(commands.first?["data"])) == [])
       #expect(items.compactMap { $0["kind"] as? String } == ["due", "proposal", "promoted"])
@@ -60,7 +60,7 @@ struct InboxGroupCommandTests {
           environment: TaskCommandTests.actor.merging([
             "USER": "acme", "TZ": "Pacific/Honolulu", "SILTA_NOW": time,
           ]) { $1 })
-        return try #require(TaskStateRegressionTests.data(output)["items"] as? [[String: Any]])
+        return try #require(TaskStateCommandTests.data(output)["items"] as? [[String: Any]])
       }
       let before = try store.read {
         try Row.fetchAll($0, sql: "SELECT * FROM task_event").description
@@ -84,7 +84,7 @@ struct InboxGroupCommandTests {
         try $0.database.execute(
           sql: "UPDATE task SET created_at='2023-10-01T00:00:00.000Z' WHERE seq=2")
       }
-      let result = try TaskStateRegressionTests.data(run(["inbox", "--for", "me", "--json"]))
+      let result = try TaskStateCommandTests.data(run(["inbox", "--for", "me", "--json"]))
       let items = try #require(result["items"] as? [[String: Any]])
       #expect(items.compactMap { $0["ref"] as? String } == (5...16).reversed().map { "AC-\($0)" })
       #expect(result["remaining"] as? Int == 2)
@@ -103,7 +103,7 @@ struct InboxGroupCommandTests {
         try String.fetchAll($0, sql: "SELECT status FROM task WHERE seq IN (2,3,4) ORDER BY seq")
       }
       #expect(statuses == ["proposed", "proposed", "proposed"])
-      let all = try TaskStateRegressionTests.data(
+      let all = try TaskStateCommandTests.data(
         run(["inbox", "--for", "human:acme", "--all", "--json"]))
       #expect((all["items"] as? [Any])?.count == 13 && all["more"] == nil)
     }

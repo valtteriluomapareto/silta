@@ -14,7 +14,9 @@ This covers setup, commands and the merge workflow. Agents should start with
 
 CI selects exactly this Xcode (`scripts/ci/select-xcode.sh`) and installs the
 SHA-checked tools. Use the same pinned tools locally; Homebrew's current versions
-can produce different lint results. On macOS 15+ arm64 with Command Line Tools:
+can produce different lint results. Use the
+[development installer requirements](docs/getting-started.md#1-requirements).
+On arm64 with Command Line Tools, install the pinned tools as follows:
 
 ```sh
 silta_tools=$(mktemp -d)
@@ -58,26 +60,25 @@ in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
 
 1. **Issue or slice.** Work starts from a slice in the active plan, or from a GitHub
    issue that names one.
-2. **Plan.** Anything beyond a small fix gets a written plan. Follow the current
-   [dogfooding stage](AGENTS.md#dogfooding) for its location; larger plans use
-   `docs/plans/` and its template.
-3. **Plan review.** Three independent reviewer subagents (Architect, Tester,
-   Pragmatism) review the plan, using [`skills/persona-review`](skills/persona-review/SKILL.md).
-   A fourth, Agent experience, joins when the change touches agent-facing output.
-   One agent playing several personas doesn't count. If subagents aren't available,
-   say so in the PR.
+2. **Plan.** Follow the [workflow](AGENTS.md#workflow) and the current
+   [dogfooding stage](AGENTS.md#dogfooding) for where to record a plan.
+3. **Plan review.** Use the [workflow](AGENTS.md#workflow) to determine when review
+   is required and the [persona table](skills/persona-review/SKILL.md#who) to find
+   the independent reviewers for the change.
 4. **Tests first**, following the
    [test-first flow](docs/coding-guidelines.md#test-first-flow).
    - A bug fix starts with a committed reproduction that fails for the reported
      reason (`withKnownIssue`).
    - A feature starts from its acceptance tests.
    - A PR labelled `bug` must change a test; CI checks this.
-5. **Implementation review** by the same reviewers. Fix or answer every finding.
+5. **Implementation review.** Follow [AGENTS.md](AGENTS.md#reviews) for
+   reviewer selection and follow-up.
 6. **Merge** on green CI for the current head. Use squash merges titled
    `<slice or #issue> <type>: summary`, e.g. `S4 feat: JSON envelope and exit codes`.
    `main` is protected (D19): the branch must be up to date with `main`, so rebase or
    merge `main` in when GitHub asks. `gh pr merge --auto --squash` queues the merge for
-   when CI passes.
+   when CI passes. The [dogfooding workflow](AGENTS.md#dogfooding) covers task
+   submission and the steps after a merge.
 
 ## Branches and commits
 

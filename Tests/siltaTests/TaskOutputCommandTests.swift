@@ -212,7 +212,7 @@ struct TaskOutputCommandTests {
           "Preview it", "--json",
         ], in: scratch)
       #expect(preview.termination == .exit(0))
-      let warnings = try TaskStateRegressionTests.warnings(preview)
+      let warnings = try TaskStateCommandTests.warnings(preview)
       #expect(warnings == ["approval_unused"])
       #expect(preview.stdout.contains("A dry run records nothing"))
       let ungated = try Self.run(

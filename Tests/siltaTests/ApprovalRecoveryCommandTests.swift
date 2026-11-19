@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
-struct ApprovalRecoveryRegressionTests {
+struct ApprovalRecoveryCommandTests {
   @Test(arguments: [
     (["ws", "edit", "-F", "absent.yaml"], "silta ws edit"),
     (["--ws", "acme", "task", "add", "Acme", "--allow-secret"], "silta --ws 'acme' task add"),
@@ -41,7 +41,7 @@ struct ApprovalRecoveryRegressionTests {
   }
 }
 
-extension ApprovalRecoveryRegressionTests {
+extension ApprovalRecoveryCommandTests {
   @Test(arguments: [
     (["--ws", "acme", "ws", "edit"], "silta ws edit 'acme'"),
     (["ws", "edit", "acme"], "silta ws edit 'acme'"),
@@ -62,7 +62,7 @@ extension ApprovalRecoveryRegressionTests {
           in: scratch, environment: TaskCommandTests.actor)
         #expect(result.termination == .exit(3))
         if json {
-          let error = try TaskStateRegressionTests.error(result)
+          let error = try TaskStateCommandTests.error(result)
           #expect(error["code"] as? String == "human_only")
           #expect(error["next_by"] as? String == "human")
           #expect(error["next"] as? [String] == [expected])
@@ -104,7 +104,7 @@ extension ApprovalRecoveryRegressionTests {
                 json ? "ws-edit-rename-refused.json" : "ws-edit-rename-refused.txt")
             }
             if json {
-              let error = try TaskStateRegressionTests.error(result)
+              let error = try TaskStateCommandTests.error(result)
               #expect(error["next"] as? [String] == next)
             } else {
               #expect(next.allSatisfy { result.stderr.contains($0) })
@@ -157,7 +157,7 @@ extension ApprovalRecoveryRegressionTests {
   }
 }
 
-extension ApprovalRecoveryRegressionTests {
+extension ApprovalRecoveryCommandTests {
   @Test func missingWorkspaceKeepsListingRecoveryAndNoApprovalRow() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)

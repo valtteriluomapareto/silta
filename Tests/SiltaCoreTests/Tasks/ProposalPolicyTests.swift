@@ -16,7 +16,7 @@ struct ProposalPolicyTests {
   }
 
   static func set(_ policy: String?, in store: DatabaseStore) throws {
-    try WorkspaceSettingsRegressionTests.set(
+    try WorkspaceSettingValidationTests.set(
       policy.map { "{\"proposals\":\"\($0)\"}" } ?? "{}", in: store)
   }
 

@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-struct AgentInstallRoundTwoTests {
+struct AgentInstallBoundaryTests {
   static let limit = 1_048_576
   static let paths = [
     ".claude/skills/silta/SKILL.md", ".claude/CLAUDE.md", ".codex/AGENTS.md", ".codex/config.toml",

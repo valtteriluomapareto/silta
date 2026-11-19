@@ -7,7 +7,7 @@ import Testing
 /// Guards that depend on who writes: the secret guard checks only added text, a human
 /// unblocks without approval, and task reads have their index.
 @Suite(.timeLimit(.minutes(1)))
-struct TaskGuardRegressionTests {
+struct TaskStoragePolicyTests {
   @Test func humanTickKeepsAnAllowedSecretPlan() async throws {
     try await withScratchDirectory { home in
       let env = try TaskServiceTests.environment(home, actor: TaskServiceTests.human())

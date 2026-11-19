@@ -6,17 +6,17 @@ import Testing
 
 /// Validation and secret-guard rules of the task commands, from the outside.
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
-struct TaskInputRegressionTests {
-  static let other = TaskStateRegressionTests.other
+struct TaskInputCommandTests {
+  static let other = TaskStateCommandTests.other
 
   private static func run(
     _ arguments: [String], in scratch: URL, as actor: [String: String] = TaskCommandTests.actor
   ) throws -> CLIResult {
-    try TaskStateRegressionTests.run(arguments, in: scratch, as: actor)
+    try TaskStateCommandTests.run(arguments, in: scratch, as: actor)
   }
 
   private static func warnings(_ result: CLIResult) throws -> [String] {
-    try TaskStateRegressionTests.warnings(result)
+    try TaskStateCommandTests.warnings(result)
   }
 
   private static func document(title: String, plan: String, result: String = "") -> String {

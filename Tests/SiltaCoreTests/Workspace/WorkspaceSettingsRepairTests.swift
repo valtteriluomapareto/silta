@@ -11,7 +11,7 @@ struct WorkspaceSettingsRepairTests {
     try withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home)
       try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
-      try WorkspaceSettingsRegressionTests.set(stored, in: store)
+      try WorkspaceSettingValidationTests.set(stored, in: store)
       let shown = try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") }
       let replacement =
         shown.split(separator: "\n").map {

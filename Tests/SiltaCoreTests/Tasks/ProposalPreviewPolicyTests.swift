@@ -3,7 +3,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-struct ProposalPreviewRegressionTests {
+struct ProposalPreviewPolicyTests {
   @Test(arguments: ["triage", "ask"], ["", "<unused>"])
   func approvedPreviewPredictsTodoWithoutValidatingWords(policy: String, words: String) async throws
   {
