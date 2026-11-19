@@ -19,9 +19,12 @@ struct DogfoodReportTests {
       let tools = try Self.tools(scratch)
       let result = try Self.run(["--since", "2023-11-14"], scratch: scratch, tools: tools)
       #expect(result.termination == .exit(0))
-      Golden.forTests().check(result.stdout, "dogfood-report.md")
+      withKnownIssue("#267: the report omits human inbox load") {
+        Golden.forTests().check(result.stdout, "dogfood-report.md")
+      }
       #expect(
-        !result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply"))
+        !result.stdout.contains("Acme foreign") && !result.stdout.contains("Acme private reply")
+          && !result.stdout.contains("Acme inbox private"))
       #expect(result.stderr.isEmpty)
     }
   }
@@ -49,7 +52,9 @@ struct DogfoodReportTests {
       let next = try DogfoodReportTests.run([], scratch: scratch, tools: tools, script: script)
       #expect(next.termination == .exit(0))
       #expect(!next.stdout.contains("Warning:"))
-      Golden.forTests().check(next.stdout, "dogfood-report.md")
+      withKnownIssue("#267: the report omits human inbox load") {
+        Golden.forTests().check(next.stdout, "dogfood-report.md")
+      }
     }
   }
 
@@ -100,7 +105,7 @@ struct DogfoodReportTests {
     }
   }
 
-  @Test func emptyWorkspaceHasRealZeroMeasurementsAndUnavailableInbox() throws {
+  @Test func emptyWorkspaceHasRealZeroMeasurementsAndEmptyInbox() throws {
     try withScratchDirectory { scratch in
       _ = try DogfoodImportTests.store(scratch)
       let tools = try DogfoodReportTests.tools(scratch)
@@ -121,7 +126,10 @@ struct DogfoodReportTests {
       #expect(result.stdout.contains("## Calls\n\nNone.\n"))
       #expect(result.stdout.contains("## Warnings\n\nNone.\n"))
       #expect(result.stdout.contains("Open dogfood tasks:\n\nNone.\n"))
-      #expect(result.stdout.contains("Inbox size and oldest item: n/a (S11)."))
+      withKnownIssue("#267: the report omits zero inbox measurements") {
+        #expect(result.stdout.contains("Questions to @me: 0."))
+        #expect(result.stdout.contains("Inbox size: 0 items. Oldest item: none."))
+      }
     }
   }
 
@@ -268,6 +276,7 @@ extension DogfoodReportTests {
       try seedTasks(tx)
       try seedEvents(tx)
       try seedApprovals(tx)
+      try seedInboxQuestions(1...1, in: tx)
     }
     return store
   }
@@ -295,7 +304,9 @@ extension DogfoodReportTests {
           """,
         arguments: [
           "silta-task-\(seq)", seq, seq == 4 ? "Acme command repair" : "Acme \(seq)",
-          status, result, Self.actor, "2023-11-01T00:00:00.000Z", "2023-11-30T00:00:00.000Z",
+          status, result, Self.actor,
+          seq == 6 ? "2023-11-17T00:00:00.000Z" : "2023-11-01T00:00:00.000Z",
+          "2023-11-30T00:00:00.000Z",
         ])
     }
     try tx.database.execute(sql: "UPDATE task SET archive_override='archived' WHERE seq=1")
@@ -426,7 +437,7 @@ extension DogfoodReportTests {
       [(script ?? root.appending(path: "scripts/dogfood-report.sh")).path] + args,
       in: scratch,
       environment: [
-        "PATH": tools.path + ":/usr/bin:/bin", "SILTA_ACTOR": actor,
+        "PATH": tools.path + ":/usr/bin:/bin", "SILTA_ACTOR": actor, "USER": "acme",
         "SILTA_NOW": "2023-11-30T00:00:00.000Z",
       ])
   }
