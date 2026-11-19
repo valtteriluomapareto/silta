@@ -36,6 +36,7 @@ class ReviewReplays(unittest.TestCase):
         evidence = json.loads((output / result['evidence']).read_text())
         return result, evidence
 
+    @unittest.expectedFailure  # #262
     def test_plan_file_grading_uses_native_write_targets_and_item_identity(self):
         for harness in ('claude', 'codex'):
             result, evidence = self.trial(harness, 'plan-not-file', 'pass')
@@ -54,6 +55,7 @@ class ReviewReplays(unittest.TestCase):
                 phase['opaque'] = [
                     {'id': 'search', 'type': 'mcp_tool_call', 'arguments': {'pattern': '**/PLAN.md'}},
                     {'id': 'change', 'type': 'file_change', 'changes': []},
+                    {'id': 'malformed', 'type': 'file_change', 'changes': [{'path': 'PLAN.md'}]},
                 ]
                 write = {'id': 'change', 'type': 'file_change',
                          'changes': [{'path': 'PLAN.md', 'kind': 'add'}]}

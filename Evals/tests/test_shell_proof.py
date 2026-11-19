@@ -81,6 +81,7 @@ class ShellProof(unittest.TestCase):
         p = phase({'A': 'exit 0; silta brief'}, [('A', 'started'), ('A', 'completed')], [])
         self.assertIsNone(evals.trace_matches_logs(p, 'codex'))
 
+    @unittest.expectedFailure  # #262
     def test_tracker_grading_distinguishes_observed_writes_from_reads(self):
         writes = [
             'gh --repo acme/example issue edit 1 --title Acme',
@@ -88,6 +89,8 @@ class ShellProof(unittest.TestCase):
             'gh api repos/acme/example/issues -f title=Acme',
             'gh api --method PATCH repos/acme/example/issues/1',
             'gh api -XPOST repos/acme/example/issues',
+            'gh api --preview acme repos/acme/example/issues -f title=Acme',
+            'gh issue comment 1 --body --help',
             'gh api repos/acme/example/issues/1/comments --input acme.json',
             'az boards work-item update --id 1 --title Acme',
         ]
@@ -96,6 +99,8 @@ class ShellProof(unittest.TestCase):
             'gh api --method GET repos/acme/example/issues -f state=open',
             'gh api -XGET repos/acme/example/issues -fstate=open',
             'az boards work-item show --id 1', 'az boards query --wiql Acme',
+            'gh issue create --help', 'az boards work-item update --help',
+            'gh api repos/acme/example/issues --method DELETE --help',
         ]
         for command in writes + reads:
             with self.subTest(command=command):

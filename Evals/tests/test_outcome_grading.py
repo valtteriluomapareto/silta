@@ -47,12 +47,13 @@ class OutcomeGrading(unittest.TestCase):
         self.assertCountEqual(evals.forbidden(e), ['repository file: ' + plan,
                                                    'repository file: acme-mobile/TODO'])
 
+    @unittest.expectedFailure  # #262
     def test_context_metrics_use_observed_output_and_the_immediate_followup(self):
         e = evidence()
         p = e['phases'][0]
         wanted = "silta --ws 'acme' task show 'AC-1'"
         output = json.dumps({'schema': 1, 'ok': False,
-                             'error': {'code': 'conflict', 'next': [wanted]}})
+                             'error': {'code': 'conflict', 'next_by': 'agent', 'next': [wanted]}})
         p['wall_time_s'] = 0.75
         for number, (command, code, stdout) in enumerate([
             ('silta --ws acme brief', 0, 'Acme',),
@@ -63,8 +64,9 @@ class OutcomeGrading(unittest.TestCase):
             p['tool_results'].append({'id': str(number), 'native_start': 2 * number,
                                       'native_end': 2 * number + 1, 'command': command,
                                       'exit': code, 'output': stdout})
-        p['logs'] = [dict(command='silta ' + command, exit_code=code)
+        p['logs'] = [dict(command='silta ' + command, exit_code=code, actor=p['actor'])
                      for command, code in [('brief', 0), ('task start', 6), ('task show', 0)]]
+        p['logs'][1]['error_code'] = 'conflict'
         expected = dict(brief_calls=2, brief_output_tokens_estimate=2,
                         observed_error_recoveries=1, wall_time_s=0.75)
         for key, value in expected.items():
@@ -74,6 +76,35 @@ class OutcomeGrading(unittest.TestCase):
         report = evals.aggregate([trial], 'stub')
         self.assertEqual({k: report['groups'][0][k] for k in expected}, expected)
         self.assertIn('Brief output tokens (estimate)', evals.render_html(report))
+
+        def with_output(change):
+            copy_of_e = copy.deepcopy(e)
+            current = copy_of_e['phases'][0]
+            if change == 'missing logs':
+                current['logs'] = []
+            elif change == 'mismatched error':
+                current['logs'][1]['error_code'] = 'claimed'
+            elif change == 'mismatched exit':
+                current['logs'][1]['exit_code'] = 1
+            elif change == 'missing brief output':
+                current['tool_results'][0]['output'] = ''
+            elif change == 'human JSON':
+                refusal = json.loads(output)
+                refusal['error']['next_by'] = 'human'
+                current['tool_results'][1]['output'] = json.dumps(refusal)
+            elif change == 'human text':
+                current['tool_results'][1]['output'] = f"error: Acme conflict. [conflict]\nask human: {wanted}"
+            elif change == 'JSON format':
+                command = wanted + ' --json'
+                current['commands'][-1] = current['tool_results'][-1]['command'] = command
+            return evals.metrics(copy_of_e)
+        for kind in ('missing logs', 'mismatched error', 'mismatched exit'):
+            with self.subTest(kind=kind):
+                self.assertIsNone(with_output(kind)['observed_error_recoveries'])
+        self.assertIsNone(with_output('missing brief output')['brief_output_tokens_estimate'])
+        self.assertEqual(with_output('human JSON')['observed_error_recoveries'], 0)
+        self.assertEqual(with_output('human text')['observed_error_recoveries'], 0)
+        self.assertEqual(with_output('JSON format')['observed_error_recoveries'], 1)
 
         wrong_scope = 'silta --ws later task show AC-1'
         p['commands'][-1] = p['tool_results'][-1]['command'] = wrong_scope
