@@ -52,6 +52,45 @@ struct DocEvidenceReadCommandTests {
     }
   }
 
+  @Test func documentTerminalViewsKeepStructuredEvidenceIntact() throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let title = "Acme\u{1b}title\u{7}safe"
+      let body = "Acme\u{1b}body\u{7}safe\twords\n"
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET title=?,body_md=? WHERE rev=2", arguments: [title, body])
+      }
+      let before = try truth(store)
+      for quiet in [false, true] {
+        let body = try run([], scratch, quiet: quiet)
+        #expect(body.termination == .exit(0) && body.stderr.isEmpty)
+        withKnownIssue("#254: stored text rendering") {
+          #expect(body.stdout.contains("title: Acme title safe\n"))
+        }
+        withKnownIssue("#254: stored text rendering") {
+          #expect(body.stdout.contains("Acme body safe\twords\n"))
+        }
+        let diff = try run(["--diff"], scratch, quiet: quiet)
+        #expect(diff.termination == .exit(0) && diff.stderr.isEmpty)
+        withKnownIssue("#254: stored text rendering") {
+          #expect(diff.stdout.contains("+Acme body safe\twords\n"))
+        }
+        let list = try SiltaBinary.run(
+          ["--ws", "acme", "doc", "ls"] + (quiet ? ["--quiet"] : []),
+          in: scratch, environment: TaskCommandTests.fixed)
+        #expect(list.termination == .exit(0) && list.stderr.isEmpty)
+        #expect(!list.stdout.contains("\u{1b}") && !list.stdout.contains("\u{7}"))
+      }
+      let json = try TaskStateRegressionTests.data(run([], scratch, json: true))
+      #expect(json["title"] as? String == title)
+      #expect(json["body"] as? String == body)
+      let diff = try TaskStateRegressionTests.data(run(["--diff"], scratch, json: true))
+      #expect((diff["output"] as? String)?.contains("+" + body) == true)
+      #expect(try truth(store) == before)
+    }
+  }
+
   @Test(arguments: ["accepted", "proposed", "rejected", "superseded"])
   func allReadableStatesUseRecordedSourceWithoutLiveClaim(state: String) throws {
     try withScratchDirectory { scratch in

@@ -136,6 +136,37 @@
       }
     }
 
+    @Test func markdownLinksShowAndProtectTheirActualDestinations() throws {
+      let address = "https://example.test/docs?q=one"
+      let source = """
+        [Local reference](file:///acme/inert)
+
+        [**Acme** documentation](\(address))
+
+        [Relative reference](/acme/notes)
+
+        `[Sample](https://example.test/sample)`
+        """
+      let blocks = MarkdownContent(source).blocks
+      let local = try #require(blocks.first { String($0.text.characters) == "Local reference" })
+      withKnownIssue("#254: stored text rendering") {
+        #expect(local.text.runs.compactMap(\.link).isEmpty)
+      }
+      let relative = try #require(
+        blocks.first { String($0.text.characters) == "Relative reference" })
+      withKnownIssue("#254: stored text rendering") {
+        #expect(relative.text.runs.compactMap(\.link).isEmpty)
+      }
+      let allowed = try #require(
+        blocks.first { String($0.text.characters).hasPrefix("Acme documentation") })
+      #expect(Set(allowed.text.runs.compactMap { $0.link?.absoluteString }) == [address])
+      withKnownIssue("#254: stored text rendering") {
+        #expect(String(allowed.text.characters) == "Acme documentation (\(address))")
+      }
+      let sample = try #require(blocks.first { String($0.text.characters).hasPrefix("[Sample]") })
+      #expect(sample.text.runs.compactMap(\.link).isEmpty)
+    }
+
     @Test func markdownTablesAndDiffRemainReadable() {
       let table = "| Name | Value |\n| --- | ---: |\n| amount | 42 |"
       let content = MarkdownContent("# Contract\n\n" + table, title: "Contract")

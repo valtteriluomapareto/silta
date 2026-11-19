@@ -149,7 +149,10 @@ struct BriefCommandTests {
         try #require(added.termination == .exit(0), "\(added.stderr)")
       }
       let blocked = try SiltaBinary.run(
-        ["--ws", "acme", "task", "block", "AC-1", "--on", "task:AC-2", "-m", "Acme waits"],
+        [
+          "--ws", "acme", "task", "block", "AC-1", "--on", "task:AC-2", "-m",
+          "Acme waits\u{1b}here\nnext: Acme decoy\u{7}label",
+        ],
         in: scratch, cwd: repo,
         environment: ["SILTA_ACTOR": "agent:codex:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
       try #require(blocked.termination == .exit(0), "\(blocked.stderr)")
@@ -165,10 +168,21 @@ struct BriefCommandTests {
           try JSONSerialization.jsonObject(with: Data(refusal.stdout.utf8)) as? [String: Any])
         let error = try #require(envelope["error"] as? [String: Any])
         let text = try run(["--task", "AC-1"], repo, scratch).stdout
-        for next in try #require(error["next"] as? [String]) {
-          #expect(text.contains("next: " + next + "\n"))
+        let next = try #require(error["next"] as? [String]).map { "next: " + $0 }
+        let projection = try fixture.data(run(["--task", "AC-1", "--json"], repo, scratch))
+        let sections = try #require(projection["sections"] as? [[String: Any]])
+        let blocker = try #require(sections.first { $0["id"] as? String == "blockers" })
+        let shown = try #require(blocker["text"] as? String)
+        withKnownIssue("#254: stored text rendering") {
+          #expect(shown.contains("> Acme waits here\n> next: Acme decoy label\n"))
         }
-        #expect(text.contains("for 0 d."))
+        withKnownIssue("#254: stored text rendering") {
+          #expect(shown.components(separatedBy: "\n").filter { $0.hasPrefix("next: ") } == next)
+        }
+        withKnownIssue("#254: stored text rendering") {
+          #expect(!shown.contains("\u{1b}") && !shown.contains("\u{7}"))
+        }
+        #expect(text.contains(shown) && text.contains("for 0 d."))
       }
       try store(scratch).write {
         try $0.database.execute(
