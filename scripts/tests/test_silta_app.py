@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import select
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -72,6 +73,51 @@ class Waits(unittest.TestCase):
             child.wait()
             with self.assertRaisesRegex(driver.DriverError, "exited"):
                 driver.wait_for(Path(root), child.pid, lambda: None, [], 0)
+
+    def test_action_waits_for_both_settlement_and_the_response_link(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            request = root / "req-1.json"
+            response = root / "res-1.json"
+            state_url = root / "state.json"
+            initial = {"run": "owned", "seq": 0, "settledSeq": 0}
+            expected = {"version": 1, "run": "owned", "seq": 1, "outcome": "accepted",
+                        "copied": "AC-9"}
+            driver.atomic_json(state_url, initial)
+            waiting = threading.Event()
+            saw_settled_without_response = threading.Event()
+
+            def fake_app():
+                if waiting.wait(4):
+                    driver.atomic_json(state_url, dict(initial, seq=1, settledSeq=1))
+                    if saw_settled_without_response.wait(4):
+                        driver.atomic_json(response, expected, exclusive=True)
+
+            def wait(conditions, timeout, ready):
+                def check(state):
+                    result = ready(state)
+                    if state["settledSeq"] == 1 and not result:
+                        saw_settled_without_response.set()
+                    return result
+
+                waiting.set()
+                return driver.wait_for(root, os.getpid(), run.read, conditions, timeout, check)
+
+            run = SimpleNamespace(root=root, read=lambda: driver.read_json(state_url),
+                                  verify=lambda: None, wait=wait)
+            app = threading.Thread(target=fake_app)
+            app.start()
+            try:
+                fields = {"action": "copy.ref"}
+                self.assertEqual(driver.action(run, fields, 4), expected)
+                self.assertEqual(driver.read_json(request), {**fields, "version": 1,
+                                                             "run": "owned", "seq": 1})
+                self.assertTrue(saw_settled_without_response.is_set())
+            finally:
+                waiting.set()
+                saw_settled_without_response.set()
+                app.join(5)
+
 
 
 class OwnedRuns(unittest.TestCase):
@@ -143,6 +189,71 @@ class OwnedRuns(unittest.TestCase):
                 self.assertEqual(confirm.call_count, 4)
             self.assertTrue(output.exists())
             self.assertEqual(driver.read_json(output.with_suffix(".png.json"))["revision"], 4)
+
+class FixtureCLI(unittest.TestCase):
+    def setUp(self):
+        scratch = self.enterContext(tempfile.TemporaryDirectory())
+        self.root = Path(scratch)
+        self.run = Mock(root=self.root / "run")
+        self.run.read.return_value = {"fixtureNow": "2030-06-01T02:03:04.000Z"}
+        self.data = self.run.root / "data"
+        self.data.mkdir(parents=True)
+        self.database = self.data / "silta.db"
+        self.database.touch()
+        self.cli = self.root / ".build/debug/silta"
+        self.cli.parent.mkdir(parents=True)
+        self.audit = self.run.root / "cli.json"
+        self.enterContext(patch.object(driver, "ROOT", self.root))
+
+    def stub(self, stdout, status=0):
+        self.cli.write_text(
+            f"#!{sys.executable}\n"
+            "import json, os, pathlib, sys\n"
+            "pathlib.Path('cli.json').write_text(json.dumps("
+            "{'args': sys.argv[1:], 'env': dict(os.environ), 'cwd': os.getcwd()}))\n"
+            f"print({stdout!r})\n"
+            f"sys.exit({status})\n"
+        )
+        self.cli.chmod(0o700)
+
+    def test_fixture_cli_uses_scrubbed_environment_and_exact_args(self):
+        self.stub("AC-24")
+        with patch.dict(os.environ, {"HOME": "/ignore-parent-home", "SILTA_HOME": "/ignore-silta-home",
+                                     "SILTA_NOW": "ignore-parent-clock", "SILTA_TOKEN": "unused"}):
+            self.assertEqual(driver.write_fixture_proposal(self.run, "--example title"), "AC-24")
+        call = driver.read_json(self.audit)
+        self.assertEqual(call["args"], ["--ws", "acme", "task", "add", "--quiet", "--",
+                                        "--example title"])
+        self.assertEqual(Path(call["cwd"]).resolve(), self.run.root.resolve())
+        self.assertEqual(call["env"]["HOME"], str(self.run.root))
+        self.assertEqual(call["env"]["SILTA_HOME"], str(self.data))
+        self.assertEqual(call["env"]["SILTA_ACTOR"], "agent:codex:control")
+        self.assertEqual(call["env"]["SILTA_NOW"], "2030-06-01T02:03:04.000Z")
+        self.assertNotIn("SILTA_TOKEN", call["env"])
+
+    def test_linked_fixture_store_refuses_before_invoking_cli(self):
+        self.stub("AC-24")
+        external = self.root / "external"
+        self.data.rename(external)
+        self.data.symlink_to(external, target_is_directory=True)
+        with self.assertRaisesRegex(driver.DriverError, "isolated directory"):
+            driver.write_fixture_proposal(self.run, "Acme test")
+        self.data.unlink()
+        self.data.mkdir()
+        os.link(external / "silta.db", self.database)
+        with self.assertRaisesRegex(driver.DriverError, "isolated directory"):
+            driver.write_fixture_proposal(self.run, "Acme test")
+        self.assertFalse(self.audit.exists())
+
+    def test_fixture_cli_refuses_failed_exit_and_unparsable_ref(self):
+        for stdout, status in (("AC-24", 1), ("AC-0", 0), ("AC-24\nother", 0)):
+            with self.subTest(stdout=stdout, status=status):
+                self.stub(stdout, status)
+                with self.assertRaisesRegex(driver.DriverError, "did not return a task reference"):
+                    driver.write_fixture_proposal(self.run, "Acme test")
+                self.assertTrue(self.audit.exists())
+                self.audit.unlink()
+
 
 class FixtureWriteRecovery(unittest.TestCase):
     def test_intent_survives_interruption_and_never_replays(self):

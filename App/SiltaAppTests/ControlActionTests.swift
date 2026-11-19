@@ -4,7 +4,43 @@
   import SiltaAppSupport
   import Testing
 
-  @MainActor struct ControlActionTests {
+  @MainActor @Suite(.timeLimit(.minutes(1)))
+  struct ControlActionTests {
+    @Test func wireAcceptsJSONFormattingAndRejectsEscapedDuplicateKeys() throws {
+      let formatted = Data(
+        #"{ "version" : 1, "seq" : 1, "run" : "current", "action" : "copy\u002eref" }"#.utf8)
+      withKnownIssue("The wire requires a byte-for-byte match with Foundation's encoder") {
+        let request = try? ControlRequest(  // the old decoder refuses this valid request
+          data: formatted, run: "current", sequence: 1)
+        #expect(request?.action == .copyRef)
+      }
+      let duplicate = Data(
+        #"{"version":1,"seq":1,"run":"current","action":"refresh","act\u0069on":"copy.ref"}"#.utf8)
+      #expect(throws: ControlRefusal.invalidRequest) {
+        try ControlRequest(data: duplicate, run: "current", sequence: 1)
+      }
+    }
+
+    @Test func statusStaysBusyUntilProductWriteCompletes() async throws {
+      let writes = ControlledWrites()
+      let model = AppModel(
+        writer: { write, workspace in try await writes.write(write, workspace) },
+        load: { _, _, _ in
+          AppLoadedData(
+            workspaces: [], workspace: "acme", snapshot: nil, map: nil,
+            version: 1, checkedAt: AppV2Fixture.now)
+        })
+      await model.refresh().value
+      let write = try #require(model.perform(.acceptAnswer(ref: "AC-14/2"), for: "AC-14/2"))
+      let pending = await writes.next()
+      withKnownIssue("Control readiness ignores product writes") {
+        #expect(!ControlState(model: model, run: "owned", revision: 1, dark: false).idle)
+      }
+      pending.continuation.resume()
+      await write.value
+      #expect(ControlState(model: model, run: "owned", revision: 2, dark: false).idle)
+    }
+
     @Test func strictWireDistinguishesMalformedAndStaleRequests() throws {
       let fields: [String: Any] = ["action": "select", "ref": "AC-12", "screen": "board"]
       #expect(try wire(fields).action == .select("board:AC-12"))
@@ -42,7 +78,10 @@
         })
       #expect(await actions.perform(.select("board:AC-9")) == .accepted)
       #expect(model.boardInspectorPresented && model.taskDetail.value?.ref == "AC-9")
-      #expect(await actions.perform(.copyRef) == .accepted)
+      let copied = await actions.perform(.copyRef)
+      withKnownIssue("The response omits the copied text") {
+        #expect(copied.response(run: "owned", sequence: 1)["copied"] as? String == "AC-9")
+      }
       #expect(await actions.perform(.copyCommand) == .accepted)
       let failingCopy = ControlActions(model: model, copy: { _ in false })
       #expect(await failingCopy.perform(.copyRef) == .refused(.copyFailed))
