@@ -1,0 +1,14 @@
+fixtures: true
+steps:
+  - args: [init, --scan, fixtures/acme-platform, --slug, acme, --prefix, AC, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.workspace: acme}}
+  - args: [--ws, acme, doc, propose, rules, -F, fixtures/acme-platform/README.md, -m, Share Acme guidance, --title, Rules, --about, 'app:acme-platform-api', --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: 'doc:rules@1'}}
+  - args: [--ws, acme, doc, triage, --accept, 'doc:rules@1', --approved, Use the Acme recommendations, --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.docs.0.ref: 'doc:rules@1', data.docs.0.state: accepted}}
+  - args: [--ws, acme, doc, show, 'doc:rules', --json]
+    env: {SILTA_ACTOR: 'agent:codex:acme'}
+    expect: {exit: 0, json: {data.ref: 'doc:rules@1', data.state: accepted}}

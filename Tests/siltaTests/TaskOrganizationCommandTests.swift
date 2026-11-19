@@ -69,7 +69,10 @@ struct TaskOrganizationCommandTests {
       #expect(listed.stdout.contains("[read-only: ado:42]"))
       let refused = try run(["task", "plan", "AC-1", "-m", "Changed"])
       #expect(refused.termination == .exit(3))
-      #expect((refused.stdout + refused.stderr).contains("read_only_promoted"))
+      let output = json ? refused.stdout : refused.stderr
+      #expect((json ? refused.stderr : refused.stdout).isEmpty)
+      Golden.forTests().check(output, "task-read-only-promoted.\(json ? "json" : "txt")")
+      if json { try EditorCommandTests.followRecovery(output, in: scratch) }
       try store.read { db in
         let row = try #require(try Row.fetchOne(db, sql: "SELECT * FROM task"))
         #expect(row["acceptance_md"] as String == "Acme acceptance")

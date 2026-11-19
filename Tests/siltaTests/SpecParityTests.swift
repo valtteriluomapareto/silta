@@ -94,6 +94,8 @@ struct SpecParityTests {
         try #require(token.hasPrefix("`") && token.hasSuffix("`"), "Invalid code: \(token)")
         let code = String(token.dropFirst().dropLast())
         #expect(documented.updateValue(exit, forKey: code) == nil, "Duplicate code: \(code)")
+        let coded = try #require(ErrorCode(rawValue: code))
+        #expect(cells[3] == coded.agentShould, "§16 advice for \(code)")
       }
     }
     #expect(successExits == [0])

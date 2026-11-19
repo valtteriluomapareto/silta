@@ -70,17 +70,20 @@ struct TaskRecoveryTests {
       }
       let add = try SiltaBinary.run(
         ["--ws", "beta", "task", "add", "Acme beta work", "--start", "--json"],
-        in: scratch, environment: TaskCommandTests.actor)
+        in: scratch, environment: TaskCommandTests.fixed)
       #expect(add.termination == .exit(0))
-      let rival = ["SILTA_ACTOR": ActorID.agent(tool: "codex", session: "rival").description]
+      let rival = TaskCommandTests.fixed.merging(["SILTA_ACTOR": "agent:codex:rival"]) { _, new in
+        new
+      }
       for json in [false, true] {
         let result = try SiltaBinary.run(
           ["--ws", "beta", "task", "start", "BT-1"] + (json ? ["--json"] : []),
           in: scratch, environment: rival)
         #expect(result.termination == .exit(6))
-        #expect(
-          (json ? result.stdout : result.stderr).contains(
-            "silta --ws 'beta' task start BT-1 --steal"))
+        let output = json ? result.stdout : result.stderr
+        #expect((json ? result.stderr : result.stdout).isEmpty)
+        Golden.forTests().check(output, "task-claimed.\(json ? "json" : "txt")")
+        if json { try EditorCommandTests.followRecovery(output, in: scratch) }
       }
     }
   }

@@ -108,8 +108,9 @@ package struct DocTriageService {
           workspace: read.workspace)
       }
     }
+    var seen: Set<String> = []
     return CommandFailure(
-      error: error, next: next, nextBy: .agent,
+      error: error, next: next.filter { seen.insert($0).inserted }, nextBy: .agent,
       message: SecretGuard.redacted(error.message))
   }
 

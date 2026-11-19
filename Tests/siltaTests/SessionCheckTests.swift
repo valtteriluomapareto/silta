@@ -4,6 +4,7 @@ import SiltaCore
 import SiltaTestSupport
 import Testing
 
+@Suite(.timeLimit(.minutes(1)))
 struct SessionCheckTests {
   static let environment = [
     "CLAUDECODE": "1", "SILTA_SESSION": "acme-session",
@@ -72,12 +73,18 @@ struct SessionCheckTests {
   }
 
   static func assertBlockedThenActive(_ command: String, payload: String, in scratch: URL) throws {
-    let blocked = try AgentsHookTests.hook(
-      command, payload: payload, in: scratch, environment: Self.environment)
-    #expect(blocked.termination == .exit(0))
-    let result = try GuideContractTests.object(blocked.stdout)
-    #expect(result["decision"] as? String == "block")
-    #expect((result["reason"] as? String)?.contains("AC-1") == true)
+    var withoutSession = Self.environment
+    withoutSession.removeValue(forKey: "SILTA_SESSION")
+    var otherSession = withoutSession
+    otherSession["SILTA_SESSION"] = "other-acme-session"
+    for environment in [Self.environment, withoutSession, otherSession] {
+      let blocked = try AgentsHookTests.hook(
+        command, payload: payload, in: scratch, environment: environment)
+      #expect(blocked.termination == .exit(0) && blocked.stderr.isEmpty)
+      let result = try GuideContractTests.object(blocked.stdout)
+      #expect(result["decision"] as? String == "block")
+      #expect((result["reason"] as? String)?.contains("AC-1") == true)
+    }
     let active = try AgentsHookTests.hook(
       command, payload: #"{"session_id":"acme-session","stop_hook_active":true}"#, in: scratch,
       environment: Self.environment)
@@ -166,6 +173,9 @@ extension SessionCheckTests {
           ).termination == .exit(0))
       }
       #expect(try Self.tasks(in: scratch).map { $0["workspace"] } == ["acme", "beta"])
+      let text = try Self.run(["session", "check"], in: scratch)
+      #expect(text.termination == .exit(0) && text.stderr.isEmpty)
+      Golden.forTests().check(text.stdout, "session-check.txt")
       let command = try AgentsHookTests.command("Stop", in: scratch)
       let blocked = try AgentsHookTests.hook(
         command, payload: #"{"session_id":"acme-session"}"#, in: scratch,
