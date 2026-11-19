@@ -447,10 +447,11 @@ symlinks resolved, case-folded on case-insensitive volumes.
 
 1. **Repo.** Run `git rev-parse --path-format=absolute --git-common-dir` and match
    against `repo_path`. No match → `unregistered` (exit 2; `brief --hook` prints
-   nothing). If an unbound configuration declares the clone's exact origin,
-   `where` offers a workspace-scoped scan of the canonical main clone when the
+   nothing). If an unbound configuration declares the clone's exact network origin
+   or absolute local origin, `where` offers a workspace-scoped scan of the canonical main clone when the
    match is unique. Competing declarations offer read-only inspection of each
-   matching workspace so the human can choose.
+   matching workspace so the human can choose. A matching relative origin also
+   needs inspection because it depends on the clone's location.
 2. **Candidates** are the repo's apps.
    - If the cwd is under an app's `subpath`, only the subpath apps are candidates.
    - Otherwise subpath apps are dropped, which leaves one primary app per ref.
@@ -2216,7 +2217,8 @@ to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is r
 The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
 An empty `ws ls` prints a scan command from a Git checkout or `silta init --help`
-elsewhere. Its JSON includes `next` and `next_by` for the empty list.
+elsewhere. The command supplies valid naming options when the checkout name
+would give an invalid workspace slug or task prefix. Its JSON includes `next` and `next_by` for the empty list.
 A successful scan lists the workspace and its sorted registered repository and app
 slugs. Text tells a human how to open the workspace editor and tells agents to ask
 before editing. Text and JSON give one read-only, workspace-scoped `ws show` next.
@@ -2502,7 +2504,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   stale pieces warn, damaged ownership/unreadable files fail, and absent optional
   hooks are skipped. Warnings and failures carry `next`. Hook evidence for an
   absent optional hook is skipped, including SessionStart propagation when its hook
-  is absent. Evidence warnings for installed hooks ask the human to run an ordinary
+  is absent. Damaged retained logs still have a diagnostic when both hooks are
+  absent. Evidence warnings for installed hooks ask the human to run an ordinary
   Claude Code session in a registered repo before repeating the install check.
   Hook evidence reports the latest timestamp, exit code and milliseconds per event;
   error codes and warnings prevent an exit-0 pass. Propagation requires an ordinary
@@ -3001,10 +3004,11 @@ does. Its task prefix is the slug's first two letters uppercased unless `--prefi
 names another; a message about a derived prefix names where it came from, the slug when
 `--slug` was given and the directory otherwise. Chosen values keep their case and use the
 identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
-naming options can refresh an existing workspace of the same slug, preserving
-its prefix. Slug and prefix clashes compare case-insensitively, as does `--ws`.
-An exact clone binding or exact nonempty origin is evidence of existing
-configuration. Before creating a workspace, a scan checks all clone paths together.
+naming options can refresh an existing workspace of the same slug when the clones
+all match its registered repos, preserving its prefix. Slug and prefix clashes compare case-insensitively, as does `--ws`.
+An exact clone binding, exact network origin, or exact absolute local origin
+is evidence of existing configuration. A matching relative local origin or a
+workspace name alone calls for inspection before selecting a target. Before creating a workspace, a scan checks all clone paths together.
 A unique match to one workspace and one distinct repo per clone offers a scoped
 rescan when the repo paths agree or are unbound. If the scan includes competing
 registrations, a different bound clone, or a mix of registered and unfamiliar

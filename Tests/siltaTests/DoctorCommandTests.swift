@@ -77,12 +77,10 @@ struct DoctorCommandTests {
       for id in ["install.claude.session_start", "install.claude.last_stop"] {
         #expect(try AgentHealthTests.check(id, in: checks)["status"] as? String == "skipped")
       }
-      try withKnownIssue("#260: hook applicability can hide retained log damage") {
-        let log = try AgentHealthTests.check("install.log", in: checks)
-        #expect(log["status"] as? String == "warning")
-        #expect(log["next_by"] as? String == "human")
-        #expect((log["message"] as? String)?.contains(file.path) == true)
-      }
+      let log = try AgentHealthTests.check("install.log", in: checks)
+      #expect(log["status"] as? String == "warning")
+      #expect(log["next_by"] as? String == "human")
+      #expect((log["message"] as? String)?.contains(file.path) == true)
     }
   }
 

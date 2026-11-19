@@ -22,13 +22,11 @@ enum AgentHealthLogs {
   static func inspect(home: URL, at now: Date, sessionStart: Bool, stop: Bool) -> [DoctorCheck] {
     var entries: [Entry] = []
     var problem: EvidenceProblem?
-    if sessionStart || stop {
-      do { entries = try read(home: home, at: now) } catch let failure as EvidenceProblem {
-        problem = failure
-      } catch {
-        problem = EvidenceProblem(
-          path: home.appending(path: "log"), reason: "Retained log inventory cannot be inspected.")
-      }
+    do { entries = try read(home: home, at: now) } catch let failure as EvidenceProblem {
+      problem = failure
+    } catch {
+      problem = EvidenceProblem(
+        path: home.appending(path: "log"), reason: "Retained log inventory cannot be inspected.")
     }
     let complete = problem == nil
     let next = problem?.next(home: home) ?? ["silta doctor --install"]
@@ -58,6 +56,13 @@ enum AgentHealthLogs {
       sessionStart
         ? propagation(applicable, complete: complete, detail: detail, next: next)
         : skipped("install.claude.session", label: "SessionStart"))
+    if !sessionStart && !stop, let problem {
+      checks.append(
+        DoctorCheck(
+          id: "install.log", status: .warning,
+          message: "Retained log evidence is incomplete or invalid." + detail,
+          next: problem.next(home: home), nextBy: .human))
+    }
     return checks
   }
 

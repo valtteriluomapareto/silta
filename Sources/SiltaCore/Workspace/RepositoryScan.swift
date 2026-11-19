@@ -63,7 +63,7 @@ package enum RepositoryScan {
       guard Set(request.repos.map(\.slug)).count == request.repos.count else {
         throw RepoError.duplicateSlug
       }
-      try preventDuplicateRegistration(request, in: db)
+      let bindings = try implicitBindings(request, workspace: existing?["slug"], in: db)
       if case .named(let chosenSlug, _) = request.target, let existing {
         throw ScanError.slugExists(
           request.slug, chosen: chosenSlug != nil, workspace: existing["slug"] as String,
@@ -85,7 +85,8 @@ package enum RepositoryScan {
           repos: repos, apps: apps)
         try config.apply(in: tx, ids: request.identity.ids, at: request.identity.date)
       }
-      let (registered, apps) = try registerPaths(repos, workspace: workspace, in: db)
+      let (registered, apps) = try registerPaths(
+        repos, workspace: workspace, bindings: bindings, in: db)
       if let existing { try tx.recordChange(kind: "workspace", rowID: existing["id"] as Int64) }
       return ScanOutcome(
         workspace: workspace, repositories: registered, apps: apps, warnings: warnings)
@@ -100,19 +101,22 @@ package enum RepositoryScan {
       db, sql: "SELECT id,slug FROM workspace WHERE lower(slug)=lower(?)", arguments: [slug])
   }
 
-  private static func preventDuplicateRegistration(_ request: ScanRequest, in db: Database) throws {
-    if case .rescan = request.target { return }
+  private static func implicitBindings(
+    _ request: ScanRequest, workspace: String?, in db: Database
+  ) throws -> [String: ScanRegistration] {
+    if case .rescan = request.target { return [:] }
     let paths = request.repos.map { $0.path.path }
     let matches = try request.repos.map {
       try ScanRegistration.matching(path: $0.path.path, origin: $0.remote, in: db)
     }
-    guard let recovery = ScanRegistration.recovery(matches, paths: paths, roots: request.roots)
-    else { return }
-    if case .derived = request.target,
-      derivedRefresh(matches, paths: paths, workspace: request.slug)
-    {
-      return
+    let recovery = ScanRegistration.recovery(matches, paths: paths, roots: request.roots)
+    if case .derived = request.target, let workspace, !paths.isEmpty {
+      if let bindings = derivedBindings(matches, paths: paths, workspace: workspace) {
+        return bindings
+      }
+      if recovery == nil { throw ScanError.unverifiedWorkspace(workspace) }
     }
+    guard let recovery else { return [:] }
     if paths.count == 1, let path = paths.first, let match = matches.first?.first,
       matches.first?.count == 1, match.path == path,
       match.workspace.lowercased() != request.slug.lowercased()
@@ -122,35 +126,37 @@ package enum RepositoryScan {
     throw recovery
   }
 
-  private static func derivedRefresh(
+  private static func derivedBindings(
     _ matches: [[ScanRegistration]], paths: [String], workspace: String
-  ) -> Bool {
-    let single = matches.compactMap { $0.count == 1 ? $0.first : nil }
-    return single.count == paths.count && Set(single.map(\.id)).count == single.count
-      && zip(single, paths).allSatisfy { binding, path in
-        binding.workspace.lowercased() == workspace.lowercased()
+  ) -> [String: ScanRegistration]? {
+    guard let rows = ScanRegistration.identities(matches),
+      zip(rows, paths).allSatisfy({ binding, path in
+        binding.workspace == workspace
           && (binding.path == path
             || binding.path.map { !FileManager.default.fileExists(atPath: $0 + "/.git") } == true)
-      }
+      })
+    else { return nil }
+    return Dictionary(uniqueKeysWithValues: zip(paths, rows))
   }
 
   /// Binds each clone to its repo row, after refusing a path another workspace holds.
   private static func registerPaths(
-    _ repos: [DiscoveredRepo], workspace: String, in db: Database
+    _ repos: [DiscoveredRepo], workspace: String, bindings: [String: ScanRegistration],
+    in db: Database
   ) throws -> (repositories: [String], apps: [String]) {
-    var names: [String] = []
+    let matches = try repos.map { repo in
+      let path = repo.path.path
+      if let holder = try pathHolder(path, excluding: workspace, in: db) {
+        throw ScanError.repoPathTaken(repo: holder.repo, path: path, workspace: holder.workspace)
+      }
+      if let binding = bindings[path] { return (id: binding.id, slug: binding.repo) }
+      return try registeredRepo(repo, workspace: workspace, in: db)
+    }
+    guard Set(matches.map(\.id)).count == matches.count else {
+      throw ScanError.registeredWorkspaces([workspace], roots: nil)
+    }
     var apps: [String] = []
-    var used: Set<Int64> = []
-    for repo in repos {
-      if let holder = try pathHolder(repo.path.path, excluding: workspace, in: db) {
-        throw ScanError.repoPathTaken(
-          repo: holder.repo, path: repo.path.path, workspace: holder.workspace)
-      }
-      let match = try registeredRepo(repo, workspace: workspace, in: db)
-      guard used.insert(match.id).inserted else {
-        throw ScanError.registeredWorkspaces([workspace], roots: nil)
-      }
-      names.append(match.slug)
+    for (repo, match) in zip(repos, matches) {
       apps += try String.fetchAll(
         db, sql: "SELECT slug FROM app WHERE repo_id=?", arguments: [match.id])
       try db.execute(
@@ -160,7 +166,7 @@ package enum RepositoryScan {
           ON CONFLICT(repo_id) DO UPDATE SET path=excluded.path
           """, arguments: [match.id, repo.path.path])
     }
-    return (names.sorted(), apps.sorted())
+    return (matches.map(\.slug).sorted(), apps.sorted())
   }
 
   private static func registeredRepo(_ repo: DiscoveredRepo, workspace: String, in db: Database)
@@ -168,7 +174,7 @@ package enum RepositoryScan {
   {
     let matches = try ScanRegistration.matching(path: repo.path.path, origin: repo.remote, in: db)
       .filter { $0.workspace == workspace }
-    if matches.count == 1, let match = matches.first,
+    if matches.count == 1, let match = matches.first, match.isIdentity,
       match.path == nil || match.path == repo.path.path
     {
       return (match.id, match.repo)
@@ -335,7 +341,17 @@ extension RepositoryScan {
       let path = raw.trimmingCharacters(in: .newlines)
       let root = try canonical(URL(filePath: path))
       let current = try canonical(directory)
-      return "silta init --scan " + (current.path == root.path ? "." : shellWord(root.path))
+      let argument = current.path == root.path ? "." : shellWord(root.path)
+      let derived = root.lastPathComponent.lowercased()
+      let needsSlug = !WorkspaceConfig.isValidIdentifier(derived)
+      let slug = needsSlug ? suggestedSlug(derived) : derived
+      var command = "silta init --scan " + argument
+      if needsSlug { command += " --slug " + shellWord(slug) }
+      if !WorkspaceConfig.isValidIdentifier(String(slug.prefix(2))) {
+        let prefix = slug.replacing(/[^a-z0-9]/, with: "").prefix(2).uppercased()
+        command += " --prefix " + shellWord(prefix)
+      }
+      return command
     } catch {
       return "silta init --help"
     }
@@ -357,8 +373,14 @@ extension RepositoryScan {
           """) ?? false
     }
     guard hasPathless else { return nil }
-    let main = try await mainClone(root, git: git)
-    let origin = try await cloneOrigin(main, git: git)
+    let main: URL
+    let origin: String?
+    do {
+      main = try await mainClone(root, git: git)
+      origin = try await cloneOrigin(main, git: git)
+    } catch {
+      return nil
+    }
     let found = try store.read {
       try ScanRegistration.matching(path: main.path, origin: origin, in: $0).filter {
         workspace == nil || $0.workspace == workspace

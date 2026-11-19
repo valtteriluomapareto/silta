@@ -28,7 +28,7 @@ enum AgentHealth {
       "install.path", "install.hook", "install.skill", "install.codex_root",
       "install.codex.instructions", "install.claude.instructions", "install.claude.stop",
       "install.opencode.skill", "install.claude.session_start", "install.claude.last_stop",
-      "install.claude.session", "install.claude.version", "install.codex.version",
+      "install.claude.session", "install.log", "install.claude.version", "install.codex.version",
       "install.codex.hooks", "install.opencode.version", "install.opencode.hooks",
     ]
     return order.compactMap { id in checks.first { $0.id == id } }

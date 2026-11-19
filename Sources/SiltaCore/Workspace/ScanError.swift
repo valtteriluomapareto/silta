@@ -73,6 +73,9 @@ package enum ScanError: CodedError, Equatable {
   /// The requested clones overlap workspace configuration and need scoped recovery.
   case registeredWorkspaces([String], roots: [String]?)
 
+  /// The derived workspace name is already in use without a verified repo match.
+  case unverifiedWorkspace(String)
+
   /// The named directory can't be read.
   case unreadableRoot(String)
 
@@ -82,7 +85,9 @@ package enum ScanError: CodedError, Equatable {
   package var code: ErrorCode {
     switch self {
     case .invalidSlug, .invalidPrefix: .invalid
-    case .slugExists, .prefixTaken, .repoPathTaken, .reservedSlug, .registeredWorkspaces: .conflict
+    case .slugExists, .prefixTaken, .repoPathTaken, .reservedSlug, .registeredWorkspaces,
+      .unverifiedWorkspace:
+      .conflict
     case .unreadableRoot: .env
     }
   }
@@ -131,6 +136,9 @@ package enum ScanError: CodedError, Equatable {
       return roots == nil
         ? "Existing registrations in \(names) overlap this scan. Inspect them and ask the human to choose."
         : "The clones match workspace \(names). Scan them in that workspace."
+    case .unverifiedWorkspace(let workspace):
+      return "Workspace \(workspace.debugDescription) already exists. Inspect its "
+        + "repository configuration before choosing a scan target."
     case .unreadableRoot(let path):
       return
         "Cannot read scan directory \(path.debugDescription). Choose an existing readable directory."
@@ -162,6 +170,8 @@ package enum ScanError: CodedError, Equatable {
         return ["silta --ws \(shellWord(workspace)) init --scan \(roots.scanArguments)"]
       }
       return workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
+    case .unverifiedWorkspace(let workspace):
+      return ["silta --ws " + shellWord(workspace) + " ws show"]
     case .reservedSlug, .unreadableRoot: return ["silta init --help"]
     }
   }

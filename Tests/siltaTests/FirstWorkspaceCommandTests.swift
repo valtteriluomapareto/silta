@@ -167,13 +167,11 @@ struct FirstWorkspaceCommandTests {
         ["init", "--scan", ".", "--json"], in: scratch, cwd: unrelated)
       let old = try SiltaBinary.run(["where"], in: scratch, cwd: original)
       let new = try SiltaBinary.run(["where"], in: scratch, cwd: unrelated)
-      try withKnownIssue("#260: an implicit clone name can retarget the existing repo identity") {
-        #expect(second.termination == .exit(6))
-        #expect(old.termination == .exit(0))
-        #expect(new.termination == .exit(2))
-        let hints = try TaskStateRegressionTests.error(second)["next"] as? [String]
-        #expect(hints == ["silta --ws 'acme' ws show"])
-      }
+      #expect(second.termination == .exit(6))
+      #expect(old.termination == .exit(0))
+      #expect(new.termination == .exit(2))
+      let hints = try TaskStateRegressionTests.error(second)["next"] as? [String]
+      #expect(hints == ["silta --ws 'acme' ws show"])
     }
   }
 

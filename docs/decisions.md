@@ -723,8 +723,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     enforce scope because agents do not reliably propagate `--ws`. Guide recipes still
     carry an explicit workspace to support intentional cross-workspace/outside work.
   - ↳ 2026-11-19: Recover local clone bindings in the existing workspace. An
-    exact canonical path or nonempty configured origin establishes a match.
-    Ambiguous or partial matches require inspection and a human choice. Keep
+    exact canonical path, network origin, or absolute local origin establishes a
+    match. Relative local origins, names alone, and ambiguous or partial matches
+    require inspection and a human choice. Keep
     existing duplicate workspaces and their data. Workspace deletion is outside
     this setup workflow (spec §7 and Appendix A).
 
