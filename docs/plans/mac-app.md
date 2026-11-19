@@ -105,8 +105,10 @@ the human copies.
   inspector toggle. The toolbar belongs to the detail column and starts with a flexible
   spacer, so its controls sit at the window's trailing edge. The inspector is a 340 pt
   Sea glass card beside the content (`seaInspector`), not a system `.inspector` column,
-  so it shares the window's shore. The content starts with one large title and its
-  count line (`navigationTitle` still names the window). The app accent is tide `#0B6E8E`, from the asset catalog.
+  so it shares the window's shore. Its width is fixed; at the minimum window width the
+  Board lanes scroll sideways. The content starts with one large title and its count
+  line (`navigationTitle` still names the window). The app accent is tide `#0B6E8E`,
+  from the asset catalog.
 - **Sea glass surfaces:** an opaque shore gradient is the window background, under the
   system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
   Reduce Transparency makes them opaque and drops the gradient's glows; Increase

@@ -110,14 +110,15 @@
         to: directory.appending(path: "sidebar.png"))
       if model.route == .board, model.boardInspectorPresented {
         try await capture(
-          TaskInspector(model: model), size: NSSize(width: 360, height: size.height),
+          TaskInspector(model: model),
+          size: NSSize(width: SeaInspectorMetrics.width, height: size.height),
           to: directory.appending(path: "inspector.png"))
       } else if model.route == .workspace, model.workspaceInspectorPresented,
         let map = model.visibleData?.map, let node = model.workspaceNode
       {
         try await capture(
           NodeInspector(ref: node, map: map, model: model),
-          size: NSSize(width: 360, height: size.height),
+          size: NSSize(width: SeaInspectorMetrics.width, height: size.height),
           to: directory.appending(path: "inspector.png"))
       } else if model.route == .workspace, model.workspaceInspectorPresented,
         let map = model.visibleData?.map
@@ -126,7 +127,7 @@
           .connection(model.workspaceSelection?.connectionRef)
         try await capture(
           ConnectionInspector(connection: connection, model: model),
-          size: NSSize(width: 360, height: size.height),
+          size: NSSize(width: SeaInspectorMetrics.width, height: size.height),
           to: directory.appending(path: "inspector.png"))
       }
     }
