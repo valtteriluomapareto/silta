@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from fault_source import mutated_source
+
 ROOT = Path(__file__).resolve().parents[1]
 SHARED = 'test_one_signin_and_fresh_data_hooks_config_grants_per_trial'
 FAILURE = 'test_cleanup_conflict_and_unknown_state_abort_future_trials'
@@ -38,7 +40,8 @@ FAULTS = [
     ('opaque_auth_read', 'profiles.py', '        self.reset()\n\n    def safe_config',
      "        (self.directory / ('auth.json' if self.harness == 'codex' else '.credentials.json')).read_bytes()\n        self.reset()\n\n    def safe_config",
      SHARED, 'FORBIDDEN_PROFILE_READ_COPY'),
-    ('opaque_auth_deleted', 'profiles.py', '        allowed = {p.name', '        runtime.add(auth)\n        allowed = {p.name',
+    ('opaque_auth_deleted', 'profiles.py', '        allowed = ({p.name',
+     '        runtime.add(auth)\n        allowed = ({p.name',
      SHARED, '1 != 3'),
     ('unexpected_login_grant', 'profiles.py', "            if config.get('sandbox_workspace_write', {}).get('writable_roots'):",
      '            if False:', 'test_config_aliases_and_unexpected_grant_are_refused_without_reads', 'False is not true'),
@@ -70,7 +73,7 @@ FAULTS = [
      '        if profile:\n            pass', 'test_operator_eof_retains_attempt_phase_evidence_and_known_usage', 'Completed phase usage lost'),
     ('review_loses_run_lifecycle', 'review.py', 'updated.update({key: report[key] for key in evals.RUN_FIELDS if key in report})',
      'pass', 'test_review_preserves_aborted_zero_trial_report_and_exit', 'Review converted an aborted run to success'),
-    ('review_aborted_empty_run_passes', 'review.py', "not updated.get('aborted', False) and all", 'all',
+    ('review_aborted_empty_run_passes', 'review.py', 'evals.report_passes(updated)', 'all(t["passed"] for t in updated["trials"])',
      'test_review_preserves_aborted_zero_trial_report_and_exit', 'Review converted an aborted run to success'),
     ('present_turn_starts_fresh', 'evals.py', "if scenario != 'handoff-resume':", 'if False:',
      'test_present_continuation_keeps_conversation_auth_and_task_state', ' != '),
@@ -228,10 +231,8 @@ def main():
     for name, file, marker, replacement, test, expected in FAULTS:
         path = ROOT / file
         original = path.read_text()
-        if original.count(marker) != 1:
-            raise SystemExit('Non-unique mutation marker: ' + name)
         try:
-            path.write_text(original.replace(marker, replacement))
+            path.write_text(mutated_source(original, file, name, marker, replacement))
             qualified = test if '.' in test else 'test_profiles.Profiles.' + test
             run = subprocess.run([sys.executable, '-B', '-m', 'unittest', qualified],
                                  cwd=ROOT / 'tests', text=True, capture_output=True)
