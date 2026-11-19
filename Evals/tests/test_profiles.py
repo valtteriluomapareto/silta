@@ -283,7 +283,6 @@ class Profiles(unittest.TestCase):
                     output, report, entries, text, _ = self.run_live(harness, mode, scenario='handoff-resume')
                     self.assert_aborted_trial(output, report, entries, text, 7 if mode == 'nonzero' else 0)
 
-    @unittest.expectedFailure  # #262
     def test_failed_terminal_preserves_logged_steal_in_report_and_review(self):
         for harness in ('claude', 'codex'):
             with self.subTest(harness=harness):
@@ -312,7 +311,6 @@ class Profiles(unittest.TestCase):
                 self.assertEqual(reviewed['trials'][0]['violations'], trial['violations'])
                 self.assertTrue(reviewed['aborted'])
 
-    @unittest.expectedFailure  # #262
     def test_cleanup_failure_preserves_graded_violations(self):
         output, report, entries, text, _ = self.run_live('codex', 'cleanup-steal')
         model, = [row for row in entries if row['event'] == 'model']

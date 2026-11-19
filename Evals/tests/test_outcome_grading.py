@@ -34,7 +34,6 @@ def record(e, body, table='comments', **extra):
 
 
 class OutcomeGrading(unittest.TestCase):
-    @unittest.expectedFailure  # #262
     def test_existing_plan_changes_and_phase_only_writes_are_observed(self):
         e = evidence()
         plan = 'acme-mobile/PLAN.txt'

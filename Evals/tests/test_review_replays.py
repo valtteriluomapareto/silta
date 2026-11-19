@@ -35,7 +35,6 @@ class ReviewReplays(unittest.TestCase):
         evidence = json.loads((output / result['evidence']).read_text())
         return result, evidence
 
-    @unittest.expectedFailure  # #262
     def test_plan_file_grading_uses_native_write_targets_and_item_identity(self):
         for harness in ('claude', 'codex'):
             result, evidence = self.trial(harness, 'plan-not-file', 'pass')

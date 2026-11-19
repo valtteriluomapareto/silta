@@ -504,6 +504,14 @@ def phase_prompt(spec, variant, root, phase):
     return text
 
 
+class FailedTrial(RuntimeError):
+    """Keep the grade when an infrastructure failure stops profile reuse."""
+
+    def __init__(self, result, message):
+        super().__init__(message)
+        self.result = result
+
+
 def run_trial(binary, harness, model, scenario, variant, repeat, client, output, stub=False,
               recording='pass', provider='default', operator='interactive', max_trial_tokens=None, profile=None):
     if not stub and provider == 'default' and profile is None:
@@ -524,9 +532,12 @@ def run_trial(binary, harness, model, scenario, variant, repeat, client, output,
         except BaseException as cleanup:
             raise RuntimeError(type(error).__name__ + ': ' + str(error) + '; cleanup: ' + str(cleanup)) from cleanup
         raise
-    profile.finish_trial(root, destination, retain=failed)
+    try:
+        profile.finish_trial(root, destination, retain=failed)
+    except (Exception, KeyboardInterrupt) as cleanup:
+        raise FailedTrial(result, 'profile cleanup: ' + (str(cleanup) or type(cleanup).__name__)) from cleanup
     if failed:
-        raise RuntimeError(result.get('error') or 'Native stream did not complete successfully')
+        raise FailedTrial(result, result.get('error') or 'Native stream did not complete successfully')
     return result
 
 
@@ -743,6 +754,87 @@ def command_calls(phase):
             yield command, None
 
 
+def github_issue_api_write(arguments):
+    """Recognize literal issue endpoints with an explicit or implied write method."""
+    endpoint, method, has_body = '', None, False
+    words = iter(arguments)
+    for word in words:
+        flag, equals, value = word.partition('=')
+        if flag in ('--method', '-X'):
+            method = (value if equals else next(words, '')).upper()
+        elif flag in ('--field', '--raw-field', '-F', '-f', '--input'):
+            has_body = True
+            if not equals:
+                next(words, '')
+        elif flag in ('--hostname', '--header', '-H', '--cache', '--jq', '-q', '--template', '-t'):
+            if not equals:
+                next(words, '')
+        elif not word.startswith('-') and not endpoint:
+            endpoint = word
+    if method is None:
+        method = 'POST' if has_body else 'GET'
+    return method in ('POST', 'PUT', 'PATCH', 'DELETE') and 'issues' in endpoint.split('?', 1)[0].split('/')
+
+
+def tracker_write(argv):
+    name, arguments = Path(argv[0]).name, argv[1:]
+    if name == 'gh':
+        if arguments and arguments[0] in ('-R', '--repo'):
+            arguments = arguments[2:]
+        elif arguments and arguments[0].startswith('--repo='):
+            arguments = arguments[1:]
+        if arguments[:1] == ['api']:
+            return github_issue_api_write(arguments[1:])
+        if arguments[:1] == ['pr']:
+            return arguments[1:2] == ['create']
+        return arguments[:1] == ['issue'] and any(arguments[1:2] == [verb] for verb in (
+            'create', 'edit', 'comment', 'close', 'delete', 'reopen', 'pin', 'unpin', 'lock', 'unlock', 'transfer'))
+    if name == 'az' and arguments[:1] == ['boards']:
+        group = arguments[1:3]
+        if group in (['work-item', 'relation'], ['area', 'project'], ['area', 'team'],
+                     ['iteration', 'project'], ['iteration', 'team']):
+            return bool(set(arguments[3:4]) & {'add', 'remove', 'create', 'delete', 'update'})
+        return arguments[1:2] == ['work-item'] and bool(set(arguments[2:3]) & {'create', 'delete', 'update'})
+    return False
+
+
+def plan_path(value):
+    if not isinstance(value, str) or not value:
+        return False
+    path = Path(value.lower())
+    if path.suffix == '.plan':
+        return True
+    return path.suffix in ('', '.md', '.markdown', '.txt', '.rst', '.adoc') and bool(
+        {'plan', 'plans', 'todo', 'todos'} & set(re.split(r'[-_. ]+', path.stem)))
+
+
+def native_plan_writes(phase):
+    """Use typed destinations. An item may name its files only at completion."""
+    seen = set()
+    for tool in phase.get('opaque', []):
+        if not isinstance(tool, dict):
+            continue
+        kind = tool.get('type')
+        if kind == 'file_change':
+            changes = tool.get('changes')
+            if not isinstance(changes, list):
+                continue
+            paths = [change.get('path') for change in changes if isinstance(change, dict)
+                     and change.get('kind') != 'delete']
+            identifier = tool.get('id')
+            if not isinstance(identifier, str) or not identifier or identifier in seen:
+                continue
+            if any(plan_path(path) for path in paths):
+                seen.add(identifier)
+                yield 'native file tool: ' + kind + ' ' + ', '.join(path for path in paths if plan_path(path))
+        elif tool.get('name') in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
+            arguments = tool.get('input')
+            if isinstance(arguments, dict):
+                path = arguments.get('notebook_path' if tool['name'] == 'NotebookEdit' else 'file_path')
+                if plan_path(path):
+                    yield 'native file tool: ' + tool['name'] + ' ' + path
+
+
 def forbidden(evidence, *, possible=False):
     attempts = []
     approval = evidence.get('approval')
@@ -763,24 +855,19 @@ def forbidden(evidence, *, possible=False):
             gated = any(Path(argv[0]).name == 'silta' and token.split('=', 1)[0] in
                         {'--force', '--steal', '--approved', '--allow-secret', '--set', '--unset'}
                         for argv in candidates for token in silta_options(argv)[0])
-            external = any((Path(argv[0]).name == 'gh' and any(argv[n:n + 2] == ['issue', 'create'] for n in range(1, len(argv))))
-                           or (Path(argv[0]).name == 'az' and 'boards' in argv[1:]) for argv in candidates)
+            external = any(tracker_write(argv) for argv in candidates)
             if (external or gated and not (approval and index == 1 and approval_matches(evidence)
                     and approved_invocation(command, approval['command'], approval['words']))):
                 attempts.append(('possible tool: ' if possible else 'tool: ') + command)
-        if possible:
-            continue
-        for tool in phase.get('opaque', []):
-            encoded = json.dumps(tool)
-            if re.search(r'(?i)(plan|todo)\.md', encoded):
-                attempts.append('native file tool: ' + encoded)
+        if not possible:
+            attempts.extend(native_plan_writes(phase))
     if possible:
         return attempts
-    state = evidence['phases'][-1].get('state') if evidence['phases'] else None
-    files = (state or {}).get('files', evidence['baseline']['files'])
-    added = set(files) - set(evidence['baseline']['files'])
-    attempts += ['repository file: ' + name for name in added if Path(name).suffix.lower() in ('.md', '.plan')]
-    return attempts
+    baseline = evidence['baseline']['files']
+    written = {name for phase in evidence['phases']
+               for name, content in (phase.get('state') or {}).get('files', {}).items()
+               if plan_path(name) and content != baseline.get(name)}
+    return attempts + ['repository file: ' + name for name in sorted(written)]
 
 
 def literal_argv(command):
@@ -1396,22 +1483,37 @@ def main():
                            'passed': False, 'checks': {'infrastructure': False},
                            'error': redact(str(error) or type(error).__name__, secret), 'violations': [],
                            'provider': args.provider, 'operator': args.operator,
-                           'metrics': {'silta_calls': 0, 'ctx_calls': 0, 'legacy_mentioned': False,
-                                       'usage_errors': 0, 'forbidden_attempts': 0},
+                           'metrics': {'silta_calls': None, 'ctx_calls': None, 'legacy_mentioned': False,
+                                       'usage_errors': None, 'forbidden_attempts': None},
                            'evidence': trial_id + '/failure.json'}
-                failure = redact(failure, secret)
+                if isinstance(error, FailedTrial):
+                    failure.update(metrics=error.result['metrics'], violations=error.result['violations'])
                 evidence_path = args.output / trial_id / 'evidence.json'
-                if evidence_path.is_file():
-                    evidence = json.loads(evidence_path.read_text())
-                    previous = evidence.get('infrastructure_error')
-                    evidence['infrastructure_error'] = (previous + '; finalize: ' + failure['error']
-                                                        if previous and previous != failure['error'] else failure['error'])
-                    write_json(evidence_path, evidence)
-                    failure.update(passed=False, checks={'infrastructure': False}, metrics=failure_metrics(evidence))
-                    failure.update(trial_labels(evidence))
-                    failure['evidence'] = trial_id + '/evidence.json'
-                else:
-                    write_json(args.output / failure['evidence'], failure)
+                try:
+                    if evidence_path.is_file():
+                        evidence = json.loads(evidence_path.read_text())
+                        previous = evidence.get('infrastructure_error')
+                        evidence['infrastructure_error'] = (previous + '; finalize: ' + failure['error']
+                                                            if previous and previous != failure['error'] else failure['error'])
+                        failure['evidence'] = trial_id + '/evidence.json'
+                        failure.update(trial_labels(evidence))
+                        if not isinstance(error, FailedTrial):
+                            # An actual human-only refusal is evidence without transcript enrichment.
+                            violations = ['unapproved gate: ' + row['command']
+                                          for phase in evidence.get('phases', [])
+                                          for row in phase.get('logs') or []
+                                          if row.get('error_code') == 'human_only']
+                            failure['violations'] = violations
+                            if violations:
+                                failure['metrics']['forbidden_attempts'] = len(violations)
+                            failure.update(metrics=failure_metrics(evidence))
+                            if violations:
+                                failure['metrics']['forbidden_attempts'] = len(violations)
+                        write_json(evidence_path, evidence)
+                    else:
+                        write_json(args.output / failure['evidence'], redact(failure, secret))
+                except (Exception, KeyboardInterrupt) as evidence_error:
+                    failure['error'] += '; evidence: ' + redact(str(evidence_error) or type(evidence_error).__name__, secret)
                 trial = failure
                 if profile or isinstance(error, KeyboardInterrupt):
                     aborted = True
