@@ -2,25 +2,31 @@ import Foundation
 import GRDB
 
 extension TaskService {
-  /// Validates every decision before applying the batch and its single approval audit.
-  package func triage(_ batch: TaskTriage) throws -> [TaskResult] {
+  /// Validates the entire batch before approval and body input, then rechecks it
+  /// before applying the decisions and recording their single approval.
+  package func triage(_ batch: TaskTriage, readBody: (() throws -> String?)? = nil)
+    throws -> [TaskResult]
+  {
     guard !batch.accept.isEmpty || !batch.drop.isEmpty else {
       throw TaskError.invalid("Triage needs at least one --accept or --drop reference.")
     }
     if let priority = batch.priority { try Self.validatePriority(priority) }
-    let command = batch.command
-    let approval = try approval(required: true, command: batch.retryCommand)
-    let content = try checked(
-      batch.why ?? "Dropped in triage.",
-      allow: batch.allowSecret, command: batch.retryCommand)
     let slug = try selected()
+    let preflightAt = environment.clock.now()
+    let (beforeAccept, beforeDrop) = try environment.db.read {
+      try triageTasks(batch, workspace: slug, at: preflightAt, in: $0)
+    }
+    let command = batch.command
+    let flag = retryBodyFlag ?? (batch.why == nil ? nil : "-F -")
+    let retry = scopedCommand(command, workspace: slug) + (flag.map { " " + $0 } ?? "")
+    let approval = try approval(required: true, command: retry)
+    let why = try readBody?() ?? batch.why
+    let content = try checked(
+      why ?? "Dropped in triage.", allow: batch.allowSecret, command: retry)
     let at = environment.clock.now()
     return try environment.db.write { tx in
-      let accepted = try triageTasks(batch.accept, workspace: slug, at: at, in: tx.database)
-      let dropped = try triageTasks(batch.drop, workspace: slug, at: at, in: tx.database)
-      if let overlap = accepted.first(where: { task in dropped.contains { $0.id == task.id } }) {
-        throw TaskError.invalid("\(overlap.ref) cannot be both accepted and dropped.")
-      }
+      let (accepted, dropped) = try triageTasks(batch, workspace: slug, at: at, in: tx.database)
+      try verifyTriageIdentity(beforeAccept + beforeDrop, accepted + dropped)
       for task in accepted + dropped {
         let accept = accepted.contains { $0.id == task.id }
         try tx.database.execute(
@@ -49,6 +55,23 @@ extension TaskService {
             ref: $0.ref, status: "dropped", warnings: content.1 ? [SecretGuard.warning] : [])
         }
     }
+  }
+
+  private func verifyTriageIdentity(_ before: [TaskDetails], _ after: [TaskDetails]) throws {
+    for (original, current) in zip(before, after) where original.uid != current.uid {
+      throw TaskError.triageChanged(original.ref)
+    }
+  }
+
+  private func triageTasks(_ batch: TaskTriage, workspace: String, at date: Date, in db: Database)
+    throws -> (accepted: [TaskDetails], dropped: [TaskDetails])
+  {
+    let accepted = try triageTasks(batch.accept, workspace: workspace, at: date, in: db)
+    let dropped = try triageTasks(batch.drop, workspace: workspace, at: date, in: db)
+    if let overlap = accepted.first(where: { task in dropped.contains { $0.id == task.id } }) {
+      throw TaskError.invalid("\(overlap.ref) cannot be both accepted and dropped.")
+    }
+    return (accepted, dropped)
   }
 
   private func triageTasks(_ refs: [String], workspace: String, at date: Date, in db: Database)

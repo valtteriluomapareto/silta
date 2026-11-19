@@ -42,6 +42,37 @@ struct ApprovalRecoveryRegressionTests {
 }
 
 extension ApprovalRecoveryRegressionTests {
+  @Test(arguments: [
+    (["--ws", "acme", "ws", "edit"], "silta ws edit 'acme'"),
+    (["ws", "edit", "acme"], "silta ws edit 'acme'"),
+    (["--ws", "acme", "doc", "edit", "rules"], "silta --ws 'acme' doc edit 'doc:rules'"),
+    (["--ws", "acme", "task", "edit", "AC-1"], "silta --ws 'acme' task edit 'AC-1'"),
+  ])
+  func humanOnlyEditKeepsStdinInput(row: ([String], String)) throws {
+    try withScratchDirectory { scratch in
+      _ = try TaskCommandTests.setup(scratch)
+      try #require(
+        try SiltaBinary.run(
+          ["task", "add", "Acme proposal"], in: scratch, environment: TaskCommandTests.actor
+        ).termination == .exit(0))
+      let expected = row.1 + " -F - --approved \"<the human's words>\""
+      for json in [false, true] {
+        let result = try SiltaBinary.run(
+          row.0 + ["-F", "-"] + (json ? ["--json"] : []),
+          in: scratch, environment: TaskCommandTests.actor)
+        #expect(result.termination == .exit(3))
+        if json {
+          let error = try TaskStateRegressionTests.error(result)
+          #expect(error["code"] as? String == "human_only")
+          #expect(error["next_by"] as? String == "human")
+          #expect(error["next"] as? [String] == [expected])
+        } else {
+          #expect(result.stderr.contains("ask human: " + expected))
+        }
+      }
+    }
+  }
+
   @Test func workspaceFailuresRetainNoncurrentTargetAndFileRepair() throws {
     try withScratchDirectory { scratch in
       let store = try workspaces(scratch)

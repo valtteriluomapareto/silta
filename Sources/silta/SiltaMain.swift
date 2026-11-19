@@ -289,10 +289,7 @@ extension SiltaMain {
     if let edit = command as? DocEditCommand { try edit.authorize(context) }
     if let archive = command as? DocArchiveCommand { try archive.authorize(context) }
     if let triage = command as? DocTriageCommand { try triage.authorize(context) }
-    if command is WsEditCommand {
-      try context.environment.actor.requireHuman(
-        command: "silta ws edit -F <file>", approved: command.global.approved)
-    }
+    if let edit = command as? WsEditCommand { try edit.authorize(context) }
     let selected = try await WorkspaceSelection.fallback(
       path: URL(filePath: FileManager.default.currentDirectoryPath),
       environment: context.environment)

@@ -18,11 +18,6 @@ package struct TaskTriage: Sendable {
   /// Starts an empty batch, which must receive at least one decision.
   package init() {}
 
-  /// Retains a body placeholder only when a drop reason was supplied.
-  package var retryCommand: String {
-    command + (why == nil ? "" : " -F <file>")
-  }
-
   /// A body-free retry retaining all decisions.
   package var command: String {
     var value = "silta task triage"

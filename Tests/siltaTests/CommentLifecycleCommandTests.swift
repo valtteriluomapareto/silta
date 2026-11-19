@@ -97,6 +97,59 @@ struct CommentLifecycleCommandTests {
 
 extension CommentLifecycleCommandTests {
   @Test(arguments: ["resolve", "reopen"], [false, true])
+  func changedThreadRetryUsesStdin(action: String, stdin: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try CommentHandoffTests.setup(scratch)
+      let env = TaskCommandTests.fixed
+      let posted = try SiltaBinary.run(
+        ["comment", "AC-1", "-m", "Finding"], in: scratch, environment: env)
+      try #require(posted.termination == .exit(0))
+      if action == "reopen" {
+        let initial = try SiltaBinary.run(
+          ["comment", "resolve", "AC-1/1"], in: scratch, environment: env)
+        try #require(initial.termination == .exit(0))
+      }
+      let body = "Pwd=" + "acme-value"
+      let args =
+        ["--ws", "acme", "comment", action, "AC-1/1", "--allow-secret"]
+        + (stdin ? ["-F", "-"] : ["-m", body])
+      let binary = shellWord(try SiltaBinary.url().path)
+      let file = scratch.appending(path: "explanation.md")
+      try Data(body.utf8).write(to: file)
+      func run(_ json: Bool) throws -> CLIResult {
+        let tokens = args + (json ? ["--json"] : [])
+        let command =
+          binary + " " + tokens.map(shellWord).joined(separator: " ")
+          + " < " + shellWord(file.path)
+        return try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-c", command], in: scratch, environment: env)
+      }
+      let result = try run(true)
+      #expect(result.termination == .exit(3))
+      let error = try TaskStateRegressionTests.error(result)
+      let next = try #require((error["next"] as? [String])?.first)
+      #expect(next.contains(" --allow-secret -F - "))
+      let text = try run(false)
+      #expect(text.termination == .exit(3) && text.stderr.contains("ask human: " + next))
+      let retry =
+        binary
+        + String(next.dropFirst("silta".count))
+        .replacingOccurrences(of: "<the human's words>", with: "Keep the Acme explanation")
+        + " < " + shellWord(file.path)
+      let replay = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", retry], in: scratch, environment: env)
+      #expect(replay.termination == .exit(0))
+      let stored = try store.read {
+        try String.fetchOne($0, sql: "SELECT body_md FROM comment WHERE seq=2")
+      }
+      let audit = try store.read { try String.fetchOne($0, sql: "SELECT command FROM approval") }
+      #expect(stored == body)
+      #expect(audit?.contains("-F <file> --allow-secret") == true)
+      #expect(audit?.contains(body) == false)
+    }
+  }
+
+  @Test(arguments: ["resolve", "reopen"], [false, true])
   func unchangedSecretFlagsDoNotRequireConsent(action: String, placeholder: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try CommentHandoffTests.setup(scratch)

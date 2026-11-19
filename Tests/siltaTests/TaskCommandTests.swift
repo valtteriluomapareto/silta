@@ -237,7 +237,7 @@ extension TaskCommandTests {
         (["task", "start", "AC-1", "--steal"], "silta task start 'AC-1' --steal"),
         (
           ["task", "done", "AC-2", "--force", "-m", "Acme done"],
-          "silta task done 'AC-2' --force -F <file>"
+          "silta task done 'AC-2' --force -F -"
         ),
         (
           ["task", "done", "AC-7", "--allow-secret"],

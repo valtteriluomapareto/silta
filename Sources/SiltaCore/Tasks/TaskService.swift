@@ -11,17 +11,21 @@ package struct TaskService: Sendable {
 
   let bodyFlag: String?
 
+  let retryBodyFlag: String?
+
   /// Uses the supplied workspace, or the current selection when an operation begins.
   /// `bodyFlag` is the body flag the command was given, `-m <text>` or `-F <file>`,
-  /// which approval rows name without the body (spec §11).
+  /// which approval rows name without the body (spec §11). `retryBodyFlag` tells
+  /// the caller how to resupply the input without revealing it.
   package init(
     environment: SiltaEnvironment, workspace: String? = nil, approved: String? = nil,
-    bodyFlag: String? = nil
+    bodyFlag: String? = nil, retryBodyFlag: String? = nil
   ) {
     self.environment = environment
     self.workspace = workspace
     self.approved = approved
     self.bodyFlag = bodyFlag
+    self.retryBodyFlag = retryBodyFlag ?? bodyFlag
   }
 
   /// `command` as an approval row records it: with the body flag passed, never the body.

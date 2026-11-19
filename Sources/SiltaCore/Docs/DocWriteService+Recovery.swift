@@ -53,6 +53,10 @@ extension DocWriteService {
     guard safeScopeAndIdentity(request, workspace: workspace) else {
       return readCommand(workspace: workspace)
     }
+    if request.retryFromStdin, !fields.isEmpty {
+      let help = "silta doc edit --help"
+      return workspace.map { workspaceCommand(help, workspace: $0) } ?? help
+    }
     var retry = request
     if fields.contains("-F") { retry.keepBody = false }
     if fields.contains("--title") { retry.title = "" }

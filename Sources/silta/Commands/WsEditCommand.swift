@@ -26,6 +26,13 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     if file == nil { try TerminalEditor.validate() }
   }
 
+  func authorize(_ context: CommandContext) throws {
+    let target = (workspace ?? global.ws).map { " " + shellWord($0) } ?? ""
+    let input = file == "-" ? " -F -" : " -F <file>"
+    try context.environment.actor.requireHuman(
+      command: "silta ws edit" + target + input, approved: global.approved)
+  }
+
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let environment = context.environment
     let workspace = workspace ?? global.ws
@@ -34,7 +41,8 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     if let file {
       selected = try WorkspaceEditor.apply(
         try read(file), slug: workspace, store: environment.db, actor: environment.actor,
-        identity: identity, approved: global.approved, prepared: environment.workspaceSelection)
+        identity: identity, approved: global.approved, prepared: environment.workspaceSelection,
+        retryFromStdin: file == "-")
     } else {
       selected = try WorkspaceEditor.edit(
         slug: workspace, store: environment.db, actor: environment.actor,

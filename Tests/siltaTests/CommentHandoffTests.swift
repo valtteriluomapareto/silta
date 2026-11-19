@@ -89,6 +89,8 @@ struct CommentHandoffTests {
       Golden.forTests().check(
         json ? result.stdout : result.stderr,
         "comment-body-required.\(json ? "json" : "txt")")
+      let report = json ? result.stdout : result.stderr
+      #expect(report.contains("silta --ws 'acme' comment 'AC-1' --kind 'handoff' --help"))
     }
   }
 

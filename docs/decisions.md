@@ -544,6 +544,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     before the human's go-ahead is asked for.
   - **`triage --priority` is optional**: without it, accepted tasks keep their stored
     priority.
+  - ↳ 2026-11-19: Triage checks the whole batch before the human's go-ahead.
+    The write rechecks proposal state and identity before recording approval (§8).
   - **Unblocking a block that isn't ready needs the human's go-ahead.** Ready means
     every blocker is a task and all are done (§8). An agent's `unblock` of a batch
     with any other task is `human_only` unless `--approved` is given, decided inside

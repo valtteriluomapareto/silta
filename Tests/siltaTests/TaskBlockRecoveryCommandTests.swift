@@ -26,14 +26,14 @@ struct TaskBlockRecoveryCommandTests {
         try JSONSerialization.jsonObject(with: Data(refusal.stdout.utf8)) as? [String: Any])
       let error = try #require(object["error"] as? [String: Any])
       let retry = try #require((error["next"] as? [String])?.first)
+      #expect(retry.contains(" -F - "))
       let file = scratch.appending(path: "answer.md")
       try Data("Acme answer".utf8).write(to: file)
       let binary = try SiltaBinary.url()
       let shell =
         retry.replacingOccurrences(of: "silta ", with: shellWord(binary.path) + " ")
-        .replacingOccurrences(of: "<file>", with: shellWord(file.path))
         .replacingOccurrences(of: "<the human's words>", with: "Keep this Acme answer.")
-        + " --deterministic --json"
+        + " --deterministic --json < " + shellWord(file.path)
       let result = try SiltaBinary.runProcess(
         URL(filePath: "/bin/bash"), ["-c", shell],
         in: scratch, environment: TaskBlockCommandTests.environment)

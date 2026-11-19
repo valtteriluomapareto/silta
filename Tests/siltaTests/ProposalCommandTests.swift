@@ -55,10 +55,22 @@ struct ProposalCommandTests {
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
       let file = scratch.appending(path: "body.md")
       try "Acme detail".write(to: file, atomically: true, encoding: .utf8)
-      let approved = try SiltaBinary.run(
-        ["--ws", "acme", "task", "add", "-F", file.path, "--approved", "Create the Acme task"]
-          + (json ? ["--json"] : []) + ["--", "-Acme"],
-        in: scratch, environment: TaskCommandTests.actor)
+      let next: String
+      if json {
+        let error = try TaskStateRegressionTests.error(result)
+        next = try #require((error["next"] as? [String])?.first)
+      } else {
+        let prefix = "ask human: "
+        let line = try #require(result.stderr.split(separator: "\n").first { $0.hasPrefix(prefix) })
+        next = String(line.dropFirst(prefix.count))
+      }
+      let retry =
+        binary + (json ? " --json" : "")
+        + String(next.dropFirst("silta".count))
+        .replacingOccurrences(of: "<the human's words>", with: "Create the Acme task")
+        + " < " + shellWord(file.path)
+      let approved = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", retry], in: scratch, environment: TaskCommandTests.actor)
       #expect(approved.termination == .exit(0) && approved.stderr.isEmpty)
       Golden.forTests().check(
         approved.stdout, "task-add-proposal-approved.\(json ? "json" : "txt")")

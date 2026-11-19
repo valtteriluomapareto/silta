@@ -70,7 +70,7 @@ package enum CommentError: CodedError {
       ["silta task show " + shellWord(task) + " --timeline"]
     case .answerRequired(let task): ["silta task show " + shellWord(task) + " --timeline"]
     case .explanationEmpty(let recovery): recovery
-    case .bodyRequired(let command): [command + " -m \"<text>\""]
+    case .bodyRequired(let command): [command + " --help"]
     case .foreignHandoff(let task): ["silta comment " + shellWord(task) + " --kind comment -F -"]
     }
   }

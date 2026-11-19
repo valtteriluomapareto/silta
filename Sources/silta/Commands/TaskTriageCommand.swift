@@ -29,17 +29,14 @@ struct TaskTriageCommand: OutputCommand {
     batch.drop = drop
     batch.priority = priority
     batch.allowSecret = body.allowSecret
-    batch.why = body.file != nil || body.message != nil ? "" : nil
-    try context.environment.actor.requireHuman(
-      command: batch.retryCommand,
-      approved: global.approved)
-    batch.why = try body.read(
-      actor: context.environment.actor, command: batch.command,
-      approved: global.approved)
+    let command = batch.command
+    try body.validateChoice(command: "silta task triage")
     let tasks = try TaskService(
       environment: context.environment, workspace: global.ws,
-      approved: global.approved, bodyFlag: body.flag
-    ).triage(batch)
+      approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
+    ).triage(batch) {
+      try body.readContent(command: command)
+    }
     return CommandOutput(
       text: tasks.map { "\($0.ref) \($0.status)" }.joined(separator: "\n"),
       data: Data(tasks: tasks), warnings: tasks.flatMap(\.warnings), approvalUsed: true

@@ -40,7 +40,7 @@ struct TaskDoneCommand: OutputCommand {
       approved: global.approved)
     let closed = try await TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved,
-      bodyFlag: body.flag
+      bodyFlag: body.flag, retryBodyFlag: body.retryFlag
     )
     .close(
       ref, result: text, commit: commit,

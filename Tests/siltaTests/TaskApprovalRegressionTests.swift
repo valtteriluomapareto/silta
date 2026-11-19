@@ -23,6 +23,103 @@ struct TaskApprovalRegressionTests {
     try TaskStateRegressionTests.warnings(result)
   }
 
+  @Test func triageStateAndInputShapeComeBeforeApprovalOrBodyReads() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try #require(
+        try Self.run(["task", "add", "Acme proposal"], in: scratch).termination == .exit(0))
+      try #require(
+        try Self.run(["task", "add", "Acme doing", "--start"], in: scratch).termination == .exit(0))
+      let unreadable = ["-F", scratch.appending(path: "missing-body.txt").path, "--json"]
+      let cases: [([String], (Int32, String))] = [
+        ([], (1, "invalid")),
+        (["--accept", "AC-1", "--priority", "9"], (1, "invalid")),
+        (["--accept", "AC-999"], (2, "not_found")),
+        (["--accept", "AC-1", "AC-2"], (6, "conflict")),
+        (["--accept", "AC-1", "--drop", "task:AC-1"], (1, "invalid")),
+        (["--accept", "AC-1", "-m", "Acme body"], (1, "invalid")),
+      ]
+      for (decisions, (exit, code)) in cases {
+        let result = try Self.run(["task", "triage"] + decisions + unreadable, in: scratch)
+        let actual = try Self.error(result)["code"] as? String
+        #expect(result.termination == .exit(exit), "\(decisions)")
+        #expect(actual == code, "\(decisions)")
+      }
+      let valid = try Self.run(
+        ["task", "triage", "--accept", "AC-1"] + unreadable, in: scratch)
+      #expect(valid.termination == .exit(3))
+      #expect(try Self.error(valid)["code"] as? String == "human_only")
+      try store.read { (db: Database) throws in
+        #expect(
+          try String.fetchAll(db, sql: "SELECT status FROM task ORDER BY seq") == [
+            "proposed", "doing",
+          ])
+        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM approval") == 0)
+      }
+    }
+  }
+
+  @Test func droppingAnotherAgentsProposalKeepsDropIntent() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try #require(
+        try Self.run(["task", "add", "Acme proposal"], in: scratch, as: Self.other)
+          .termination == .exit(0))
+      let arguments = ["--ws", "acme", "task", "drop", "AC-1", "-m", "Acme reason"]
+      let result = try Self.run(arguments + ["--json"], in: scratch)
+      #expect(result.termination == .exit(6))
+      let error = try Self.error(result)
+      #expect(error["next_by"] as? String == "human")
+      Golden.forTests().check(result.stdout, "task-drop-foreign-proposal.json")
+      let text = try Self.run(arguments, in: scratch)
+      #expect(text.termination == .exit(6))
+      Golden.forTests().check(text.stderr, "task-drop-foreign-proposal.txt")
+      let next = try #require(error["next"] as? [String])
+      #expect(
+        next.contains {
+          $0.contains("triage --drop AC-1") && $0.contains("--approved")
+        })
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT status FROM task") } == "proposed")
+    }
+  }
+
+  @Test func foreignDropCanReplayAnApprovedSecretReasonFromAFile() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try #require(
+        try Self.run(["task", "add", "Acme proposal"], in: scratch, as: Self.other)
+          .termination == .exit(0))
+      let reason = "Pwd=" + "acme-value"
+      let file = scratch.appending(path: "reason.md")
+      try Data(reason.utf8).write(to: file)
+      let result = try Self.run(
+        [
+          "--ws", "acme", "task", "drop", "AC-1", "-F", file.path, "--allow-secret",
+          "--approved", "Keep the Acme reason", "--json",
+        ], in: scratch)
+      #expect(result.termination == .exit(6))
+      let error = try Self.error(result)
+      let next = try #require((error["next"] as? [String])?.first)
+      let expected =
+        "silta --ws 'acme' task triage --drop AC-1 --allow-secret -F -"
+        + " --approved \"<the human's words>\""
+      #expect(next == expected)
+      let retry =
+        shellWord(try SiltaBinary.url().path)
+        + String(next.dropFirst("silta".count))
+        .replacingOccurrences(of: "<the human's words>", with: "Drop it and retain its reason")
+        + " < " + shellWord(file.path)
+      let replay = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", retry], in: scratch, environment: TaskCommandTests.actor)
+      #expect(replay.termination == .exit(0))
+      let body = try store.read { try String.fetchOne($0, sql: "SELECT result_md FROM task") }
+      let audit = try store.read { try String.fetchAll($0, sql: "SELECT command FROM approval") }
+      #expect(body == reason)
+      #expect(audit == ["silta task triage --drop 'AC-1' --allow-secret -F <file>"])
+    }
+  }
+
   @Test func approvalRowsNameTheTasksTheyCreated() throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)

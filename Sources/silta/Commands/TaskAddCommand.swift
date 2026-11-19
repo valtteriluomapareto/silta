@@ -48,7 +48,7 @@ struct TaskAddCommand: OutputCommand {
         approved: global.approved) ?? ""
     let result = try await TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved,
-      bodyFlag: body.flag
+      bodyFlag: body.flag, retryBodyFlag: body.retryFlag
     )
     .add(
       draft,
