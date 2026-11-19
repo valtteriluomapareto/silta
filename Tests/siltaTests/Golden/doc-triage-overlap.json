@@ -1,0 +1,1 @@
+{"error":{"code":"conflict","message":"Accept at most one proposal per doc: doc:rules@2, doc:rules@3","next":["silta --ws 'acme' doc show 'doc:rules@2'","silta --ws 'acme' doc show 'doc:rules@3'","silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --base <rev> --title <title> --about <ref>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

@@ -1,0 +1,4 @@
+error: Accept at most one proposal per doc: doc:rules@2, doc:rules@3 [conflict]
+next: silta --ws 'acme' doc show 'doc:rules@2'
+next: silta --ws 'acme' doc show 'doc:rules@3'
+next: silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --base <rev> --title <title> --about <ref>

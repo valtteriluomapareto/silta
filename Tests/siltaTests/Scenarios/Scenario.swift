@@ -16,7 +16,14 @@ struct Scenario: Decodable {
         (step as? [AnyHashable: Any])?["expect"], allowed: ["exit", "code", "stdout", "json"],
         at: "step \(index) expect")
     }
-    return try YAMLDecoder().decode(Scenario.self, from: yaml)
+    let scenario = try YAMLDecoder().decode(Scenario.self, from: yaml)
+    guard !scenario.steps.isEmpty else {
+      throw ScenarioFailure(description: "A scenario requires at least one step.")
+    }
+    for (index, step) in scenario.steps.enumerated() where step.expect.json?.isEmpty == true {
+      throw ScenarioFailure(description: "Step \(index) expect.json requires at least one match.")
+    }
+    return scenario
   }
 
   private static func checkKeys(_ node: Any?, allowed: Set<String>, at place: String) throws {

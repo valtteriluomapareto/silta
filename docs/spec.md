@@ -2684,10 +2684,11 @@ scriptable and deterministic (D13).
 - **Scenarios:** `Tests/Scenarios/<name>.yaml` files. A runner executes each one in
   a fresh temporary `SILTA_HOME`. A scenario lists:
   - the fixture repos and seed data
-  - a sequence of `silta` invocations: `args`, scratch-relative `cwd`, and `env`
+  - at least one `silta` invocation: `args`, scratch-relative `cwd`, and `env`
     (including `SILTA_ACTOR` and `SILTA_SESSION`)
   - expectations: `exit`, optional `code`, `stdout` golden filename, or `json`
-    dotted paths (numeric components select array indices) equal to string, integer or boolean values
+    dotted paths (numeric components select array indices) equal to string, integer or boolean values.
+    A `json` map must contain at least one path.
   - `fixtures: true` builds the fixed Acme suite. Seed-data/file/DB expectations
     join the format when commands need them.
   - An unknown key fails the scenario, so a misspelled expectation can't pass unchecked.

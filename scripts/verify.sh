@@ -96,8 +96,11 @@ full_swift() {
   export SILTA_SLOW_TESTS=1
   # Bound competing subprocess and filesystem work on the CI runner.
   SILTA_DEADLINE_TESTS='' run_tests --experimental-maximum-parallelization-width 4
-  # The stress test and every test that drives a prior-writer binary.
+  # Scenario replay, concurrency guarantees and every prior-writer compatibility check.
   require_passed twentyProcessesAddFiveHundredTasksWithoutSequenceGaps \
+    allScenariosReplayByteIdentically \
+    tenDistinctSessionsHaveExactlyOneSuccessfulClaim \
+    busyRetryNamesOnlyFailedCommandPath \
     actualPriorWriterRefusesUpgradedDatabaseWithoutChangingIt \
     actualMetadataWriterCannotWriteAfterNamespaceUpgrade \
     actualV6WriterKeepsPopulatedAuditFields \
