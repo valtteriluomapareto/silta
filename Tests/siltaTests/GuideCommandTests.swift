@@ -13,6 +13,19 @@ struct GuideCommandTests {
     }
   }
 
+  @Test(.timeLimit(.minutes(1))) func humanGuideNamesDocumentWriteGates() throws {
+    try withScratchDirectory { scratch in
+      let text = try SiltaBinary.run(["guide", "human"], in: scratch)
+      let json = try GuideContractTests.data(
+        SiltaBinary.run(["guide", "human", "--json"], in: scratch))
+      try #require(text.termination == .exit(0))
+      #expect(json["text"] as? String == text.stdout)
+      withKnownIssue("#266: guide human omits accepted-document write gates") {
+        #expect(text.stdout.contains("`doc edit`") && text.stdout.contains("`doc archive`"))
+      }
+    }
+  }
+
   @Test func fullGuideSummarizesDocsAndPreservesOtherTopics() throws {
     try withScratchDirectory { scratch in
       let full = try SiltaBinary.run(["guide"], in: scratch)
