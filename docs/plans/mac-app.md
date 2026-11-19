@@ -155,8 +155,8 @@ Delivery order is My work, Board, Workspace, then Docs: one screen per PR. A6a i
 one cross-screen exception, because it restyles the shared shell.
 Follow the [workflow](../../AGENTS.md#workflow) and [review rules](../../AGENTS.md#reviews).
 Use the test-first flow for logic and view-model tests for SwiftUI layout.
-No planted faults except for guard tests. Split only when a diff substantially
-exceeds about 1,000 lines. Add navigation, observable state and development hooks
+Use [AGENTS.md](../../AGENTS.md#keep-it-lean) for fault probes and PR size.
+Add navigation, observable state and development hooks
 only when a screen needs them. The minimal [control support](mac-app-control.md)
 provides isolated fixtures, versioned model state and offscreen root PNGs. The
 terminal driver waits on model state and can capture a real owned window when
