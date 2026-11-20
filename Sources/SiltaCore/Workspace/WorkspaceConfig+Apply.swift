@@ -34,8 +34,10 @@ extension WorkspaceConfig {
   private func requireUnblocked(_ map: WorkspaceMapEdit, in db: Database) throws {
     let blockers = map.changes.blockers
     guard !blockers.isEmpty else { return }
-    if blockers.count == 1, let first = blockers.first,
-      first.references.allSatisfy({ $0.hasPrefix("doc:") }),
+    let documentsOnly = blockers.allSatisfy { item in
+      item.references.allSatisfy { $0.hasPrefix("doc:") }
+    }
+    if documentsOnly, blockers.count == 1, let first = blockers.first,
       let item = map.removals.first(where: { $0.ref == first.item })
     {
       let workspace = try TaskService.workspaceID(slug, in: db)
@@ -46,7 +48,7 @@ extension WorkspaceConfig {
       details: blockers.map { blocker in
         TaskError.shown(blocker.item) + " ("
           + blocker.references.map(TaskError.shown).joined(separator: ", ") + ")"
-      })
+      }, documentsOnly: documentsOnly)
   }
 
   static func json(_ value: Any) throws -> String {

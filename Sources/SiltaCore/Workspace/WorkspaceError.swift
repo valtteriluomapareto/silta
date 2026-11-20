@@ -23,7 +23,7 @@ package enum WorkspaceError: CodedError {
 
   /// Removing a configured row would break an existing reference.
   case conflict
-  case removalBlockers(workspace: String, details: [String])
+  case removalBlockers(workspace: String, details: [String], documentsOnly: Bool)
 
   /// Removing a map item would detach current accepted knowledge.
   case docAttachments(
@@ -61,7 +61,7 @@ package enum WorkspaceError: CodedError {
       "This repository belongs to several workspaces. "
         + "Retry the original command with --ws and a workspace from the candidates."
     case .conflict: "Configuration conflicts with an existing reference or unique value."
-    case .removalBlockers(_, let details):
+    case .removalBlockers(_, let details, _):
       "Workspace removal blocked by " + details.joined(separator: "; ") + "."
     case .docAttachments(_, let item, let docs, _, _):
       "Cannot remove \(TaskError.shown(DocService.about([item]))); attached docs: "
@@ -78,7 +78,10 @@ package enum WorkspaceError: CodedError {
     case .setting(let workspace, _, _), .unknownSetting(let workspace, _, _):
       ["silta --ws " + shellWord(workspace) + " ws show"]
     case .docAttachments(_, _, _, let commands, _): commands
-    case .removalBlockers(let workspace, _): [workspaceEditRead(workspace)]
+    case .removalBlockers(let workspace, _, let documentsOnly):
+      documentsOnly && RestoreService.canNameInRecovery(workspace)
+        ? [workspaceCommand("silta doc ls", workspace: workspace), workspaceEditRead(workspace)]
+        : [workspaceEditRead(workspace)]
     case .notFound, .unknown: ["silta ws ls"]
     case .ambiguous(let workspaces): workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
     case .invalid(_, true): ["silta ws edit --help"]
