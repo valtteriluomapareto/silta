@@ -98,9 +98,13 @@ package enum ExportError: CodedError, Equatable {
     case .unsupported(let what):
       "This workspace has \(what), which this version of silta can't export; nothing was written."
     case .invalidExport(let reason, let workspace):
-      "Cannot export \(Self.safeWorkspace(workspace) ? "workspace " + workspace : "this workspace"): "
-        + "\(reason). Ask the human to inspect the configuration and correct it with ws edit "
-        + "where possible. Nothing was written."
+      if Self.safeWorkspace(workspace) {
+        "Cannot export workspace \(workspace): \(reason). "
+          + "Ask the human to inspect the configuration and correct it with ws edit. Nothing was written."
+      } else {
+        "Cannot export this workspace: \(reason). Ask the human to inspect its configuration. "
+          + "Nothing was written."
+      }
     case .newerFormat:
       "This export uses a newer format than this version of silta can read; nothing was changed."
     case .unwritable(let path, _):
