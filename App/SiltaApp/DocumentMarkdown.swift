@@ -105,7 +105,6 @@ private struct MarkdownTable: View {
           .accessibilityAddTraits(header ? .isHeader : [])
       }
     }
-    .accessibilityElement(children: .combine)
   }
 
   private func horizontal(_ alignment: MarkdownContent.Alignment) -> HorizontalAlignment {

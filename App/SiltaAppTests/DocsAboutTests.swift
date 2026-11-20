@@ -91,6 +91,30 @@
       model.filterDocuments(about: "topic:other")
       #expect(model.docsAbout == "topic:other")
       #expect(docs.ref == "doc:a-notes@1" && docs.view == .comments)
+      await model.loadDocuments()
+      #expect(docs.ref == "doc:a-notes@1" && docs.view == .comments)
+    }
+
+    @Test func anUnfilteredReloadDropsTopicsThatAreGone() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      var entries = [
+        doc("env", about: ["topic:environments"]), doc("login", about: ["topic:login"]),
+      ]
+      let docs = DocsModel(readList: { _, _, about, _, _ in
+        let shown =
+          about.map { ref in entries.filter { $0.about?.contains(ref) == true } } ?? entries
+        return AppDocumentList(entries: shown, total: shown.count, nextOffset: nil)
+      })
+      await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
+      await docs.refresh(reader, workspace: "acme", about: "topic:login", archived: false)
+      #expect(docs.topics == ["topic:environments", "topic:login"])
+      entries.removeLast()
+      await docs.refresh(reader, workspace: "acme", about: nil, archived: false, force: true)
+      #expect(docs.topics == ["topic:environments"])
     }
   }
 #endif

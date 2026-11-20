@@ -101,6 +101,8 @@
       #expect(parsed.header.map { String($0.characters) } == ["Name", "Value"])
       #expect(parsed.rows.map { $0.map { String($0.characters) } } == [["amount", "42"]])
       #expect(parsed.alignments == [.leading, .trailing])
+      let centred = MarkdownContent("| a | b |\n|:-:|---|\n| 1 | 2 |\n").blocks.compactMap(\.table)
+      #expect(centred.first?.alignments == [.center, .leading])
       let fenced = MarkdownContent("```text\n" + table + "\n```")
       #expect(fenced.blocks.filter(\.code).count == 1)
       #expect(fenced.blocks.allSatisfy { $0.table == nil })

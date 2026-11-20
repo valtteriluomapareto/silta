@@ -193,11 +193,14 @@ extension DocsView {
         if let color = DocsAboutMenu.color(ref, map: model.visibleData?.map) {
           Circle().fill(color).frame(width: 7, height: 7)
         }
-        Text(DocsContent.name(ref)).font(.system(size: 12)).lineLimit(1)
+        Text(DocsContent.aboutLabel(ref, map: model.visibleData?.map)).font(.system(size: 12))
+          .lineLimit(1)
       }.padding(.horizontal, 9).padding(.vertical, 3)
         .background(Color("Ink").opacity(0.05), in: .capsule)
     }.buttonStyle(.plain).help("Show docs about \(ref)")
-      .accessibilityLabel("Show docs about " + DocsContent.name(ref))
+      .accessibilityLabel(
+        "Show docs about " + DocsContent.aboutLabel(ref, map: model.visibleData?.map)
+      )
       .contextMenu {
         Button("Copy reference") { _ = CopyValue.writeToPasteboard(ref) }
       }
