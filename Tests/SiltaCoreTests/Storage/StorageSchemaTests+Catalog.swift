@@ -6,7 +6,7 @@ import Testing
 @testable import SiltaCore
 
 extension StorageSchemaTests {
-  private static let writerFloors = [1, 2, 3, 4, 5, 6, 6, 8, 9]
+  private static let writerFloors = [1, 2, 3, 4, 5, 6, 6, 8, 9, 10]
 
   @Test func everyMigrationMatchesItsFrozenCatalogAndWriterFloor() throws {
     let migrator = StorageSchema.migrator
@@ -41,7 +41,7 @@ extension StorageSchemaTests {
     }
   }
 
-  @Test(arguments: Array(1...8))
+  @Test(arguments: Array(1...9))
   func migratedCatalogMatchesFreshStore(version: Int) throws {
     try withScratchDirectory { scratch in
       let fresh = Self.store(scratch.appending(path: "fresh"))

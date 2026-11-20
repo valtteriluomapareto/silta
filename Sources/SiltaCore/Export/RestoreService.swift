@@ -41,20 +41,9 @@ package enum RestoreService {
     let directory = request.directory.standardizedFileURL
     try validateManifestPrefix(request.manifest, directory: directory)
     let files = try readTree(directory)
-    let tree = try ExportTree.parse(files)
-    let slug = tree.workspace.value("slug") ?? ""
-    if let field = tree.invalidIdentifier() {
-      throw ExportError.invalidRestoreIdentifier(field: field)
-    }
-    if let expected, expected != slug {
-      throw ExportError.otherWorkspace(tree: slug, given: expected, directory: directory.path)
-    }
-    try RestoreDocumentGraph(tree: tree, slug: slug).run()
-    let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
-    if let manifest = request.manifest, !digest.hasPrefix(manifest.lowercased()) {
-      throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
-    }
-    _ = try RestoreWriter.nextTaskSeq(stored: nil, tree: tree)
+    let admitted = try admit(
+      files, directory: directory, expected: expected, manifest: request.manifest)
+    let (tree, slug, digest) = (admitted.tree, admitted.slug, admitted.digest)
     let milliseconds = Int64(identity.date.timeIntervalSince1970 * 1000)
     let snapshot = "silta-\(utcDay(identity.date))-before-restore-\(milliseconds).db"
     return try store.write(rollingBack: dryRun, keepingBackup: \.snapshot) { tx in
@@ -75,6 +64,33 @@ package enum RestoreService {
         identity: identity, in: tx)
       return report
     }
+  }
+
+  struct Admission {
+    let tree: ExportSnapshot
+    let slug: String
+    let digest: String
+  }
+
+  /// Parses and validates the exact bytes this binary would be able to restore.
+  static func admit(
+    _ files: [String: Data], directory: URL, expected: String?, manifest: String? = nil
+  ) throws -> Admission {
+    let tree = try ExportTree.parse(files)
+    let slug = tree.workspace.value("slug") ?? ""
+    if let field = tree.invalidIdentifier() {
+      throw ExportError.invalidRestoreIdentifier(field: field)
+    }
+    if let expected, expected != slug {
+      throw ExportError.otherWorkspace(tree: slug, given: expected, directory: directory.path)
+    }
+    try RestoreDocumentGraph(tree: tree, slug: slug).run()
+    let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
+    if let manifest, !digest.hasPrefix(manifest.lowercased()) {
+      throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
+    }
+    _ = try RestoreWriter.nextTaskSeq(stored: nil, tree: tree)
+    return Admission(tree: tree, slug: slug, digest: digest)
   }
 
   /// Checks an optional approval digest before reading a tree or asking for approval.

@@ -18,7 +18,7 @@ struct DocProposalExportTests {
         #expect(
           try store.read {
             try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-          } == 9)
+          } == 10)
         let files = try ExportTreeTests.render(store)
         #expect(try ExportVersionTests.version(files) == "4")
         let snapshot = try ExportTree.parse(files)

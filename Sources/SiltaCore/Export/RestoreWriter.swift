@@ -124,7 +124,7 @@ struct RestoreWriter {
   private mutating func replaceRows() throws {
     let kept = try machineRows()
     let old = try removedIDs()
-    if let workspace { try delete(workspace) }
+    if let workspace { try WorkspaceOwnedRows.removeContents(workspace, in: db) }
     let row = tree.workspace
     if let workspace {
       try db.execute(
@@ -172,56 +172,8 @@ struct RestoreWriter {
     for comment in old.comments + new.1 { try tx.recordChange(kind: "comment", rowID: comment) }
   }
 
-  struct RowIDs {
-    var tasks: [Int64]
-    var docs: [Int64]
-    var comments: [Int64]
-  }
-
   /// Owned row ids removed by replacement, for the change log.
-  func removedIDs() throws -> RowIDs {
-    RowIDs(
-      tasks: try Int64.fetchAll(
-        db, sql: "SELECT id FROM task WHERE workspace_id IS ?", arguments: [workspace]),
-      docs: try Int64.fetchAll(
-        db, sql: "SELECT id FROM doc WHERE workspace_id IS ? ORDER BY id", arguments: [workspace]),
-      comments: try Int64.fetchAll(
-        db,
-        sql:
-          """
-          SELECT id FROM comment
-          WHERE task_id IN (SELECT id FROM task WHERE workspace_id IS :ws)
-            OR doc_rev_id IN (SELECT r.id FROM doc_rev r JOIN doc d ON d.id=r.doc_id
-              WHERE d.workspace_id IS :ws)
-          ORDER BY id
-          """,
-        arguments: ["ws": workspace])
-    )
-  }
-
-  private func delete(_ workspace: Int64) throws {
-    let tasks = "task_id IN (SELECT id FROM task WHERE workspace_id=:ws)"
-    let apps = "app_id IN (SELECT id FROM app WHERE workspace_id=:ws)"
-    try db.execute(sql: "DELETE FROM link WHERE workspace_id=?", arguments: [workspace])
-    try deleteDocuments(workspace: workspace)
-    try db.execute(
-      sql: """
-        DELETE FROM alias_decision WHERE workspace_id=:ws;
-        DELETE FROM review_request WHERE \(tasks);
-        DELETE FROM comment WHERE \(tasks);
-        DELETE FROM task_event WHERE \(tasks);
-        DELETE FROM task_plan_rev WHERE \(tasks);
-        DELETE FROM task WHERE workspace_id=:ws;
-        DELETE FROM worktree_override WHERE \(apps);
-        DELETE FROM environment WHERE \(apps);
-        DELETE FROM edge WHERE workspace_id=:ws;
-        DELETE FROM topic_alias WHERE workspace_id=:ws;
-        DELETE FROM source WHERE workspace_id=:ws;
-        DELETE FROM app WHERE workspace_id=:ws;
-        DELETE FROM repo_path WHERE repo_id IN (SELECT id FROM repo WHERE workspace_id=:ws);
-        DELETE FROM repo WHERE workspace_id=:ws;
-        DELETE FROM service WHERE workspace_id=:ws;
-        DELETE FROM topic WHERE workspace_id=:ws;
-        """, arguments: ["ws": workspace])
+  func removedIDs() throws -> WorkspaceOwnedRows.RemovedIDs {
+    try WorkspaceOwnedRows.rowIDs(workspace, in: db)
   }
 }

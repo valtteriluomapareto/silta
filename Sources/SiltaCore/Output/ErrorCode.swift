@@ -77,7 +77,8 @@ public enum ErrorCode: String, CaseIterable, Sendable, Encodable {
     case .usage, .invalid: "Read `silta <cmd> --help` and fix the call"
     case .notFound, .unregistered: "Check the ref, or carry on without silta"
     case .humanOnly:
-      "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` after they say yes"
+      "Ask the human in chat. They run `ws rm` directly. For other commands, "
+        + "rerun with `--approved \"<their words>\"` after they say yes."
     case .readOnlyPromoted: "Leave it to its tracker and pick other work"
     case .ambiguousLocation:
       "Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity"

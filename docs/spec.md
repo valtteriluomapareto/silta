@@ -1344,7 +1344,8 @@ silta code ls   <app>[@<ref>] [<dir>]
   - Without `--approved`, an agent gets `human_only` (exit 3). The message says the
     command needs the human's go-ahead; `next` is the same command with
     `--approved "<the human's words>"`. If the retry uses `-F -`, supply the original body
-    again on stdin.
+    again on stdin. Workspace removal requires a human terminal (§15). Its retry
+    is for the human and takes no approval quote.
   - `--approved` on a command that doesn't need it warns `approval_unused` and stores
     nothing. A `--dry-run` records nothing, so it needs no approval, `--allow-secret`
     included, and its `--approved` warns `approval_unused`, saying a dry run records
@@ -1533,7 +1534,8 @@ workspace. A setting that changes the rules gets one conditional sentence, and
     triage, questions. Never drip them one at a time.
   - Human-only commands: name the exact commands in your message, and after the human
     says yes, run them with `--approved "<their words>"`. Their answer covers the
-    commands you named, and nothing else. Never write the words yourself.
+    commands you named, and nothing else. Never write the words yourself. The human
+    runs workspace removal directly in their terminal (§15).
   - When no answer can come (the human is away, or the harness runs without a human):
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
@@ -1991,6 +1993,23 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **Importers** (M4): `silta import --from dex|beads|backlog-md <path>`. Imported tasks
   become `proposed`, with a `source` link to the original id.
 
+### Remove a mistaken workspace
+
+`silta ws rm <slug> --dry-run` lists owned row counts, default selection and
+live registered clones without initializing or changing storage. The human
+runs `silta ws rm <slug>` directly in their terminal. Removing the saved
+default or a workspace with a live registered clone requires `--allow-active`.
+The command clears that selection or registration and leaves the Git clone on disk.
+
+The write rechecks the workspace and registrations and publishes a fresh SQLite
+backup and a validated recovery tree before removing the owned graph in one
+transaction. Use the printed `restore --dry-run` to inspect the recovery tree,
+then run restore in the human's terminal to recover the workspace without
+replacing others. The whole database snapshot includes machine-local registrations
+and worktree information. The portable tree follows the export portability rules
+above. The v10 writer floor prevents older selectors from saving a workspace
+that was deleted before their write.
+
 ## 16. CLI
 
 **Conventions:**
@@ -2081,8 +2100,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   shown to an agent is `human`, because its `next` is the human's triage. A code
   read's timeout or failed `--fetch` (§10) is `agent`, because narrowing the read or
   reading the cached ref comes first. The human works through an agent
-  (D38), so for `human` the agent asks the human in chat; for `human_only` it then
-  runs the printed command with `--approved "<their words>"`.
+  (D38), so for `human` the agent asks the human in chat. If a `human_only` retry
+  includes `--approved`, the agent runs it with the human's words after they say yes.
+  For workspace removal the human runs the retry directly.
 - `schema` is the envelope version. Before DF0, data shapes may narrow without a
   `schema` bump; from DF0 on they only gain fields, and any other change bumps
   `schema`.
@@ -2149,7 +2169,7 @@ run.
 | 0 | — | — |
 | 1 | `usage`, `invalid` | Read `silta <cmd> --help` and fix the call |
 | 2 | `not_found`, `unregistered` | Check the ref, or carry on without silta |
-| 3 | `human_only` | Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes |
+| 3 | `human_only` | Ask the human in chat. They run `ws rm` directly. For other commands, rerun with `--approved "<their words>"` after they say yes. |
 | 3 | `read_only_promoted` | Leave it to its tracker and pick other work |
 | 4 | `ambiguous_location` | Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity |
 | 5 | `busy` | Retry once after a few seconds |
@@ -2168,6 +2188,7 @@ silta ws edit
 silta ws show
 silta ws ls
 silta ws use
+silta ws rm
 silta repo fetch
 silta agents install
 silta agents uninstall

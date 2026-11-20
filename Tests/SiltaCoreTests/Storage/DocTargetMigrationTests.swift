@@ -42,7 +42,7 @@ struct DocTargetMigrationTests {
           try Int.fetchOne(db, sql: "SELECT count(*) FROM doc_rev WHERE about_targets IS NOT NULL")
             == 0)
         #expect(
-          try Int.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'") == 9)
+          try Int.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'") == 10)
       }
       let backup = home.appending(path: "backups/silta-2023-11-14-before-v8-1700000000000.db")
       #expect(
