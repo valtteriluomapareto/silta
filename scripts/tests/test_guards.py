@@ -364,6 +364,10 @@ class WebsiteLinksTests(GuardTestCase):
         self.assertEqual(errors, [f"{self.CONSTS}:1: broken link to docs/gone.md",
                                   f"{self.CONSTS}:2: broken link to README.md#install"])
 
+    def test_consts_without_blob_links_fails(self) -> None:
+        self.tree.write(self.CONSTS, "export const A = 'https://example.com';\n")
+        self.assertEqual(len(check_website_links.check(self.tree.root)), 1)
+
     def test_diverged_asset_copy_fails(self) -> None:
         self.tree.write("docs/assets/mark.svg", "<svg/>")
         self.tree.write("website/public/mark.svg", "<svg old/>")

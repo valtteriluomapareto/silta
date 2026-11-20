@@ -28,7 +28,10 @@ def check(root: Path) -> list[str]:
     errors = []
     consts = root / CONSTS
     if consts.is_file():
-        for number, line in enumerate(consts.read_text(encoding="utf-8").splitlines(), 1):
+        lines = consts.read_text(encoding="utf-8").splitlines()
+        if not any(BLOB.search(line) for line in lines):
+            errors.append(f"{CONSTS}: no blob('…') links found; update this guard if they moved")
+        for number, line in enumerate(lines, 1):
             for match in BLOB.finditer(line):
                 target = match.group(2)
                 location, _, fragment = target.partition("#")
