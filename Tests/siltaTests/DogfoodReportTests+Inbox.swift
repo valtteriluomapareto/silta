@@ -15,10 +15,8 @@ extension DogfoodReportTests {
       let result = try Self.run(
         ["--since", "2023-11-25"], scratch: scratch, tools: Self.tools(scratch))
       #expect(result.termination == .exit(0), "\(result.stderr)")
-      withKnownIssue("The report only examines the capped inbox and newest grouped dates.") {
-        #expect(result.stdout.contains("Questions to @me: 13."))
-        #expect(result.stdout.contains("Inbox size: 15 items. Oldest item: 12 days."))
-      }
+      #expect(result.stdout.contains("Questions to @me: 13."))
+      #expect(result.stdout.contains("Inbox size: 15 items. Oldest item: 12 days."))
       #expect(!result.stdout.contains("Acme inbox private"))
     }
   }

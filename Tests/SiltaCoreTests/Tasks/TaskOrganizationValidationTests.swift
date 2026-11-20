@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.timeLimit(.minutes(1)))
-struct TaskOrganizationReviewTests {
+struct TaskOrganizationValidationTests {
   @Test(arguments: [false, true]) func unchangedApprovedSecretIsARead(human: Bool) async throws {
     try await withScratchDirectory { home in
       let clock = FakeClock(now: TaskServiceTests.now)

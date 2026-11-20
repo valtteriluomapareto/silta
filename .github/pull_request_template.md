@@ -13,6 +13,7 @@
 
 - [ ] `scripts/run-guards.sh` (docs-only changes)
 - [ ] `scripts/verify.sh quick`
+- [ ] `scripts/verify.sh app` (Mac app and Xcode project changes)
 - [ ] `scripts/verify.sh full` (storage, concurrency, location, agent-facing output)
 - [ ] Evals (spec §21), if agent behaviour changed
 

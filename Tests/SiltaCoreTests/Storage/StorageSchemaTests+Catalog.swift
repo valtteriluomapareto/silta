@@ -24,6 +24,11 @@ extension StorageSchemaTests {
       }
       try queue.read { db in
         let actual = try Self.catalog(db)
+        if version == "v1" {
+          let metadata = try String.fetchAll(
+            db, sql: "SELECT key || '=' || value FROM meta ORDER BY key")
+          #expect(metadata == ["change_seq=0", "last_backup_day=", "min_writer_version=1"])
+        }
         #expect(actual.count == expected.count, "Migration \(version)")
         for (row, frozen) in zip(actual, expected) {
           #expect(row == frozen, "Migration \(version), object \(row[1] ?? "")")
@@ -36,7 +41,7 @@ extension StorageSchemaTests {
     }
   }
 
-  @Test(arguments: [4, 6, 7])
+  @Test(arguments: Array(1...7))
   func migratedCatalogMatchesFreshStore(version: Int) throws {
     try withScratchDirectory { scratch in
       let fresh = Self.store(scratch.appending(path: "fresh"))
@@ -44,17 +49,52 @@ extension StorageSchemaTests {
       let fixtures = DocsMigrationTests.fixture.deletingLastPathComponent()
       let store = try DocAuditMigrationTests.copy(
         fixtures.appending(path: "storage-v\(version).db"), to: scratch)
-      let canaryColumns = ["id", "future"]
+      let hasCanary = version >= 4
+      let canaryColumns = hasCanary ? ["id", "future"] : ["id", "body_md"]
       let before = try DocAuditMigrationTests.rows(
         store.path, table: "doc_rev", columns: canaryColumns)
-      #expect(before.contains { $0.contains("retained current") })
+      let tasks = try DocAuditMigrationTests.rows(
+        store.path, table: "task", columns: ["uid", "seq", "title"])
+      try #require(!tasks.isEmpty)
+      if hasCanary { #expect(before.contains { $0.contains("retained current") }) }
       try store.initialize()
       #expect(
         try fresh.read { try Self.catalog($0) }
-          == store.read { try Self.catalog($0, legacyCanary: true) })
+          == store.read { try Self.catalog($0, legacyCanary: hasCanary) })
       #expect(
         try DocAuditMigrationTests.rows(store.path, table: "doc_rev", columns: canaryColumns)
           == before)
+      #expect(
+        try DocAuditMigrationTests.rows(
+          store.path, table: "task", columns: ["uid", "seq", "title"])
+          == tasks)
+      try store.read { (db: Database) throws in
+        #expect(try Row.fetchAll(db, sql: "PRAGMA foreign_key_check").isEmpty)
+        #expect(try String.fetchOne(db, sql: "PRAGMA integrity_check") == "ok")
+      }
+    }
+  }
+
+  @Test(arguments: [1, 2, 3, 5])
+  func historicalFixtureKeepsItsWriterFloorAndOriginalData(version: Int) throws {
+    var options = Configuration()
+    options.readonly = true
+    let file = DocsMigrationTests.fixture.deletingLastPathComponent()
+      .appending(path: "storage-v\(version).db")
+    let queue = try DatabaseQueue(path: file.path, configuration: options)
+    try queue.read { (db: Database) throws in
+      #expect(
+        try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations ORDER BY rowid")
+          == (1...version).map { "v\($0)" })
+      #expect(
+        try Int.fetchOne(db, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
+          == version)
+      let expected = version == 5 ? "Acme v5 writer evidence" : "Acme historical work"
+      #expect(
+        try Int.fetchOne(db, sql: "SELECT count(*) FROM task WHERE title=?", arguments: [expected])
+          == 1)
+      #expect(try Row.fetchAll(db, sql: "PRAGMA foreign_key_check").isEmpty)
+      #expect(try String.fetchOne(db, sql: "PRAGMA integrity_check") == "ok")
     }
   }
 

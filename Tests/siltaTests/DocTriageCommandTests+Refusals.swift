@@ -9,6 +9,14 @@ extension DocTriageCommandTests {
   func staleAndOverlappingAcceptancesHaveReplayableRecovery(stale: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try AcmeDocAttachments.make(in: scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix)
+            VALUES('acme-unrelated','acme-other','Acme Other','AD')
+            """)
+      }
+      try WorkspaceSelection.use("acme-other", in: store)
       try AcmeDocAttachments.attach("rules", to: "service", in: store)
       #expect(try Self.propose(scratch) == "doc:rules@2")
       if stale {
@@ -22,12 +30,7 @@ extension DocTriageCommandTests {
       let before = try Self.truth(store)
       let next = try Self.checkRefusal(args, name: stale ? "stale" : "overlap", in: scratch)
       #expect(try Self.truth(store) == before)
-      if stale {
-        withKnownIssue("The stale refusal omits the read that supplies the accepted baseline.") {
-          #expect(next.contains("silta --ws 'acme' doc show 'doc:rules' --json"))
-        }
-      }
-      try Self.replayRefusal(next, store: store, scratch: scratch)
+      try Self.replayRefusal(next, stale: stale, store: store, scratch: scratch)
     }
   }
 
@@ -44,11 +47,11 @@ extension DocTriageCommandTests {
     return try #require(error["next"] as? [String])
   }
 
-  private static func replayRefusal(_ next: [String], store: DatabaseStore, scratch: URL) throws {
-    let current = try #require(
-      try store.read { try Int.fetchOne($0, sql: "SELECT current_rev FROM doc") })
-    let shown = try SiltaBinary.run(["--ws", "acme", "doc", "show", "doc:rules"], in: scratch)
-    #expect(shown.termination == .exit(0) && shown.stdout.contains("doc:rules@\(current)"))
+  private static func replayRefusal(
+    _ next: [String], stale: Bool, store: DatabaseStore, scratch: URL
+  ) throws {
+    let shown = try readBaseline(next, stale: stale, scratch: scratch)
+    let current = shown.revision
     let immutable = try store.read {
       try Row.fetchAll($0, sql: "SELECT * FROM doc_rev ORDER BY id")
     }
@@ -64,7 +67,7 @@ extension DocTriageCommandTests {
     let products = try SiltaBinary.url().deletingLastPathComponent().path
     let env = TaskCommandTests.fixed.merging(["PATH": products + ":/usr/bin:/bin"]) { _, new in new
     }
-    for hint in next {
+    for hint in next where hint != shown.command {
       let command = values.reduce(hint) { command, pair in
         command.replacingOccurrences(of: pair.key, with: pair.value)
       }
@@ -81,5 +84,24 @@ extension DocTriageCommandTests {
       #expect(try Int.fetchOne(db, sql: "SELECT current_rev FROM doc") == current)
       #expect(try Row.fetchAll(db, sql: "SELECT * FROM approval ORDER BY id") == approvals)
     }
+  }
+
+  private static func readBaseline(_ hints: [String], stale: Bool, scratch: URL) throws
+    -> (revision: Int, command: String)
+  {
+    let command =
+      if stale {
+        try #require(
+          hints.first { $0.contains(" doc show 'doc:rules'") && $0.hasSuffix(" --json") })
+      } else {
+        "silta --ws 'acme' doc show 'doc:rules' --json"
+      }
+    let shown = try FirstWorkspaceCommandTests.replay(command, in: scratch, cwd: scratch)
+    try #require(shown.termination == .exit(0), "\(shown.stdout)\(shown.stderr)")
+    let data = try TaskStateCommandTests.data(shown)
+    let ref = try #require(data["ref"] as? String)
+    let revision = try #require(ref.split(separator: "@").last.flatMap { Int($0) })
+    #expect(revision == (stale ? 3 : 1))
+    return (revision, command)
   }
 }

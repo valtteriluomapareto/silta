@@ -112,11 +112,12 @@ done <<<"$(/usr/bin/jq -r '.data.tasks[].ref' "$temporary/tasks")"
 /usr/bin/jq -s '[.[] | if .ok == true then .data else error("task read failed") end]' "$temporary/details" > "$temporary/detail-array" || fail 'invalid task timelines.'
 silta --ws "$ws" schema --json > "$temporary/schema" || fail 'schema read failed.'
 /usr/bin/jq -e '.ok == true and (.data.commands | type == "array")' "$temporary/schema" >/dev/null || fail 'invalid schema.'
-silta --ws "$ws" inbox --for me --json > "$temporary/inbox" || fail "human inbox read failed. Run silta --ws $ws inbox --for me."
+SILTA_NOW="${asof%Z}.000Z" silta --ws "$ws" inbox --for me --all --json > "$temporary/inbox" \
+  || fail "human inbox read failed. Run silta --ws $ws inbox --for me --all."
 /usr/bin/jq -es '
   length == 1 and (.[0] |
     .ok == true and (.data.items | type == "array")
-    and (.data.remaining | type == "number" and . >= 0 and floor == .)
+    and .data.remaining == 0
     and all(.data.items[]; type == "object" and (.kind | type == "string")
       and (.created_at == null or (.created_at | type == "string"))))
 ' "$temporary/inbox" >/dev/null 2>&1 || fail 'invalid human inbox.'
@@ -133,7 +134,7 @@ audit="$(/usr/bin/jq '[.[] | select(.name == "triaged_at")] | length' "$temporar
 if [[ "$audit" == 0 ]]; then audit='NULL AS triaged_at,NULL AS triaged_by'
 else audit='r.triaged_at,r.triaged_by'; fi
 /usr/bin/sqlite3 -readonly -json "$home/silta.db" "
-SELECT r.state,r.actor,r.created_at,$audit
+SELECT d.id AS doc_id,d.archived,r.state,r.actor,r.created_at,$audit
 FROM doc_rev r JOIN doc d ON d.id=r.doc_id JOIN workspace w ON w.id=d.workspace_id
 WHERE w.slug='$ws';
 " > "$temporary/docs" 2>/dev/null || fail 'document metadata read failed.'
@@ -201,16 +202,20 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
     . == $scoped or startswith($scoped + " ");
   def in_range: . != null and . >= $start and . <= $now;
   def optional_time: if . == null then null else seconds end;
-  $inbox[0].data as $attention |
-  (($attention.items | length) + $attention.remaining) as $inbox_size |
-  ($attention.items | map(select(.kind == "question")) | length) as $questions |
-  ($attention.items | map(.created_at | optional_time)) as $inbox_dates |
+  ($docs[0] | map(. + {born:(.created_at|seconds), decided:(.triaged_at|optional_time)})) as $documents |
+  ($now - 14 * 86400) as $proposal_cutoff |
+  ($inbox[0].data.items | map(select(.kind != "doc_proposal" and
+    (.kind != "proposal" or ((.created_at | optional_time) // 0) > $proposal_cutoff)))) as $items |
+  ($documents | map(select(.archived == 0 and .state == "proposed" and .born > $proposal_cutoff))
+    | group_by(.doc_id) | map(map(.born) | min)) as $doc_ages |
+  (($items | map(.created_at | optional_time)) + $doc_ages) as $inbox_dates |
+  ($inbox_dates | length) as $inbox_size |
+  ($items | map(select(.kind == "question")) | length) as $questions |
   (if $inbox_size == 0 then "none"
-   elif $attention.remaining > 0 or any($inbox_dates[]; . == null) then "unknown"
+   elif any($inbox_dates[]; . == null) then "unknown"
    else "\((([$now - ($inbox_dates|min), 0] | max) / 86400) | floor) days" end) as $inbox_oldest |
   def paired: .triaged_at != null and .triaged_by != null;
   def terminal: .state == "accepted" or .state == "rejected" or .state == "superseded";
-  ($docs[0] | map(. + {born:(.created_at|seconds), decided:(.triaged_at|optional_time)})) as $documents |
   ($documents | map(select(.actor != $actor and (.born|in_range) and
     (.state == "proposed" or (terminal and paired))))) as $doc_submissions |
   ($documents | map(select(paired and .triaged_by != $actor and (.decided|in_range) and
@@ -287,7 +292,7 @@ if ! /usr/bin/jq -nr --slurpfile raw "$temporary/logs" --slurpfile tasks "$tempo
   "Proposals accepted: \($proposals | map(select(.decision.body == "todo" and (.decided|after(.)))) | length); dropped: \($triage | map(select(.decision.body == "dropped" and (.decided|after(.)))) | length); left untriaged past 14 days: \($pending | map(select((.born+1209600) as $expiry | ($expiry|after(.)) and $expiry <= $now)) | length).",
   "Oldest pending proposal: \(if ($pending|length) == 0 then "none" else "\($pending | map(($now-.born)/86400|floor) | max) days" end).",
   "Triage wait: \(stats($waits; "min")).",
-  "Questions to @me: \(if $attention.remaining > 0 then "at least " else "" end)\($questions).",
+  "Questions to @me: \($questions).",
   "Inbox size: \($inbox_size) \(if $inbox_size == 1 then "item" else "items" end). Oldest item: \($inbox_oldest).",
   "Target: under 12 inbox items, none older than one week.",
   "", "## Document proposals", "",

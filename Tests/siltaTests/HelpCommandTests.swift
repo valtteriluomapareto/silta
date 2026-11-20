@@ -545,3 +545,23 @@ extension HelpCommandTests {
     }
   }
 }
+
+extension HelpCommandTests {
+  @Test func informationalRoutesWorkWithoutWorkspaceStorage() throws {
+    try withScratchDirectory { scratch in
+      let blocked = scratch.appending(path: "acme-storage-file")
+      try Data("Acme".utf8).write(to: blocked)
+      let environment = ["SILTA_HOME": blocked.path]
+      for args in [["--help"], ["task"], ["task", "--help"], ["help", "task"], ["--version"]] {
+        let result = try SiltaBinary.run(args, in: scratch, environment: environment)
+        #expect(result.termination == .exit(0), "\(args): \(result.stderr)")
+        #expect(!result.stdout.isEmpty && result.stderr.isEmpty)
+      }
+      let invalid = try SiltaBinary.run(
+        ["--json", "task", "acme-unknown"], in: scratch, environment: environment)
+      #expect(invalid.termination == .exit(ErrorCode.usage.exitCode) && invalid.stderr.isEmpty)
+      #expect(try TaskStateCommandTests.error(invalid)["code"] as? String == "usage")
+      #expect(try Data(contentsOf: blocked) == Data("Acme".utf8))
+    }
+  }
+}

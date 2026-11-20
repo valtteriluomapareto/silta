@@ -28,6 +28,28 @@ extension RestoreServiceTests {
     }
   }
 
+  private static func expectArchivedDiscussion(
+    _ doc: ExportDocument?, allocations: [ExportRow]
+  ) {
+    #expect(doc?.row.value("archived") == "1" && doc?.row.value("current_rev") == "1")
+    let revisions = doc?.records.filter { $0.value("table") == "doc_rev" } ?? []
+    #expect(revisions.count >= 2)
+    #expect(revisions.first?.value("triaged_at") == "2023-11-15T00:07:00.000Z")
+    #expect(revisions.first?.value("triaged_by") == "human:acme")
+    let proposed = revisions.last
+    #expect(proposed?.value("state") == "proposed" && proposed?.value("base_rev") == "1")
+    #expect(proposed?.value("about_refs") == #"["app:portal"]"#)
+    #expect(
+      proposed?.value("about_targets") == #"[{"kind":"app","uid":"01HZAPP0000000000000000009"}]"#)
+    let comments = doc?.records.filter { $0.value("table") == "comment" } ?? []
+    #expect(comments.map { $0.value("seq") } == ["1", "3"])
+    #expect(comments.allSatisfy { $0.value("doc_rev") == proposed?.value("uid") })
+    #expect(comments.last?.value("thread") == comments.first?.value("uid"))
+    let allocation = allocations.first { $0.value("slug") == "generated-archived" }
+    let next = allocation?.value("next").flatMap(Int.init) ?? 0
+    #expect(next > revisions.count + 1)
+  }
+
   private static func expectGeneratedDocuments(_ snapshot: ExportSnapshot) {
     let documents = snapshot.documents.documents
     let active = documents.first { $0.slug == "generated-active" }
@@ -37,7 +59,7 @@ extension RestoreServiceTests {
     #expect(active?.row.value("archived") == "0" && active?.row.value("current_rev") == "1")
     #expect(pending?.row.value("archived") == "0" && pending?.row.value("current_rev") == nil)
     #expect(pending?.records.map { $0.value("state") } == ["proposed"])
-    #expect(archived?.row.value("archived") == "1" && archived?.row.value("current_rev") == "1")
+    expectArchivedDiscussion(archived, allocations: snapshot.documents.revisionAllocations)
     #expect(
       revisions.map { $0.value("state") } == ["accepted", "proposed", "rejected", "superseded"])
     let verification = active?.records.first { $0.value("table") == "doc_verification" }

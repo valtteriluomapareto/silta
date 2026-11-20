@@ -1568,8 +1568,7 @@ workspace. A setting that changes the rules gets one conditional sentence, and
   branch and sha.
 - **Reviews:** submit, read task discussion and reply to each finding with
   `--reply-to`, naming the change and proving test. Authors do not resolve findings
-  unless assigned that responsibility. M2 (not yet available): `inbox` → `inbox take`
-  → `task diff` → one `task review` with a lines file → replies → batch `comment resolve`.
+  unless assigned that responsibility.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
   `--steal`, `where --set/--unset`, `task promote` or `--allow-secret` on your own initiative, only
   with the human's words through `--approved`. Never create tracker items, or plan
