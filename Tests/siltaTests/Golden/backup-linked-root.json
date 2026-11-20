@@ -1,1 +1,1 @@
-{"error":{"code":"env","message":"Required database backup could not be completed.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+{"error":{"code":"env","message":"Backup could not be completed because the backup directory could not be opened safely.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

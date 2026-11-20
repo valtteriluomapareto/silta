@@ -26,6 +26,7 @@ package enum DoctorService {
     var checks = database(store, backups: backups, at: now)
     checks.append(writability(store.path))
     checks.append(wal(home))
+    if let modes = loosePermissions(home: home, path: store.path) { checks.append(modes) }
     if let exports = unsafeExports(home) { checks.append(exports) }
     checks.append(await gitVersion(git))
     return DoctorReport(checks: orderedChecks(checks))
@@ -93,17 +94,22 @@ package enum DoctorService {
 
   static func wal(_ home: URL) -> DoctorCheck {
     do {
-      let file = home.appending(path: "silta.db-wal")
+      let entry = home.appending(path: "silta.db").path
+      let path = (try? DatabaseFile(at: entry).path) ?? entry  // Use the configured entry.
+      let file = URL(filePath: path + "-wal")
       let size =
         FileManager.default.fileExists(atPath: file.path)
         ? try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0 : 0
       let large = size > 64 * 1024 * 1024
+      let next =
+        RestoreService.canNameInRecovery(path)
+        ? ["/usr/sbin/lsof " + shellWord(path)] : ["silta doctor --help"]
       return DoctorCheck(
         id: "database.wal", status: large ? .warning : .pass,
         message: large
           ? "WAL exceeds 64 MiB; inspect active database readers before deciding on repairs."
           : "WAL is at most 64 MiB.",
-        next: large ? ["/usr/sbin/lsof " + shellWord(home.appending(path: "silta.db").path)] : [])
+        next: large ? next : [])
     } catch {
       return DoctorCheck(
         id: "database.wal", status: .warning, message: "WAL size could not be read.",

@@ -87,17 +87,16 @@ extension RestoreRefusalTests {
       let after = kind == "destination" ? try RestoreSupport.dump(store) : nil
       let published = try RestoreSupport.backups(home)
       let exists = FileManager.default.fileExists(atPath: store.path)
-      withKnownIssue("Restore admits a task counter with no available next ref") {
-        if case .failure(let error as any CodedError) = restoration {
-          #expect(error.code == (kind == "destination" ? .conflict : .invalid))
-          #expect(error.message.contains("counter"))
-        } else {
-          Issue.record("Expected a coded counter refusal.")
-        }
-        #expect(after == before)
-        #expect(published == backups)
-        #expect(exists == (kind == "destination"))
+      if case .failure(let error as any CodedError) = restoration {
+        #expect(error.code == (kind == "destination" ? .conflict : .invalid))
+        #expect(error.message.contains("counter"))
+        #expect(error.next == ["silta restore --help"])
+      } else {
+        Issue.record("Expected a coded counter refusal.")
       }
+      #expect(after == before)
+      #expect(published == backups)
+      #expect(exists == (kind == "destination"))
     }
   }
 

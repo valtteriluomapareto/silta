@@ -5,58 +5,104 @@ import GRDB
 /// Fixed-location complete snapshots. Publication never replaces an existing backup.
 struct StorageBackup {
   let home: URL
+  private let file: DatabaseFile?
   private static let pendingLeaf = "snapshot.pending"
 
-  init(home: URL) {
+  init(home: URL, file: DatabaseFile? = nil) {
     self.home = DirectoryPath.canonicalHome(home)
+    self.file = file
   }
 
   /// Daily and pre-migration snapshots stage under fixed names protected by their
   /// caller's write or migration lock. Manual snapshots have a private work directory.
   func snapshot(
     name: String, reuseExisting: Bool = false, staging: String? = nil,
-    source: DatabaseQueue? = nil
+    source: DatabaseQueue? = nil, openedStage: Int32? = nil
   ) throws -> URL {
-    do {
-      let parent = try DirectoryPath.open(home)
-      defer { close(parent) }
-      let directory = try DirectoryPath.open("backups", in: parent, creating: true)
-      defer { close(directory) }
-      let nameInHome = staging ?? (reuseExisting ? "daily.pending" : "migration.pending")
-      let fixed = !nameInHome.hasPrefix(".manual-")
-      let work = fixed ? ".backup-" + nameInHome : nameInHome
-      let stage = try DirectoryPath.open(work, in: parent, creating: fixed)
-      defer { close(stage) }
-      var info = stat()
-      guard fstat(stage, &info) == 0, info.st_uid == geteuid(), info.st_mode & 0o077 == 0
-      else { throw StorageError.backupFailed }
-      let leaf = Self.pendingLeaf
-      defer {
-        _ = unlinkat(stage, leaf, 0)
-        if fixed { _ = unlinkat(parent, work, AT_REMOVEDIR) }
+    let parent = try DirectoryPath.open(home)
+    defer { close(parent) }
+    let directory = try backupDirectory(in: parent)
+    defer { close(directory) }
+    let nameInHome = staging ?? (reuseExisting ? "daily.pending" : "migration.pending")
+    let fixed = openedStage == nil
+    let work = fixed ? ".backup-" + nameInHome : nameInHome
+    let stage = try openedStage ?? DirectoryPath.open(work, in: parent, creating: true)
+    defer { if fixed { close(stage) } }
+    try requirePrivateStage(stage)
+    let leaf = Self.pendingLeaf
+    let namedStage = home.appending(path: work)
+    let namedDestination = home.appending(path: "backups")
+    try Self.requireAttached(stage, path: namedStage)
+    defer {
+      _ = unlinkat(stage, leaf, 0)
+      if fixed, DirectoryPath.matches(parent, path: home),
+        DirectoryPath.matches(stage, path: namedStage)
+      {
+        _ = unlinkat(parent, work, AT_REMOVEDIR)
       }
-      if fixed {
-        // Clear the previous staging name, including one left by an older writer.
-        _ = unlinkat(directory, nameInHome, 0)
-        _ = unlinkat(stage, leaf, 0)
-      }
-      try copy(to: home.appending(path: work).appending(path: leaf), source: source)
-      let file = openat(stage, leaf, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
-      guard file >= 0 else { throw StorageError.backupFailed }
-      defer { close(file) }
-      guard fstat(file, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1,
-        fchmod(file, 0o600) == 0, fcntl(file, F_FULLFSYNC) == 0 || fsync(file) == 0
-      else { throw StorageError.backupFailed }
-      let failure = try Self.publish(
-        name, in: directory, work: work, staged: (stage, file))
-      guard
-        failure == 0
-          || (reuseExisting && failure == EEXIST && Self.regularSize(name, in: directory) != nil)
-      else { throw StorageError.backupFailed }
-      return home.appending(path: "backups").appending(path: name)
-    } catch {
-      throw StorageError.backupFailed
     }
+    if fixed {
+      _ = unlinkat(directory, nameInHome, 0)
+      _ = unlinkat(stage, leaf, 0)
+    }
+    try Self.requireAttached(stage, path: namedStage)
+    try copy(to: namedStage.appending(path: leaf), source: source)
+    let snapshot = try Self.preparedSnapshot(in: stage)
+    defer { close(snapshot) }
+    try Self.requireAttached(stage, path: namedStage)
+    try Self.requireAttached(directory, path: namedDestination)
+    try file?.requireCurrent(at: sourceEntry)
+    let failure = try Self.publish(name, in: directory, work: work, staged: (stage, snapshot))
+    guard
+      failure == 0
+        || (reuseExisting && failure == EEXIST && (Self.regularSize(name, in: directory) ?? 0) > 0)
+    else {
+      if failure == EEXIST { throw BackupFailure.occupied }
+      throw BackupFailure.filesystem(StorageError.fileFailure(failure, at: home.path))
+    }
+    try Self.requireAttached(directory, path: namedDestination)
+    return namedDestination.appending(path: name)
+  }
+
+  func hasPublishedSnapshot(named name: String) -> Bool {
+    do {
+      let directory = try DirectoryPath.open(home.appending(path: "backups"))
+      defer { close(directory) }
+      return (Self.regularSize(name, in: directory) ?? 0) > 0
+    } catch { return false }
+  }
+
+  private var sourceEntry: String { home.appending(path: "silta.db").path }
+
+  private func backupDirectory(in parent: Int32) throws -> Int32 {
+    do {
+      return try DirectoryPath.open("backups", in: parent, creating: true)
+    } catch {
+      throw BackupFailure.destination
+    }
+  }
+
+  private func requirePrivateStage(_ stage: Int32) throws {
+    var info = stat()
+    guard fstat(stage, &info) == 0, info.st_uid == geteuid(), info.st_mode & 0o077 == 0
+    else { throw BackupFailure.staging }
+  }
+
+  static func requireAttached(_ descriptor: Int32, path: URL) throws {
+    guard DirectoryPath.matches(descriptor, path: path) else { throw BackupFailure.detached }
+  }
+
+  private static func preparedSnapshot(in stage: Int32) throws -> Int32 {
+    let file = openat(stage, pendingLeaf, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+    guard file >= 0 else { throw BackupFailure.staging }
+    var info = stat()
+    guard fstat(file, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1,
+      fchmod(file, 0o600) == 0, fcntl(file, F_FULLFSYNC) == 0 || fsync(file) == 0
+    else {
+      close(file)
+      throw BackupFailure.staging
+    }
+    return file
   }
 
   /// A mounted backups directory needs a private same-volume copy before publication.
@@ -75,28 +121,41 @@ struct StorageBackup {
     _ = unlinkat(transfer, leaf, 0)
     let file = openat(
       transfer, leaf, O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW | O_CLOEXEC, 0o600)
-    guard file >= 0 else { throw StorageError.backupFailed }
+    guard file >= 0 else { throw transferFailure(errno) }
     defer {
       close(file)
       _ = unlinkat(transfer, leaf, 0)
     }
-    guard fcopyfile(staged.file, file, nil, UInt32(COPYFILE_DATA)) == 0,
-      fcntl(file, F_FULLFSYNC) == 0 || fsync(file) == 0
-    else { throw StorageError.backupFailed }
+    guard fcopyfile(staged.file, file, nil, UInt32(COPYFILE_DATA)) == 0 else {
+      throw transferFailure(errno)
+    }
+    guard fcntl(file, F_FULLFSYNC) == 0 || fsync(file) == 0 else { throw transferFailure(errno) }
     return linkat(transfer, leaf, backups, name, 0) == 0 ? 0 : errno
   }
 
+  private static func transferFailure(_ code: Int32) -> BackupFailure {
+    BackupFailure.filesystem(StorageError.fileFailure(code, at: ""))
+  }
+
   private func copy(to temporary: URL, source: DatabaseQueue?) throws {
-    // Keep SQLite's named destination in the home, independent of the backups entry.
-    // A read-write connection can initialize WAL sidecars while reading committed state.
+    let target = try file ?? DatabaseFile(at: sourceEntry)
+    try target.requireCurrent(at: sourceEntry)
     var config = Configuration()
+    // A writer already holds the WAL coordination files for transaction-side snapshots.
+    config.readonly = file != nil
     config.busyMode = .timeout(5)
-    let source =
-      try source
-      ?? DatabaseQueue(
-        path: home.appending(path: "silta.db").path, configuration: config)
-    try source.writeWithoutTransaction { db in
-      try db.execute(sql: "VACUUM INTO ?", arguments: [temporary.path])
+    do {
+      let source = try source ?? DatabaseQueue(path: target.path, configuration: config)
+      try source.writeWithoutTransaction { db in
+        try target.requireCurrent(at: sourceEntry)
+        try db.execute(sql: "VACUUM INTO ?", arguments: [temporary.path])
+        try target.requireCurrent(at: sourceEntry)
+      }
+    } catch let error as StorageError where error == .databaseReplaced {
+      throw error
+    } catch {
+      let cause = StorageError.mapped(error, at: target.path)
+      throw BackupFailure.filesystem(cause)
     }
   }
 

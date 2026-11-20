@@ -52,6 +52,35 @@
       }
     }
 
+    @Test func aReplacementReloadsWhenItsDataVersionIsEqual() throws {
+      try fixture { reader, home in
+        let session = AppReadSession(reader: reader, now: { AppV2Fixture.now })
+        let first = try #require(try session.load(previous: nil, workspace: "acme", force: false))
+        let root = home.deletingLastPathComponent()
+        let other = root.appending(path: "replacement")
+        try AppV2Fixture.seed(home: other)
+        let yaml = try AppTestCLI.run(["ws", "show", "acme"], home: other)
+        let updated = yaml.replacingOccurrences(
+          of: #""name":"Acme""#, with: #""name":"Acme Replacement""#)
+        try #require(updated != yaml)
+        let edited = root.appending(path: "replacement.yaml")
+        try updated.write(to: edited, atomically: true, encoding: .utf8)
+        try AppTestCLI.run(
+          ["ws", "edit", "acme", "-F", edited.path, "--approved", "Rename the Acme fixture"],
+          home: other)
+        let entry = home.appending(path: "silta.db")
+        try FileManager.default.moveItem(at: entry, to: root.appending(path: "original.db"))
+        try FileManager.default.createSymbolicLink(
+          at: entry, withDestinationURL: other.appending(path: "silta.db"))
+        let reloaded = try #require(
+          try session.load(previous: first, workspace: "acme", force: false))
+        #expect(reloaded.version == first.version)
+        #expect(reloaded.workspace == "acme" && reloaded.snapshot != nil)
+        #expect(reloaded.workspaces.first { $0.slug == "acme" }?.name == "Acme Replacement")
+        #expect(try session.load(previous: reloaded, workspace: "acme", force: false) == nil)
+      }
+    }
+
     @Test func failedHydrationDoesNotConsumeAChangedVersion() throws {
       do {
         try fixture { reader, home in

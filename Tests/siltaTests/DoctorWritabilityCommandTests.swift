@@ -107,12 +107,35 @@ extension DoctorWritabilityCommandTests {
       let writable = try #require(checks.first { $0["id"] as? String == "database.writable" })
       let error = try #require(payload["error"] as? [String: Any])
       #expect(result.termination == .exit(9))
-      withKnownIssue("Doctor treats a dangling link as an absent database") {
-        #expect(writable["status"] as? String == "fail")
-        let hints = error["next"] as? [String] ?? []
-        #expect(hints.contains { $0.hasPrefix("/bin/ls ") })
-        #expect(!hints.contains("silta init"))
-      }
+      #expect(writable["status"] as? String == "fail")
+      let hints = error["next"] as? [String] ?? []
+      #expect(hints.contains { $0.hasPrefix("/bin/ls ") })
+      #expect(!hints.contains("silta init"))
+      let command = try #require(hints.first)
+      let inspected = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", command], in: scratch)
+      #expect(inspected.termination == .exit(0))
+    }
+  }
+
+  @Test func doctorDoesNotEchoAnUnsafeResolvedDatabasePath() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "silta-home")
+      let target = scratch.appending(path: "Acme private\nphysical filename.db")
+      try FileManager.default.createDirectory(at: home, withIntermediateDirectories: false)
+      try Data(repeating: 65, count: 4096).write(to: target)
+      let entry = home.appending(path: "silta.db")
+      try FileManager.default.createSymbolicLink(at: entry, withDestinationURL: target)
+      let result = try SiltaBinary.run(["doctor", "--json"], in: scratch, environment: environment)
+      let error = try TaskStateCommandTests.error(result)
+      let next = try #require(error["next"] as? [String])
+      #expect(result.termination == .exit(9))
+      #expect(!result.stdout.contains("physical filename"))
+      #expect(!next.contains { $0.contains("\n") })
+      let inspection = try #require(next.first { $0.contains(entry.path) })
+      let replay = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", inspection], in: scratch)
+      #expect(replay.termination == .exit(0))
     }
   }
 
@@ -132,10 +155,15 @@ extension DoctorWritabilityCommandTests {
       let data = try TaskStateCommandTests.data(result)
       let checks = try #require(data["checks"] as? [[String: Any]])
       let advisory = checks.first { $0["id"] as? String == "data.permissions" }
-      withKnownIssue("Doctor does not report existing loose data modes") {
-        #expect(advisory?["status"] as? String == "warning")
-        #expect(advisory?["next_by"] as? String == "human")
-      }
+      #expect(advisory?["status"] as? String == "warning")
+      #expect(advisory?["next_by"] as? String == "human")
+      #expect((advisory?["message"] as? String)?.contains("0600") == true)
+      let writable = checks.first { $0["id"] as? String == "database.writable" }
+      #expect(writable?["status"] as? String == "pass")
+      let command = try #require((advisory?["next"] as? [String])?.first)
+      let inspected = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", command], in: scratch)
+      #expect(inspected.termination == .exit(0))
       for (url, mode) in paths { #expect(try permissions(url) == mode) }
       #expect(result.termination == .exit(0))
     }

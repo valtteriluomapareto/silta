@@ -94,6 +94,9 @@ They're summarised here so every decision has one index.
     WAL setup can fail without waiting; SQLite write transactions alone do not
     serialize the complete initialization section. Ordinary writes still use
     `BEGIN IMMEDIATE` and reads never take this lock.
+  - ↳ update (2026-11-20): store initialization locks the directory containing the
+    resolved regular database file so linked entries coordinate against the same
+    target. One Silta home owns the backup history for a target (spec §§15, 18).
 - **D13: Scripting contract.** This is the "control plane" idea applied to a CLI: an
   agent must be able to prove from the command line that a change works.
   - Data goes to stdout; logs and diagnostics go to stderr.

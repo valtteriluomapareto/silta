@@ -65,12 +65,10 @@
         try FileManager.default.moveItem(at: file, to: retired)
         try FileManager.default.moveItem(at: replacement, to: file)
         let sampled = Result { try probe.version() }
-        withKnownIssue("The app probe does not identify a replaced file") {
-          if case .failure(let error as AppReadError) = sampled {
-            #expect(error.message.contains("Database file changed while this connection was open"))
-          } else {
-            Issue.record("The replaced probe did not report file identity drift.")
-          }
+        if case .failure(let error as AppReadError) = sampled {
+          #expect(error.message.contains("Database file changed while this connection was open"))
+        } else {
+          Issue.record("The replaced probe did not report file identity drift.")
         }
       }
     }

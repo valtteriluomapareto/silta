@@ -126,7 +126,7 @@ extension BodyInputCommandTests {
       let before = try Self.storedInput(in: store)
       for (bytes, message) in [
         (Data([0xc3]), "Body input must be valid UTF-8."),
-        (Data("Acme\u{0}tail".utf8), "Doc input must not contain NUL bytes."),
+        (Data("Acme\u{0}tail".utf8), "Body input must not contain NUL bytes."),
       ] {
         try bytes.write(to: source)
         let result = try SiltaBinary.run(
@@ -185,9 +185,9 @@ extension BodyInputCommandTests {
   }
 
   private static func storedInput(in store: DatabaseStore) throws -> [String] {
-    try store.read { db in
-      try ["task", "task_plan_rev", "workspace", "doc", "doc_rev", "approval", "comment"].flatMap {
-        table in
+    let tables = ["task", "task_plan_rev", "workspace", "doc", "doc_rev", "approval", "comment"]
+    return try store.read { db in
+      try tables.flatMap { table in
         try Row.fetchAll(db, sql: "SELECT * FROM " + table + " ORDER BY id").map(\.description)
       }
     }
@@ -216,12 +216,10 @@ extension BodyInputCommandTests {
         result = try SiltaBinary.run(invocation, in: scratch, environment: TaskCommandTests.fixed)
       }
       let after = try Self.storedInput(in: store)
-      withKnownIssue("Task and comment file input accepts NUL") {
-        #expect(result.termination == .exit(1))
-        #expect(result.stdout.contains("Body input must not contain NUL bytes."))
-        #expect(after == before)
-        #expect(!result.stdout.contains("Acme invisible"))
-      }
+      #expect(result.termination == .exit(1))
+      #expect(result.stdout.contains("Body input must not contain NUL bytes."))
+      #expect(after == before)
+      #expect(!result.stdout.contains("Acme invisible"))
       #expect(!result.stdout.contains(source.path))
     }
   }

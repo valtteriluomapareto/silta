@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import SiltaTestSupport
 import Testing
@@ -38,7 +39,7 @@ extension BackupServiceTests {
       try fm.moveItem(at: backups, to: reserved)
       try fm.createDirectory(at: other, withIntermediateDirectories: false)
       try fm.createSymbolicLink(at: backups, withDestinationURL: other)
-      #expect(throws: StorageError.backupFailed) {
+      #expect(throws: BackupFailure.destination) {
         if manual {
           _ = try BackupService.backup(
             store: store, home: home, clock: FakeClock(now: StorageSchemaTests.instant))
@@ -55,13 +56,62 @@ extension BackupServiceTests {
 }
 
 extension BackupServiceTests {
+  @Test func onlyTheOpenedDirectoryMatchesTheSnapshotPath() throws {
+    try withScratchDirectory { scratch in
+      let expected = scratch.appending(path: "acme-stage")
+      let unrelated = scratch.appending(path: "other-directory")
+      for directory in [expected, unrelated] {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+      }
+      let opened = try DirectoryPath.open(expected)
+      defer { close(opened) }
+      try StorageBackup.requireAttached(opened, path: expected)
+      #expect(throws: BackupFailure.detached) {
+        try StorageBackup.requireAttached(opened, path: unrelated)
+      }
+    }
+  }
+
+  @Test func snapshotsRefuseAnUnrelatedStagingDescriptorWithoutCleanup() throws {
+    try withScratchDirectory { home in
+      let store = try ExportFixture.make(home)
+      let fm = FileManager.default
+      let named = home.appending(path: ".manual-AAAAAA")
+      let other = home.appending(path: "other-directory")
+      for directory in [named, other] {
+        try fm.createDirectory(
+          at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+      }
+      let sentinel = other.appending(path: "snapshot.pending")
+      let label = Data("Acme harmless fixture".utf8)
+      try label.write(to: sentinel)
+      let descriptor = try DirectoryPath.open(other)
+      defer { close(descriptor) }
+      let backups = try RestoreSupport.backups(home)
+      let connection = try store.preparedWriter()
+      let backup = StorageBackup(home: home, file: connection.file)
+      #expect(throws: BackupFailure.detached) {
+        try backup.snapshot(
+          name: "silta-2023-11-14-manual-1700000000000-AAAAAA.db",
+          staging: named.lastPathComponent, source: connection.queue, openedStage: descriptor)
+      }
+      #expect(try fm.contentsOfDirectory(atPath: named.path).isEmpty)
+      #expect(try Data(contentsOf: sentinel) == label)
+      #expect(try RestoreSupport.backups(home) == backups)
+    }
+  }
+
   @Test func sourceRemovedDuringBackupIsNotRecreated() throws {
     try withScratchDirectory { home in
       let store = try ExportFixture.make(home)
       let path = URL(filePath: store.path)
       let moved = home.appending(path: "moved.db")
       let clock = BackupMoveClock(path: path, moved: moved)
-      _ = try? BackupService.backup(store: store, home: home, clock: clock)  // refusal is valid
+      let before = try RestoreSupport.backups(home)
+      #expect(throws: StorageError.databaseReplaced) {
+        try BackupService.backup(store: store, home: home, clock: clock)
+      }
+      #expect(try RestoreSupport.backups(home) == before)
       #expect(FileManager.default.fileExists(atPath: moved.path))
       #expect(!FileManager.default.fileExists(atPath: path.path))
     }

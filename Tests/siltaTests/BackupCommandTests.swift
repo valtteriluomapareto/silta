@@ -129,9 +129,7 @@ extension BackupCommandTests {
       #expect(error["code"] as? String == "env")
       #expect(error["next"] as? [String] == ["silta doctor"])
       #expect(error["next_by"] as? String == "human")
-      withKnownIssue("Backup discards its safe failure cause") {
-        #expect((error["message"] as? String)?.contains("backup directory") == true)
-      }
+      #expect((error["message"] as? String)?.contains("backup directory") == true)
       #expect(!result.stdout.contains(elsewhere.path))
       #expect(try FileManager.default.contentsOfDirectory(atPath: elsewhere.path).isEmpty)
     }

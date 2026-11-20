@@ -18,6 +18,11 @@ package enum BoundedInput {
     return bytes
   }
 
+  /// Rejects embedded NUL before a text body is parsed or stored.
+  package static func requireNoNul(_ text: String) throws {
+    guard !text.utf8.contains(0) else { throw BodyInputError.nul }
+  }
+
   /// Opens a regular file and returns attributes of the same open descriptor.
   package static func openRegular(
     _ path: String, followSymlinks: Bool = true
@@ -47,6 +52,8 @@ package enum BodyInputError: CodedError {
   case tooLarge(Int)
   /// The supplied bytes could not be decoded as UTF-8.
   case invalidUTF8
+  /// The supplied text contains an embedded NUL.
+  case nul
 
   /// Supplied input with an unsupported source, size or encoding is invalid.
   package var code: ErrorCode {
@@ -60,6 +67,7 @@ package enum BodyInputError: CodedError {
     case .notRegular: "Body input requires a regular file or standard input."
     case .tooLarge(let maximum): "Body input exceeds \(maximum) bytes."
     case .invalidUTF8: "Body input must be valid UTF-8."
+    case .nul: "Body input must not contain NUL bytes."
     }
   }
 

@@ -203,10 +203,24 @@ struct StorageWriteTests {
       try FileManager.default.createDirectory(
         at: home.appending(path: "backups/silta-2023-11-14.db"), withIntermediateDirectories: false)
       var called = false
-      #expect(throws: StorageError.backupFailed) { try store.write { _ in called = true } }
+      #expect(throws: BackupFailure.occupied) { try store.write { _ in called = true } }
       #expect(!called)
       #expect(try Self.meta(store, "last_backup_day") == "")
       #expect(try Self.meta(store, "change_seq") == "0")
+    }
+  }
+
+  @Test func recordedDailyBackupCannotReuseAnEmptyOccupiedFile() throws {
+    try withScratchDirectory { home in
+      let store = Self.make(home, clock: FakeClock(now: StorageSchemaTests.instant))
+      try store.write { _ in () }
+      let daily = home.appending(path: "backups/silta-2023-11-14.db")
+      try Data().write(to: daily)
+      var entered = false
+      #expect(throws: BackupFailure.occupied) { try store.write { _ in entered = true } }
+      #expect(!entered)
+      #expect(try Data(contentsOf: daily).isEmpty)
+      #expect(try Self.meta(store, "last_backup_day") == "2023-11-14")
     }
   }
 

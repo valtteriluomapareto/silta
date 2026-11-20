@@ -1768,7 +1768,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **Daily backup (M1):** on the first write of each day, `VACUUM INTO
   $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
   first. Retention protects the current operation's snapshots and prefers valid
-  dates through today over invalid or future-dated names.
+  dates through today over invalid or future-dated names. A recorded date counts
+  as covered only while the owning home has a nonempty regular daily snapshot.
 - **`silta backup`** takes an on-demand whole-database SQLite snapshot, including
   every workspace regardless of `--ws`, and reports its path. It publishes a complete
   `backups/silta-<day>-manual-<ms>-<unique>.db` from staging owned by that invocation.
@@ -1777,6 +1778,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   separately from daily and pre-restore backups. It requires an existing database
   file, and a missing-store refusal creates no files or directories.
   It does not export a text tree or run Git, and never advances `last_backup_day`.
+  Backups and writes use the same resolved database file and its SQLite sidecars.
+  A snapshot that detects a changed staging or backup directory refuses publication.
+  Backup refusals report a fixed cause without exposing paths, SQL or stored data.
 - **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
   keyed by `uid`; display refs are included for readability. Machine-local state is
@@ -1934,8 +1938,10 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     accepts them, unique uids, slugs, aliases, plan revisions and comment seqs,
     references that resolve inside the tree, and no parent cycles. Workspace, app,
     repo, service and topic slugs and the task prefix must follow the workspace
-    identifier grammar in all supported export formats. A task sequence must leave
-    room for the next number. A database of a newer schema is refused, and so is a tree whose uid, task
+    identifier grammar in all supported export formats. Restore refuses when the
+    incoming counter or highest task sequence would leave no usable next task ref.
+    A destination whose existing counter is exhausted also refuses restore because
+    task refs cannot be rewound. A database of a newer schema is refused, and so is a tree whose uid, task
     prefix, row uids or approval uids another workspace holds.
   - The replace happens in one transaction, and nothing is written on failure. The
     workspace keeps its row; its other rows are deleted and the tree's inserted.
@@ -2007,12 +2013,13 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   `task from-plan` follows the same file and stdin rules as `-F`. Supplied file or
   stdin bodies accept up to 65,536 bytes of valid UTF-8, including any headers. A
   named source must open a regular file. Unreadable files, nonregular named
-  sources, invalid UTF-8, and input beyond the byte ceiling return `invalid`
+  sources, invalid UTF-8, embedded NUL bytes, and input beyond the byte ceiling return `invalid`
   and help for the invoked command. The help command includes the workspace when
   its name can be printed safely. Stdin can be a pipe, and overflow is refused
   when its first extra byte arrives. Content checks for each command still apply.
   Interactive `task edit` and `ws edit` require terminal input and terminal stderr. Both editor output streams
-  go to that terminal, leaving Silta's stdout for its own output. These commands
+  go to that terminal, leaving Silta's stdout for its own output. Editor output also
+  refuses embedded NUL bytes. These commands
   return `usage` and point to `-F` without a terminal or file input. A task edit also
   points to the scoped `--print` command when the task can be read, or to command help
   when it cannot. Editor startup failures return `env` with help for the edit command.
@@ -2276,7 +2283,8 @@ Every CLI call is its own short-lived process, and several agents run at once.
   move or copy data.
 - **Migrations:**
   - GRDB `DatabaseMigrator` applies atomic migrations excluding competing writers.
-    Initialization is serialized across processes, including database mode setup,
+    Initialization is serialized across processes by an advisory lock at the
+    resolved database target directory. The lock covers database mode setup,
     pending-migration discovery and the pre-migration snapshot. Concurrent openers
     wait, then see the migrated schema.
   - Migrations raise `meta.min_writer_version` when older writers could misinterpret
@@ -2290,7 +2298,8 @@ Every CLI call is its own short-lived process, and several agents run at once.
     writes could leave data a newer reader misreads (D32).
   - A `VACUUM INTO` backup is taken before each migration.
 - **Change signal** (from M5): after each commit, `notify_post("com.valtteriluoma.silta.changed")`.
-  The app checks `PRAGMA data_version`, and watches the WAL file as a fallback.
+  The app checks `PRAGMA data_version`. If the configured database is replaced, it
+  opens a new probe and reloads even when the new connection reports the same number.
 
 ### Language: Swift (decided)
 
@@ -2379,6 +2388,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   The managed `backups` and default `exports` entries must open without following
   symbolic links. Refusals report `env` with `silta doctor`. An explicitly selected
   export root outside the default location may be a directory alias.
+  The configured `silta.db` entry may link to an existing regular database.
+  SQLite opens the resolved target, where its sidecars live. The logical Silta
+  home owns the backups and bookkeeping for this target. Use one owning home
+  per database. An open writer refuses a change in the target's resolved name or
+  file identity and asks the operator to retry with a fresh connection.
 
 ## 19. Observability
 
@@ -2614,13 +2628,17 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   `database.writable` independently checks the existing truth file's effective
   write access and its resolved containing directory's write and search access,
-  including a symlinked database target. A confirmed missing file is skipped;
-  inaccessible or uninspectable paths and non-regular targets fail. Denied access
+  including a symlinked database target. A missing entry is skipped. An existing
+  entry with an unresolved link, inaccessible path or nonregular target fails
+  and points to inspection. The WAL check uses the resolved target when available. Denied access
   never suggests initializing the database. Failures provide human-owned inspection
   of both paths and do not prevent independent readable checks. This is a permission
   preflight without probe writes or permission changes: a pass does not guarantee
   free space, stable access, or that a later SQLite write will succeed. Broad doctor
   can still update SQLite coordination sidecars as described above.
+  The `data.permissions` advisory reports group or other access on the data home,
+  resolved database file or managed backups directory. It offers read-only path
+  inspection, names the owner-only modes and leaves permissions unchanged.
   A passing diagnostic run does not certify skipped checks. Check warnings live
   in `data.checks`; envelope and command-log warnings describe command/environment
   warnings. Failures before CLI environment setup are not logged.

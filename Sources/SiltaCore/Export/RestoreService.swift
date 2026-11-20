@@ -54,6 +54,7 @@ package enum RestoreService {
     if let manifest = request.manifest, !digest.hasPrefix(manifest.lowercased()) {
       throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
     }
+    _ = try RestoreWriter.nextTaskSeq(stored: nil, tree: tree)
     let milliseconds = Int64(identity.date.timeIntervalSince1970 * 1000)
     let snapshot = "silta-\(utcDay(identity.date))-before-restore-\(milliseconds).db"
     return try store.write(rollingBack: dryRun, keepingBackup: \.snapshot) { tx in
@@ -61,7 +62,7 @@ package enum RestoreService {
       var report = try writer.prepare(digest: digest, dryRun: dryRun)
       if !dryRun && !report.created {
         // Reused on a retried transaction, which has committed nothing.
-        report.snapshot = try StorageBackup(home: home).snapshot(
+        report.snapshot = try StorageBackup(home: home, file: tx.file).snapshot(
           name: snapshot, reuseExisting: true, staging: "restore.pending"
         ).path
       }
