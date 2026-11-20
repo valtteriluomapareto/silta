@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="180 216 686 548" width="172" height="137" role="img" aria-label="Silta">
+  <rect x="282" y="236" width="564" height="300" rx="42" fill="#E6F2F5"/>
+  <path d="M242 320 H742 A42 42 0 0 1 784 362 V744 H646 A154 154 0 0 0 338 744 H200 V362 A42 42 0 0 1 242 320 Z" fill="#3BA3C2"/>
+  <rect x="262" y="392" width="232" height="34" rx="17" fill="#0E1C22"/>
+  <rect x="262" y="458" width="348" height="34" rx="17" fill="#0E1C22" fill-opacity="0.35"/>
+</svg>
