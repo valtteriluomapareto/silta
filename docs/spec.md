@@ -2364,8 +2364,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
   - private-key armour, including PGP and SSH2. An unfinished block starts with a
     standalone opening marker, optionally inside a Markdown quote or list. Its
-    armour lines can carry Markdown prefixes. Inline marker mentions stay readable,
-    as do prose and paragraph spacing after an unfinished block.
+    armour lines can carry Markdown prefixes. Inline mentions of an unmatched
+    marker stay readable, as do prose and paragraph spacing after an unfinished block.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
