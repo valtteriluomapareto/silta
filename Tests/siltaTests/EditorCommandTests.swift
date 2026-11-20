@@ -70,6 +70,53 @@ struct EditorCommandTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func staleWorkspaceSnapshotKeepsTheCurrentConfiguration(unchanged: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let old = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
+      try #require(old.termination == .exit(0), "\(old.stderr)")
+      let file = scratch.appending(path: "workspace.yaml")
+      let winner = """
+        workspace: {slug: acme, name: Acme, task_prefix: AC}
+        services: [mailer]
+
+        """
+      try winner.write(to: file, atomically: true, encoding: .utf8)
+      let edit = Self.wsEdit + ["-F", file.path, "--json"]
+      let first = try SiltaBinary.run(edit, in: scratch, environment: TaskCommandTests.actor)
+      try #require(first.termination == .exit(0), "\(first.stdout)")
+      let draft =
+        unchanged ? old.stdout : old.stdout.replacingOccurrences(of: "Acme", with: "Edited")
+      try draft.write(to: file, atomically: true, encoding: .utf8)
+      let stale = try SiltaBinary.run(edit, in: scratch, environment: TaskCommandTests.actor)
+      let currentService = try store.read {
+        try String.fetchOne($0, sql: "SELECT slug FROM service")
+      }
+      let approvalCount = try store.read {
+        try Int.fetchOne($0, sql: "SELECT count(*) FROM approval")
+      }
+      withKnownIssue("A stale ws show snapshot is accepted as a new write") {
+        #expect(stale.termination == .exit(6))
+        #expect(currentService == "mailer")
+        #expect(approvalCount == 1)
+      }
+    }
+  }
+
+  @Test func nonTerminalTaskEditPointsToTheScopedDocument() throws {
+    try withScratchDirectory { scratch in
+      try Self.seed(scratch)
+      let result = try SiltaBinary.run(
+        Self.taskEdit + ["--json"], in: scratch, environment: Self.editor("echo"))
+      #expect(result.termination == .exit(1))
+      let error = try TaskStateCommandTests.error(result)
+      withKnownIssue("Non-terminal task editing only points at generic help") {
+        #expect(error["next"] as? [String] == ["silta --ws 'acme' task edit 'AC-1' --print"])
+      }
+    }
+  }
+
   static func followRecovery(_ envelope: String, in scratch: URL) throws {
     let json = try #require(
       JSONSerialization.jsonObject(with: Data(envelope.utf8)) as? [String: Any])

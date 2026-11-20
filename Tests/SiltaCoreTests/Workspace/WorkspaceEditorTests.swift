@@ -75,6 +75,24 @@ struct WorkspaceEditorTests {
       #expect(retained == proposed)
       #expect(service == "mailer")
       #expect(approvals == 0)
+      let replayed = Result {
+        try WorkspaceEditor.apply(
+          retained, slug: initiallyExists ? "acme" : nil, store: store,
+          actor: TaskServiceTests.agent,
+          identity: (SeededIDGenerator(seed: 2), WorkspaceConfigTests.instant),
+          approved: "yes, update the Acme fixture")
+      }
+      let currentService = try store.read {
+        try String.fetchOne($0, sql: "SELECT slug FROM service")
+      }
+      let approvalCount = try store.read {
+        try Int.fetchOne($0, sql: "SELECT count(*) FROM approval")
+      }
+      withKnownIssue("A retained draft can be reapplied after a concurrent change") {
+        #expect(throws: WorkspaceEditConflict.self) { try replayed.get() }
+        #expect(currentService == "mailer")
+        #expect(approvalCount == 0)
+      }
     }
   }
   @Test(arguments: [false, true])

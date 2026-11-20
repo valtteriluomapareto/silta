@@ -92,6 +92,47 @@ struct FirstWorkspaceCommandTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func whereFindsAPathlessCloneDeclaration(withRemote: Bool) throws {
+    try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "ac-platform")
+      try InitCommandTests.makeRepo(repo, in: scratch)
+      try InitCommandTests.git(
+        ["remote", "add", "origin", "git@example.invalid:acme/platform.git"], in: scratch, cwd: repo
+      )
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO repo(uid,workspace_id,slug,remote_url)
+            SELECT 'acme-existing-repo',id,?,? FROM workspace WHERE slug='acme'
+            """,
+          arguments: [
+            withRemote ? "declared-platform" : "ac-platform",
+            withRemote ? "https://example.invalid/acme/platform.git" : nil,
+          ])
+      }
+      let result = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: repo)
+      let error = try TaskStateCommandTests.error(result)
+      let next = try #require((error["next"] as? [String])?.first)
+      withKnownIssue("Equivalent origins and remote-less declarations are missed") {
+        #expect(next.hasPrefix("silta --ws 'acme' init --scan "))
+      }
+    }
+  }
+
+  @Test func emptyScanDoesNotCreateAWorkspaceOrDatabase() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(["init", "--scan", ".", "--json"], in: scratch)
+      withKnownIssue("An empty scan registers a workspace") {
+        #expect(result.termination == .exit(1))
+        #expect(
+          !FileManager.default.fileExists(
+            atPath: scratch.appending(path: "silta-home/silta.db").path))
+      }
+    }
+  }
+
   @Test func competingWorkspaceDeclarationsOnlyOfferInspection() throws {
     try withScratchDirectory { scratch in
       let repo = scratch.appending(path: "renamed-platform")
@@ -196,7 +237,9 @@ struct FirstWorkspaceCommandTests {
       let missing = scratch.appending(path: "Missing Acme")
       let result = try SiltaBinary.run(["init", "--scan", missing.path, "--json"], in: scratch)
       let error = try TaskStateCommandTests.error(result)
-      #expect(result.termination == .exit(9) && error["code"] as? String == "env")
+      withKnownIssue("A missing caller-supplied root is classified as an environment error") {
+        #expect(result.termination == .exit(1) && error["code"] as? String == "invalid")
+      }
       #expect((error["message"] as? String)?.contains(missing.path) == true)
       #expect(error["next"] as? [String] == ["silta init --help"])
       #expect(error["next_by"] as? String == "agent")
