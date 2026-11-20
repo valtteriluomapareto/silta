@@ -34,6 +34,34 @@ extension DocTriageCommandTests {
     }
   }
 
+  @Test func mixedStaleAcceptanceOnlyReproposesTheStaleMember() throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      try AcmeDocAttachments.attach("rules", to: "service", in: store)
+      #expect(try Self.propose(scratch) == "doc:rules@2")
+      let changed = try DocEditCommandTests.input(scratch, "Accepted Acme correction.")
+      let edited = try DocEditCommandTests.run(["rules", "-F", changed.path], scratch)
+      try #require(edited.termination == .exit(0), "\(edited.stdout)\(edited.stderr)")
+      #expect(try Self.propose(scratch, slug: "fresh") == "doc:fresh@1")
+      let before = try Self.truth(store)
+      let result = try Self.run(["--accept", "doc:fresh@1", "doc:rules@2", "--json"], scratch)
+      #expect(result.termination == .exit(6))
+      #expect(try Self.truth(store) == before)
+      let error = try DocEditCommandTests.error(result)
+      let next = try #require(error["next"] as? [String])
+      withKnownIssue("Stale recovery currently asks to re-propose every member.") {
+        #expect(
+          next == [
+            "silta --ws 'acme' doc show 'doc:fresh@1'",
+            "silta --ws 'acme' doc show 'doc:rules@2'",
+            "silta --ws 'acme' doc show 'doc:rules' --json",
+            "silta --ws 'acme' doc propose 'doc:rules'"
+              + " -F <file> -m <why> --base <rev> --title <title> --about <ref>",
+          ])
+      }
+    }
+  }
+
   private static func checkRefusal(_ args: [String], name: String, in scratch: URL) throws
     -> [String]
   {
