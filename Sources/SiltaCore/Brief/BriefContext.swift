@@ -35,12 +35,15 @@ struct BriefContext {
       let row = try Row.fetchOne(
         db,
         sql: """
-          SELECT app.id,app.summary FROM app JOIN workspace ON workspace.id=app.workspace_id
+          SELECT app.id,app.summary,NULLIF(app.name,app.slug) AS display_name
+          FROM app JOIN workspace ON workspace.id=app.workspace_id
           WHERE workspace.slug=? AND app.slug=?
           """, arguments: [location.workspace, app])
     else { return [] }
     let id: Int64 = row["id"]
-    var sections = [BriefSection(id: "app", text: "app: \(TaskError.shown(app))\n")]
+    let name: String? = row["display_name"]
+    let label = name.map { " (" + HumanText.line($0) + ")" } ?? ""
+    var sections = [BriefSection(id: "app", text: "app: \(TaskError.shown(app))\(label)\n")]
     if let summary: String = row["summary"], !summary.isEmpty {
       sections.append(
         BriefSection(id: "app", text: "summary: \(TaskError.shown(summary))\n", policy: .characters)

@@ -4,11 +4,17 @@ import GRDB
 
 /// What a scan bound: the workspace it created or refreshed.
 package struct ScanOutcome: Sendable {
+  package struct App: Encodable, Sendable {
+    package let slug: String
+    /// Distinct display name, if configured.
+    package let name: String?
+  }
+
   package let workspace: String
   /// Slugs of the configured repositories bound by the scan.
   package let repositories: [String]
   /// Configured apps on those repositories.
-  package let apps: [String]
+  package let apps: [App]
   /// Skipped child directories or generated app stubs.
   package let warnings: [OutputWarning]
 }
@@ -143,7 +149,7 @@ package enum RepositoryScan {
   private static func registerPaths(
     _ repos: [DiscoveredRepo], workspace: String, bindings: [String: ScanRegistration],
     created: Bool, in db: Database
-  ) throws -> (repositories: [String], apps: [String]) {
+  ) throws -> (repositories: [String], apps: [ScanOutcome.App]) {
     let matches = try repos.map { repo in
       let path = repo.path.path
       if let holder = try pathHolder(path, excluding: workspace, in: db) {
@@ -155,10 +161,12 @@ package enum RepositoryScan {
     guard Set(matches.map(\.id)).count == matches.count else {
       throw ScanError.registeredWorkspaces([workspace], roots: nil)
     }
-    var apps: [String] = []
+    var apps: [ScanOutcome.App] = []
     for (repo, match) in zip(repos, matches) {
-      apps += try String.fetchAll(
-        db, sql: "SELECT slug FROM app WHERE repo_id=?", arguments: [match.id])
+      apps += try Row.fetchAll(
+        db, sql: "SELECT slug,NULLIF(name,slug) AS display_name FROM app WHERE repo_id=?",
+        arguments: [match.id]
+      ).map { ScanOutcome.App(slug: $0["slug"], name: $0["display_name"]) }
       try db.execute(
         sql: """
           INSERT INTO repo_path(repo_id,path)
@@ -166,7 +174,7 @@ package enum RepositoryScan {
           ON CONFLICT(repo_id) DO UPDATE SET path=excluded.path
           """, arguments: [match.id, repo.path.path])
     }
-    return (matches.map(\.slug).sorted(), apps.sorted())
+    return (matches.map(\.slug).sorted(), apps.sorted { $0.slug < $1.slug })
   }
 
   private static func registeredRepo(

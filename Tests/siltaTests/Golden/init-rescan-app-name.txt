@@ -1,0 +1,5 @@
+Workspace acme.
+Repositories: platform
+Apps: platform (Acme Platform), portal
+Ask the human before editing the workspace configuration.
+next: silta --ws 'acme' ws show

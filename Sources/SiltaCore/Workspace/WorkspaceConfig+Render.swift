@@ -55,11 +55,14 @@ private struct WorkspaceRenderer {
   }
 
   mutating func section(_ name: String, _ rows: [Any]) throws {
-    if rows.isEmpty {
+    section(name, encodedRows: try rows.map(WorkspaceConfig.json))
+  }
+
+  private mutating func section(_ name: String, encodedRows: [String]) {
+    if encodedRows.isEmpty {
       output += "\(name): []\n"
     } else {
-      output +=
-        "\(name):\n" + (try rows.map { "  - " + (try WorkspaceConfig.json($0)) + "\n" }.joined())
+      output += "\(name):\n" + encodedRows.map { "  - " + $0 + "\n" }.joined()
     }
   }
   func query(_ sql: String, fields: [String: String], arrays: [String] = []) throws -> [[String:
@@ -92,24 +95,7 @@ private struct WorkspaceRenderer {
         WHERE workspace_id=?
         ORDER BY slug
         """, fields: ["slug": "slug", "remote": "remote_url"]))
-    try section(
-      "apps",
-      query(
-        """
-        SELECT app.*,repo.slug AS repo_slug FROM app
-        JOIN repo ON repo.id=app.repo_id
-        WHERE app.workspace_id=?
-        ORDER BY app.slug
-        """,
-        fields: [
-          "slug": "slug", "repo": "repo_slug", "ref": "ref", "prod_ref": "prod_ref",
-          "subpath": "subpath", "summary": "summary", "lifecycle": "lifecycle",
-        ]
-      ).map {
-        var row = $0
-        if row["lifecycle"] as? String == "active" { row.removeValue(forKey: "lifecycle") }
-        return row
-      })
+    try renderApps()
     try section(
       "environments",
       query(
@@ -132,6 +118,32 @@ private struct WorkspaceRenderer {
         guard let slug = try $0.strictText("slug") else { throw StorageError.corrupt }
         return slug
       })
+  }
+
+  private mutating func renderApps() throws {
+    // YAML folds some raw scalars that the JSON encoder leaves intact.
+    let apps = try query(
+      """
+      SELECT app.*,NULLIF(app.name,app.slug) AS display_name,repo.slug AS repo_slug FROM app
+      JOIN repo ON repo.id=app.repo_id
+      WHERE app.workspace_id=?
+      ORDER BY app.slug
+      """,
+      fields: [
+        "slug": "slug", "name": "display_name", "repo": "repo_slug", "ref": "ref",
+        "prod_ref": "prod_ref", "subpath": "subpath", "summary": "summary",
+        "lifecycle": "lifecycle",
+      ]
+    ).map { row in
+      let fields = row.keys.sorted().compactMap { key -> String? in
+        guard let value = row[key] as? String, key != "lifecycle" || value != "active" else {
+          return nil
+        }
+        return ExportFormat.quote(key) + ":" + ExportFormat.quote(value)
+      }
+      return "{" + fields.joined(separator: ",") + "}"
+    }
+    section("apps", encodedRows: apps)
   }
 
   mutating func renderRelationships() throws {
