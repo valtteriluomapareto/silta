@@ -234,7 +234,8 @@ package struct CodeService {
           db,
           sql: """
             SELECT app.ref,app.prod_ref,app.subpath,repo.slug,repo_path.path,repo_path.fetched_at
-            FROM app JOIN repo ON repo.id=app.repo_id LEFT JOIN repo_path ON repo_path.repo_id=repo.id
+            FROM app JOIN repo ON repo.id=app.repo_id
+            LEFT JOIN repo_path ON repo_path.repo_id=repo.id
             WHERE app.id=?
             """, arguments: [named.id])
       else {

@@ -95,7 +95,8 @@ package enum WorkspaceEditor {
 
     private var token: String {
       guard let uid else { return "new" }
-      return SHA256.hash(data: Data((uid + "\0" + text + "\0" + mapIdentity).utf8))
+      let identity = mapIdentity.isEmpty ? "" : "\0" + mapIdentity
+      return SHA256.hash(data: Data((uid + "\0" + text + identity).utf8))
         .map { String(format: "%02x", $0) }.joined()
     }
 
@@ -208,7 +209,10 @@ package enum WorkspaceEditor {
         db, sql: "SELECT uid FROM \(kind.rawValue) WHERE workspace_id=? ORDER BY slug",
         arguments: [id])
     }
-    return try WorkspaceConfig.json([settings ?? "{}", identity] as [Any])
+    let stored = settings ?? "{}"
+    guard identity.contains(where: { !$0.isEmpty }) || stored.contains(WorkspaceSlugs.retiredKey)
+    else { return "" }
+    return try WorkspaceConfig.json([stored, identity] as [Any])
   }
 
 }
