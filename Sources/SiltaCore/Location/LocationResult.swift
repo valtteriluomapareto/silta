@@ -10,6 +10,7 @@ package struct LocationResult: Encodable, Sendable {
   package let worktree: String
   /// Whether an override request changed stored state; absent for ordinary reads.
   package var overrideChanged: Bool?
+  package var overrideApp: String?
   /// The workspace containing the registered repository.
   package let workspace: String
   /// The registered repository slug.

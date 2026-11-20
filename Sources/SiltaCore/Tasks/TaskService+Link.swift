@@ -31,7 +31,8 @@ extension TaskService {
             task.workspaceID, task.id, relation, target.kind,
             target.id, target.external, target.anchor,
           ]) ?? false
-      var result = receipt(task, warnings: content.1 ? [SecretGuard.warning] : [])
+      var result = receipt(
+        task, warnings: (content.1 ? [SecretGuard.warning] : []) + target.warnings)
       result.target = try target.rendered(in: tx.database)
       if exists { return result }
       try tx.database.execute(

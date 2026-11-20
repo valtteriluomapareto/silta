@@ -9,15 +9,22 @@ extension LocationService {
   ) async throws -> (result: LocationResult, approvalUsed: Bool) {
     let context = try await inspect(path: path, workspace: workspace)
     let repo = context.repo
-    if let app, !repo.apps.contains(where: { $0.app == app }) {
-      try validate(app, candidates: context.candidates, repo: repo, path: context.path)
+    let named = try app.flatMap {
+      try WorkspaceSelection.appName($0, workspace: repo.workspace, in: environment.db)
     }
-    let selected = repo.apps.first { $0.app == app }?.id
+    if let app, !repo.apps.contains(where: { $0.id == named?.id }) {
+      _ = try validate(app, candidates: context.candidates, repo: repo, path: context.path)
+    }
+    let selected = named?.id
     let before = try environment.db.read { try Self.overrideID(context.root, in: $0) }
-    let reportApp = context.candidates.first { $0.app == app }?.app
+    let reportApp = context.candidates.first { $0.id == selected }?.app
     var result = try await resolve(context, app: reportApp, task: nil, ignoringOverride: true)
     if reportApp != nil { result.reason = result.candidates.count == 1 ? "single" : "override" }
     result.overrideChanged = false
+    result.overrideApp = named?.slug
+    if let app, let warning = named?.warning(for: app, kind: .app) {
+      result.warnings.append(warning)
+    }
     guard before != selected else { return (result, false) }
     let command =
       "silta --ws " + shellWord(repo.workspace) + " where --path "

@@ -7,6 +7,7 @@ struct TaskLinkTarget {
   var id: Int64?
   var external: String?
   var anchor: String?
+  var warnings: [OutputWarning] = []
 
   static func resolve(_ raw: String, source: TaskDetails, workspace: String, in db: Database)
     throws -> Self
@@ -26,12 +27,8 @@ struct TaskLinkTarget {
     if ["edge", "service"].contains(prefix) {
       return try map(raw, workspace: source.workspaceID, in: db)
     }
-    for kind in ["app", "topic"] where raw.hasPrefix(kind + ":") {
-      return Self(
-        kind: kind,
-        id: try TaskService.entity(
-          kind,
-          slug: String(raw.dropFirst(kind.count + 1)), workspace: source.workspaceID, in: db))
+    if ["app", "topic"].contains(prefix) {
+      return try map(raw, workspace: source.workspaceID, in: db)
     }
     if raw.hasPrefix("note:"), raw.count > 5 {
       return Self(kind: "note", external: String(raw.dropFirst(5)))
@@ -132,12 +129,21 @@ struct TaskLinkTarget {
         error: TaskError.invalid("Use code: for code in apps named doc, edge or service."),
         next: ["silta task link --help"])
     }
-    _ = try TaskService.entity("app", slug: String(owner[0]), workspace: workspace, in: db)
-    _ = try storedCodeApp(value)
-    return Self(kind: "code", external: value)
+    let slug = try storedCodeApp(value)
+    let app = try TaskService.namedSlug(.app, slug, workspace: workspace, in: db)
+    return Self(
+      kind: "code", external: replacingCodeApp(in: value) { _ in app.slug },
+      warnings: [app.warning(for: slug, kind: .app)].compactMap { $0 })
   }
 
-  /// Checks an already-classified code payload without resolving a historical app.
+  /// Canonicalizes the owner while retaining the complete code reference suffix.
+  static func replacingCodeApp(in raw: String, with canonical: (String) -> String) -> String {
+    let prefix = raw.hasPrefix("code:") ? "code:" : ""
+    let value = String(raw.dropFirst(prefix.count))
+    guard let app = try? storedCodeApp(value) else { return raw }  // Keep raw ref.
+    return prefix + canonical(app) + String(value.dropFirst(app.count))
+  }
+
   static func storedCodeApp(_ value: String) throws -> String {
     guard let colon = value.firstIndex(of: ":") else {
       throw TaskError.invalid("Invalid code reference.")

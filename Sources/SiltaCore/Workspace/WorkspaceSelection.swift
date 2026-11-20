@@ -80,15 +80,15 @@ package enum WorkspaceSelection {
   package static func app(_ slug: String, workspace: String, in store: DatabaseStore) throws
     -> String?
   {
+    try appName(slug, workspace: workspace, in: store)?.slug
+  }
+
+  static func appName(_ slug: String, workspace: String, in store: DatabaseStore) throws
+    -> WorkspaceSlugs.Resolved?
+  {
     try store.read { db in
-      try String.fetchOne(
-        db,
-        sql: """
-          SELECT app.slug
-          FROM app
-          JOIN workspace ON workspace.id=app.workspace_id
-          WHERE workspace.slug=? AND app.slug=?
-          """, arguments: [workspace, slug])
+      let id = try TaskService.workspaceID(workspace, in: db)
+      return try WorkspaceSlugs.resolve(.app, slug, workspace: id, in: db)
     }
   }
 

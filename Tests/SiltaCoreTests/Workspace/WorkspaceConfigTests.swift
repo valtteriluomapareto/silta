@@ -218,7 +218,7 @@ struct WorkspaceConfigTests {
         }
         return 0
       }
-      #expect(slug == "acme")
+      #expect(slug?.workspace == "acme")
       #expect(calls == 2)
       #expect(!FileManager.default.fileExists(atPath: try #require(temporary).path))
     }

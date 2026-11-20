@@ -19,12 +19,30 @@ extension TaskService {
   /// Reads the selected workspace backlog and always retains the caller's proposals.
   /// Promoted tasks belong to their tracker and are left out unless asked for.
   package func list(_ filter: TaskFilter = TaskFilter()) throws -> [TaskDetails] {
+    try listWithWarnings(filter).tasks
+  }
+
+  package func listWithWarnings(_ filter: TaskFilter) throws
+    -> (tasks: [TaskDetails], warnings: [OutputWarning])
+  {
     if let status = filter.status, !Self.statuses.contains(status) {
       throw TaskError.invalid("Unknown task status.")
     }
     let slug = try selected()
     return try environment.db.read { db in
       let id = try Self.workspaceID(slug, in: db)
+      let app = try filter.app.flatMap {
+        try WorkspaceSlugs.resolve(.app, $0, workspace: id, in: db)
+      }
+      let topic = try filter.topic.flatMap {
+        try WorkspaceSlugs.resolve(.topic, $0, workspace: id, in: db)
+      }
+      let warnings = [
+        filter.app.flatMap { app?.warning(for: $0, kind: .app) },
+        filter.topic.flatMap { topic?.warning(for: $0, kind: .topic) },
+      ].compactMap { $0 }
+      let appSlug = app?.slug ?? filter.app
+      let topicSlug = topic?.slug ?? filter.topic
       if let on = filter.on { _ = try Self.blocker(on, workspace: slug, in: db) }
       let visibility = TaskVisibility(
         actor: environment.actor, at: environment.clock.now(),
@@ -32,7 +50,7 @@ extension TaskService {
         proposed: filter.proposed || filter.status == "proposed", promoted: filter.promoted)
       var arguments = visibility.arguments
       arguments += ["workspace": id]
-      return try Row.fetchAll(
+      let tasks = try Row.fetchAll(
         db,
         sql: Self.query + """
           \nWHERE task.workspace_id=:workspace AND \(TaskVisibility.localSQL)
@@ -40,18 +58,18 @@ extension TaskService {
           """, arguments: arguments
       ).map { TaskDetails(row: $0) }.filter {
         (filter.status == nil || filter.status == $0.status)
-          && (filter.app == nil || filter.app == $0.app)
+          && (appSlug == nil || appSlug == $0.app)
           && (!filter.mine || $0.createdBy == environment.actor.description
             || $0.claimedBy == environment.actor.description)
       }.filter { try Self.matchesBlocker(filter.on, task: $0, workspace: slug, in: db) }
         .map { try Self.decorate($0, at: environment.clock.now(), in: db) }.filter {
           (!($0.archived) || filter.archived)
-            && (filter.topic == nil
+            && (topicSlug == nil
               || $0.links.contains {
-                $0.target == "topic:" + (filter.topic ?? "") && $0.rel == "about"
+                $0.target == "topic:" + (topicSlug ?? "") && $0.rel == "about"
               })
         }
-
+      return (tasks, warnings)
     }
   }
 

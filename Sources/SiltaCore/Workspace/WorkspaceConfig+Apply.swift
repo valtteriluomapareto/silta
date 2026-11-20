@@ -11,13 +11,42 @@ extension WorkspaceConfig {
   /// Keeps retained identities and unknown columns; referenced deletions throw conflict.
   package func apply(in transaction: StorageTransaction, ids: any IDGenerator, at date: Date) throws
   {
-    var writer = WorkspaceWriter(config: self, db: transaction.database, ids: ids, date: date)
+    _ = try applyWithChanges(in: transaction, ids: ids, at: date)
+  }
+
+  func applyWithChanges(in transaction: StorageTransaction, ids: any IDGenerator, at date: Date)
+    throws
+    -> WorkspaceMapChanges
+  {
+    let db = transaction.database
+    let map = try WorkspaceMapEdit.read(self, in: db)
+    try requireUnblocked(map, in: db)
+    var writer = WorkspaceWriter(config: self, db: db, ids: ids, date: date, map: map)
     do {
       try writer.apply()
       try transaction.recordChange(kind: "workspace", rowID: writer.workspace)
+      return map.changes
     } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
       throw WorkspaceError.conflict
     }
+  }
+
+  private func requireUnblocked(_ map: WorkspaceMapEdit, in db: Database) throws {
+    let blockers = map.changes.blockers
+    guard !blockers.isEmpty else { return }
+    if blockers.count == 1, let first = blockers.first,
+      first.references.allSatisfy({ $0.hasPrefix("doc:") }),
+      let item = map.removals.first(where: { $0.ref == first.item })
+    {
+      let workspace = try TaskService.workspaceID(slug, in: db)
+      try prepareDocRemoval(of: item.table, id: item.id, workspace: workspace, in: db)
+    }
+    throw WorkspaceError.removalBlockers(
+      workspace: slug,
+      details: blockers.map { blocker in
+        TaskError.shown(blocker.item) + " ("
+          + blocker.references.map(TaskError.shown).joined(separator: ", ") + ")"
+      })
   }
 
   static func json(_ value: Any) throws -> String {
@@ -40,9 +69,9 @@ private struct WorkspaceWriter {
 
   let date: Date
 
-  var workspace: Int64 = 0
+  let map: WorkspaceMapEdit
 
-  var kept: [String: Set<Int64>] = [:]
+  var workspace: Int64 = 0
 
   var repos: [String: Int64] = [:]
 
@@ -65,6 +94,7 @@ private struct WorkspaceWriter {
       }
     }
     for key in WorkspaceConfig.fields["settings"] ?? [] { settings.removeValue(forKey: key) }
+    if !map.retired.isEmpty { settings[WorkspaceSlugs.retiredKey] = map.retired }
     for (key, value) in config.root["settings"]?.mapping ?? Node.Mapping([]) {
       settings[key.string ?? ""] = value.any
     }
@@ -76,9 +106,19 @@ private struct WorkspaceWriter {
         "settings": try WorkspaceConfig.json(settings).databaseValue,
       ])
 
+    try applyRenames(.app, map.apps)
+    try applyRenames(.topic, map.topics)
     try applyReposAppsAndEnvironments()
     try applyEdgesTopicsAndSources()
     try deleteMissing()
+  }
+
+  private func applyRenames(_ kind: WorkspaceSlugs.Kind, _ plan: WorkspaceSlugs.Plan) throws {
+    for match in plan.renames {
+      try db.execute(
+        sql: "UPDATE \(kind.rawValue) SET slug=?,previous_slugs=? WHERE id=?",
+        arguments: [match.slug, try WorkspaceConfig.json(match.previous), match.old.id])
+    }
   }
 
   mutating func applyReposAppsAndEnvironments() throws {
@@ -112,7 +152,8 @@ private struct WorkspaceWriter {
       _ = try persist(
         "environment",
         identity: [
-          "app_id": apps[env["app"]?.string ?? ""].databaseValue, "name": text(env, "name"),
+          "app_id": apps[map.apps.canonical(env["app"]?.string ?? "")].databaseValue,
+          "name": text(env, "name"),
         ], values: ["url": text(env, "url")])
     }
     for service in config.rows("services") {
@@ -128,13 +169,13 @@ private struct WorkspaceWriter {
 
   mutating func applyEdgesTopicsAndSources() throws {
     for edge in config.rows("edges") {
-      let target = edge["to"]?.string ?? ""
+      let target = map.apps.canonical(edge["to"]?.string ?? "")
       let isService = target.hasPrefix("service:")
       _ = try persist(
         "edge",
         identity: [
           "workspace_id": workspace.databaseValue,
-          "from_app_id": apps[edge["from"]?.string ?? ""].databaseValue,
+          "from_app_id": apps[map.apps.canonical(edge["from"]?.string ?? "")].databaseValue,
           "to_app_id": (isService ? nil : apps[target]).databaseValue,
           "to_service_id": (isService ? services[String(target.dropFirst(8))] : nil)
             .databaseValue,
@@ -142,8 +183,12 @@ private struct WorkspaceWriter {
         ],
         values: [
           "summary": text(edge, "summary"),
-          "code_refs": try WorkspaceConfig.json(edge["code"]?.array(of: String.self) ?? [])
-            .databaseValue,
+          "code_refs": try WorkspaceConfig.json(
+            (edge["code"]?.array(of: String.self) ?? []).map {
+              TaskLinkTarget.replacingCodeApp(in: $0, with: map.apps.canonical)
+            }
+          )
+          .databaseValue,
         ])
     }
     try applyTopics()
@@ -199,41 +244,23 @@ private struct WorkspaceWriter {
   }
 
   private func deleteMissing() throws {
-    for table in ["edge", "environment", "source", "app", "service", "topic", "repo"] {
-      let filter =
-        table == "environment"
-        ? "app_id IN (SELECT id FROM app WHERE workspace_id=?)" : "workspace_id=?"
-      let existing = try Int64.fetchAll(
-        db, sql: "SELECT id FROM \(table) WHERE \(filter) ORDER BY id", arguments: [workspace])
-      for id in existing where !(kept[table] ?? []).contains(id) {
-        if ["app", "edge", "service", "topic"].contains(table) {
-          try config.prepareDocRemoval(of: table, id: id, workspace: workspace, in: db)
-        }
-        if ["app", "edge", "service", "topic"].contains(table),
-          try Bool.fetchOne(
-            db,
-            sql: """
-              SELECT EXISTS(SELECT 1 FROM link WHERE to_kind=? AND to_id=? AND from_kind<>'doc')
-              """, arguments: [table, id]) == true
-        {
-          throw WorkspaceError.conflict
-        }
-        if table == "repo" {
-          try db.execute(sql: "DELETE FROM repo_path WHERE repo_id=?", arguments: [id])
-        }
-        try db.execute(sql: "DELETE FROM \(table) WHERE id=?", arguments: [id])
+    for item in map.removals {
+      if ["app", "edge", "service", "topic"].contains(item.table) {
+        try config.prepareDocRemoval(of: item.table, id: item.id, workspace: workspace, in: db)
       }
+      if item.table == "repo" {
+        try db.execute(sql: "DELETE FROM repo_path WHERE repo_id=?", arguments: [item.id])
+      }
+      try db.execute(sql: "DELETE FROM \(item.table) WHERE id=?", arguments: [item.id])
     }
-
   }
 
-  private mutating func persist(
+  private func persist(
     _ table: String, identity: [String: DatabaseValue], values: [String: DatabaseValue]
   ) throws -> Int64 {
-    let id = try save(table: table, identity: identity, values: values)
-    kept[table, default: []].insert(id)
-    return id
+    try save(table: table, identity: identity, values: values)
   }
+
   private func text(_ node: Node?, _ key: String) -> DatabaseValue {
     node?[key]?.string.databaseValue ?? .null
   }

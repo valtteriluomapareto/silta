@@ -2,6 +2,12 @@ import CryptoKit
 package import Foundation
 import GRDB
 
+/// The canonical workspace and the map changes made by an edit or preview.
+package struct WorkspaceEditResult: Sendable {
+  package let workspace: String
+  package let changes: WorkspaceMapChanges
+}
+
 /// Runs an approved editing loop over a temporary YAML view.
 package enum WorkspaceEditor {
   /// Requires the human's go-ahead before reading configuration or invoking the editor.
@@ -10,7 +16,7 @@ package enum WorkspaceEditor {
     slug: String?, store: DatabaseStore, actor: ActorID,
     identity: (ids: any IDGenerator, date: Date), approved: String? = nil,
     prepared: Result<String?, any Error>? = nil, editor: (URL) throws -> Int32
-  ) throws -> String? {
+  ) throws -> WorkspaceEditResult? {
     let command = approvalCommand(slug)
     let approval = try actor.requireHuman(command: command + " -F <file>", approved: approved)
     let baseline = try capture(slug: slug, store: store, prepared: prepared)
@@ -29,7 +35,7 @@ package enum WorkspaceEditor {
     _ input: @autoclosure () throws -> String, slug: String?, store: DatabaseStore, actor: ActorID,
     identity: (ids: any IDGenerator, date: Date), approved: String? = nil,
     prepared: Result<String?, any Error>? = nil, retryFromStdin: Bool = false
-  ) throws -> String? {
+  ) throws -> WorkspaceEditResult? {
     let base = approvalCommand(slug)
     let command = base + " -F <file>"
     let retry = retryFromStdin ? base + " -F -" : command
@@ -56,10 +62,31 @@ package enum WorkspaceEditor {
       approval: (approval, command))
   }
 
+  /// Reads an edit against the same captured configuration used by an eventual save.
+  package static func preview(
+    _ input: @autoclosure () throws -> String, slug: String?, store: DatabaseStore,
+    prepared: Result<String?, any Error>? = nil
+  ) throws -> WorkspaceEditResult {
+    let baseline = try capture(slug: slug, store: store, prepared: prepared)
+    let document = try input()
+    try BoundedInput.requireNoNul(document)
+    let (stamp, text) = try Baseline.payload(document, workspace: baseline.slug)
+    try baseline.check(stamp: stamp)
+    let config = try WorkspaceConfig.parse(text, keepingAppNames: baseline.appNames)
+    try checkSlug(config, baseline: baseline)
+    guard baseline.slug != nil else { throw WorkspaceError.notFound }
+    return try store.read { db in
+      try baseline.check(in: db)
+      let map = try WorkspaceMapEdit.read(config, in: db)
+      return WorkspaceEditResult(workspace: config.slug, changes: map.changes)
+    }
+  }
+
   private struct Baseline {
     let slug: String?
     let uid: String?
     let text: String
+    let mapIdentity: String
     /// Unchanged legacy labels can survive an edit without relaxing validation of new text.
     let appNames: [String: String]
 
@@ -68,7 +95,7 @@ package enum WorkspaceEditor {
 
     private var token: String {
       guard let uid else { return "new" }
-      return SHA256.hash(data: Data((uid + "\0" + text).utf8))
+      return SHA256.hash(data: Data((uid + "\0" + text + "\0" + mapIdentity).utf8))
         .map { String(format: "%02x", $0) }.joined()
     }
 
@@ -119,7 +146,8 @@ package enum WorkspaceEditor {
       if let slug {
         let current = try WorkspaceEditor.uid(in: db, slug: slug)
         guard current == uid,
-          try WorkspaceConfig.render(from: db, slug: slug).utf8.elementsEqual(text.utf8)
+          try WorkspaceConfig.render(from: db, slug: slug).utf8.elementsEqual(text.utf8),
+          try WorkspaceEditor.mapIdentity(slug, in: db).utf8.elementsEqual(mapIdentity.utf8)
         else {
           throw WorkspaceEditConflict(workspace: current == nil ? nil : slug)
         }
@@ -147,7 +175,7 @@ package enum WorkspaceEditor {
       if try WorkspaceSelection.list(in: store).isEmpty {
         return Baseline(
           slug: nil, uid: nil, text: "workspace: {slug: acme, name: Acme, task_prefix: AC}\n",
-          appNames: [:])
+          mapIdentity: "", appNames: [:])
       }
     }
     let selected = try WorkspaceSelection.resolve(slug, in: store, prepared: prepared)
@@ -167,14 +195,29 @@ package enum WorkspaceEditor {
       }
       return Baseline(
         slug: selected, uid: uid, text: try WorkspaceConfig.render(from: db, slug: selected),
-        appNames: appNames)
+        mapIdentity: try mapIdentity(selected, in: db), appNames: appNames)
     }
   }
 
+  private static func mapIdentity(_ slug: String, in db: Database) throws -> String {
+    let id = try TaskService.workspaceID(slug, in: db)
+    let settings = try String.fetchOne(
+      db, sql: "SELECT settings FROM workspace WHERE id=?", arguments: [id])
+    let identity = try WorkspaceSlugs.Kind.allCases.map { kind in
+      try String.fetchAll(
+        db, sql: "SELECT uid FROM \(kind.rawValue) WHERE workspace_id=? ORDER BY slug",
+        arguments: [id])
+    }
+    return try WorkspaceConfig.json([settings ?? "{}", identity] as [Any])
+  }
+
+}
+
+extension WorkspaceEditor {
   private static func editCaptured(
     _ baseline: Baseline, store: DatabaseStore, identity: (ids: any IDGenerator, date: Date),
     approval: (HumanApproval?, String), editor: (URL) throws -> Int32
-  ) throws -> String? {
+  ) throws -> WorkspaceEditResult? {
     do {
       let manager = FileManager.default
       let directory = try manager.url(
@@ -248,20 +291,24 @@ package enum WorkspaceEditor {
     CommandFailure(error: error, next: [workspaceEditRead(baseline.slug)], nextBy: .agent)
   }
 
-  private static func save(
-    _ config: WorkspaceConfig, baseline: Baseline, store: DatabaseStore,
-    identity: (ids: any IDGenerator, date: Date), approval: (HumanApproval?, String)
-  ) throws -> String {
+  private static func checkSlug(_ config: WorkspaceConfig, baseline: Baseline) throws {
     if let original = baseline.slug, config.slug != original {
       throw WorkspaceError.invalid(["line 1: workspace renaming is not supported"])
     }
-    try store.write { tx in
+  }
+
+  private static func save(
+    _ config: WorkspaceConfig, baseline: Baseline, store: DatabaseStore,
+    identity: (ids: any IDGenerator, date: Date), approval: (HumanApproval?, String)
+  ) throws -> WorkspaceEditResult {
+    try checkSlug(config, baseline: baseline)
+    return try store.write { tx in
       try baseline.check(in: tx.database)
-      try config.apply(in: tx, ids: identity.ids, at: identity.date)
+      let changes = try config.applyWithChanges(in: tx, ids: identity.ids, at: identity.date)
       try approval.0?.record(
         command: approval.1, workspace: config.slug, identity: identity, in: tx)
+      return WorkspaceEditResult(workspace: config.slug, changes: changes)
     }
-    return config.slug
   }
 }
 
@@ -283,7 +330,7 @@ struct WorkspaceEditConflict: CodedError {
   }
 }
 
-private func workspaceEditRead(_ slug: String?) -> String {
+func workspaceEditRead(_ slug: String?) -> String {
   guard let slug, WorkspaceConfig.isValidIdentifier(slug),
     RestoreService.canNameInRecovery(slug)
   else { return "silta ws ls" }

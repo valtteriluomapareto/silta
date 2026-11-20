@@ -240,6 +240,7 @@ enum SiltaMain {
     _ error: any CodedError, edit: WsEditCommand, context: CommandContext
   ) -> [String] {
     if case .docAttachments = error as? WorkspaceError { return error.next }
+    if case .removalBlockers = error as? WorkspaceError { return error.next }
     var target = edit.workspace ?? edit.global.ws
     if target == nil {
       do {
@@ -252,6 +253,15 @@ enum SiltaMain {
     let suffix = target.map { " " + shellWord($0) } ?? ""
     if case .invalid(_, true) = error as? WorkspaceError {
       return (target == nil ? [] : ["silta ws show" + suffix]) + error.next
+    }
+    if edit.dryRun {
+      let safe = target.flatMap { value in
+        WorkspaceConfig.isValidIdentifier(value) && RestoreService.canNameInRecovery(value)
+          ? " " + shellWord(value) : nil
+      }
+      let inspect = safe.map { ["silta ws show" + $0] } ?? ["silta ws ls"]
+      return inspect
+        + ["silta ws edit" + (safe ?? "") + " --dry-run -F " + (edit.file == "-" ? "-" : "<file>")]
     }
     let repair = "silta ws edit" + suffix + " -F <file> --approved \"<the human's words>\""
     if target != nil, error.code == .invalid || error.code == .conflict {
@@ -294,7 +304,14 @@ extension SiltaMain {
       let help = commandPath(arguments) + " --help"
       let workspace = (command as? WsEditCommand)?.workspace ?? command.global.ws
       let next: [String]
-      if let workspace, WorkspaceConfig.isValidIdentifier(workspace),
+      if let edit = command as? WsEditCommand, edit.dryRun {
+        let suffix =
+          workspace.flatMap { value in
+            WorkspaceConfig.isValidIdentifier(value) && RestoreService.canNameInRecovery(value)
+              ? " " + shellWord(value) : nil
+          } ?? ""
+        next = ["silta ws edit" + suffix + " --dry-run -F " + (edit.file == "-" ? "-" : "<file>")]
+      } else if let workspace, WorkspaceConfig.isValidIdentifier(workspace),
         RestoreService.canNameInRecovery(workspace)
       {
         let inspect = (command as? TaskEditCommand).map {

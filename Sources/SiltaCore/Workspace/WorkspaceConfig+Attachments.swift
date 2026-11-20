@@ -2,16 +2,8 @@ import GRDB
 
 extension WorkspaceConfig {
   func prepareDocRemoval(of table: String, id: Int64, workspace: Int64, in db: Database) throws {
-    let docs = try Row.fetchAll(
-      db,
-      sql: """
-        SELECT DISTINCT doc.id,doc.slug FROM link
-        JOIN doc ON link.from_kind='doc' AND link.from_id=doc.id
-        JOIN doc_rev ON doc_rev.doc_id=doc.id AND doc_rev.rev=doc.current_rev
-        WHERE link.workspace_id=? AND doc.workspace_id=? AND link.rel='about'
-          AND link.to_kind=? AND link.to_id=? AND doc.archived=0 AND doc_rev.state='accepted'
-        ORDER BY doc.slug
-        """, arguments: [workspace, workspace, table, id])
+    let row = WorkspaceMapRow(table: table, id: id, parts: [])
+    let docs = try WorkspaceMapReferences.documents(row, workspace: workspace, in: db)
     if !docs.isEmpty {
       let recovery = try docs.map {
         try reattachCommand($0, removing: table, id: id, workspace: workspace, in: db)

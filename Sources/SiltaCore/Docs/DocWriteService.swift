@@ -86,6 +86,7 @@ package struct DocWriteService {
       let warnings =
         environment.actor.approvalWarnings(approved, used: approval != nil)
         + (captured.redacted || bodyRedacted ? [SecretGuard.warning] : [])
+        + captured.mapWarnings
       return DocWriteResult(
         ref: SecretGuard.redacted("doc:\(request.slug)@\(revision.revision)"), warnings: warnings,
         workspace: slug, approvalUsed: approval != nil)
@@ -133,7 +134,8 @@ package struct DocWriteService {
       try policy.identities(metadata.refs, keeping: retainedRefs)
       return CapturedEdit(
         id: id, baseline: baseline, draft: draft,
-        binding: try DocVerification.binding(metadata, workspace: id, in: db), redacted: redacted)
+        binding: try DocVerification.binding(metadata, workspace: id, in: db),
+        redacted: redacted, mapWarnings: metadata.targets.flatMap(\.warnings))
     }
   }
 
@@ -143,6 +145,7 @@ package struct DocWriteService {
     let draft: DocDraft
     let binding: DocVerification.Binding
     let redacted: Bool
+    let mapWarnings: [OutputWarning]
   }
 
   private func suppliedBody(

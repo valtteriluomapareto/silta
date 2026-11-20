@@ -2257,6 +2257,13 @@ the `apps` slug array and includes optional `app_names` rows with `slug` and `na
 for the listed apps that have distinct names. Text tells a human how to open the
 workspace editor and tells agents to ask before editing. Text and JSON give one
 read-only, workspace-scoped `ws show` next.
+`ws edit --dry-run -F <file>` previews an edit to an existing workspace. Use
+`-F -` for stdin. It reads the same stamped snapshot as a save and reports the
+proposed adds, removals, renames and all blocking references. Preview needs no
+approval and writes no workspace state. When adding or removing map items,
+a successful save lists the affected references. A rename receipt additionally
+counts the attached docs, tasks, edges and environments that kept their identities.
+
 A scan with a missing root or no Git repositories returns `invalid` and creates
 no workspace. A bare `init` prepares the database and points to scan help.
 
@@ -2279,8 +2286,9 @@ Every CLI call is its own short-lived process, and several agents run at once.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
 - **Workspace edits** capture the selected configuration before launching the editor
   or reading `-F`. The save verifies the baseline in its write transaction. Every
-  `ws show` projection carries a YAML comment tied to the workspace identity and
-  canonical configuration. Keep this comment when editing a file or pasting it
+  `ws show` projection carries a YAML comment tied to the workspace identity,
+  the canonical configuration, and the app and topic UIDs. An identically
+  configured replacement still invalidates a draft. Keep this comment when editing a file or pasting it
   into the interactive editor. A stale comment or a competing change returns `conflict`. Malformed or duplicate baseline
   comments return `invalid`. A stale interactive edit keeps its private YAML file
   with the original baseline. Review fresh `ws show` output and reapply your edits
@@ -3044,7 +3052,17 @@ A fictional workspace that shows every section. The eval fixtures (§21) use the
 same shape. Slugs identify workspace, repo, app, service and topic rows. Environments
 match by app and name; edges by from, to and kind; sources by kind and root. Duplicate
 identities are invalid. Saving updates retained rows and removes omitted rows in one
-transaction; removing a referenced app or repo is a conflict. Renaming is not supported.
+transaction. A removal refusal names all blocked items and the references that
+pin them. Accepted docs, tasks, worktree overrides and retained source bindings
+can block removal.
+To rename an app or topic, set its new `slug` and list its old slug under `previous`.
+The edit retains the database identity, task and document links, edge endpoints and
+environments. Edge code references are saved with the current app slug, retaining
+their ref, path and line suffixes. An explicit former slug resolves to its current
+owner and warns with `renamed`. Historical slugs stay reserved in the workspace
+after the owning app or topic is removed. Export and restore carry the history in
+the selected snapshot. The metadata-only v9 migration raises the writer floor
+because earlier writers can reassign historical names (D32).
 Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
 item and its docs. Proposal-only or archived docs and `cites` links do not pin map

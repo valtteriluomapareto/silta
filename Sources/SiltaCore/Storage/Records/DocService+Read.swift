@@ -98,7 +98,9 @@ extension DocService {
           about: try target.map { try $0.rendered(in: db) }, archived: archived,
           offset: offset + entries.count, limit: limit, document: document)
         : nil
-      return DocListResult(entries: entries, total: total, offset: offset, limit: limit, next: next)
+      return DocListResult(
+        entries: entries, total: total, offset: offset, limit: limit, next: next,
+        warnings: target?.warnings ?? [])
     }
   }
 
