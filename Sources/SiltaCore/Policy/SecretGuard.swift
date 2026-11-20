@@ -9,8 +9,10 @@ package enum SecretGuard {
 
   /// Finds all supported secret forms, merging overlaps so no detected span is exposed.
   /// Whole placeholders are exempt in credential fields. Explicit credentials outrank refs.
-  package static func matches(in text: String) -> [SecretMatch] {
-    var candidates = privateKeyMatches(in: text)
+  package static func matches(
+    in text: String, armourFieldStart: String.Index? = nil
+  ) -> [SecretMatch] {
+    var candidates = privateKeyMatches(in: text, fieldStart: armourFieldStart)
     for (rule, pattern) in rules {
       for match in text.matches(of: pattern.wordBoundaryKind(.simple)) {
         let value = String(text[match.range])
@@ -114,7 +116,8 @@ package enum SecretGuard {
     /[ \t]*(?:>[ \t]*|(?:[-+*]|[0-9]{1,9}[.)])[ \t]+)*/
   }
 
-  private static func privateKeyMatches(in text: String) -> [SecretMatch] {
+  private static func privateKeyMatches(in text: String, fieldStart: String.Index?) -> [SecretMatch]
+  {
     let boundary =
       /(?:-----|---- )(BEGIN|END) ((?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?)(?:-----| ----)/
     let prefix = armourMarkdownPrefix
@@ -126,7 +129,13 @@ package enum SecretGuard {
     func appendUnfinished(_ opening: ArmourOpening, before limit: String.Index) {
       let after = text[opening.range.upperBound..<limit]
       let suffix = after.prefix(while: { !$0.isNewline })
-      guard text[opening.lineStart..<opening.range.lowerBound].wholeMatch(of: prefix) != nil,
+      let start =
+        if let fieldStart, (opening.lineStart...opening.range.lowerBound).contains(fieldStart) {
+          fieldStart
+        } else {
+          opening.lineStart
+        }
+      guard text[start..<opening.range.lowerBound].wholeMatch(of: prefix) != nil,
         suffix.allSatisfy({ $0 == " " || $0 == "\t" }),
         suffix.endIndex == text.endIndex || suffix.endIndex < limit
       else { return }
