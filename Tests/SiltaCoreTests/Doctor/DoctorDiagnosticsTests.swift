@@ -4,7 +4,7 @@ import GRDB
 import SiltaTestSupport
 import Testing
 
-struct DoctorReviewTests {
+struct DoctorDiagnosticsTests {
   private let now = StorageSchemaTests.instant
 
   private func inspect(_ home: URL, at: Date? = nil) async -> DoctorReport {
@@ -282,7 +282,7 @@ struct DoctorReviewTests {
   }
 }
 
-extension DoctorReviewTests {
+extension DoctorDiagnosticsTests {
   @Test func malformedStoredCloseDateFailsDoctor() async throws {
     try await withScratchDirectory { home in
       let store = StorageSchemaTests.store(home)

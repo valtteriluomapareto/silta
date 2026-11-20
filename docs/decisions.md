@@ -633,8 +633,10 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     `--approved`: relayed words don't count (D38), so it names human-only commands
     and the coordinating agent asks for them in chat and runs them itself.
   - ↳ update (2026-11-19): The [current merge workflow](../AGENTS.md#dogfooding)
-    applies to app and CLI slices. It covers finishing from the verified merge and
-    using a separate task for a plan-only PR.
+    applies to app and CLI slices. Reviewers record findings as Silta comment threads.
+    One PR verdict points to those threads. This supersedes the earlier PR-only
+    review format. Finish from the verified merge and use a separate task for a
+    plan-only PR.
 
 ## Agent harness evidence (2026-11-05)
 

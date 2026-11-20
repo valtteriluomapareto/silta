@@ -185,7 +185,7 @@ flowchart LR
 - You need team coordination: Silta is single-user and local, and your team tracker
   remains the record of committed work.
 - You need a server, an MCP integration or a web UI.
-- You need Silta Dev or the combined installer on a Mac earlier than macOS 26.
+- Your Mac runs an OS earlier than macOS 26. The documented installer targets macOS 26 and later.
 
 ## Install
 

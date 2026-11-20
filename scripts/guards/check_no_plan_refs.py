@@ -21,13 +21,25 @@ PATTERNS = {
 }
 
 
+# These conventional spellings also look like short-form slice references.
+TECHNICAL_TERMS = re.compile(
+    r"(?P<explicit_slice>(?i:\bslice\s+))?"
+    r"\b(?:C(?:89|90|95|99|11|17|23)|K8s|A[0-9](?=\s+paper\b)|S3(?=\s+bucket\b))\b"
+)
+
+
 def check(root: Path) -> list[str]:
     errors = []
     for path in swift_files(root, "Sources", "Tests", "App"):
         _, comments = split_swift(path.read_text(encoding="utf-8"))
         for line, text in comments:
             for label, pattern in PATTERNS.items():
-                if pattern.search(text):
+                candidate = text
+                if label == "slice reference":
+                    candidate = TECHNICAL_TERMS.sub(
+                        lambda match: match[0] if match["explicit_slice"] else "", text
+                    )
+                if pattern.search(candidate):
                     rel = path.relative_to(root)
                     errors.append(f"{rel}:{line}: {label} in a comment: {text.strip()[:80]}")
     return errors

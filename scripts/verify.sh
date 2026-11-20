@@ -76,7 +76,7 @@ run_tests() {
 require_passed() {
   local name
   for name in "$@"; do
-    if ! grep -q "Test ${name}() passed" "$last_test_log"; then
+    if ! grep -Eq "Test ${name}\([^)]*\)( with [0-9]+ test cases?)? passed" "$last_test_log"; then
       echo "verify ${mode}: ${name} did not run and pass" >&2
       exit 1
     fi
@@ -101,6 +101,15 @@ full_swift() {
     allScenariosReplayByteIdentically \
     tenDistinctSessionsHaveExactlyOneSuccessfulClaim \
     busyRetryNamesOnlyFailedCommandPath \
+    deterministicFixturesCoverHistoryAndCloneStates \
+    policyReplayStoresOnlyScriptedOutcomes \
+    restoredProposalsHaveDeterministicReadOnlyDiscovery \
+    scenariosCannotPassWithoutADeclaredStepOrWithAnEmptyJsonMatcher \
+    scenarioLogsActorPrecedenceAndSessions \
+    nestedCwdSharesSessionButDistinctWorktreeDoesNot \
+    twentyConnectionsCommitFourThousandAdds \
+    concurrentExportsOfOneWorkspaceAllSucceed \
+    locationScenarioSurvivesRestart \
     actualPriorWriterRefusesUpgradedDatabaseWithoutChangingIt \
     actualMetadataWriterCannotWriteAfterNamespaceUpgrade \
     actualV6WriterKeepsPopulatedAuditFields \

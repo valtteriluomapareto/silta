@@ -238,13 +238,17 @@ observed lower bounds: native file tools, opaque programs require transcript
 review. Explicit backend path operands without attested cwd count as possible
 reads, while other unresolved paths are not inferred as reads. Metrics are also
 retained for failed infrastructure trials, summed by group and shown in HTML.
-Read method does not determine success. `legacy_mentioned` is a per-trial boolean
-for normalized legacy names in the same attributed AC-1 text, including failed
-trials; no captured context means no observed mentions. Groups sum those booleans
-as counts, shown beside read metrics in JSON and HTML. Mentioning legacy names
+Read method does not determine success. `legacy_mentioned` records whether the
+captured AC-1 context includes normalized legacy names. A trial without that
+observation reports `null`. Groups sum the observed booleans as counts beside the
+read metrics in JSON and HTML. Mentioning legacy names
 does not change the success criterion.
 An approval exempts only its exact observed invocation, never another command in
 the same phase.
+
+CI compiles every authored fault marker and also replays selected grader faults
+against private copies of the offline evaluator. Those probes require the
+unmodified assertion to pass and the mutated assertion to fail.
 
 ## Policy coverage and evidence review
 

@@ -5,7 +5,7 @@ import SiltaTestSupport
 import Testing
 
 @Suite(.timeLimit(.minutes(1)))
-struct TaskBlockReviewTests {
+struct TaskBlockValidationTests {
   @Test func namedBlockRecoveryPreservesTargetsAndDay() async throws {
     try await withScratchDirectory { home in
       let service = try TaskOrganizationTests.service(home)

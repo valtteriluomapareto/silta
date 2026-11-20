@@ -37,9 +37,10 @@ enum SiltaMain {
     let flags = Set(withoutApprovalValues(arguments).prefix { $0 != "--" })
     let timer = ContinuousClock()
     let started = timer.now
-    let parseResult = parseCommand(arguments)
-    if let rendered = informationalResult(parseResult, arguments: arguments, mode: mode) {
-      return rendered
+    let parseResult: Result<any OutputCommand, any Error>
+    switch parseCommand(arguments, mode: mode) {
+    case .informational(let rendered): return rendered
+    case .output(let parsed): parseResult = parsed
     }
     do {
       guard let snapshot = try environmentSnapshot(arguments, hook: hookDeadline != nil) else {
@@ -125,15 +126,15 @@ enum SiltaMain {
 
   /// Executes the parse result using the environment assembled by the command boundary.
   static func execute(
-    _ arguments: [String], parseResult: Result<any ParsableCommand, any Error>,
+    _ arguments: [String], parseResult: Result<any OutputCommand, any Error>,
     context: CommandContext
   ) async -> CommandExecution {
     var context = context
     let mode = context.mode
-    var command: any ParsableCommand
+    var outputCommand: any OutputCommand
     switch parseResult {
     case .success(let parsedCommand):
-      command = parsedCommand
+      outputCommand = parsedCommand
     case .failure(let error):
       let store = context.environment.db
       let scope =
@@ -142,16 +143,6 @@ enum SiltaMain {
         : CommandScope.usage(arguments, command: parsed(arguments).command, store: store)
       return CommandExecution(
         rendered: parseFailure(error, arguments: arguments, mode: mode), scope: scope)
-    }
-    guard var outputCommand = command as? any OutputCommand else {
-      // The root or a command group: ArgumentParser answers with help.
-      do {
-        try command.run()
-        return CommandExecution(
-          rendered: Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil))
-      } catch {
-        return CommandExecution(rendered: parseFailure(error, arguments: arguments, mode: mode))
-      }
     }
     let store = context.environment.db
     let explicitWorkspace = outputCommand.global.ws

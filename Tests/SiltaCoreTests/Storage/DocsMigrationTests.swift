@@ -81,6 +81,38 @@ struct DocsMigrationTests {
     }
   }
 
+  @Test func populatedV5BackfillMatchesTheHistoricalWriter() throws {
+    try withScratchDirectory { scratch in
+      let store = try Self.copyFixture(to: scratch)
+      let active = try DatabaseQueue(path: store.path)
+      let historical = Self.fixture.deletingLastPathComponent().appending(path: "storage-v5.db")
+      var options = Configuration()
+      options.readonly = true
+      let frozen = try DatabaseQueue(path: historical.path, configuration: options)
+      try StorageSchema.migrator.migrate(active, upTo: "v5")
+      let projection = """
+        SELECT id,title,kind,about_refs,source_task_id,body_md,future FROM doc_rev ORDER BY id
+        """
+      let expected = try frozen.read { try Row.fetchAll($0, sql: projection) }
+      let actual = try active.read { try Row.fetchAll($0, sql: projection) }
+      #expect(actual == expected)
+      let current = try #require(actual.first { $0["id"] as Int == 12 })
+      #expect(current["title"] as String? == "Push rules")
+      #expect(current["kind"] as String? == "contract")
+      #expect(current["about_refs"] as String? != nil)
+      for revision in actual where revision["id"] as Int != 12 {
+        #expect(revision["title"] as String? == nil)
+        #expect(revision["kind"] as String? == nil)
+        #expect(revision["about_refs"] as String? == nil)
+      }
+      #expect(
+        try active.read {
+          try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
+        }
+          == 5)
+    }
+  }
+
   @Test func verificationAndSourceTaskUseOwnedForeignKeys() throws {
     try withScratchDirectory { home in
       let store = try Self.copyFixture(to: home)

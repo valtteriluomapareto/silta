@@ -6,12 +6,12 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(1)))
 struct DocTriageCommandTests {
-  static func propose(_ scratch: URL) throws -> String {
+  static func propose(_ scratch: URL, slug: String = "rules") throws -> String {
     let file = scratch.appending(path: "proposal.md")
     try "Shared proposal.".write(to: file, atomically: true, encoding: .utf8)
     let result = try SiltaBinary.run(
       [
-        "--ws", "acme", "doc", "propose", "rules", "-F", file.path, "-m", "Share.",
+        "--ws", "acme", "doc", "propose", slug, "-F", file.path, "-m", "Share.",
         "--title", "Rules", "--about", "service:push", "--json",
       ],
       in: scratch, environment: TaskCommandTests.fixed)

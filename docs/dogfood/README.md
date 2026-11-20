@@ -144,9 +144,10 @@ workspace and excludes its own actor's calls and approvals.
   its own proposal is not triage and isn't counted; the oldest pending
   proposal shows what still waits. The first report's numbers are mostly the setup
   triage. The report reads the current human inbox for the selected workspace.
-  It counts questions addressed to `@me` and includes omitted entries in the
-  inbox size. When the inbox omits entries, the question count is a lower bound.
-  The oldest age is unknown if any entry is omitted or lacks a timestamp.
+  It counts all eligible questions addressed to `@me` and every eligible inbox
+  group. Task and document proposals use the normal 14-day window. Archived
+  documents are excluded. A document proposal group ages from its oldest eligible
+  revision. The oldest age is unknown if an eligible inbox item lacks a timestamp.
   These inbox measurements describe the report time, regardless of `--since`.
 
 The report also measures document proposal decisions and observed brief exposure.
