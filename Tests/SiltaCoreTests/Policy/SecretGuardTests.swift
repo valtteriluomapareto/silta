@@ -224,7 +224,7 @@ struct SecretGuardTests {
     let token = "AK" + "IA" + String(repeating: "Q", count: 16)
     let input = "🦊 " + token + " 🦊 " + token + "!"
     #expect(SecretGuard.redacted(input) == "🦊 [REDACTED:aws_key] 🦊 [REDACTED:aws_key]!")
-    #expect(SecretGuard.version == 4)
+    #expect(SecretGuard.version == 5)
   }
 
   @Test func rejectionAndWarningNeverStoreOrRenderMatches() throws {

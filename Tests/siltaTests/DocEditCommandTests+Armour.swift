@@ -24,11 +24,9 @@ extension DocEditCommandTests {
       try #require(exported.termination == .exit(0), "\(exported.stdout)\(exported.stderr)")
       let file = scratch.appending(path: "silta-home/exports/acme/docs/rules.md")
       let snapshot = try String(contentsOf: file, encoding: .utf8)
-      withKnownIssue("The write currently keeps quoted key material and strips inline mentions.") {
-        #expect(warnings.contains("secret_redacted") == quote)
-        #expect(stored == expected)
-        #expect(snapshot.contains("\n" + expected + "\n") && !snapshot.contains(payload))
-      }
+      #expect(warnings.contains("secret_redacted") == quote)
+      #expect(stored == expected)
+      #expect(snapshot.contains("\n" + expected + "\n") && !snapshot.contains(payload))
     }
   }
 }

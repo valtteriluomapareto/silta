@@ -19,7 +19,9 @@ extension SecretGuardTests {
 
   @Test(arguments: samples) func corpusFindsEveryRequiredRule(sample: Sample) throws {
     let suffix = sample.rule == "private_key" ? "\nEnd." : " end"
-    let input = "Acme 🦊 " + sample.text + suffix
+    let separator = sample.rule == "private_key" && !sample.text.contains("END ") ? "\n" : " "
+    let prefix = "Acme 🦊" + separator
+    let input = prefix + sample.text + suffix
     let matches = SecretGuard.matches(in: input)
     let detected = matches.contains { $0.rule == sample.rule }
     #expect(detected, "missing rule \(sample.rule)")
@@ -28,7 +30,7 @@ extension SecretGuardTests {
     #expect(!leaked, "unredacted \(sample.rule)")
     #expect(output.contains("[REDACTED:\(sample.rule)]"))
     if sample.rule == "private_key" {
-      #expect(output == "Acme 🦊 [REDACTED:private_key]" + suffix)
+      #expect(output == prefix + "[REDACTED:private_key]" + suffix)
     }
     for match in matches {
       let preview = match.preview(in: input)
@@ -42,8 +44,8 @@ extension SecretGuardTests {
   @Test(arguments: syntheticArmour)
   func privateArmourRedactsTheWholeRunAndKeepsFollowingProse(block: String) {
     let tail = "\nRead the Acme documentation."
-    #expect(
-      SecretGuard.redacted("Acme: " + block + tail) == "Acme: [REDACTED:private_key]" + tail)
+    let prefix = block.contains("END ") ? "Acme: " : "Acme:\n"
+    #expect(SecretGuard.redacted(prefix + block + tail) == prefix + "[REDACTED:private_key]" + tail)
     #expect(SecretGuard.redacted(block) == "[REDACTED:private_key]")
   }
 
@@ -67,9 +69,7 @@ extension SecretGuardTests {
     let expected = prefix + "[REDACTED:private_key]" + newline + tail
     let framed = HumanText.framed(original)
     #expect(framed.utf8.count { $0 == 10 } == original.utf8.count { $0 == 10 })
-    withKnownIssue("The unfinished scanner stops before Markdown-prefixed payload lines.") {
-      #expect(SecretGuard.redacted(original) == expected && !framed.contains(first))
-    }
+    #expect(SecretGuard.redacted(original) == expected && !framed.contains(first))
   }
 
   @Test(arguments: ["paragraph", "numbered", "leading"])
@@ -82,10 +82,8 @@ extension SecretGuardTests {
       default: "The manual prints `" + start + "` before the key."
       }
     let original = line + "\n\nDone\nVerify\n"
-    withKnownIssue("An inline marker currently starts a run and removes ordinary prose.") {
-      #expect(
-        SecretGuard.matches(in: original).isEmpty && SecretGuard.redacted(original) == original)
-    }
+    #expect(
+      SecretGuard.matches(in: original).isEmpty && SecretGuard.redacted(original) == original)
   }
 
   @Test(arguments: ["ext", "service"])
