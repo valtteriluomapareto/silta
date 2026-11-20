@@ -56,6 +56,38 @@ extension SecretGuardTests {
         == "[REDACTED:private_key]" + prose + "[REDACTED:private_key]")
   }
 
+  @Test(arguments: ["> ", "- ", "12. ", "> - > "], ["\n", "\r\n"])
+  func unfinishedMarkdownArmourMasksTheEntireBody(prefix: String, newline: String) {
+    let start = "-----BE" + "GIN RSA PRIVATE KEY-----"
+    let first = String(repeating: "Q", count: 64)
+    let second = String(repeating: "Z", count: 44) + "=="
+    let tail = [prefix, prefix + "Read the Acme documentation."].joined(separator: newline)
+    let original = ([start, first, second].map { prefix + $0 } + [tail]).joined(
+      separator: newline)
+    let expected = prefix + "[REDACTED:private_key]" + newline + tail
+    let framed = HumanText.framed(original)
+    #expect(framed.utf8.count { $0 == 10 } == original.utf8.count { $0 == 10 })
+    withKnownIssue("The unfinished scanner stops before Markdown-prefixed payload lines.") {
+      #expect(SecretGuard.redacted(original) == expected && !framed.contains(first))
+    }
+  }
+
+  @Test(arguments: ["paragraph", "numbered", "leading"])
+  func inlineArmourMentionsKeepTheRestOfTheDocument(style: String) {
+    let start = "-----BE" + "GIN PRIVATE KEY-----"
+    let line =
+      switch style {
+      case "numbered": "42. Verify the marker `" + start + "` in the manual."
+      case "leading": start + " is the example marker."
+      default: "The manual prints `" + start + "` before the key."
+      }
+    let original = line + "\n\nDone\nVerify\n"
+    withKnownIssue("An inline marker currently starts a run and removes ordinary prose.") {
+      #expect(
+        SecretGuard.matches(in: original).isEmpty && SecretGuard.redacted(original) == original)
+    }
+  }
+
   @Test(arguments: ["ext", "service"])
   func longReferenceIdentifiersStayReadable(kind: String) {
     let ref = kind + ":" + Self.legacyPAT
