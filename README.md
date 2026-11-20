@@ -35,7 +35,7 @@ Coding agent work loses its thread:
   agent-made work items fill the team tracker.
 
 Silta keeps that context in one local store on your Mac. Agents read and write it
-through a plain CLI (`silta`), and you follow along in the inbox or the native app.
+through a plain CLI (`silta`), and you follow along from your terminal or the native app.
 *Silta* is Finnish for **bridge**: across repos, across sessions that never meet, and
 between you and your agents.
 
@@ -52,58 +52,59 @@ and Codex is waiting for your review on AC-9.</sub>
 | Feature | What it does |
 |---|---|
 | 🧭 **A brief at session start** | `silta brief` prints the task, its plan, the newest handoff, the app, its environments and neighbouring apps, within a 2,500-token budget (800 for the hook). Claude Code gets it from a SessionStart hook. |
-| 🗺️ **A workspace map** | Repos, apps (including several apps on branches of one repo), environments, external services and the connections between them, with pointers to the code that proves each one. |
+| 🗺️ **A workspace map** | Repos, apps (including several apps on branches of one repo), environments, external services and the connections between them, each pointing to the code behind it. |
 | 🔎 **Read across apps** | `silta code grep`, `show`, `ls` and `log` read another app's committed code at its ref, with no checkout or branch switch. |
 | 📋 **A backlog agents can use** | Tasks with claims, plans with tickable steps, questions, answers, handoffs and results. Agents propose; you triage. |
-| 🙋 **You stay in charge** | Human-only commands need your words in chat, passed with `--approved`. `silta inbox --for me` lists everything waiting on you. |
+| 🙋 **You stay in charge** | Human-only commands need your words in chat, passed with `--approved`. `silta inbox --for me` lists the questions, proposals and blocked work waiting on you. |
 | 🖥️ **A native Mac app** | Silta Dev shows My work, the board, the workspace map and Docs. You can answer questions, accept answers and proposals, comment and unblock ready work there. |
 
 ## A change of watch
 
 Here is one task crossing two sessions in the fictional Acme workspace, where a Flutter
-app (`mobile`) talks to an API that lives on the `api` branch of the `platform` repo.
+app (`mobile`) talks to an API app (`platform-api`) that lives on the `api` branch of the
+`platform` repo.
 
 **Claude Code** starts the work from the mobile repo. It claims a task, stores a plan
 on it and reads the API without leaving its checkout:
 
 ```console
 $ silta task add --start "Refresh expired tokens on the login screen" --app mobile
-AC-12 doing
+AC-23 doing
 
-$ silta task plan AC-12 -F - <<'PLAN'
+$ silta task plan AC-23 -F - <<'PLAN'
 - [ ] Read how the API rotates refresh tokens
 - [ ] Retry once on 401 with the refreshed token
 - [ ] Cover the expired-token path with a widget test
 PLAN
-AC-12 plan revision 1 (3 steps)
+AC-23 plan revision 1 (3 steps)
 
-$ silta code grep api -- 'Refresh'
-api@origin/api 5e0c2a9d41b7f3e86a1d0c4f92b8e7a3c6d1f058
+$ silta code grep platform-api -- 'Refresh'
+platform-api@origin/api 5e0c2a9d41b7f3e86a1d0c4f92b8e7a3c6d1f058
 src/Api/Controllers/AuthController.cs:9:    public IActionResult Refresh(RefreshRequest request) => Ok(tokens.Rotate(request.Token));
 
-$ silta task plan AC-12 --step 1 --done
-AC-12 step 1 done: Read how the API rotates refresh tokens (1/3)
+$ silta task plan AC-23 --step 1 --done
+AC-23 step 1 done: Read how the API rotates refresh tokens (1/3)
 ```
 
 The session runs out before the work is done, so it leaves a handoff. That releases the
 claim:
 
 ```console
-$ silta comment AC-12 --kind handoff -m "Retry logic is in lib/auth/session.dart; \
+$ silta comment AC-23 --kind handoff -m "Retry logic is in lib/auth/session.dart; \
 the widget test is still missing. The API returns 401 with error=token_expired, not 403."
-AC-12/1 handoff; claim released
+AC-23/1 handoff; claim released
 ```
 
 **Codex** picks the task up the next morning. Its first command shows where it is, what
 was left for it and which neighbour to read next:
 
 ```console
-$ silta brief --task AC-12
+$ silta brief --task AC-23
 acme / mobile / mobile [high: single]
 branch: main
-task: AC-12
-doing: Refresh expired tokens on the login screen (app: mobile)
-handoff AC-12/1 by agent:claude:7f3e at 2026-11-19T16:02:11.482Z:
+task: AC-23
+doing: Refresh expired tokens on the login screen
+handoff AC-23/1 by agent:claude:7f3e at 2026-11-19T16:02:11.482Z:
 > Retry logic is in lib/auth/session.dart; the widget test is still missing. The API returns 401 with error=token_expired, not 403.
 plan (revision 1):
 1 done
@@ -111,12 +112,13 @@ plan (revision 1):
 3. [ ] Cover the expired-token path with a widget test
 app: mobile
 summary: Flutter app.
-neighbour: edge:mobile/api/http-api Login, token refresh and data endpoints
-next: silta --ws 'acme' code show 'api' -- 'src/Api/Controllers/AuthController.cs'
-more: silta --ws 'acme' task show AC-12
+neighbour: edge:mobile/platform-api/http-api Login, token refresh and data endpoints
+next: silta --ws 'acme' code show 'platform-api' -- 'src/Api/Controllers/AuthController.cs'
+open: AC-23 [doing, p2] Refresh expired tokens on the login screen
+more: silta --ws 'acme' task show AC-23
 ```
 
-It runs `silta task start AC-12`, finishes the plan and submits the task for your
+It runs `silta task start AC-23`, finishes the plan and submits the task for your
 review. Nothing was pasted between chats, and no plan file was left in either repo.
 
 **You** see questions, proposals and blocked work in one place, in Silta Dev's My work
@@ -130,7 +132,7 @@ When an agent needs a human-only command, such as accepting its proposals, it na
 exact command in chat. Your reply is the approval it passes on:
 
 ```sh
-silta --ws acme task triage --accept AC-14 --approved "Accept AC-14."
+silta --ws acme task triage --accept AC-24 --approved "Accept AC-24."
 ```
 
 ## How it fits together
@@ -144,7 +146,7 @@ flowchart LR
   CLI["silta CLI<br/>text or --json"]
   CORE[("SiltaCore<br/>SQLite in ~/.silta")]
   GIT["Your Git clones<br/>read at any ref"]
-  APP["Silta Dev.app<br/>inbox · board · map · docs"]
+  APP["Silta Dev.app<br/>my work · board · map · docs"]
   YOU(("You"))
 
   CC --> CLI
@@ -187,8 +189,9 @@ flowchart LR
 
 ## Install
 
-You need macOS 26 or later, Xcode 27.1 (Swift 6.4) selected with `xcode-select`, and
-Git. Run the installer from a clean `main` that matches `origin/main`:
+The installer needs macOS 26 or later and Xcode 27.1; see the
+[full requirements](docs/getting-started.md#1-requirements). Run it from a clean `main`
+that matches `origin/main`:
 
 ```sh
 git clone https://github.com/valtteriluomapareto/silta.git
@@ -206,13 +209,13 @@ Rerun it after pulling `main` to update both from the same commit.
 # 1. Scan the clones that belong together into a workspace
 silta init --scan ~/work/api ~/work/web --slug acme --prefix AC
 
-# 2. Describe the apps, environments and connections (opens your editor)
-silta ws edit acme
-
-# 3. Connect your agents: preview first, then apply with the printed token
+# 2. Connect your agents: preview first, then apply with the printed token
 silta agents install --claude --hook
 silta agents install --codex
 silta doctor --install
+
+# 3. Describe the apps, environments and connections (opens your editor)
+silta ws edit acme
 ```
 
 Then, from a registered repo, tell your agent: **"Add a task for X and start it."**
@@ -223,8 +226,8 @@ configuration, including several apps on branches of one repo.
 
 ## Status
 
-Pre-1.0. Coding agents use the CLI. Silta Dev gives people the inbox, board, workspace
-map and Docs, with the supported [Mac app actions](docs/plans/mac-app-actions.md).
+Pre-1.0. Coding agents use the CLI. Silta Dev gives people My work, the board, the
+workspace map and Docs, and handles the actions in the [human's guide](docs/human-guide.md).
 
 ## Learn more
 
