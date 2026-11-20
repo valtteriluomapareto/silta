@@ -1,2 +1,2 @@
-error: Required database backup could not be completed. [env]
+error: Backup could not be completed because the backup directory could not be opened safely. [env]
 ask human: silta doctor

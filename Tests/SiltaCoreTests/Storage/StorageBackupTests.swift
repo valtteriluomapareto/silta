@@ -42,7 +42,7 @@ struct StorageBackupTests {
       #expect(try Data(contentsOf: last) == previous)
       let collision = folder.appending(path: "silta-2023-12-10.db")
       try FileManager.default.createDirectory(at: collision, withIntermediateDirectories: false)
-      #expect(throws: StorageError.backupFailed) {
+      #expect(throws: BackupFailure.occupied) {
         try backups.snapshot(
           name: collision.lastPathComponent, reuseExisting: true)
       }
@@ -97,7 +97,7 @@ struct StorageBackupTests {
       let existing = try DatabaseQueue(path: file.path)
       try existing.write { try $0.execute(sql: "CREATE TABLE acme_note(id INTEGER PRIMARY KEY)") }
       let original = try Data(contentsOf: file)
-      #expect(throws: StorageError.backupFailed) {
+      #expect(throws: BackupFailure.occupied) {
         try StorageSchemaTests.store(scratch).initialize()
       }
       #expect(try Data(contentsOf: file) == original)
@@ -128,7 +128,7 @@ struct StorageBackupTests {
   @Test func requiredBackupFailurePreventsMigration() throws {
     try withScratchDirectory { scratch in
       try Data("Acme".utf8).write(to: scratch.appending(path: "backups"))
-      #expect(throws: StorageError.backupFailed) {
+      #expect(throws: BackupFailure.destination) {
         try StorageSchemaTests.store(scratch).initialize()
       }
       let queue = try DatabaseQueue(path: scratch.appending(path: "silta.db").path)
@@ -161,15 +161,17 @@ struct StorageBackupTests {
     try withScratchDirectory { scratch in
       let failures = Mutex<[String]>([])
       DispatchQueue.concurrentPerform(iterations: 10) { _ in
+        var operation = "initialize"
         do {
           let store = StorageSchemaTests.store(scratch)
           try store.initialize()
+          operation = "read"
           let count = try store.read {
             try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations")
           }
           #expect(count == StorageSchema.migrator.migrations.count)
         } catch {
-          failures.withLock { $0.append(String(describing: error)) }
+          failures.withLock { $0.append("\(operation): \(error)") }
         }
       }
       #expect(failures.withLock { $0.isEmpty }, "\(failures.withLock { $0 })")

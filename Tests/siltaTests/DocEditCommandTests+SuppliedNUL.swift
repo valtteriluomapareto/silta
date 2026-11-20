@@ -50,7 +50,7 @@ extension DocEditCommandTests {
           #expect((error?["next"] as? [String])?.isEmpty == false)
         }
         #expect(error?["code"] as? String == "invalid")
-        #expect(error?["message"] as? String == "Doc input must not contain NUL bytes.")
+        #expect(error?["message"] as? String == "Body input must not contain NUL bytes.")
         #expect(after == before)
       }
       #expect(!(result.stdout + result.stderr).contains("private-tail"))

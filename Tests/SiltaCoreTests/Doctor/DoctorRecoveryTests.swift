@@ -93,7 +93,12 @@ struct DoctorRecoveryTests {
     async throws
   {
     try await withScratchDirectory { home in
-      if state == "empty" { try Data().write(to: home.appending(path: "silta.db")) }
+      try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: home.path)
+      if state == "empty" {
+        let path = home.appending(path: "silta.db")
+        try Data().write(to: path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+      }
       if state == "initialized" { try StorageSchemaTests.store(home).initialize() }
       let ids = await inspect(home).checks.map(\.id)
       #expect(ids == DoctorService.checkOrder)

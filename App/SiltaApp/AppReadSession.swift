@@ -15,15 +15,13 @@ nonisolated final class AppReadSession: Sendable {
   func load(previous: AppLoadedData?, workspace: String?, force: Bool) throws -> AppLoadedData? {
     let (version, reused) = try probe.withLock { cached in
       do {
-        let reused = cached != nil
-        let connection: AppChangeProbe
-        if let cached {
-          connection = cached
-        } else {
-          connection = try reader.makeChangeProbe()
-          cached = connection
+        if let cached, cached.isCurrent() {
+          return (try cached.version(), true)
         }
-        return (try connection.version(), reused)
+        cached = nil
+        let connection = try reader.makeChangeProbe()
+        cached = connection
+        return (try connection.version(), false)
       } catch {
         cached = nil
         throw error

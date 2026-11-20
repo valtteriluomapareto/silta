@@ -36,6 +36,7 @@ package enum WorkspaceEditor {
     let approval = try actor.requireHuman(command: retry, approved: approved)
     let captured = Result { try capture(slug: slug, store: store, prepared: prepared) }
     let document = try input()
+    try BoundedInput.requireNoNul(document)
     let workspace = (try? captured.get())?.slug ?? slug  // Only scopes malformed input recovery.
     let (stamp, text) = try Baseline.payload(document, workspace: workspace)
     let baseline: Baseline
@@ -177,6 +178,7 @@ package enum WorkspaceEditor {
         try content.write(to: file, atomically: true, encoding: .utf8)
         guard try editor(file) == 0 else { return nil }
         let changed = try String(contentsOf: file, encoding: .utf8)
+        try BoundedInput.requireNoNul(changed)
         let unchanged = changed.utf8.elementsEqual(content.utf8)
         if let rejected, unchanged || changed.utf8.elementsEqual(rejected.text.utf8) {
           throw unchangedFailure(rejected.error, baseline: baseline)

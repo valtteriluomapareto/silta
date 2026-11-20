@@ -15,7 +15,12 @@ package final class DatabaseStore: Sendable {
   private let readBusyTimeout: TimeInterval
   /// Writes only to an existing, current database: never creates or migrates one.
   private let existingOnly: Bool
-  private let writer = Mutex<DatabaseQueue?>(nil)
+  private let writer = Mutex<Connection?>(nil)
+
+  struct Connection: Sendable {
+    let queue: DatabaseQueue
+    let file: DatabaseFile
+  }
 
   /// Configures the fixed database/backup locations without opening or creating files.
   /// With `existingOnly`, writes refuse a missing database or a pending migration.
@@ -41,68 +46,91 @@ package final class DatabaseStore: Sendable {
   func initialize(creating: Bool) throws {
     do {
       try writer.withLock { cached in
-        if !creating { try requireExistingFile() }
-        guard cached == nil else { return }
-        if creating {
-          let directory = try DirectoryPath.open(DirectoryPath.canonicalHome(home), creating: true)
-          close(directory)
+        if let connection = cached {
+          do {
+            try connection.file.requireCurrent(at: path)
+            return
+          } catch StorageError.databaseReplaced {
+            cached = nil
+            throw StorageError.databaseReplaced
+          }
         }
-        let descriptor = Darwin.open(
-          home.appending(path: "migration.lock").path, O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC,
-          0o600)
-        guard descriptor >= 0 else { throw StorageError.fileFailure(errno, at: home.path) }
-        defer { close(descriptor) }
-        // Covers WAL setup and discovery as well as migration execution across processes.
-        guard flock(descriptor, LOCK_EX) == 0 else {
-          throw StorageError.fileFailure(errno, at: home.path)
-        }
-        defer { flock(descriptor, LOCK_UN) }
-        try prepareDatabaseFile(creating: creating)
-        var config = Configuration()
-        config.prepareDatabase { TaskVisibility.register(in: $0) }
-        config.busyMode = .timeout(5)
-        let queue = try DatabaseQueue(path: path, configuration: config)
-        let migrator = StorageSchema.migrator
-        let pending = try queue.read(Self.pendingMigration)
-        if existingOnly, pending != nil { throw StorageError.migrationRequired }
-        try queue.writeWithoutTransaction { db in
-          try Self.requireWAL(try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL"))
-        }
-        if let pending {
-          // A name that already exists (a retry at the same instant) refuses, never replaces.
-          let timestamp = clock.now()
-          let milliseconds = Int64(timestamp.timeIntervalSince1970 * 1000)
-          let name = "silta-\(utcDay(timestamp))-before-\(pending)-\(milliseconds).db"
-          let backup = StorageBackup(home: home)
-          _ = try backup.snapshot(name: name)
-          try migrator.migrate(queue)
-          try? backup.prune(on: utcDay(timestamp), keeping: [name])  // retention after commit
-        }
-        cached = queue
+        cached = try openWriter(creating: creating)
       }
+    } catch let error as any CodedError {
+      throw error
     } catch {
       throw StorageError.mapped(error, at: path)
     }
   }
 
-  private func prepareDatabaseFile(creating: Bool) throws {
-    if creating {
-      let file = Darwin.open(path, O_CREAT | O_EXCL | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0o600)
-      if file >= 0 {
-        close(file)
-      } else if errno != EEXIST {
-        throw StorageError.fileFailure(errno, at: path)
-      }
+  private func prepareDatabaseFile(in directory: Int32) throws {
+    let descriptor = openat(
+      directory, "silta.db", O_CREAT | O_EXCL | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0o600)
+    if descriptor >= 0 {
+      close(descriptor)
+    } else if errno != EEXIST {
+      throw StorageError.fileFailure(errno, at: path)
     }
-    try requireExistingFile()
   }
 
-  /// Confirms the fixed database entry is an existing regular file.
-  private func requireExistingFile() throws {
-    var file = stat()
-    guard lstat(path, &file) == 0, file.st_mode & S_IFMT == S_IFREG else {
-      throw StorageError.cannotOpen
+  private func openWriter(creating: Bool) throws -> Connection {
+    let selected: DatabaseFile?
+    do {
+      selected = try DatabaseFile(at: path)
+    } catch StorageError.cannotOpen where creating {
+      selected = nil
     }
+    let parent = selected?.directory ?? DirectoryPath.canonicalHome(home)
+    let directory = try DirectoryPath.open(parent, creating: selected == nil)
+    defer { close(directory) }
+    let lockPath = parent.appending(path: "migration.lock").path
+    let descriptor = Darwin.open(lockPath, O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0o600)
+    guard descriptor >= 0 else { throw StorageError.fileFailure(errno, at: parent.path) }
+    defer { close(descriptor) }
+    // Aliases to the same target share its initialization lock.
+    guard flock(descriptor, LOCK_EX) == 0 else {
+      throw StorageError.fileFailure(errno, at: parent.path)
+    }
+    defer { flock(descriptor, LOCK_UN) }
+    guard DirectoryPath.matches(directory, path: parent) else {
+      throw StorageError.databaseReplaced
+    }
+    if selected == nil, DatabaseFile.isMissing(path) { try prepareDatabaseFile(in: directory) }
+    let file = try DatabaseFile(at: path)
+    guard file.directory.path == parent.path, selected == nil || selected == file else {
+      throw StorageError.databaseReplaced
+    }
+    return try openWriter(file)
+  }
+
+  private func openWriter(_ file: DatabaseFile) throws -> Connection {
+    var config = Configuration()
+    config.prepareDatabase { TaskVisibility.register(in: $0) }
+    config.busyMode = .timeout(5)
+    let queue = try DatabaseQueue(path: file.path, configuration: config)
+    try file.requireCurrent(at: path)
+    let pending = try queue.read(Self.pendingMigration)
+    if existingOnly, pending != nil { throw StorageError.migrationRequired }
+    try queue.writeWithoutTransaction { db in
+      try Self.requireWAL(try String.fetchOne(db, sql: "PRAGMA journal_mode=WAL"))
+    }
+    if let pending {
+      try migrate(queue, file: file, pending: pending)
+    }
+    try file.requireCurrent(at: path)
+    return Connection(queue: queue, file: file)
+  }
+
+  private func migrate(_ queue: DatabaseQueue, file: DatabaseFile, pending: String) throws {
+    let timestamp = clock.now()
+    let milliseconds = Int64(timestamp.timeIntervalSince1970 * 1000)
+    let name = "silta-\(utcDay(timestamp))-before-\(pending)-\(milliseconds).db"
+    let backup = StorageBackup(home: home, file: file)
+    _ = try backup.snapshot(name: name, source: queue)
+    try file.requireCurrent(at: path)
+    try StorageSchema.migrator.migrate(queue)
+    try? backup.prune(on: utcDay(timestamp), keeping: [name])  // retention after commit
   }
 
   /// The first migration this binary still has to apply, after the writer floor check.
@@ -122,9 +150,10 @@ package final class DatabaseStore: Sendable {
   }
 
   /// The already-open connection for snapshotting an existing store.
-  func preparedWriter() throws -> DatabaseQueue {
-    guard let queue = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
-    return queue
+  func preparedWriter() throws -> Connection {
+    guard let connection = writer.withLock({ $0 }) else { throw StorageError.internalMisuse }
+    try connection.file.requireCurrent(at: path)
+    return connection
   }
 
   /// Commits one BEGIN IMMEDIATE transaction, retrying raw SQLite busy failures at most
@@ -140,25 +169,29 @@ package final class DatabaseStore: Sendable {
     var kept: T?
     do {
       try initialize()
-      let queue = try preparedWriter()
-      let backup = StorageBackup(home: home)
+      let connection = try preparedWriter()
+      let file = connection.file
+      let backup = StorageBackup(home: home, file: file)
       let (result, day) = try withStorageRetry(clock: clock, jitter: jitter) {
-        try queue.write { db in
+        try connection.queue.write { db in
+          try file.requireCurrent(at: path)
           try Self.checkWriterVersion(db)
           // WAL lock acquisition alone does not prove the main file is writable.
-          guard FileManager.default.isWritableFile(atPath: path) else {
+          guard FileManager.default.isWritableFile(atPath: file.path) else {
             throw StorageError.accessDenied
           }
           let day = utcDay(clock.now())
           let previous = try String.fetchOne(
             db, sql: "SELECT value FROM meta WHERE key='last_backup_day'")
           guard let previous else { throw StorageError.corrupt }
-          if previous != day {
-            _ = try backup.snapshot(name: "silta-\(day).db", reuseExisting: true)
+          let daily = "silta-\(day).db"
+          if previous != day || !backup.hasPublishedSnapshot(named: daily) {
+            _ = try backup.snapshot(name: daily, reuseExisting: true)
             try db.execute(
               sql: "UPDATE meta SET value=? WHERE key='last_backup_day'", arguments: [day])
           }
-          let value = try body(StorageTransaction(database: db))
+          let value = try body(StorageTransaction(database: db, file: file))
+          try file.requireCurrent(at: path)
           guard !rollingBack else {
             kept = value
             throw RollBack()
@@ -199,8 +232,8 @@ package final class DatabaseStore: Sendable {
   /// Missing/unreadable files and attempts to mutate in the closure are coded failures.
   package func read<T>(_ body: (Database) throws -> T) throws -> T {
     do {
-      let queue = try openReader()
-      return try queue.read(body)
+      let connection = try openReader()
+      return try connection.queue.read(body)
     } catch let error as any CodedError {
       throw error
     } catch {
@@ -209,27 +242,29 @@ package final class DatabaseStore: Sendable {
   }
 
   /// Opens an existing store with the same read-only WAL recovery policy as ordinary reads.
-  func openReader() throws -> DatabaseQueue {
+  func openReader() throws -> Connection {
     do {
+      let file = try DatabaseFile(at: path)
       var config = Configuration()
       config.prepareDatabase { TaskVisibility.register(in: $0) }
       config.readonly = true
       config.busyMode = .timeout(readBusyTimeout)
       let queue: DatabaseQueue
       do {
-        queue = try DatabaseQueue(path: path, configuration: config)
+        queue = try DatabaseQueue(path: file.path, configuration: config)
       } catch let error as DatabaseError
         where error.resultCode == .SQLITE_CANTOPEN
-        && FileManager.default.isWritableFile(atPath: path)
+        && FileManager.default.isWritableFile(atPath: file.path)
       {
         // A read-only connection cannot recreate `-wal`/`-shm`, which another SQLite
         // client removes when it closes the database last. A read-write connection can;
         // `DatabaseQueue.read` still runs the body query-only. A read-only `silta.db` is
         // left alone: recreated files would inherit its mode and block later writes.
         config.readonly = false
-        queue = try DatabaseQueue(path: path, configuration: config)
+        queue = try DatabaseQueue(path: file.path, configuration: config)
       }
-      return queue
+      try file.requireCurrent(at: path)
+      return Connection(queue: queue, file: file)
     } catch {
       throw StorageError.mapped(error, at: path)
     }

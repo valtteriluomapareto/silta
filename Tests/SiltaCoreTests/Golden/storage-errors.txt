@@ -20,6 +20,16 @@ error: Database file could not be opened; it may be missing or its directory may
 ask human: silta doctor
 {"error":{"code":"env","message":"Database file could not be opened; it may be missing or its directory may not exist.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
 
+## invalidDatabaseTarget
+error: Database entry must resolve to an existing regular file. Inspect the entry and its target. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database entry must resolve to an existing regular file. Inspect the entry and its target.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
+## databaseReplaced
+error: Database file changed while this connection was open. Inspect the store and retry with a fresh connection. [env]
+ask human: silta doctor
+{"error":{"code":"env","message":"Database file changed while this connection was open. Inspect the store and retry with a fresh connection.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}
+
 ## ioFailure
 error: Database file could not be read or written because of a filesystem I/O error. [env]
 ask human: silta doctor

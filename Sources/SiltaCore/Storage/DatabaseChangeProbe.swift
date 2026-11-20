@@ -2,23 +2,32 @@ import GRDB
 
 /// A persistent serialized reader whose version values share one SQLite connection.
 package struct DatabaseChangeProbe: Sendable {
-  private let queue: DatabaseQueue
+  private let connection: DatabaseStore.Connection
   private let path: String
 
   /// Opens an existing store without creating it or applying migrations.
   package init(store: DatabaseStore) throws {
-    queue = try store.openReader()
+    connection = try store.openReader()
     path = store.path
+  }
+
+  package func isCurrent() -> Bool {
+    do {
+      try connection.file.requireCurrent(at: path)
+      return true
+    } catch { return false }
   }
 
   /// Checks compatibility and samples the connection-local version in one read transaction.
   package func sample() throws -> (version: Int, needsMigration: Bool) {
     do {
-      return try queue.read { db in
+      return try connection.queue.read { db in
+        try connection.file.requireCurrent(at: path)
         let pending = try DatabaseStore.readerNeedsMigration(in: db)
         guard let version = try Int.fetchOne(db, sql: "PRAGMA data_version") else {
           throw StorageError.corrupt
         }
+        try connection.file.requireCurrent(at: path)
         return (version, pending)
       }
     } catch let error as any CodedError {

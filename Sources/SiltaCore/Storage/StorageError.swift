@@ -11,6 +11,10 @@ package enum StorageError: CodedError, CaseIterable {
   case accessDenied
   /// The database file is missing or cannot be opened.
   case cannotOpen
+  /// The configured database entry exists but its target is unusable.
+  case invalidDatabaseTarget
+  /// An open connection no longer points at the configured database.
+  case databaseReplaced
   /// The filesystem reported an I/O failure while reading or writing the database.
   case ioFailure
   /// The database's filesystem is out of space or over its quota.
@@ -53,6 +57,11 @@ package enum StorageError: CodedError, CaseIterable {
       "Database access is denied by file permissions or a read-only file or directory."
     case .cannotOpen:
       "Database file could not be opened; it may be missing or its directory may not exist."
+    case .invalidDatabaseTarget:
+      "Database entry must resolve to an existing regular file. Inspect the entry and its target."
+    case .databaseReplaced:
+      "Database file changed while this connection was open. Inspect the store and retry "
+        + "with a fresh connection."
     case .ioFailure: "Database file could not be read or written because of a filesystem I/O error."
     case .diskFull: "Database write failed because the disk is full or over its quota."
     case .walRefused:

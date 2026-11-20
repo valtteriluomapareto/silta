@@ -6,8 +6,8 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreDocumentLinkReportTests {
-  static func report(_ before: ExportSnapshot, _ after: ExportSnapshot) -> RestoreReport {
-    RestoreReport.between(before, after, workspace: "acme", digest: "abc", dryRun: true)
+  static func report(_ before: ExportSnapshot, _ after: ExportSnapshot) throws -> RestoreReport {
+    try RestoreReport.between(before, after, workspace: "acme", digest: "abc", dryRun: true)
   }
 
   static func validate(_ tree: ExportSnapshot) throws {
@@ -43,7 +43,7 @@ struct RestoreDocumentLinkReportTests {
     try Self.validate(after)
     #expect(before.documents == after.documents)
     #expect(before.links.count == after.links.count)
-    let result = Self.report(before, after)
+    let result = try Self.report(before, after)
     #expect(result.removedDocs.isEmpty && result.rows.isEmpty)
     #expect(result.changedDocs == ["doc:push-rules"])
   }
@@ -67,12 +67,12 @@ struct RestoreDocumentLinkReportTests {
     RestoreDocumentGraphFixture.link(&after, index, "to_ext", "After")
     try Self.validate(before)
     try Self.validate(after)
-    #expect(Self.report(before, after).changedDocs.isEmpty)
+    #expect(try Self.report(before, after).changedDocs.isEmpty)
   }
 
   @Test func presentedSnapshotMasksCredentialPathWhileRawReportStaysLiteral() throws {
     let tree = try RestoreDocumentGraphFixture.graph()
-    var raw = Self.report(tree, tree)
+    var raw = try Self.report(tree, tree)
     #expect(raw.presented.snapshot == nil)
     let ordinary = "/private/acme/backups/before-restore.db"
     raw.snapshot = ordinary

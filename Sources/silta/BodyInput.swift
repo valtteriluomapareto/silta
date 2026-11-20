@@ -12,6 +12,7 @@ enum BodyInput {
       guard let text = String(data: bytes, encoding: .utf8) else {
         throw BodyInputError.invalidUTF8
       }
+      try BoundedInput.requireNoNul(text)
       return text
     } catch let error as BodyInputError {
       throw error

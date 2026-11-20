@@ -107,12 +107,16 @@ extension RestoreWriter {
 
   /// The task counter never rewinds: refs already cited are never reused. Nil when the
   /// database holds none and the tree has nothing to count.
-  static func nextTaskSeq(stored: Int64?, tree: ExportSnapshot) -> Int64? {
+  static func nextTaskSeq(stored: Int64?, tree: ExportSnapshot) throws -> Int64? {
     let highest = tree.tasks.compactMap { Int64($0.row.value("seq") ?? "") }.max() ?? 0
+    let imported = tree.workspace.value("next_task_seq").flatMap(Int64.init)
+    let (minimum, overflow) = highest.addingReportingOverflow(1)
+    guard !overflow, minimum < Int64.max, imported != Int64.max
+    else { throw ExportError.exhaustedTaskCounter(destination: false) }
+    guard stored != Int64.max else { throw ExportError.exhaustedTaskCounter(destination: true) }
     guard stored != nil || !tree.tasks.isEmpty || tree.workspace.value("next_task_seq") != nil
     else { return nil }
-    return [stored, tree.workspace.value("next_task_seq").flatMap { Int64($0) }, highest + 1]
-      .compactMap { $0 }.max() ?? highest + 1
+    return max(stored ?? minimum, imported ?? minimum, minimum)
   }
 
   /// Writes the counter the next task ref is taken from.
@@ -120,7 +124,7 @@ extension RestoreWriter {
     let scope = "task:\(workspace)"
     let stored = try Int64.fetchOne(
       db, sql: "SELECT next FROM seq_counter WHERE scope=?", arguments: [scope])
-    guard let next = Self.nextTaskSeq(stored: stored, tree: tree) else { return }
+    guard let next = try Self.nextTaskSeq(stored: stored, tree: tree) else { return }
     try db.execute(
       sql: """
         INSERT INTO seq_counter(scope,next) VALUES(?,?)

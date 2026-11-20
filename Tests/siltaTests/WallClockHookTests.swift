@@ -139,10 +139,7 @@ struct WallClockHookTests {
       let fifo = scratch.appending(path: "blocked")
       try #require(mkfifo(fifo.path, 0o600) == 0)
       if kind == "git" {
-        let config = repo.appending(path: ".git/config")
-        var text = try String(contentsOf: config, encoding: .utf8)
-        text += "\n[include]\npath = \(fifo.path)\n"
-        try Data(text.utf8).write(to: config)
+        try Self.blockGit(repo, on: fifo)
       } else {
         let path = store(scratch).path
         try FileManager.default.removeItem(atPath: path)
@@ -185,9 +182,9 @@ struct WallClockHookTests {
   @Test func watchdogWritesOneBodyFreeTraceAndDoesNotBlockOnLogFIFO() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)
-      let path = store(scratch).path
-      try FileManager.default.removeItem(atPath: path)
-      try #require(mkfifo(path, 0o600) == 0)
+      let fifo = scratch.appending(path: "blocked-git")
+      try #require(mkfifo(fifo.path, 0o600) == 0)
+      try Self.blockGit(repo, on: fifo)
       let log = scratch.appending(path: "silta-home/log/2023-11-14.jsonl")
       let result = try run(["--hook"], repo, scratch)
       #expect(result == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
@@ -262,5 +259,14 @@ struct WallClockHookTests {
       #expect(hook.stdout.contains("open: AC-1"))
       #expect(!warnings.contains("hook_timeout"))
     }
+  }
+}
+
+extension WallClockHookTests {
+  private static func blockGit(_ repo: URL, on fifo: URL) throws {
+    let config = repo.appending(path: ".git/config")
+    var text = try String(contentsOf: config, encoding: .utf8)
+    text += "\n[include]\npath = \(fifo.path)\n"
+    try Data(text.utf8).write(to: config)
   }
 }

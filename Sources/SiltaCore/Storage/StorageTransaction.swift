@@ -4,6 +4,8 @@ package import GRDB
 package struct StorageTransaction {
   /// Connection confined to the write closure; never retain it beyond that closure.
   package let database: Database
+  /// Pinned source for backups made outside this write transaction.
+  let file: DatabaseFile
 
   /// Allocates the next one-based sequence for a scope inside the caller's transaction.
   package func nextSequence(scope: String) throws -> Int64 {

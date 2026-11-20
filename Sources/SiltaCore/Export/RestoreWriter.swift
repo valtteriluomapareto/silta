@@ -41,7 +41,7 @@ struct RestoreWriter {
         "workspace \(other) already has the tree's uid or task prefix")
     }
     try checkForeignUIDs()
-    return RestoreReport.between(current, tree, workspace: slug, digest: digest, dryRun: dryRun)
+    return try RestoreReport.between(current, tree, workspace: slug, digest: digest, dryRun: dryRun)
   }
 
   /// A uid of the tree that a row of another workspace holds; uids are unique across
