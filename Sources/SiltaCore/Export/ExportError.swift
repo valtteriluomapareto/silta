@@ -11,7 +11,7 @@ package enum ExportError: CodedError, Equatable {
   /// The workspace holds data this binary can't export yet.
   case unsupported(String)
   /// A stored workspace, map identifier or generated file path is invalid.
-  case invalidExport(reason: String)
+  case invalidExport(reason: String, workspace: String)
   /// A workspace or map identifier in the tree cannot be restored.
   case invalidRestoreIdentifier(field: String)
   /// The tree uses a canonical format version newer than this reader supports.
@@ -97,8 +97,10 @@ package enum ExportError: CodedError, Equatable {
         + "so export changed nothing."
     case .unsupported(let what):
       "This workspace has \(what), which this version of silta can't export; nothing was written."
-    case .invalidExport(let reason):
-      "Cannot export this workspace: \(reason). Nothing was written."
+    case .invalidExport(let reason, let workspace):
+      "Cannot export \(Self.safeWorkspace(workspace) ? "workspace " + workspace : "this workspace"): "
+        + "\(reason). Ask the human to inspect the configuration and correct it with ws edit "
+        + "where possible. Nothing was written."
     case .newerFormat:
       "This export uses a newer format than this version of silta can read; nothing was changed."
     case .unwritable(let path, _):
@@ -178,7 +180,11 @@ package enum ExportError: CodedError, Equatable {
         ]
     case .otherWorkspace(let tree, _, let directory):
       [workspaceCommand("silta restore " + shellWord(directory) + " --dry-run", workspace: tree)]
-    case .restoreConflict, .invalidExport, .invalidRestoreIdentifier: ["silta ws ls"]
+    case .invalidExport(_, let workspace):
+      Self.safeWorkspace(workspace)
+        ? ["silta --ws \(shellWord(workspace)) ws show"]
+        : ["silta ws show --help"]
+    case .restoreConflict, .invalidRestoreIdentifier: ["silta ws ls"]
     case .exhaustedTaskCounter: ["silta restore --help"]
     case .invalidManifest(let directory), .manifestChanged(_, let directory):
       RestoreService.canNameInRecovery(directory)

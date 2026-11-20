@@ -243,7 +243,7 @@ extension ExportError: ErrorExamples {
       .unsupported("docs"), .newerFormat, .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
       .invalidTree(reason: "links.jsonl does not match its sha256", workspace: "acme"),
       .exhaustedTaskCounter(destination: false), .exhaustedTaskCounter(destination: true),
-      .invalidExport(reason: "the task prefix is not an identifier"),
+      .invalidExport(reason: "the task prefix is not an identifier", workspace: "acme"),
       .invalidRestoreIdentifier(field: "service slug"),
       .defaultRootUnavailable,
       .invalidManifest(directory: "/tmp/acme-notes/acme"),

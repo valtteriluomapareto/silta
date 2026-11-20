@@ -27,7 +27,10 @@ extension ExportServiceTests {
         "slug": "workspace slug", "task_prefix": "task prefix", "service": "service slug",
       ]
       let name = try #require(fields[field])
-      #expect(throws: ExportError.invalidExport(reason: "the \(name) is not an identifier")) {
+      #expect(
+        throws: ExportError.invalidExport(
+          reason: "the \(name) is not an identifier", workspace: slug)
+      ) {
         try ExportService.export(workspace: slug, to: root, store: store, home: home)
       }
       #expect(try Set(fm.contentsOfDirectory(atPath: scratch.path)) == surroundings)

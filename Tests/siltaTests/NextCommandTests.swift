@@ -67,13 +67,11 @@ struct NextCommandTests {
       ]
       let paths = try Set(
         Self.hints(in: directory).compactMap { Self.commandPath($0, groups: groups) })
-      withKnownIssue("Recovery shapes were skipped by the golden checker.") {
-        #expect(
-          paths == [
-            "silta task ls", "silta ws show", "silta task triage", "silta app ls", "silta repo ls",
-            "silta code ls", "silta where", "silta task show", "silta guide",
-          ])
-      }
+      #expect(
+        paths == [
+          "silta task ls", "silta ws show", "silta task triage", "silta app ls", "silta repo ls",
+          "silta code ls", "silta where", "silta task show", "silta guide",
+        ])
     }
   }
 
@@ -86,7 +84,7 @@ struct NextCommandTests {
       switch file.pathExtension {
       case "txt":
         return try textHints(from: file)
-      case "json":
+      case "json", "jsonl":
         return try jsonHints(from: file)
       default:
         return []
@@ -96,9 +94,15 @@ struct NextCommandTests {
 
   private static func textHints(from file: URL) throws -> [String] {
     let contents = try String(contentsOf: file, encoding: .utf8)
-    return contents.split(separator: "\n").compactMap { line in
-      let prefixes = ["next: ", "ask human: "]
-      return prefixes.first { line.hasPrefix($0) }.map { String(line.dropFirst($0.count)) }
+    return contents.split(separator: "\n").flatMap { original -> [String] in
+      let line = original.drop(while: { $0 == " " || $0 == "\t" })
+      if line.hasPrefix("next: ") {
+        return recoveryCommands(String(line.dropFirst("next: ".count)))
+      }
+      if line.hasPrefix("ask human: ") || line.hasPrefix("After approval: ") {
+        return recoveryCommands(String(line))
+      }
+      return []
     }
   }
 
@@ -115,10 +119,21 @@ struct NextCommandTests {
 
   private static func nestedHints(_ value: Any) -> [String] {
     if let object = value as? [String: Any] {
-      return (object["next"] as? [String] ?? []) + object.values.flatMap(nestedHints)
+      let next = object["next"] as? [String] ?? (object["next"] as? String).map { [$0] } ?? []
+      return next.flatMap(recoveryCommands) + object.values.flatMap(nestedHints)
     }
     if let list = value as? [Any] { return list.flatMap(nestedHints) }
     return []
+  }
+
+  private static func recoveryCommands(_ hint: String) -> [String] {
+    if hint.hasPrefix("After approval: ") || hint.hasPrefix("ask human: "),
+      let approval = hint.range(of: "After approval: ")
+    {
+      return hint[approval.upperBound...].components(separatedBy: "; or ")
+    }
+    if hint.hasPrefix("ask human: ") { return [String(hint.dropFirst("ask human: ".count))] }
+    return [hint]
   }
 
   private static func commandPath(_ hint: String, groups: Set<String>) -> String? {

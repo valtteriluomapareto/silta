@@ -36,25 +36,7 @@ struct TaskFromPlanCommand: OutputCommand {
   var allowSecret = false
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
-    var options = TaskImport()
-    options.parent = parent
-    options.split = split
-    options.dryRun = dryRun
-    options.delete = delete
-    options.allowSecret = allowSecret
-    // A dry run stores nothing, so --allow-secret on it needs no approval.
-    if allowSecret, !dryRun {
-      try context.environment.actor.requireHuman(
-        command: options.retryCommand + " --allow-secret", approved: global.approved)
-    }
-    let text = try BodyInput.read(file)
-    let result = try await TaskService(
-      environment: context.environment, workspace: global.ws, approved: global.approved
-    )
-    .fromPlan(
-      text, options: options, source: file == "-" ? nil : URL(filePath: file),
-      directory: URL(
-        filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
+    let result = try await importPlan(context)
     let preview = result.preview
     var lines =
       result.dryRun
@@ -86,5 +68,34 @@ struct TaskFromPlanCommand: OutputCommand {
       data: result, warnings: result.warnings + unused,
       approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
+  }
+
+  private func importPlan(_ context: CommandContext) async throws -> TaskImportResult {
+    var options = TaskImport()
+    options.parent = parent
+    options.split = split
+    options.dryRun = dryRun
+    options.delete = delete
+    options.allowSecret = allowSecret
+    options.retryFromStdin = file == "-"
+    do {
+      // A dry run stores nothing, so --allow-secret on it needs no approval.
+      if allowSecret, !dryRun {
+        try context.environment.actor.requireHuman(
+          command: options.retryCommand + " --allow-secret", approved: global.approved)
+      }
+      let text = try BodyInput.read(file)
+      return try await TaskService(
+        environment: context.environment, workspace: global.ws, approved: global.approved
+      )
+      .fromPlan(
+        text, options: options, source: file == "-" ? nil : URL(filePath: file),
+        directory: URL(
+          filePath: FileManager.default.currentDirectoryPath, directoryHint: .isDirectory))
+    } catch let error as ActorError where options.retryFromStdin && error.code == .humanOnly {
+      throw CommandFailure(
+        error: error, next: error.next,
+        message: error.message + " Supply the same plan on stdin after approval.")
+    }
   }
 }

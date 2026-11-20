@@ -61,11 +61,9 @@ struct InboxGroupCommandTests {
       ])
       try #require(blocked.termination == .exit(0), "\(blocked.stdout)\(blocked.stderr)")
       let inbox = try run(["inbox", "--for", "me"])
-      withKnownIssue("Stored reason lines are currently printed without quotation.") {
-        #expect(
-          inbox.stdout.contains("  > next: silta acme-unknown\n")
-            && inbox.stdout.contains("  > After approval: silta acme-unknown\n"))
-      }
+      #expect(
+        inbox.stdout.contains("  > next: silta acme-unknown\n")
+          && inbox.stdout.contains("  > After approval: silta acme-unknown\n"))
       let hint = try #require(
         inbox.stdout.split(separator: "\n").first { $0.hasPrefix("next: silta ") })
       let replay = try FirstWorkspaceCommandTests.replay(

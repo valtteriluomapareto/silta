@@ -17,13 +17,17 @@ package struct BriefService {
     let location = try await LocationService(environment: environment).resolve(
       path: path, workspace: workspace, app: app, task: task, cacheWrites: !hook)
     let now = environment.clock.now()
-    return try environment.db.read {
-      try report(
+    var report = try environment.db.read {
+      try self.report(
         location, app: app, topics: topics, budget: budget, compact: short || hook, at: now, in: $0)
     }
+    await addEdgeCommands(to: &report, workspace: location.workspace)
+    report.trim(tokens: budget)
+    report.insertDocuments(tokens: budget)
+    return report
   }
 
-  /// Renders and trims the report in the caller's read snapshot.
+  /// Captures brief data in the caller's read snapshot before any edge probes.
   func report(
     _ location: LocationResult, app: String? = nil, topics: [String] = [], budget: Int = 2500,
     compact: Bool = false, at now: Date, in db: Database
@@ -58,7 +62,7 @@ package struct BriefService {
       }
         ?? [command + " task ls", command + " ws show"])
       + (discussion.inbox.isEmpty ? [] : [command + " inbox"])
-    var report = BriefReport(
+    return BriefReport(
       location: BriefLocation(location), settings: settings,
       currentTask: selected?.ref,
       sections: sections(
@@ -66,9 +70,28 @@ package struct BriefService {
         discussion: discussion.task, characters: characters)
         + discussion.inbox + context.sections,
       more: more, warnings: location.warnings + settings.warnings + context.warnings)
-    report.trim(tokens: budget)
-    report.insertDocuments(tokens: budget)
-    return report
+  }
+
+  private func addEdgeCommands(to report: inout BriefReport, workspace: String) async {
+    var probe = EdgeCodeEvidence(workspace: workspace, environment: environment)
+    var emitted: Set<String> = []
+    for index in report.sections.indices {
+      guard let references = report.sections[index].edgeCodeRefs else { continue }
+      var needsInspection = references.isEmpty
+      for reference in references {
+        guard let command = await probe.command(reference) else {
+          needsInspection = true
+          continue
+        }
+        if emitted.insert(command).inserted {
+          report.sections[index].text += "next: " + command + "\n"
+        }
+      }
+      if needsInspection, emitted.insert(probe.inspect).inserted {
+        report.sections[index].text += "next: " + probe.inspect + "\n"
+      }
+      report.sections[index].edgeCodeRefs = nil
+    }
   }
 
   private func sections(

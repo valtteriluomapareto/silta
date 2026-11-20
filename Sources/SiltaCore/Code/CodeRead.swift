@@ -21,7 +21,8 @@ package enum CodeRead: Sendable {
   func contentCapture() throws -> GitCapture {
     guard case .show(_, let lines) = self else { return .init(byteLimit: Self.byteLimit) }
     return try .init(
-      byteLimit: Self.byteLimit, skipLines: (lineRange(lines)?.lowerBound ?? 1) - 1)
+      byteLimit: Self.byteLimit, skipLines: (lineRange(lines)?.lowerBound ?? 1) - 1,
+      countLines: lines == nil)
   }
 
   var verb: String {
@@ -237,7 +238,7 @@ extension CodeRead {
       if range.upperBound <= end {
         warnings = []
       } else if result.stdoutTruncated {
-        warnings = [byteWarning]
+        warnings = [count == 0 ? oversizedLine(end + 1) : byteWarning]
       } else {
         warnings = [
           .init(
@@ -254,14 +255,22 @@ extension CodeRead {
     }
     let output =
       count > Self.showLimit ? lines.prefix(Self.showLimit).joined(separator: "\n") + "\n" : text
-    if result.stdoutTruncated { return (output, [byteWarning]) }
-    guard count > Self.showLimit else { return (output, []) }
-    let warning = OutputWarning(
+    guard result.stdoutTruncated || count > Self.showLimit else { return (output, []) }
+    if count == 0 { return (output, [oversizedLine(end + 1)]) }
+    let shown = min(count, Self.showLimit)
+    let total = result.stdoutTruncated ? result.stdoutLineCount : count
+    let message =
+      total.map {
+        "Output cut after \(shown) of \($0) lines; read the rest with --lines \(shown + 1)-\($0)."
+      } ?? "Output cut after \(shown) lines at 1 MiB; continue with --lines \(shown + 1)."
+    return (output, [.init(code: "output_truncated", message: message)])
+  }
+
+  private func oversizedLine(_ line: Int) -> OutputWarning {
+    .init(
       code: "output_truncated",
-      message:
-        "Output cut after \(Self.showLimit) of \(count) lines; "
-        + "read the rest with --lines \(Self.showLimit + 1)-\(count).")
-    return (output, [warning])
+      message: "Line \(line) exceeds 1 MiB and cannot be displayed. "
+        + "Use --lines \(line + 1) to read the next line if present.")
   }
 
   private static func completeRecords(_ result: GitResult, delimiter: UInt8) -> String {

@@ -250,7 +250,7 @@ struct CodeServiceTests {
             "--format=", "--no-color",
             "--no-ext-diff", "--no-textconv",
             sha + ":README.md",
-          ], directory: home, capture: .init(byteLimit: CodeRead.byteLimit)),
+          ], directory: home, capture: .init(byteLimit: CodeRead.byteLimit, countLines: true)),
         .success(.init(termination: .exit(0), stdout: Data("committed\n".utf8)))
       ),
     ]
@@ -263,5 +263,32 @@ struct CodeServiceTests {
       workspace: "acme", store: store, git: git, at: WorkspaceConfigTests.instant
     )
     .read(.show("README.md", lines: nil), target: "api", fetch: fetch)
+  }
+}
+
+extension CodeServiceTests {
+  @Test func validatingLocalEvidenceDoesNotReadBlobContentOrEnableLazyFetch() async throws {
+    try await withScratchDirectory { home in
+      let store = try setup(home)
+      let commit = try #require(reads(home).first)
+      let prefix = ["--no-pager", "-c", "format.pretty=medium"]
+      let git = ScriptedGitRunner(script: [
+        (
+          .init(arguments: commit.0.arguments, directory: home, timeout: 0.25, lazyFetch: false),
+          commit.1
+        ),
+        (
+          .init(
+            arguments: prefix + ["cat-file", "-t", "--", sha + ":README.md"],
+            directory: home, timeout: 0.25, lazyFetch: false),
+          .success(.init(termination: .exit(0), stdout: Data("blob\n".utf8)))
+        ),
+      ])
+      let reader = CodeService(
+        workspace: "acme", store: store, git: git, at: WorkspaceConfigTests.instant, localOnly: true
+      )
+      #expect(try await reader.validateEvidence(.show("README.md", lines: "1"), target: "api"))
+      #expect(git.isExhausted)
+    }
   }
 }

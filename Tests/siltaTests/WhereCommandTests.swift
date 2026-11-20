@@ -95,17 +95,15 @@ struct WhereCommandTests {
       let accepted = try task(["triage", "--accept", ref, "--approved", "Accept Acme work."])
       try #require(accepted.termination == .exit(0), "\(accepted.stdout)")
       let started = try task(["start", ref])
-      withKnownIssue("Resolving an unborn HEAD as a commit refuses to start the task.") {
-        #expect(started.termination == .exit(0), "\(started.stdout)")
-      }
-      guard started.termination == .exit(0) else {
-        #expect(try TaskStateCommandTests.error(started)["code"] as? String == "env")
-        return
-      }
+      try #require(started.termination == .exit(0), "\(started.stdout)")
       let taskData = try data(task(["show", ref]))
       #expect(taskData["branch"] as? String == "acme-unborn")
-      #expect(taskData["worktree"] as? String == repo.resolvingSymlinksInPath().path)
-      #expect(try task(["done", ref, "-m", "Acme finished"]).termination != .exit(0))
+      let topLevel = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/git"), ["rev-parse", "--show-toplevel"], in: scratch, cwd: repo)
+      #expect(topLevel.termination == .exit(0))
+      #expect(taskData["worktree"] as? String == topLevel.stdout.trimmingCharacters(in: .newlines))
+      let refused = try task(["done", ref, "-m", "Acme finished"])
+      #expect(try TaskStateCommandTests.error(refused)["code"] as? String == "env")
       #expect(try data(task(["show", ref]))["status"] as? String == "doing")
     }
   }

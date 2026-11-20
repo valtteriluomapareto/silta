@@ -114,18 +114,15 @@ extension CodeCommandTests {
       let warning = try warnings(first.stdout)["output_truncated"]
       let count = output.split(separator: "\n").count
       #expect(count == (width == 2450 ? 400 : 298))
-      withKnownIssue("Byte truncation loses the line count and continuation.") {
-        #expect(
-          warning == "Output cut after \(count) of 450 lines; "
-            + "read the rest with --lines \(count + 1)-450.")
-      }
-      if let range = warning?.split(separator: " ").last, range.first?.isNumber == true {
-        let next = try SiltaBinary.run(
-          command + ["--lines", String(range.dropLast())], in: scratch)
-        #expect(
-          try envelope(next.stdout)["output"] as? String
-            == lines.dropFirst(count).joined(separator: "\n"))
-      }
+      #expect(
+        warning == "Output cut after \(count) of 450 lines; "
+          + "read the rest with --lines \(count + 1)-450.")
+      let range = try #require(warning?.split(separator: " ").last)
+      let next = try SiltaBinary.run(command + ["--lines", String(range.dropLast())], in: scratch)
+      #expect(next.termination == .exit(0))
+      #expect(
+        try envelope(next.stdout)["output"] as? String
+          == lines.dropFirst(count).joined(separator: "\n"))
     }
   }
 
@@ -141,10 +138,11 @@ extension CodeCommandTests {
       let oversized = try SiltaBinary.run(command + ["2-2"], in: scratch)
       let warnings = try warnings(oversized.stdout)
       #expect(try envelope(oversized.stdout)["output"] as? String == "")
-      withKnownIssue("A range retry cannot fit an oversized physical line.") {
-        #expect(warnings["output_truncated"]?.contains("Line 2 exceeds 1 MiB") == true)
-      }
-      let later = try SiltaBinary.run(command + ["3-3"], in: scratch)
+      let warning = try #require(warnings["output_truncated"])
+      #expect(warning.contains("Line 2 exceeds 1 MiB"))
+      let next = try #require(warning.firstMatch(of: /--lines ([0-9]+)/)?.output.1)
+      let later = try SiltaBinary.run(command + [String(next)], in: scratch)
+      #expect(later.termination == .exit(0))
       #expect(try envelope(later.stdout)["output"] as? String == "last")
     }
   }

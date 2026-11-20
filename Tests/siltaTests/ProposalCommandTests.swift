@@ -128,9 +128,8 @@ struct ProposalCommandTests {
       let hints = try #require(failure["next"] as? [String])
       let hint = try #require(hints.first { $0.contains("silta --ws 'acme' task from-plan") })
       let expected = "task from-plan -" + (split ? " --split" : "") + " --approved"
-      withKnownIssue("The retry currently forgets that the plan came from stdin.") {
-        #expect(hint.contains(expected))
-      }
+      #expect(hint.contains(expected))
+      #expect((failure["message"] as? String)?.contains("Supply the same plan on stdin") == true)
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 0)
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
       guard hint.contains(expected) else { return }

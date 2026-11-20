@@ -52,7 +52,7 @@ extension BriefCommandTests {
       #expect(open.components(separatedBy: "AC-2").count == 2)
       #expect(result.stdout.contains("glossary: messages = messaging, push"))
       #expect(result.stdout.contains("code show 'api' --lines 1 -- 'README.md'"))
-      #expect(result.stdout.contains("code ls 'portal'"))
+      #expect(result.stdout.contains("next: silta --ws 'acme' ws show"))
       #expect(result.stdout.contains("service:push"))
       #expect(!result.stdout.contains("code ls 'api'"))
       let explicit = try run(
@@ -70,14 +70,7 @@ extension BriefCommandTests {
 
   @Test func neighbourEvidenceUsesTheCommittedRefAndAppSubpath() throws {
     try withScratchDirectory { scratch in
-      let repo = try fixture.setup(scratch)
-      try fixture.git(["checkout", "-q", "api"], repo, scratch)
-      try fixture.git(["switch", "-c", "acme-edge"], repo, scratch)
-      let directory = repo.appending(path: "guide")
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      try Data("Acme guide\n".utf8).write(to: directory.appending(path: "Acme's guide.md"))
-      try fixture.git(["add", "guide"], repo, scratch)
-      try fixture.git(["commit", "-m", "Add Acme guide"], repo, scratch)
+      let repo = try committedEdgeFixture(scratch)
       let config = scratch.appending(path: "workspace.yml")
       try """
       workspace: {slug: acme, name: Acme, task_prefix: AC}
@@ -99,7 +92,14 @@ extension BriefCommandTests {
         ],
         in: scratch, cwd: repo, environment: TaskCommandTests.actor)
       try #require(edit.termination == .exit(0), "\(edit.stdout)\(edit.stderr)")
-      let warnings = try TaskStateCommandTests.warnings(edit)
+      let warnings = try #require(
+        try TaskStateCommandTests.object(edit)["warnings"] as? [[String: String]])
+      let warning = try #require(
+        warnings.first { $0["code"] == "edge_code_unavailable" }?["message"])
+      #expect(
+        warnings.count == 1 && warning.contains("api:") && warning.contains("guide.md"),
+        "\(warning)")
+      let inspect = try #require(warning.firstMatch(of: /Inspect it with (silta .+)\.$/)?.output.1)
       let brief = try run(["--app", "portal"], repo, scratch)
       try #require(brief.termination == .exit(0), "\(brief.stdout)\(brief.stderr)")
       let hints = brief.stdout.split(separator: "\n").compactMap { line -> String? in
@@ -110,16 +110,23 @@ extension BriefCommandTests {
       let replay = try FirstWorkspaceCommandTests.replay(valid, in: scratch, cwd: repo)
       #expect(replay.termination == .exit(0) && replay.stdout.contains("Acme guide"))
       let unknown = hints.contains { $0.contains("code show 'api'") }
-      let inspect = "silta --ws 'acme' ws show"
-      withKnownIssue("Workspace edits and briefs currently trust unverified code paths.") {
-        #expect(warnings.contains("edge_code_unavailable") && !unknown && hints.contains(inspect))
-      }
-      if hints.contains(inspect) {
-        #expect(
-          try FirstWorkspaceCommandTests.replay(inspect, in: scratch, cwd: repo).termination
-            == .exit(0))
-      }
+      #expect(!unknown)
+      let fallback = try #require(hints.first { $0 == inspect })
+      let configRead = try FirstWorkspaceCommandTests.replay(fallback, in: scratch, cwd: repo)
+      #expect(configRead.termination == .exit(0) && configRead.stdout.contains("Acme integration"))
     }
+  }
+
+  private func committedEdgeFixture(_ scratch: URL) throws -> URL {
+    let repo = try fixture.setup(scratch)
+    try fixture.git(["checkout", "-q", "api"], repo, scratch)
+    try fixture.git(["switch", "-c", "acme-edge"], repo, scratch)
+    let directory = repo.appending(path: "guide")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try Data("Acme guide\n".utf8).write(to: directory.appending(path: "Acme's guide.md"))
+    try fixture.git(["add", "guide"], repo, scratch)
+    try fixture.git(["commit", "-m", "Add Acme guide"], repo, scratch)
+    return repo
   }
 
   @Test func backlogOrderLimitsVisibilityAndDoneResult() throws {

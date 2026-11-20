@@ -3,7 +3,8 @@ Scope: current local attention; tracker status is not refreshed.
 ext:acme follow-up due 2023-11-14
   AC-1: Acme
   waiting on: ext:acme
-  ask: Choose API
+  ask:
+  > Choose API
   follow-up: 2023-11-14
 next: silta --ws 'acme' task ls --status todo
 next: silta --ws 'acme' task show 'AC-1'

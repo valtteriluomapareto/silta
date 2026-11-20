@@ -74,7 +74,7 @@ struct TaskBlockGuardTests {
       let git = ScriptedGitRunner(
         script: TaskGitTests.script(repo: repo, cwd: repo, completion: false),
         beforeRequest: { request in
-          if request.arguments == ["rev-parse", "--abbrev-ref", "HEAD"] {
+          if request.arguments == ["symbolic-ref", "--quiet", "HEAD"] {
             _ = try blocking.block("AC-1", TaskBlockTests.input(["ext:acme"]))
           }
         })

@@ -79,9 +79,7 @@ struct ExportCommandTests {
       let next = malformedWorkspace ? "silta ws show --help" : "silta --ws 'acme' ws show"
       #expect(message.contains(malformedWorkspace ? "workspace slug" : "task prefix"))
       #expect(!message.contains(outsideIdentifier))
-      withKnownIssue("Export reports an unscoped list instead of safe inspection.") {
-        #expect(hints == [next])
-      }
+      #expect(hints == [next])
       guard hints == [next] else { return }
       let replay = try FirstWorkspaceCommandTests.replay(next, in: scratch, cwd: scratch)
       #expect(replay.termination == .exit(0), "\(replay.stdout)\(replay.stderr)")

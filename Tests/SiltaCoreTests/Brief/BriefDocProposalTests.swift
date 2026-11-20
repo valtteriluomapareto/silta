@@ -219,7 +219,10 @@ struct BriefDocProposalTests {
       path: "/acme", worktree: "/acme", workspace: "acme", repo: "platform", branch: "main",
       head: "a", confidence: "high", reason: "single", candidates: [])
     location.currentTask = current
-    return try BriefService(environment: service.environment).report(
+    var report = try BriefService(environment: service.environment).report(
       location, budget: budget, at: AcmeDocAttachments.instant, in: db)
+    report.trim(tokens: budget)
+    report.insertDocuments(tokens: budget)
+    return report
   }
 }

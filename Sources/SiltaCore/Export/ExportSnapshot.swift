@@ -110,14 +110,16 @@ package struct ExportSnapshot: Equatable, Sendable {
   /// Validates stored identifiers and output paths before a workspace can be published.
   func publicationFiles(workspace slug: String) throws -> [String: Data] {
     guard WorkspaceConfig.isValidIdentifier(slug) else {
-      throw ExportError.invalidExport(reason: "the workspace slug is not an identifier")
+      throw ExportError.invalidExport(
+        reason: "the workspace slug is not an identifier", workspace: slug)
     }
     if let field = invalidIdentifier() {
-      throw ExportError.invalidExport(reason: "the \(field) is not an identifier")
+      throw ExportError.invalidExport(reason: "the \(field) is not an identifier", workspace: slug)
     }
     let files = try files()
     guard files.keys.allSatisfy(ExportDurability.isRelativeFilePath) else {
-      throw ExportError.invalidExport(reason: "a generated file path is outside the tree")
+      throw ExportError.invalidExport(
+        reason: "a generated file path is outside the tree", workspace: slug)
     }
     return files
   }
