@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 import GRDB
 
@@ -46,32 +45,30 @@ package struct WorkspaceRemovalService {
       throw WorkspaceError.unknown(slug)
     }
     let selected = try store.read { try capture(slug, in: $0) }
-    let clones = try await liveClones(selected.paths, workspace: slug)
+    let clones = try await RegisteredCloneInspection(
+      paths: selected.paths, workspace: slug, git: environment.git)
     if dryRun {
       return try store.read { db in
         try check(selected, slug: slug, in: db)
-        return try report(slug, selection: selected, clones: clones, dryRun: true, in: db)
+        try clones.requireUnchanged(workspace: slug)
+        return try report(slug, selection: selected, clones: clones.active, dryRun: true, in: db)
       }
     }
     return try store.write(keepingBackup: \.backup) { tx in
       try check(selected, slug: slug, in: tx.database)
+      if !allowActive { try clones.requireUnchanged(workspace: slug) }
       var report = try self.report(
-        slug, selection: selected, clones: clones, dryRun: false, in: tx.database)
-      guard allowActive || (!report.savedDefault && clones.isEmpty) else {
+        slug, selection: selected, clones: clones.active, dryRun: false, in: tx.database)
+      guard allowActive || (!report.savedDefault && clones.active.isEmpty) else {
         throw WorkspaceRemovalError.active(slug)
       }
       let files = try WorkspaceRemovalBackup.make(
         slug, tx: tx, home: environment.home.url, date: environment.clock.now())
+      if !allowActive { try clones.requireUnchanged(workspace: slug) }
       try WorkspaceOwnedRows.removeWorkspace(selected.id, in: tx)
       report.backup = files.backup
       report.recovery = files.recovery
-      report.next =
-        RestoreService.canNameInRecovery(files.recovery) && RestoreService.canNameInRecovery(slug)
-        ? [
-          workspaceCommand(
-            "silta restore " + shellWord(files.recovery) + " --dry-run", workspace: slug)
-        ]
-        : ["silta guide human"]
+      report.next = [Self.recoveryPreview(files.recovery, workspace: slug)]
       report.nextBy = NextBy.agent.rawValue
       return report
     }
@@ -122,22 +119,19 @@ package struct WorkspaceRemovalService {
     }
   }
 
-  private func liveClones(_ paths: [String], workspace: String) async throws -> [String] {
-    var result: [String] = []
-    for path in paths {
-      var info = stat()
-      if lstat(path, &info) != 0 {
-        if errno == ENOENT || errno == ENOTDIR { continue }
-        throw WorkspaceRemovalError.registration(workspace)
-      }
-      let git = LocationGit(runner: environment.git, directory: URL(filePath: path))
-      do {
-        if try await git.commonDirectory() != nil { result.append(path) }
-      } catch {
-        throw WorkspaceRemovalError.registration(workspace)
-      }
+  private static func recoveryPreview(_ recovery: String, workspace: String) -> String {
+    let argument: String
+    if RestoreService.canNameInRecovery(recovery) {
+      argument = shellWord(recovery)
+    } else {
+      let tree = URL(filePath: recovery)
+      let relative =
+        tree.deletingLastPathComponent().lastPathComponent + "/" + tree.lastPathComponent
+      argument = #""${SILTA_HOME:-$HOME/.silta}"/"# + shellWord(relative)
     }
-    return result.sorted()
+    let command = "silta restore " + argument + " --dry-run"
+    return RestoreService.canNameInRecovery(workspace)
+      ? workspaceCommand(command, workspace: workspace) : command
   }
 
   private func report(

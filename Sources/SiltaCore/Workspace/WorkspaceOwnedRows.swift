@@ -13,8 +13,8 @@ enum WorkspaceOwnedRows {
   private static let approvals = "workspace=(SELECT slug FROM workspace WHERE id=:ws)"
   private static let commentSequences =
     "scope IN (SELECT 'comment:doc_rev:'||id FROM (\(revisions)))"
-  private static let sequences =
-    "\(commentSequences) OR scope='task:'||:ws OR scope GLOB 'doc_rev:'||:ws||':*'"
+  private static let allocations = "scope='task:'||:ws OR scope GLOB 'doc_rev:'||:ws||':*'"
+  private static let sequences = "\(commentSequences) OR \(allocations)"
 
   static func counts(_ id: Int64, in db: Database) throws -> [WorkspaceRemovalReport.Count] {
     let scopes = [
@@ -95,7 +95,7 @@ enum WorkspaceOwnedRows {
         DELETE FROM approval WHERE \(approvals);
         DELETE FROM meta WHERE key='current_workspace'
           AND value=(SELECT slug FROM workspace WHERE id=:ws);
-        DELETE FROM seq_counter WHERE \(sequences);
+        DELETE FROM seq_counter WHERE \(allocations);
         """, arguments: ["ws": id])
     try removeContents(id, in: db)
     try db.execute(sql: "DELETE FROM workspace WHERE id=?", arguments: [id])

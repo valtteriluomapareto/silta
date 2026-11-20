@@ -2001,8 +2001,9 @@ runs `silta ws rm <slug>` directly in their terminal. Removing the saved
 default or a workspace with a live registered clone requires `--allow-active`.
 The command clears that selection or registration and leaves the Git clone on disk.
 
-The write rechecks the workspace and registrations and publishes a fresh SQLite
-backup and a validated recovery tree before removing the owned graph in one
+The write rechecks the workspace and registrations. If an inactive path changes
+while removing without an override, preview again. Removal publishes a fresh SQLite
+backup and a validated recovery tree before deleting the owned graph in one
 transaction. Use the printed `restore --dry-run` to inspect the recovery tree,
 then run restore in the human's terminal to recover the workspace without
 replacing others. The whole database snapshot includes machine-local registrations

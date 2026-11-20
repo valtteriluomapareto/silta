@@ -47,6 +47,10 @@ struct WorkspaceRemovalCommandTests {
       let unsafe = try Self.human(["ws", "rm", "acme", "--allow-active", "--json"], in: scratch)
       #expect(unsafe.termination == .exit(1))
       #expect(unsafe.stdout.contains("future"))
+      #expect(
+        try TaskStateCommandTests.error(unsafe)["next"] as? [String] == [
+          "silta --ws 'acme' ws show"
+        ])
       try store.write {
         try $0.database.execute(
           sql: """
@@ -56,7 +60,10 @@ struct WorkspaceRemovalCommandTests {
             """)
       }
       let failed = try Self.human(["ws", "rm", "acme", "--allow-active", "--json"], in: scratch)
-      #expect(failed.termination != .exit(0))
+      #expect(failed.termination == .exit(9))
+      #expect(
+        try TaskStateCommandTests.error(failed)["message"] as? String
+          == StorageError.constraintViolation.message)
       #expect(try Self.export("acme", to: "after-failure", in: scratch) == before)
       try store.read { (db: Database) throws in
         #expect(
@@ -216,5 +223,94 @@ struct WorkspaceRemovalCommandTests {
 
   private static func run(_ args: [String], in scratch: URL) throws -> CLIResult {
     try SiltaBinary.run(args, in: scratch, environment: TaskCommandTests.fixed)
+  }
+}
+
+extension WorkspaceRemovalCommandTests {
+  @Test func successfulTextWithAnUnsafeHomePrintsAReplayableRecoveryPreview() throws {
+    try withScratchDirectory { root in
+      let scratch = root.appending(path: "Acme\nrecovery")
+      try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+      _ = try TaskCommandTests.setup(scratch)
+      let result = try Self.human(["ws", "rm", "acme", "--allow-active"], in: scratch)
+      try #require(result.termination == .exit(0), "\(result.stdout)")
+      let line = try #require(result.stdout.split(separator: "\n").first { $0.hasPrefix("next: ") })
+      let hint = String(line.dropFirst("next: ".count))
+      #expect(hint.contains("$" + "{SILTA_HOME:-$HOME/.silta}"))
+      #expect(!hint.contains(scratch.path))
+      let preview = try FirstWorkspaceCommandTests.replay(
+        hint, in: scratch, cwd: scratch, json: true)
+      try #require(preview.termination == .exit(0), "\(preview.stdout)")
+      #expect(try TaskStateCommandTests.data(preview)["created"] as? Bool == true)
+    }
+  }
+
+  @Test func removalAndRecoveryPreserveAPopulatedBystanderAndAQuestion() throws {
+    try withScratchDirectory { scratch in
+      let (store, _) = try Self.fixture(scratch)
+      try Self.populateBeta(store)
+      for (workspace, ref) in [("acme", "AC-1"), ("beta", "BE-1")] {
+        let asked = try Self.run(
+          [
+            "--ws", workspace, "comment", ref, "--kind", "question", "-m",
+            "@me Check Acme evidence?",
+          ],
+          in: scratch)
+        try #require(asked.termination == .exit(0), "\(asked.stderr)")
+      }
+      let beta = try Self.export("beta", to: "populated-beta", in: scratch)
+      let local = try Self.betaRegistrations(store)
+      let acme = try Self.export("acme", to: "populated-acme", in: scratch)
+      let removed = try Self.human(["ws", "rm", "acme", "--allow-active", "--json"], in: scratch)
+      try #require(removed.termination == .exit(0), "\(removed.stdout)")
+      #expect(try Self.export("beta", to: "after-remove-beta", in: scratch) == beta)
+      #expect(try Self.betaRegistrations(store) == local)
+      #expect(
+        try store.read {
+          try String.fetchAll($0, sql: "SELECT task_prefix FROM workspace ORDER BY id")
+        } == ["BE"])
+      try Self.recover(try TaskStateCommandTests.data(removed), target: acme, in: scratch)
+      #expect(try Self.betaRegistrations(store) == local)
+    }
+  }
+
+  private static func populateBeta(_ store: DatabaseStore) throws {
+    try store.write { tx in
+      try tx.database.execute(
+        sql: """
+          INSERT INTO repo(id,uid,workspace_id,slug) VALUES(10,'beta-repo',10,'beta-engine');
+          INSERT INTO repo_path(repo_id,path) VALUES(10,'/acme-fixture/beta-engine');
+          INSERT INTO app(id,uid,workspace_id,slug,name,repo_id,ref)
+            VALUES(10,'beta-app',10,'engine','Beta Engine',10,'main');
+          INSERT INTO worktree_override(path,app_id,set_by)
+            VALUES('/acme-fixture/beta-engine',10,'human:acme');
+          INSERT INTO task(id,uid,workspace_id,seq,title,status,app_id,
+            created_by,created_at,updated_at)
+            VALUES(10,'beta-task',10,1,'Beta work','todo',10,'human:acme',:now,:now);
+          UPDATE seq_counter SET next=2 WHERE scope='task:10';
+          INSERT INTO doc(id,uid,workspace_id,slug,title,kind,current_rev,created_at,updated_at)
+            VALUES(10,'beta-doc',10,'rules','Beta rules','reference',1,:now,:now);
+          INSERT INTO doc_rev(id,uid,doc_id,rev,body_md,state,actor,created_at)
+            VALUES(10,'beta-rev',10,1,'Beta guidance.','accepted','human:acme',:now);
+          INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,
+            created_by,created_at)
+            VALUES('beta-about',10,'doc',10,'about','app',10,'human:acme',:now);
+          INSERT INTO approval(uid,workspace,actor,command,words,created_at)
+            VALUES('beta-approval','beta','agent:codex:acme','silta ws edit','Create Beta',:now);
+          """, arguments: ["now": "2023-11-14T22:13:20.000Z"])
+    }
+  }
+
+  private static func betaRegistrations(_ store: DatabaseStore) throws -> [Row] {
+    try store.read { db in
+      try Row.fetchAll(
+        db,
+        sql: """
+          SELECT repo_path.path AS repo,worktree_override.path AS worktree FROM app
+          JOIN repo_path ON repo_path.repo_id=app.repo_id
+          JOIN worktree_override ON worktree_override.app_id=app.id
+          WHERE app.workspace_id=10
+          """)
+    }
   }
 }

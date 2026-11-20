@@ -45,7 +45,10 @@ struct WsRemoveCommand: WorkspaceArgumentCommand {
     let verb = report.dryRun ? "Preview removal of" : "Removed"
     var lines = ["\(verb) \(HumanText.line(report.workspace)) (\(report.name))."]
     lines += report.counts.filter { $0.count > 0 }.map { "\($0.kind): \($0.count)" }
-    if report.savedDefault { lines.append("Saved default workspace.") }
+    if report.savedDefault {
+      lines.append(
+        report.dryRun ? "Saved default workspace." : "Cleared the saved default workspace.")
+    }
     if !report.registeredClones.isEmpty {
       lines.append("Registered clones: \(report.registeredClones.count).")
     }

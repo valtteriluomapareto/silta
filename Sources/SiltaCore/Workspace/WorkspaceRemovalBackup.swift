@@ -8,7 +8,11 @@ enum WorkspaceRemovalBackup {
   ) throws -> (backup: String, recovery: String) {
     let files = try ExportSnapshot.read(tx.database, workspace: slug).publicationFiles(
       workspace: slug)
-    _ = try RestoreService.admit(files, directory: home, expected: slug)
+    do {
+      _ = try RestoreService.admit(files, directory: home, expected: slug)
+    } catch let error as any CodedError {
+      throw CommandFailure(error: error, next: [workspaceEditRead(slug)])
+    }
     let parent = try DirectoryPath.open(home)
     defer { close(parent) }
     let prefix = "removed-workspace-"

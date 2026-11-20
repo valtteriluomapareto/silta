@@ -106,3 +106,66 @@ struct WorkspaceRemovalServiceTests {
     }
   }
 }
+
+extension WorkspaceRemovalServiceTests {
+  @Test(arguments: [false, true])
+  func inactiveRegistrationThatBecomesACloneRefusesRemoval(pathExisted: Bool) async throws {
+    try await withScratchDirectory { scratch in
+      let home = scratch.appending(path: "data")
+      let first = scratch.appending(path: "alpha")
+      let second = scratch.appending(path: "beta")
+      let fm = FileManager.default
+      if pathExisted { try fm.createDirectory(at: first, withIntermediateDirectories: true) }
+      try fm.createDirectory(at: second, withIntermediateDirectories: true)
+      let setup = try TaskServiceTests.environment(home, actor: TaskServiceTests.human())
+      try WorkspaceConfigTests.apply(
+        WorkspaceConfigTests.minimal + "repos: [{slug: alpha}, {slug: beta}]\n", to: setup.db)
+      try setup.db.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO repo_path(repo_id,path)
+            SELECT id,CASE slug WHEN 'alpha' THEN ? ELSE ? END FROM repo
+            """,
+          arguments: [first.path, second.path])
+      }
+      let notGit = GitResult(
+        termination: .exit(128), stdout: Data(),
+        stderr: Data("fatal: not a git repository\n".utf8))
+      let paths = pathExisted ? [first, second] : [second]
+      let git = ScriptedGitRunner(
+        script: paths.map { directory in
+          (
+            GitRequest(
+              arguments: ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+              directory: directory, lazyFetch: false), .success(notGit)
+          )
+        }
+      ) { request in
+        guard request.directory == second else { return }
+        try Self.createGitMarkers(at: first)
+      }
+      let env = try TaskServiceTests.environment(home, actor: TaskServiceTests.human(), git: git)
+      do {
+        _ = try await WorkspaceRemovalService(environment: env).remove(
+          "acme", dryRun: false, allowActive: false)
+        Issue.record("Removed the workspace after an inactive registration became a Git clone.")
+      } catch let error as WorkspaceRemovalError {
+        #expect(error.code == .conflict)
+        #expect(error.message.contains("registrations changed"))
+      }
+      #expect(git.isExhausted)
+      #expect(try WorkspaceSelection.resolve("acme", in: setup.db) == "acme")
+      #expect(try Self.attempts(home).isEmpty)
+    }
+  }
+
+  private static func createGitMarkers(at directory: URL) throws {
+    let git = directory.appending(path: ".git")
+    for folder in ["objects", "refs"] {
+      try FileManager.default.createDirectory(
+        at: git.appending(path: folder), withIntermediateDirectories: true)
+    }
+    try Data("ref: refs/heads/main\n".utf8).write(to: git.appending(path: "HEAD"))
+  }
+
+}
