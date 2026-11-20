@@ -235,12 +235,19 @@ enum SiltaMain {
     return CommandFailure(error: error, next: next)
   }
 
+}
+
+extension SiltaMain {
   /// Repairs the intended workspace through file input, without an editor or quote echo.
   static func workspaceRecovery(
     _ error: any CodedError, edit: WsEditCommand, context: CommandContext
   ) -> [String] {
     if case .docAttachments = error as? WorkspaceError { return error.next }
-    if case .removalBlockers = error as? WorkspaceError { return error.next }
+    if case .removalBlockers(_, let items, let documentsOnly) = error as? WorkspaceError,
+      documentsOnly || items.count > 1
+    {
+      return error.next
+    }
     var target = edit.workspace ?? edit.global.ws
     if target == nil {
       do {
@@ -270,9 +277,6 @@ enum SiltaMain {
     return [repair]
   }
 
-}
-
-extension SiltaMain {
   /// Captures selection once for synchronous services, recovery and attribution.
   /// Commands execute once even when preparation fails, preserving stdin and early gates.
   private static func prepareWorkspace(

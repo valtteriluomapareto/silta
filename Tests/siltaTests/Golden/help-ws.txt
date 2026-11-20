@@ -32,9 +32,10 @@ OVERVIEW: Edit workspace YAML (human-only).
 Keep the baseline comment from ws show or a retained editor draft. If stale,
 review a fresh ws show before reapplying your edits. An unstamped file uses the
 configuration at command start.
+Preview map changes and blockers without approval using --dry-run -F <file>.
 Update Acme YAML (human): silta ws edit acme -F acme.yml
 
-USAGE: silta ws edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<workspace>] [-F <F>]
+USAGE: silta ws edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<workspace>] [-F <F>] [--dry-run]
 
 ARGUMENTS:
   <workspace>             The workspace slug; defaults to repository location,
@@ -51,6 +52,8 @@ GLOBAL OPTIONS:
 OPTIONS:
   -F <F>                  Read UTF-8 YAML from a file, or - for stdin; default
                           is none.
+  --dry-run               Preview map changes and blockers without saving.
+                          Requires -F.
   --version               Show the version.
   -h, --help              Show help information.
 

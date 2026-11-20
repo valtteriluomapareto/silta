@@ -63,19 +63,20 @@ enum WorkspaceSlugs {
     let rows = try Row.fetchAll(
       db,
       sql: """
-        SELECT id,slug FROM \(kind.rawValue) AS item
+        SELECT id,CAST(slug AS BLOB) AS slug_bytes FROM \(kind.rawValue) AS item
         WHERE workspace_id=? AND (
-          slug=? OR EXISTS(
+          slug=CAST(? AS TEXT) OR EXISTS(
             SELECT 1 FROM json_each(
               CASE WHEN json_valid(item.previous_slugs) THEN
                 CASE WHEN json_type(item.previous_slugs)='array'
                   THEN item.previous_slugs ELSE '[]' END
               ELSE '[]' END
-            ) WHERE type='text' AND value=?))
+            ) WHERE type='text' AND value=CAST(? AS TEXT)))
         ORDER BY slug LIMIT 2
-        """, arguments: [workspace, slug, slug])
+        """, arguments: [workspace, Data(slug.utf8), Data(slug.utf8)])
     guard rows.count < 2 else { throw try lookupCollision(kind, slug, workspace, in: db) }
-    return rows.first.map { Resolved(id: $0["id"], slug: $0["slug"]) }
+    guard let row = rows.first, let current = try row.strictText("slug_bytes") else { return nil }
+    return Resolved(id: row["id"], slug: current)
   }
 
   static func topic(_ word: String, workspace: Int64, in db: Database) throws -> Resolved? {
@@ -84,10 +85,14 @@ enum WorkspaceSlugs {
     let row = try Row.fetchOne(
       db,
       sql: """
-        SELECT topic.id,topic.slug FROM topic_alias JOIN topic ON topic.id=topic_alias.topic_id
-        WHERE topic_alias.workspace_id=? AND topic_alias.alias=? AND topic.workspace_id=?
-        """, arguments: [workspace, WorkspaceConfig.normalize(word), workspace])
-    let alias = row.map { Resolved(id: $0["id"], slug: $0["slug"], former: false) }
+        SELECT topic.id,CAST(topic.slug AS BLOB) AS slug_bytes
+        FROM topic_alias JOIN topic ON topic.id=topic_alias.topic_id
+        WHERE topic_alias.workspace_id=? AND topic_alias.alias=CAST(? AS TEXT)
+          AND topic.workspace_id=?
+        """, arguments: [workspace, Data(WorkspaceConfig.normalize(word).utf8), workspace])
+    let alias = try row.flatMap { row in
+      try row.strictText("slug_bytes").map { Resolved(id: row["id"], slug: $0, former: false) }
+    }
     if let name, let alias, name.id != alias.id {
       throw try lookupCollision(.topic, word, workspace, in: db)
     }

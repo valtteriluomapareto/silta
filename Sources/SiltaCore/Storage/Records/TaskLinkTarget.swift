@@ -27,8 +27,12 @@ struct TaskLinkTarget {
     if ["edge", "service"].contains(prefix) {
       return try map(raw, workspace: source.workspaceID, in: db)
     }
-    if ["app", "topic"].contains(prefix) {
-      return try map(raw, workspace: source.workspaceID, in: db)
+    if let kind = WorkspaceSlugs.Kind(rawValue: prefix) {
+      let slug = String(raw.dropFirst(prefix.count + 1))
+      let named = try TaskService.namedSlug(kind, slug, workspace: source.workspaceID, in: db)
+      return Self(
+        kind: prefix, id: named.id,
+        warnings: [named.warning(for: slug, kind: kind)].compactMap { $0 })
     }
     if raw.hasPrefix("note:"), raw.count > 5 {
       return Self(kind: "note", external: String(raw.dropFirst(5)))

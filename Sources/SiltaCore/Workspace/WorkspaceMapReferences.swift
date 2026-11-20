@@ -86,10 +86,13 @@ enum WorkspaceMapReferences {
         """, arguments: [workspace, row.table, row.id, tasksOnly]
     ).map { link in
       let kind: String = link["to_kind"]
-      if kind == "task" || kind == "comment" {
+      let fallback = kind + " link #" + String(link["to_id"] as Int64)
+      guard kind == "task" || kind == "comment" else { return fallback }
+      do {
         return String(try TaskLinkTarget.render(link, in: db).dropFirst(kind.count + 1))
+      } catch StorageError.corrupt {
+        return fallback
       }
-      return kind + " link #" + String(link["to_id"] as Int64)
     }
   }
 
