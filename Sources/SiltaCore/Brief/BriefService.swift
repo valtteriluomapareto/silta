@@ -73,16 +73,18 @@ package struct BriefService {
   }
 
   private func addEdgeCommands(to report: inout BriefReport, workspace: String) async {
-    let git: any GitRunner =
-      if let hook = environment.git as? BriefHookGitRunner { hook.optionalReads() } else {
-        environment.git
-      }
+    let hook = environment.git as? BriefHookGitRunner
+    let git: any GitRunner = hook?.optionalReads() ?? environment.git
     var probe = EdgeCodeEvidence(workspace: workspace, environment: environment, git: git)
     var emitted: Set<Data> = []
     for index in report.sections.indices {
       guard let references = report.sections[index].edgeCodeRefs else { continue }
       var needsInspection = references.isEmpty
       for reference in references {
+        if let hook, hook.deadline.childSeconds <= 0 {
+          needsInspection = true
+          break
+        }
         guard let command = await probe.command(reference) else {
           needsInspection = true
           continue
