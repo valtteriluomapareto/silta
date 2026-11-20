@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct HumanApprovalTests {
@@ -174,7 +175,7 @@ struct HumanApprovalTests {
       #expect(
         try WorkspaceEditor.apply(
           updated, slug: nil, store: env.db, actor: env.actor,
-          identity: (env.ids, env.clock.now()), approved: "Apply this.") == "acme")
+          identity: (env.ids, env.clock.now()), approved: "Apply this.")?.workspace == "acme")
       #expect(
         try WorkspaceEditor.apply(
           updated, slug: nil, store: env.db, actor: env.actor,

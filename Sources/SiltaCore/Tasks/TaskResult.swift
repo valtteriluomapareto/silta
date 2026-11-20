@@ -7,7 +7,7 @@ package struct TaskResult: Encodable, Sendable {
   package let status: String
 
   /// Diagnostics that contain no original secret content.
-  package let warnings: [OutputWarning]
+  package var warnings: [OutputWarning]
 
   /// The fields an edit wrote, lowercased, for its receipt text; never encoded.
   package var changed: [String] = []

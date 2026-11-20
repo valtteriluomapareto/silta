@@ -30,6 +30,10 @@ package struct DocListResult: Encodable, Sendable {
   /// Complete scoped command for the next page, when one exists.
   package let next: String?
 
+  package var warnings: [OutputWarning] = []
+
+  private enum CodingKeys: String, CodingKey { case entries, total, offset, limit, next }
+
   /// The same summaries as JSON, with counts and pagination recovery.
   package var output: String {
     entries.map(\.output).joined()

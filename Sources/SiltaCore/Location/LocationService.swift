@@ -27,11 +27,15 @@ package struct LocationService {
     async throws -> LocationResult
   {
     let repo = context.repo
+    let explicit = try app.map {
+      try validate($0, candidates: context.candidates, repo: repo, path: context.path)
+    }
     let selectedTask = try task.map { try explicitTask($0, workspace: repo.workspace) }
     let git = context.git
     let candidates = context.candidates
     let (branch, head) = try await git.headState()
-    let current = try await currentTask(selectedTask, context: context, app: app, branch: branch)
+    let current = try await currentTask(
+      selectedTask, context: context, app: explicit?.slug, branch: branch)
     var result = LocationResult(
       path: context.path.path, worktree: context.root.path,
       workspace: repo.workspace, repo: repo.slug, branch: branch,
@@ -46,9 +50,9 @@ package struct LocationService {
       selected.reason = reason
       return selected
     }
-    if let app {
-      try validate(app, candidates: candidates, repo: repo, path: context.path)
-      return picked(app, "explicit")
+    if let app, let explicit {
+      if let warning = explicit.warning(for: app, kind: .app) { result.warnings.append(warning) }
+      return picked(explicit.slug, "explicit")
     }
     if candidates.count == 1, let single = candidates.first { return picked(single.app, "single") }
     let override = try environment.db.read {
@@ -112,8 +116,7 @@ package struct LocationService {
   ) throws -> String? {
     if let selected {
       if let app = selected.app {
-        try validate(app, candidates: candidates, repo: repo, path: path)
-        return app
+        return try validate(app, candidates: candidates, repo: repo, path: path).slug
       }
       return nil
     }
@@ -121,16 +124,18 @@ package struct LocationService {
   }
 
   func validate(_ app: String, candidates: [LocationCandidate], repo: LocationRepository, path: URL)
-    throws
+    throws -> WorkspaceSlugs.Resolved
   {
-    guard try WorkspaceSelection.app(app, workspace: repo.workspace, in: environment.db) != nil
+    guard
+      let named = try WorkspaceSelection.appName(app, workspace: repo.workspace, in: environment.db)
     else {
       throw LocationError.app(app, workspace: repo.workspace)
     }
-    guard candidates.contains(where: { $0.app == app }) else {
+    guard candidates.contains(where: { $0.app == named.slug }) else {
       throw LocationError.outsideCandidates(
         candidates.map(\.app), workspace: repo.workspace, path: path.path)
     }
+    return named
   }
 
   func inspect(path: URL, workspace: String?) async throws

@@ -188,7 +188,8 @@ struct RestoreValidation {
     guard let object = parsed as? [String: Any] else {
       throw invalid("settings are not a JSON object")
     }
-    let known = Set(WorkspaceSettings.CodingKeys.allCases.map(\.rawValue))
+    let known = Set(
+      WorkspaceSettings.CodingKeys.allCases.map(\.rawValue) + [WorkspaceSlugs.retiredKey])
     if let unknown = Set(object.keys).subtracting(known).sorted().first {
       throw invalid("settings have the unknown key \(unknown)")
     }
@@ -199,9 +200,40 @@ struct RestoreValidation {
       _ = try settings.askAbout
       _ = try settings.archiveAfterDays
       _ = try settings.staleDays
+      try slugHistory(WorkspaceSlugs.retired(object))
     } catch let error as WorkspaceError {
       throw invalid("settings: \(error.message)")
     }
+  }
+
+  private func slugHistory(_ retired: [String: [String]]) throws {
+    var topicSpelling: [String: String] = [:]
+    var history: [(String?, String)] = []
+    for kind in WorkspaceSlugs.Kind.allCases {
+      let rows = tree.sections.first { $0.name == kind.section }?.rows ?? []
+      let items = try rows.enumerated().map { index, row in
+        let slug = row.value("slug") ?? ""
+        if kind == .topic, let uid = row.value("uid") { topicSpelling[uid] = slug }
+        return try WorkspaceSlugs.Item(
+          id: Int64(index) + 1, slug: slug,
+          previous: WorkspaceSlugs.previous(row.value("previous_slugs")))
+      }
+      let reserved = retired[kind.rawValue] ?? []
+      _ = try WorkspaceSlugs.ownership(kind, items: items, retired: reserved)
+      if kind == .topic {
+        history =
+          items.flatMap { item in item.previous.map { (item.slug, $0) } }
+          + reserved.map { (nil, $0) }
+      }
+    }
+    let rows = tree.sections.first { $0.name == "topic_aliases" }?.rows ?? []
+    let aliases = rows.compactMap { row -> (String, String)? in
+      guard let uid = row.value("topic"), let owner = topicSpelling[uid],
+        let alias = row.value("alias")
+      else { return nil }
+      return (owner, alias)
+    }
+    try WorkspaceSlugs.checkTopicAliases(aliases, history: history)
   }
 
   private func integers(_ row: ExportRow, in table: String) throws {

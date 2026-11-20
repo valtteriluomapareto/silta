@@ -77,6 +77,7 @@ extension GuideCommand {
         with --ws.
         Use the app `slug` from `ws show` in commands and references. The optional \
         `apps[].name` is a display label.
+        Former app and topic slugs still work. Use the current slug named by a `renamed` warning.
         For "work the backlog", run `silta --ws acme task ls --status todo`, optionally with \
         --app. \
         Start the first task; skip subtasks whose parent another session claims and skip \
@@ -228,6 +229,9 @@ extension GuideCommand {
         Keep the baseline comment from `ws show` or a retained editor draft when applying \
         workspace YAML. On `conflict`, review fresh `ws show` output and reapply your edits there. \
         Unstamped YAML uses the configuration at command start.
+        To rename an app or topic, change its `slug` and list the old slug in `previous`. \
+        Preview adds, removals, renames and blockers with `silta --ws acme ws edit --dry-run \
+        -F <file>` before requesting approval.
         Set a display label with the optional `name` key under `apps` in workspace YAML. \
         Remove the key to use the slug as the label. Read both with `silta --ws acme ws show` \
         and use the slug in commands and references.

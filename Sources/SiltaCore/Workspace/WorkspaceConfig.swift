@@ -9,10 +9,12 @@ package struct WorkspaceConfig {
     "workspace": ["slug", "name", "task_prefix"],
     "settings": WorkspaceSettings.CodingKeys.allCases.map(\.rawValue),
     "repos": ["slug", "remote"],
-    "apps": ["slug", "name", "repo", "ref", "prod_ref", "subpath", "summary", "lifecycle"],
+    "apps": [
+      "slug", "previous", "name", "repo", "ref", "prod_ref", "subpath", "summary", "lifecycle",
+    ],
     "environments": ["app", "name", "url"],
     "edges": ["from", "to", "kind", "summary", "code"],
-    "topics": ["slug", "aliases"],
+    "topics": ["slug", "previous", "aliases"],
     "sources": ["kind", "root", "include", "exclude"],
   ]
 
@@ -196,7 +198,9 @@ private struct WorkspaceValidation {
     for (keyNode, value) in entry.mapping ?? Node.Mapping([]) {
       let key = keyNode.string ?? ""
       if section == "apps", key == "name" {
-        validateAppName(value, slug: entry["slug"]?.string)
+        validateAppName(value, entry: entry)
+      } else if key == "previous", ["apps", "topics"].contains(section) {
+        validatePrevious(value, slug: entry["slug"]?.string)
       } else if ["code", "aliases", "include", "exclude"].contains(key) {
         if value.sequence == nil || value.array().contains(where: { $0.tag != Tag(.str) }) {
           problem(value, "\(key) must be a list of strings")
@@ -216,12 +220,25 @@ private struct WorkspaceValidation {
     }
   }
 
-  private mutating func validateAppName(_ value: Node, slug: String?) {
+  private mutating func validatePrevious(_ value: Node, slug: String?) {
+    let history = value.array(of: String.self)
+    if value.sequence == nil || value.array().contains(where: { $0.tag != Tag(.str) })
+      || !history.allSatisfy(WorkspaceConfig.isValidIdentifier)
+      || Set(history).count != history.count || history.contains(slug ?? "")
+    {
+      problem(value, "previous must be a list of distinct former slugs")
+    }
+  }
+
+  private mutating func validateAppName(_ value: Node, entry: Node) {
     guard value.tag == Tag(.str), let name = value.string else {
       problem(value, "app name must be a string")
       return
     }
-    if let slug, let stored = appNames[slug], name.utf8.elementsEqual(stored.utf8) { return }
+    let slugs =
+      [entry["slug"]?.string].compactMap { $0 }
+      + (entry["previous"]?.array(of: String.self) ?? [])
+    if slugs.contains(where: { appNames[$0]?.utf8.elementsEqual(name.utf8) == true }) { return }
     let controls = CharacterSet.controlCharacters.union(.newlines)
     if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       || name.count > 120 || name.rangeOfCharacter(from: controls) != nil
@@ -277,8 +294,10 @@ private struct WorkspaceValidation {
   mutating func reference(_ entry: Node, _ key: String, _ section: String, prefix: String = "") {
     guard let value = entry[key]?.string else { return }
     let target = prefix.isEmpty ? value : String(value.dropFirst(prefix.count))
-    let known = rows(section).compactMap {
-      section == "services" ? $0.string : $0["slug"]?.string
+    let known = rows(section).flatMap { row -> [String] in
+      let slug = section == "services" ? row.string : row["slug"]?.string
+      return [slug].compactMap { $0 }
+        + (section == "apps" ? row["previous"]?.array(of: String.self) ?? [] : [])
     }
     if !known.contains(target) {
       problem(

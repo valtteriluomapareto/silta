@@ -124,20 +124,12 @@ struct BriefBacklog {
   }
 
   func topicID(_ word: String, workspace: Int64) throws -> Int64 {
-    guard
-      let id = try Int64.fetchOne(
-        db,
-        sql: """
-          SELECT topic.id FROM topic LEFT JOIN topic_alias ON topic_alias.topic_id=topic.id
-          WHERE topic.workspace_id=? AND (topic.slug=? OR topic_alias.alias=?)
-          ORDER BY (topic.slug=?) DESC,topic.slug LIMIT 1
-          """, arguments: [workspace, word, WorkspaceConfig.normalize(word), word])
-    else {
+    guard let named = try WorkspaceSlugs.topic(word, workspace: workspace, in: db) else {
       throw CommandFailure(
         error: TaskError.notFound("topic " + word),
         next: [workspaceCommand("silta ws show", workspace: location.workspace)])
     }
-    return id
+    return named.id
   }
 
   private func openSection(_ row: Row, prefix: String) -> BriefSection {

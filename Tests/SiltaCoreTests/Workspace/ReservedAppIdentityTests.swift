@@ -101,7 +101,7 @@ struct ReservedAppIdentityTests {
       #expect(
         try queue.read {
           try Int.fetchOne($0, sql: "SELECT value FROM meta WHERE key='min_writer_version'")
-        } == 8)
+        } == 9)
     }
   }
 

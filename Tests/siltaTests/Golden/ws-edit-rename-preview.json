@@ -1,0 +1,1 @@
+{"data":{"changes":{"added":[],"blockers":[],"removed":[],"renamed":[{"docs":1,"edges":1,"environments":1,"from":"api","kind":"app","tasks":1,"to":"delivery"},{"docs":1,"edges":0,"environments":0,"from":"messaging","kind":"topic","tasks":1,"to":"delivery-design"}]},"dry_run":true,"workspace":"acme"},"ok":true,"schema":1,"warnings":[]}

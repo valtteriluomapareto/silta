@@ -20,7 +20,13 @@ extension TaskLinkTarget {
         throw TaskError.invalid("Use app:, edge:, service: or topic: attachment references.")
       }
       if kind == "topic" { return try topic(value, workspace: workspace, in: db) }
-      let name = kind == "service" ? try decodeComponent(value) : try identifier(value)
+      if kind == "app" {
+        let name = try identifier(value)
+        let app = try TaskService.namedSlug(.app, name, workspace: workspace, in: db)
+        return Self(
+          kind: kind, id: app.id, warnings: [app.warning(for: name, kind: .app)].compactMap { $0 })
+      }
+      let name = try decodeComponent(value)
       return Self(
         kind: kind, id: try TaskService.entity(kind, slug: name, workspace: workspace, in: db))
     } catch let error as TaskError {
@@ -39,19 +45,11 @@ extension TaskLinkTarget {
   }
 
   private static func topic(_ value: String, workspace: Int64, in db: Database) throws -> Self {
-    let raw = Data(value.utf8)
-    let alias = Data(WorkspaceConfig.normalize(value).utf8)
-    guard
-      let id = try Int64.fetchOne(
-        db,
-        sql: """
-          SELECT topic.id FROM topic LEFT JOIN topic_alias ON topic_alias.topic_id=topic.id
-          WHERE topic.workspace_id=? AND (topic.slug=CAST(? AS TEXT)
-            OR topic_alias.alias=CAST(? AS TEXT))
-          ORDER BY (topic.slug=CAST(? AS TEXT)) DESC,topic.slug LIMIT 1
-          """, arguments: [workspace, raw, alias, raw])
+    guard let topic = try WorkspaceSlugs.topic(value, workspace: workspace, in: db)
     else { throw TaskError.notFound("topic " + value) }
-    return Self(kind: "topic", id: id)
+    return Self(
+      kind: "topic", id: topic.id,
+      warnings: [topic.warning(for: value, kind: .topic)].compactMap { $0 })
   }
 
   private static func edge(_ raw: String, workspace: Int64, in db: Database) throws -> Self {
@@ -60,13 +58,14 @@ extension TaskLinkTarget {
       throw TaskError.invalid(
         "Use edge:<from>/<to>/<kind>, retaining service: for a service target.")
     }
-    let source = try TaskService.entity(
-      "app", slug: identifier(pieces[0]), workspace: workspace, in: db)
+    let source = try TaskService.namedSlug(
+      .app, identifier(pieces[0]), workspace: workspace, in: db)
     let service = pieces[1].hasPrefix("service:")
     let name =
       service ? try decodeComponent(String(pieces[1].dropFirst(8))) : try identifier(pieces[1])
-    let target = try TaskService.entity(
-      service ? "service" : "app", slug: name, workspace: workspace, in: db)
+    let app = try service ? nil : TaskService.namedSlug(.app, name, workspace: workspace, in: db)
+    let target =
+      try app?.id ?? TaskService.entity("service", slug: name, workspace: workspace, in: db)
     let kind = try decodeComponent(pieces[2])
     guard
       let id = try Int64.fetchOne(
@@ -76,12 +75,16 @@ extension TaskLinkTarget {
             AND to_app_id IS ? AND to_service_id IS ? AND kind=CAST(? AS TEXT)
           """,
         arguments: [
-          workspace, source, service ? nil : target, service ? target : nil, Data(kind.utf8),
+          workspace, source.id, service ? nil : target, service ? target : nil, Data(kind.utf8),
         ])
     else {
       throw TaskError.notFound("edge " + raw)
     }
-    return Self(kind: "edge", id: id)
+    return Self(
+      kind: "edge", id: id,
+      warnings: [
+        source.warning(for: pieces[0], kind: .app), app?.warning(for: name, kind: .app),
+      ].compactMap { $0 })
   }
 
   private static func identifier(_ value: String) throws -> String {

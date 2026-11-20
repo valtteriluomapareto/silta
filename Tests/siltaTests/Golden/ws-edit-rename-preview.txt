@@ -1,0 +1,3 @@
+Preview workspace acme.
+Rename app: api -> delivery (docs 1, tasks 1, edges 1, environments 1)
+Rename topic: messaging -> delivery-design (docs 1, tasks 1, edges 0, environments 0)

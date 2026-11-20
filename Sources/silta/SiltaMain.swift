@@ -235,11 +235,15 @@ enum SiltaMain {
     return CommandFailure(error: error, next: next)
   }
 
+}
+
+extension SiltaMain {
   /// Repairs the intended workspace through file input, without an editor or quote echo.
   static func workspaceRecovery(
     _ error: any CodedError, edit: WsEditCommand, context: CommandContext
   ) -> [String] {
     if case .docAttachments = error as? WorkspaceError { return error.next }
+    if case .removalBlockers = error as? WorkspaceError { return error.next }
     var target = edit.workspace ?? edit.global.ws
     if target == nil {
       do {
@@ -253,6 +257,15 @@ enum SiltaMain {
     if case .invalid(_, true) = error as? WorkspaceError {
       return (target == nil ? [] : ["silta ws show" + suffix]) + error.next
     }
+    if edit.dryRun {
+      let safe = target.flatMap { value in
+        WorkspaceConfig.isValidIdentifier(value) && RestoreService.canNameInRecovery(value)
+          ? " " + shellWord(value) : nil
+      }
+      let inspect = safe.map { ["silta ws show" + $0] } ?? ["silta ws ls"]
+      return inspect
+        + ["silta ws edit" + (safe ?? "") + " --dry-run -F " + (edit.file == "-" ? "-" : "<file>")]
+    }
     let repair = "silta ws edit" + suffix + " -F <file> --approved \"<the human's words>\""
     if target != nil, error.code == .invalid || error.code == .conflict {
       return ["silta ws show" + suffix, repair]
@@ -260,9 +273,6 @@ enum SiltaMain {
     return [repair]
   }
 
-}
-
-extension SiltaMain {
   /// Captures selection once for synchronous services, recovery and attribution.
   /// Commands execute once even when preparation fails, preserving stdin and early gates.
   private static func prepareWorkspace(
@@ -294,7 +304,14 @@ extension SiltaMain {
       let help = commandPath(arguments) + " --help"
       let workspace = (command as? WsEditCommand)?.workspace ?? command.global.ws
       let next: [String]
-      if let workspace, WorkspaceConfig.isValidIdentifier(workspace),
+      if let edit = command as? WsEditCommand, edit.dryRun {
+        let suffix =
+          workspace.flatMap { value in
+            WorkspaceConfig.isValidIdentifier(value) && RestoreService.canNameInRecovery(value)
+              ? " " + shellWord(value) : nil
+          } ?? ""
+        next = ["silta ws edit" + suffix + " --dry-run -F " + (edit.file == "-" ? "-" : "<file>")]
+      } else if let workspace, WorkspaceConfig.isValidIdentifier(workspace),
         RestoreService.canNameInRecovery(workspace)
       {
         let inspect = (command as? TaskEditCommand).map {
