@@ -34,6 +34,7 @@ run_guard control-release python3 -B scripts/guards/check_control_release.py
 run_guard app-pins python3 -B scripts/guards/check_app_pins.py
 run_guard package-graph python3 -B scripts/guards/check_package_graph.py
 run_guard docs-links python3 -B scripts/guards/check_docs_links.py
+run_guard website-links python3 -B scripts/guards/check_website_links.py
 run_guard plans-board python3 -B scripts/guards/check_plans_board.py
 
 if (( ${#failed[@]} )); then

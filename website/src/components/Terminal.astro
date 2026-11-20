@@ -32,8 +32,12 @@ function segments(line: Line): Segment[] {
 		<span class="dot"></span>
 		<span class="title">{title}</span>
 	</div>
-	<figcaption class="visually-hidden">{label}</figcaption>
-	<pre class="body" tabindex="0"><code>{lines.map((line, index) => (
+	<pre
+		class="body"
+		role="region"
+		aria-label={label}
+		tabindex="0"
+	><code>{lines.map((line, index) => (
 		<>{index > 0 && '\n'}{segments(line).map((segment) =>
 			typeof segment === 'string' ? segment : (
 				<span class={segment[1]}>{segment[0]}</span>

@@ -37,6 +37,7 @@ verbose output.
 | Change | Run |
 |---|---|
 | Markdown only | `scripts/run-guards.sh` (link check, plans board) |
+| `website/` | `npm run validate` in `website/` ([website README](website/README.md)) |
 | App UI or Xcode project | `scripts/verify.sh app` (guards, lint, native Debug acceptance, Release build) |
 | Swift code outside `App/` | `scripts/verify.sh quick` (guards, lint, build with warnings as errors, tests) |
 | Storage, concurrency, location, agent-facing output | `scripts/verify.sh full` (adds stress, scenario and compatibility tiers, the wall-clock deadline tier alone, then the eval replays) |
@@ -78,7 +79,9 @@ through. Fix the change, or propose a decision first.
    Every SwiftPM target and native app configuration enables the six Swift 7 upcoming
    features. SwiftPM experimental features require a decision. `check_package_features.py`
    enforces both (D29).
-6. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
+6. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`. The
+   website's links into the repo resolve and its copies of `docs/assets/` match,
+   enforced by `check_website_links.py`.
 7. **The plans board in `docs/README.md` mirrors `docs/plans/` one-to-one.** Enforced
    by `check_plans_board.py`.
 8. **Agent-facing output is a contract.** This covers `silta guide` text, `--json`

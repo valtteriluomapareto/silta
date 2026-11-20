@@ -29,6 +29,7 @@ import check_package_graph  # noqa: E402
 import check_plans_board  # noqa: E402
 import check_test_waits  # noqa: E402
 import check_try_optional  # noqa: E402
+import check_website_links  # noqa: E402
 from swift_source import split_swift  # noqa: E402
 
 
@@ -341,6 +342,32 @@ class DocsLinksTests(GuardTestCase):
                         "[setext](#setext-title) [real](#real) [code](#fake) [rule](#topic-1)\n")
         errors = check_docs_links.check(self.tree.root)
         self.assertEqual([error.rsplit(" ", 1)[-1] for error in errors], ["#fake", "#topic-1"])
+
+
+class WebsiteLinksTests(GuardTestCase):
+    CONSTS = "website/src/consts.ts"
+
+    def test_resolving_links_and_matching_copies_pass(self) -> None:
+        self.tree.write("README.md", "# Silta\n## Install\n")
+        self.tree.write("docs/spec.md", "# Spec\n")
+        self.tree.write(self.CONSTS, "export const A = blob('README.md#install');\n"
+                                     "export const B = blob(\"docs/spec.md\");\n")
+        self.tree.write("docs/assets/mark.svg", "<svg/>")
+        self.tree.write("website/public/mark.svg", "<svg/>")
+        self.tree.write("website/public/robots.txt", "only here")
+        self.assertEqual(check_website_links.check(self.tree.root), [])
+
+    def test_missing_file_and_missing_anchor_fail(self) -> None:
+        self.tree.write("README.md", "# Silta\n")
+        self.tree.write(self.CONSTS, "const A = blob('docs/gone.md');\nconst B = blob('README.md#install');\n")
+        errors = check_website_links.check(self.tree.root)
+        self.assertEqual(errors, [f"{self.CONSTS}:1: broken link to docs/gone.md",
+                                  f"{self.CONSTS}:2: broken link to README.md#install"])
+
+    def test_diverged_asset_copy_fails(self) -> None:
+        self.tree.write("docs/assets/mark.svg", "<svg/>")
+        self.tree.write("website/public/mark.svg", "<svg old/>")
+        self.assertEqual(len(check_website_links.check(self.tree.root)), 1)
 
 
 class PlansBoardTests(GuardTestCase):

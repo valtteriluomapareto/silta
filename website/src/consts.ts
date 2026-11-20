@@ -14,5 +14,5 @@ export const CONTRIBUTING_URL = blob('CONTRIBUTING.md');
 export const LICENSE_URL = blob('LICENSE');
 
 // What the Copy button in the closing section puts on the clipboard: the
-// install steps from the README, joined into one line.
-export const INSTALL_COMMAND = `git clone ${GITHUB_URL}.git && cd silta && scripts/install-dev.sh`;
+// README's install steps, joined into one line for a shell.
+export const INSTALL_COMMAND = `git clone ${GITHUB_URL}.git && cd silta && scripts/install-dev.sh && export PATH="$HOME/.local/bin:$PATH"`;

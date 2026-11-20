@@ -18,12 +18,7 @@ concurrency:
 # PRs, the weekly run and manual runs: `scripts/verify.sh full` split in three parallel jobs,
 # plus the website build, with `verify` as the required check. A push to main only refills
 # the shared caches: with squash merges and the up-to-date rule its tree is the one its PR
-# just verified (D19).
-#
-# `changes` decides which jobs a PR or push needs: website/ and website.yml changes need only
-# the website build, and every other change needs the Swift jobs. Path filters on the
-# triggers would leave the required `verify` check missing, so the jobs are skipped here
-# instead and `verify` accepts a skip only where `changes` asked for one.
+# just verified (D19). `changes` picks the jobs a PR or push needs (CONTRIBUTING.md#commands).
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -31,9 +26,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: read   # paths-filter lists a PR's files through the API
+    # The filter step runs only for PRs and pushes; the weekly and manual runs get 'true'.
     outputs:
-      code: ${{ steps.result.outputs.code }}
-      website: ${{ steps.result.outputs.website }}
+      code: ${{ steps.filter.outputs.code || 'true' }}
+      website: ${{ steps.filter.outputs.website || 'true' }}
     steps:
       - name: Check out repository
         if: github.event_name == 'push'
@@ -50,26 +46,12 @@ jobs:
               - '**'
               - '!website/**'
               - '!.github/workflows/website.yml'
+              - '!.github/workflows/website-build.yml'
             website:
               - 'website/**'
               - '.github/workflows/website.yml'
-
-      # The weekly run and manual runs verify everything.
-      - name: Choose jobs
-        id: result
-        env:
-          EVENT: ${{ github.event_name }}
-          CODE: ${{ steps.filter.outputs.code }}
-          WEBSITE: ${{ steps.filter.outputs.website }}
-        run: |
-          if [[ "$EVENT" == pull_request || "$EVENT" == push ]]; then
-            echo "code=$CODE" >> "$GITHUB_OUTPUT"
-            echo "website=$WEBSITE" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            echo "website=true" >> "$GITHUB_OUTPUT"
-          fi
-          echo "event: $EVENT, code: ${CODE:-forced}, website: ${WEBSITE:-forced}"
+              - '.github/workflows/website-build.yml'
+              - '.github/workflows/ci.yml'
 
   swift:
     needs: changes
@@ -153,19 +135,10 @@ jobs:
           path: .build/app/run.*/Test.xcresult
           if-no-files-found: ignore
 
-  # The website build, from website.yml. It never deploys from here.
   website:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.website == 'true'
-    uses: ./.github/workflows/website.yml
-    with:
-      ci: true
-    # A ceiling for the called workflow, which declares its deploy job's scopes even
-    # though `ci: true` skips that job. The build job itself runs with contents: read.
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
+    uses: ./.github/workflows/website-build.yml
 
   # A job whose needs failed is skipped, and a skipped required check counts as passing,
   # so this always runs (except on push, which verifies nothing). Each job must succeed,
@@ -176,6 +149,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Require the needed jobs to succeed
         env:
           CHANGES: ${{ needs.changes.result }}
@@ -185,15 +161,7 @@ jobs:
           EVALS: ${{ needs.evals.result }}
           APP: ${{ needs.app.result }}
           SITE: ${{ needs.website.result }}
-        run: |
-          echo "changes: $CHANGES (code: $CODE, website: $WEBSITE)"
-          echo "swift: $SWIFT, evals: $EVALS, app: $APP, website: $SITE"
-          [[ "$CHANGES" == success ]] || exit 1
-          expect() {
-            if [[ "$1" == true ]]; then [[ "$2" == success ]]; else [[ "$2" == skipped ]]; fi
-          }
-          expect "$CODE" "$SWIFT" && expect "$CODE" "$EVALS" && expect "$CODE" "$APP" \
-            && expect "$WEBSITE" "$SITE"
+        run: python3 -B scripts/ci/check_verify_gate.py
 
   # PRs can read caches saved on main but not each other's, so main keeps the shared
   # prior-writer cache filled: after each merge, and weekly so a runner-image toolchain

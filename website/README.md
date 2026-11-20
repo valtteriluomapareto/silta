@@ -11,8 +11,8 @@ both widths and adapts between them.
 
 ## Prerequisites
 
-Node 24, as pinned in [`.nvmrc`](.nvmrc) (`nvm use` picks it up); Astro needs Node
-22.23.4 or later. CI reads the same file. Nothing else: the site does not need the Swift
+Node 24.22.3, as pinned in [`.nvmrc`](.nvmrc), which CI reads too (`nvm use` picks it
+up). Astro itself needs Node 22.23.4 or later. Nothing else: the site does not need the Swift
 toolchain.
 
 ## Commands
@@ -29,8 +29,12 @@ Run every command from `website/`. Start with `npm ci`, which installs exactly w
 | `npm run validate` | Prettier check, `astro check`, then the build: the gate CI runs |
 | `npm run format` | Formats every file with Prettier |
 
-Run `npm run validate` before pushing. A website-only change doesn't need
-`scripts/verify.sh`; `scripts/run-guards.sh` still checks this README's links.
+Run `npm run validate` before pushing. It ends with `scripts/check-dist.mjs`, which
+checks that every internal link and asset in `dist/` sits under the base path and
+resolves, fragments included. A website-only change doesn't need `scripts/verify.sh`.
+`scripts/run-guards.sh` checks this README's links and, through
+`check_website_links.py`, the `blob()` links in `src/consts.ts` and the asset copies;
+CI's website build runs those two guards on Linux.
 
 ## Layout
 
@@ -43,7 +47,7 @@ Run `npm run validate` before pushing. A website-only change doesn't need
 | `src/styles/site.css` | Design tokens, base styles and shared classes (`.container`, `.eyebrow`, `.section-header`, `.card`, `.card-grid`, `.arrow-link`) |
 | `src/consts.ts` | Every outbound link, and the command the Copy button copies |
 | `src/utils.ts` | `withBase()`, which prefixes the Pages base path |
-| `public/` | Files served as they are: the mark (favicon), the Board screenshot (hero and OpenGraph image) and `robots.txt` |
+| `public/` | Files served as they are: the mark (favicon) and the Board screenshot (hero and OpenGraph image) |
 | `astro.config.mjs` | `site` and `base`, derived from `GITHUB_REPOSITORY`; the sitemap |
 
 Component styles are scoped in each component's `<style>` block. A style used by
@@ -105,16 +109,15 @@ icon layers; see [app-icon.md](../docs/app-icon.md).
 
 ## Deploys
 
-[`.github/workflows/website.yml`](../.github/workflows/website.yml) builds the site, and
-on `main` deploys `dist/` to GitHub Pages.
+[`website-build.yml`](../.github/workflows/website-build.yml) runs `npm ci`,
+`npm run validate` and the markdown link guard. CI runs it for pull requests that touch
+the website ([CONTRIBUTING](../CONTRIBUTING.md#commands) says when).
+[`website.yml`](../.github/workflows/website.yml) runs it again and deploys `dist/` to
+GitHub Pages:
 
-- **Pull requests:** CI calls the website build only when a PR changes `website/` or
-  `website.yml`. The Swift jobs are skipped when nothing else changed. The required
-  `verify` check passes only if each needed job succeeded.
-  [CONTRIBUTING](../CONTRIBUTING.md#commands) describes the CI jobs.
-- **Push to `main`:** a merge that changed `website/` or `website.yml` runs the
-  workflow, which builds and deploys. Deploys share the `pages` concurrency group and
-  are never cancelled halfway.
+- **Push to `main`:** a merge that changed `website/` or either website workflow
+  builds and deploys. Runs share the `pages` concurrency group, so a newer run waits
+  and a deploy is never cancelled halfway.
 - **Manual:** run the "Website" workflow on `main` from the Actions tab to rebuild and
   deploy.
 

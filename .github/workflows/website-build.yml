@@ -1,0 +1,53 @@
+name: Website build
+
+# Builds and checks the Astro site in website/. Called by CI for pull requests that
+# change the website, and by website.yml before it deploys. Never deploys itself.
+
+on:
+  workflow_call:
+    inputs:
+      pages-artifact:
+        description: Upload dist/ as the GitHub Pages artifact for a later deploy job.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: website/.nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Prettier, astro check and astro build: the same gate as locally.
+      - name: Validate
+        run: npm run validate
+
+      # Website-only changes skip the Swift jobs that run the repository guards.
+      - name: Check markdown and website links
+        working-directory: .
+        run: |
+          python3 -B scripts/guards/check_docs_links.py
+          python3 -B scripts/guards/check_website_links.py
+
+      - name: Upload Pages artifact
+        if: inputs.pages-artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: website/dist

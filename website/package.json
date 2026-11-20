@@ -11,7 +11,7 @@
 		"build": "astro build",
 		"preview": "astro preview",
 		"check": "astro check",
-		"validate": "prettier --check . && astro check && astro build",
+		"validate": "prettier --check . && astro check && astro build && node scripts/check-dist.mjs",
 		"format": "prettier --write .",
 		"astro": "astro"
 	},

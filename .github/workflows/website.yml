@@ -1,82 +1,39 @@
 name: Website
 
-# Builds the Astro site in website/ and publishes it to GitHub Pages.
-#
-# Pull requests: CI (ci.yml) calls this workflow only when the PR changes
-# website/ or this file, and its `verify` job requires the build to pass.
-# Push to main: runs when the merge changed website/ or this file, then deploys.
-# Manual runs on main rebuild and deploy the current site.
-#
-# Pages must be set to deploy from GitHub Actions (Settings → Pages → Source).
+# Deploys the website to GitHub Pages after a merge that changed it, or on a manual run.
+# Pull requests build it through CI instead. See website/README.md#deploys.
 
 on:
-  workflow_call:
-    inputs:
-      ci:
-        description: Build only, for a CI run; never deploy.
-        type: boolean
-        default: false
   push:
     branches: [main]
     paths:
       - 'website/**'
       - '.github/workflows/website.yml'
+      - '.github/workflows/website-build.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# One run at a time: a newer run waits, and a deploy is never cancelled halfway through.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    defaults:
-      run:
-        working-directory: website
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: website/.nvmrc
-          cache: npm
-          cache-dependency-path: website/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      # Prettier, astro check and astro build: the same gate as locally.
-      - name: Validate
-        run: npm run validate
-
-      # Website-only changes skip the Swift jobs that run the repository guards,
-      # so check that markdown links (website/README.md included) still resolve.
-      - name: Check markdown links
-        working-directory: .
-        run: python3 -B scripts/guards/check_docs_links.py
-
-      - name: Upload Pages artifact
-        if: ${{ !inputs.ci }}
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: website/dist
+    uses: ./.github/workflows/website-build.yml
+    with:
+      pages-artifact: true
 
   deploy:
     needs: build
-    if: ${{ !inputs.ci && github.ref == 'refs/heads/main' }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
-    # One deploy at a time, and never cancel one halfway through.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

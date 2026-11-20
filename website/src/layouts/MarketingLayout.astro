@@ -8,9 +8,11 @@ import { GITHUB_URL } from '../consts';
 interface Props {
 	title: string;
 	description: string;
+	/** For pages that must stay out of search results, such as the 404 page. */
+	noindex?: boolean;
 }
 
-const { title, description } = Astro.props;
+const { title, description, noindex = false } = Astro.props;
 
 // OpenGraph and canonical URLs must be absolute; social scrapers reject
 // relative image paths.
@@ -29,7 +31,7 @@ const structuredData = {
 	'@type': 'SoftwareApplication',
 	name: 'Silta',
 	description,
-	operatingSystem: 'macOS 26',
+	operatingSystem: 'macOS 26 or later',
 	applicationCategory: 'DeveloperApplication',
 	license: 'https://opensource.org/license/mit',
 	offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -46,7 +48,11 @@ const structuredData = {
 		<title>{title}</title>
 		<meta name="description" content={description} />
 		<meta name="theme-color" content="#ffffff" />
-		<link rel="canonical" href={canonicalUrl} />
+		{noindex ? (
+			<meta name="robots" content="noindex" />
+		) : (
+			<link rel="canonical" href={canonicalUrl} />
+		)}
 		<link
 			rel="icon"
 			href={withBase('silta-mark-light.svg')}
