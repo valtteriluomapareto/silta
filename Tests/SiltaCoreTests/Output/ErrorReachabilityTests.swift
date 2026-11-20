@@ -98,6 +98,15 @@ extension WorkspaceError: ErrorExamples {
   }
 }
 
+extension WorkspaceRemovalError: ErrorExamples {
+  static var examples: [WorkspaceRemovalError] {
+    [
+      .directHuman("acme", allowActive: false), .directHuman("acme", allowActive: true),
+      .active("acme"), .changed("acme"), .registration("acme"),
+    ]
+  }
+}
+
 extension DocError: ErrorExamples {
   static var examples: [DocError] {
     [
@@ -301,7 +310,8 @@ struct ErrorReachabilityTests {
     ScanError.self, CommentError.self, DocError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,
-    WorkspaceEditConflict.self, ExportError.self, ExportFailure.self, ExportGitFailure.self,
+    WorkspaceEditConflict.self, WorkspaceRemovalError.self,
+    ExportError.self, ExportFailure.self, ExportGitFailure.self,
     AppReadError.self,
   ]
 
