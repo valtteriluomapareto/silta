@@ -19,7 +19,9 @@ extension SecretGuardTests {
 
   @Test(arguments: samples) func corpusFindsEveryRequiredRule(sample: Sample) throws {
     let suffix = sample.rule == "private_key" ? "\nEnd." : " end"
-    let input = "Acme 🦊 " + sample.text + suffix
+    let separator = sample.rule == "private_key" && !sample.text.contains("END ") ? "\n" : " "
+    let prefix = "Acme 🦊" + separator
+    let input = prefix + sample.text + suffix
     let matches = SecretGuard.matches(in: input)
     let detected = matches.contains { $0.rule == sample.rule }
     #expect(detected, "missing rule \(sample.rule)")
@@ -28,7 +30,7 @@ extension SecretGuardTests {
     #expect(!leaked, "unredacted \(sample.rule)")
     #expect(output.contains("[REDACTED:\(sample.rule)]"))
     if sample.rule == "private_key" {
-      #expect(output == "Acme 🦊 [REDACTED:private_key]" + suffix)
+      #expect(output == prefix + "[REDACTED:private_key]" + suffix)
     }
     for match in matches {
       let preview = match.preview(in: input)
@@ -42,8 +44,8 @@ extension SecretGuardTests {
   @Test(arguments: syntheticArmour)
   func privateArmourRedactsTheWholeRunAndKeepsFollowingProse(block: String) {
     let tail = "\nRead the Acme documentation."
-    #expect(
-      SecretGuard.redacted("Acme: " + block + tail) == "Acme: [REDACTED:private_key]" + tail)
+    let prefix = block.contains("END ") ? "Acme: " : "Acme:\n"
+    #expect(SecretGuard.redacted(prefix + block + tail) == prefix + "[REDACTED:private_key]" + tail)
     #expect(SecretGuard.redacted(block) == "[REDACTED:private_key]")
   }
 
@@ -54,6 +56,45 @@ extension SecretGuardTests {
     #expect(
       SecretGuard.redacted(incomplete + prose + complete)
         == "[REDACTED:private_key]" + prose + "[REDACTED:private_key]")
+  }
+
+  @Test(arguments: ["> ", "- ", "12. ", "> - > "], ["\n", "\r\n"])
+  func unfinishedMarkdownArmourMasksTheEntireBody(prefix: String, newline: String) {
+    let start = "-----BE" + "GIN RSA PRIVATE KEY-----"
+    let first = String(repeating: "Q", count: 64)
+    let second = String(repeating: "Z", count: 44) + "=="
+    let tail = [prefix, prefix + "Read the Acme documentation."].joined(separator: newline)
+    let original = ([start, first, second].map { prefix + $0 } + [tail]).joined(
+      separator: newline)
+    let expected = prefix + "[REDACTED:private_key]" + newline + tail
+    let framed = HumanText.framed(original)
+    #expect(framed.utf8.count { $0 == 10 } == original.utf8.count { $0 == 10 })
+    #expect(SecretGuard.redacted(original) == expected && !framed.contains(first))
+  }
+
+  @Test(arguments: ["> ", "- ", "3. "])
+  func aParagraphOutsideTheMarkdownContainerSurvives(prefix: String) {
+    let start = "-----BE" + "GIN PRIVATE KEY-----"
+    let body = String(repeating: "Q", count: 64)
+    let moreBody = String(repeating: "X", count: 64)
+    let after = "\n\nDone\n\nKeep these instructions."
+    let input =
+      prefix + start + "\n" + prefix + body + "\n" + prefix + "\n" + prefix + moreBody + after
+    #expect(SecretGuard.redacted(input) == prefix + "[REDACTED:private_key]" + after)
+  }
+
+  @Test(arguments: ["paragraph", "numbered", "leading"])
+  func inlineArmourMentionsKeepTheRestOfTheDocument(style: String) {
+    let start = "-----BE" + "GIN PRIVATE KEY-----"
+    let line =
+      switch style {
+      case "numbered": "42. Verify the marker `" + start + "` in the manual."
+      case "leading": start + " is the example marker."
+      default: "The manual prints `" + start + "` before the key."
+      }
+    let original = line + "\n\nDone\nVerify\n"
+    #expect(
+      SecretGuard.matches(in: original).isEmpty && SecretGuard.redacted(original) == original)
   }
 
   @Test(arguments: ["ext", "service"])

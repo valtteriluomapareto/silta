@@ -2362,8 +2362,11 @@ revision before the write. It checks only the fields a write changes, each chang
 field whole rather than its changed lines; an unchanged field is never rescanned, so
 text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
-  - private-key armour, including PGP and SSH2, and the armour run after an opening
-    marker whose closing marker is missing
+  - private-key armour, including PGP and SSH2. An unfinished block starts with a
+    standalone opening marker, optionally inside a Markdown quote or list. Its
+    armour lines can carry Markdown prefixes. Inline mentions of an unmatched
+    marker stay readable. After a blank line, a quoted or listed block continues
+    only inside its Markdown container, preserving subsequent prose and spacing.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs

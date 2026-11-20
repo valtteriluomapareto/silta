@@ -43,9 +43,12 @@ enum DocDiff {
     let text =
       "title: \(revision.title ?? "(unknown)")\nkind: \(revision.kind ?? "(unknown)")\n"
       + "about: \(DocService.aboutForMasking(revision.about))\n" + DocService.evidence(revision)
+    let title = text.index(text.startIndex, offsetBy: "title: ".count)
+    let matches = SecretGuard.matches(in: text, armourFieldStart: title)
+    let masked = SecretGuard.redacted(text, matches: matches)
     var fields: [String: String] = [:]
     var field = ""
-    for line in SecretGuard.redacted(text).components(separatedBy: "\n").dropLast() {
+    for line in masked.components(separatedBy: "\n").dropLast() {
       if !line.hasPrefix("  ") { field = String(line.prefix { $0 != ":" }) }
       fields[field, default: ""] += "  " + line + "\n"
     }
