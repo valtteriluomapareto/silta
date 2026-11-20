@@ -72,6 +72,19 @@ extension SecretGuardTests {
     #expect(SecretGuard.redacted(original) == expected && !framed.contains(first))
   }
 
+  @Test(arguments: ["> ", "- ", "3. "])
+  func aParagraphOutsideTheMarkdownContainerSurvives(prefix: String) {
+    let start = "-----BE" + "GIN PRIVATE KEY-----"
+    let body = String(repeating: "Q", count: 64)
+    let moreBody = String(repeating: "X", count: 64)
+    let after = "\n\nDone\n\nKeep these instructions."
+    let input =
+      prefix + start + "\n" + prefix + body + "\n" + prefix + "\n" + prefix + moreBody + after
+    withKnownIssue("An unprefixed one-word paragraph can look like armour.") {
+      #expect(SecretGuard.redacted(input) == prefix + "[REDACTED:private_key]" + after)
+    }
+  }
+
   @Test(arguments: ["paragraph", "numbered", "leading"])
   func inlineArmourMentionsKeepTheRestOfTheDocument(style: String) {
     let start = "-----BE" + "GIN PRIVATE KEY-----"
