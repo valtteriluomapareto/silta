@@ -26,9 +26,18 @@ struct ExportRestoreRefusalCommandTests {
         #expect(json ? result.stderr.isEmpty : result.stdout.isEmpty)
         Golden.forTests().check(
           json ? result.stdout : result.stderr, golden + (json ? ".json" : ".txt"))
+        let hint: String
+        if json {
+          let error = try TaskStateCommandTests.error(result)
+          hint = try #require((error["next"] as? [String])?.first)
+        } else {
+          let line = try #require(result.stderr.split(separator: "\n").last)
+          try #require(line.hasPrefix("next: "))
+          hint = String(line.dropFirst("next: ".count))
+        }
+        let recovery = try FirstWorkspaceCommandTests.replay(hint, in: scratch, cwd: scratch)
+        #expect(recovery.termination == .exit(0))
       }
-      let recovery = try SiltaBinary.run(["ws", "ls"], in: scratch)
-      #expect(recovery.termination == .exit(0))
     }
   }
 

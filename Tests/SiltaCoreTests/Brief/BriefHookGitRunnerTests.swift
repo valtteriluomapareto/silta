@@ -1,5 +1,5 @@
 import Foundation
-import SiltaCore
+@testable import SiltaCore
 import SiltaTestSupport
 import Synchronization
 import Testing
@@ -22,6 +22,27 @@ struct BriefHookGitRunnerTests {
     #expect(result.termination == termination)
     #expect(scripted.requests == [bounded])
     #expect(notifications.withLock { $0 } == (termination == .timedOut ? 1 : 0))
+  }
+
+  @Test(arguments: [750, 1000])
+  func optionalReadsUseRemainingBudgetWithoutMarkingTheHookTimedOut(elapsed: Int) async throws {
+    let capture = GitCapture(byteLimit: 1024)
+    let request = GitRequest(
+      arguments: ["cat-file", "-t", "HEAD:README.md"], directory: URL(filePath: "/acme"),
+      timeout: 0.5, capture: capture)
+    let bounded = GitRequest(
+      arguments: request.arguments, directory: request.directory, timeout: 0.25,
+      lazyFetch: false, capture: capture)
+    let scripted = ScriptedGitRunner(
+      script: elapsed == 1000 ? [] : [(bounded, .success(.init(termination: .timedOut)))])
+    let notifications = Mutex(0)
+    let runner = BriefHookGitRunner(
+      runner: scripted, deadline: BriefHookDeadlineTests.deadline(elapsed),
+      onTimeout: { notifications.withLock { $0 += 1 } })
+    let result = try await runner.optionalReads().run(request)
+    #expect(result.termination == .timedOut)
+    #expect(scripted.requests == (elapsed == 1000 ? [] : [bounded]))
+    #expect(notifications.withLock { $0 } == 0)
   }
 
   @Test func expiredBudgetNotifiesWithoutSpawning() async throws {

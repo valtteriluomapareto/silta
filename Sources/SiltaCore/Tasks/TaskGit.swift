@@ -37,13 +37,18 @@ struct TaskGit: Sendable {
   }
 
   private static func branchName(_ directory: URL, runner: any GitRunner) async throws -> String {
-    let name = try await value(
-      ["rev-parse", "--abbrev-ref", "HEAD"], directory: directory, runner: runner)
-    guard name.utf8.starts(with: "heads/".utf8) || name.utf8.starts(with: gitBranchPrefix.utf8)
-    else { return name }
-    let ref = try await value(
-      ["symbolic-ref", "--quiet", "HEAD"], directory: directory, runner: runner)
-    guard let branch = gitBranchName(in: ref) else { throw TaskError.git }
+    let result: GitResult
+    do {
+      result = try await runner.run(
+        .init(arguments: ["symbolic-ref", "--quiet", "HEAD"], directory: directory))
+    } catch {
+      throw TaskError.git
+    }
+    if result.termination == .exit(1) { return "HEAD" }
+    guard result.termination == .exit(0),
+      let ref = String(data: result.stdout, encoding: .utf8),
+      let branch = gitBranchName(in: ref.trimmingCharacters(in: .newlines))
+    else { throw TaskError.git }
     return branch
   }
 

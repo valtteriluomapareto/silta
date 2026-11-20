@@ -7,13 +7,18 @@ package struct CodeService {
   private let store: DatabaseStore
   private let git: any GitRunner
   private let date: Date
+  private let localOnly: Bool
 
   /// Creates a reader with command-scoped storage, git and injected time.
-  package init(workspace: String, store: DatabaseStore, git: any GitRunner, at date: Date) {
+  package init(
+    workspace: String, store: DatabaseStore, git: any GitRunner, at date: Date,
+    localOnly: Bool = false
+  ) {
     self.workspace = workspace
     self.store = store
     self.git = git
     self.date = date
+    self.localOnly = localOnly
   }
 
   /// Resolves the selected commit once, optionally fetching first. Reads never update
@@ -21,23 +26,7 @@ package struct CodeService {
   package func read(
     _ operation: CodeRead, target: String, prod: Bool = false, fetch: Bool = false
   ) async throws -> CodeResult {
-    try operation.validate()
-    let parts = target.split(separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
-    guard let first = parts.first, !first.isEmpty,
-      parts.count == 1 || (!parts[1].isEmpty && !prod), !target.contains("\0")
-    else {
-      throw CodeError.invalid(
-        "Use app[@ref], or app with --prod.", command: "silta code \(operation.verb)")
-    }
-    let app = String(first)
-    let selection = try select(app)
-    try operation.validate(subpath: selection.subpath)
-    let ref = parts.count == 2 ? String(parts[1]) : (prod ? selection.prod : selection.ref)
-    let configuration = "silta --ws \(shellWord(workspace)) ws show"
-    guard let ref else {
-      throw CodeError.notFound(
-        "App \(app.debugDescription) has no prod_ref.", next: [configuration])
-    }
+    let (selection, ref) = try selectedRead(operation, target: target, prod: prod)
     if fetch {
       do {
         _ = try await RepositoryFetch.fetch(
@@ -48,13 +37,25 @@ package struct CodeService {
           retry: operation.command(workspace: workspace, target: target, prod: prod))
       }
     }
-    let sha = try await resolve(ref, app: app, selection: selection, operation: operation)
+    let sha = try await resolve(ref, selection: selection, operation: operation)
     let (output, warnings) = try await content(
-      operation, sha: sha, selection: selection, target: app + "@" + ref)
+      operation, sha: sha, selection: selection, target: selection.app + "@" + ref)
     let immutable = [40, 64].contains(ref.count) && ref.allSatisfy(\.isHexDigit)
     return CodeResult(
-      app: app, ref: ref, sha: sha, output: output,
+      app: selection.app, ref: ref, sha: sha, output: output,
       warnings: (fetch || immutable ? [] : stale(selection)) + warnings)
+  }
+
+  /// Probes the same selected ref and literal path as code show without loading the blob.
+  func validateEvidence(_ operation: CodeRead, target: String) async throws -> Bool {
+    let (selection, ref) = try selectedRead(operation, target: target, prod: false)
+    let subpath = CodeRead.normalized(selection.subpath)
+    let leaf = CodeRead.normalized(operation.path)
+    let path = subpath.isEmpty ? leaf : subpath + "/" + leaf
+    let result = try await run(
+      ["cat-file", "-t", "--", ref + "^{commit}:" + path], selection, operation,
+      capture: .init(byteLimit: 1024))
+    return result.termination == .exit(0) && result.stdout.elementsEqual("blob\n".utf8)
   }
 
   /// Resolves a captured app selection without selecting it again or reading content.
@@ -63,14 +64,14 @@ package struct CodeService {
       throw RepoError.localPath(repo: repo, workspace: workspace)
     }
     let selection = Selection(
-      ref: ref, prod: nil, subpath: "", repo: repo, path: path, fetched: nil)
-    return try await resolve(ref, app: app, selection: selection, operation: .list(nil))
+      app: app, ref: ref, prod: nil, subpath: "", repo: repo, path: path, fetched: nil)
+    return try await resolve(ref, selection: selection, operation: .list(nil))
   }
 
   /// Resolves `ref` to a commit. A ref git rejects or can't find is `not_found`; when its
   /// `origin/` counterpart resolves, the error suggests repeating the read with that ref.
   private func resolve(
-    _ ref: String, app: String, selection: Selection, operation: CodeRead
+    _ ref: String, selection: Selection, operation: CodeRead
   ) async throws -> String {
     let peel = { (ref: String) in
       ["rev-parse", "--verify", "--quiet", "--end-of-options", ref + "^{commit}"]
@@ -100,7 +101,9 @@ package struct CodeService {
     throw CodeError.notFound(
       "Commit for Git ref \(ref.debugDescription) not found.",
       next: suggestion.termination == .exit(0)
-        ? [operation.command(workspace: workspace, target: app + "@" + remote, prod: false)]
+        ? [
+          operation.command(workspace: workspace, target: selection.app + "@" + remote, prod: false)
+        ]
         : [
           "silta --ws \(shellWord(workspace)) repo fetch \(shellWord(selection.repo))",
           "silta --ws \(shellWord(workspace)) ws show",
@@ -210,7 +213,7 @@ package struct CodeService {
         .init(
           arguments: ["--no-pager", "-c", "format.pretty=medium"] + arguments,
           directory: URL(filePath: selection.path, directoryHint: .isDirectory),
-          capture: capture))
+          timeout: localOnly ? 0.25 : 10, lazyFetch: !localOnly, capture: capture))
     } catch { throw failure(selection) }
     switch result.termination {
     case .exit: return result
@@ -243,7 +246,7 @@ package struct CodeService {
         throw RepoError.localPath(repo: repo, workspace: workspace)
       }
       return Selection(
-        ref: row["ref"], prod: row["prod_ref"], subpath: row["subpath"] ?? "", repo: repo,
+        app: app, ref: row["ref"], prod: row["prod_ref"], subpath: row["subpath"] ?? "", repo: repo,
         path: path, fetched: row["fetched_at"])
     }
   }
@@ -263,10 +266,36 @@ package struct CodeService {
 }
 
 private struct Selection {
+  let app: String
   let ref: String
   let prod: String?
   let subpath: String
   let repo: String
   let path: String
   let fetched: String?
+}
+
+extension CodeService {
+  private func selectedRead(_ operation: CodeRead, target: String, prod: Bool) throws
+    -> (Selection, String)
+  {
+    try operation.validate()
+    let parts = target.split(separator: "@", maxSplits: 1, omittingEmptySubsequences: false)
+    guard let first = parts.first, !first.isEmpty,
+      parts.count == 1 || (!parts[1].isEmpty && !prod), !target.contains("\0")
+    else {
+      throw CodeError.invalid(
+        "Use app[@ref], or app with --prod.", command: "silta code \(operation.verb)")
+    }
+    let app = String(first)
+    let selection = try select(app)
+    try operation.validate(subpath: selection.subpath)
+    let ref = parts.count == 2 ? String(parts[1]) : (prod ? selection.prod : selection.ref)
+    let configuration = "silta --ws \(shellWord(workspace)) ws show"
+    guard let ref else {
+      throw CodeError.notFound(
+        "App \(app.debugDescription) has no prod_ref.", next: [configuration])
+    }
+    return (selection, ref)
+  }
 }

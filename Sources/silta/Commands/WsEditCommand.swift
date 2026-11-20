@@ -36,7 +36,7 @@ struct WsEditCommand: WorkspaceArgumentCommand {
       command: "silta ws edit" + target + input, approved: global.approved)
   }
 
-  func execute(_ context: CommandContext) throws -> CommandOutput {
+  func execute(_ context: CommandContext) async throws -> CommandOutput {
     let environment = context.environment
     let workspace = workspace ?? global.ws
     let identity = (environment.ids, environment.clock.now())
@@ -57,6 +57,10 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     var output = CommandOutput(
       text: selected.map { "Updated workspace \($0)." } ?? "No changes.",
       data: Data(workspace: selected), approvalUsed: selected != nil && !environment.actor.isHuman)
+    if let selected {
+      output.warnings = await EdgeCodeEvidence.warnings(
+        workspace: selected, environment: environment)
+    }
     output.workspace = selected
     return output
   }

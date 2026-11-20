@@ -17,6 +17,17 @@ package enum HumanText {
     render(text, layout: .line)
   }
 
+  /// Masks stored text and prefixes every line so it cannot look like a command hint.
+  package static func quoted(_ text: String) -> [String] {
+    quoteLines(body(text).trimmingCharacters(in: .newlines))
+  }
+
+  /// Quotes content that has already been masked and framed.
+  static func quoteLines(_ text: String) -> [String] {
+    text.split(separator: "\n", omittingEmptySubsequences: false)
+      .map { "> " + $0.replacingOccurrences(of: "\t", with: " ") }
+  }
+
   private enum Layout {
     case line, body, framed
   }

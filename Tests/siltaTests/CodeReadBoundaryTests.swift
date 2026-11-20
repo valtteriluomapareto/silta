@@ -98,6 +98,81 @@ extension CodeCommandTests {
     }
   }
 
+  @Test(arguments: [2450, 3500])
+  func byteCappedReadsGiveTheFirstUnreadLineAndTotal(width: Int) throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let padding = String(repeating: "x ", count: width / 2)
+      let lines = (1...450).map { "Acme line \($0) " + padding }
+      let path = "wide.txt"
+      try Data(lines.joined(separator: "\n").utf8).write(
+        to: repo.appending(path: "apps/console/" + path))
+      try commitAll(repo, scratch)
+      let command = ["--json", "code", "show", "console@HEAD", path]
+      let first = try SiltaBinary.run(command, in: scratch)
+      let output = try #require(try envelope(first.stdout)["output"] as? String)
+      let warning = try warnings(first.stdout)["output_truncated"]
+      let count = output.split(separator: "\n").count
+      #expect(count == (width == 2450 ? 400 : 298))
+      #expect(
+        warning == "Output cut after \(count) of 450 lines; "
+          + "read the rest with --lines \(count + 1)-450.")
+      let range = try #require(warning?.split(separator: " ").last)
+      let next = try SiltaBinary.run(command + ["--lines", String(range.dropLast())], in: scratch)
+      #expect(next.termination == .exit(0))
+      #expect(
+        try envelope(next.stdout)["output"] as? String
+          == lines.dropFirst(count).joined(separator: "\n"))
+    }
+  }
+
+  @Test func everyByteCappedWindowGivesAConcreteContinuation() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let padding = String(repeating: "x ", count: 1750)
+      let file = (1...1200).map { "Acme \($0) " + padding }.joined(separator: "\n")
+      let name = "several-windows.txt"
+      try Data(file.utf8).write(to: repo.appending(path: "apps/console/" + name))
+      try commitAll(repo, scratch)
+      let show = ["--json", "code", "show", "console@HEAD", name]
+      var range: [String] = []
+      var output = ""
+      for _ in 0..<6 {
+        let page = try SiltaBinary.run(show + range, in: scratch)
+        try #require(page.termination == .exit(0), "\(page.stdout)\(page.stderr)")
+        output += try #require(try envelope(page.stdout)["output"] as? String)
+        guard let cut = try warnings(page.stdout)["output_truncated"] else {
+          #expect(output == file)
+          return
+        }
+        let next = try #require(cut.firstMatch(of: /--lines ([0-9]+-[0-9]+)/)?.output.1)
+        range = ["--lines", String(next)]
+      }
+      Issue.record("The printed continuations did not reach the last line.")
+    }
+  }
+
+  @Test func aSingleWideLineIsDiagnosedAtItsActualLineNumber() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let path = "wide.txt"
+      let line = String(repeating: "é", count: 525_000)
+      try Data(("first\n" + line + "\nlast").utf8).write(
+        to: repo.appending(path: "apps/console/" + path))
+      try commitAll(repo, scratch)
+      let command = ["--json", "code", "show", "console@HEAD", path, "--lines"]
+      let oversized = try SiltaBinary.run(command + ["2-2"], in: scratch)
+      let warnings = try warnings(oversized.stdout)
+      #expect(try envelope(oversized.stdout)["output"] as? String == "")
+      let warning = try #require(warnings["output_truncated"])
+      #expect(warning.contains("Line 2 exceeds 1 MiB"))
+      let next = try #require(warning.firstMatch(of: /--lines ([0-9]+)/)?.output.1)
+      let later = try SiltaBinary.run(command + [String(next)], in: scratch)
+      #expect(later.termination == .exit(0))
+      #expect(try envelope(later.stdout)["output"] as? String == "last")
+    }
+  }
+
   @Test func grepUsesExtendedRegularExpressions() throws {
     try withScratchDirectory { scratch in
       _ = try setup(scratch)

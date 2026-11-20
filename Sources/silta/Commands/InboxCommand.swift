@@ -106,7 +106,9 @@ struct InboxCommand: OutputCommand {
           "waiting on: "
             + (on.isEmpty ? "an answer" : on.map(HumanText.line).joined(separator: ", ")))
       }
-      if let why = task.why { lines += indented("ask: " + HumanText.body(why)) }
+      if let why = task.why {
+        lines += ["  ask:"] + HumanText.quoted(why).map { "  " + $0 }
+      }
       if let day = task.followUpAt { lines += indented("follow-up: " + day) }
       if let external = task.externalRef {
         lines += indented("tracker: " + HumanText.line(external))

@@ -15,9 +15,12 @@ package struct TaskImport: Sendable {
   /// Retains detected secrets with the human's go-ahead.
   package var allowSecret = false
 
-  /// A body-free retry preserves the options that determine the import result.
+  /// Whether the source is stdin and must be supplied again on retry.
+  package var retryFromStdin = false
+
+  /// A body-free retry preserves the source kind and options.
   package var retryCommand: String {
-    "silta task from-plan <file>" + commandOptions
+    "silta task from-plan " + (retryFromStdin ? "-" : "<file>") + commandOptions
   }
 
   /// The flags actually passed, then the created refs, without the source body or path.

@@ -352,7 +352,7 @@ struct TaskParentAppOptOutTests {
       let git = ScriptedGitRunner(
         script: TaskGitTests.script(repo: repo, cwd: repo, completion: false)
       ) { request in
-        if request.arguments == ["rev-parse", "--abbrev-ref", "HEAD"] {
+        if request.arguments == ["symbolic-ref", "--quiet", "HEAD"] {
           try setup.db.write {
             try $0.database.execute(sql: "UPDATE task SET app_id=NULL WHERE seq=1")
           }

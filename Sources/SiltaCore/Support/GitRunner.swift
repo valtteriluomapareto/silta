@@ -34,11 +34,15 @@ package struct GitCapture: Equatable, Sendable {
   /// Number of LF-delimited stdout lines to discard before capturing a prefix.
   package let skipLines: Int
 
+  /// Whether a truncated prefix also needs the total count of LF-delimited lines.
+  package let countLines: Bool
+
   /// Returns a bounded capture request, optionally starting at a later stdout line.
-  package init(byteLimit: Int, skipLines: Int = 0) {
+  package init(byteLimit: Int, skipLines: Int = 0, countLines: Bool = false) {
     precondition(byteLimit > 0, "Git capture needs a positive byte limit")
     self.byteLimit = byteLimit
     self.skipLines = skipLines
+    self.countLines = countLines
   }
 }
 
@@ -66,16 +70,20 @@ package struct GitResult: Equatable, Sendable {
   /// Number of lines discarded before capture. A timed-out read captures its initial prefix.
   package let stdoutSkippedLines: Int
 
+  /// Total LF-delimited lines in a truncated stdout stream, when requested and counted in time.
+  package let stdoutLineCount: Int?
+
   /// Creates a captured result without decoding or combining its streams.
   package init(
     termination: GitTermination, stdout: Data = Data(), stderr: Data = Data(),
-    stdoutTruncated: Bool = false, stdoutSkippedLines: Int = 0
+    stdoutTruncated: Bool = false, stdoutSkippedLines: Int = 0, stdoutLineCount: Int? = nil
   ) {
     self.termination = termination
     self.stdout = stdout
     self.stderr = stderr
     self.stdoutTruncated = stdoutTruncated
     self.stdoutSkippedLines = stdoutSkippedLines
+    self.stdoutLineCount = stdoutLineCount
   }
 }
 

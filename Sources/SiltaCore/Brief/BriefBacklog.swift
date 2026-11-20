@@ -84,14 +84,20 @@ struct BriefBacklog {
           text: "\(count - rows.count) more open:\n"
             + commands.map { "next: " + $0 + "\n" }.joined()))
     }
+    // Materialize the five keys before reading result bodies for the selected rows.
     let done = try Row.fetchAll(
       db,
       sql: """
-        SELECT task.seq,
+        WITH recent AS MATERIALIZED (
+          SELECT task.id,task.seq,silta_archive_instant(task.closed_at) AS instant
+          \(base("task.status='done' AND " + TaskVisibility.readableOverrideSQL))
+          ORDER BY instant DESC,task.seq DESC LIMIT 5
+        )
+        SELECT recent.seq,
           substr(task.result_md,1,instr(task.result_md||char(10),char(10))-1) AS result,
           substr(task.done_sha,1,12) AS sha
-        \(base("task.status='done' AND " + TaskVisibility.readableOverrideSQL))
-        ORDER BY silta_archive_instant(task.closed_at) DESC,task.seq DESC LIMIT 5
+        FROM recent JOIN task ON task.id=recent.id
+        ORDER BY recent.instant DESC,recent.seq DESC
         """, arguments: arguments)
     sections += done.map { doneSection($0, prefix: prefix) }
     return sections

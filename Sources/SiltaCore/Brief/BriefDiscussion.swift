@@ -117,7 +117,8 @@ struct BriefDiscussion {
     let header = "\(item.kind) \(ref)\(kind)\(question) on \(task)"
     let read = "\(command) task show \(shellWord(task)) --timeline"
     let marker = item.next.contains(read) ? "(trimmed)\n" : "(trimmed; \(read))\n"
-    return header + " by \(TaskError.shown(author)):\n" + Self.quoteLines(body)
+    return header + " by \(TaskError.shown(author)):\n"
+      + HumanText.quoteLines(body).joined(separator: "\n") + "\n"
       + (cut ? marker : "")
       + (item.kind == "discussion" ? "clears on your next write to \(task)\n" : "")
       + next.joined()
@@ -140,11 +141,6 @@ struct BriefDiscussion {
 
   /// Masks, then quotes every line so comment text cannot pose as brief structure.
   static func quoted(_ body: String) -> String {
-    quoteLines(HumanText.body(body).trimmingCharacters(in: .newlines))
-  }
-
-  private static func quoteLines(_ text: String) -> String {
-    text.split(separator: "\n", omittingEmptySubsequences: false)
-      .map { "> " + $0.replacingOccurrences(of: "\t", with: " ") + "\n" }.joined()
+    HumanText.quoted(body).joined(separator: "\n") + "\n"
   }
 }

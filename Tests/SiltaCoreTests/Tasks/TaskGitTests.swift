@@ -23,7 +23,10 @@ struct TaskGitTests {
         repo.path + "/.git"
       ),
       (.init(arguments: ["rev-parse", "--show-toplevel"], directory: cwd), cwd.path),
-      (.init(arguments: ["rev-parse", "--abbrev-ref", "HEAD"], directory: cwd), "acme-release"),
+      (
+        .init(arguments: ["symbolic-ref", "--quiet", "HEAD"], directory: cwd),
+        "refs/heads/acme-release"
+      ),
     ]
     if completion {
       calls += [
@@ -233,7 +236,7 @@ extension TaskGitTests {
       let steps = Self.script(repo: repo, cwd: repo, completion: completion)
       let git = ScriptedGitRunner(script: steps) { request in
         if request.arguments
-          == (completion ? ["status", "--porcelain"] : ["rev-parse", "--abbrev-ref", "HEAD"])
+          == (completion ? ["status", "--porcelain"] : ["symbolic-ref", "--quiet", "HEAD"])
         {
           try human.db.write {
             if change == "status" {
@@ -280,7 +283,7 @@ extension TaskGitTests {
       try Self.configure(setup, repo: repo)
       let steps = Self.script(repo: repo, cwd: repo, completion: false)
       let git = ScriptedGitRunner(script: steps) { request in
-        if request.arguments == ["rev-parse", "--abbrev-ref", "HEAD"] {
+        if request.arguments == ["symbolic-ref", "--quiet", "HEAD"] {
           try setup.db.write {
             try $0.database.execute(sql: "UPDATE repo_path SET path='/acme/moved'")
           }

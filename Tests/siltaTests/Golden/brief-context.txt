@@ -14,7 +14,7 @@ neighbour: edge:api/service:push/uses Acme push
 neighbour: edge:api/portal/calls Acme integration
 next: silta --ws 'acme' code show 'api' --lines 1 -- 'README.md'
 neighbour: edge:portal/api/calls Acme caller
-next: silta --ws 'acme' code ls 'portal'
+next: silta --ws 'acme' ws show
 open: AC-1 [doing, p2] Acme task
 open: AC-2 [doing, p2] Acme task (app: portal)
 glossary: messages = messaging, push
