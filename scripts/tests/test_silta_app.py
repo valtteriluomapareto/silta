@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import select
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -73,6 +74,65 @@ class Waits(unittest.TestCase):
             with self.assertRaisesRegex(driver.DriverError, "exited"):
                 driver.wait_for(Path(root), child.pid, lambda: None, [], 0)
 
+    def test_action_waits_for_both_settlement_and_the_response_link(self):
+        for state_first in (True, False):
+            with self.subTest(state_first=state_first):
+                self.round_trip_with_split_publication(state_first)
+
+    def round_trip_with_split_publication(self, state_first):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            request = root / "req-1.json"
+            response = root / "res-1.json"
+            state_url = root / "state.json"
+            initial = {"run": "owned", "seq": 0, "settledSeq": 0}
+            expected = {"version": 1, "run": "owned", "seq": 1, "outcome": "accepted",
+                        "copied": "AC-9"}
+            driver.atomic_json(state_url, initial)
+            waiting = threading.Event()
+            saw_first_without_second = threading.Event()
+
+            def publish_state():
+                driver.atomic_json(state_url, dict(initial, seq=1, settledSeq=1))
+
+            def publish_response():
+                driver.atomic_json(response, expected, exclusive=True)
+
+            def fake_app():
+                if waiting.wait(4):
+                    first, second = ((publish_state, publish_response) if state_first
+                                     else (publish_response, publish_state))
+                    first()
+                    if saw_first_without_second.wait(4):
+                        second()
+
+            def wait(conditions, timeout, ready):
+                def check(state):
+                    result = ready(state)
+                    first_visible = state["settledSeq"] == 1 if state_first else response.exists()
+                    if first_visible and not result:
+                        saw_first_without_second.set()
+                    return result
+
+                waiting.set()
+                return driver.wait_for(root, os.getpid(), run.read, conditions, timeout, check)
+
+            run = SimpleNamespace(root=root, read=lambda: driver.read_json(state_url),
+                                  verify=lambda: None, wait=wait)
+            app = threading.Thread(target=fake_app)
+            app.start()
+            try:
+                fields = {"action": "copy.ref"}
+                self.assertEqual(driver.action(run, fields, 4), expected)
+                self.assertEqual(driver.read_json(request), {**fields, "version": 1,
+                                                             "run": "owned", "seq": 1})
+                self.assertTrue(saw_first_without_second.is_set())
+            finally:
+                waiting.set()
+                saw_first_without_second.set()
+                app.join(5)
+
+
 
 class OwnedRuns(unittest.TestCase):
     def test_symlink_or_nonprivate_directory_refuses(self):
@@ -120,6 +180,30 @@ class OwnedRuns(unittest.TestCase):
                 child.terminate.assert_called_once()
                 child.wait.assert_called_once_with(timeout=2)
 
+    def test_failed_initial_read_stops_launch_without_handing_off_the_run(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            app = root / "SiltaApp"
+            app.touch()
+            child = Mock(pid=10, poll=Mock(return_value=None))
+            failed = {"idle": True, "refresh": {"phase": "failed"}}
+
+            def wait(directory, pid, read, conditions, timeout):
+                self.assertEqual(conditions, driver.READY)
+                return read()
+
+            run = Mock(root=root, pid=10, read=Mock(return_value=failed))
+            with patch.object(driver, "APP", app), patch.object(driver, "native_tool"), \
+                    patch.object(driver.tempfile, "mkdtemp", return_value=str(root)), \
+                    patch.object(driver.subprocess, "Popen", return_value=child), \
+                    patch.object(driver, "identity", return_value={"pid": 10}), \
+                    patch.object(driver, "Run", return_value=run), \
+                    patch.object(driver, "wait_for", side_effect=wait):
+                with self.assertRaisesRegex(driver.DriverError, "initial fixture view failed"):
+                    driver.launch(SimpleNamespace(route="board", dark=False, timeout=1))
+            child.terminate.assert_called_once()
+            self.assertFalse((root / "driver.json").exists())
+
     def test_shot_publishes_png_and_correlated_state_only_after_postcheck(self):
         with tempfile.TemporaryDirectory() as root:
             output = Path(root) / "window.png"
@@ -144,7 +228,82 @@ class OwnedRuns(unittest.TestCase):
             self.assertTrue(output.exists())
             self.assertEqual(driver.read_json(output.with_suffix(".png.json"))["revision"], 4)
 
+class FixtureCLI(unittest.TestCase):
+    def setUp(self):
+        scratch = self.enterContext(tempfile.TemporaryDirectory())
+        self.root = Path(scratch)
+        self.run = Mock(root=self.root / "run")
+        self.run.read.return_value = {"fixtureNow": "2030-06-01T02:03:04.000Z"}
+        self.data = self.run.root / "data"
+        self.data.mkdir(parents=True)
+        self.database = self.data / "silta.db"
+        self.database.touch()
+        self.cli = self.root / ".build/debug/silta"
+        self.cli.parent.mkdir(parents=True)
+        self.audit = self.run.root / "cli.json"
+        self.enterContext(patch.object(driver, "ROOT", self.root))
+
+    def stub(self, stdout, status=0):
+        self.cli.write_text(
+            f"#!{sys.executable}\n"
+            "import json, os, pathlib, sys\n"
+            "pathlib.Path('cli.json').write_text(json.dumps("
+            "{'args': sys.argv[1:], 'env': dict(os.environ), 'cwd': os.getcwd()}))\n"
+            f"print({stdout!r})\n"
+            f"sys.exit({status})\n"
+        )
+        self.cli.chmod(0o700)
+
+    def test_fixture_cli_uses_scrubbed_environment_and_exact_args(self):
+        self.stub("AC-24")
+        with patch.dict(os.environ, {"HOME": "/ignore-parent-home", "SILTA_HOME": "/ignore-silta-home",
+                                     "SILTA_NOW": "ignore-parent-clock", "SILTA_TOKEN": "unused"}):
+            self.assertEqual(driver.write_fixture_proposal(self.run, "--example title"), "AC-24")
+        call = driver.read_json(self.audit)
+        self.assertEqual(call["args"], ["--ws", "acme", "task", "add", "--quiet", "--",
+                                        "--example title"])
+        self.assertEqual(Path(call["cwd"]).resolve(), self.run.root.resolve())
+        self.assertEqual(call["env"]["HOME"], str(self.run.root))
+        self.assertEqual(call["env"]["SILTA_HOME"], str(self.data))
+        self.assertEqual(call["env"]["SILTA_ACTOR"], "agent:codex:control")
+        self.assertEqual(call["env"]["SILTA_NOW"], "2030-06-01T02:03:04.000Z")
+        self.assertNotIn("SILTA_TOKEN", call["env"])
+
+    def test_linked_fixture_store_refuses_before_invoking_cli(self):
+        self.stub("AC-24")
+        external = self.root / "external"
+        self.data.rename(external)
+        self.data.symlink_to(external, target_is_directory=True)
+        with self.assertRaisesRegex(driver.DriverError, "isolated directory"):
+            driver.write_fixture_proposal(self.run, "Acme test")
+        self.data.unlink()
+        self.data.mkdir()
+        os.link(external / "silta.db", self.database)
+        with self.assertRaisesRegex(driver.DriverError, "isolated directory"):
+            driver.write_fixture_proposal(self.run, "Acme test")
+        self.assertFalse(self.audit.exists())
+
+    def test_fixture_cli_refuses_failed_exit_and_unparsable_ref(self):
+        for stdout, status in (("AC-24", 1), ("AC-0", 0), ("AC-24\nother", 0)):
+            with self.subTest(stdout=stdout, status=status):
+                self.stub(stdout, status)
+                with self.assertRaisesRegex(driver.DriverError, "did not return a task reference"):
+                    driver.write_fixture_proposal(self.run, "Acme test")
+                self.assertTrue(self.audit.exists())
+                self.audit.unlink()
+
+
 class FixtureWriteRecovery(unittest.TestCase):
+    def test_client_lock_refuses_a_second_driver(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            run = SimpleNamespace(root=Path(scratch))
+            with driver.client_lock(run):
+                with self.assertRaisesRegex(driver.DriverError, "Another client"):
+                    with driver.client_lock(run):
+                        self.fail("The second client acquired the same lock")
+            with driver.client_lock(run):
+                self.assertTrue((run.root / "client.lock").is_file())
+
     def test_intent_survives_interruption_and_never_replays(self):
         with tempfile.TemporaryDirectory() as root:
             record = Path(root) / "write.json"
@@ -195,6 +354,21 @@ class FixtureWriteRecovery(unittest.TestCase):
                     write.assert_not_called()
                 self.assertFalse((root / "write-new.json").exists())
 
+    def test_missing_clock_refuses_without_creating_intent(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            cli = root / ".build/debug/silta"
+            cli.parent.mkdir(parents=True)
+            cli.touch()
+            run = Mock(root=root)
+            run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0}
+            with patch.object(driver, "ROOT", root), \
+                    patch.object(driver, "write_fixture_proposal") as write:
+                with self.assertRaisesRegex(driver.DriverError, "did not publish its clock"):
+                    driver.fixture_write(run, "new", "Acme review", 1)
+                write.assert_not_called()
+            self.assertFalse((root / "write-new.json").exists())
+
     def test_published_action_failure_identifies_the_recoverable_sequence(self):
         for error in (subprocess.TimeoutExpired("identity", 5), OSError("read failed"),
                       KeyboardInterrupt()):
@@ -210,6 +384,10 @@ class FixtureWriteRecovery(unittest.TestCase):
                 run.wait.side_effect = None
                 driver.atomic_json(root / "res-1.json", {"version": 1, "run": "owned", "seq": 1,
                                                          "outcome": "accepted"})
+                with self.assertRaisesRegex(driver.DriverError, "different request"):
+                    driver.action(run, {"action": "refresh"}, 1, sequence=1)
+                run.read.return_value = {"run": "owned", "seq": 1, "settledSeq": 0}
+                self.assertEqual(driver.action(run, fields, 1)["outcome"], "accepted")
                 self.assertEqual(driver.action(run, fields, 1, sequence=1)["outcome"], "accepted")
                 self.assertEqual((root / "req-1.json").read_bytes(), original)
                 self.assertFalse((root / "req-2.json").exists())
@@ -221,7 +399,8 @@ class FixtureWriteRecovery(unittest.TestCase):
             cli.parent.mkdir(parents=True)
             cli.touch()
             run = Mock(root=root)
-            run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0}
+            run.read.return_value = {"run": "owned", "seq": 0, "settledSeq": 0,
+                                     "fixtureNow": "2030-06-01T02:03:04.000Z"}
             with patch.object(driver, "ROOT", root), \
                     patch.object(driver, "write_fixture_proposal", return_value="AC-24") as write, \
                     patch.object(driver, "action", side_effect=[driver.DriverError("refresh wait"),

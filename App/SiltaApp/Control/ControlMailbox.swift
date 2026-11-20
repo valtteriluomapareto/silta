@@ -1,6 +1,5 @@
 #if DEBUG
   import Darwin
-  import Dispatch
   import Foundation
 
   @MainActor final class ControlMailbox {

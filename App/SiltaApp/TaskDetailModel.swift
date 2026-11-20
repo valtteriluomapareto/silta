@@ -10,20 +10,29 @@ final class TaskDetailModel {
   private var workspace: String?
   private var ref: String?
   private var loadedVersion: Int?
+  private var failureVersion: Int?
 
   func clear() {
     generation += 1
     workspace = nil
     ref = nil
     loadedVersion = nil
+    failureVersion = nil
     value = nil
     failure = nil
     isLoading = false
   }
 
-  func isCurrent(version: Int?) -> Bool {
-    !isLoading && failure == nil && value != nil && loadedVersion == version
-  }
+  #if DEBUG
+    enum Phase: String { case loading, ready, failed }
+
+    func phase(workspace: String?, ref: String, version: Int?) -> Phase {
+      guard !isLoading, self.workspace == workspace, self.ref == ref
+      else { return .loading }
+      if failure != nil, failureVersion == version { return .failed }
+      return value?.ref == ref && loadedVersion == version ? .ready : .loading
+    }
+  #endif
 
   func load(
     workspace: String, ref: String, version: Int? = nil,
@@ -35,6 +44,7 @@ final class TaskDetailModel {
     generation += 1
     let token = generation
     failure = nil
+    failureVersion = nil
     isLoading = true
     defer { if token == generation { isLoading = false } }
     do {
@@ -45,6 +55,7 @@ final class TaskDetailModel {
     } catch {
       guard token == generation, !Task.isCancelled else { return }
       failure = AppLoadFailure(error).message
+      failureVersion = version
     }
   }
 }

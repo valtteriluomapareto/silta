@@ -85,6 +85,34 @@
       #expect(permissions == 0o700)
     }
 
+    @Test func driverDirectoryRefusesWrongLocationPrefixModeAndExistingState() throws {
+      let manager = FileManager.default
+      let temporary = manager.temporaryDirectory
+      let prefix = "silta-app-" + UUID().uuidString
+      let outer = temporary.appending(path: prefix)
+      let wrongName = temporary.appending(path: "wrong-" + prefix)
+      let nested = outer.appending(path: prefix)
+      let permissive = temporary.appending(path: prefix + "-public")
+      let used = temporary.appending(path: prefix + "-used")
+      defer {
+        for root in [outer, wrongName, permissive, used] {
+          try? manager.removeItem(at: root)  // cleanup
+        }
+      }
+      for root in [outer, wrongName, nested, permissive, used] {
+        try manager.createDirectory(
+          at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+      }
+      try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: permissive.path)
+      try Data("{}".utf8).write(to: used.appending(path: "state.json"))
+
+      for bad in [wrongName, nested, permissive, used] {
+        #expect(throws: AppLoadFailure.self) { try FixtureLaunch.prepare(runDirectory: bad) }
+        #expect(!manager.fileExists(atPath: bad.appending(path: "data").path))
+      }
+      #expect(try FixtureLaunch.prepare(runDirectory: outer).home.lastPathComponent == "data")
+    }
+
     @Test func ordinaryLaunchDoesNotRequireTestSettings() throws {
       try TestLaunchPolicy.validate(
         environment: [:], temporaryRoots: [])

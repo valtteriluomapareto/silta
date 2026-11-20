@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / ".build/app"
 APP = BUILD / "DerivedData/Build/Products/Debug/SiltaApp.app/Contents/MacOS/SiltaApp"
 STATE = {
-    "snapshotVersion": None, "run": None, "revision": None, "fixture": None,
+    "snapshotVersion": None, "run": None, "revision": None, "fixture": None, "fixtureNow": None,
     "appearance": None, "screen": None, "route": None, "inspectorOpen": None,
     "selection": {"kind": None, "ref": None, "view": None},
     "counts": {"lanes": {}, "sidebar": {"waiting": None, "claimed": None, "apps": {}}},
@@ -226,7 +226,14 @@ def launch(args):
         if process is None:
             raise DriverError("Fixture exited during startup.")
         run = Run(root, {"process": process})
-        state = run.wait(READY, args.timeout)
+
+        def initial_state():
+            current = run.read()
+            if current is not None and field(current, "refresh.phase") == "failed":
+                raise DriverError("The initial fixture view failed to load.")
+            return current
+
+        state = wait_for(run.root, run.pid, initial_state, READY, args.timeout)
         run.record["run"] = state["run"]
         atomic_json(root / "driver.json", run.record)
         print(root, flush=True)
@@ -335,7 +342,8 @@ def mailbox_state(run):
 def recovery_error(error, sequence):
     detail = str(error) or "Interrupted while reading the action result."
     return DriverError(f"{detail}\nAction {sequence} may have run. Repeat with --seq {sequence} "
-                       "to read its result without replaying it.")
+                       "to read its result without replaying it. If it stays pending, "
+                       "stop and relaunch the fixture.")
 
 
 def action(run, fields, timeout, sequence=None):
@@ -396,6 +404,13 @@ def fixture_receipt(path, title, write):
     return receipt["ref"]
 
 
+def fixture_clock(state):
+    clock = state.get("fixtureNow") if state else None
+    if not isinstance(clock, str) or re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z", clock) is None:
+        raise DriverError("The fixture did not publish its clock. Rebuild and launch a fresh run.")
+    return clock
+
+
 def write_fixture_proposal(run, title):
     cli = ROOT / ".build/debug/silta"
     if not cli.is_file():
@@ -409,7 +424,7 @@ def write_fixture_proposal(run, title):
         raise DriverError("Fixture store must be an isolated directory with ordinary files.")
     environment = {"PATH": "/usr/bin:/bin", "HOME": str(run.root), "USER": "acme",
                    "SILTA_HOME": str(data), "SILTA_ACTOR": "agent:codex:control",
-                   "SILTA_NOW": "2026-11-16T12:00:00.000Z", "TZ": "UTC"}
+                   "SILTA_NOW": fixture_clock(run.read()), "TZ": "UTC"}
     command = [cli, "--ws", "acme", "task", "add", "--quiet", "--", title]
     result = subprocess.run(command, env=environment, cwd=run.root, stdin=subprocess.DEVNULL,
                             capture_output=True, text=True, timeout=15)
@@ -433,6 +448,7 @@ def fixture_write(run, write_id, title, timeout):
             if state["seq"] >= next_sequence or os.path.lexists(pending):
                 raise DriverError(f"Action {next_sequence} is outstanding. Read {pending.name} "
                                   f"and recover it with --seq {next_sequence} before writing.")
+            fixture_clock(state)
         reference = fixture_receipt(receipt, title, lambda value: write_fixture_proposal(run, value))
         try:
             result = action(run, {"action": "refresh"}, timeout)

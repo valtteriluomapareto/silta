@@ -59,6 +59,7 @@ struct CopyValue: View {
     copied = Self.writeToPasteboard(value)
   }
 
+  /// Product copy actions write the general pasteboard; Debug control copies never call this.
   static func writeToPasteboard(_ value: String) -> Bool {
     NSPasteboard.general.clearContents()
     return NSPasteboard.general.setString(value, forType: .string)

@@ -1,12 +1,7 @@
 # Silta for Mac development control plane
 
-Status: active
-
-## Goal
-
-Validate the running app with an isolated Debug fixture. The shipped fixture
-launch, capture and action-driver slices are listed below.
-The [Mac app plan](mac-app.md#validation) explains what each validation layer proves.
+Validate the running app with an isolated Debug fixture. The
+[Mac app plan](plans/mac-app.md#validation) explains what each validation layer proves.
 
 ## Fixture and offscreen output
 
@@ -14,7 +9,7 @@ Use the shared `v2` fixture from `SiltaAppSupport/Control`, its fixed clock and 
 existing ID generator. `SiltaTestSupport` reuses these implementations. Every
 launch creates a fresh private temporary data home before opening the app reader;
 control never accepts or inherits an existing SILTA_HOME. The app’s product action
-flows are documented in the [Mac actions plan](mac-app-actions.md).
+flows are documented in the [Mac actions plan](plans/mac-app-actions.md).
 
 ```text
 SiltaApp -SiltaFixture v2 [-SiltaRoute mywork] [-SiltaDark]
@@ -65,13 +60,14 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | `pid`, `windowNumber` | Process ID and real window number. The window number is null until available and in offscreen mode. |
 | `run`, `revision` | Unique launch identity and increasing publication number |
 | `fixture`, `appearance` | `v2` and the launch flags' `light`/`dark`; exact for snapshot and driver runs, not for a hand-launched fixture |
+| `fixtureNow` | The fixture's fixed UTC timestamp, also used by the driver's fixture CLI |
 | `screen`, `route` | Current screen and canonical route including selected ref and document view |
 | `selection` | Null, typed `{kind: task/connection/app/service, ref: ...}`, or `{kind: document, ref: ..., view: ...}` |
 | `inspectorOpen` | Flag belonging to the current route |
 | `counts.lanes` | Visible Board lane counts, including current filters/proposals; null until loaded |
 | `counts.sidebar` | Actionable waiting, claimed tasks and app open-count badges; null until loaded |
 | `refresh` | `starting`, `loading`, `ready` or `failed`, plus the observed dataVersion |
-| `idle` | Initial loading, selected task/document content and current scope/version refresh have settled |
+| `idle` | The current route and selected read have settled, and no product write is in flight |
 
 Lane keys use their displayed names: Todo, Doing, Review, Done this week. Failed
 loads may be idle; also check refresh.phase. Idle does not prove painted pixels.
@@ -149,53 +145,73 @@ objects with the exact fields below:
 | `nav` | `screen` | Open `mywork`, `board`, `workspace`, or `docs`. |
 | `select` | `screen`, `ref`, optional `view` for Docs | Select a Board task, Workspace edge/app/service, or Docs revision. Docs views are `document`, `changes`, `comments`. |
 | `inspector.toggle` | | Open or close the current Board or Workspace inspector. |
-| `copy.ref` | | Copy the current task, app, service, connection or document ref to the Mac clipboard. |
-| `copy.command` | | Copy the Board inspector’s read command for the selected task in review. |
+| `copy.ref` | | Return the exact current task, app, service, connection or document ref in `copied`. |
+| `copy.command` | | Return the Board inspector’s read command for the selected task in review in `copied`. |
 | `refresh` | | Force a model refresh and settle the current scope. |
 
 ```sh
 run=$(scripts/silta-app.sh launch)
 scripts/silta-app.sh action "$run" '{"action":"select","screen":"board","ref":"AC-9"}'
 scripts/silta-app.sh wait "$run" 'settledSeq=1' 'selection.ref="AC-9"' 'idle=true'
+scripts/silta-app.sh action "$run" '{"action":"copy.command"}'
 scripts/silta-app.sh fixture.write "$run" sample-proposal 'Check the Acme refresh'
 scripts/silta-app.sh state "$run" counts.sidebar.waiting
 scripts/silta-app.sh stop "$run"
 ```
 
-The driver serializes clients with a per-run lock. It adds `version`, `run` and `seq`
-and publishes a compact, sorted UTF-8 `req-<seq>.json`. The app consumes the next
+The driver adds `version`, `run` and `seq` and publishes a UTF-8 `req-<seq>.json`.
+Whitespace, member order and equivalent string escapes are accepted. The app
+decodes scalar values, enforces each action's field set and refuses duplicate
+decoded names, including escaped aliases. This prevents a direct mailbox writer
+from making the action or run fields ambiguous. Tests
+`wireAcceptsJSONFormattingAndRejectsEscapedDuplicateKeys` and
+`strictWireDistinguishesMalformedAndStaleRequests` cover both rules.
+
+The app consumes the next
 sequence once, including malformed requests, and publishes `settledSeq` before an
 atomic `res-<seq>.json`. Results include the run and sequence, plus `accepted`, `noop`
 or `refused` with a stable reason. A refused action exits nonzero. Reasons distinguish
 an invalid request, stale run, unknown selection, unavailable action, read failure,
-superseded selection, and clipboard failure. The model’s loader state is checked before
-completing a selection. Users can still change the window while a request is in flight.
+and a superseded selection. The private response file holds copied text. Product
+Copy buttons continue to use the Mac clipboard. The Board command check asserts
+that AC-9 uses the review timeline command with the exact fixture `SILTA_HOME`.
+
+After validating a ref, a windowed action calls the existing model handler and
+waits for the read owned by the view. Offscreen snapshots explicitly load the
+content they render. Refresh has the same behavior as ⌘R. With an unchanged Board
+version it keeps the current inspector result. A current read failure returns
+`readFailed`; a retained result from an earlier version stays pending until the
+view's current read finishes. Users can change the selection while a request waits.
 
 On an action timeout, retry the same JSON with `--seq N` to recover that request’s
-result. The driver checks the stored request to avoid applying it twice. Keep the run
-folder for its logs, state, and receipts. Stop and launch a fresh fixture if a child
-exits or the run can’t be recovered.
+result. Keep the run folder for its logs, state, and receipts. Stop and relaunch if
+the window has closed or a read stays pending after the driver's deadline. The
+server keeps the sequence unsettled while the read is pending.
 
 `fixture.write RUN WRITE_ID TITLE` creates one Acme task proposal through the repository’s
-built CLI, using only the run’s private `data/` and a fixed argument list. It then sends
+built CLI, using only the run’s private `data/`, fixed argument list and published
+fixture clock. Build both the CLI and the Debug app from the same checkout with
+`scripts/verify.sh app`. The driver then sends
 an ordinary `refresh` and reports the new task ref and refresh outcome. A fresh write
 requires a live mailbox with no earlier action waiting to settle. Keep the same
 write ID and title to retry refresh after a successful write. If the CLI result was
 interrupted, inspect the fixture and the write receipt before doing another write.
 The same ID cannot execute another CLI write, including after an ambiguous interruption.
-Copy actions write only to the clipboard and the mailbox never executes copied commands.
 
-## Slices
+### Failure handling
 
-| Slice | Scope | Status |
+| Mechanism | Failure it prevents | Tests |
 |---|---|---|
-| C1a / SI-152 / #178 | Isolated v2 launch, route selection, state JSON and offscreen PNG | Shipped in #214, with additional screens and snapshot parts in later PRs |
-| C1b / SI-153 / #178 | Driver, predicate waits, owned real-window capture and cleanup | Shipped in #245 |
-| C2 / SI-147 / #179 | Mailbox, shared UI handlers, sequence barriers, copy and fixture-write refresh | Shipped in #246 |
+| Per-run client lock and mailbox preflight | Two drivers can race to reserve a sequence, or a new CLI write can change the data while an earlier action is still running. Reject a missing fixture clock before reserving an ID. | `test_client_lock_refuses_a_second_driver`, `test_new_write_does_not_create_intent_with_no_mailbox_or_pending_request`, `test_missing_clock_refuses_without_creating_intent` |
+| Sequenced requests, stored responses and `--seq` recovery | An inspector toggle can run before a timeout or interruption drops the caller's answer. Reading the recorded result preserves the original toggle and copied value. | `test_published_action_failure_identifies_the_recoverable_sequence`, `test_action_waits_for_both_settlement_and_the_response_link` |
+| Separate state settlement and response links | The filesystem can wake the client between the state update and the response link. A settled sequence alone does not give the caller its outcome. | `test_action_waits_for_both_settlement_and_the_response_link`, `mailboxWatcherDrainsFutureRequestAndRefusesStaleRunAtNextSequence` |
+| Write-ID intent before spawning the CLI | The CLI can commit before the caller knows its result. An uncertain ID stays reserved so an ordinary retry cannot add a second task. | `test_intent_survives_interruption_and_never_replays` |
+| Saved ref after the CLI returns | Refresh can fail after a successful write. The same ID and title let the caller retry refresh without rerunning the CLI. | `test_written_receipt_retries_only_refresh_after_failure` |
+| Current selected read and app-write barrier | The new version can arrive before SwiftUI starts its read. A cancelled retry can leave an older value visible. A product write can be suspended before refresh. The mailbox and snapshots share the readiness check. | `refreshObservesAnOutsideWriteAndWaitsForTheCurrentInspector`, `cancelledRetryDoesNotValidateAValueFromBeforeTheFailure`, `statusStaysBusyUntilProductWriteCompletes` |
 
-Neither C1b nor C2 blocks screen PRs. Add fixture variants, state fields, routes
-and actions as screens need them. Keep one slice per PR and no grandchildren tasks.
-
-SI-146 tracks C1. SI-152 and SI-153 track its implementation parts, and plan-only
-PR #186 belongs to SI-159. Follow the [dogfooding workflow](../../AGENTS.md#dogfooding)
-for plan-only subtasks, submission before merge and completion after merge.
+The native process check uses the effective UID, executable, working directory and
+subsecond start time to keep stop and capture tied to the owned run. The write driver
+refuses linked fixture storage because a symlink or hard link can point outside the
+private directory. The mailbox rejects symlinks and nonregular files and bounds
+request input to 16 KiB to keep a malformed manual request from reading another
+file, blocking on a pipe or allocating an unbounded buffer.
