@@ -37,6 +37,8 @@ import SiltaAppSupport
     }
   }
 
+  static func subtitle(_ group: DocsModel.Group) -> String { "" }
+
   static func row(_ group: DocsModel.Group) -> String {
     guard let document = group.preferred else { return "" }
     let pending = group.entries.filter { $0.state == "proposed" }

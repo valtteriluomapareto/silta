@@ -7,6 +7,12 @@ nonisolated struct MarkdownContent {
     let header: Int?
     let code: Bool
     let prefix: String?
+    var table: Table? = nil
+  }
+  struct Table {
+    let header: [AttributedString]
+    let rows: [[AttributedString]]
+    let trailing: [Bool]
   }
   let blocks: [Block]
 
