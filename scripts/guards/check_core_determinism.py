@@ -14,11 +14,22 @@ from swift_source import run, split_swift, swift_files
 
 CORE_DIR = "Sources/SiltaCore"
 MARKER = "guard:allow-nondeterminism"
+def constructor(types: str, parameters: str) -> re.Pattern[str]:
+    """Match explicit or contextually typed construction of a system value."""
+    return re.compile(
+        rf"\b(?:{types})\s*(?:\.\s*init\s*)?\(\s*{parameters}"
+        rf"|\b(?:{types})\s*\??\s*(?:=|\{{\s*(?:return\b)?)"
+        rf"\s*\.\s*init\s*\(\s*{parameters}"
+    )
+
+
 PATTERNS = {
-    "Date()": re.compile(r"\bDate\s*(?:\.\s*init\s*)?\(\s*\)"),
-    "Date.now": re.compile(r"\bDate\s*(?:=\s*)?\.\s*now\b"),
-    "Date(timeIntervalSinceNow:)": re.compile(r"\bDate\s*(?:\.\s*init\s*)?\(\s*timeIntervalSinceNow:"),
-    "UUID()": re.compile(r"\bUUID\s*(?:\.\s*init\s*)?\(\s*\)"),
+    "Date()": constructor("Date|NSDate", r"\)"),
+    "Date.now": re.compile(
+        r"\bDate\s*\.\s*now\b|(?:[:={,(]|\breturn\b)\s*\.\s*now\b(?!\s*\()"
+    ),
+    "Date(timeIntervalSinceNow:)": constructor("Date|NSDate", r"timeIntervalSinceNow:"),
+    "UUID()": constructor("UUID|NSUUID", r"\)"),
 }
 
 
@@ -28,13 +39,12 @@ def check(root: Path) -> list[str]:
         raw = path.read_text(encoding="utf-8")
         raw_lines = raw.split("\n")
         code, _ = split_swift(raw)
-        for number, code_line in enumerate(code.split("\n"), start=1):
-            if MARKER in raw_lines[number - 1]:
-                continue
-            for label, pattern in PATTERNS.items():
-                if pattern.search(code_line):
-                    rel = path.relative_to(root)
-                    errors.append(f"{rel}:{number}: {label} in core; inject Clock/IDGenerator instead")
+        rel = path.relative_to(root)
+        findings = {(code.count("\n", 0, match.start()) + 1, label)
+                    for label, pattern in PATTERNS.items() for match in pattern.finditer(code)}
+        for number, label in sorted(findings):
+            if MARKER not in raw_lines[number - 1]:
+                errors.append(f"{rel}:{number}: {label} in core; inject Clock/IDGenerator instead")
     return errors
 
 

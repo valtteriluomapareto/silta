@@ -12,7 +12,7 @@ from swift_source import run, split_swift, swift_files
 CORE_DIR = "Sources/SiltaCore"
 FORBIDDEN = ("AppKit", "SwiftUI", "UIKit", "Cocoa", "ArgumentParser", "os", "OSLog")
 IMPORT = re.compile(
-    r"^[ \t]*(?:@\w+(?:\([^)]*\))?\s+)*"
+    r"(?:^|(?<=;))[ \t]*(?:@\w+(?:\([^)]*\))?\s+)*"
     r"(?:(?:public|package|internal|fileprivate|private)\s+)?import\s+"
     r"(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?"
     r"(" + "|".join(FORBIDDEN) + r")\b",

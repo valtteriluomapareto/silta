@@ -760,8 +760,9 @@ def command_calls(phase):
 
 
 def github_issue_api_write(arguments):
-    """Recognize literal issue endpoints with an explicit or implied write method."""
+    """Recognize literal REST issue writes and submitted GitHub GraphQL mutations."""
     endpoint, method, has_body = '', None, False
+    queries = []
     words = iter(arguments)
     for word in words:
         flag, equals, value = word.partition('=')
@@ -771,10 +772,12 @@ def github_issue_api_write(arguments):
             method = word[2:].upper()
         elif flag in ('--field', '--raw-field', '-F', '-f', '--input'):
             has_body = True
-            if not equals:
-                next(words, '')
+            field = value if equals else next(words, '')
+            if flag != '--input':
+                queries.append(field)
         elif word.startswith(('-f', '-F')) and len(word) > 2:
             has_body = True
+            queries.append(word[2:])
         elif flag in ('--hostname', '--header', '-H', '--cache', '--jq', '-q', '--template', '-t', '--preview', '-p'):
             if not equals:
                 next(words, '')
@@ -782,7 +785,13 @@ def github_issue_api_write(arguments):
             endpoint = word
     if method is None:
         method = 'POST' if has_body else 'GET'
-    return method in ('POST', 'PUT', 'PATCH', 'DELETE') and 'issues' in endpoint.split('?', 1)[0].split('/')
+    if method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        return False
+    route = endpoint.split('?', 1)[0].strip('/')
+    if route == 'graphql':
+        return any(re.match(r'query=\s*(?:#[^\n]*\n\s*)*mutation\b', field)
+                   for field in queries)
+    return 'issues' in route.split('/')
 
 
 def tracker_help(arguments):
@@ -801,20 +810,28 @@ def tracker_help(arguments):
     return False
 
 
+def skip_github_repo(arguments):
+    if arguments and arguments[0] in ('-R', '--repo'):
+        return arguments[2:]
+    if arguments and arguments[0].startswith('--repo='):
+        return arguments[1:]
+    return arguments
+
 def tracker_write(argv):
     name, arguments = Path(argv[0]).name, argv[1:]
     if name in ('gh', 'az') and tracker_help(arguments):
         return False
     if name == 'gh':
-        if arguments and arguments[0] in ('-R', '--repo'):
-            arguments = arguments[2:]
-        elif arguments and arguments[0].startswith('--repo='):
-            arguments = arguments[1:]
-        if arguments[:1] == ['api']:
-            return github_issue_api_write(arguments[1:])
-        if arguments[:1] == ['pr']:
-            return arguments[1:2] == ['create']
-        return arguments[:1] == ['issue'] and any(arguments[1:2] == [verb] for verb in (
+        arguments = skip_github_repo(arguments)
+        if not arguments:
+            return False
+        group, rest = arguments[0], arguments[1:]
+        if group == 'api':
+            return github_issue_api_write(rest)
+        verb = skip_github_repo(rest)[:1]
+        if group == 'pr':
+            return verb in (['create'], ['comment'], ['edit'], ['merge'])
+        return group == 'issue' and any(verb == [action] for action in (
             'create', 'edit', 'comment', 'close', 'delete', 'reopen', 'pin', 'unpin', 'lock', 'unlock', 'transfer'))
     if name == 'az' and arguments[:1] == ['boards']:
         group = arguments[1:3]
@@ -831,8 +848,9 @@ def plan_path(value):
     path = Path(value.lower())
     if path.suffix == '.plan':
         return True
-    return path.suffix in ('', '.md', '.markdown', '.txt', '.rst', '.adoc', '.ipynb') and bool(
-        {'plan', 'plans', 'todo', 'todos'} & set(re.split(r'[-_. ]+', path.stem)))
+    return path.suffix in ('', '.md', '.markdown', '.txt', '.rst', '.adoc', '.ipynb', '.yaml', '.yml') and (
+        bool({'plan', 'plans'} & set(path.parts[:-1]))
+        or bool({'plan', 'plans', 'todo', 'todos', 'roadmap'} & set(re.split(r'[-_. ]+', path.stem))))
 
 
 def native_plan_writes(phase):
@@ -1193,6 +1211,13 @@ def backend_categories(e):
             if ' ' + category.replace('_', ' ') + ' ' in words}
 
 
+def legacy_mention(e):
+    phases = e.get('phases', [])
+    if not phases or not isinstance(phases[-1].get('state'), dict):
+        return None
+    return bool(set(LEGACY_CATEGORIES) & backend_categories(e))
+
+
 def result_calls(phase, ref, candidates, harness):
     """Match captured writer receipts, without claiming per-field JSON provenance."""
     if not phase.get('complete') or phase.get('exit') != 0 or trace_matches_logs(phase, harness) is not True:
@@ -1490,7 +1515,7 @@ def failure_metrics(e, *, enrich=True):
     logs_known = bool(phases) and all(isinstance(p.get('logs'), list) for p in phases)
     calls = [row for p in phases for row in (p.get('logs') or [])]
     measured = {**recorded_context_metrics(phases),
-                'legacy_mentioned': False,
+                'legacy_mentioned': None,
                 'silta_calls': len(calls) if logs_known else None,
                 'ctx_calls': sum(row.get('command') in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for row in calls) if logs_known else None,
                 'usage_errors': None, 'forbidden_attempts': None,
@@ -1500,7 +1525,7 @@ def failure_metrics(e, *, enrich=True):
     if enrich:
         measured.update(backend_read_metrics(e))
         measured.update(context_metrics(phases, e.get('harness')))
-        measured['legacy_mentioned'] = bool(set(LEGACY_CATEGORIES) & backend_categories(e))
+        measured['legacy_mentioned'] = legacy_mention(e)
     return measured
 
 
@@ -1509,7 +1534,7 @@ def metrics(e):
     calls = [log for phase in phases for log in phase['logs']]
     counts = [p.get('tokens', tokens(p['usage'])) for p in phases]
     return {**backend_read_metrics(e), **context_metrics(phases, e.get('harness')),
-            'legacy_mentioned': bool(set(LEGACY_CATEGORIES) & backend_categories(e)),
+            'legacy_mentioned': legacy_mention(e),
             'silta_calls': len(calls),
             'ctx_calls': sum(log['command'] in ('silta brief', 'silta task show', 'silta code show', 'silta code grep', 'silta agents session-start') for log in calls),
             'usage_errors': usage_errors(phases), 'forbidden_attempts': len(forbidden(e)),
@@ -1638,7 +1663,7 @@ def main():
                            'passed': False, 'checks': {'infrastructure': False},
                            'error': redact(str(error) or type(error).__name__, secret), 'violations': [],
                            'provider': args.provider, 'operator': args.operator,
-                           'metrics': {'silta_calls': None, 'ctx_calls': None, 'legacy_mentioned': False,
+                           'metrics': {'silta_calls': None, 'ctx_calls': None, 'legacy_mentioned': None,
                                        'usage_errors': None, 'forbidden_attempts': None},
                            'evidence': trial_id + '/failure.json'}
                 if isinstance(error, FailedTrial):

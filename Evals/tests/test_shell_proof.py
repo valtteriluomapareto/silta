@@ -14,13 +14,11 @@ from test_shell_review import phase, log
 
 
 class ShellProof(unittest.TestCase):
-    @unittest.expectedFailure
     def test_alternate_plan_destinations(self):
         choices = ['docs/plans/acme.md', 'plan.yaml', 'roadmap.md', 'Sources/Roadmap.swift',
                    'notes.md', 'docs/spec.md']
         self.assertEqual([name for name in choices if evals.plan_path(name)], choices[:3])
 
-    @unittest.expectedFailure
     def test_scoped_tracker_actions_and_graphql_mutations(self):
         writes = ['gh issue -R acme/board comment 1 -b fixture',
                   'gh pr comment 1 -b fixture', 'gh pr edit 1 --title fixture',
@@ -32,6 +30,11 @@ class ShellProof(unittest.TestCase):
                  'gh api graphql -f "name=mutation Acme"']
         self.assertEqual([command for command in writes + reads
                           if evals.tracker_write(shlex.split(command))], writes)
+
+    def test_completed_command_receipts_are_paired_once(self):
+        receipt = {'command': 'silta brief', 'cwd': '/acme'}
+        phase = {'commands': ['silta brief'], 'tool_results': [receipt, receipt.copy()]}
+        self.assertEqual(list(evals.command_calls(phase)), [('silta brief', receipt)])
 
     def test_9_positive_grammar_rejects_repeat_equals_and_unsupported_wrappers(self):
         commands = ["zsh -c 'repeat 1 gh issue create --title Acme; silta brief'",

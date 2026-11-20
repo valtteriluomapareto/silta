@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+if sys.flags.isolated:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fault_source import mutated_source
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -120,7 +120,6 @@ class CoreBoundaryTests(GuardTestCase):
         self.tree.write("Sources/SiltaCore/View.swift", "import Foundation\nimport SwiftUI\n")
         self.assertEqual(len(check_core_boundary.check(self.tree.root)), 1)
 
-    @unittest.expectedFailure
     def test_imports_after_semicolons_are_checked(self) -> None:
         self.tree.write("Sources/SiltaCore/A.swift",
                         "import Foundation; import AppKit; import SwiftUI\n")
@@ -172,7 +171,6 @@ class CoreHygieneTests(GuardTestCase):
         )
         self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 4)
 
-    @unittest.expectedFailure
     def test_a_setter_access_modifier_does_not_allow_static_storage(self) -> None:
         self.tree.write("Sources/SiltaCore/A.swift",
                         "struct Acme { static private(set) var shared = 0 }\n")
@@ -225,7 +223,6 @@ class CodedErrorsTests(GuardTestCase):
                 self.tree.write("Sources/SiltaCore/A.swift", f"enum Example: {conformance} {{}}\n")
                 self.assertEqual(len(check_coded_errors.check(self.tree.root)), 1)
 
-    @unittest.expectedFailure
     def test_foundation_subclasses_and_plain_error_aliases_fail(self) -> None:
         self.tree.write("Sources/SiltaCore/Errors.swift",
                         "typealias Failure = Swift.Error\n"
@@ -285,7 +282,6 @@ class CoreDeterminismTests(GuardTestCase):
                         "let epoch = Date(timeIntervalSince1970: 0)\n")
         self.assertEqual(check_core_determinism.check(self.tree.root), [])
 
-    @unittest.expectedFailure
     def test_implicit_split_and_foundation_constructor_spellings_fail(self) -> None:
         spellings = [
             "func f(at: Date? = .now) {}", "record(at: .now)",
@@ -330,7 +326,6 @@ class TestWaitsTests(GuardTestCase):
         self.tree.write("Tests/A.swift", "try await ContinuousClock().sleep(for: .seconds(1))\n")
         self.assertEqual(len(check_test_waits.check(self.tree.root)), 1)
 
-    @unittest.expectedFailure
     def test_generic_posix_and_stored_wall_clock_waits_fail(self) -> None:
         self.tree.write(
             "Tests/A.swift",
@@ -369,7 +364,6 @@ class NoPlanRefsTests(GuardTestCase):
         self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), 5)
 
 
-    @unittest.expectedFailure
     def test_exact_technical_references_are_not_slice_bookkeeping(self) -> None:
         self.tree.write("Sources/SiltaCore/A.swift",
                         "// Build with C99 and deploy to K8s.\n"
