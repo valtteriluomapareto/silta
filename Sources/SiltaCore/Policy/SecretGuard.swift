@@ -135,11 +135,12 @@ package enum SecretGuard {
         } else {
           opening.lineStart
         }
-      guard text[start..<opening.range.lowerBound].wholeMatch(of: prefix) != nil,
+      let openingPrefix = text[start..<opening.range.lowerBound]
+      guard openingPrefix.wholeMatch(of: prefix) != nil,
         suffix.allSatisfy({ $0 == " " || $0 == "\t" }),
         suffix.endIndex == text.endIndex || suffix.endIndex < limit
       else { return }
-      let end = armourRunEnd(after)
+      let end = armourRunEnd(after, openingPrefix: openingPrefix)
       matches.append(SecretMatch(rule: "private_key", range: opening.range.lowerBound..<end))
     }
 
@@ -163,26 +164,45 @@ package enum SecretGuard {
   }
 
   /// Accepts armour and metadata after an unfinished opener, retaining original indices.
-  private static func armourRunEnd(_ body: Substring) -> String.Index {
+  private static func armourRunEnd(_ body: Substring, openingPrefix: Substring) -> String.Index {
     let content = /(?:[A-Za-z0-9+\/]+={0,2}|=[A-Za-z0-9+\/]{4})[ \t]*/
     let header = /(?:Version|Comment|MessageID|Hash|Charset|Proc-Type|DEK-Info):/
     let prefix = armourMarkdownPrefix
+    let quoted = openingPrefix.contains(">")
+    let listIndent =
+      openingPrefix.contains(where: { $0 != " " && $0 != "\t" })
+      ? openingPrefix.count : 0
     var end = body.firstIndex(where: \.isNewline) ?? body.endIndex
     var cursor = end
     var continuedHeader = false
+    var sawPayload = false
+    var afterSeparator = false
     while cursor < body.endIndex {
       let next = body.index(after: cursor)
       cursor = body[next...].firstIndex(where: \.isNewline) ?? body.endIndex
       let original = body[next..<cursor]
-      let line = original[(original.prefixMatch(of: prefix)?.range.upperBound ?? next)...]
+      let start = original.prefixMatch(of: prefix)?.range.upperBound ?? next
+      let line = original[start...]
       if line.isEmpty {
-        // A blank separator belongs to the block only if more armour follows.
+        // Keep interior separators with the armour and leave trailing spacing intact.
         continuedHeader = false
+        afterSeparator = sawPayload
         continue
+      }
+      if afterSeparator {
+        let continuationPrefix = original[..<start]
+        if quoted, !continuationPrefix.contains(">") { break }
+        if !quoted, continuationPrefix.count < listIndent,
+          continuationPrefix.allSatisfy({ $0 == " " || $0 == "\t" })
+        {
+          break
+        }
       }
       let isHeader = continuedHeader || line.prefixMatch(of: header) != nil
       guard isHeader || line.wholeMatch(of: content) != nil else { break }
       continuedHeader = isHeader && line.last == "\\"
+      sawPayload = sawPayload || !isHeader
+      afterSeparator = false
       end = cursor
     }
     return end

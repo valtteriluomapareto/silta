@@ -13,8 +13,8 @@ extension DocEditCommandTests {
       let payload = String(repeating: "Q", count: 64)
       let inline = "The Acme guide shows `" + marker + "`.\n\nDone\nVerify."
       let original =
-        quote ? "> " + marker + "\n> " + payload + "\n\nKeep these instructions." : inline
-      let expected = quote ? "> [REDACTED:private_key]\n\nKeep these instructions." : inline
+        quote ? "> " + marker + "\n> " + payload + "\n\nDone\n\nKeep these instructions." : inline
+      let expected = quote ? "> [REDACTED:private_key]\n\nDone\n\nKeep these instructions." : inline
       let body = try Self.input(scratch, original)
       let written = try Self.run(["rules"] + Self.creation + ["-F", body.path], scratch)
       try #require(written.termination == .exit(0), "\(written.stdout)\(written.stderr)")

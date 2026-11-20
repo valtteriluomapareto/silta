@@ -80,9 +80,7 @@ extension SecretGuardTests {
     let after = "\n\nDone\n\nKeep these instructions."
     let input =
       prefix + start + "\n" + prefix + body + "\n" + prefix + "\n" + prefix + moreBody + after
-    withKnownIssue("An unprefixed one-word paragraph can look like armour.") {
-      #expect(SecretGuard.redacted(input) == prefix + "[REDACTED:private_key]" + after)
-    }
+    #expect(SecretGuard.redacted(input) == prefix + "[REDACTED:private_key]" + after)
   }
 
   @Test(arguments: ["paragraph", "numbered", "leading"])
