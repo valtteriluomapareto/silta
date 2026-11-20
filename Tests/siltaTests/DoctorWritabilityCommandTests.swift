@@ -90,3 +90,82 @@ struct DoctorWritabilityCommandTests {
     }
   }
 }
+
+extension DoctorWritabilityCommandTests {
+  @Test func danglingDatabaseLinkRequiresInspection() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "silta-home")
+      try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+      try FileManager.default.createDirectory(
+        at: home.appending(path: "backups"), withIntermediateDirectories: false)
+      let link = home.appending(path: "silta.db")
+      try FileManager.default.createSymbolicLink(
+        at: link, withDestinationURL: scratch.appending(path: "Acme missing.db"))
+      let result = try SiltaBinary.run(["doctor", "--json"], in: scratch, environment: environment)
+      let payload = try GuideContractTests.object(result.stdout)
+      let checks = try #require((payload["data"] as? [String: Any])?["checks"] as? [[String: Any]])
+      let writable = try #require(checks.first { $0["id"] as? String == "database.writable" })
+      let error = try #require(payload["error"] as? [String: Any])
+      #expect(result.termination == .exit(9))
+      #expect(writable["status"] as? String == "fail")
+      let hints = error["next"] as? [String] ?? []
+      #expect(hints.contains { $0.hasPrefix("/bin/ls ") })
+      #expect(!hints.contains("silta init"))
+      let command = try #require(hints.first)
+      let inspected = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", command], in: scratch)
+      #expect(inspected.termination == .exit(0))
+    }
+  }
+
+  @Test func doctorDoesNotEchoAnUnsafeResolvedDatabasePath() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "silta-home")
+      let target = scratch.appending(path: "Acme private\nphysical filename.db")
+      try FileManager.default.createDirectory(at: home, withIntermediateDirectories: false)
+      try Data(repeating: 65, count: 4096).write(to: target)
+      let entry = home.appending(path: "silta.db")
+      try FileManager.default.createSymbolicLink(at: entry, withDestinationURL: target)
+      let result = try SiltaBinary.run(["doctor", "--json"], in: scratch, environment: environment)
+      let error = try TaskStateCommandTests.error(result)
+      let next = try #require(error["next"] as? [String])
+      #expect(result.termination == .exit(9))
+      #expect(!result.stdout.contains("physical filename"))
+      #expect(!next.contains { $0.contains("\n") })
+      let inspection = try #require(next.first { $0.contains(entry.path) })
+      let replay = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", inspection], in: scratch)
+      #expect(replay.termination == .exit(0))
+    }
+  }
+
+  @Test func doctorWarnsAboutLooseModesWithoutChangingThem() throws {
+    try withScratchDirectory { scratch in
+      try #require(
+        SiltaBinary.run(["init"], in: scratch, environment: environment).termination == .exit(0))
+      let home = scratch.appending(path: "silta-home")
+      let paths = [
+        (home, 0o755), (home.appending(path: "silta.db"), 0o644),
+        (home.appending(path: "backups"), 0o755),
+      ]
+      for (url, mode) in paths {
+        try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
+      }
+      let result = try SiltaBinary.run(["doctor", "--json"], in: scratch, environment: environment)
+      let data = try TaskStateCommandTests.data(result)
+      let checks = try #require(data["checks"] as? [[String: Any]])
+      let advisory = checks.first { $0["id"] as? String == "data.permissions" }
+      #expect(advisory?["status"] as? String == "warning")
+      #expect(advisory?["next_by"] as? String == "human")
+      #expect((advisory?["message"] as? String)?.contains("0600") == true)
+      let writable = checks.first { $0["id"] as? String == "database.writable" }
+      #expect(writable?["status"] as? String == "pass")
+      let command = try #require((advisory?["next"] as? [String])?.first)
+      let inspected = try SiltaBinary.runProcess(
+        URL(filePath: "/bin/sh"), ["-c", command], in: scratch)
+      #expect(inspected.termination == .exit(0))
+      for (url, mode) in paths { #expect(try permissions(url) == mode) }
+      #expect(result.termination == .exit(0))
+    }
+  }
+}

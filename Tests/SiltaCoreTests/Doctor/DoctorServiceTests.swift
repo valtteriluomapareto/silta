@@ -270,6 +270,24 @@ struct DoctorServiceTests {
 }
 
 extension DoctorServiceTests {
+  @Test func linkedDatabaseWALIsMeasuredAtTheResolvedFile() throws {
+    try withScratchDirectory { home in
+      let fm = FileManager.default
+      let target = home.appending(path: "Acme's target.db")
+      let wal = URL(filePath: target.path + "-wal")
+      try Data().write(to: target)
+      try Data().write(to: wal)
+      let handle = try FileHandle(forWritingTo: wal)
+      try handle.truncate(atOffset: 64 * 1024 * 1024 + 1)
+      try handle.close()
+      try fm.createSymbolicLink(at: home.appending(path: "silta.db"), withDestinationURL: target)
+      let check = DoctorService.wal(home)
+      #expect(check.status == .warning)
+      #expect(check.next == ["/usr/sbin/lsof " + shellWord(target.path)])
+      #expect(!fm.fileExists(atPath: home.appending(path: "silta.db-wal").path))
+    }
+  }
+
   @Test(arguments: [0, 1]) func walWarningStartsAboveSixtyFourMiB(excess: Int) throws {
     try withScratchDirectory { home in
       let url = home.appending(path: "silta.db-wal")

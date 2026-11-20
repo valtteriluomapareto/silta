@@ -6,13 +6,15 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RestoreDocumentReportTests {
-  private static func report(_ before: ExportSnapshot?, _ after: ExportSnapshot) -> RestoreReport {
-    RestoreReport.between(before, after, workspace: "acme", digest: "abc", dryRun: true)
+  private static func report(_ before: ExportSnapshot?, _ after: ExportSnapshot) throws
+    -> RestoreReport
+  {
+    try RestoreReport.between(before, after, workspace: "acme", digest: "abc", dryRun: true)
   }
 
   @Test func reportsActualDocumentAndCombinedRecordCounts() throws {
     let tree = try RestoreDocumentGraphFixture.graph()
-    let result = Self.report(nil, tree)
+    let result = try Self.report(nil, tree)
     #expect(result.docs == RestoreReport.Counts(before: 0, after: 1))
     #expect(result.changedDocs.isEmpty && result.removedDocs.isEmpty)
     let counts = Dictionary(
@@ -29,30 +31,30 @@ struct RestoreDocumentReportTests {
 
   @Test func changedRemovedAndRenamedUseStableUIDAndPublicRefs() throws {
     let original = try RestoreDocumentGraphFixture.graph()
-    #expect(Self.report(original, original).changedDocs.isEmpty)
+    #expect(try Self.report(original, original).changedDocs.isEmpty)
     var renamed = original
     renamed.documents.documents[0].slug = "delivery-rules"
     renamed.documents.documents[0].row = renamed.documents.documents[0].row.replacing(
       "slug", with: "delivery-rules", keys: ExportFormat.docKeys)
-    #expect(Self.report(original, renamed).changedDocs == ["doc:delivery-rules"])
-    #expect(Self.report(original, renamed).removedDocs.isEmpty)
+    #expect(try Self.report(original, renamed).changedDocs == ["doc:delivery-rules"])
+    #expect(try Self.report(original, renamed).removedDocs.isEmpty)
     var replaced = original
     replaced.documents.documents[0].row = replaced.documents.documents[0].row.replacing(
       "uid", with: "different-document", keys: ExportFormat.docKeys)
-    let replacement = Self.report(original, replaced)
+    let replacement = try Self.report(original, replaced)
     #expect(replacement.removedDocs == ["doc:push-rules"])
     #expect(replacement.changedDocs.isEmpty)
     #expect(replacement.docs == RestoreReport.Counts(before: 1, after: 1))
     var removed = original
     removed.documents.documents = []
-    let removal = Self.report(original, removed)
+    let removal = try Self.report(original, removed)
     #expect(removal.removedDocs == ["doc:push-rules"])
     #expect(removal.docs == RestoreReport.Counts(before: 1, after: 0))
     var counters = original
     counters.documents.revisionAllocations.append(
       ExportDocumentTests.row([("slug", "absent-name"), ("next", "900")]))
-    #expect(Self.report(original, counters).changedDocs.isEmpty)
-    #expect(Self.report(original, counters).rows.isEmpty)
+    #expect(try Self.report(original, counters).changedDocs.isEmpty)
+    #expect(try Self.report(original, counters).rows.isEmpty)
   }
 
   @Test(arguments: ["body_md", "title", "about_refs", "app_shas", "triaged_by", "comment"])
@@ -74,8 +76,8 @@ struct RestoreDocumentReportTests {
     #expect(
       before.documents.documents[0].records[index].value(field)
         == after.documents.documents[0].records[index].value(field))
-    #expect(Self.report(before, after).changedDocs == ["doc:push-rules"])
-    #expect(Self.report(before, after).removedDocs.isEmpty)
+    #expect(try Self.report(before, after).changedDocs == ["doc:push-rules"])
+    #expect(try Self.report(before, after).removedDocs.isEmpty)
   }
 
   @Test(arguments: ["title", "kind", "owner"])
@@ -91,7 +93,7 @@ struct RestoreDocumentReportTests {
       key, with: "cafe\u{301}", keys: ExportFormat.docKeys)
     #expect(
       before.documents.documents[0].row.value(key) == after.documents.documents[0].row.value(key))
-    #expect(Self.report(before, after).changedDocs == ["doc:push-rules"])
+    #expect(try Self.report(before, after).changedDocs == ["doc:push-rules"])
   }
 
   @Test func admittedDifferentASCIIUIDsRemainDifferentIdentities() throws {
@@ -103,14 +105,14 @@ struct RestoreDocumentReportTests {
     for tree in [before, after] {
       try RestoreDocumentGraph(tree: tree, slug: "acme").run()
     }
-    let result = Self.report(before, after)
+    let result = try Self.report(before, after)
     #expect(result.removedDocs == ["doc:push-rules"])
     #expect(result.changedDocs.isEmpty)
   }
 
   @Test func presentationMasksCredentialIdentitiesWithoutChangingLiteralData() throws {
     let tree = try RestoreDocumentGraphFixture.graph()
-    var raw = Self.report(tree, tree)
+    var raw = try Self.report(tree, tree)
     let credential = "ghp_" + String(repeating: "x", count: 36)
     let doc52 = "doc:" + String(repeating: "a", count: 52)
     raw.workspace = credential

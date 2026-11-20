@@ -213,6 +213,38 @@ struct EditorCommandTests {
   }
 }
 
+extension EditorCommandTests {
+  @Test func terminalOutputWithNulDoesNotSaveOrRecordApproval() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let added = try SiltaBinary.run(
+        ["--ws", "acme", "task", "add", "Acme task", "--start"], in: scratch,
+        environment: TaskCommandTests.actor)
+      try #require(added.termination == .exit(0))
+      let printed = try SiltaBinary.run(Self.taskEdit + ["--print"], in: scratch)
+      let original = printed.stdout
+      let changed = original.replacingOccurrences(
+        of: "## Description\n~~~\n\n", with: "## Description\n~~~\nAcme private\u{0}tail\n")
+      try #require(changed != original)
+      let edited = scratch.appending(path: "typed body")
+      try changed.write(to: edited, atomically: true, encoding: .utf8)
+      let args =
+        Self.taskEdit + ["--allow-secret", "--approved", "Edit the Acme fixture", "--json"]
+      let environment = TaskCommandTests.actor.merging(
+        ["EDITOR": "cp " + shellWord(edited.path)]) { _, editor in editor }
+      let output = try EditorTerminalFixture.run(args, in: scratch, environment: environment)
+      #expect(output.result.termination == .exit(1))
+      let error = try TaskStateCommandTests.error(output.result)
+      #expect(error["code"] as? String == "invalid")
+      #expect(error["message"] as? String == "Body input must not contain NUL bytes.")
+      #expect(!output.result.stdout.contains("Acme private"))
+      try Self.followRecovery(output.result.stdout, in: scratch)
+      #expect(try SiltaBinary.run(Self.taskEdit + ["--print"], in: scratch).stdout == original)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
+    }
+  }
+}
+
 /// Runs the CLI inside a real pseudoterminal while saving its own stdout and exit.
 enum EditorTerminalFixture {
   static func run(_ arguments: [String], in scratch: URL, environment: [String: String]) throws

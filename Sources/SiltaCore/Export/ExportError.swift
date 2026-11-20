@@ -32,6 +32,8 @@ package enum ExportError: CodedError, Equatable {
   case otherWorkspace(tree: String, given: String, directory: String)
   /// The tree clashes with another workspace in this database.
   case restoreConflict(String)
+  /// The computed next task reference exceeds the allocator's usable range.
+  case exhaustedTaskCounter(destination: Bool)
   /// The supplied manifest prefix has invalid length or characters.
   case invalidManifest(directory: String)
   /// The tree's manifest is not the one the human approved.
@@ -47,9 +49,9 @@ package enum ExportError: CodedError, Equatable {
   package var code: ErrorCode {
     switch self {
     case .busy: .busy
-    case .notAnExport, .restoreConflict, .manifestChanged: .conflict
+    case .notAnExport, .restoreConflict, .manifestChanged, .exhaustedTaskCounter(true): .conflict
     case .insideRepo, .invalidExport, .invalidTree, .notATree, .otherWorkspace, .notWorkTree,
-      .invalidManifest, .invalidRestoreIdentifier:
+      .invalidManifest, .invalidRestoreIdentifier, .exhaustedTaskCounter(false):
       .invalid
     case .unsupported, .newerFormat, .unwritable, .previousKept, .gitFailed,
       .publicationUnconfirmed, .defaultRootUnavailable:
@@ -62,7 +64,7 @@ package enum ExportError: CodedError, Equatable {
   package var nextBy: NextBy {
     switch self {
     case .notATree(_, _, .some), .otherWorkspace, .invalidManifest, .manifestChanged,
-      .notWorkTree, .busy, .invalidExport, .invalidRestoreIdentifier:
+      .notWorkTree, .busy, .invalidExport, .invalidRestoreIdentifier, .exhaustedTaskCounter:
       .agent
     case .invalidTree(_, let workspace)
     where workspace.map({ !Self.safeWorkspace($0) }) == true:
@@ -118,6 +120,11 @@ package enum ExportError: CodedError, Equatable {
       "The tree holds workspace \(tree), not \(given); nothing was restored."
     case .restoreConflict(let reason):
       "The tree clashes with this database: \(SecretGuard.redacted(reason)). Nothing was restored."
+    case .exhaustedTaskCounter(let destination):
+      destination
+        ? "The destination workspace has an exhausted task counter. Task refs cannot be rewound. "
+          + "Choose a healthy destination with the human."
+        : "The export leaves the task counter exhausted. Choose a healthy export with the human."
     case .invalidManifest:
       "--manifest needs 12 to 64 hexadecimal digits from the restore dry run."
     case .manifestChanged(let approved, _):
@@ -172,6 +179,7 @@ package enum ExportError: CodedError, Equatable {
     case .otherWorkspace(let tree, _, let directory):
       [workspaceCommand("silta restore " + shellWord(directory) + " --dry-run", workspace: tree)]
     case .restoreConflict, .invalidExport, .invalidRestoreIdentifier: ["silta ws ls"]
+    case .exhaustedTaskCounter: ["silta restore --help"]
     case .invalidManifest(let directory), .manifestChanged(_, let directory):
       RestoreService.canNameInRecovery(directory)
         ? ["silta restore " + shellWord(directory) + " --dry-run"]

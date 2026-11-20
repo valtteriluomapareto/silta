@@ -29,7 +29,7 @@ extension UsageError: ErrorExamples {
 
 extension BodyInputError: ErrorExamples {
   static var examples: [BodyInputError] {
-    [.unreadable, .notRegular, .tooLarge(65_536), .invalidUTF8]
+    [.unreadable, .notRegular, .tooLarge(65_536), .invalidUTF8, .nul]
   }
 }
 
@@ -66,6 +66,12 @@ extension SeamError: ErrorExamples {
 
 extension StorageError: ErrorExamples {
   static var examples: [StorageError] { Array(allCases) }
+}
+
+extension BackupFailure: ErrorExamples {
+  static var examples: [BackupFailure] {
+    [.destination, .staging, .detached, .occupied, .filesystem(.diskFull)]
+  }
 }
 
 extension SecretError: ErrorExamples {
@@ -236,6 +242,7 @@ extension ExportError: ErrorExamples {
       .insideRepo(path: "/tmp/acme/platform/exports/acme", repo: "platform", workspace: "acme"),
       .unsupported("docs"), .newerFormat, .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
       .invalidTree(reason: "links.jsonl does not match its sha256", workspace: "acme"),
+      .exhaustedTaskCounter(destination: false), .exhaustedTaskCounter(destination: true),
       .invalidExport(reason: "the task prefix is not an identifier"),
       .invalidRestoreIdentifier(field: "service slug"),
       .defaultRootUnavailable,
@@ -289,7 +296,8 @@ struct ErrorReachabilityTests {
   static let registry: [any ErrorExamples.Type] = [
     UsageError.self, BodyInputError.self, InternalError.self, SchemaError.self, SeamError.self,
     SecretError.self,
-    StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
+    StorageError.self, BackupFailure.self, ActorError.self, WorkspaceError.self, RepoError.self,
+    TaskError.self,
     ScanError.self, CommentError.self, DocError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,

@@ -139,7 +139,7 @@ extension RestoreReport {
   static func between(
     _ current: ExportSnapshot?, _ tree: ExportSnapshot, workspace: String, digest: String,
     dryRun: Bool
-  ) -> RestoreReport {
+  ) throws -> RestoreReport {
     let incoming = Dictionary(
       tree.tasks.map { (($0.row.value("uid") ?? ""), $0) },
       uniquingKeysWith: { first, _ in first })
@@ -172,7 +172,7 @@ extension RestoreReport {
       removed: removed, changed: changed, rows: rowCounts(current, tree),
       settings: settingChanges(
         current?.workspace.value("settings"), tree.workspace.value("settings")),
-      nextTaskRef: taskRefs(current, tree),
+      nextTaskRef: try taskRefs(current, tree),
       approvalsAdded: 0, claimsReplaced: claims, reposWithoutPath: [], snapshot: nil)
   }
 
@@ -221,7 +221,8 @@ extension RestoreReport {
   /// The task refs before and after, each with its own workspace's prefix: the counter
   /// takes the highest of what the database holds, what the tree holds and one past the
   /// tree's last task.
-  private static func taskRefs(_ current: ExportSnapshot?, _ tree: ExportSnapshot) -> TaskRef {
+  private static func taskRefs(_ current: ExportSnapshot?, _ tree: ExportSnapshot) throws -> TaskRef
+  {
     func ref(_ next: Int64?, prefix: String) -> String? {
       next.map { "\(prefix)-\($0)" }
     }
@@ -229,7 +230,7 @@ extension RestoreReport {
     return TaskRef(
       before: ref(stored, prefix: current?.workspace.value("task_prefix") ?? ""),
       after: ref(
-        RestoreWriter.nextTaskSeq(stored: stored, tree: tree),
+        try RestoreWriter.nextTaskSeq(stored: stored, tree: tree),
         prefix: tree.workspace.value("task_prefix") ?? ""))
   }
 

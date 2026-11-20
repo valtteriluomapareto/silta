@@ -20,6 +20,7 @@ extension TaskService {
     _ = try approval(required: needed, command: retry)
     let original = TaskEditDocument(before)
     guard let text = try input(original.render()) else { return (receipt(before), false) }
+    try BoundedInput.requireNoNul(text)
     let parsed = try TaskEditDocument.parse(text, from: before)
     if parsed == original {
       return try unchangedEdit(before, allowSecret: allowSecret, retry: retry)

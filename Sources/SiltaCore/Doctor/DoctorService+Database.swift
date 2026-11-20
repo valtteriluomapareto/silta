@@ -12,42 +12,17 @@ extension DoctorService {
   static func database(_ store: DatabaseStore, backups: DoctorBackups, at now: Date)
     -> [DoctorCheck]
   {
-    let evidence = "/usr/bin/sqlite3 -readonly " + shellWord(store.path)
+    let target = Result { try DatabaseFile(at: store.path) }
+    let file = try? target.get()  // Inspect the configured entry if unavailable.
+    let resolved = file?.path ?? store.path
     let inspectBackups = !backups.isKnownEmpty
     let recovery =
       (inspectBackups ? [backups.listing] : [])
-      + [
-        evidence + " 'PRAGMA integrity_check;'", evidence + " 'PRAGMA foreign_key_check;'",
-        evidence + " '.schema'",
-      ]
-    var info = stat()
-    let missing = stat(store.path, &info) != 0 && errno == ENOENT
-    if missing || !FileManager.default.isReadableFile(atPath: store.path) {
-      let first: DoctorCheck
-      if missing {
-        first = DoctorCheck(
-          id: "database.integrity", status: .fail,
-          message: "Database \(store.path.debugDescription) is missing."
-            + (backups.count > 0
-              ? " Backups are available; restore is the human's decision."
-              : !backups.readable
-                ? " Backup availability is unknown; "
-                  + "the human must decide recovery after inspection."
-                : " Initialize only if no existing data is expected."),
-          next: inspectBackups ? [backups.listing] : ["silta init"],
-          nextBy: inspectBackups ? .agent : .human)
-      } else {
-        first = DoctorCheck(
-          id: "database.integrity", status: .fail,
-          message:
-            "Database access is denied by file permissions; "
-            + "inspect access before diagnosing corruption.",
-          next: (inspectBackups ? [backups.listing] : []) + [
-            "/bin/ls -ld " + shellWord(store.path) + " "
-              + shellWord(URL(filePath: store.path).deletingLastPathComponent().path)
-          ], nextBy: .human)
-      }
-      return [first] + skipped(["database.foreign_keys", "database.schema"] + dependentIDs)
+      + databaseEvidence(resolved: resolved, configured: store.path)
+    if let unavailable = unavailableEntry(
+      store.path, resolved: resolved, target: target, backups: backups)
+    {
+      return [unavailable] + skipped(["database.foreign_keys", "database.schema"] + dependentIDs)
         + [backups.check(expectedDay: nil)]
     }
     do {
@@ -61,6 +36,47 @@ extension DoctorService {
       return [failure] + skipped(["database.foreign_keys", "database.schema"] + dependentIDs)
         + [backups.check(expectedDay: nil)]
     }
+  }
+
+  private static func databaseEvidence(resolved: String, configured: String) -> [String] {
+    guard RestoreService.canNameInRecovery(resolved) else { return entryInspection(configured) }
+    let command = "/usr/bin/sqlite3 -readonly " + shellWord(resolved)
+    return [
+      command + " 'PRAGMA integrity_check;'", command + " 'PRAGMA foreign_key_check;'",
+      command + " '.schema'",
+    ]
+  }
+
+  private static func unavailableEntry(
+    _ path: String, resolved: String, target: Result<DatabaseFile, any Error>,
+    backups: DoctorBackups
+  ) -> DoctorCheck? {
+    let inspectBackups = !backups.isKnownEmpty
+    if DatabaseFile.isMissing(path) {
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: "Database \(path.debugDescription) is missing."
+          + (backups.count > 0
+            ? " Backups are available; restore is the human's decision."
+            : !backups.readable
+              ? " Backup availability is unknown; "
+                + "the human must decide recovery after inspection."
+              : " Initialize only if no existing data is expected."),
+        next: inspectBackups ? [backups.listing] : ["silta init"],
+        nextBy: inspectBackups ? .agent : .human)
+    }
+    if case .failure(StorageError.invalidDatabaseTarget) = target {
+      return DoctorCheck(
+        id: "database.integrity", status: .fail,
+        message: StorageError.invalidDatabaseTarget.message,
+        next: entryInspection(path), nextBy: .human)
+    }
+    guard !FileManager.default.isReadableFile(atPath: resolved) else { return nil }
+    return DoctorCheck(
+      id: "database.integrity", status: .fail,
+      message: "Database access is denied by file permissions; "
+        + "inspect access before diagnosing corruption.",
+      next: (inspectBackups ? [backups.listing] : []) + entryInspection(path), nextBy: .human)
   }
 
   static func readFailure(_ error: StorageError, path: String, recovery: [String], hasBackups: Bool)
