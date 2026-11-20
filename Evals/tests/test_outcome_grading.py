@@ -145,6 +145,16 @@ class OutcomeGrading(unittest.TestCase):
                 record(e, body)
                 self.assertFalse(evals.backend_context(e))
 
+    @unittest.expectedFailure
+    def test_unavailable_legacy_observation_is_unknown(self):
+        observed = evidence()
+        record(observed, WRONG)
+        by_case = [evals.failure_metrics({'phases': []})['legacy_mentioned'],
+                   evals.failure_metrics(observed, enrich=False)['legacy_mentioned']]
+        observed['phases'][0]['state'] = None
+        by_case.append(evals.failure_metrics(observed)['legacy_mentioned'])
+        self.assertEqual(by_case, [None, None, None])
+
     def test_legacy_mentioned_metrics_are_boolean_and_summed(self):
         trials = []
         for number, (body, expected) in enumerate([
