@@ -48,7 +48,7 @@ extension WorkspaceConfig {
       details: blockers.map { blocker in
         TaskError.shown(blocker.item) + " ("
           + blocker.references.map(TaskError.shown).joined(separator: ", ") + ")"
-      }, documentsOnly: documentsOnly)
+      }, hasDocuments: blockers.contains { $0.references.contains { $0.hasPrefix("doc:") } })
   }
 
   static func json(_ value: Any) throws -> String {

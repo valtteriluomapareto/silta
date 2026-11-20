@@ -34,7 +34,9 @@ extension TaskService {
       var result = receipt(
         task, warnings: (content.1 ? [SecretGuard.warning] : []) + target.warnings)
       result.target = try target.rendered(in: tx.database)
-      if exists { return result }
+      if try exists || target.hasFormerCodeLink(task, relation: relation, in: tx.database) {
+        return result
+      }
       try tx.database.execute(
         sql: """
           INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,to_ext,anchor,
@@ -78,5 +80,30 @@ extension TaskService {
     do { return try checked(raw, allow: false, command: command) } catch let error as SecretError {
       throw CommandFailure(error: error, next: ["silta task link --help"])
     }
+  }
+}
+
+extension TaskLinkTarget {
+  /// Matches earlier code spelling without changing the original evidence or its suffix bytes.
+  fileprivate func hasFormerCodeLink(_ task: TaskDetails, relation: String, in db: Database)
+    throws -> Bool
+  {
+    guard let codeAppID, let external else { return false }
+    let history = try WorkspaceSlugs.previous(
+      String.fetchOne(db, sql: "SELECT previous_slugs FROM app WHERE id=?", arguments: [codeAppID]))
+    guard !history.isEmpty else { return false }
+    let former = Set(
+      history.map { slug in
+        Data(Self.replacingCodeApp(in: external) { _ in slug }.utf8)
+      })
+    return try Data.fetchAll(
+      db,
+      sql: """
+        SELECT CAST(to_ext AS BLOB) FROM link
+        WHERE workspace_id=? AND from_kind='task' AND from_id=? AND rel=?
+          AND to_kind='code' AND to_id IS NULL AND anchor IS NULL AND to_ext IS NOT NULL
+        """,
+      arguments: [task.workspaceID, task.id, relation]
+    ).contains(where: former.contains)
   }
 }

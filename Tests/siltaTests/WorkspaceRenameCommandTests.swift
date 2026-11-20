@@ -365,3 +365,74 @@ extension WorkspaceRenameCommandTests {
     }
   }
 }
+
+extension WorkspaceRenameCommandTests {
+  @Test func oneItemWithDocumentAndTaskBlockersKeepsRecoveryReadOnly() throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      try AcmeDocAttachments.attach("delivery-guide", to: "app", in: store)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO task(uid,workspace_id,seq,title,status,app_id,
+              created_by,created_at,updated_at)
+            SELECT 'task-acme',workspace_id,1,'Acme work','todo',id,'human:acme','x','x'
+            FROM app;
+            """)
+      }
+      let before = try Self.show(in: scratch)
+      let refused = try Self.edit(
+        AcmeDocAttachments.yaml(removing: "app"), flags: Self.approval + ["--json"],
+        in: scratch)
+      #expect(refused.termination == .exit(6))
+      let error = try TaskStateCommandTests.error(refused)
+      #expect(error["next_by"] as? String == "agent")
+      #expect(
+        error["next"] as? [String] == [
+          "silta --ws 'acme' doc ls", "silta --ws 'acme' ws show",
+        ])
+      let message = try #require(error["message"] as? String)
+      #expect(message.contains("app:api (AC-1, doc:delivery-guide)"))
+      #expect(try Self.approvals(store) == 0)
+      #expect(try Self.show(in: scratch) == before)
+    }
+  }
+
+  @Test func oldAndCurrentCodeLinkSpellingKeepTheOriginalLinkAndHistory() throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      let added = try Self.run(["task", "add", "Check readme", "--app", "none"], in: scratch)
+      try #require(added.termination == .exit(0), "\(added.stderr)")
+      let first = try Self.run(
+        ["task", "link", "AC-1", "code:api@origin/main:readme#L1"], in: scratch)
+      try #require(first.termination == .exit(0), "\(first.stderr)")
+      let before = try Self.codeLinks(store)
+      let rename = AcmeDocAttachments.yaml().replacingOccurrences(
+        of: "slug: api, ", with: "slug: delivery, previous: [api], ")
+      let saved = try Self.edit(rename, flags: Self.approval, in: scratch)
+      try #require(saved.termination == .exit(0), "\(saved.stderr)")
+      for owner in ["api", "delivery"] {
+        let repeated = try Self.run(
+          ["task", "link", "AC-1", "\(owner)@origin/main:readme#L1", "--json"],
+          in: scratch)
+        #expect(repeated.termination == .exit(0))
+        #expect(
+          try TaskStateCommandTests.warnings(repeated).contains("renamed") == (owner == "api"))
+        #expect(try Self.codeLinks(store) == before)
+      }
+      let distinct = try Self.run(
+        ["task", "link", "AC-1", "delivery@origin/main:readme#L2"], in: scratch)
+      #expect(distinct.termination == .exit(0))
+      #expect(try Self.codeLinks(store).allSatisfy { $0.count == 2 })
+    }
+  }
+
+  private static func codeLinks(_ store: DatabaseStore) throws -> [[Row]] {
+    try store.read { db in
+      [
+        try Row.fetchAll(db, sql: "SELECT * FROM link WHERE to_kind='code' ORDER BY id"),
+        try Row.fetchAll(db, sql: "SELECT * FROM task_event WHERE kind='link' ORDER BY id"),
+      ]
+    }
+  }
+}

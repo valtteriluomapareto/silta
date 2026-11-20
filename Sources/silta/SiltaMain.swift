@@ -243,11 +243,7 @@ extension SiltaMain {
     _ error: any CodedError, edit: WsEditCommand, context: CommandContext
   ) -> [String] {
     if case .docAttachments = error as? WorkspaceError { return error.next }
-    if case .removalBlockers(_, let items, let documentsOnly) = error as? WorkspaceError,
-      documentsOnly || items.count > 1
-    {
-      return error.next
-    }
+    if case .removalBlockers = error as? WorkspaceError { return error.next }
     var target = edit.workspace ?? edit.global.ws
     if target == nil {
       do {

@@ -23,7 +23,7 @@ package enum WorkspaceError: CodedError {
 
   /// Removing a configured row would break an existing reference.
   case conflict
-  case removalBlockers(workspace: String, details: [String], documentsOnly: Bool)
+  case removalBlockers(workspace: String, details: [String], hasDocuments: Bool)
 
   /// Removing a map item would detach current accepted knowledge.
   case docAttachments(
@@ -78,8 +78,8 @@ package enum WorkspaceError: CodedError {
     case .setting(let workspace, _, _), .unknownSetting(let workspace, _, _):
       ["silta --ws " + shellWord(workspace) + " ws show"]
     case .docAttachments(_, _, _, let commands, _): commands
-    case .removalBlockers(let workspace, _, let documentsOnly):
-      documentsOnly && RestoreService.canNameInRecovery(workspace)
+    case .removalBlockers(let workspace, _, let hasDocuments):
+      hasDocuments && RestoreService.canNameInRecovery(workspace)
         ? [workspaceCommand("silta doc ls", workspace: workspace), workspaceEditRead(workspace)]
         : [workspaceEditRead(workspace)]
     case .notFound, .unknown: ["silta ws ls"]

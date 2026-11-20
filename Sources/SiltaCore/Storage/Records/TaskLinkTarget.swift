@@ -8,6 +8,7 @@ struct TaskLinkTarget {
   var external: String?
   var anchor: String?
   var warnings: [OutputWarning] = []
+  var codeAppID: Int64?
 
   static func resolve(_ raw: String, source: TaskDetails, workspace: String, in db: Database)
     throws -> Self
@@ -137,7 +138,7 @@ struct TaskLinkTarget {
     let app = try TaskService.namedSlug(.app, slug, workspace: workspace, in: db)
     return Self(
       kind: "code", external: replacingCodeApp(in: value) { _ in app.slug },
-      warnings: [app.warning(for: slug, kind: .app)].compactMap { $0 })
+      warnings: [app.warning(for: slug, kind: .app)].compactMap { $0 }, codeAppID: app.id)
   }
 
   /// Canonicalizes the owner while retaining the complete code reference suffix.
