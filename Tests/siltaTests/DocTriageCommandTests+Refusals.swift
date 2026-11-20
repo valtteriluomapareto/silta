@@ -49,16 +49,14 @@ extension DocTriageCommandTests {
       #expect(try Self.truth(store) == before)
       let error = try DocEditCommandTests.error(result)
       let next = try #require(error["next"] as? [String])
-      withKnownIssue("Stale recovery currently asks to re-propose every member.") {
-        #expect(
-          next == [
-            "silta --ws 'acme' doc show 'doc:fresh@1'",
-            "silta --ws 'acme' doc show 'doc:rules@2'",
-            "silta --ws 'acme' doc show 'doc:rules' --json",
-            "silta --ws 'acme' doc propose 'doc:rules'"
-              + " -F <file> -m <why> --base <rev> --title <title> --about <ref>",
-          ])
-      }
+      #expect(
+        next == [
+          "silta --ws 'acme' doc show 'doc:fresh@1'",
+          "silta --ws 'acme' doc show 'doc:rules@2'",
+          "silta --ws 'acme' doc show 'doc:rules' --json",
+          "silta --ws 'acme' doc propose 'doc:rules'"
+            + " -F <file> -m <why> --base <rev> --title <title> --about <ref>",
+        ])
     }
   }
 

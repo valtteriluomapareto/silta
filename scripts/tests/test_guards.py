@@ -373,6 +373,10 @@ class NoPlanRefsTests(GuardTestCase):
         self.assertEqual(len(errors), 2)
         self.assertTrue(all(":3: " in error for error in errors))
 
+    def test_explicit_slice_reference_can_precede_a_technical_term(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift", "// See slice S3 bucket handling.\n")
+        self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), 1)
+
     def test_bare_slice_ids_fail(self) -> None:
         slices = ["S12a", "FR5", "A6b", "B1", "C1a", "K2", "DF3-a"]
         self.tree.write("Sources/SiltaCore/A.swift", "".join(f"// {name} explains this.\n" for name in slices)

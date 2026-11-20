@@ -97,14 +97,17 @@ package struct DocTriageService {
     }
     let read = (selected ?? workspace).map { DocService(workspace: $0, store: environment.db) }
     var next = read.map { read in batch.refs.map { read.showCommand($0) } } ?? [hub]
-    if let read, error.code == .staleRev {
-      next += batch.accept.compactMap { ref in
-        guard let selected = try? DocTriage.selection(ref) else { return nil }  // Use the hub.
-        return read.showCommand("doc:" + selected.0, flags: " --json")
+    let reproposals: [String]
+    if let docError = error as? DocError, case .stale(let ref) = docError {
+      reproposals = [ref]
+      if let read, let selected = try? DocTriage.selection(ref) {  // Keep pinned reads.
+        next.append(read.showCommand("doc:" + selected.0, flags: " --json"))
       }
+    } else {
+      reproposals = error.code == .conflict ? batch.accept : []
     }
-    if let read, !batch.accept.isEmpty, [.conflict, .staleRev].contains(error.code) {
-      next += batch.accept.map { ref in
+    if let read {
+      next += reproposals.map { ref in
         guard let selected = try? DocTriage.selection(ref),  // Invalid refs use the read hub.
           read.scopeIsSafe, DocService.safeReference(ref)
         else { return hub }
