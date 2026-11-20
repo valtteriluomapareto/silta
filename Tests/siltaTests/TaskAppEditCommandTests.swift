@@ -76,7 +76,7 @@ struct TaskAppEditCommandTests {
       try Self.addTasks(fixture, in: scratch)
       let legacy = try Self.run(["task", "edit", "AC-1", "--app", "app:none"], in: scratch)
       try #require(legacy.termination == .exit(0), "\(legacy.stderr)")
-      #expect(legacy.stdout.contains("app:api -> app:none"))
+      #expect(legacy.stdout == "AC-1 app:api -> app:none\nChildren still on app:api: AC-2\n")
       let stillCode = try Self.task("AC-1", in: scratch)
       #expect(stillCode["app"] as? String == "none")
       #expect(stillCode["branch"] as? String == "main")
@@ -228,6 +228,8 @@ extension TaskAppEditCommandTests {
     #expect(after[2].count == before[2].count + 1)
     #expect(after[2].last?["workspace"] as? String == "acme")
     #expect(after[2].last?["words"] as? String == "Move the Acme release.")
+    #expect(after[2].last?["actor"] as? String == targetActor["SILTA_ACTOR"])
+    #expect(after[2].last?["command"] as? String == "silta task edit 'AC-1' --app 'web'")
     #expect(try store.read { db in try history(db) } == ["app:api -> app:web"])
     let repeatMove = try run(
       [
