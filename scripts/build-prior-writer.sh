@@ -18,7 +18,7 @@ case "${2:-prior}" in
   prior) prior_commit=dc868192e3877a29d79dc54681f0f57b72c3f56f ;;
   v6) prior_commit=b65eab8994b7ada9f54495f9c050ebe5a3090d74 ;;
   v8) prior_commit=605a8a69d553be1207f1fecb649dc8e30ba70724 ;;
-  v9) prior_commit=06d3ba50cf3a25f9ec609b7fe78e4ecbc8fa9fb8 ;;
+  v9) prior_commit=9e956c388729d35d23ae4d9317a901e0f7cfa1db ;;
   *) echo "build-prior-writer: unknown writer '$2'; use prior, v6, v8 or v9" >&2; exit 64 ;;
 esac
 out="$1"
