@@ -30,10 +30,8 @@ package struct LocationService {
     let selectedTask = try task.map { try explicitTask($0, workspace: repo.workspace) }
     let git = context.git
     let candidates = context.candidates
-    let branch = try await git.value(
-      ["symbolic-ref", "--quiet", "--short", "HEAD"], optional: true)
-    let head = try await git.required(["rev-parse", "--verify", "HEAD"])
-    let current = try currentTask(selectedTask, context: context, app: app, branch: branch)
+    let (branch, head) = try await git.headState()
+    let current = try await currentTask(selectedTask, context: context, app: app, branch: branch)
     var result = LocationResult(
       path: context.path.path, worktree: context.root.path,
       workspace: repo.workspace, repo: repo.slug, branch: branch,
@@ -64,6 +62,7 @@ package struct LocationService {
     {
       return picked(taskApp, "task")
     }
+    guard !head.isEmpty else { return result }
     let available = candidates.filter { candidate in context.refs.contains { $0.0 == candidate.app }
     }
     if let evidence = try await git.evidence(branch: branch, candidates: available) {
@@ -87,12 +86,23 @@ package struct LocationService {
   private func currentTask(
     _ explicit: TaskDetails?, context: LocationContext,
     app: String?, branch: String?
-  ) throws -> TaskDetails? {
+  ) async throws -> TaskDetails? {
     if let explicit { return explicit }
-    return try environment.db.read { db in
+    func lookup(_ branches: [String], in db: Database) throws -> TaskDetails? {
       try CurrentTaskSelector.select(
-        context, app: app, actor: environment.actor.description,
-        branch: branch, in: db)
+        context, app: app, actor: environment.actor.description, branches: branches, in: db)
+    }
+    let names = branch.map { [$0] } ?? []
+    let legacy = branch.map { ["heads/" + $0, gitBranchPrefix + $0] } ?? []
+    let (current, hasLegacy) = try environment.db.read { db in
+      let current = try lookup(names, in: db)
+      guard current == nil, !legacy.isEmpty else { return (current, false) }
+      return (nil, try lookup(legacy, in: db) != nil)
+    }
+    guard hasLegacy, let spelling = try await context.git.legacyBranchSpelling(in: legacy)
+    else { return current }
+    return try environment.db.read { db in
+      try lookup(names, in: db) ?? lookup([spelling], in: db)
     }
   }
 
@@ -161,13 +171,19 @@ package struct LocationService {
         path: path, root: root, repo: repo, git: git, candidates: candidates,
         refs: refs, warnings: warnings, displayRoot: displayRoot)
     }
+    if let recovery = try await RepositoryScan.repair(
+      root, workspace: workspace, store: environment.db, git: environment.git)
+    {
+      throw CommandFailure(
+        error: LocationError.unregistered, next: recovery.next, message: recovery.message)
+    }
     throw unregistered(path: root, workspace: workspace)
   }
 
   private func unregistered(path: URL, workspace: String?) -> CommandFailure {
-    let selection = workspace.map { " --ws " + shellWord($0) } ?? ""
-    return CommandFailure(
-      error: LocationError.unregistered,
-      next: ["silta" + selection + " init --scan " + shellWord(path.path)])
+    let next =
+      workspace.map { "silta --ws " + shellWord($0) + " ws show" }
+      ?? ("silta init --scan " + shellWord(path.path))
+    return CommandFailure(error: LocationError.unregistered, next: [next])
   }
 }

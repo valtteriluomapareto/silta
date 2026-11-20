@@ -10,7 +10,8 @@ They're summarised here so every decision has one index.
 ## Product
 
 - **D1: SQLite is the source of truth.** It holds everything Silta owns. YAML is only
-  an editing view of the configuration (`silta ws edit`).
+  an editing view of the configuration (`silta ws edit`). A workspace save checks
+  the captured view against SQLite before applying it (spec §17).
 - **D2: External sources are indexed, never owned.** That means meeting notes and repo
   docs.
 - **D3: Deterministic export** to a text tree for backup and diff. `restore` replaces
@@ -45,12 +46,19 @@ They're summarised here so every decision has one index.
       failure leaves an unflushed name. No preparation provenance or recursive
       directory cleanup is needed.
 - **D4: CLI only, `--json` everywhere.** No MCP server and no daemon.
+  - ↳ update (2026-11-19): The native development app gives the human a second
+    front-end to the same Core services (D50).
 - **D5: Agent writes are gated.** Unsolicited tasks start as `proposed`, doc edits are
   proposals, and some commands are human-only. Since D38, an agent runs those with
   the human's quoted go-ahead.
   - ↳ update (D39): with `proposals: ask`, an agent's unsolicited task needs the
     human's go-ahead in chat instead of triage.
+  - ↳ update (2026-11-19): Agents submit document changes with `doc propose`.
+    Accepting revisions, editing accepted docs and archiving docs use the existing
+    human gate. See [workspace document policy](spec.md#9-docs) and D38.
 - **D6: Silta resolves "where am I"** from cwd, branch, upstream and claimed task.
+  - ↳ 2026-11-19: An unborn branch uses its branch name with an empty JSON head.
+    The existing field types and pre-distance selection rules are retained (§7).
 - **D7: Code access is read-only**, through `git show`, `grep` and `log` on
   configured refs.
 - **D8: Truth (`silta.db`) and derived data (`index.db`) live in separate files.**
@@ -67,6 +75,12 @@ They're summarised here so every decision has one index.
   - Targets: `SiltaCore` (library), `silta` (executable), and later `SiltaApp`.
   - macOS 15+.
   - Domain types don't import GRDB; record conformances live in the storage layer.
+  - ↳ update (2026-11-19): Domain types remain free of GRDB, and migrations stay
+    centralized in `SiltaCore/Storage/`. Feature-specific persistence may live
+    next to the feature in files with an explicit storage responsibility.
+    Silta Dev uses the same Core. See the
+    [development installer requirements](getting-started.md#1-requirements) for
+    the combined build and [spec §17](spec.md#17-storage-concurrency-technology) for the package floor.
 - **D12: SQLite through GRDB**, using the system SQLite.
   - Need (2026-11-02): many short-lived Swift writer processes with full-text search.
     PostgreSQL offers Finnish search and sharing but needs a server; it is the planned
@@ -541,6 +555,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     before the human's go-ahead is asked for.
   - **`triage --priority` is optional**: without it, accepted tasks keep their stored
     priority.
+  - ↳ 2026-11-19: Triage checks the whole batch before the human's go-ahead.
+    The write rechecks proposal state and identity before recording approval (§8).
   - **Unblocking a block that isn't ready needs the human's go-ahead.** Ready means
     every blocker is a task and all are done (§8). An agent's `unblock` of a batch
     with any other task is `human_only` unless `--approved` is given, decided inside
@@ -613,6 +629,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     prompts; S7 needed eight relays and no decisions. Such a run never uses
     `--approved`: relayed words don't count (D38), so it names human-only commands
     and the coordinating agent asks for them in chat and runs them itself.
+  - ↳ update (2026-11-19): The [current merge workflow](../AGENTS.md#dogfooding)
+    applies to app and CLI slices. It covers finishing from the verified merge and
+    using a separate task for a plan-only PR.
 
 ## Agent harness evidence (2026-11-05)
 
@@ -625,6 +644,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     `--add-dir` adds writable directories. `CODEX_THREAD_ID` has the observation
     recorded in spec §11; its presence across harnesses/versions remains unverified.
     No official marker guarantee was found in the documentation checked.
+  - Silta protects its managed backup and export entries inside the configured data
+    directory (spec §18). Temporary-home tests verify Silta's path handling.
+    Effective permissions in a live harness require their own acceptance check.
   - [Claude hook reference](https://code.claude.com/docs/en/hooks) documents appending
     exports to `CLAUDE_ENV_FILE` in SessionStart for later shell commands. Stop can
     return `decision: block` with a reason; `stop_hook_active` avoids endless
@@ -714,6 +736,12 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     routine retries and safe reconstruction of stdin writes; recipes alone cannot
     enforce scope because agents do not reliably propagate `--ws`. Guide recipes still
     carry an explicit workspace to support intentional cross-workspace/outside work.
+  - ↳ 2026-11-19: Recover local clone bindings in the existing workspace. An
+    exact canonical path, network origin, or absolute local origin establishes a
+    match. Relative local origins, names alone, and ambiguous or partial matches
+    require inspection and a human choice. Keep
+    existing duplicate workspaces and their data. Workspace deletion is outside
+    this setup workflow (spec §7 and Appendix A).
 
 ## Docs compatibility (2026-11-12)
 
@@ -725,6 +753,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   The maintainer chose this after the shipped writer refused to change an attached
   legacy edge kind. Retaining an executable for repair would leave fresh installs
   and attached identities without a reliable upgrade path.
+
+  ↳ 2026-11-19: Workspace editing and ref resolution retain legacy service
+  identities. Text export and restore both require identifier-shaped service slugs,
+  including restore of older supported formats. Legacy edge kinds retain their
+  existing round-trip behavior. See [spec §15](spec.md#15-export-backup-restore).
 
   Task-link input does not yet accept edge/service targets: its add-only surface
   has no unlink recovery. The internal resolver serves doc attachments, whose
@@ -782,3 +815,16 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   line named `app <action>`, beside an existing store only, so measurement can tell app
   use from terminal use. Reads and writes share the facade's `AppReadError`. Plan:
   [`mac-app-actions.md`](plans/mac-app-actions.md).
+- **D51: A repository's own plan rule wins.** On 2026-11-19 the maintainer chose to fix
+  a contradiction found while dogfooding: a repository whose instructions require
+  committed plan files (for example a reviewed `docs/plans/` folder) met Silta's
+  "never create repo plan files". When the repository's own instructions require a
+  plan file, agents write it where they say. That file is the plan of record: the
+  Silta task plan holds its path and branch or PR plus a short checklist of steps to
+  tick, not its full text, and the file wins if they disagree. Everywhere else plans stay
+  on the task (§2 goal 3), and the rule about tracker items is unchanged. This follows
+  §3 (Silta doesn't replace repo-local `AGENTS.md`) and D39 (a repo's own rules still
+  apply). The installed block, `silta guide` and spec §11 carry one wording; older
+  installs show as stale in `doctor --install` until reinstalled. The eval fixtures
+  require no plan file, so `plan-not-file` and the forbidden-attempt check stay as
+  they are (§21).

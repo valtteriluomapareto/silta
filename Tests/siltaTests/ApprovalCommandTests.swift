@@ -102,7 +102,8 @@ struct ApprovalCommandTests {
       ] {
         let result = try SiltaBinary.run(args, in: scratch)
         #expect(result.termination == .exit(0))
-        #expect(result.stdout.hasPrefix("workspace:"))
+        #expect(result.stdout.hasPrefix("# silta-base: "))
+        #expect(result.stdout.contains("\nworkspace: "))
         #expect(result.stderr.contains("approval_unused"))
       }
       let failed = try SiltaBinary.run(
@@ -230,9 +231,11 @@ extension ApprovalCommandTests {
         let result = try SiltaBinary.run(
           ["ws", "edit", "-F", path, "--approved", "Apply.", "--json"], in: scratch,
           environment: TaskCommandTests.actor)
-        #expect(result.termination == .exit(9))
-        #expect(result.stdout.contains("silta ws edit 'acme' -F <file>"))
-        #expect(!result.stdout.contains("silta task add"))
+        #expect(result.termination == .exit(1))
+        let error = try TaskStateCommandTests.error(result)
+        #expect(error["code"] as? String == "invalid")
+        #expect(error["next"] as? [String] == ["silta --ws 'acme' ws edit --help"])
+        #expect(error["next_by"] as? String == "agent")
       }
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
     }
@@ -335,7 +338,7 @@ extension ApprovalCommandTests {
       let noSHA = try SiltaBinary.run(
         ["task", "done", "AC-1", "--force", "--no-sha", "-m", "Acme done", "--json"], in: scratch,
         environment: TaskCommandTests.actor)
-      #expect(noSHA.termination == .exit(3) && noSHA.stdout.contains("--force --no-sha -F <file>"))
+      #expect(noSHA.termination == .exit(3) && noSHA.stdout.contains("--force --no-sha -F -"))
     }
   }
 }

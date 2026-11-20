@@ -61,6 +61,14 @@ extension AppModel {
     send(draftOf: task) { .comment(task: task, body: $0) }
   }
 
+  /// Sends the reply draft for a thread, posted into that thread.
+  @discardableResult func reply(to root: String, task: String) -> Task<Void, Never>? {
+    send(draftOf: Self.replyTarget(root)) { .comment(task: task, body: $0, replyTo: root) }
+  }
+
+  /// A thread's reply draft, apart from the task's new-thread comment draft.
+  static func replyTarget(_ root: String) -> String { "reply:" + root }
+
   private func send(draftOf ref: String, _ write: (String) -> AppWrite) -> Task<Void, Never>? {
     guard let target = target(ref) else { return nil }
     let body = actions.draft(target).trimmingCharacters(in: .whitespacesAndNewlines)

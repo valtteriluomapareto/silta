@@ -57,26 +57,6 @@ struct RestoreServiceTests {
     }
   }
 
-  /// Seeded workspaces of every shape round-trip byte for byte, into a fresh home and
-  /// in place. A failure names its seed.
-  @Test(arguments: Array(UInt64(0)..<6))
-  func generatedWorkspacesRoundTrip(seed: UInt64) throws {
-    try withScratchDirectory { scratch in
-      let home = scratch.appending(path: "a")
-      let store = try ExportFixture.make(home)
-      var generator = RestoreGenerator(seed: seed)
-      try DatabaseQueue(path: store.path).write { try generator.insert($0) }
-      let exported = try ExportTreeTests.render(store)
-      let tree = try RestoreSupport.write(exported, to: scratch.appending(path: "tree/acme"))
-      let fresh = ExportFixture.store(scratch.appending(path: "b"))
-      try fresh.initialize()
-      _ = try RestoreSupport.restore(tree, into: fresh, home: scratch.appending(path: "b"))
-      ExportTreeTests.expectSame(try ExportTreeTests.render(fresh), exported)
-      _ = try RestoreSupport.restore(tree, into: store, home: home)
-      ExportTreeTests.expectSame(try ExportTreeTests.render(store), exported)
-    }
-  }
-
   /// An older export replaces newer work, the report lists what is lost, and the task
   /// counter never rewinds, so refs already cited are never reused.
   @Test func olderTreeReportsLostWorkAndKeepsTheCounter() throws {

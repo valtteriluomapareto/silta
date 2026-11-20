@@ -54,8 +54,12 @@ extension GuideCommand {
         # When to use Silta
         Use Silta for cross-repo work, another app or backend, branch-as-app repos, plans, \
         handoffs, review requests and meeting decisions. Trivial single-repo edits need no \
-        task. Keep plans and results in Silta, never in PLAN.md or other repo plan files; \
-        never create tracker items yourself.
+        task. Keep plans and results in Silta, never in PLAN.md or other repo plan files, and \
+        never create tracker items yourself. Exception: when the repository's own instructions \
+        require a plan file, write it where they say; that file is the plan of record, and \
+        the Silta task plan holds its path and branch or PR plus a short checklist of steps \
+        to tick, not its full text. A conditional rule, such as plans in a plans folder \
+        only for work that spans several slices, requires a file only when its condition holds.
         """ + "\n"),
     Section(
       topic: "start",
@@ -95,7 +99,8 @@ extension GuideCommand {
         two-proposal cap and needs triage unless the human asked for it in this chat; then \
         pass their words as --approved. Preview imports before writing; imports keep the \
         source by default. --delete is not human-only; it removes only an unchanged untracked \
-        source after commit and refuses harness files.
+        source after commit and refuses harness files. Don't import or --delete a plan file \
+        the repository's instructions require; point the task plan at it.
         ```sh
         silta --ws acme task add --start 'Implement Acme sign-in' --app platform-api
         silta --ws acme task plan AC-12 -F - <<'PLAN'
@@ -210,12 +215,17 @@ extension GuideCommand {
         earlier instructions, comments, answers and handoffs never count. With no human in \
         this chat, never use --approved. Name the commands in a question for @me and leave a \
         handoff instead. Never invent approval words.
-        Human-only gates: `task promote`; task edit except your claimed task; effective \
-        `where --set/--unset` changes; task triage; doc triage; --steal \
-        over another session's fresh claim; --force past an unmet review gate; --allow-secret; \
-        ws edit; restore except --dry-run; task unblock with open blockers; and proposed-task \
-        writes under `proposals: ask`. Before `restore`, run --dry-run and show the human its \
-        lines; it drops work done after the export. Never edit an export tree.
+        Human-only commands include `task promote`, `task triage`, `doc triage`, `doc edit`, \
+        `doc archive` and `ws edit`. The same gate applies to `task edit` unless you hold its \
+        claim or use `--print`. Other human-only operations include effective `where \
+        --set/--unset` changes, `--steal` over another session's fresh claim, `--force` past an \
+        unmet review gate, `--allow-secret`, `restore` except `--dry-run`, `task unblock` \
+        unless every task is ready, and proposed-task writes under `proposals: ask`. Before \
+        `restore`, run `--dry-run` and show the human its lines. Restore drops work done after \
+        the export. Never edit an export tree.
+        Keep the baseline comment from `ws show` or a retained editor draft when applying \
+        workspace YAML. On `conflict`, review fresh `ws show` output and reapply your edits there. \
+        Unstamped YAML uses the configuration at command start.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \
         A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not \
@@ -314,7 +324,8 @@ extension GuideCommand {
         code default. Never use --force, --steal, `where --set/--unset`, `task promote` or \
         --allow-secret on your own initiative; name the exact command, wait for the human's \
         reply in this chat, then pass their words through --approved. Never create tracker \
-        items or repo plan files. With no human in this chat, see `silta guide human`.
+        items, or plan files the repository's instructions don't require. With no human in \
+        this chat, see `silta guide human`.
         """ + "\n" + ErrorCode.allCases.map { "  \($0.helpLine)\n" }.joined()),
     Section(
       topic: "refs",

@@ -28,8 +28,10 @@ public struct AppWriter: Sendable {
           var draft = CommentDraft(body: body, kind: "answer")
           draft.replyTo = question
           _ = try service.comment(task, draft)
-        case .comment(let task, let body):
-          _ = try service.comment(task, CommentDraft(body: body))
+        case .comment(let task, let body, let replyTo):
+          var draft = CommentDraft(body: body)
+          draft.replyTo = replyTo
+          _ = try service.comment(task, draft)
         case .acceptAnswer(let ref):
           _ = try service.acceptComment(ref)
         case .acceptProposals(let refs):

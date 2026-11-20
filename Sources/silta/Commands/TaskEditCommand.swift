@@ -5,7 +5,7 @@ import SiltaCore
 struct TaskEditCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit",
-    abstract: "Edit task fields; approval is needed unless you hold its claim.",
+    abstract: "Edit a task (human-only unless you hold its claim or use --print).",
     discussion: "`--print` outputs the document; edit it and return it with `-F`.\n"
       + "Order: ## Title, ## Description, ## Acceptance, ## Plan, ## Result.\n"
       + "Each heading is followed by a tilde fence (~~~ or longer) around the value.\n"
@@ -36,10 +36,17 @@ struct TaskEditCommand: OutputCommand {
   @Flag(help: "Retain secrets with human approval.")
   var allowSecret = false
 
+  var missingTerminal: Bool { file == nil && !print && !TerminalEditor.hasTerminal }
+
+  static let terminalUsage = UsageError.usage(
+    message: "Editing needs terminal input and terminal stderr. Use --print for the current "
+      + "document, then supply -F <file> or -F - for stdin.",
+    command: "silta task edit")
+
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let service = TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved,
-      bodyFlag: file.map { _ in "-F <file>" })
+      bodyFlag: file.map { _ in "-F <file>" }, retryBodyFlag: file == "-" ? "-F -" : nil)
     if print {
       guard file == nil, !allowSecret else {
         throw TaskError.invalid("--print only reads; use it without -F or --allow-secret.")
@@ -51,8 +58,9 @@ struct TaskEditCommand: OutputCommand {
           ref: printed.task.ref, status: printed.task.status, document: printed.document)
       ).reporting(context.taskWorkspace(global.ws))
     }
+    guard !missingTerminal else { throw terminalFailure(service) }
     let result = try service.edit(ref, allowSecret: allowSecret) { original in
-      if let file { return try read(file) }
+      if let file { return try BodyInput.read(file) }
       return try edit(original, environment: context.environment)
     }
     return TaskOutput.receipt(
@@ -63,15 +71,21 @@ struct TaskEditCommand: OutputCommand {
     ).reporting(context.taskWorkspace(global.ws))
   }
 
-  private func read(_ path: String) throws -> String {
+  private func terminalFailure(_ service: TaskService) -> CommandFailure {
+    let usage = Self.terminalUsage
+    guard let workspace = service.resolvedWorkspace(), WorkspaceConfig.isValidIdentifier(workspace),
+      RestoreService.canNameInRecovery(workspace)
+    else { return CommandFailure(error: usage, next: usage.next) }
     do {
-      let data =
-        try path == "-"
-        ? FileHandle.standardInput.readToEnd() ?? Data()
-        : Data(contentsOf: URL(filePath: path))
-      guard let text = String(data: data, encoding: .utf8) else { throw TaskError.input }
-      return text
-    } catch { throw TaskError.input }
+      let task = try service.show(ref)
+      guard RestoreService.canNameInRecovery(task.ref) else {
+        return CommandFailure(error: usage, next: usage.next)
+      }
+      let command = "silta task edit " + shellWord(task.ref) + " --print"
+      return CommandFailure(error: usage, next: [workspaceCommand(command, workspace: workspace)])
+    } catch {
+      return CommandFailure(error: usage, next: usage.next)
+    }
   }
 
   private func edit(_ original: String, environment: SiltaEnvironment) throws -> String? {
@@ -83,14 +97,10 @@ struct TaskEditCommand: OutputCommand {
     }
     do {
       try original.write(to: path, atomically: true, encoding: .utf8)
-      let process = Process()
-      process.executableURL = URL(filePath: "/bin/sh")
-      let editor = ProcessInfo.processInfo.environment["EDITOR"] ?? "vi"
-      process.arguments = ["-c", "exec " + editor + " \"$1\"", "silta-editor", path.path]
-      try process.run()
-      process.waitUntilExit()
-      guard process.terminationStatus == 0 else { return nil }
-      return try read(path.path)
+      guard try TerminalEditor.run(path, command: "silta task edit") == 0 else { return nil }
+      return try String(contentsOf: path, encoding: .utf8)
+    } catch let error as any CodedError {
+      throw error
     } catch { throw TaskError.input }
   }
 

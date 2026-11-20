@@ -142,6 +142,29 @@ struct DocTriageCommandTests {
     }
   }
 
+  @Test func overlapRecoveryOffersOneProposalCommandPerDocument() throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      try AcmeDocAttachments.attach("rules", to: "service", in: store)
+      #expect(try Self.propose(scratch) == "doc:rules@2")
+      try AcmeDocAttachments.copyLatestRulesProposal(in: store)
+      let before = try Self.truth(store)
+      let result = try Self.run(["--accept", "doc:rules@2", "doc:rules@3", "--json"], scratch)
+      #expect(result.termination == .exit(6))
+      let error = try DocEditCommandTests.error(result)
+      #expect(error["code"] as? String == "conflict")
+      let next = try #require(error["next"] as? [String])
+      #expect(
+        next.prefix(2) == [
+          "silta --ws 'acme' doc show 'doc:rules@2'",
+          "silta --ws 'acme' doc show 'doc:rules@3'",
+        ])
+      #expect(next.count == 3)
+      #expect(next.filter { $0.contains(" doc propose ") }.count == 1)
+      #expect(try Self.truth(store) == before)
+    }
+  }
+
   @Test(arguments: [
     ["--reject", "rules"], ["--reject", "doc:rules@01"],
     ["--reject", "doc:rules@1", "doc:rules@1"],

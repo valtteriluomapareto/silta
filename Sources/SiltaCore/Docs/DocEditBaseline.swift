@@ -39,7 +39,7 @@ struct DocEditBaseline: Equatable {
               THEN CAST(r.body_md AS BLOB) END AS body
           FROM doc d LEFT JOIN doc_rev r ON r.doc_id=d.id AND r.rev=d.current_rev
           WHERE d.workspace_id=? AND d.slug=?
-          """, arguments: [keepBody, DocInput.maximumBytes, workspace, slug])
+          """, arguments: [keepBody, BoundedInput.maximumBodyBytes, workspace, slug])
     else {
       return Self(
         literalFields: [], identities: [workspaceUID], archived: false,

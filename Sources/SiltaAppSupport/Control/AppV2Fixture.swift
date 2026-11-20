@@ -40,12 +40,48 @@
       _ = try service.link(
         "AC-9", target: "url:https://github.com/acme/example/pull/41", relation: "about")
       try answeredHumanQuestion(environment)
+      try reviewThreads(environment)
       var block = TaskBlock(why: "Needs the rounded totals first.")
       block.on = ["AC-19"]
       _ = try service.block("AC-17", block)
       try store.write {
         try DebugTaskFixture.complete(19, in: $0, at: now.addingTimeInterval(-1800))
       }
+    }
+
+    /// A review on AC-9: an open finding Codex replied to, and a finding Claude resolved
+    /// after Codex's reply, so the inspector shows an open and a resolved thread.
+    private static func reviewThreads(_ environment: SiltaEnvironment) throws {
+      func service(_ actor: ActorID) -> TaskService {
+        TaskService(
+          environment: SiltaEnvironment(
+            clock: environment.clock, ids: environment.ids, git: environment.git,
+            home: environment.home, db: environment.db, log: environment.log, actor: actor,
+            human: environment.human),
+          workspace: "acme")
+      }
+      let reviewer = service(.agent(tool: "claude", session: "review"))
+      let author = service(.agent(tool: "codex", session: "fixture"))
+      let open = try reviewer.comment(
+        "AC-9",
+        CommentDraft(
+          body: "Review (round 1, major): retries back off but never stop. "
+            + "PushRetry.schedule doubles the delay without a cap, so a device that stays "
+            + "offline keeps a retry alive for days and the queue grows without bound. The "
+            + "plan says retries give up after an hour.\n\nFix: cap the delay at five "
+            + "minutes and drop the registration after an hour."))
+      var reply = CommentDraft(
+        body: "Capped at five minutes and dropped after an hour. "
+          + "PushRetryTests.retriesGiveUpAfterAnHour proves it with the fake clock.")
+      reply.replyTo = open.comment.ref
+      _ = try author.comment("AC-9", reply)
+      let closed = try reviewer.comment(
+        "AC-9",
+        CommentDraft(body: "Review (round 1, minor): Retry-After is ignored; honour it first."))
+      var fixed = CommentDraft(body: "Honoured; RetryAfterTests.headerWinsOverBackoff.")
+      fixed.replyTo = closed.comment.ref
+      _ = try author.comment("AC-9", fixed)
+      _ = try reviewer.updateComments([closed.comment.ref], action: .resolve)
     }
 
     /// The human asks Codex on AC-14 and Codex answers, which leaves an answer to accept.

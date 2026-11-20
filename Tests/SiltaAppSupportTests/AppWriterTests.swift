@@ -151,6 +151,34 @@
       }
     }
 
+    @Test func aWarmedWriterUsesTheReplacementAndRefusesRemoval() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let writer = AppWriter(reader: try Self.reader(scratch))
+        let first = "Acme comment in the first store."
+        let second = "Acme comment in the replacement."
+        try writer.perform(.comment(task: "AC-15", body: first), workspace: "acme")
+        let current = scratch.appending(path: "silta-home")
+        let retired = scratch.appending(path: "retired")
+        try FileManager.default.moveItem(at: current, to: retired)
+        try AppFixtures.seed(in: scratch)
+        try writer.perform(.comment(task: "AC-15", body: second), workspace: "acme")
+
+        let old = try Self.reader(scratch, home: "retired").task("AC-15", workspace: "acme")
+        let replaced = try Self.reader(scratch).task("AC-15", workspace: "acme")
+        #expect(old.comments.last?.body == first)
+        #expect(replaced.comments.last?.body == second)
+        #expect(!replaced.comments.contains { $0.body == first })
+        try FileManager.default.moveItem(at: current, to: scratch.appending(path: "removed"))
+        let refused = try Self.failure {
+          try writer.perform(
+            .comment(task: "AC-15", body: "Would recreate the store."), workspace: "acme")
+        }
+        #expect(refused.kind == .unavailableStore)
+        #expect(!FileManager.default.fileExists(atPath: current.path))
+      }
+    }
+
     @Test func aStoreNeedingMigrationIsLeftUnchanged() throws {
       try withScratchDirectory { scratch in
         let home = scratch.appending(path: "silta-home")

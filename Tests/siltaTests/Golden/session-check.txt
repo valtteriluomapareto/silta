@@ -1,0 +1,3 @@
+Handoffs needed; provide each body on stdin:
+silta --ws 'acme' comment 'AC-1' --kind handoff -F -
+silta --ws 'beta' comment 'BE-1' --kind handoff -F -

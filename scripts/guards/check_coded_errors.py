@@ -17,7 +17,9 @@ from swift_source import run, split_swift, swift_files
 DIRS = ("Sources/SiltaCore", "Sources/silta")
 MARKER = "guard:allow-error"
 DECLARATION = re.compile(r"\b(?:enum|struct|class|actor|extension|protocol)\s+([\w.]+)[^{:]*:([^{]*)\{")
-PLAIN_ERROR = re.compile(r"(?<![\w.])(?:Swift\.)?(?:Localized)?Error\b")
+PLAIN_ERROR = re.compile(
+    r"(?<![\w.])(?:(?:Swift|Foundation)\s*\.\s*)?(?:Error|LocalizedError|CustomNSError)\b"
+)
 
 
 def check(root: Path) -> list[str]:

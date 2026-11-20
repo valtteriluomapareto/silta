@@ -1,0 +1,1 @@
+{"error":{"code":"read_only_promoted","message":"AC-1 is read-only; work in tracker ado:42.","next":["silta --ws 'acme' task ls --status todo"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

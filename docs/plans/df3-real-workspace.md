@@ -2,6 +2,9 @@
 
 Status: proposed
 
+The [setup rehearsal](#validation) passed in temporary homes.
+The [repository dogfooding stage](../../AGENTS.md#dogfooding) tracks live adoption.
+
 ## Goal
 
 The maintainer and their agents use Silta every day for six weeks in a real

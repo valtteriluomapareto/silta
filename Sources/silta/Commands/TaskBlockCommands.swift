@@ -46,7 +46,9 @@ struct TaskBlockCommand: OutputCommand {
     // The -m is the ask to the parties this call names, not to earlier ones.
     let named = on.filter { $0.hasPrefix("ext:") }
     for party in result.waiting?.on ?? [] where named.contains(party) {
-      lines.append("Silta sends nothing; ask \(party): \(result.waiting?.why ?? "")")
+      lines.append(
+        "Silta sends nothing; ask \(HumanText.line(party)): \(HumanText.line(result.waiting?.why ?? ""))"
+      )
     }
     return CommandOutput(
       text: lines.joined(separator: "\n"), data: result,
@@ -58,7 +60,7 @@ struct TaskBlockCommand: OutputCommand {
 struct TaskUnblockCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "unblock",
-    abstract: "Return a blocked batch to todo; an open blocker needs the human's go-ahead.")
+    abstract: "Return blocked tasks to todo (human-only unless every task is ready).")
 
   static let dataShape = Shape.object(["tasks": .array(TaskOutput.receiptShape)])
 
@@ -78,7 +80,7 @@ struct TaskUnblockCommand: OutputCommand {
       actor: context.environment.actor, command: command, approved: global.approved)
     let result = try TaskService(
       environment: context.environment, workspace: global.ws,
-      approved: global.approved, bodyFlag: body.flag
+      approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
     ).unblock(refs, why: why, allowSecret: body.allowSecret)
     let tasks = result.tasks
     return CommandOutput(

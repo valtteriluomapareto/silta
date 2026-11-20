@@ -39,7 +39,7 @@ struct ReservedAppIdentityTests {
             DELETE FROM doc;
             UPDATE workspace SET settings='{}';
             UPDATE app SET slug=? WHERE id=1;
-            UPDATE service SET slug='push/legacy %雪' WHERE id=1;
+            UPDATE service SET slug='push-legacy' WHERE id=1;
             UPDATE edge SET kind='HTTP API' WHERE id=1;
             """, arguments: [slug])
       }

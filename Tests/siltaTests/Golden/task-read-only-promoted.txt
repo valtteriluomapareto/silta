@@ -1,0 +1,2 @@
+error: AC-1 is read-only; work in tracker ado:42. [read_only_promoted]
+next: silta --ws 'acme' task ls --status todo

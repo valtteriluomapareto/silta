@@ -132,14 +132,20 @@ struct FixtureTests {
       let sentinel = destination.appending(path: "Acme.txt")
       try Data("Acme".utf8).write(to: sentinel)
       let file = scratch.appending(path: "fixture-failure.yaml")
-      try Data("fixtures: true\nsteps: []\n".utf8).write(to: file)
+      let scenario = """
+        fixtures: true
+        steps:
+          - args: [--version]
+            expect: {exit: 0}
+        """
+      try Data(scenario.utf8).write(to: file)
       let evidence = scratch.appending(path: "evidence")
       #expect(throws: ScenarioFailure.self) {
         try ScenarioRunner.run(file, in: scratch, evidence: evidence)
       }
       #expect(try Data(contentsOf: sentinel) == Data("Acme".utf8))
       let failure = try String(contentsOf: evidence.appending(path: "failure.md"), encoding: .utf8)
-      #expect(failure.contains("fixture"))
+      #expect(failure.contains("fixture generation failed:"))
     }
   }
 

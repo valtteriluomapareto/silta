@@ -8,8 +8,8 @@ Don't leave the contradiction in place.
 ## What this repo is
 
 Silta is a local context hub and backlog for coding agents: a Swift core library
-(`SiltaCore`), a CLI (`silta`) that agents call through their shell, and later a
-macOS app. The design is in [`docs/spec.md`](docs/spec.md). **Status: M1 in
+(`SiltaCore`), the shell CLI (`silta`) for agents, and the native Silta Dev app
+for people. The design is in [`docs/spec.md`](docs/spec.md). **Status: M1 in
 progress.** The first milestone (M1) is broken into slices in
 [`docs/plans/m1-daily-use.md`](docs/plans/m1-daily-use.md). What each target and
 folder holds is in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
@@ -53,7 +53,9 @@ through. Fix the change, or propose a decision first.
 1. **`SiltaCore` imports no UI or CLI frameworks.** That means no AppKit, SwiftUI,
    UIKit, Cocoa or ArgumentParser. Enforced by `check_core_boundary.py`, and in
    `Package.swift` by `check_package_graph.py`: `SiltaCore` depends only on GRDB and
-   Yams.
+   Yams. The app imports SiltaAppSupport and Apple frameworks, enforced by
+   `check_app_boundary.py`. `check_app_pins.py` keeps shared dependency pins aligned.
+   `check_control_release.py` requires whole-file DEBUG isolation for control sources.
 2. **Core code gets time and ids from injected seams**, never from `Date()`,
    `Date.now` or `UUID()`. Enforced by `check_core_determinism.py`. Mark a deliberate
    exception with `// guard:allow-nondeterminism <reason>`.
@@ -73,8 +75,9 @@ through. Fix the change, or propose a decision first.
    (D21, D22, D27).
    Errors in `SiltaCore` and the CLI conform to `CodedError`, never to `Error`
    directly; enforced by `check_coded_errors.py` (D22, D30).
-   `Package.swift` enables the six Swift 7 upcoming features on every target and no
-   experimental features without a decision; enforced by `check_package_features.py` (D29).
+   Every SwiftPM target and native app configuration enables the six Swift 7 upcoming
+   features. SwiftPM experimental features require a decision. `check_package_features.py`
+   enforces both (D29).
 6. **Relative links in markdown resolve.** Enforced by `check_docs_links.py`.
 7. **The plans board in `docs/README.md` mirrors `docs/plans/` one-to-one.** Enforced
    by `check_plans_board.py`.
@@ -160,8 +163,9 @@ blocker and major findings.
 
 Silta is built with Silta (spec §22.1, D20). **Current stage: DF1** (since
 2026-11-05; [setup](docs/dogfood/README.md)). Update this line when a stage starts.
-From DF2 the session-start hook runs `silta agents session-start`; until then, start
-with `silta --ws silta task show <ref>`.
+Start a repository dogfood session with `silta --ws silta task show <ref>`.
+DF2 starts once this repository's SessionStart hook is installed and verified
+in a live session. See the [acceptance checks](docs/dogfood/agents-acceptance.md).
 
 Every command runs as `silta --ws silta …` with `~/.local/bin/silta`, which
 `scripts/install-dev.sh` builds from `main`. Rerun that script after pulling `main`,
@@ -221,9 +225,9 @@ previous installs.
   confirms the fix. Approval is a PR comment starting `Review: approve`.
 - **Finish after the merge.** Whoever merges the PR pulls `main`, then runs
   `scripts/dogfood-finish.sh <ref> <pr>` and `scripts/install-dev.sh` from the main
-  checkout. The script runs `task done` with the merge commit and the PR's draft
-  result, posts the result on the slice issue and closes it. So a PR that only plans
-  work gets its own subtask; finishing it must not close the work it plans.
+  checkout. The finish script verifies the merge and completes the Silta task with
+  the PR's draft result. It posts the result and closes a linked issue while that
+  issue is open. Use a separate subtask for a PR that plans later work.
 
 ## Mac app verification
 

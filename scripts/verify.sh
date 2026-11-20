@@ -96,8 +96,11 @@ full_swift() {
   export SILTA_SLOW_TESTS=1
   # Bound competing subprocess and filesystem work on the CI runner.
   SILTA_DEADLINE_TESTS='' run_tests --experimental-maximum-parallelization-width 4
-  # The stress test and every test that drives a prior-writer binary.
+  # Scenario replay, concurrency guarantees and every prior-writer compatibility check.
   require_passed twentyProcessesAddFiveHundredTasksWithoutSequenceGaps \
+    allScenariosReplayByteIdentically \
+    tenDistinctSessionsHaveExactlyOneSuccessfulClaim \
+    busyRetryNamesOnlyFailedCommandPath \
     actualPriorWriterRefusesUpgradedDatabaseWithoutChangingIt \
     actualMetadataWriterCannotWriteAfterNamespaceUpgrade \
     actualV6WriterKeepsPopulatedAuditFields \
@@ -117,7 +120,7 @@ full_swift() {
     echo "verify ${mode}: a wall-clock deadline test was skipped" >&2
     exit 1
   fi
-  for suite in WallClockHookTests WallClockGitTests WallClockWhereTests; do
+  for suite in WallClockHookTests WallClockGitTests WallClockWhereTests WallClockBodyInputTests; do
     if ! grep -q "Suite ${suite} passed" "$last_test_log"; then
       echo "verify ${mode}: ${suite} did not run" >&2
       exit 1

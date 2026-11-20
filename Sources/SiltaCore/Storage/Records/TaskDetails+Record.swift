@@ -3,6 +3,7 @@ import GRDB
 extension TaskDetails {
   init(row: Row) {
     id = row["id"]
+    uid = row["uid"]
     workspaceID = row["workspace_id"]
     appID = row["app_id"]
     repoPath = row["repo_path"]

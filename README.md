@@ -42,16 +42,17 @@ neighbour: api -> service:push [uses] Acme push
 - You need team coordination: Silta is single-user, local and has no sync; your team
   tracker remains the record of committed work.
 - You need a server, MCP integration or a web UI.
-- You are not on macOS 15 or later.
+- You need Silta Dev or the combined installer on a Mac earlier than macOS 26.
 
 ## Status
 
-Pre-1.0, CLI only.
+Pre-1.0. Coding agents use the CLI. Silta Dev gives people the inbox, board,
+workspace map and Docs, with the supported [Mac app actions](docs/plans/mac-app-actions.md).
 
 ## Install
 
-Silta needs macOS 15 and Xcode 27.1 (Swift 6.4). From a clean `main` matching
-`origin/main`:
+Check the [development installer requirements](docs/getting-started.md#1-requirements).
+Run the installer from a clean `main` matching `origin/main`:
 
 ```sh
 git clone https://github.com/valtteriluomapareto/silta.git
@@ -65,6 +66,7 @@ Data lives in `~/.silta`, or in `SILTA_HOME` when set. Follow
 
 ## Learn more
 
+- The [human's guide](docs/human-guide.md) covers the inbox, proposals, questions and approvals.
 - `silta --help` lists commands; each command has its own `--help`.
 - `silta guide` and `silta schema` are the agent manuals.
 - Agents contributing to Silta start at [`AGENTS.md`](AGENTS.md); humans at

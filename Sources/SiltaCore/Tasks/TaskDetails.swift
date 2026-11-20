@@ -2,6 +2,8 @@
 package struct TaskDetails: Encodable, Sendable {
   let id: Int64
 
+  let uid: String
+
   let workspaceID: Int64
 
   let appID: Int64?

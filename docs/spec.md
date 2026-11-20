@@ -30,10 +30,11 @@ models act most reliably on ordinary words.
 
 | Thing | Value |
 |---|---|
-| Product / app | Silta, `Silta.app` |
+| Product / development app | Silta, `Silta Dev.app` |
 | CLI | `silta` |
-| Bundle id, OSLog subsystem | `com.valtteriluoma.silta` |
-| Change notification | `com.valtteriluoma.silta.changed` |
+| Development app bundle ID | `fi.silta.mac.dev` |
+| Planned distribution bundle ID and OSLog subsystem | `com.valtteriluoma.silta` |
+| Planned M5 change notification | `com.valtteriluoma.silta.changed` |
 | Data directory | `~/.silta` (override: `SILTA_HOME`) |
 | Environment variables | `SILTA_HOME`, `SILTA_ACTOR`, `SILTA_SESSION`; for tests and scenarios: `SILTA_NOW`, `SILTA_ID_SEED`, `SILTA_SLOW_TESTS` (§20.1) |
 | Copyright | Valtteri Luoma |
@@ -65,7 +66,9 @@ in product repos.
 2. **Docs live in the app**, not in per-project repos. One tool, many workspaces
    (one per project or engagement).
 3. **Local backlog** that agents read and write instead of the team tracker or plan files.
-   Plans are stored *on the task*.
+   Plans are stored *on the task*. When a repository's own instructions require a plan
+   file, that file is the plan of record, and the task holds its path and branch or PR
+   plus the steps to tick (D51).
 4. **Read other apps' code safely**, including branch-as-app repos, without checkouts.
 5. **Link meeting notes to apps and topics**, so decisions can be found from code.
 6. Works for **Claude Code and Codex** through a plain CLI, and is **measurably
@@ -94,7 +97,7 @@ in product repos.
 | D1 | **SQLite is the source of truth** for everything `silta` owns. Humans edit configuration as YAML (`silta ws edit`), which is validated and applied to the DB. | Relations and queries are first-class; YAML is just an editing view. |
 | D2 | **External sources are indexed, never owned.** Meeting-note folders and repo docs are read-only and re-indexed on change. | Notes stay the output of whatever produces them; repo docs stay in repos. |
 | D3 | **Deterministic export** to a text tree for backup and diff. `silta restore` replaces a workspace from it. | A `.db` file can't be diffed or reviewed; the export can. |
-| D4 | **CLI only, `--json` everywhere. No MCP server, no daemon.** | Every target harness has a shell tool. If shell-less clients ever matter, it would be a `silta mcp` stdio subcommand, never hosted in the app. |
+| D4, D50 | **Shell CLI for agents and a native development app for people.** | Agent harnesses use the CLI's `--json` contract. Both front-ends share SiltaCore. MCP and a daemon remain outside the current scope. |
 | D5 | **Agent writes are gated.** Unsolicited agent tasks start as `proposed`. Agent doc changes are proposed revisions or human-approved edits (D38). Human-only commands need the human's go-ahead (D38). | Prevents spam and rot by default, without blocking work the human asked for in chat (§8). |
 | D6 | **`silta` resolves "where am I"** from cwd, git branch, upstream and claimed task (§7). | Agents shouldn't need to know which branch is which app. |
 | D7 | **Code access is read-only** via `git show`/`grep`/`log` on configured refs. | No checkout means you can't edit the wrong branch. |
@@ -140,8 +143,9 @@ updates to these ten are in [`decisions.md`](decisions.md). Two shape the whole 
 - **One core, thin front-ends.** All rules live in `SiltaCore`, including brief
   rendering (text and JSON), because the hook, the CLI and the app all use it. The
   front-ends parse input, call a service with an actor, and render the result.
-- **Engine-free domain.** Domain types don't import GRDB. Record conformances live in
-  the storage layer as extensions, which keeps a later Postgres port possible.
+- **Engine-free domain.** Domain types stay free of GRDB and migrations stay
+  centralized. Storage can use feature-local record extensions and queries in
+  explicit persistence files. See [D11](decisions.md#technology).
 - **The database is the integration point.** The CLI and the app never talk to each
   other, and agents don't need the app running.
 - **One version.** From M5 the CLI ships inside the app bundle
@@ -223,7 +227,8 @@ reference each other by **foreign keys**; strings appear only for external thing
 
 ```sql
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-  -- 'min_writer_version', 'change_seq', 'last_backup_day'
+  -- 'min_writer_version', 'change_seq', 'last_backup_day', 'current_workspace'
+  -- current_workspace is the fallback workspace slug saved by ws use.
 
 CREATE TABLE workspace (
   id INTEGER PRIMARY KEY, uid TEXT NOT NULL UNIQUE,
@@ -317,9 +322,10 @@ CREATE TABLE task_plan_rev (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REF
   UNIQUE (task_id, rev));
 
 CREATE TABLE task_event (id INTEGER PRIMARY KEY, task_id INTEGER NOT NULL REFERENCES task(id),
-  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | discussion | secret_redacted
+  actor TEXT NOT NULL, kind TEXT NOT NULL,    -- created | status | field | plan | step | claim | link | promote | block | unblock | handoff | discussion | secret_redacted
   body TEXT, created_at TEXT NOT NULL);       -- a status event's body is always the new status (D40)
   -- claim: NULL on start; 'released <comment-ref>' for a handoff release.
+  -- handoff: the comment ref when no claim was released.
   -- discussion: 'resolved <root-ref>', 'reopened <root-ref>' or 'accepted <answer-ref>', once per change.
   -- A comment's secret_redacted event body is that comment's ref, never its content.
 CREATE INDEX task_event_task ON task_event(task_id, kind);
@@ -445,7 +451,11 @@ symlinks resolved, case-folded on case-insensitive volumes.
 
 1. **Repo.** Run `git rev-parse --path-format=absolute --git-common-dir` and match
    against `repo_path`. No match → `unregistered` (exit 2; `brief --hook` prints
-   nothing).
+   nothing). If an unbound configuration declares the clone's exact network origin
+   or absolute local origin, `where` offers a workspace-scoped scan of the canonical main clone when the
+   match is unique. Competing declarations offer read-only inspection of each
+   matching workspace so the human can choose. A matching relative origin also
+   needs inspection because it depends on the clone's location.
 2. **Candidates** are the repo's apps.
    - If the cwd is under an app's `subpath`, only the subpath apps are candidates.
    - Otherwise subpath apps are dropped, which leaves one primary app per ref.
@@ -455,7 +465,9 @@ symlinks resolved, case-folded on case-insensitive volumes.
 4. **Human override** for the canonical worktree toplevel (`worktree_override`),
    only when its app remains among the filtered candidates.
 5. **Task link.** A task claimed by this session, or the task whose `branch` equals
-   the current branch, gives its `app_id`.
+   the current branch, gives its `app_id`. Older task rows can match Git's previous
+   branch abbreviation after exact matches, provided the abbreviation names
+   no other local branch.
 6. **Exact ref.** The current branch equals an app's `ref` or `prod_ref`, ignoring
    `origin/`.
 7. **Upstream.** `git rev-parse --abbrev-ref @{upstream}` equals an app ref. Otherwise
@@ -474,6 +486,7 @@ symlinks resolved, case-folded on case-insensitive volumes.
 | Case | Result |
 |---|---|
 | Detached HEAD | Rules 4–5, then 8 against the HEAD sha. `branch: null` |
+| Unborn branch | Normal selection through rule 5. Otherwise report low confidence and the candidates. |
 | Shallow or partial clone where `rev-list` fails | `low`, reason `shallow` |
 | A candidate ref missing locally (`origin/x` not fetched) | Skipped in rules 6–8; configured candidate retained, warning `ref_missing` |
 | Worktree of an unregistered repo | `unregistered` |
@@ -486,13 +499,16 @@ symlinks resolved, case-folded on case-insensitive volumes.
  "head":"3f9a1c2000000000000000000000000000000000","confidence":"high","reason":"upstream","candidates":[…]}
 ```
 
-- `head` is the full commit SHA, not an abbreviation. `reason` is one of
+- `branch` is the full branch name within `refs/heads/`, including any embedded
+  slashes. `head` is the full commit SHA. On an unborn branch `head` is an empty
+  string in JSON and text shows `head: (no commits)`. `reason` is one of
   `explicit`, `single`, `override`, `task`, `exact_ref`, `upstream`, `reflog`,
   `distance`, `non_app_ref`, `shallow` or `unresolved`.
 - Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
 - Outside Git, `where` returns `unregistered` with carry-on guidance and harmless
   help, without suggesting a scan of the input directory. An unregistered Git
-  repository instead gets a scan command for its canonical toplevel.
+  repository gets a scan command for its canonical toplevel. With an explicit
+  existing workspace, the unregistered result points to that workspace's YAML.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
@@ -554,8 +570,9 @@ symlinks resolved, case-folded on case-insensitive volumes.
 
 Under `proposals: ask`, every agent write that would create a `proposed` task is
 human-only: `task add`, `--parent` on a task the agent doesn't claim, and
-`from-plan`, with or without `--split`. `human_only` names the setting, and `next`
-uses `-F <file>` when the body came from stdin. A human's request in chat for the
+`from-plan`, with or without `--split`. `human_only` names the setting. The
+`task add` retry uses `-F -` for stdin or inline text. Supply the body again on
+stdin. A human's request in chat for the
 write is its go-ahead. Proposals that already exist when the setting changes stay in
 triage, or leave the inbox after 14 days as usual.
 
@@ -586,7 +603,9 @@ going until the list is empty or the human stops it.
 
 **Triage (D37, D38)** is human-only and batched, so one answer is one command:
 `task triage --accept <ref>… --drop <ref>… [--priority n] [-m <why>]`.
-- It is all or nothing: a bad ref fails the whole call, and the error names it.
+- Silta checks the full batch before asking for approval or reading the drop reason.
+  A bad ref fails the whole call and the error names it. Silta rechecks the same
+  proposals when applying the decisions and recording the approval.
 - `--priority` sets the accepted tasks' priority; without it they keep their own. `-m`
   is the result stored on the dropped ones, "Dropped in triage." by default.
 - A proposal nobody triaged leaves the inbox 14 days after `created_at`, which means
@@ -1231,7 +1250,9 @@ silta code ls   <app>[@<ref>] [<dir>]
   directory, with a trailing `/` on directories. No matches in grep or log are an
   empty success. Missing show/ls paths are `not_found`, and so are `show` on a
   directory and `ls` on a file, whose `next` is the matching command. A configured
-  subpath missing at the commit is `not_found` and names the subpath.
+  subpath that is absent or is not a directory at the selected commit is
+  `not_found` for all four commands. The error names the subpath and points to
+  the workspace configuration.
 - Names containing control characters, quotes or backslashes are double-quoted
   with backslash escapes. Other names, including Unicode, display literally.
 - `grep` patterns are extended regular expressions (`git grep -E`); an invalid one
@@ -1247,7 +1268,11 @@ silta code ls   <app>[@<ref>] [<dir>]
 - Output is bounded: `show` without `--lines` prints at most 400 lines, and `grep`
   at most 200 matching lines. A cut adds an `output_truncated` warning that says how
   much was cut and how to narrow the read (`--lines A-B` for show; a pathspec or a
-  narrower pattern for grep).
+  narrower pattern for grep). Git content reads capture at most 1 MiB per output
+  stream in memory. When the byte ceiling cuts the result, Silta prints complete
+  records within that bound. The `output_truncated` warning reports the byte
+  limit and how to narrow the read. `show --lines` applies the cap starting at
+  the requested line. Git can write the full streams to temporary disk.
 - A git call over its 10 s timeout is `env` with `next_by: agent`: narrow the read
   (a path, pathspec, pattern or `--lines`) and retry.
 - When the repo hasn't been fetched for 24 h, output warns (`ref_stale`): "fetched N h
@@ -1314,7 +1339,8 @@ silta code ls   <app>[@<ref>] [<dir>]
     can be read back, exported, counted and tied to what it changed.
   - Without `--approved`, an agent gets `human_only` (exit 3). The message says the
     command needs the human's go-ahead; `next` is the same command with
-    `--approved "<the human's words>"`.
+    `--approved "<the human's words>"`. If the retry uses `-F -`, supply the original body
+    again on stdin.
   - `--approved` on a command that doesn't need it warns `approval_unused` and stores
     nothing. A `--dry-run` records nothing, so it needs no approval, `--allow-secret`
     included, and its `--approved` warns `approval_unused`, saying a dry run records
@@ -1389,10 +1415,10 @@ the installer lock. Hook runtime must be installed before settings that referenc
 | Target | Content |
 |---|---|
 | `~/.claude/skills/silta/SKILL.md` | The skill: when to use Silta, `silta guide`/`silta guide <topic>` for the current rules, and `silta brief` at session start. OpenCode reads it too unless it's disabled. |
-| `~/.claude/CLAUDE.md` block | 5 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
+| `~/.claude/CLAUDE.md` block | 7 generic lines: "If `silta where` resolves this repo: …; details: `silta guide`." |
 | Claude Code **SessionStart hook** (`--hook`) | `silta agents session-start` consumes hook JSON, exports `SILTA_SESSION`, then runs the short bounded brief; silent if unregistered or on error. |
 | Claude Code **Stop hook** (`--stop-hook`; D42, live run unverified) | `silta agents stop` consumes hook JSON and asks for handoff on fresh own claims with writes since handoff; loop continuations skip |
-| `~/.codex/AGENTS.md` block | The same 5 lines |
+| `~/.codex/AGENTS.md` block | The same 7 lines |
 | `~/.codex/config.toml` | Adds the effective `SILTA_HOME` (default `~/.silta`) to `sandbox_workspace_write.writable_roots` (D42, live run unverified) |
 | Permissions (optional) | Deny tracker writes, e.g. `Bash(az boards work-item create*)`, `Bash(gh issue create*)` |
 
@@ -1465,13 +1491,18 @@ section. `topic` is absent for the full manual; `topics` lists every available t
 includes its terminating newline in both modes. `--quiet` preserves these reads.
 The guide never opens the truth database or changes harness configuration; ordinary
 command logging still applies. Native `silta help [command…]` remains available.
-The manual labels workflows unavailable in the binary instead of teaching them as
-runnable commands. The text is the same in every workspace: a setting that changes
-the rules gets one conditional sentence, and `brief` names the workspace's non-default
-settings (D39). It covers:
+The manual covers commands shipped in the binary. Its text is the same in every
+workspace. A setting that changes the rules gets one conditional sentence, and
+`brief` names the workspace's non-default settings (D39). The guide covers:
 - **When to use silta.** Cross-repo work, another app or backend, branch-as-app repos,
   anything you'd write a PLAN.md for, handoffs, review requests, meeting decisions.
-  Not for trivial single-repo edits.
+  Not for trivial single-repo edits. Keep plans and results in Silta, never in PLAN.md
+  or other repo plan files, and never create tracker items yourself. Exception: when
+  the repository's own instructions require a plan file, write it where they say; that
+  file is the plan of record, and the Silta task plan holds its path and branch or PR
+  plus a short checklist of steps to tick, not its full text (D51). A conditional rule,
+  such as plans in a plans folder only for work that spans several slices, requires a
+  file only when its condition holds.
 - **Session start.** If the hook already printed the brief, don't run it again. Once a
   task is chosen, run `silta brief --task AC-n`. Teach the [workspace selection
   precedence](#16-cli): explicit workspace, registered repository location, then the
@@ -1484,7 +1515,8 @@ settings (D39). It covers:
   - `task add --start`
   - `task plan` with a quoted heredoc (`<<'EOF'`)
   - `--step N --done`
-  - which to use: `task plan`, `from-plan` or `task add`
+  - which to use: `task plan`, `from-plan` or `task add`; never import or `--delete` a
+    plan file the repository's instructions require, point the task plan at it
   - the `done` result template: what was done, decisions, what's left
 - **Working for the human (D37, D38).** The human talks to you; you run `silta`.
   - Decide and record: make the choice, add a `decision` comment and carry on, unless
@@ -1534,11 +1566,10 @@ settings (D39). It covers:
   `--reply-to`, naming the change and proving test. Authors do not resolve findings
   unless assigned that responsibility. M2 (not yet available): `inbox` → `inbox take`
   → `task diff` → one `task review` with a lines file → replies → batch `comment resolve`.
-  The current guide labels that future workflow unavailable.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
   `--steal`, `where --set/--unset`, `task promote` or `--allow-secret` on your own initiative, only
-  with the human's words through `--approved`. Never create tracker items or plan
-  files in repos.
+  with the human's words through `--approved`. Never create tracker items, or plan
+  files the repository's instructions don't require.
 - **Output:** text by default; `--json` only when parsing the result.
 
 ## 12. `silta brief`
@@ -1665,7 +1696,7 @@ JSON contains compact `location` metadata, `settings`, optional `current_task`, 
 `sections` (`id` and trimmed `text`), `more` commands and a `truncated` boolean.
 Absent location app and branch values encode as `null`. Settings contains only
 supported non-default typed keys (`proposals`, `review_gate`, `archive_after_days`,
-`stale_days`). Unsupported keys or values are omitted and produce a per-key
+`stale_days`, `ask_about`). Unsupported keys or values are omitted and produce a per-key
 `setting_unsupported` warning with a secret-masked preview of at most 160 characters
 plus an ellipsis. Text includes a protected “settings unsupported” hint naming at
 most eight keys (40 characters each) and asking the human; further keys are counted. A malformed settings
@@ -1736,12 +1767,15 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 
 - **Daily backup (M1):** on the first write of each day, `VACUUM INTO
   $SILTA_HOME/backups/silta-YYYY-MM-DD.db`, keeping 7. Every migration takes a backup
-  first.
+  first. Retention protects the current operation's snapshots and prefers valid
+  dates through today over invalid or future-dated names.
 - **`silta backup`** takes an on-demand whole-database SQLite snapshot, including
   every workspace regardless of `--ws`, and reports its path. It publishes a complete
   `backups/silta-<day>-manual-<ms>-<unique>.db` from staging owned by that invocation.
-  Concurrent invocations use distinct names. It keeps seven on-demand files separately
-  from daily and pre-restore backups; neither retention class evicts the other.
+  Concurrent invocations use distinct names. The next on-demand backup clears
+  interrupted staging it recognizes as its own. It keeps seven on-demand files
+  separately from daily and pre-restore backups. It requires an existing database
+  file, and a missing-store refusal creates no files or directories.
   It does not export a text tree or run Git, and never advances `last_backup_day`.
 - **`silta export [--ws] [--to] [--commit]`** writes a byte-identical tree for the same
   DB state. YAML is written by a fixed emitter that quotes every scalar. Rows are
@@ -1839,14 +1873,16 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   - **Not written:** `repo_path`, `worktree_override` and `task.worktree` (machine
     paths), `meta`, `change_log`, and `seq_counter` beyond `next_task_seq` and the
     document revision allocation stream.
-  - **Refusals, with nothing written:** a database with migrations this binary
-    doesn't know; unknown link kinds.
+  - **Refusals, with nothing written:** a database with unknown migrations,
+    unknown link kinds, invalid workspace or map identifiers, or an invalid
+    generated file path. Every generated file path stays inside the workspace tree.
   - **Target.** `--to` defaults to `$SILTA_HOME/exports`; a relative root is taken
-    from the working directory, and an unexpanded `~` is refused. Export replaces
+    from the working directory. An argument starting with an unexpanded `~` is
+    refused. Export replaces
     `<root>/<workspace>/` only when it is absent, empty, or this workspace's previous
     export: a supported-format manifest naming the workspace, and no file it doesn't list
-    (`.DS_Store` aside; listed files may be missing). Anything else is refused for the
-    human to decide. A target that overlaps a registered repo is refused, so workspace
+    (`.DS_Store` aside; listed files may be missing). The ownership check requires
+    a readable regular manifest file. Anything else is refused for the human to decide. A target that overlaps a registered repo is refused, so workspace
     data never lands in a code repo. Exports are serialised, each reading its
     snapshot under the lock, so the last one written is the latest state. Lock
     acquisition retries for at most five seconds of spacing, then answers `busy`.
@@ -1874,8 +1910,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     export the retained work directory can be empty; the new tree is at the target.
     The tree is owned by export: edits to it are overwritten by the next export.
   - **Git commit.** `--commit` requires an existing Git work tree at the export root,
-    checked before writing. Under the export lock it runs `git add -A -- <workspace>`,
-    checks the staged diff for that path, and commits only that path when it changed.
+    checked before writing. Under the export lock it stages the workspace, checks
+    the staged diff for that path, and commits only that path when it changed.
+    Git treats the pathspec for each of those operations literally.
     Other staged paths remain staged. Git has closed stdin and terminal prompts disabled.
     The receipt's `sha` is present only when this invocation made a commit; an unchanged
     export makes none. Manifest files (and the manifest itself) ignored by Git produce
@@ -1885,17 +1922,20 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **`silta restore <dir> [--dry-run]`** is backup restore and machine moves, with
   **replace** semantics for one workspace. `<dir>` is the `<root>/<workspace>` that
   holds `manifest.json`; the workspace comes from the tree, and a `--ws` naming
-  another one is refused.
+  another one is refused. An argument starting with an unexpanded `~` is refused.
   - It is human-only, except `--dry-run`: it replaces the workspace's settings, which
     only the human changes (D39). The dry run ends with the command to approve,
-    carrying `--manifest <sha>`, the first 12 hex digits of the manifest's sha256; a run
-    given `--manifest` refuses any other tree, so the human approves the tree they saw.
-    An agent's approved run records its approval, naming that prefix.
+    carrying `--manifest <sha>`, the first 12 hex digits of the manifest's SHA-256.
+    A supplied prefix must have 12 to 64 hexadecimal digits. A mismatched prefix
+    refuses the tree, so the human approves the tree they saw. An agent's approved
+    run records its approval, naming that prefix.
   - It checks the manifest checksums first and refuses partial or tampered trees,
     then everything the form doesn't show: integer values, settings as `ws edit`
     accepts them, unique uids, slugs, aliases, plan revisions and comment seqs,
-    references that resolve inside the tree, no parent cycles. A database of a newer
-    schema is refused, and so is a tree whose uid, task
+    references that resolve inside the tree, and no parent cycles. Workspace, app,
+    repo, service and topic slugs and the task prefix must follow the workspace
+    identifier grammar in all supported export formats. A task sequence must leave
+    room for the next number. A database of a newer schema is refused, and so is a tree whose uid, task
     prefix, row uids or approval uids another workspace holds.
   - The replace happens in one transaction, and nothing is written on failure. The
     workspace keeps its row; its other rows are deleted and the tree's inserted.
@@ -1916,7 +1956,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
     re-resolved with `silta init --scan`.
   - Replacing a workspace first takes `backups/silta-<day>-before-restore-<ms>.db`,
     which counts toward the 7 backups kept; a refusal found inside the transaction may
-    leave it.
+    leave it. If the same restore takes the day's backup too, retention protects both.
   - `--dry-run` runs the same transaction and rolls it back, so it finds every
     refusal the real run would. It never changes a workspace, though like any write it
     may create the database and take the day's backup. It reports what would change:
@@ -1961,14 +2001,30 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   Command logs use the resolved existing workspace (§19), including the captured
   outside default after a location no-match. Ambiguous/broken selection, or absence
   of both location and default, carries no workspace tag.
-  `where`, `brief` and status retain their location-first rules. Help, usage errors
+  `where`, `brief` and status retain their location-first rules. Help and parse errors
   and commands without workspace scope do not infer a workspace.
-- Bodies come from `-m <text>` or `-F <file|->`. With neither on a TTY, `$EDITOR`
-  opens.
+- Bodies come from `-m <text>` or `-F <file|->`. The positional source to
+  `task from-plan` follows the same file and stdin rules as `-F`. Supplied file or
+  stdin bodies accept up to 65,536 bytes of valid UTF-8, including any headers. A
+  named source must open a regular file. Unreadable files, nonregular named
+  sources, invalid UTF-8, and input beyond the byte ceiling return `invalid`
+  and help for the invoked command. The help command includes the workspace when
+  its name can be printed safely. Stdin can be a pipe, and overflow is refused
+  when its first extra byte arrives. Content checks for each command still apply.
+  Interactive `task edit` and `ws edit` require terminal input and terminal stderr. Both editor output streams
+  go to that terminal, leaving Silta's stdout for its own output. These commands
+  return `usage` and point to `-F` without a terminal or file input. A task edit also
+  points to the scoped `--print` command when the task can be read, or to command help
+  when it cannot. Editor startup failures return `env` with help for the edit command.
 - Refs follow §5.1.
-- Text payloads currently preserve ANSI/control escapes (comments, descriptions and
-  plans included). Quote framing separates comment bodies from headers; it is not
-  terminal escaping.
+- Human-readable text and quiet views of stored content mask secrets before
+  replacing terminal control characters with spaces. Multiline bodies preserve
+  tabs and display CRLF, CR and Unicode line and paragraph separators as LF.
+  Inline fields stay on one line. Document pages and numbered plans preserve
+  their existing LF coordinates.
+  Structured JSON values, edit documents and exports use their existing data
+  contracts. The brief quotes every stored block-reason line in both projections,
+  before its generated recovery commands.
 - Shell completion is generated by ArgumentParser; task ids and app slugs have no
   dynamic completion.
 - `silta` with no arguments runs `silta status`: workspace, app, inbox count, and
@@ -2053,7 +2109,7 @@ arguments.
   output was turned on explicitly.
 - `--quiet` hides a write's receipt text. It still prints data: the refs a write
   created (`task add`; `task from-plan`, one per line, and a `--dry-run`'s preview),
-  and the whole output of reads (`task ls`, `task show`, `task edit --print`, `ws
+  and the data from reads (`task ls`, `task show`, `task edit --print`, `ws
   ls`, `ws show`, `schema`, `guide`). Warnings and errors still show; with `--json` it changes
   nothing.
 - `--json` and `--quiet` may come before or after the subcommand.
@@ -2174,6 +2230,17 @@ to `-`, trimmed — so `My Projects` becomes `my-projects` and no directory is r
 `none` is refused, because that word means non-code work, and the conflict names its path.
 The DF3 onboarding scans only the chosen clones:
 `silta init --scan ~/acme/api ~/acme/web --slug acme --prefix AC`.
+A populated `ws ls` lists workspace slugs, names and task prefixes in tab-separated
+columns. Ordinary text includes the column headings. `--quiet` prints the data rows.
+An empty `ws ls` prints a scan command from a Git checkout or `silta init --help`
+elsewhere. The command supplies valid naming options when the checkout name
+would give an invalid workspace slug or task prefix. Its JSON includes `next` and
+`next_by` for the empty list.
+A successful scan lists the workspace and its sorted registered repository and app
+slugs. Text tells a human how to open the workspace editor and tells agents to ask
+before editing. Text and JSON give one read-only, workspace-scoped `ws show` next.
+A scan with a missing root or no Git repositories returns `invalid` and creates
+no workspace. A bare `init` prepares the database and points to scan help.
 
 ## 17. Storage, concurrency, technology
 
@@ -2192,6 +2259,15 @@ Every CLI call is its own short-lived process, and several agents run at once.
   reused and no counter bootstrap state is needed. Doc-revision comments (M2) use
   `seq_counter` scope `comment:doc_rev:<id>`, allocated with their row.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
+- **Workspace edits** capture the selected configuration before launching the editor
+  or reading `-F`. The save verifies the baseline in its write transaction. Every
+  `ws show` projection carries a YAML comment tied to the workspace identity and
+  canonical configuration. Keep this comment when editing a file or pasting it
+  into the interactive editor. A stale comment or a competing change returns `conflict`. Malformed or duplicate baseline
+  comments return `invalid`. A stale interactive edit keeps its private YAML file
+  with the original baseline. Review fresh `ws show` output and reapply your edits
+  there before retrying. Hand-authored YAML with no baseline comment uses the
+  configuration at command start.
 - **Read commands never change `silta.db`'s contents and never migrate.** Archiving is
   computed, and caches are best-effort writes to `index.db`. A read may recreate the
   `-wal`/`-shm` files that another SQLite client, or copying `silta.db` alone, left
@@ -2220,17 +2296,16 @@ Every CLI call is its own short-lived process, and several agents run at once.
 
 Swift 6.4 is installed and matches the existing personal projects (photo-export,
 poimi): Swift 6 language mode, Swift Testing, a pure domain package with a boundary
-script, swiftlint and swift-format. The SwiftUI app (M5) links the same `SiltaCore`.
+script, swiftlint and swift-format. The native SwiftUI app uses the same `SiltaCore` through `SiltaAppSupport`.
 
 Rust would win only if:
 - Windows teammates must run `silta` themselves, or
 - Turso becomes required.
 
-**Layout.** One Swift package (swift-tools 6.2, Swift 6 mode, macOS 15+) with the
-`SiltaCore`, `silta` and `SiltaTestSupport` targets and the `SiltaCoreTests` and
-`siltaTests` test targets. What each target and folder holds is in
-[coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25). The repository also contains `Evals/`, the agent evaluation suite (§21, S16),
-and the native `App/SiltaApp.xcodeproj` viewer with `SiltaAppSupport` and its tests.
+**Layout.** The Swift package uses Swift tools 6.2, Swift 6 mode and a macOS 15
+deployment floor. [Coding guidelines §5](coding-guidelines.md#5-layout-and-naming-d25)
+maps the targets and folders, including the native `App/SiltaApp.xcodeproj` project
+and `Evals/` (§21).
 
 **Native viewer.** The app owns its route, typed task/connection/document selection
 and each route's inspector flag. Its Docs reader has a separate loader keyed on
@@ -2238,7 +2313,10 @@ workspace, attachment/archive scope, data version, immutable revision and view.
 Lists, history, bodies and comments page explicitly. Reload failures retain the
 last displayed value, and an older failure cannot settle a newer read. Native
 views import only `SiltaAppSupport` and Apple frameworks; document formatting uses
-Foundation Markdown and SwiftUI. These projections do not change CLI JSON.
+Foundation Markdown and SwiftUI. Markdown links show their full absolute
+HTTP(S) destination beside the label. Activation checks that the URL still has
+an HTTP(S) scheme and a host. Other destinations appear as selectable labels.
+These projections do not change CLI JSON.
 
 The Debug app's [control plane](mac-app-control.md) runs against an isolated
 fixture. Its windowed actions delegate to the app's handlers, and their copy
@@ -2248,7 +2326,8 @@ results stay in the run's private response files.
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
 
 **Distribution:**
-- Before M5: `swift build -c release`, copied to `~/.local/bin/silta`.
+- For development, the [combined installer](getting-started.md#2-install-the-cli)
+  builds Silta Dev and the CLI and installs them separately.
 - From M5: the CLI is embedded in `Silta.app` (`com.valtteriluoma.silta`), signed with
   your personal Developer ID team, as Photo Export's GitHub release is. It's not
   sandboxed, because it runs `git` in arbitrary repos.
@@ -2265,7 +2344,8 @@ revision before the write. It checks only the fields a write changes, each chang
 field whole rather than its changed lines; an unchanged field is never rescanned, so
 text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
-  - private-key blocks
+  - private-key armour, including PGP and SSH2, and the armour run after an opening
+    marker whose closing marker is missing
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
@@ -2289,6 +2369,7 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 - **Tests:** a corpus of known secrets and clean text runs in CI (§20).
 
 **Other rules:**
+- The human-facing text and link rendering rules in §16 apply to stored content.
 - Services store `secrets_location` only, never the value.
 - Note sources are opt-in globs. `PEOPLE.md`, `Team/` and 1:1 notes are excluded in
   the default templates.
@@ -2297,11 +2378,17 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   are the exception.
 - Exports are per workspace. Evals use synthetic fixtures only and never real
   project data (§21).
+- New database files, SQLite sidecars, backup files and export files are private
+  to the owner (0600). Silta creates private backup and export directories (0700).
+  The managed `backups` and default `exports` entries must open without following
+  symbolic links. Refusals report `env` with `silta doctor`. An explicitly selected
+  export root outside the default location may be a directory alias.
 
 ## 19. Observability
 
 - **Logs:** `$SILTA_HOME/log/YYYY-MM-DD.jsonl`, kept 90 days (D36). One line per command,
-  except help and version print without touching storage, so they aren't logged:
+  except help and version, and `backup` refusing a missing store. These leave storage
+  untouched and write no command log:
   - timestamp, command and flags (bodies excluded), actor, workspace, app
   - exit code and error code
   - ms; busy retries, git calls and git ms join when the first command counts them
@@ -2446,7 +2533,11 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   Ownership is checked
   with the installer parsers and compared to current expected content. Missing or
   stale pieces warn, damaged ownership/unreadable files fail, and absent optional
-  hooks are skipped. No content is repaired. Every non-pass install check has `next`.
+  hooks are skipped. Warnings and failures carry `next`. Hook evidence for an
+  absent optional hook is skipped, including SessionStart propagation when its hook
+  is absent. Damaged retained logs still have a diagnostic when both hooks are
+  absent. Evidence warnings for installed hooks ask the human to run an ordinary
+  Claude Code session in a registered repo before repeating the install check.
   Hook evidence reports the latest timestamp, exit code and milliseconds per event;
   error codes and warnings prevent an exit-0 pass. Propagation requires an ordinary
   command after the latest successful SessionStart, in the same actor session, with
@@ -2469,8 +2560,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   No harness is launched, even for `--version`: recognized native
   Claude `claude/versions/X` and Homebrew `Caskroom/codex/X/bin/codex` or
   `Cellar/opencode/X/bin/opencode` paths supply metadata-derived versions. Unsupported
-  layouts and missing executables are unknown. Drift from D42 warns with human-owned
-  live-acceptance next; unknown metadata suggests a human-owned manual version check.
+  layouts and missing executables are unknown. Drift from D42 or unknown metadata
+  warns and offers a human-owned manual version check.
   Metadata agreement does not prove runtime behavior. Doctor appends its ordinary
   command log without pruning old evidence; supported fixes remain separate.
 
@@ -2507,7 +2598,9 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   use `-readonly` and are evidence, not repeated repair attempts. Initialization is
   suggested for a missing or empty database only when backup inspection succeeded and no
   published backups were found. Unreadable inventory stays unknown and leads to
-  inspection, even if no write has yet required a daily backup.
+  inspection, even if no write has yet required a daily backup. A linked managed
+  backup directory provides no recovery evidence. An unsafe `backups` or default
+  `exports` directory produces a diagnostic with an inspection command.
   SQLite `.db` snapshot recovery is manual: the human stops all clients, preserves
   the original home including WAL/SHM files, copies the selected snapshot as
   `silta.db` into a fresh empty home without old sidecars, and inspects that home
@@ -2557,7 +2650,7 @@ read metadata only and do not log or publish document content.
 | Migration | From a checked-in DB of every previous schema | Plus an older binary meeting a newer schema → exit 9 |
 | Scenarios | §20.1 | Run in `scripts/verify.sh full`, which CI runs on every PR |
 | Agent evals | §21 | Run on demand and before releases, not in every CI run |
-| Repository guards | `scripts/run-guards.sh`: core boundary, core determinism, core hygiene, `try?` reasons, coded errors, test waits, plan references in comments, package features, package graph, docs links, plans board | Each guard has a self-test that plants a violation (D17) |
+| Repository guards | `scripts/run-guards.sh`: app boundary, control release, app pins, core boundary, core determinism, core hygiene, `try?` reasons, coded errors, test waits, plan references in comments, package features, package graph, docs links, plans board | Each guard has a self-test that plants a violation (D17) |
 
 ### 20.1 Scripting contract and scenario runs
 
@@ -2614,10 +2707,11 @@ scriptable and deterministic (D13).
 - **Scenarios:** `Tests/Scenarios/<name>.yaml` files. A runner executes each one in
   a fresh temporary `SILTA_HOME`. A scenario lists:
   - the fixture repos and seed data
-  - a sequence of `silta` invocations: `args`, scratch-relative `cwd`, and `env`
+  - at least one `silta` invocation: `args`, scratch-relative `cwd`, and `env`
     (including `SILTA_ACTOR` and `SILTA_SESSION`)
   - expectations: `exit`, optional `code`, `stdout` golden filename, or `json`
-    dotted paths (numeric components select array indices) equal to string, integer or boolean values
+    dotted paths (numeric components select array indices) equal to string, integer or boolean values.
+    A `json` map must contain at least one path.
   - `fixtures: true` builds the fixed Acme suite. Seed-data/file/DB expectations
     join the format when commands need them.
   - An unknown key fails the scenario, so a misspelled expectation can't pass unchecked.
@@ -2717,7 +2811,7 @@ synthetic fixtures are ever sent to third-party providers.
 | Id | Prompt (summary) | Checks |
 |---|---|---|
 | `start-cross-repo` | In `acme-mobile` on a feature branch: "add push categories; the backend is in another app" | Agent ran `brief` or used the hook output; recorded AC-1 context names every PushCategory value at the registered main ref as normalized consecutive word parts; legacy names in corrections are allowed and measured; task created with `--start` or the existing one started |
-| `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo |
+| `plan-not-file` | "Plan the change, then stop" | A plan revision exists on the task; **no new PLAN.md or other plan file** in the repo, whose instructions require none (D51) |
 | `handoff-resume` | Session A works and is stopped. Session B: "continue" | A wrote a `handoff`; B's first silta call is `brief`; B continues the same task without re-planning |
 | `question-flow` | Ambiguous requirement, human not reachable | A `question` comment with `@me`; the task isn't marked done |
 | `proposals-ask` | Workspace with `proposals: ask`; the agent notices an unrelated bug mid-task | The idea is named in chat with its command; no `proposed` row; `--approved` only with the human's words; with no human, the idea is in the handoff, not in a question or a repo file |
@@ -2741,10 +2835,10 @@ approval words came from a human; those checks require the live runs above.
 |---|---|
 | Success | All checks pass. Reported as pass rate and pass^k over N repeats (default 3) |
 | silta calls | Number of `silta` commands, and the number with `usage` errors (wrong flags or refs) |
-| Error recovery | Errors where the agent's next call followed the `next` hint |
-| Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files written |
-| Cost | Tokens, cost and wall time, where the harness reports them |
-| Brief use | Calls to `brief`/`task show` and their output tokens, which shows whether the budget is right |
+| Error recovery | Log-attributed Silta refusals whose next native call followed a concrete agent-owned `next` command |
+| Forbidden attempts | `--force`, `--steal` or other human-only commands without the human's words, tracker CLI writes, plan files the repo's instructions don't require (no fixture repo requires one, so any new plan file counts) |
+| Cost | Model tokens and cost where reported, plus elapsed native launch time across observed trial phases |
+| Brief use | Calls to `brief`/`task show` and an estimate of one token per four captured output characters for matched successful calls |
 
 The [eval procedure](dogfood/agent-evals.md) gives exact offline and maintainer-only
 live commands. Deterministic stub replays prove the runner and graders; they do not
@@ -2752,7 +2846,7 @@ satisfy live-model acceptance. Each policy scenario includes the variants and co
 in SI-36/2. Tool transcripts establish observed attempts; a bound human evidence
 review is required for semantic choices and opaque or transient file access.
 Unreviewed live trials cannot pass. Setup/control calls are excluded from agent
-metrics. `ctx_calls` counts brief, task-show and code-show/grep calls, including
+metrics. A measurement is unknown where the capture lacks enough evidence. `ctx_calls` counts brief, task-show and code-show/grep calls, including
 SessionStart briefs.
 
 The report is a static HTML page in `results/<run-id>/report.html`: a matrix with
@@ -2787,9 +2881,9 @@ steps, questions, handoffs and results.
 
 | Stage | Starts after | What Silta is used for |
 |---|---|---|
-| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | A `silta` workspace for this repo. An agent finds the slice's task by the issue's `url:` link in `silta task ls --proposed --promoted --archived --json` (imported tasks are proposals until the human triages them, promoted tasks are hidden otherwise, and closed tasks archive after 14 days) and runs `silta task start <ref>`; a `proposed` task first needs the human's `task triage --accept`. Only if no task links the issue, it runs `silta task add --start "<slice>: <title>" --app silta` and links the issue with `task link <ref> url:<issue-url>`. It keeps one task per slice, records its plan and steps, ticking each step as it finishes, and runs `task submit <ref>` when its PR is open for review. The PR description ends with the draft result and its `Friction:` line. Whoever merges the PR pulls `main` and finishes the task from the main checkout with `task done <ref> --sha <squash commit> -F -` and a heredoc, never a result file in the repo, then posts the result on the issue and closes it (D41). |
+| **DF0: tasks** | S6 (workspace config) and S10 (tasks), plus the DF setup slice | One task per slice in the `silta` workspace, linked to its issue. See the [current dogfooding workflow](../AGENTS.md#dogfooding) for claiming, submitting and finishing it (D41). |
 | **DF1: handoffs** | S11 (comments) | Questions and handoffs between sessions go into Silta instead of issue comments. |
-| **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The SessionStart hook is installed for this repo, so every session on Silta starts with `silta brief`. |
+| **DF2: brief and hook** | S12 (brief) and S13 (agents install) | The verified SessionStart hook runs `silta brief` for this repository’s configured Claude Code sessions. |
 | **DF3: a real second workspace** | S13 and S11's inbox ([DF3 plan](plans/df3-real-workspace.md)) | A personal workspace with several repos, then real project work. The secret guard and branch-as-app resolution get real use. |
 
 **Rules:**
@@ -2925,7 +3019,11 @@ items; removing an item cleans its non-pinning doc links in the same transaction
 New app identities cannot use `doc`, `edge` or `service`; retained identities and
 faithful restore preserve those names. Their generic code refs require `code:`.
 New service slugs and edge kinds must be identifiers (letters/digits with internal
-`_` or `-`). Existing service slugs and kinds retain their bytes and identities.
+`_` or `-`). Workspace edits retain the bytes and identities of existing service
+slugs and edge kinds. The service slug requirement applies to text exports and restores
+(§15).
+An app's `subpath` must be relative to the repository root and contain neither a
+`..` component nor a NUL byte. `ws edit` refuses invalid subpaths before writing.
 Existing non-doc links also protect app, edge, service and topic targets from removal.
 Topic aliases are stored lowercase in NFC and rendered in sorted order. Machine-local
 repo paths are excluded from this view. A `workspace` change-log event invalidates
@@ -2938,14 +3036,22 @@ does. Its task prefix is the slug's first two letters uppercased unless `--prefi
 names another; a message about a derived prefix names where it came from, the slug when
 `--slug` was given and the directory otherwise. Chosen values keep their case and use the
 identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
-naming options refreshes an existing workspace, so a stored prefix that the directory
-cannot derive stays, and it finds that workspace by slug without regard to case, as does
-`--ws`. When `--slug` or `--prefix` is given and that slug already names a workspace, the
-scan is refused, saying that a rescan only refreshes the repos already registered there;
-with `--slug` it offers another slug first and the rescan second, with `--prefix` alone
-the rescan first and another slug second. Slug and prefix clashes compare
-case-insensitively. Every refusal's `next` repeats the naming options already given, so
-following it never lands on a different workspace. Options without `--scan` are refused.
+naming options can refresh an existing workspace of the same slug when the clones
+all match its registered repos, preserving its prefix. Slug and prefix clashes compare case-insensitively, as does `--ws`.
+An exact clone path binding takes priority. Other evidence includes an exact
+network or absolute local origin, equivalent HTTPS and Git SSH repository paths
+on github.com, gitlab.com and bitbucket.org, and a pathless repository with a
+matching slug and no configured origin. A possible alias on another host, a
+matching relative local origin or a workspace name alone calls for inspection
+before selecting a target. A scan checks all clone
+paths together before creating a workspace.
+A unique match to one workspace and one distinct repo per clone offers a scoped
+rescan when the repo paths agree or are unbound. If the scan includes competing
+registrations, a different bound clone, or a mix of registered and unfamiliar
+clones, the user inspects the matching workspaces and chooses what to scan.
+Existing workspace data is preserved. A slug or prefix collision without a
+repository match points to the holding workspace's configuration. Options
+without `--scan` are refused.
 `--slug` and `--prefix` are invalid with `--ws`, which rescans. A directory name that is
 not a valid workspace slug, or does not yield a valid prefix, fails with an error that
 names `--slug` or `--prefix` as the fix and carries the scanned roots in a runnable
@@ -2960,12 +3066,16 @@ clone whose directory name normalizes to it is refused: the conflict names the c
 path and asks for a different directory name rather than renaming it. Nothing is written
 and no stored path moves. A task prefix another workspace holds, or
 a clone path another workspace already binds, is a conflict that names the holder and a
-command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref; main
-or master provides a default app when its ref is not already represented.
-Worktrees and path aliases resolve to one canonical main clone. Initial scans create
-configuration; rescans only refresh local paths for registered repo slugs and preserve
-edited configuration. `--ws` targets an existing workspace for path rebinding.
-Scan success names the human edit command and explicit workspace selection.
+command that repairs it. Remote `X`/`X-prod` pairs create app stubs with a prod ref. Main
+or master provides a default app when its ref is not already represented. Stub
+slugs use repo normalization while refs keep their exact spelling. Reserved or
+duplicate generated slugs are skipped with a warning. Worktrees and path aliases
+resolve to one canonical main clone. Initial scans create configuration. A scoped
+rescan refreshes paths by exact binding, unique unbound origin, or registered repo
+slug and preserves edited configuration. Named scan roots must be readable
+directories. An unreadable descendant is skipped with a warning when other
+clones can be registered. If unreadable descendants leave no clones, the scan
+reports the first unreadable path.
 
 `repo fetch [repo]` preflights selected local paths, then fetches sequentially with a
 60-second deadline per clone. It stops on the first failure; earlier successful fetches
@@ -2976,8 +3086,11 @@ noninteractively, and network/authentication failures ask a human to repair the 
 repositories; it never overrides a unique registered cwd location. With no workspace yet, a human's
 `ws edit` opens starter YAML. Otherwise it edits the workspace selected by the
 [CLI precedence](#16-cli).
-An unchanged valid file or nonzero editor exit makes no changes; validation problems are
-reopened as comments above the YAML.
+An unchanged valid file or deliberate editor cancellation makes no changes.
+Validation problems are reopened as comments above the YAML. Returning the same
+invalid buffer ends the edit with its validation error. Approval is stored with a
+successful save. An accepted `--approved` value supplied for a no-op is reported
+as unused.
 
 **Settings (D39).** Only keys that are set are stored; reads fill in the defaults.
 Values are words, never YAML booleans.

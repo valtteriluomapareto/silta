@@ -44,8 +44,8 @@ struct ScenarioExpectationTests {
   }
 
   @Test(arguments: [
-    "fixture: true\nsteps: []\n",
-    "steps:\n  - args: []\n    enviroment: {}\n    expect: {exit: 0}\n",
+    "fixture: true\nsteps:\n  - args: [--version]\n    expect: {exit: 0}\n",
+    "steps:\n  - args: [--version]\n    enviroment: {}\n    expect: {exit: 0}\n",
   ])
   func unknownScenarioKeysFail(yaml: String) throws {
     try withScratchDirectory { scratch in
@@ -55,6 +55,14 @@ struct ScenarioExpectationTests {
         try ScenarioRunner.run(file, in: scratch, evidence: scratch.appending(path: "evidence"))
       }
     }
+  }
+
+  @Test(arguments: [
+    "steps: []",
+    "steps:\n  - args: [schema, --json]\n    expect: {exit: 0, json: {}}",
+  ])
+  func scenariosCannotPassWithoutADeclaredStepOrWithAnEmptyJsonMatcher(yaml: String) {
+    #expect(throws: ScenarioFailure.self) { try Scenario.decode(yaml) }
   }
 
   @Test func transcriptKeepsStderr() throws {

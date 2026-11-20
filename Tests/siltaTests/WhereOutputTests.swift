@@ -68,6 +68,18 @@ struct WhereOutputTests {
     }
   }
 
+  @Test func unmatchedRepositoryInExistingWorkspaceHasAnActionableNext() throws {
+    try withScratchDirectory { scratch in
+      _ = try fixture.setup(scratch)
+      let repo = scratch.appending(path: "fixtures/acme-detached")
+      let result = try fixture.run(["--ws", "acme"], repo, scratch)
+      #expect(result.termination == .exit(2))
+      let error = try TaskStateCommandTests.error(result)
+      let next = try #require(error["next"] as? [String])
+      #expect(next == ["silta --ws 'acme' ws show"])
+    }
+  }
+
   @Test func missingTaskRetryUsesInferredWorkspace() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)

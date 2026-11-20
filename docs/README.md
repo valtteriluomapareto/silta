@@ -4,6 +4,7 @@
 |---|---|
 | Agents working in this repo | [`../AGENTS.md`](../AGENTS.md) |
 | New users: what Silta is, install | [`../README.md`](../README.md) |
+| Inbox, proposals, questions and approvals | [`human-guide.md`](human-guide.md) |
 | New users: install to first task in their workspace | [`getting-started.md`](getting-started.md) |
 | Annotated app, repo and edge configuration | [`examples/acme-workspace.yaml`](examples/acme-workspace.yaml) |
 | Contributors (toolchain, commands, workflow) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
@@ -46,7 +47,7 @@ a plan ships:
 | [`plans/df3-real-workspace.md`](plans/df3-real-workspace.md) | proposed | Onboarding a real multi-repo workspace and measuring whether Silta helps |
 | [`plans/m1-daily-use.md`](plans/m1-daily-use.md) | active | M1 broken into slices with dependencies, for parallel agents |
 | [`plans/mac-app-actions.md`](plans/mac-app-actions.md) | active | First app actions: answer, accept answers, comment, accept proposals and unblock |
-| [`plans/mac-app.md`](plans/mac-app.md) | active | Read-only macOS app on SiltaCore for My work, the board, the workspace and docs |
+| [`plans/mac-app.md`](plans/mac-app.md) | active | Native app views and navigation on SiltaCore for My work, the board, the workspace and docs |
 | [`plans/workspace-knowledge.md`](plans/workspace-knowledge.md) | active | Docs attached to workspace map items; reads, proposals, freshness and offline evals |
 <!-- plans-board:end -->
 

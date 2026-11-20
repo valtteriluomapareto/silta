@@ -39,20 +39,24 @@ package enum RestoreService {
   ) throws -> RestoreReport {
     let (expected, approval, dryRun) = (request.workspace, request.approval, request.dryRun)
     let directory = request.directory.standardizedFileURL
+    try validateManifestPrefix(request.manifest, directory: directory)
     let files = try readTree(directory)
     let tree = try ExportTree.parse(files)
     let slug = tree.workspace.value("slug") ?? ""
+    if let field = tree.invalidIdentifier() {
+      throw ExportError.invalidRestoreIdentifier(field: field)
+    }
     if let expected, expected != slug {
       throw ExportError.otherWorkspace(tree: slug, given: expected, directory: directory.path)
     }
     try RestoreDocumentGraph(tree: tree, slug: slug).run()
     let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
-    if let manifest = request.manifest, manifest.isEmpty || !digest.hasPrefix(manifest) {
+    if let manifest = request.manifest, !digest.hasPrefix(manifest.lowercased()) {
       throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
     }
     let milliseconds = Int64(identity.date.timeIntervalSince1970 * 1000)
     let snapshot = "silta-\(utcDay(identity.date))-before-restore-\(milliseconds).db"
-    return try store.write(rollingBack: dryRun) { tx in
+    return try store.write(rollingBack: dryRun, keepingBackup: \.snapshot) { tx in
       var writer = RestoreWriter(tx: tx, tree: tree, slug: slug)
       var report = try writer.prepare(digest: digest, dryRun: dryRun)
       if !dryRun && !report.created {
@@ -70,6 +74,22 @@ package enum RestoreService {
         identity: identity, in: tx)
       return report
     }
+  }
+
+  /// Checks an optional approval digest before reading a tree or asking for approval.
+  /// Throws `ExportError.invalidManifest` when a supplied prefix has the wrong length or syntax.
+  package static func validateManifestPrefix(_ prefix: String?, directory: URL) throws {
+    guard let prefix else { return }
+    guard prefix.wholeMatch(of: /[0-9a-fA-F]{12,64}/) != nil else {
+      throw ExportError.invalidManifest(directory: directory.path)
+    }
+  }
+
+  /// Whether a path can be printed intact in a single-line recovery command.
+  package static func canNameInRecovery(_ path: String) -> Bool {
+    let excluded = CharacterSet.controlCharacters.union(.newlines)
+    return !path.unicodeScalars.contains(where: excluded.contains)
+      && SecretGuard.matches(in: path).isEmpty
   }
 
   /// Every regular file under `directory`, by relative path; `.DS_Store` is skipped.
@@ -139,6 +159,9 @@ struct RestoreValidation {
     var uids: [String: Set<String>] = [:]
     func add(_ table: String, _ row: ExportRow) throws {
       try integers(row, in: table)
+      if table == "task", row.value("seq").flatMap(Int64.init) == Int64.max {
+        throw invalid("a task sequence leaves no room for the next ref")
+      }
       guard let uid = row.value("uid") else { return }
       guard uids[table, default: []].insert(uid).inserted else {
         throw invalid("\(table) uid \(uid) appears twice")

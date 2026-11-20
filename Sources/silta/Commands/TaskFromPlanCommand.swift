@@ -47,7 +47,7 @@ struct TaskFromPlanCommand: OutputCommand {
       try context.environment.actor.requireHuman(
         command: options.retryCommand + " --allow-secret", approved: global.approved)
     }
-    let text = try read()
+    let text = try BodyInput.read(file)
     let result = try await TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved
     )
@@ -58,16 +58,17 @@ struct TaskFromPlanCommand: OutputCommand {
     let preview = result.preview
     var lines =
       result.dryRun
-      ? ["Preview: \(preview.status): \(preview.title)"]
+      ? ["Preview: \(preview.status): \(HumanText.line(preview.title))"]
       : result.tasks.map { TaskOutput.receiptText($0) }
     if result.dryRun {
       if let app = preview.app { lines.append("App: \(app)") }
-      let description = preview.description.trimmingCharacters(in: .newlines)
+      let description = HumanText.body(preview.description).trimmingCharacters(in: .newlines)
       if !description.isEmpty { lines += ["", description] }
       lines += ["", split ? "Subtasks:" : "Checklist:"]
       for (index, step) in preview.steps.enumerated() {
-        lines.append("\(index + 1). " + (step.status.map { $0 + ": " } ?? "") + step.title)
-        let detail = step.description.trimmingCharacters(in: .newlines)
+        lines.append(
+          "\(index + 1). " + (step.status.map { $0 + ": " } ?? "") + HumanText.line(step.title))
+        let detail = HumanText.body(step.description).trimmingCharacters(in: .newlines)
         if !detail.isEmpty { lines.append(detail) }
       }
     }
@@ -85,16 +86,5 @@ struct TaskFromPlanCommand: OutputCommand {
       data: result, warnings: result.warnings + unused,
       approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
-  }
-
-  private func read() throws -> String {
-    do {
-      let data =
-        try file == "-"
-        ? FileHandle.standardInput.readToEnd() ?? Data()
-        : Data(contentsOf: URL(filePath: file))
-      guard let text = String(data: data, encoding: .utf8) else { throw TaskError.input }
-      return text
-    } catch { throw TaskError.input }
   }
 }

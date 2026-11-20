@@ -71,7 +71,7 @@ private func identity(_ url: URL) -> [String] {
 
 // Resolve the existing ancestor before appending missing components: Foundation's
 // symlink normalization treats nonexistent /private/var descendants inconsistently.
-private func canonicalURL(_ url: URL) throws -> URL {
+func canonicalURL(_ url: URL) throws -> URL {
   guard !url.path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
     throw SeamError.invalidHome
   }

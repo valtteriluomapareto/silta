@@ -68,17 +68,14 @@ enum SiltaMain {
       if hookDeadline != nil {
         return completeHook(rendered, entry: entry, watchdog: watchdog, log: environment.log)
       }
-      environment.log.record(entry)
+      record(entry, environment: environment)
       return rendered
     } catch {
       if hookDeadline != nil {
         watchdog?.failed(milliseconds: elapsedMilliseconds(started.duration(to: timer.now)))
         return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
       }
-      if case .failure(let error) = parseResult {
-        return parseFailure(error, arguments: arguments, mode: mode)
-      }
-      return OutputRouter.render(.failure(error), mode: mode)
+      return startupFailure(error, parsed: parseResult, arguments: arguments, mode: mode)
     }
   }
 
@@ -262,6 +259,9 @@ enum SiltaMain {
       }
     }
     let suffix = target.map { " " + shellWord($0) } ?? ""
+    if case .invalid(_, true) = error as? WorkspaceError {
+      return (target == nil ? [] : ["silta ws show" + suffix]) + error.next
+    }
     let repair = "silta ws edit" + suffix + " -F <file> --approved \"<the human's words>\""
     if target != nil, error.code == .invalid || error.code == .conflict {
       return ["silta ws show" + suffix, repair]
@@ -286,10 +286,7 @@ extension SiltaMain {
     if let edit = command as? DocEditCommand { try edit.authorize(context) }
     if let archive = command as? DocArchiveCommand { try archive.authorize(context) }
     if let triage = command as? DocTriageCommand { try triage.authorize(context) }
-    if command is WsEditCommand {
-      try context.environment.actor.requireHuman(
-        command: "silta ws edit -F <file>", approved: command.global.approved)
-    }
+    if let edit = command as? WsEditCommand { try edit.authorize(context) }
     let selected = try await WorkspaceSelection.fallback(
       path: URL(filePath: FileManager.default.currentDirectoryPath),
       environment: context.environment)
@@ -302,7 +299,22 @@ extension SiltaMain {
     explicitWorkspace: String?, arguments: [String], context: CommandContext
   ) -> CommandExecution {
     var failure: any Error = error
-    if let coded = failure as? any CodedError {
+    if let body = error as? BodyInputError {
+      let help = commandPath(arguments) + " --help"
+      let workspace = (command as? WsEditCommand)?.workspace ?? command.global.ws
+      let next: [String]
+      if let workspace, WorkspaceConfig.isValidIdentifier(workspace),
+        RestoreService.canNameInRecovery(workspace)
+      {
+        let inspect = (command as? TaskEditCommand).map {
+          "silta task edit " + shellWord($0.ref) + " --print"
+        }
+        next = [inspect, help].compactMap { $0 }.map { workspaceCommand($0, workspace: workspace) }
+      } else {
+        next = [help]
+      }
+      failure = CommandFailure(error: body, next: next)
+    } else if let coded = failure as? any CodedError {
       var recoveryCommand = command
       // Approval hints retain caller selection; operation logs retain captured selection.
       if coded is ActorError { recoveryCommand.global.ws = explicitWorkspace }
@@ -314,4 +326,14 @@ extension SiltaMain {
         command, store: context.environment.db, prepared: context.environment.workspaceSelection),
       command: loggedPath(arguments, command))
   }
+}
+
+private func record(_ entry: LogEntry, environment: SiltaEnvironment) {
+  // An on-demand backup must not create a home when its database is missing.
+  if entry.command == "silta backup",
+    !FileManager.default.fileExists(atPath: environment.db.path)
+  {
+    return
+  }
+  environment.log.record(entry)
 }

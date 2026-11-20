@@ -17,7 +17,7 @@ struct CommentReviewCommandTests {
       _ = try Self.run(home, ["comment", "AC-1", "-m", "Finding"], actor: "agent:claude:poster")
       _ = try Self.run(home, ["comment", "resolve", "AC-1/1", "-m", "Fixed"])
       let raw = try Self.run(home, ["task", "show", "AC-1", "--timeline", "--json"])
-      let data = try TaskStateRegressionTests.data(raw)
+      let data = try TaskStateCommandTests.data(raw)
       let comments = try #require(data["comments"] as? [[String: Any]])
       #expect(
         comments.count == 2
@@ -41,7 +41,7 @@ struct CommentReviewCommandTests {
       #expect(before.stdout.components(separatedBy: "next:").count == 2)
       _ = try Self.run(home, ["comment", "delete", "AC-1/2"])
       let raw = try Self.run(home, ["task", "show", "AC-1", "--json"])
-      #expect(try TaskStateRegressionTests.data(raw)["handed_off"] == nil)
+      #expect(try TaskStateCommandTests.data(raw)["handed_off"] == nil)
       let shown = try Self.run(home, ["task", "show", "AC-1"])
       #expect(!shown.stdout.contains("handed off AC-1/2"))
       #expect(shown.stdout.contains("Unclaimed; next: silta --ws 'acme' task start 'AC-1'"))

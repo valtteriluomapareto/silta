@@ -5,7 +5,10 @@ import SiltaCore
 struct WsEditCommand: WorkspaceArgumentCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit", abstract: "Edit workspace YAML (human-only).",
-    discussion: "Update Acme YAML (human): silta ws edit acme -F acme.yml")
+    discussion: "Keep the baseline comment from ws show or a retained editor draft. "
+      + "If stale, review a fresh ws show before reapplying your edits. "
+      + "An unstamped file uses the configuration at command start.\n"
+      + "Update Acme YAML (human): silta ws edit acme -F acme.yml")
 
   static let dataShape = Shape.object(["workspace": .optional(.string)])
 
@@ -22,49 +25,40 @@ struct WsEditCommand: WorkspaceArgumentCommand {
     name: .customShort("F"), help: "Read UTF-8 YAML from a file, or - for stdin; default is none.")
   var file: String?
 
+  func validate() throws {
+    if file == nil { try TerminalEditor.validate() }
+  }
+
+  func authorize(_ context: CommandContext) throws {
+    let target = (workspace ?? global.ws).map { " " + shellWord($0) } ?? ""
+    let input = file == "-" ? " -F -" : " -F <file>"
+    try context.environment.actor.requireHuman(
+      command: "silta ws edit" + target + input, approved: global.approved)
+  }
+
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let environment = context.environment
+    let workspace = workspace ?? global.ws
+    let identity = (environment.ids, environment.clock.now())
     let selected: String?
     if let file {
-      let target = (workspace ?? global.ws).map { " " + shellWord($0) } ?? ""
-      try environment.actor.requireHuman(
-        command: "silta ws edit" + target + " -F <file>", approved: global.approved)
-      let text = try read(file)
       selected = try WorkspaceEditor.apply(
-        text, slug: workspace ?? global.ws, store: environment.db, actor: environment.actor,
-        identity: (environment.ids, environment.clock.now()), approved: global.approved,
-        prepared: environment.workspaceSelection)
+        try BodyInput.read(file), slug: workspace, store: environment.db, actor: environment.actor,
+        identity: identity, approved: global.approved, prepared: environment.workspaceSelection,
+        retryFromStdin: file == "-")
     } else {
       selected = try WorkspaceEditor.edit(
-        slug: workspace ?? global.ws, store: environment.db, actor: environment.actor,
-        identity: (environment.ids, environment.clock.now()), approved: global.approved,
-        prepared: environment.workspaceSelection
+        slug: workspace, store: environment.db, actor: environment.actor,
+        identity: identity, approved: global.approved, prepared: environment.workspaceSelection
       ) { file in
-        let process = Process()
-        process.executableURL = URL(filePath: "/bin/sh")
-        // EDITOR is a human's shell command; the file path is passed as a positional argument.
-        process.arguments = ["-c", "exec ${EDITOR:-vi} \"$1\"", "silta-editor", file.path]
-        try process.run()
-        process.waitUntilExit()
-        return process.terminationStatus
+        try TerminalEditor.run(file, command: "silta ws edit")
       }
     }
     var output = CommandOutput(
       text: selected.map { "Updated workspace \($0)." } ?? "No changes.",
-      data: Data(workspace: selected), approvalUsed: true)
+      data: Data(workspace: selected), approvalUsed: selected != nil && !environment.actor.isHuman)
     output.workspace = selected
     return output
-  }
-
-  private func read(_ file: String) throws -> String {
-    do {
-      let data =
-        try file == "-"
-        ? FileHandle.standardInput.readToEnd() ?? Foundation.Data()
-        : Foundation.Data(contentsOf: URL(filePath: file))
-      guard let text = String(data: data, encoding: .utf8) else { throw WorkspaceError.input }
-      return text
-    } catch { throw WorkspaceError.input }
   }
 
   private struct Data: Encodable {

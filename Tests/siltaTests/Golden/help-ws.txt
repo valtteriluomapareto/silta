@@ -17,8 +17,7 @@ OPTIONS:
   -h, --help              Show help information.
 
 SUBCOMMANDS:
-  ls                      List workspaces; ask in chat before editing
-                          configuration.
+  ls                      List workspace slugs, names and task prefixes.
   use                     Set the default workspace outside registered
                           repositories.
   edit                    Edit workspace YAML (human-only).
@@ -30,6 +29,9 @@ SUBCOMMANDS:
 
 OVERVIEW: Edit workspace YAML (human-only).
 
+Keep the baseline comment from ws show or a retained editor draft. If stale,
+review a fresh ws show before reapplying your edits. An unstamped file uses the
+configuration at command start.
 Update Acme YAML (human): silta ws edit acme -F acme.yml
 
 USAGE: silta ws edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] [<workspace>] [-F <F>]
@@ -54,7 +56,7 @@ OPTIONS:
 
 ### silta ws ls
 
-OVERVIEW: List workspaces; ask in chat before editing configuration.
+OVERVIEW: List workspace slugs, names and task prefixes.
 
 USAGE: silta ws ls [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose]
 

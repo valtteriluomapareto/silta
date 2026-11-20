@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 import SiltaAppSupport
@@ -6,6 +7,7 @@ import SwiftUI
 @main
 struct SiltaApp: App {
   @State private var model: AppModel
+  @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system
   #if DEBUG
     private let control: ControlRuntime?
   #endif
@@ -27,6 +29,11 @@ struct SiltaApp: App {
         if let options = try ControlLaunch.parse(ProcessInfo.processInfo.arguments) {
           let control = try ControlRuntime(options: options)
           self.control = control
+          if options.isAutomated {
+            Self.pinPreferencesForControl()
+          } else if !options.dark {
+            Self.apply(Self.storedAppearance)
+          }
           let fixture = control.fixture
           let model = Self.makeReaderModel(
             home: fixture.home, user: fixture.user, now: { fixture.now })
@@ -41,6 +48,12 @@ struct SiltaApp: App {
       }
     #endif
     _model = State(initialValue: Self.makeModel())
+    Self.apply(Self.storedAppearance)
+  }
+
+  private static var storedAppearance: AppAppearance {
+    AppAppearance(rawValue: UserDefaults.standard.string(forKey: AppAppearance.storageKey) ?? "")
+      ?? .system
   }
 
   private static func makeModel() -> AppModel {
@@ -94,11 +107,45 @@ struct SiltaApp: App {
     #else
       mainWindow
     #endif
+    Settings {
+      Form {
+        Picker("Appearance", selection: $appearance) {
+          ForEach(AppAppearance.allCases) { Text($0.title).tag($0) }
+        }.pickerStyle(.radioGroup)
+      }.padding(20).frame(width: 320)
+        .onChange(of: appearance) { applyAppearance() }
+    }
+  }
+
+  #if DEBUG
+    /// An automated control run shares the installed app's defaults, so it pins the
+    /// inspector width in the volatile argument domain: captures stay deterministic and
+    /// never read the human's stored width.
+    private static func pinPreferencesForControl() {
+      let defaults = UserDefaults.standard
+      var pinned = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+      pinned[SeaInspectorMetrics.storageKey] = SeaInspectorMetrics.width
+      defaults.setVolatileDomain(pinned, forName: UserDefaults.argumentDomain)
+    }
+  #endif
+
+  /// Applies the stored appearance app-wide. An automated Debug control run keeps the
+  /// appearance its launch flags chose, so captures stay deterministic.
+  private func applyAppearance() {
+    #if DEBUG
+      if control?.options.isAutomated == true { return }
+    #endif
+    Self.apply(appearance)
+  }
+
+  private static func apply(_ appearance: AppAppearance) {
+    NSApplication.shared.appearance = appearance.appearanceName.flatMap(NSAppearance.init(named:))
   }
 
   private var mainWindow: some Scene {
     Window("Silta", id: "main") {
       AppShellView(model: model)
+        .onChange(of: appearance) { applyAppearance() }
         #if DEBUG
           .background {
             if let control { ControlWindowProbe(report: control.attach) }
@@ -116,6 +163,10 @@ struct SiltaApp: App {
             .keyboardShortcut("i", modifiers: [.command, .option])
           Divider()
           Button("Refresh") { model.refresh(force: true) }.keyboardShortcut("r")
+          Divider()
+          Picker("Appearance", selection: $appearance) {
+            ForEach(AppAppearance.allCases) { Text($0.title).tag($0) }
+          }
         }
       }
   }

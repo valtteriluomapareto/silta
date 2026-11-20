@@ -7,27 +7,30 @@ extension ExportService {
     workspace: String, to root: URL, store: DatabaseStore, home: URL,
     seams: (git: any GitRunner, clock: any Clock)
   ) async throws -> ExportResult {
-    let root = root.standardizedFileURL
-    let operation = ExportCommit(root: root, workspace: workspace, git: seams.git)
+    let root = normalizedRoot(root, home: home)
+    try validateDefaultRoot(root, home: home)
+    let operation = ExportCommit(root: root, home: home, workspace: workspace, git: seams.git)
     try await operation.preflight()
     try store.initialize()
     let lock = try exportLock(home: home, clock: seams.clock)
     defer { withExtendedLifetime(lock) {} }
-    let result = try write(workspace: workspace, to: root, store: store, moves: ExportMoves())
-    return try await operation.commit(result)
+    let written = try write(workspace: workspace, to: root, store: store, home: home)
+    return try await operation.commit(written.result, paths: written.paths)
   }
 }
 
 /// Git operations for one export root, with warnings retained on every post-write failure.
 private struct ExportCommit {
   let root: URL
+  let home: URL
   let workspace: String
   let git: any GitRunner
 
   var failed: ExportError { .gitFailed(root: root.path, workspace: workspace) }
 
   func run(_ arguments: [String]) async throws -> GitResult {
-    try await git.run(.init(arguments: arguments, directory: root))
+    try ExportService.validateDefaultRoot(root, home: home)
+    return try await git.run(.init(arguments: arguments, directory: root))
   }
 
   func preflight() async throws {
@@ -39,15 +42,11 @@ private struct ExportCommit {
     } catch { throw ExportError.notWorkTree(root: root.path) }
   }
 
-  func commit(_ written: ExportResult) async throws -> ExportResult {
+  func commit(_ written: ExportResult, paths: [String]) async throws -> ExportResult {
     var result = written
     var warnings = result.leftovers.map(\.warning)
     do {
-      let manifest = try ExportManifest(
-        Data(contentsOf: root.appending(path: workspace + "/manifest.json")))
-      let paths = (Array(manifest.files.keys) + [ExportFormat.manifestFile]).sorted().map {
-        workspace + "/" + $0
-      }
+      let paths = paths.sorted().map { workspace + "/" + $0 }
       let ignored = try await ignoredPaths(paths)
       if !ignored.isEmpty {
         let warning = OutputWarning(
@@ -58,10 +57,14 @@ private struct ExportCommit {
         warnings.append(warning)
       }
       try await stage(allIgnored: ignored.count == paths.count)
-      let changed = try await run(["diff", "--cached", "--quiet", "--", workspace])
+      let changed = try await run([
+        "--literal-pathspecs", "diff", "--cached", "--quiet", "--", workspace,
+      ])
       if changed.termination == .exit(0) { return result }
       guard changed.termination == .exit(1) else { throw failed }
-      let committed = try await run(["commit", "-m", "Export " + workspace, "--", workspace])
+      let committed = try await run([
+        "--literal-pathspecs", "commit", "-m", "Export " + workspace, "--", workspace,
+      ])
       guard committed.termination == .exit(0) else { throw failed }
       let head = try await run(["rev-parse", "--verify", "HEAD"])
       guard head.termination == .exit(0), let text = String(bytes: head.stdout, encoding: .utf8)
@@ -90,14 +93,14 @@ private struct ExportCommit {
   }
 
   func stage(allIgnored: Bool) async throws {
-    let added = try await run(["add", "-A", "--", workspace])
+    let added = try await run(["--literal-pathspecs", "add", "-A", "--", workspace])
     if added.termination == .exit(0) { return }
     guard added.termination == .exit(1) else { throw failed }
     if allIgnored { return }
     // Git reports an ignored directory even while updating its tracked descendants.
     let rootIgnored = try await run(["check-ignore", "--no-index", "--", workspace])
     guard rootIgnored.termination == .exit(0) else { throw failed }
-    let updated = try await run(["add", "-u", "--", workspace])
+    let updated = try await run(["--literal-pathspecs", "add", "-u", "--", workspace])
     guard updated.termination == .exit(0) else { throw failed }
   }
 }

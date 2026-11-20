@@ -28,7 +28,7 @@ struct InboxCommandTests {
       #expect(answer.termination == .exit(0))
       #expect(try run(args).stdout.contains("AC-1/1 question"))
       let own = try run(["--ws", "acme", "inbox", "--json"])
-      let data = try TaskStateRegressionTests.data(own)
+      let data = try TaskStateCommandTests.data(own)
       let items = try #require(data["items"] as? [[String: Any]])
       #expect(items.first?["kind"] as? String == "answer")
       #expect(items.first?["next"] as? [String] == ["silta --ws 'acme' comment accept 'AC-1/2'"])
@@ -62,7 +62,7 @@ struct InboxCommandTests {
       let help = try SiltaBinary.run(["inbox", "--help"], in: scratch)
       #expect(
         help.termination == .exit(0)
-          && help.stdout.contains("Human inboxes include grouped blockers"))
+          && help.stdout.contains("Use --for me for the human's inbox"))
       let schema = try SiltaBinary.run(["schema", "inbox", "--json"], in: scratch)
       #expect(schema.termination == .exit(0) && schema.stdout.contains("remaining"))
     }
@@ -89,7 +89,7 @@ struct InboxCommandTests {
       let foreign = try run(
         ["--ws", "acme", "inbox", "--for", "agent:codex:acme", "--json"], other)
       let items = try #require(
-        try TaskStateRegressionTests.data(foreign)["items"] as? [[String: Any]])
+        try TaskStateCommandTests.data(foreign)["items"] as? [[String: Any]])
       #expect(items.map { $0["ref"] as? String } == ["AC-1/1", "AC-1/2"])
       #expect(
         items.last?["next"] as? [String] == [
@@ -100,7 +100,7 @@ struct InboxCommandTests {
       )
       let discussion = try run(["--ws", "acme", "inbox", "--json"], holder)
       let posts = try #require(
-        try TaskStateRegressionTests.data(discussion)["items"] as? [[String: Any]])
+        try TaskStateCommandTests.data(discussion)["items"] as? [[String: Any]])
       #expect(posts.last?["next"] as? [String] == ["silta --ws 'acme' task show 'AC-1' --timeline"])
       #expect(
         try run(["--ws", "acme", "task", "show", "AC-1", "--timeline"], holder).termination

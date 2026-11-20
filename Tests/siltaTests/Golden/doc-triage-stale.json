@@ -1,0 +1,1 @@
+{"error":{"code":"stale_rev","message":"Proposal doc:rules@2 has a stale base; inspect and repropose.","next":["silta --ws 'acme' doc show 'doc:rules@2'","silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --base <rev> --title <title> --about <ref>"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

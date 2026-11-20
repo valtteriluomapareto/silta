@@ -1,6 +1,6 @@
 ### silta init
 
-OVERVIEW: Initialize or scan repos; select with ws use; ws edit is human-only.
+OVERVIEW: Initialize Silta or scan local Git repositories into a workspace.
 
 `init --scan` scans roots and two child levels without fetching.
 A new workspace derives its slug and task prefix from the first directory.

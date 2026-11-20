@@ -37,7 +37,7 @@ extension TaskService {
     return try environment.db.write { tx in
       let task = try Self.lookup(ref, workspace: slug, in: tx.database)
       try validateClaim(task, workspace: slug, at: at)
-      try canClose(task, dropped: dropped)
+      try canClose(task, dropped: dropped, allowSecret: commit.allowSecret)
       try Self.sameRepository(task, before)
       let review = try review(
         task, dropped: dropped, commit: commit, command: audit, in: tx.database)
@@ -80,11 +80,11 @@ extension TaskService {
     }
   }
 
-  private func canClose(_ task: TaskDetails, dropped: Bool) throws {
+  private func canClose(_ task: TaskDetails, dropped: Bool, allowSecret: Bool) throws {
     if task.status == "proposed" {
       if !dropped { throw TaskError.proposal(task.ref, human: environment.actor.isHuman) }
       if !environment.actor.isHuman && task.createdBy != environment.actor.description {
-        throw TaskError.proposal(task.ref, human: false)
+        throw TaskError.foreignProposalDrop(task.ref, allowSecret: allowSecret)
       }
       return
     }
@@ -97,7 +97,7 @@ extension TaskService {
   private func closable(
     _ task: TaskDetails, dropped: Bool, commit: TaskCommit, audit: String
   ) throws {
-    try canClose(task, dropped: dropped)
+    try canClose(task, dropped: dropped, allowSecret: commit.allowSecret)
     if commit.sha != nil, task.appID == nil || dropped {
       throw TaskError.invalid("--sha requires an app task completed with done.")
     }
@@ -115,7 +115,8 @@ extension TaskService {
     let review = try gate(task, in: db)
     guard review.unmet else { return (review.warnings, nil) }
     guard commit.force else { throw TaskError.gate(task.ref) }
-    return (review.warnings, try approval(required: true, command: command + " -F <file>"))
+    let retry = command + " " + (retryBodyFlag ?? "-F <file>")
+    return (review.warnings, try approval(required: true, command: retry))
   }
 
   /// The review gate's warnings, and whether an unmet `human` gate refuses completion.

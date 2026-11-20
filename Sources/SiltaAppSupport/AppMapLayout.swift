@@ -3,9 +3,11 @@
 /// Columns follow the calls from left to right. A depth-first walk from apps without
 /// callers, in slug order, marks the connections that close a cycle as back edges;
 /// columns are the longest path over the remaining edges. Services take one column after
-/// the last app column. Column 0 is ordered by slug; later columns by the mean row of
-/// their distinct callers in earlier columns, then by slug; nodes without such callers
-/// come last.
+/// the last app column, which the map draws as a row under the apps. Column 0 is ordered
+/// by slug; later app columns by the mean row of their distinct callers in earlier
+/// columns, then by slug. Services are ordered by the mean column of their distinct
+/// callers, then their mean row, then slug, so each sits near the apps that use it.
+/// Nodes without callers come last.
 public struct AppMapLayout: Equatable, Sendable {
   /// One app or service on the map.
   public struct Node: Equatable, Sendable {
@@ -47,9 +49,9 @@ public struct AppMapLayout: Equatable, Sendable {
       }
     }
     let serviceColumn = (column.values.max() ?? -1) + 1
-    let services = map.services.map { "service:" + $0.slug }.sorted()
+    let services = map.services.map(\.key).sorted()
     var attachments = Dictionary(uniqueKeysWithValues: map.apps.map { ($0.slug, $0.attachment) })
-    for service in map.services { attachments["service:" + service.slug] = service.attachment }
+    for service in map.services { attachments[service.key] = service.attachment }
     for service in services { column[service] = serviceColumn }
 
     var callers: [String: Set<String>] = [:]
@@ -63,9 +65,12 @@ public struct AppMapLayout: Equatable, Sendable {
     for index in 0..<count {
       let members = keys.filter { column[$0] == index }
       let sorted = members.sorted { left, right in
-        let lhs = Self.meanRow(callers[left] ?? [], rows: row, before: index, column: column)
-        let rhs = Self.meanRow(callers[right] ?? [], rows: row, before: index, column: column)
-        return lhs == rhs ? left < right : lhs < rhs
+        let lhs = Self.rank(callers[left] ?? [], rows: row, before: index, column: column)
+        let rhs = Self.rank(callers[right] ?? [], rows: row, before: index, column: column)
+        let services = index == serviceColumn
+        let lhsKey = services ? [lhs.column, lhs.row] : [lhs.row]
+        let rhsKey = services ? [rhs.column, rhs.row] : [rhs.row]
+        return lhsKey == rhsKey ? left < right : lhsKey.lexicographicallyPrecedes(rhsKey)
       }
       for (position, key) in sorted.enumerated() {
         row[key] = position
@@ -87,17 +92,29 @@ public struct AppMapLayout: Equatable, Sendable {
   /// A direction for keyboard movement on the map.
   public enum Direction: Sendable { case left, right, up, down }
 
-  /// The node an arrow key moves to. Left and right follow the first caller or callee in
-  /// connection order; up and down stay in the column. With nothing selected, the first node.
+  /// The node an arrow key moves to. On an app, left and right follow the first caller or
+  /// callee in connection order, and up and down stay in the column. On a service, left
+  /// and right move along the services row and up goes to the first caller. With nothing
+  /// selected, the first node.
   public func neighbour(
     of attachment: String?, _ direction: Direction, connections: [AppConnection]
   ) -> String? {
     guard let attachment, let current = nodes.first(where: { $0.attachment == attachment })
     else { return nodes.first?.attachment }
     let ordered = connections.sorted { $0.attachment < $1.attachment }
+    let caller = ordered.first { $0.target == current.key }.flatMap { node($0.source)?.attachment }
+    if current.isService {
+      switch direction {
+      case .up: return caller
+      case .down: return nil
+      case .left, .right:
+        let row = current.row + (direction == .left ? -1 : 1)
+        return nodes.first { $0.column == current.column && $0.row == row }?.attachment
+      }
+    }
     switch direction {
     case .left:
-      return ordered.first { $0.target == current.key }.flatMap { node($0.source)?.attachment }
+      return caller
     case .right:
       return ordered.first { $0.source == current.key }.flatMap { node($0.target)?.attachment }
     case .up, .down:
@@ -146,11 +163,18 @@ public struct AppMapLayout: Equatable, Sendable {
     return order
   }
 
-  private static func meanRow(
+  /// The mean column and mean row of a node's callers placed in earlier columns; infinite
+  /// for a node without such callers, so it sorts last.
+  private static func rank(
     _ callers: Set<String>, rows: [String: Int], before index: Int, column: [String: Int]
-  ) -> Double {
-    let placed = callers.filter { (column[$0] ?? index) < index }.compactMap { rows[$0] }
-    guard !placed.isEmpty else { return .infinity }
-    return Double(placed.reduce(0, +)) / Double(placed.count)
+  ) -> (column: Double, row: Double) {
+    let placed = callers.filter { (column[$0] ?? index) < index }
+    let placedRows = placed.compactMap { rows[$0] }
+    guard !placedRows.isEmpty else { return (.infinity, .infinity) }
+    let columns = placed.compactMap { column[$0] }
+    return (
+      Double(columns.reduce(0, +)) / Double(columns.count),
+      Double(placedRows.reduce(0, +)) / Double(placedRows.count)
+    )
   }
 }

@@ -15,7 +15,7 @@ from swift_source import run, split_swift, swift_files
 PATTERNS = {
     "phase reference": re.compile(r"\bphase\s*\d", re.IGNORECASE),
     "milestone reference": re.compile(r"\bM[1-9]\b"),
-    "slice reference": re.compile(r"\bslice\s*S?\d+", re.IGNORECASE),
+    "slice reference": re.compile(r"(?i:\bslice\s*S?\d+)|\b(?:(?:[ABCKS]|FR)\d+[a-z]?|DF\d+-[a-z])\b"),
     "review bookkeeping": re.compile(r"\breview\s+(item|finding|round|comment)s?\b", re.IGNORECASE),
     "plan reference": re.compile(r"\b(per|see|from) (the )?plan\b|\bplan\s*§", re.IGNORECASE),
 }

@@ -1,11 +1,12 @@
 # Building Silta with Silta
 
 Setup was completed with the maintainer on 2026-11-04, which started DF0. Rerun
-these steps only for a new machine or a fresh `~/.silta`. The maintainer does not
-run CLI commands.
+these steps only for a new machine or a fresh `~/.silta`. The maintainer normally
+works through an agent during repository dogfooding.
 
-The scripts need `/usr/bin/jq`, which ships with macOS 15 or later. The import
-also needs `gh` 2.48 or later, for `gh api --slurp`.
+Follow the [development installer requirements](../getting-started.md#1-requirements).
+The scripts use system `jq`. Issue import also needs `gh` 2.48 or later for
+`gh api --slurp`.
 
 ## Setup with an agent
 
@@ -142,7 +143,11 @@ workspace and excludes its own actor's calls and approvals.
   dropped, or left untriaged past 14 days, each counted once; an agent withdrawing
   its own proposal is not triage and isn't counted; the oldest pending
   proposal shows what still waits. The first report's numbers are mostly the setup
-  triage. Questions and inbox measurements are `n/a` until S11.
+  triage. The report reads the current human inbox for the selected workspace.
+  It counts questions addressed to `@me` and includes omitted entries in the
+  inbox size. When the inbox omits entries, the question count is a lower bound.
+  The oldest age is unknown if any entry is omitted or lacks a timestamp.
+  These inbox measurements describe the report time, regardless of `--since`.
 
 The report also measures document proposal decisions and observed brief exposure.
 

@@ -41,7 +41,7 @@ struct CommentHandoffTests {
       let raw = try SiltaBinary.run(
         ["task", "show", "AC-1", "--json"], in: scratch,
         environment: TaskCommandTests.fixed)
-      let data = try TaskStateRegressionTests.data(raw)
+      let data = try TaskStateCommandTests.data(raw)
       let comments = try #require(data["comments"] as? [[String: Any]])
       #expect(comments.first?["body"] as? String == Self.body)
       #expect(comments.first?["released"] == nil)
@@ -67,7 +67,7 @@ struct CommentHandoffTests {
           "comment", "AC-1", "--kind", unclaimed ? "handoff" : "comment",
           "-m", "Context", "--json",
         ], in: scratch, environment: TaskCommandTests.fixed)
-      #expect(try TaskStateRegressionTests.data(result)["released"] as? Bool == false)
+      #expect(try TaskStateCommandTests.data(result)["released"] as? Bool == false)
     }
   }
 
@@ -89,6 +89,8 @@ struct CommentHandoffTests {
       Golden.forTests().check(
         json ? result.stdout : result.stderr,
         "comment-body-required.\(json ? "json" : "txt")")
+      let report = json ? result.stdout : result.stderr
+      #expect(report.contains("silta --ws 'acme' comment 'AC-1' --kind 'handoff' --help"))
     }
   }
 
@@ -133,7 +135,7 @@ struct CommentHandoffTests {
         let raw = try SiltaBinary.run(
           args + ["task", "show", "AC-1", "--json"], in: scratch,
           environment: TaskCommandTests.fixed)
-        #expect(try TaskStateRegressionTests.data(raw)["handed_off"] == nil)
+        #expect(try TaskStateCommandTests.data(raw)["handed_off"] == nil)
       }
     }
   }
@@ -158,7 +160,7 @@ extension CommentHandoffTests {
         ["task", "show", "AC-1", "--json"], in: scratch,
         environment: TaskCommandTests.fixed)
       let comments = try #require(
-        try TaskStateRegressionTests.data(raw)["comments"] as? [[String: Any]])
+        try TaskStateCommandTests.data(raw)["comments"] as? [[String: Any]])
       #expect(comments.first?["body"] as? String == body)
     }
   }

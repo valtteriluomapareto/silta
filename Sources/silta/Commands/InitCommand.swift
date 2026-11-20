@@ -5,7 +5,7 @@ import SiltaCore
 struct InitCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "init",
-    abstract: "Initialize or scan repos; select with ws use; ws edit is human-only.",
+    abstract: "Initialize Silta or scan local Git repositories into a workspace.",
     discussion: "`init --scan` scans roots and two child levels without fetching.\n"
       + "A new workspace derives its slug and task prefix from the first directory.\n"
       + "Values keep case, use letters, digits, _ or -, and start/end alphanumeric.\n"
@@ -15,6 +15,7 @@ struct InitCommand: OutputCommand {
 
   static let dataShape = Shape.object([
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,
+    "repositories": .optional(.array(.string)), "apps": .optional(.array(.string)),
   ])
 
   static let workspaceSource = WorkspaceSource.none
@@ -67,15 +68,32 @@ struct InitCommand: OutputCommand {
         scan.map { URL(filePath: $0) }, target: target, store: env.db,
         git: env.git, identity: (env.ids, env.clock.now()))
     }
+    return receipt(outcome, actor: env.actor)
+  }
+
+  private func receipt(_ outcome: ScanOutcome?, actor: ActorID) -> CommandOutput {
     let workspace = outcome?.workspace
-    let edit =
-      (workspace.map { "silta ws edit '" + $0 + "'" } ?? "silta ws edit")
-      + " -F <file> --approved \"<the human's words>\""
-    var text = workspace.map { "Initialized workspace \($0)." } ?? "Initialized database."
-    if let workspace { text += "\nnext: silta ws use '\(workspace)'" }
-    text += "\nask human: \(edit)"
+    let next = workspace.map { "silta --ws " + shellWord($0) + " ws show" } ?? "silta init --help"
+    var text =
+      workspace.map { "Workspace \($0)." }
+      ?? "Initialized database. Choose the repositories to scan."
+    if let outcome {
+      text +=
+        "\nRepositories: "
+        + (outcome.repositories.isEmpty ? "none" : outcome.repositories.joined(separator: ", "))
+      text += "\nApps: " + (outcome.apps.isEmpty ? "none" : outcome.apps.joined(separator: ", "))
+      text +=
+        actor.isHuman
+        ? "\nEdit from your terminal with silta ws edit " + shellWord(outcome.workspace) + "."
+        : "\nAsk the human before editing the workspace configuration."
+    }
+    text += "\nnext: " + next
     var output = CommandOutput(
-      text: text, data: InitData(workspace: workspace, next: [edit], nextBy: "human"))
+      text: text,
+      data: InitData(
+        workspace: workspace, next: [next], nextBy: "agent",
+        repositories: outcome?.repositories, apps: outcome?.apps),
+      warnings: outcome?.warnings ?? [])
     output.workspace = workspace
     return output
   }
@@ -89,8 +107,12 @@ private struct InitData: Encodable {
 
   let nextBy: String
 
+  let repositories: [String]?
+
+  let apps: [String]?
+
   enum CodingKeys: String, CodingKey {
-    case workspace, next
+    case workspace, next, repositories, apps
     case nextBy = "next_by"
   }
 }

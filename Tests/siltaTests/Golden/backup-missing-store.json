@@ -1,0 +1,1 @@
+{"error":{"code":"env","message":"Database file could not be opened; it may be missing or its directory may not exist.","next":["silta doctor"],"next_by":"human"},"ok":false,"schema":1,"warnings":[]}

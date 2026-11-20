@@ -52,6 +52,78 @@ struct DocEvidenceReadCommandTests {
     }
   }
 
+  @Test func documentTerminalViewsKeepStructuredEvidenceIntact() throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let title = "Acme\u{1b}title\u{7}safe"
+      let body = "Acme\u{1b}body\u{7}safe\twords\n"
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET title=?,body_md=? WHERE rev=2", arguments: [title, body])
+      }
+      let before = try truth(store)
+      for quiet in [false, true] {
+        let body = try run([], scratch, quiet: quiet)
+        #expect(body.termination == .exit(0) && body.stderr.isEmpty)
+        #expect(body.stdout.contains("title: Acme title safe\n"))
+        #expect(body.stdout.contains("Acme body safe\twords\n"))
+        let diff = try run(["--diff"], scratch, quiet: quiet)
+        #expect(diff.termination == .exit(0) && diff.stderr.isEmpty)
+        #expect(diff.stdout.contains("+Acme body safe\twords\n"))
+        let list = try SiltaBinary.run(
+          ["--ws", "acme", "doc", "ls"] + (quiet ? ["--quiet"] : []),
+          in: scratch, environment: TaskCommandTests.fixed)
+        #expect(list.termination == .exit(0) && list.stderr.isEmpty)
+        #expect(!list.stdout.contains("\u{1b}") && !list.stdout.contains("\u{7}"))
+      }
+      let json = try TaskStateCommandTests.data(run([], scratch, json: true))
+      #expect(json["title"] as? String == title)
+      #expect(json["body"] as? String == body)
+      let full = try #require(json["output"] as? String)
+      let index = try #require(full.components(separatedBy: "\n").firstIndex { $0 + "\n" == body })
+      let lineFlags = ["--lines", String(index + 1)]
+      let line = try run(lineFlags, scratch)
+      #expect(line.stdout.contains("Acme body safe\twords\n"))
+      let bodyWindow = try TaskStateCommandTests.data(run(lineFlags, scratch, json: true))
+      #expect((bodyWindow["output"] as? String)?.contains(body) == true)
+      let diff = try TaskStateCommandTests.data(run(["--diff"], scratch, json: true))
+      #expect((diff["output"] as? String)?.contains("+" + body) == true)
+      #expect(try truth(store) == before)
+    }
+  }
+
+  @Test func terminalDocumentPaginationKeepsItsLineCoordinates() throws {
+    try withScratchDirectory { scratch in
+      let store = try fixture(scratch)
+      let storedRow = "Acme first\u{2028}continued\u{2029}paragraph\rending"
+      let displayedRow = "Acme first continued paragraph ending"
+      let following = (2...410).map { "Acme line \($0)" }
+      let body = ([storedRow] + following).joined(separator: "\n")
+      try store.write {
+        try $0.database.execute(
+          sql: "UPDATE doc_rev SET body_md=? WHERE rev=2", arguments: [body])
+      }
+      let page = try run([], scratch)
+      let raw = try TaskStateCommandTests.data(run([], scratch, json: true))
+      let rawLines = try #require(raw["output"] as? String).components(separatedBy: "\n")
+      let row = try #require(rawLines.firstIndex(of: storedRow))
+      let footer = try #require(rawLines.first { $0.contains("lines omitted; next: ") })
+      let range = try #require(footer.components(separatedBy: " --lines ").dropFirst().first)
+      let one = try run(["--lines", String(row + 1)], scratch, quiet: true)
+      let diff = try run(["--diff"], scratch)
+      let continued = try run(["--lines", range], scratch)
+      let items = (page.stdout + continued.stdout).split(separator: "\n")
+        .filter { $0.hasPrefix("Acme ") }.map(String.init)
+      #expect(
+        one.stdout == displayedRow + "\n"
+          && diff.stdout.contains("+" + displayedRow + "\n")
+          && page.stdout.split(separator: "\n").count <= 400
+          && items == [displayedRow] + following,
+        "The terminal page and selected row must keep the JSON line coordinates.")
+      #expect(page.stdout.contains(footer))
+    }
+  }
+
   @Test(arguments: ["accepted", "proposed", "rejected", "superseded"])
   func allReadableStatesUseRecordedSourceWithoutLiveClaim(state: String) throws {
     try withScratchDirectory { scratch in

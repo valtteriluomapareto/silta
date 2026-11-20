@@ -163,7 +163,11 @@ struct WorkspaceLocationTests {
     try withScratchDirectory { scratch in
       let (repo, _) = try Self.setup(scratch)
       try Self.secondWorkspace(scratch)
-      for args in [["task", "show", "AC-1"], ["ws", "edit", "--approved", "Edit Acme workspace"]] {
+      let file = scratch.appending(path: "config.yaml")
+      try "workspace: {slug: acme, name: Acme, task_prefix: AC}\n"
+        .write(to: file, atomically: true, encoding: .utf8)
+      let edit = ["ws", "edit", "-F", file.path, "--approved", "Edit Acme workspace"]
+      for args in [["task", "show", "AC-1"], edit] {
         for json in [false, true] {
           let result = try Self.run(args + (json ? ["--json"] : []), scratch, repo)
           #expect(result.termination == .exit(4))
@@ -224,7 +228,7 @@ struct WorkspaceLocationTests {
           #expect(result.termination == .exit(9))
           #expect(result.stdout.contains("Could not read git metadata"))
         }
-        for args in [["task", "add", "Acme", "--allow-secret"], ["ws", "edit"]] {
+        for args in [["task", "add", "Acme", "--allow-secret"], ["ws", "edit", "-F", "missing"]] {
           let result = try Self.run(args + ["--json"], scratch, repo)
           #expect(result.termination == .exit(3))
           #expect(result.stdout.contains("human_only"))
@@ -277,7 +281,8 @@ extension WorkspaceLocationTests {
     try withScratchDirectory { scratch in
       let (repo, _) = try Self.setup(scratch)
       for words in ["", "   ", "<the human's words>", String(repeating: "a", count: 301)] {
-        let result = try Self.run(["ws", "edit", "--approved", words, "--json"], scratch, repo)
+        let result = try Self.run(
+          ["ws", "edit", "-F", "missing", "--approved", words, "--json"], scratch, repo)
         #expect(result.termination == .exit(1))
         #expect(result.stdout.contains("\"code\":\"invalid\""))
         #expect(try Self.lastLog(scratch)["workspace"] == nil)

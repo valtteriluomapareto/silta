@@ -19,11 +19,17 @@ struct WorkspaceCommandTests {
         let suffix = json ? ["--json"] : []
         let listed = try SiltaBinary.run(["ws", "ls"] + suffix, in: scratch)
         #expect(listed.termination == .exit(0))
+        if !json {
+          #expect(listed.stdout.hasPrefix("SLUG\tNAME\tTASK PREFIX\n"))
+        }
         Golden.forTests().check(listed.stdout, json ? "ws-ls.json" : "ws-ls.txt")
         let selected = try SiltaBinary.run(["ws", "use", "acme"] + suffix, in: scratch)
         #expect(selected.termination == .exit(0))
         Golden.forTests().check(selected.stdout, json ? "ws-use.json" : "ws-use.txt")
       }
+      let quiet = try SiltaBinary.run(["ws", "ls", "--quiet"], in: scratch)
+      #expect(quiet.termination == .exit(0))
+      #expect(quiet.stdout == "acme\tAcme\tAC\n")
       #expect(
         try store.read {
           try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='current_workspace'")
@@ -31,10 +37,33 @@ struct WorkspaceCommandTests {
     }
   }
 
-  @Test func agentCannotOpenEditor() throws {
+  @Test func workspaceNamesStayWithinTheirTerminalColumn() throws {
+    try withScratchDirectory { scratch in
+      let store = DatabaseStore(
+        home: scratch.appending(path: "silta-home"),
+        clock: FakeClock(now: Date(timeIntervalSince1970: 1_700_000_000)), jitter: { 0 })
+      let name = "Acme\u{1b}Projects\u{7}\u{2028}Work\tTeam"
+      try store.write {
+        try $0.database.execute(
+          sql: "INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('acme','acme',?,'AC')",
+          arguments: [name])
+      }
+      for flags in [[], ["--quiet"]] {
+        let shown = try SiltaBinary.run(["ws", "ls"] + flags, in: scratch)
+        #expect(shown.termination == .exit(0))
+        #expect(shown.stdout.contains("acme\tAcme Projects  Work Team\tAC\n"))
+      }
+      let result = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      let data = try TaskStateCommandTests.data(result)
+      let workspaces = try #require(data["workspaces"] as? [[String: Any]])
+      #expect(workspaces.first?["name"] as? String == name)
+    }
+  }
+
+  @Test func unapprovedAgentCannotReadWorkspaceInput() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
-        ["ws", "edit"], in: scratch,
+        ["ws", "edit", "-F", "missing.yaml"], in: scratch,
         environment: ["SILTA_ACTOR": "agent:codex:acme", "EDITOR": "/usr/bin/false"])
       #expect(result.termination == .exit(3))
       Golden.forTests().check(result.stderr, "ws-edit-refused.txt")
@@ -71,7 +100,7 @@ struct WorkspaceCommandTests {
     try withScratchDirectory { scratch in
       for json in [false, true] {
         let result = try SiltaBinary.run(
-          arguments + (json ? ["--json"] : []), in: scratch,
+          arguments + ["-F", "missing.yaml"] + (json ? ["--json"] : []), in: scratch,
           environment: ["SILTA_ACTOR": "agent:codex:acme"])
         #expect(result.termination == .exit(3))
         Golden.forTests().check(
@@ -84,7 +113,7 @@ struct WorkspaceCommandTests {
   @Test func refusalQuotesWorkspaceShellCharacters() throws {
     try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
-        ["ws", "edit", "acme's", "--json"], in: scratch,
+        ["ws", "edit", "acme's", "-F", "missing.yaml", "--json"], in: scratch,
         environment: ["SILTA_ACTOR": "agent:codex:acme"])
       #expect(result.termination == .exit(3))
       let object = try #require(

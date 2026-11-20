@@ -6,8 +6,8 @@ struct DoctorCommand: OutputCommand {
   static let workspaceSource = WorkspaceSource.none
   static let configuration = CommandConfiguration(
     commandName: "doctor",
-    abstract: "Diagnose database, git and data across all workspaces without repairs.",
-    discussion: "--ws does not filter; --install skips SQLite and git.\n"
+    abstract: "Check the database, repositories and agent setup without repairs.",
+    discussion: "--install checks agent setup only. Checks are scoped to all workspaces.\n"
       + "Harness checks are read without launches; broad inspection can update SQLite "
       + "sidecars.\n"
       + "Snapshot recovery is human-only: stop clients; preserve home WAL/SHM sidecars.\n"

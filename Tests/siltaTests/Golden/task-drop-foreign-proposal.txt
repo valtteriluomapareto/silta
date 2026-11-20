@@ -1,0 +1,2 @@
+error: Another actor proposed AC-1. Ask the human to drop it through triage. [conflict]
+ask human: silta --ws 'acme' task triage --drop AC-1 -F - --approved "<the human's words>"

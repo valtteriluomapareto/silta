@@ -16,7 +16,7 @@ struct NodeInspector: View {
           header("Service", title: service.name, ref: service.attachment)
           if let summary = service.summary { Text(summary).font(.system(size: 13)) }
           connections(
-            "Called by", map.connections.filter { $0.target == "service:" + service.slug },
+            "Called by", map.connections.filter { $0.target == service.key },
             incoming: true)
           if service.summary == nil {
             Text("No summary in the workspace YAML.").font(.system(size: 11))
@@ -27,8 +27,7 @@ struct NodeInspector: View {
           ContentUnavailableView("Select an app or a service", systemImage: "sidebar.right")
         }
       }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
-    }.seaPane().padding(10).foregroundStyle(Color("Ink"))
-      .background { ShoreBackground() }
+    }.seaPane().foregroundStyle(Color("Ink"))
   }
 
   @ViewBuilder private func appDetail(_ app: AppMapApp) -> some View {

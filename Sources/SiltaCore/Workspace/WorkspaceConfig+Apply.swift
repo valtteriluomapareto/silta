@@ -3,6 +3,10 @@ import GRDB
 import Yams
 
 extension WorkspaceConfig {
+  static func reservedAppSlug(_ slug: String) -> Bool {
+    ["doc", "edge", "service"].contains(slug)
+  }
+
   /// Applies the complete editing view in the caller's single write transaction.
   /// Keeps retained identities and unknown columns; referenced deletions throw conflict.
   package func apply(in transaction: StorageTransaction, ids: any IDGenerator, at date: Date) throws
@@ -276,7 +280,7 @@ private struct WorkspaceWriter {
 
   private func checkNewIdentity(_ table: String, identity: [String: DatabaseValue]) throws {
     if table == "app", let slug = identity["slug"].flatMap(String.fromDatabaseValue),
-      ["doc", "edge", "service"].contains(slug)
+      WorkspaceConfig.reservedAppSlug(slug)
     {
       throw WorkspaceError.invalid([
         "New apps cannot use reserved slug \(slug); choose a different slug."

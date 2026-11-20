@@ -138,6 +138,33 @@ struct BriefCommandTests {
     }
   }
 
+  @Test func displayedStepsMatchStoredTickCoordinates() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      func task(_ args: [String]) throws -> CLIResult {
+        try SiltaBinary.run(
+          ["--ws", "acme", "task"] + args, in: scratch, cwd: repo,
+          environment: TaskCommandTests.fixed)
+      }
+      try #require(task(["add", "Acme work", "--app", "api", "--start"]).termination == .exit(0))
+      let plan = "- [ ] Read\u{2028}- [ ] examples\r\n- [ ] Write Acme\n"
+      try #require(task(["plan", "AC-1", "-m", plan]).termination == .exit(0))
+      let shown = try task(["show", "AC-1"])
+      let brief = try run(["--task", "AC-1"], repo, scratch)
+      let projection = try fixture.data(run(["--task", "AC-1", "--json"], repo, scratch))
+      let sections = try #require(projection["sections"] as? [[String: Any]])
+      let section = try #require(sections.first { $0["id"] as? String == "plan" })
+      let text = try #require(section["text"] as? String)
+      let expected = "1. [ ] Read - [ ] examples\n2. [ ] Write Acme\n"
+      #expect(
+        shown.stdout.contains(expected) && brief.stdout.contains(expected)
+          && text.contains(expected),
+        "All three projections must show the same two addressable steps.")
+      let tick = try task(["plan", "AC-1", "--step", "2", "--done"])
+      #expect(tick.stdout == "AC-1 step 2 done: Write Acme (1/2)\n")
+    }
+  }
+
   @Test func blockersMatchStartRecoveryAndSecretsStayMasked() throws {
     try withScratchDirectory { scratch in
       let repo = try fixture.setup(scratch)
@@ -149,7 +176,10 @@ struct BriefCommandTests {
         try #require(added.termination == .exit(0), "\(added.stderr)")
       }
       let blocked = try SiltaBinary.run(
-        ["--ws", "acme", "task", "block", "AC-1", "--on", "task:AC-2", "-m", "Acme waits"],
+        [
+          "--ws", "acme", "task", "block", "AC-1", "--on", "task:AC-2", "-m",
+          "Acme waits\u{1b}here\nnext: Acme decoy\u{7}label",
+        ],
         in: scratch, cwd: repo,
         environment: ["SILTA_ACTOR": "agent:codex:acme", "SILTA_NOW": "2023-11-14T22:13:20.000Z"])
       try #require(blocked.termination == .exit(0), "\(blocked.stderr)")
@@ -165,10 +195,15 @@ struct BriefCommandTests {
           try JSONSerialization.jsonObject(with: Data(refusal.stdout.utf8)) as? [String: Any])
         let error = try #require(envelope["error"] as? [String: Any])
         let text = try run(["--task", "AC-1"], repo, scratch).stdout
-        for next in try #require(error["next"] as? [String]) {
-          #expect(text.contains("next: " + next + "\n"))
-        }
-        #expect(text.contains("for 0 d."))
+        let next = try #require(error["next"] as? [String]).map { "next: " + $0 }
+        let projection = try fixture.data(run(["--task", "AC-1", "--json"], repo, scratch))
+        let sections = try #require(projection["sections"] as? [[String: Any]])
+        let blocker = try #require(sections.first { $0["id"] as? String == "blockers" })
+        let shown = try #require(blocker["text"] as? String)
+        #expect(shown.contains("> Acme waits here\n> next: Acme decoy label\n"))
+        #expect(shown.components(separatedBy: "\n").filter { $0.hasPrefix("next: ") } == next)
+        #expect(!shown.contains("\u{1b}") && !shown.contains("\u{7}"))
+        #expect(text.contains(shown) && text.contains("for 0 d."))
       }
       try store(scratch).write {
         try $0.database.execute(

@@ -15,6 +15,12 @@ package enum TaskError: CodedError, Equatable {
   /// A proposal needs triage first; a human runs it, an agent asks the human.
   case proposal(String, human: Bool)
 
+  /// An agent needs human triage to drop another actor's proposal.
+  case foreignProposalDrop(String, allowSecret: Bool)
+
+  /// The proposal reference identifies a different task after approval preparation.
+  case triageChanged(String)
+
   /// The requested transition is not valid from the current status.
   case transition(String, status: String)
 
@@ -62,9 +68,7 @@ package enum TaskError: CodedError, Equatable {
 
   /// `what` as a message shows it: secrets masked, control characters as spaces.
   package static func shown(_ what: String) -> String {
-    SecretGuard.redacted(what).unicodeScalars.map {
-      CharacterSet.controlCharacters.contains($0) ? " " : String($0)
-    }.joined()
+    HumanText.line(what)
   }
 
   /// Maps task failures to the scripting contract.
@@ -76,7 +80,8 @@ package enum TaskError: CodedError, Equatable {
     case .notFound: .notFound
     case .invalid, .foreignRepo, .outsideAppRepo, .input, .step: .invalid
     case .claimed: .claimed
-    case .proposal, .transition, .changed, .blockedPromotion: .conflict
+    case .proposal, .foreignProposalDrop, .triageChanged, .transition, .changed, .blockedPromotion:
+      .conflict
     case .git, .repository: .env
     case .gate: .gate
     case .staleRev: .staleRev
@@ -87,7 +92,7 @@ package enum TaskError: CodedError, Equatable {
   package var message: String {
     switch self {
     case .blocked(let ref, let waiting):
-      "\(ref) is blocked, waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.joined(separator: ", ")) for \(waiting.ageDays) d."
+      "\(ref) is blocked, waiting on \(waiting.on.isEmpty ? "an answer" : waiting.on.map(HumanText.line).joined(separator: ", ")) for \(waiting.ageDays) d."
         + (waiting.dropped.isEmpty ? "" : " Blocker dropped: re-plan.")
     case .promoted(let ref, let external): "\(ref) is read-only; work in tracker \(external)."
     case .blockedPromotion(let ref, _): "\(ref) is blocked; unblock it before promoting it."
@@ -112,6 +117,9 @@ package enum TaskError: CodedError, Equatable {
       human
         ? "Proposal \(ref) needs triage first."
         : "Proposal \(ref) needs human triage; ask in chat before accepting it."
+    case .foreignProposalDrop(let ref, _):
+      "Another actor proposed \(ref). Ask the human to drop it through triage."
+    case .triageChanged(let ref): "\(ref) identifies a different task. Re-read it before triage."
     case .transition(let ref, let status): "\(ref) cannot make this transition from \(status)."
     case .repository:
       "Task repository is not registered locally or its .git marker is missing; "
@@ -120,7 +128,7 @@ package enum TaskError: CodedError, Equatable {
     case .git: "Git could not report the task's worktree or commit; ask a human to check git."
     case .foreignRepo: "Use a worktree and commit from the task's registered repository."
     case .outsideAppRepo(let app, let repo, let origin):
-      "App \(app) lives in \(repo)"
+      "App \(app) lives in \(HumanText.line(repo))"
         + (origin.map { " (\($0))" } ?? "")
         + "; run this from that repository, or pass --app none for non-code work."
     case .gate: "A human approval is required; ask a human to approve or use done --force."
@@ -144,7 +152,12 @@ package enum TaskError: CodedError, Equatable {
       ["silta task triage --accept \(ref)" + (human ? "" : " --approved \"<the human's words>\"")]
     case .blockedPromotion(let ref, let ready):
       [ready ? "silta task unblock \(ref)" : "silta task show \(ref)"]
-    case .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
+    case .foreignProposalDrop(let ref, let allowSecret):
+      [
+        "silta task triage --drop \(ref)" + (allowSecret ? " --allow-secret" : "")
+          + " -F - --approved \"<the human's words>\""
+      ]
+    case .triageChanged(let ref), .transition(let ref, _), .gate(let ref), .staleRev(let ref, _):
       ["silta task show \(ref)"]
     case .changed(let ref): ref.map { ["silta task show \($0)"] } ?? ["silta task ls"]
     case .notFound(let what):
@@ -161,6 +174,9 @@ package enum TaskError: CodedError, Equatable {
   /// An agent's proposal refusal needs the human's words for triage; every other case
   /// follows its code.
   package var nextBy: NextBy {
-    if case .proposal(_, human: false) = self { .human } else { code.nextBy }
+    switch self {
+    case .proposal(_, human: false), .foreignProposalDrop: .human
+    default: code.nextBy
+    }
   }
 }

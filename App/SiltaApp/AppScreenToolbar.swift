@@ -7,6 +7,9 @@ struct AppScreenToolbar: ToolbarContent {
   let compactSearch: Bool
 
   var body: some ToolbarContent {
+    // With the title removed, the controls sit at the leading edge without this; the
+    // design keeps them at the window's trailing edge.
+    ToolbarSpacer(.flexible, placement: .primaryAction)
     if model.route == .docs {
       ToolbarItem(placement: .primaryAction) { documentTabs }
         .sharedBackgroundVisibility(.hidden)
@@ -50,6 +53,7 @@ struct AppScreenToolbar: ToolbarContent {
       }
     }
     if model.route == .board || model.route == .workspace {
+      ToolbarSpacer(.fixed, placement: .primaryAction)
       ToolbarItem(placement: .primaryAction) {
         Button("Inspector", systemImage: "sidebar.right") { model.toggleInspector() }
           .labelStyle(.iconOnly).help("Toggle inspector (⌥⌘I)")

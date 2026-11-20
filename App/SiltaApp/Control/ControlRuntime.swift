@@ -31,7 +31,9 @@
       do {
         try FileManager.default.createDirectory(
           at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        NSApplication.shared.appearance = NSAppearance(named: options.dark ? .darkAqua : .aqua)
+        if options.isAutomated || options.dark {
+          NSApplication.shared.appearance = NSAppearance(named: options.dark ? .darkAqua : .aqua)
+        }
         await model.refresh().value
         try options.route.apply(to: model)
         if let output = options.snapshot {
@@ -110,14 +112,15 @@
         to: directory.appending(path: "sidebar.png"))
       if model.route == .board, model.boardInspectorPresented {
         try await capture(
-          TaskInspector(model: model), size: NSSize(width: 360, height: size.height),
+          TaskInspector(model: model),
+          size: NSSize(width: CGFloat(SeaInspectorMetrics.width), height: size.height),
           to: directory.appending(path: "inspector.png"))
       } else if model.route == .workspace, model.workspaceInspectorPresented,
         let map = model.visibleData?.map, let node = model.workspaceNode
       {
         try await capture(
           NodeInspector(ref: node, map: map, model: model),
-          size: NSSize(width: 360, height: size.height),
+          size: NSSize(width: CGFloat(SeaInspectorMetrics.width), height: size.height),
           to: directory.appending(path: "inspector.png"))
       } else if model.route == .workspace, model.workspaceInspectorPresented,
         let map = model.visibleData?.map
@@ -126,7 +129,7 @@
           .connection(model.workspaceSelection?.connectionRef)
         try await capture(
           ConnectionInspector(connection: connection, model: model),
-          size: NSSize(width: 360, height: size.height),
+          size: NSSize(width: CGFloat(SeaInspectorMetrics.width), height: size.height),
           to: directory.appending(path: "inspector.png"))
       }
     }

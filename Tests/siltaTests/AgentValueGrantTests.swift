@@ -90,10 +90,10 @@ struct AgentValueGrantTests {
     try withScratchDirectory { scratch in
       let original = Self.table + "writable_roots = " + array + "\n" + Self.codexTables
       try AgentsInstallTests.write(original, Self.path, in: scratch)
-      let before = try AgentInstallRoundTwoTests.snapshot(scratch)
+      let before = try AgentInstallBoundaryTests.snapshot(scratch)
       let preview = try AgentsInstallTests.run(["install", "--codex", "--json"], in: scratch)
       #expect(preview.termination == .exit(0))
-      #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
+      #expect(try AgentInstallBoundaryTests.snapshot(scratch) == before)
       #expect(
         !preview.stdout.contains("/acme/foreign") && !preview.stdout.contains("Acme-private"))
       try Self.apply("install", in: scratch)
@@ -140,7 +140,7 @@ extension AgentValueGrantTests {
     try withScratchDirectory { scratch in
       if !original.isEmpty { try AgentsInstallTests.write(original, Self.path, in: scratch) }
       let env = ["SILTA_HOME": scratch.appending(path: "acme'''/data").path]
-      let before = try AgentInstallRoundTwoTests.snapshot(scratch)
+      let before = try AgentInstallBoundaryTests.snapshot(scratch)
       let preview = try AgentsInstallTests.run(
         ["install", "--json"], in: scratch, environment: env)
       let response = try GuideContractTests.object(preview.stdout)
@@ -150,12 +150,12 @@ extension AgentValueGrantTests {
       #expect(preview.termination == .exit(6))
       #expect(preview.stdout.contains("add this line yourself"))
       #expect(preview.stdout.contains("retain all other entries"))
-      #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
+      #expect(try AgentInstallBoundaryTests.snapshot(scratch) == before)
       let apply = try AgentsInstallTests.run(
         ["install", "--apply", token, "--json"], in: scratch, environment: env)
       #expect(apply.termination == .exit(6))
       #expect(apply.stdout.contains("add this line yourself"))
-      #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
+      #expect(try AgentInstallBoundaryTests.snapshot(scratch) == before)
     }
   }
 
@@ -176,12 +176,12 @@ extension AgentValueGrantTests {
       ]
       let original = Self.table + "writable_roots = " + arrays[position] + "\n" + Self.codexTables
       try AgentsInstallTests.write(original, Self.path, in: scratch)
-      let before = try AgentInstallRoundTwoTests.snapshot(scratch)
+      let before = try AgentInstallBoundaryTests.snapshot(scratch)
       let preview = try AgentsInstallTests.data(
         AgentsInstallTests.run(["install", "--codex", "--json"], in: scratch))
       let changes = try #require(preview["changes"] as? [[String: String]])
       #expect(changes.allSatisfy { $0["path"] != Self.path })
-      #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == before)
+      #expect(try AgentInstallBoundaryTests.snapshot(scratch) == before)
       try Self.apply("install", in: scratch)
       #expect(try Self.bytes(scratch) == Data(original.utf8))
       try Self.noop("install", in: scratch)
@@ -245,7 +245,7 @@ extension AgentValueGrantTests {
       try AgentsInstallTests.write(
         Self.table + "writable_roots = [\(token), \(token)]\n", Self.path, in: scratch)
       for operation in ["install", "uninstall"] {
-        try AgentInstallRoundTwoTests.refusesWithoutWrites(
+        try AgentInstallBoundaryTests.refusesWithoutWrites(
           [operation], in: scratch, reason: "retain all other entries")
       }
     }
@@ -286,7 +286,7 @@ extension AgentValueGrantTests {
   func unsafeShapesRefuseWithManualElementRecipe(operation: String, original: String) throws {
     try withScratchDirectory { scratch in
       try AgentsInstallTests.write(original, Self.path, in: scratch)
-      try AgentInstallRoundTwoTests.refusesWithoutWrites(
+      try AgentInstallBoundaryTests.refusesWithoutWrites(
         [operation], in: scratch,
         reason: operation == "install" ? "add this line yourself" : "remove only")
       let result = try AgentsInstallTests.run([operation, "--codex", "--json"], in: scratch)
@@ -307,12 +307,12 @@ extension AgentValueGrantTests {
       try AgentsInstallTests.write(
         try AgentsInstallTests.read(Self.path, in: scratch) + "# foreign edit\n", Self.path,
         in: scratch)
-      let snapshot = try AgentInstallRoundTwoTests.snapshot(scratch)
+      let snapshot = try AgentInstallBoundaryTests.snapshot(scratch)
       #expect(
         try AgentsInstallTests.run(
           ["install", "--codex", "--apply", token], in: scratch, environment: moved
         ).termination == .exit(6))
-      #expect(try AgentInstallRoundTwoTests.snapshot(scratch) == snapshot)
+      #expect(try AgentInstallBoundaryTests.snapshot(scratch) == snapshot)
       try Self.apply("install", in: scratch, environment: moved)
       try Self.apply("uninstall", in: scratch, environment: moved)
       let oldRoot = try Self.quoted(Self.root(scratch))

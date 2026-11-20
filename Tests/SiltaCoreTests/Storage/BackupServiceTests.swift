@@ -79,7 +79,7 @@ struct BackupServiceTests {
       for day in 1...9 {
         _ = try backup.snapshot(name: String(format: "silta-2023-12-%02d.db", day))
       }
-      try backup.prune()
+      try backup.prune(on: "2023-12-31")
       for path in paths { #expect(FileManager.default.fileExists(atPath: path)) }
       let after = try store.read {
         try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key='last_backup_day'")

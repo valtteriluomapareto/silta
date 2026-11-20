@@ -172,7 +172,6 @@ extension WorkspaceLocationTests {
       try yaml.stdout.write(to: config, atomically: true, encoding: .utf8)
       for args in [
         ["task", "add", "Must refuse", "--start"], ["ws", "show"],
-        ["ws", "edit", "--approved", "Edit Acme workspace"],
         ["ws", "edit", "-F", config.path, "--approved", "Edit Acme workspace"],
       ] {
         let result = try Self.run(args + ["--json"], scratch, repo)
@@ -183,8 +182,10 @@ extension WorkspaceLocationTests {
       #expect(count == 2)
       let missingFile = try Self.run(
         ["ws", "edit", "-F", "missing", "--approved", "Edit workspace", "--json"], scratch, repo)
-      #expect(missingFile.termination == .exit(9))
-      #expect(missingFile.stdout.contains("UTF-8 workspace YAML"))
+      #expect(missingFile.termination == .exit(1))
+      let invalidInput = try TaskStateCommandTests.error(missingFile)
+      #expect(invalidInput["code"] as? String == "invalid")
+      #expect(invalidInput["next"] as? [String] == ["silta ws edit --help"])
       #expect(try Self.lastLog(scratch)["workspace"] == nil)
       for (args, exit) in [
         (["task", "add", "Acme", "--allow-secret"], 3),

@@ -1,0 +1,2 @@
+No workspaces. Choose the repositories to scan.
+next: silta init --scan .

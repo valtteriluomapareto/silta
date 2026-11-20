@@ -66,7 +66,7 @@ package struct DocService {
       } else {
         for (index, ref) in refs.enumerated() {
           if index > 0 { layout.append(", ") }
-          let field = layout.field(Self.about([ref]))
+          let field = layout.field(Self.referenceForMasking(ref))
           layout.about?.append(field)
         }
       }
@@ -82,6 +82,7 @@ package struct DocService {
     return result
   }
 
+  /// Composes evidence for masking with the surrounding document fields.
   static func evidence(_ snapshot: DocRevision) -> String {
     let why: String
     switch snapshot.message {
@@ -90,10 +91,11 @@ package struct DocService {
     case .some(let text):
       why =
         "why:\n"
-        + SecretGuard.redacted(text).components(separatedBy: "\n")
+        + text.components(separatedBy: "\n")
         .map { "  " + $0 }.joined(separator: "\n") + "\n"
     }
-    return "source_task: " + (snapshot.sourceTask.map { about([$0]) } ?? "(not recorded)") + "\n"
+    return "source_task: " + (snapshot.sourceTask.map(referenceForMasking) ?? "(not recorded)")
+      + "\n"
       + "triaged_by: \(snapshot.triagedBy ?? "(not recorded)")\n"
       + "triaged_at: \(snapshot.triagedAt ?? "(not recorded)")\n" + why
   }
@@ -161,11 +163,21 @@ package struct DocService {
   }
 
   static func about(_ refs: [String]?) -> String {
+    SecretGuard.redacted(aboutForMasking(refs))
+  }
+
+  /// Keeps the reference spans intact until their complete containing text is masked.
+  static func aboutForMasking(_ refs: [String]?) -> String {
     refs.map {
       $0.isEmpty
         ? "(none)"
-        : $0.map(displayReference).joined(separator: ", ")
+        : $0.map(referenceForMasking).joined(separator: ", ")
     } ?? "(unknown)"
+  }
+
+  private static func referenceForMasking(_ ref: String) -> String {
+    let decoded = ref.removingPercentEncoding ?? ref
+    return SecretGuard.matches(in: decoded).isEmpty ? ref : decoded
   }
 
   static func displayReference(_ ref: String) -> String {

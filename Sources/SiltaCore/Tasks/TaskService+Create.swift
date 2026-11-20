@@ -16,7 +16,7 @@ extension TaskService {
       let command = prepared.draft.command + (draft.allowSecret ? " --allow-secret" : "")
       let retry =
         scopedCommand(command, workspace: slug)
-        + (bodyFlag == nil ? "" : " -F <file>")
+        + (retryBodyFlag.map { " " + $0 } ?? "")
       let inserted = try insert(
         prepared, workspace: slug, retry: (retry, prepared.draft.title), in: tx)
       var result = inserted.task

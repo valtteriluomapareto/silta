@@ -44,10 +44,11 @@ struct WhereCommand: OutputCommand {
       result = try await service.resolve(
         path: directory, workspace: global.ws, app: app, task: task)
     }
+    let head = result.head.isEmpty ? "(no commits)" : result.head
     var text =
       "\(result.workspace) / \(result.repo) / \(result.app ?? "unresolved")"
       + " [\(result.confidence): \(result.reason)]\n"
-      + "branch: \(result.branch ?? "(detached)")\nhead: \(result.head)\n"
+      + "branch: \(result.branch ?? "(detached)")\nhead: \(head)\n"
     if result.confidence == "low" {
       let candidates = result.retryCandidates
       text +=

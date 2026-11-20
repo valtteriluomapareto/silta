@@ -1,5 +1,6 @@
 #if DEBUG
   import Foundation
+  import Observation
   @testable import SiltaApp
   import SiltaAppSupport
   import Synchronization
@@ -90,6 +91,37 @@
         })
       await model.refresh().value
       try await body(model, reader)
+    }
+
+    @Test func aCommentRefreshesTheOpenDetailBeforeReleasingTheTarget() async throws {
+      try await fixtureModel { model, _ in
+        let ref = "AC-15"
+        let body = "Acme inspector discussion."
+        model.inspect(task: ref)
+        await model.loadTaskDetail()
+        let old = try #require(model.taskDetail.value)
+        #expect(!old.comments.contains { $0.body == body })
+
+        let target = try #require(model.target(ref))
+        model.actions.setDraft(body, for: target)
+        let send = try #require(model.comment(task: ref))
+        #expect(model.actions.isSending(target))
+        #expect(model.comment(task: ref) == nil)
+        let refreshedOnRelease = Mutex<Bool?>(nil)
+        withObservationTracking {
+          _ = model.actions.isSending(target)
+        } onChange: {
+          let refreshed = MainActor.assumeIsolated {
+            !model.taskDetail.isLoading
+              && model.taskDetail.value?.comments.contains { $0.body == body } == true
+          }
+          refreshedOnRelease.withLock { $0 = refreshed }
+        }
+        await send.value
+        #expect(refreshedOnRelease.withLock { $0 } == true)
+        #expect(!model.actions.isSending(target))
+        #expect(model.taskDetail.value?.comments.last?.body == body)
+      }
     }
 
     @Test func acceptingTheSelectionTriagesItAndPrunesWhatLeft() async throws {
@@ -188,6 +220,30 @@
       await sent.value
       #expect(model.actions.draft(task) == "")
       #expect(loads.forced.withLock { $0 } == 1)
+    }
+
+    @Test func aReplyPostsIntoItsThreadWithItsOwnDraft() async throws {
+      let writes = ControlledWrites()
+      let loads = Loads()
+      let model = await makeModel(writes, loads)
+      let reply = try #require(model.target(AppModel.replyTarget("AC-9/1")))
+      let comment = try #require(model.target("AC-9"))
+      model.actions.setDraft("Thanks, merging.", for: reply)
+      model.actions.setDraft("New thread draft", for: comment)
+      let first = try #require(model.reply(to: "AC-9/1", task: "AC-9"))
+      let request = await writes.next()
+      #expect(
+        request.write == .comment(task: "AC-9", body: "Thanks, merging.", replyTo: "AC-9/1"))
+      request.continuation.resume(throwing: Refused())
+      await first.value
+      #expect(model.actions.draft(reply) == "Thanks, merging.")
+      #expect(model.actions.failures[reply] != nil)
+      let second = try #require(model.reply(to: "AC-9/1", task: "AC-9"))
+      (await writes.next()).continuation.resume()
+      await second.value
+      #expect(model.actions.draft(reply) == "")
+      #expect(model.actions.draft(comment) == "New thread draft")
+      #expect(loads.forced.withLock { $0 } == 2)
     }
 
     @Test func noWriterMeansNoAction() async {

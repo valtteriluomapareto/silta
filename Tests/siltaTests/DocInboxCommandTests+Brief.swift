@@ -18,7 +18,7 @@ extension DocInboxCommandTests {
       result.stdout = result.stdout.replacingOccurrences(of: "\r\n", with: "\n")
         .replacingOccurrences(of: "^D\u{08}\u{08}", with: "")
       #expect(result.termination == .exit(0) && result.stderr.isEmpty)
-      let data = try TaskStateRegressionTests.data(result)
+      let data = try TaskStateCommandTests.data(result)
       let sections = try #require(data["sections"] as? [[String: Any]])
       let text = sections.filter { $0["id"] as? String == "inbox" }
         .compactMap { $0["text"] as? String }.joined()

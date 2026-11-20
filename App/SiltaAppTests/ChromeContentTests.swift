@@ -70,8 +70,8 @@
         await docs.refresh(reader, workspace: "acme", about: nil, archived: true)
         #expect(docs.groups(search: "").contains { $0.preferred?.archived == true })
         #expect(
-          DocsChromeContent.aboutLabel("edge:acme-mobile/acme-backend/http-api")
-            == "About acme-mobile → acme-backend")
+          DocsContent.name("edge:acme-mobile/acme-backend/http-api")
+            == "acme-mobile → acme-backend · http-api")
         let model = AppModel(load: { _, _, _ in nil })
         model.select(connection: "edge:acme-mobile/acme-backend/http-api")
         model.openDocument(

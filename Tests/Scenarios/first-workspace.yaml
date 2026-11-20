@@ -1,0 +1,23 @@
+fixtures: true
+steps:
+  - args: [ws, ls]
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, stdout: first-workspace-empty.txt}
+  - args: [init, --scan, ., --json]
+    cwd: fixtures/acme-missing-remote
+    expect:
+      exit: 0
+      json:
+        data.workspace: acme-missing-remote
+        data.repositories.0: acme-missing-remote
+        data.next.0: "silta --ws 'acme-missing-remote' ws show"
+        data.next_by: agent
+  - args: [--ws, acme-missing-remote, ws, show, --json]
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, json: {ok: true}}
+  - args: [where, --json]
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, json: {data.workspace: acme-missing-remote, data.repo: acme-missing-remote}}
+  - args: [ws, ls]
+    cwd: fixtures/acme-missing-remote
+    expect: {exit: 0, stdout: first-workspace-owned.txt}

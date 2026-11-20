@@ -1,0 +1,1 @@
+Backed up the whole database to <scratch>/silta-home/backups/<snapshot>.db.

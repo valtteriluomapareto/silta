@@ -62,13 +62,23 @@ struct TaskEditCommandTests {
   private static func editorCheck(_ scratch: URL, file: URL, store: DatabaseStore) throws {
     let script = scratch.appending(path: "editor.sh")
     let capture = scratch.appending(path: "capture.txt")
-    try "printf '%s' \"$1\" > \(shellWord(capture.path))\ncp \(shellWord(file.path)) \"$1\"\n"
-      .write(to: script, atomically: true, encoding: .utf8)
+    let body = """
+      test -t 0 || exit 3
+      printf '%s' "$1" > \(shellWord(capture.path))
+      cp \(shellWord(file.path)) "$1"
+      printf 'Acme editor stdout\n'
+      printf 'Acme editor stderr\n' >&2
+      """
+    try body.write(to: script, atomically: true, encoding: .utf8)
     var env = TaskCommandTests.actor
     env["EDITOR"] = "/bin/sh " + shellWord(script.path)
-    let edited = try SiltaBinary.run(
+    let edit = try EditorTerminalFixture.run(
       ["task", "edit", "AC-1", "--json"], in: scratch, environment: env)
-    #expect(edited.termination == .exit(0))
+    #expect(edit.result.termination == .exit(0))
+    #expect(edit.result.stdout.split(whereSeparator: \.isNewline).count == 1)
+    #expect(!edit.result.stdout.contains("Acme editor stdout"))
+    #expect(edit.terminal.contains("Acme editor stdout"))
+    #expect(edit.terminal.contains("Acme editor stderr"))
     let temporary = try String(contentsOf: capture, encoding: .utf8)
     #expect(temporary.hasPrefix("/"))
     #expect(!FileManager.default.fileExists(atPath: temporary))
@@ -78,10 +88,10 @@ struct TaskEditCommandTests {
     try "printf '%s' \"$1\" > \(shellWord(capture.path))\nprintf ignored > \"$1\"\nexit 2\n"
       .write(to: script, atomically: true, encoding: .utf8)
     #expect(
-      try SiltaBinary.run(
+      try EditorTerminalFixture.run(
         ["task", "edit", "AC-1"], in: scratch,
         environment: env
-      ).termination == .exit(0))
+      ).result.termination == .exit(0))
     let cancelled = try String(contentsOf: capture, encoding: .utf8)
     #expect(!FileManager.default.fileExists(atPath: cancelled))
     #expect(

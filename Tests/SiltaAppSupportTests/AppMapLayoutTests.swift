@@ -16,8 +16,8 @@
           #expect(layout.columnCount == 3)
           #expect(
             place(layout) == [
-              "acme-mobile 0/0", "acme-web 0/1", "acme-backend 1/0", "service:payments 2/0",
-              "service:push 2/1",
+              "acme-mobile 0/0", "acme-web 0/1", "acme-backend 1/0", "service:push 2/0",
+              "service:payments 2/1",
             ])
           #expect(layout.backEdges.isEmpty)
           #expect(layout.node("service:push")?.attachment == "service:push")
@@ -73,8 +73,21 @@
       #expect(layout.neighbour(of: "app:mobile", .down, connections: edges) == "app:web")
       #expect(layout.neighbour(of: "app:mobile", .up, connections: edges) == nil)
       #expect(layout.neighbour(of: "app:api", .left, connections: edges) == "app:mobile")
-      #expect(layout.neighbour(of: "service:push", .left, connections: edges) == "app:mobile")
-      #expect(layout.neighbour(of: "service:push", .right, connections: edges) == nil)
+      #expect(layout.neighbour(of: "service:push", .up, connections: edges) == "app:mobile")
+      #expect(layout.neighbour(of: "service:push", .left, connections: edges) == nil)
+      #expect(layout.neighbour(of: "service:push", .down, connections: edges) == nil)
+
+      let row = Self.map(
+        apps: ["api"], services: ["mail", "push"],
+        edges: [("api", "service:mail"), ("api", "service:push")])
+      let shelf = AppMapLayout(map: row)
+      #expect(
+        shelf.neighbour(of: "service:mail", .right, connections: row.connections)
+          == "service:push")
+      #expect(
+        shelf.neighbour(of: "service:push", .left, connections: row.connections)
+          == "service:mail")
+      #expect(shelf.neighbour(of: "service:push", .right, connections: row.connections) == nil)
     }
 
     @Test func cycleWalkStartsFromTheCallerLessApp() {
@@ -100,6 +113,21 @@
           edges: [("p", "r"), ("q", "s"), ("s", "service:a-svc"), ("p", "service:z-svc")]))
       #expect(
         place(services).suffix(3) == ["service:z-svc 2/0", "service:a-svc 2/1", "service:idle 2/2"])
+    }
+
+    @Test func servicesFollowTheColumnsOfTheirCallers() {
+      let layout = AppMapLayout(
+        map: Self.map(
+          apps: ["a", "b", "c"], services: ["s0", "s1", "s2", "s3", "s4", "s5"],
+          edges: [
+            ("a", "c"), ("c", "service:s1"), ("a", "service:s2"), ("c", "service:s2"),
+            ("b", "service:s3"), ("a", "service:s4"), ("b", "service:s0"),
+          ]))
+      #expect(
+        place(layout).suffix(6) == [
+          "service:s4 2/0", "service:s0 2/1", "service:s3 2/2", "service:s2 2/3",
+          "service:s1 2/4", "service:s5 2/5",
+        ])
     }
 
     @Test func layoutIgnoresInputOrder() {

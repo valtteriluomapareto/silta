@@ -45,10 +45,13 @@ package struct WorkspaceConfig {
     } catch {
       throw WorkspaceError.invalid(["line 1: invalid YAML"])
     }
-    let config = WorkspaceConfig(root: root)
-    let problems = config.validate()
-    guard problems.isEmpty else { throw WorkspaceError.invalid(problems) }
-    return config
+    var validation = WorkspaceValidation(root: root)
+    validation.run()
+    guard validation.problems.isEmpty else {
+      throw WorkspaceError.invalid(
+        validation.problems, hasInvalidSubpath: validation.hasInvalidSubpath)
+    }
+    return WorkspaceConfig(root: root)
   }
 
   var slug: String {
@@ -57,12 +60,6 @@ package struct WorkspaceConfig {
 
   func rows(_ section: String) -> [Node] {
     root[section]?.array() ?? []
-  }
-
-  private func validate() -> [String] {
-    var validation = WorkspaceValidation(root: root)
-    validation.run()
-    return validation.problems
   }
 
   static func normalize(_ alias: String) -> String {
@@ -110,6 +107,7 @@ private struct WorkspaceValidation {
   let root: Node
 
   var problems: [String] = []
+  var hasInvalidSubpath = false
 
   mutating func problem(_ node: Node, _ message: String) {
     let line = node.mark?.line ?? 1
@@ -204,6 +202,9 @@ private struct WorkspaceValidation {
         validatePolicy(value, key: key)
       } else if value.tag != Tag(.str) || (value.string ?? "").isEmpty {
         problem(value, "\(key) must be a nonempty string")
+      } else if key == "subpath", let path = value.string, !isGitRelativePath(path) {
+        hasInvalidSubpath = true
+        problem(value, "subpath must be relative, without .. components or NUL")
       }
     }
   }

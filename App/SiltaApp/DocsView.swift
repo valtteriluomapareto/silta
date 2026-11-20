@@ -39,12 +39,10 @@ struct DocsView: View {
                     .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
                 }
                 if let about = document.about, !about.isEmpty {
-                  HStack(alignment: .firstTextBaseline, spacing: 8) {
+                  FlowLayout(spacing: 6, lineSpacing: 6) {
                     Text("About").font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
-                    ViewThatFits {
-                      HStack { ForEach(about, id: \.self) { attachment($0) } }
-                      VStack(alignment: .leading) { ForEach(about, id: \.self) { attachment($0) } }
-                    }
+                      .padding(.trailing, 2).padding(.vertical, 3)
+                    ForEach(about, id: \.self) { attachment($0) }
                   }
                 } else if document.about == nil {
                   Text("Attachments not recorded").font(.system(size: 12))
@@ -100,54 +98,17 @@ extension DocsView {
         label: "Documents", options: [(false, "All"), (true, docs.proposedLabel)],
         selection: Binding(get: { docs.proposedOnly }, set: { docs.proposedOnly = $0 })
       ).padding(.horizontal, 12)
-      if let about = model.docsAbout {
-        HStack(spacing: 6) {
-          Text(DocsChromeContent.aboutLabel(about)).font(.system(size: 11)).lineLimit(2).help(about)
-            .frame(maxWidth: .infinity, alignment: .leading)
-          Button("Clear filter", systemImage: "xmark") { model.docsAbout = nil }
-            .labelStyle(.iconOnly).buttonStyle(.plain)
-        }.padding(8).foregroundStyle(Color("TideText"))
-          .background(Color("TideText").opacity(0.08), in: .rect(cornerRadius: 8))
-          .padding(.horizontal, 12)
-      }
+      DocsAboutMenu(model: model).padding(.horizontal, 12)
       if docs.listLoading { ProgressView("Loading documents…").padding(.horizontal, 12) }
       List {
         ForEach(DocsContent.sections(docs.groups(search: model.search))) { section in
           Section {
             ForEach(section.groups) { group in
-              if let preferred = group.preferred {
-                Button {
-                  model.select(document: preferred.ref)
-                } label: {
-                  HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "doc.text").frame(width: 16).foregroundStyle(
-                      Color("SecondaryInk"))
-                    VStack(alignment: .leading, spacing: 4) {
-                      Text(preferred.title ?? preferred.slug).font(
-                        .system(size: 13, weight: .medium)
-                      ).foregroundStyle(
-                        Color(
-                          preferred.archived
-                            ? "SecondaryInk" : docs.document?.slug == group.id ? "TideText" : "Ink")
-                      )
-                      Text(DocsContent.row(group)).font(.system(size: 11)).foregroundStyle(
-                        Color(
-                          group.entries.contains { $0.state == "proposed" } && !preferred.archived
-                            ? "Warning" : "SecondaryInk"))
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                  }.padding(.vertical, 5).contentShape(.rect)
-                }.buttonStyle(.plain)
-                  .accessibilityAddTraits(docs.document?.slug == group.id ? .isSelected : [])
-                  .listRowSeparator(.hidden)
-                  .listRowBackground(
-                    RoundedRectangle(cornerRadius: 10).fill(
-                      docs.document?.slug == group.id ? Color("AccentColor").opacity(0.08) : .clear
-                    ).padding(.horizontal, 6))
-              }
+              if let preferred = group.preferred { documentRow(group, preferred: preferred) }
             }
           } header: {
-            Text(section.title).font(.system(size: 12, weight: .semibold))
-              .foregroundStyle(Color("SecondaryInk")).textCase(nil).help(section.id)
+            Text(section.title).font(.system(size: 11, weight: .semibold)).tracking(0.4)
+              .textCase(.uppercase).foregroundStyle(Color("SecondaryInk"))
           }
         }
         if docs.groups(search: model.search).isEmpty && !docs.listLoading && docs.listFailure == nil
@@ -176,6 +137,29 @@ extension DocsView {
     }.padding(.top, 12)
   }
 
+  private func documentRow(_ group: DocsModel.Group, preferred: AppDocument) -> some View {
+    let selected = docs.document?.slug == group.id
+    let pending = group.entries.contains { $0.state == "proposed" } && !preferred.archived
+    return Button {
+      model.select(document: preferred.ref)
+    } label: {
+      VStack(alignment: .leading, spacing: 3) {
+        Text(preferred.title ?? preferred.slug)
+          .font(.system(size: 13, weight: selected ? .semibold : .medium))
+          .foregroundStyle(
+            Color(preferred.archived ? "SecondaryInk" : selected ? "TideText" : "Ink"))
+        Text(DocsContent.subtitle(group)).font(.system(size: 11)).lineLimit(2)
+          .foregroundStyle(Color(pending ? "Warning" : "SecondaryInk"))
+      }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 5).contentShape(.rect)
+    }.buttonStyle(.plain)
+      .accessibilityAddTraits(selected ? .isSelected : [])
+      .listRowSeparator(.hidden)
+      .listRowBackground(
+        RoundedRectangle(cornerRadius: 10).fill(
+          selected ? Color("AccentColor").opacity(0.08) : .clear
+        ).padding(.horizontal, 6))
+  }
+
   private func proposalBanner(_ banner: DocsChromeContent.Banner) -> some View {
     HStack(alignment: .center, spacing: 10) {
       if let actor = banner.proposal.actor {
@@ -202,7 +186,24 @@ extension DocsView {
   }
 
   private func attachment(_ ref: String) -> some View {
-    CopyValue(value: ref, title: "Copy attachment reference")
+    Button {
+      model.filterDocuments(about: ref)
+    } label: {
+      HStack(spacing: 6) {
+        if let color = DocsAboutMenu.color(ref, map: model.visibleData?.map) {
+          Circle().fill(color).frame(width: 7, height: 7)
+        }
+        Text(DocsContent.aboutLabel(ref, map: model.visibleData?.map)).font(.system(size: 12))
+          .lineLimit(1)
+      }.padding(.horizontal, 9).padding(.vertical, 3)
+        .background(Color("Ink").opacity(0.05), in: .capsule)
+    }.buttonStyle(.plain).help("Show docs about \(ref)")
+      .accessibilityLabel(
+        "Show docs about " + DocsContent.aboutLabel(ref, map: model.visibleData?.map)
+      )
+      .contextMenu {
+        Button("Copy reference") { _ = CopyValue.writeToPasteboard(ref) }
+      }
   }
 
   private var comments: some View {

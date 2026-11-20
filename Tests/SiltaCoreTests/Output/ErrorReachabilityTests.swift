@@ -27,6 +27,12 @@ extension UsageError: ErrorExamples {
   }
 }
 
+extension BodyInputError: ErrorExamples {
+  static var examples: [BodyInputError] {
+    [.unreadable, .notRegular, .tooLarge(65_536), .invalidUTF8]
+  }
+}
+
 extension CommentError: ErrorExamples {
   static var examples: [CommentError] {
     [
@@ -141,14 +147,11 @@ extension ScanError: ErrorExamples {
       .invalidPrefix("A_", origin: nil, roots: ["acme"], choice: .init(slug: "work")),
       .invalidPrefix("A-", origin: .directory("a-team"), roots: ["a-team"], choice: .none),
       .invalidPrefix("X-", origin: .slug("x-y"), roots: ["zed"], choice: .init(slug: "x-y")),
-      .slugExists(
-        "ACME", chosen: true, workspace: "acme", roots: ["api", "web"],
-        choice: .init(slug: "ACME", prefix: "WK")),
-      .prefixTaken(
-        "AC", derived: true, workspace: "acme", roots: ["acorn"], choice: .init(slug: "acorn")),
-      .prefixTaken(
-        "AC", derived: false, workspace: "acme", roots: ["acorn"],
-        choice: .init(prefix: "AC")),
+      .slugExists(chosen: true, workspace: "acme"),
+      .prefixTaken("AC", derived: true, workspace: "acme"),
+      .prefixTaken("AC", derived: false, workspace: "acme"),
+      .unreadableRoot("/projects/missing"),
+      .noRepositories(["/projects/empty"]),
       .repoPathTaken(repo: "api", path: "/projects/api", workspace: "acme"),
       .reservedSlug(path: "/projects/.none"),
     ]
@@ -220,6 +223,12 @@ extension ActorError: ErrorExamples {
   }
 }
 
+extension WorkspaceEditConflict: ErrorExamples {
+  static var examples: [WorkspaceEditConflict] {
+    [.init(workspace: "acme")]
+  }
+}
+
 extension ExportError: ErrorExamples {
   static var examples: [ExportError] {
     [
@@ -227,6 +236,10 @@ extension ExportError: ErrorExamples {
       .insideRepo(path: "/tmp/acme/platform/exports/acme", repo: "platform", workspace: "acme"),
       .unsupported("docs"), .newerFormat, .unwritable(path: "/tmp/acme-notes", workspace: "acme"),
       .invalidTree(reason: "links.jsonl does not match its sha256", workspace: "acme"),
+      .invalidExport(reason: "the task prefix is not an identifier"),
+      .invalidRestoreIdentifier(field: "service slug"),
+      .defaultRootUnavailable,
+      .invalidManifest(directory: "/tmp/acme-notes/acme"),
       .notATree(path: "/tmp/acme-notes", reason: "it has no manifest.json", child: "acme"),
       .notATree(path: "/tmp/silta-2023-11-14.db", reason: "it is a file", child: nil),
       .otherWorkspace(tree: "acme", given: "beta", directory: "/tmp/acme-notes/acme"),
@@ -274,12 +287,14 @@ extension ExportGitFailure: ErrorExamples {
 struct ErrorReachabilityTests {
   /// Every `CodedError` type in `Sources/`. A new type must be added here.
   static let registry: [any ErrorExamples.Type] = [
-    UsageError.self, InternalError.self, SchemaError.self, SeamError.self, SecretError.self,
+    UsageError.self, BodyInputError.self, InternalError.self, SchemaError.self, SeamError.self,
+    SecretError.self,
     StorageError.self, ActorError.self, WorkspaceError.self, RepoError.self, TaskError.self,
     ScanError.self, CommentError.self, DocError.self,
     CodeError.self, LocationError.self,
     CommandFailure.self, TaskReferenceError.self, DoctorFailure.self, AgentInstallError.self,
-    ExportError.self, ExportFailure.self, ExportGitFailure.self, AppReadError.self,
+    WorkspaceEditConflict.self, ExportError.self, ExportFailure.self, ExportGitFailure.self,
+    AppReadError.self,
   ]
 
   /// Codes no slice produces yet. A slice that adds an error type removes its codes.

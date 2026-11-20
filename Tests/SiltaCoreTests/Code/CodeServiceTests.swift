@@ -12,7 +12,8 @@ struct CodeServiceTests {
     let unreadable = CodeError.git(repo: "platform", workspace: "acme")
     let show = { (lines: String, text: String) in
       try CodeRead.show("file", lines: lines).formatted(
-        text, sha: sha, subpath: "", unreadable: unreadable)
+        .init(termination: .exit(0), stdout: Data(text.utf8)), sha: sha, subpath: "",
+        unreadable: unreadable)
     }
     #expect(try show("2-2", "one\r\ntwo\r\n").output == "two\r\n")
     #expect(try show("2", "one\ntwo").output == "two")
@@ -171,7 +172,31 @@ struct CodeServiceTests {
   @Test func unreadableGrepOutputIsACodeError() {
     #expect(throws: CodeError.self) {
       try CodeRead.grep("x", pathspec: nil).formatted(
-        "garbage", sha: sha, subpath: "", unreadable: .git(repo: "platform", workspace: "acme"))
+        .init(termination: .exit(0), stdout: Data("garbage".utf8)), sha: sha, subpath: "",
+        unreadable: .git(repo: "platform", workspace: "acme"))
+    }
+  }
+
+  @Test func formattingOnlyUsesCompleteRecordsAfterCaptureCutoff() throws {
+    let unreadable = CodeError.git(repo: "platform", workspace: "acme")
+    let prefix = sha + ":"
+    let cases: [(CodeRead, (String, String))] = [
+      (
+        .grep("x", pathspec: nil),
+        (
+          prefix + "line\nbreak.txt\0" + "1\0match\n" + prefix + "partial\nname",
+          "\"line\\nbreak.txt\":1:match\n"
+        )
+      ),
+      (.list(nil), ("100644 blob \(sha)\tone\0" + "100644 blob \(sha)\tpart", "one\n")),
+      (.log(nil, count: 5), ("\(sha) complete\n\(sha) partial", "\(sha) complete\n")),
+    ]
+    for (read, (capture, expected)) in cases {
+      let result = GitResult(
+        termination: .exit(0), stdout: Data(capture.utf8), stdoutTruncated: true)
+      let formatted = try read.formatted(result, sha: sha, subpath: "", unreadable: unreadable)
+      #expect(formatted.output == expected)
+      #expect(formatted.warnings.map(\.code) == ["output_truncated"])
     }
   }
 
@@ -225,7 +250,7 @@ struct CodeServiceTests {
             "--format=", "--no-color",
             "--no-ext-diff", "--no-textconv",
             sha + ":README.md",
-          ], directory: home),
+          ], directory: home, capture: .init(byteLimit: CodeRead.byteLimit)),
         .success(.init(termination: .exit(0), stdout: Data("committed\n".utf8)))
       ),
     ]

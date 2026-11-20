@@ -5,7 +5,7 @@ The examples call the workspace `acme` and use the task prefix `AC`; substitute 
 
 ## 1. Requirements
 
-- macOS 15 or later.
+- macOS 26 or later for the combined CLI and Silta Dev installer.
 - Xcode 27.1 (Swift 6.4), selected with `xcode-select`.
 - Git, and local clones of the repositories you want to register.
 
@@ -23,8 +23,8 @@ silta --help
 
 Add the `PATH` line to your shell profile if `silta` is not found in a new shell.
 
-The same script installs the read-only Mac app, `~/Applications/Silta Dev.app`, from
-the same commit. Rerun it after pulling `main` to update both.
+The same script installs the native app at `~/Applications/Silta Dev.app`. Rerun
+it after pulling `main` to update both products from the same commit.
 
 ## 3. Register your repositories
 
@@ -38,13 +38,17 @@ silta where
 
 The scan registers repositories and discovers likely apps, but those apps still need
 descriptions and may still need production refs. The workspace is selected from a
-registered repository you enter; use `--ws acme` when working outside one.
+registered repository you enter. Use `--ws acme` when working outside one.
+The scan lists the registered repo and app names and prints a command to inspect them.
+For a single clone, you can start with `silta ws ls` inside it and run the scan command
+it prints. If Silta finds a matching workspace with an unbound repo, follow its scoped
+rescan command. If it lists several candidates, inspect their configuration first.
 
 ## 4. Connect your agents
 
 If you use Codex, install it before its agent edits the workspace so it receives the
-writable Silta data root. Codex has no session hooks; your Codex agent runs `silta brief`
-at session start itself. Preview its user-level instructions and writable data root with:
+writable Silta data root. Silta's Codex instructions tell the agent to run
+`silta brief` at session start. Preview those instructions and the writable data root with:
 
 ```sh
 silta agents install --codex
@@ -70,8 +74,10 @@ Check the installation:
 silta doctor --install
 ```
 
-The path, hook, skill and instructions rows should pass; version and session rows can warn
-until you've run a session. Warnings for harnesses you do not use are expected.
+The rows for the installed path, hooks, skills and instructions should pass. With
+Claude SessionStart installed, open a normal session in a registered repo, run
+`silta brief`, then rerun the install check. Doctor skips evidence for optional hooks
+you left out. Version metadata can warn when a harness uses an unrecognized layout.
 
 ## 5. Describe the apps and their connections
 
@@ -81,7 +87,9 @@ Add deployment environments and the APIs or external services each app calls.
 
 See the [annotated Acme workspace](examples/acme-workspace.yaml) for the complete YAML
 shape, including several apps on branches of one repository. Start from the YAML shown
-for your workspace: saving replaces the configuration, and omitted rows are removed.
+for your workspace and keep its baseline comment. Saving replaces the configuration,
+and omitted rows are removed. If the file is stale, get fresh `ws show` output and reapply
+your changes there before retrying.
 
 Run `silta ws edit acme` to open your editor with the current YAML; no approval flag is
 needed at your own terminal. If an agent fills in the configuration, approve it in chat
@@ -101,6 +109,9 @@ silta
 silta task ls
 silta inbox --for me
 ```
+
+Follow the [human's guide](human-guide.md) to handle inbox items, proposals,
+questions and approval requests.
 
 ## 7. Undo the agent integration
 

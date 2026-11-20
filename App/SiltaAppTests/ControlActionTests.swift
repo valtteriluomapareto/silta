@@ -98,6 +98,10 @@
       #expect(await actions.perform(.toggleInspector) == .accepted)
       #expect(await actions.perform(.copyCommand) == .refused(.unavailable))
       #expect(await actions.perform(.select("board:AC-9999")) == .refused(.unknownSelection))
+      #expect(model.route == .board)
+      #expect(
+        await actions.perform(.select("docs:doc:missing@1:changes")) == .refused(.unknownSelection))
+      #expect(model.route == .board)
       #expect(await actions.perform(.navigate(.mywork)) == .accepted)
       #expect(await actions.perform(.navigate(.mywork)) == .noop)
       #expect(await actions.perform(.toggleInspector) == .refused(.unavailable))

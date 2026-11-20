@@ -28,7 +28,7 @@ extension TaskService {
         let unmet = try Self.unmet(task, in: tx.database)
         return ActorError.Wait(ref: task.ref, open: unmet.open, dropped: unmet.dropped)
       }
-      let retry = command + (why == nil ? "" : " -F <file>")
+      let retry = command + (why == nil ? "" : " " + (retryBodyFlag ?? "-F <file>"))
       if !open.isEmpty, !environment.actor.isHuman, approval == nil, approved == nil {
         throw ActorError.notReady(command: retry, actor: environment.actor, waits: open)
       }

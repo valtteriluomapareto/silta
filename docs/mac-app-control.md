@@ -29,6 +29,9 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 - All control sources live under `Control/`, wrapped as whole files in `#if DEBUG`.
   Release refuses only `-Silta*` arguments before opening storage. Keep the existing
   whole-file guard, package boundary and hosted-test isolation checks.
+- A hand-launched fixture (`scripts/run-mac-fixture.sh`) shares the installed app's
+  defaults: its inspector width and appearance are the human's, and changes made there
+  persist. Snapshot and driver runs pin both.
 - Interactive fixture launch prints its state.json path in the private run
   directory. Snapshot launch writes state.json next to the requested PNG, then
   exits. Use a separate output directory for each capture to retain matching
@@ -36,7 +39,9 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
   AppSidebar. With Board or Workspace's inspector open, it writes `inspector.png`
   from the real task, connection, app or service inspector. These filenames are reserved;
   choose a different name for the root PNG. Parts use the same model and logical
-  height, at 240 and 360 points wide, with active control appearance.
+  height, at 240 and 340 points wide, with active control appearance. The inspector is
+  a card inside the detail column, so the root PNG shows it too; `inspector.png` keeps
+  it on its own for close reading.
 - Render the real AppShellView in an offscreen NSHostingView, using
   `bitmapImageRepForCachingDisplay` and `cacheDisplay`. Do not use ImageRenderer:
   it cannot draw the native split view, lists or inspectors. This path shows
@@ -54,7 +59,7 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | `seq`, `settledSeq` | Last issued and settled action sequence. Both start at zero in a driver run and are null in other modes. |
 | `pid`, `windowNumber` | Process ID and real window number. The window number is null until available and in offscreen mode. |
 | `run`, `revision` | Unique launch identity and increasing publication number |
-| `fixture`, `appearance` | `v2` and `light`/`dark` |
+| `fixture`, `appearance` | `v2` and the launch flags' `light`/`dark`; exact for snapshot and driver runs, not for a hand-launched fixture |
 | `fixtureNow` | The fixture's fixed UTC timestamp, also used by the driver's fixture CLI |
 | `screen`, `route` | Current screen and canonical route including selected ref and document view |
 | `selection` | Null, typed `{kind: task/connection/app/service, ref: ...}`, or `{kind: document, ref: ..., view: ...}` |

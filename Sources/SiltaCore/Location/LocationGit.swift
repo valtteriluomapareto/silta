@@ -4,16 +4,14 @@ struct LocationGit {
   let runner: any GitRunner
   let directory: URL
 
-  func value(_ arguments: [String], optional: Bool = false) async throws -> String? {
-    let result: GitResult
-    do {
-      result = try await runner.run(
-        .init(arguments: arguments, directory: directory, lazyFetch: false))
-    } catch {
-      throw LocationError.git
-    }
+  func value(_ arguments: [String], optional: Bool = false, missingStatus: Int32? = nil)
+    async throws -> String?
+  {
+    let result = try await run(arguments)
     guard result.termination == .exit(0) else {
-      if optional, case .exit = result.termination { return nil }
+      if case .exit(let status) = result.termination, optional || status == missingStatus {
+        return nil
+      }
       throw LocationError.git
     }
     guard var text = String(data: result.stdout, encoding: .utf8) else { throw LocationError.git }
@@ -26,16 +24,42 @@ struct LocationGit {
     return value
   }
 
-  func commonDirectory() async throws -> URL? {
-    let result: GitResult
+  func headState() async throws -> (branch: String?, head: String) {
+    let symbolic = try await value(["symbolic-ref", "--quiet", "HEAD"], missingStatus: 1)
+    let branch = symbolic.flatMap { gitBranchName(in: $0) }
+    if symbolic != nil, branch == nil { throw LocationError.git }
+    if let sha = try await value(
+      ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], missingStatus: 1)
+    {
+      return (branch, sha)
+    }
+    // A ref with an unreadable commit is an environment error, even when attached.
+    guard branch != nil,
+      try await value(["rev-parse", "--verify", "--quiet", "HEAD"], missingStatus: 1) == nil
+    else { throw LocationError.git }
+    return (branch, "")
+  }
+
+  /// Uses Git's previous task-recording spelling only if it names no other local branch.
+  func legacyBranchSpelling(in candidates: [String]) async throws -> String? {
+    guard let spelling = try await value(["rev-parse", "--abbrev-ref", "HEAD"], optional: true),
+      candidates.contains(where: { $0.utf8.elementsEqual(spelling.utf8) })
+    else { return nil }
+    let collision = try await run(["show-ref", "--verify", "--quiet", gitBranchPrefix + spelling])
+    return collision.termination == .exit(1) ? spelling : nil
+  }
+
+  private func run(_ arguments: [String]) async throws -> GitResult {
     do {
-      result = try await runner.run(
-        .init(
-          arguments: [
-            "rev-parse", "--path-format=absolute", "--git-common-dir",
-          ],
-          directory: directory, lazyFetch: false))
-    } catch { throw LocationError.git }
+      return try await runner.run(
+        .init(arguments: arguments, directory: directory, lazyFetch: false))
+    } catch {
+      throw LocationError.git
+    }
+  }
+
+  func commonDirectory() async throws -> URL? {
+    let result = try await run(["rev-parse", "--path-format=absolute", "--git-common-dir"])
     guard result.termination == .exit(0) else {
       if case .exit = result.termination,
         (String(bytes: result.stderr, encoding: .utf8) ?? "").contains("not a git repository"),

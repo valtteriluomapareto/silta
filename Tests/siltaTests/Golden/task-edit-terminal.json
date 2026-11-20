@@ -1,0 +1,1 @@
+{"error":{"code":"usage","message":"Editing needs terminal input and terminal stderr. Use --print for the current document, then supply -F <file> or -F - for stdin.","next":["silta --ws 'acme' task edit 'AC-1' --print"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

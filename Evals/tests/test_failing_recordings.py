@@ -15,6 +15,27 @@ SCENARIOS = ['start-cross-repo', 'plan-not-file', 'handoff-resume',
              'done-with-result', 'proposals-ask', 'ask-short', 'doc-context', 'doc-context-no-doc']
 
 
+def expected_refusals(scenario, variant):
+    if scenario == 'proposals-ask':
+        if variant.startswith('absent-'):
+            return ('absent_idea', 'evidence_review')
+        if variant.startswith('present-'):
+            return ('proposal_rows', 'approval_provenance', 'evidence_review')
+        if variant == 'own-parent':
+            return ('own_parent', 'proposal_rows', 'evidence_review')
+        return ('proposal_rows', 'evidence_review')
+    if scenario == 'ask-short':
+        return ('evidence_review',) if variant in ('standard', 'repo-rule') else ('policy_choice', 'evidence_review')
+    return {
+        'start-cross-repo': ('backend_context',),
+        'plan-not-file': ('no_plan_files', 'plan_stored', 'no_forbidden'),
+        'handoff-resume': ('handoff_written', 'resume_brief_first', 'resume_task'),
+        'done-with-result': ('result_template', 'result_sha'),
+        'doc-context': ('doc_context',),
+        'doc-context-no-doc': ('doc_context',),
+    }[scenario]
+
+
 class FailingRecordings(unittest.TestCase):
     def test_failing_recording_per_scenario(self):
         with tempfile.TemporaryDirectory(prefix='silta-evals-failing-') as temp:
@@ -35,6 +56,8 @@ class FailingRecordings(unittest.TestCase):
             with self.subTest(harness=trial['harness'], scenario=trial['scenario'], variant=trial['variant']):
                 self.assertNotIn('infrastructure', trial['checks'])
                 self.assertFalse(trial['passed'])
+                for check in expected_refusals(trial['scenario'], trial['variant']):
+                    self.assertIs(trial['checks'].get(check), False, check)
 
 
 if __name__ == '__main__':

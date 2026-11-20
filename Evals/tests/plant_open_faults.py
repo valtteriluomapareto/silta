@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from fault_source import mutated_source
+
 ROOT = Path(__file__).resolve().parents[1]
 TEST = 'test_open_models.OpenModels.'
 FAULTS = [
@@ -96,10 +98,8 @@ def main():
     for name, file, marker, replacement, test, expected in FAULTS:
         path = ROOT / file
         original = path.read_text()
-        if original.count(marker) != 1:
-            raise SystemExit('Non-unique mutation marker: ' + name)
         try:
-            path.write_text(original.replace(marker, replacement))
+            path.write_text(mutated_source(original, file, name, marker, replacement))
             qualified = test.replace('REVIEW.', 'test_open_review.OpenReview.')
             if '.' not in qualified:
                 qualified = TEST + qualified

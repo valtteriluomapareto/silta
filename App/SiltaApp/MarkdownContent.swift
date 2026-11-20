@@ -7,6 +7,13 @@ nonisolated struct MarkdownContent {
     let header: Int?
     let code: Bool
     let prefix: String?
+    var table: Table?
+  }
+  enum Alignment { case leading, center, trailing }
+  struct Table {
+    let header: [AttributedString]
+    let rows: [[AttributedString]]
+    let alignments: [Alignment]
   }
   let blocks: [Block]
 
@@ -15,61 +22,127 @@ nonisolated struct MarkdownContent {
     if let title, source.hasPrefix("# " + title + "\n") {
       source = String(source.dropFirst(title.count + 3))
     }
-    source = Self.readableTables(source)
     do {
       let parsed = try AttributedString(markdown: source)
-      blocks = parsed.runs[\.presentationIntent].enumerated().map { offset, run in
-        let (intent, range) = run
-        let kinds = intent?.components.map(\.kind) ?? []
-        let header = kinds.compactMap { kind -> Int? in
-          if case .header(let level) = kind { return level }
-          return nil
-        }.first
-        let ordinal = kinds.compactMap { kind -> Int? in
-          if case .listItem(let number) = kind { return number }
-          return nil
-        }.first
-        let code = kinds.contains {
-          if case .codeBlock = $0 { return true }
-          return false
-        }
-        let prefix = ordinal.map { kinds.contains(.orderedList) ? "\($0)." : "•" }
-        return Block(
-          id: offset, text: AttributedString(parsed[range]), header: header,
-          code: code, prefix: prefix)
+      var tables = TableBuilder()
+      var flowing: [Block] = []
+      for (offset, run) in parsed.runs[\.presentationIntent].enumerated() {
+        let components = run.0?.components ?? []
+        let text = Self.checkedLinks(AttributedString(parsed[run.1]))
+        if tables.add(components, text: text) { continue }
+        flowing.append(Self.block(id: offset, kinds: components.map(\.kind), text: text))
       }
+      blocks = Self.placing(tables.tables, in: flowing)
     } catch {
       blocks = [Block(id: 0, text: AttributedString(source), header: nil, code: false, prefix: nil)]
     }
   }
 
-  private static func readableTables(_ source: String) -> String {
-    let lines = source.components(separatedBy: "\n")
-    var result: [String] = []
-    var fence: String?
-    var index = 0
-    while index < lines.count {
-      let line = lines[index]
-      let trimmed = line.trimmingCharacters(in: .whitespaces)
-      if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-        let marker = String(trimmed.prefix(3))
-        if fence == marker { fence = nil } else if fence == nil { fence = marker }
-      }
-      if fence == nil, !line.hasPrefix("    "), line.contains("|"), index + 1 < lines.count {
-        let separator = lines[index + 1].filter { !$0.isWhitespace && $0 != "|" && $0 != ":" }
-        if separator.count >= 3, separator.allSatisfy({ $0 == "-" }) {
-          result.append("```text")
-          repeat {
-            result.append(lines[index])
-            index += 1
-          } while index < lines.count && lines[index].contains("|") && !lines[index].isEmpty
-          result.append("```")
-          continue
+  /// Returns the exact absolute destination accepted by rendering and activation.
+  static func destination(for url: URL) -> String? {
+    guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+      let host = url.host(), !host.isEmpty
+    else { return nil }
+    return url.absoluteString
+  }
+
+  private static func checkedLinks(_ text: AttributedString) -> AttributedString {
+    var output = AttributedString()
+    for (url, range) in text.runs[\.link] {
+      var run = AttributedString(text[range])
+      if let url {
+        if let destination = destination(for: url) {
+          // A bare URL already shows its destination; only labelled links get the suffix.
+          if String(run.characters) != destination {
+            run.append(AttributedString(" (\(destination))"))
+          }
+        } else {
+          run.link = nil
         }
       }
-      result.append(line)
-      index += 1
+      output.append(run)
     }
-    return result.joined(separator: "\n")
+    return output
+  }
+
+  private static func block(id: Int, kinds: [PresentationIntent.Kind], text: AttributedString)
+    -> Block
+  {
+    let header = kinds.compactMap { kind -> Int? in
+      if case .header(let level) = kind { return level }
+      return nil
+    }.first
+    let ordinal = kinds.compactMap { kind -> Int? in
+      if case .listItem(let number) = kind { return number }
+      return nil
+    }.first
+    let code = kinds.contains {
+      if case .codeBlock = $0 { return true }
+      return false
+    }
+    let prefix = ordinal.map { kinds.contains(.orderedList) ? "\($0)." : "•" }
+    return Block(id: id, text: text, header: header, code: code, prefix: prefix)
+  }
+
+  /// Puts each finished table where its first cell appeared among the other blocks.
+  private static func placing(_ tables: [TableBuilder.Pending], in blocks: [Block]) -> [Block] {
+    var result: [Block] = []
+    var remaining = tables[...]
+    for block in blocks {
+      while let table = remaining.first, table.position <= block.id {
+        result.append(table.block)
+        remaining = remaining.dropFirst()
+      }
+      result.append(block)
+    }
+    return result + remaining.map(\.block)
+  }
+}
+
+/// Collects GitHub table cells by table, row and column index, so empty cells keep their place.
+nonisolated private struct TableBuilder {
+  struct Pending {
+    let identity: Int
+    let position: Int
+    let columns: [PresentationIntent.TableColumn]
+    var cells: [Int: [Int: AttributedString]] = [:]
+    var block: MarkdownContent.Block {
+      let rows = (cells.keys.max() ?? 0)
+      func row(_ index: Int) -> [AttributedString] {
+        (0..<columns.count).map { cells[index]?[$0] ?? AttributedString() }
+      }
+      return MarkdownContent.Block(
+        id: position, text: AttributedString(), header: nil, code: false, prefix: nil,
+        table: MarkdownContent.Table(
+          header: row(0), rows: rows == 0 ? [] : (1...rows).map(row),
+          alignments: columns.map {
+            $0.alignment == .right ? .trailing : $0.alignment == .center ? .center : .leading
+          }))
+    }
+  }
+  private(set) var tables: [Pending] = []
+  private var next = 0
+
+  /// Records a table cell and returns true, or returns false for any other block.
+  mutating func add(_ components: [PresentationIntent.IntentType], text: AttributedString) -> Bool {
+    defer { next += 1 }
+    var column: Int?
+    var row: Int?
+    var table: (Int, [PresentationIntent.TableColumn])?
+    for component in components {
+      switch component.kind {
+      case .tableCell(let index): column = index
+      case .tableHeaderRow: row = 0
+      case .tableRow(let index): row = index
+      case .table(let columns): table = (component.identity, columns)
+      default: break
+      }
+    }
+    guard let column, let row, let table else { return false }
+    if tables.last?.identity != table.0 {
+      tables.append(Pending(identity: table.0, position: next, columns: table.1))
+    }
+    tables[tables.count - 1].cells[row, default: [:]][column] = text
+    return true
   }
 }

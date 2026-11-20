@@ -10,6 +10,10 @@
       let dark: Bool
       let width: Int
       let height: Int
+
+      /// A snapshot or a driver run, whose output must not depend on the human's
+      /// stored preferences. A plain `-SiltaFixture` launch is for trying the app by hand.
+      var isAutomated: Bool { snapshot != nil || runDirectory != nil }
     }
 
     struct Route {

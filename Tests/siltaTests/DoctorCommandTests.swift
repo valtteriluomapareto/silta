@@ -64,8 +64,33 @@ struct DoctorCommandTests {
     }
   }
 
+  @Test func uninstalledHooksDoNotHideDamagedRetainedEvidence() throws {
+    try withScratchDirectory { scratch in
+      let directory = scratch.appending(path: "silta-home/log")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let file = directory.appending(path: "2023-11-14.jsonl")
+      try Data("{broken\n".utf8).write(to: file)
+      let result = try SiltaBinary.run(
+        ["doctor", "--install", "--json"], in: scratch, environment: environment)
+      let data = try TaskStateCommandTests.data(result)
+      let checks = try #require(data["checks"] as? [[String: Any]])
+      for id in ["install.claude.session_start", "install.claude.last_stop"] {
+        #expect(try AgentHealthTests.check(id, in: checks)["status"] as? String == "skipped")
+      }
+      let log = try AgentHealthTests.check("install.log", in: checks)
+      #expect(log["status"] as? String == "warning")
+      #expect(log["next_by"] as? String == "human")
+      #expect((log["message"] as? String)?.contains(file.path) == true)
+    }
+  }
+
   @Test func invalidLogHasScopedRecoveryInBothOutputModes() throws {
     try withScratchDirectory { scratch in
+      try #require(
+        try AgentsInstallTests.apply(
+          ["install", "--claude", "--stop-hook"], in: scratch, environment: environment
+        )
+        .termination == .exit(0))
       let directory = scratch.appending(path: "silta-home/log")
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
       try Data("{broken\n".utf8).write(to: directory.appending(path: "2023-11-14.jsonl"))

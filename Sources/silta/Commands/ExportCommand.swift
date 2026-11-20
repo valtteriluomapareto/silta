@@ -5,7 +5,7 @@ import SiltaCore
 struct ExportCommand: OutputCommand {
   static let configuration = CommandConfiguration(
     commandName: "export",
-    abstract: "Write one workspace as a deterministic text tree for backup and diff.",
+    abstract: "Save a workspace as text files for backup or comparison.",
     discussion:
       "The tree goes to <root>/<workspace>. It replaces only an absent, empty or previously "
       + "exported directory, never one inside a registered repo. Repo paths and worktrees are "
@@ -45,9 +45,9 @@ struct ExportCommand: OutputCommand {
 
   func execute(_ context: CommandContext) async throws -> CommandOutput {
     let environment = context.environment
-    if let to, to == "~" || to.hasPrefix("~/") {
+    if to?.utf8.first == 0x7E {
       throw UsageError.invalid(
-        message: "--to \(to) starts with an unexpanded ~; pass an absolute path",
+        message: "--to starts with an unexpanded ~. Pass an absolute path.",
         command: "silta export")
     }
     let workspace = try context.workspace(global.ws)

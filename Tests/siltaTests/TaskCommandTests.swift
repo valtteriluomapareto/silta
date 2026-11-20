@@ -25,7 +25,8 @@ struct TaskCommandTests {
   /// The agent at a fixed instant, for goldens that carry timestamps.
   static let fixed = actor.merging(["SILTA_NOW": "2023-11-14T22:13:20.000Z"]) { $1 }
 
-  @Test func nonCodeLifecycleAndSessionRefusal() throws {
+  @Test(arguments: [false, true])
+  func nonCodeLifecycleAndSessionRefusal(receiptJSON: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
       let added = try SiltaBinary.run(
@@ -42,15 +43,17 @@ struct TaskCommandTests {
         environment: ["SILTA_ACTOR": "agent:codex:other"])
       #expect(rival.termination == .exit(6))
       #expect(rival.stdout.contains("\"code\":\"claimed\""))
+      let format = receiptJSON ? ["--json"] : []
+      let goldenExtension = receiptJSON ? "json" : "txt"
       let submitted = try SiltaBinary.run(
-        ["task", "submit", "AC-1", "--json"], in: scratch, environment: Self.actor)
-      #expect(submitted.termination == .exit(0))
-      Golden.forTests().check(submitted.stdout, "task-submit.json")
+        ["task", "submit", "AC-1"] + format, in: scratch, environment: Self.actor)
+      #expect(submitted.termination == .exit(0) && submitted.stderr.isEmpty)
+      Golden.forTests().check(submitted.stdout, "task-submit.\(goldenExtension)")
       let done = try SiltaBinary.run(
-        ["task", "done", "task:AC-1", "-m", "Released Acme.", "--json"],
+        ["task", "done", "task:AC-1", "-m", "Released Acme."] + format,
         in: scratch, environment: Self.actor)
-      #expect(done.termination == .exit(0))
-      Golden.forTests().check(done.stdout, "task-done.json")
+      #expect(done.termination == .exit(0) && done.stderr.isEmpty)
+      Golden.forTests().check(done.stdout, "task-done.\(goldenExtension)")
       try store.read { db in
         let row = try #require(try Row.fetchOne(db, sql: "SELECT * FROM task"))
         #expect(row["result_md"] as String == "Released Acme.")
@@ -61,7 +64,8 @@ struct TaskCommandTests {
     }
   }
 
-  @Test func proposalsAndRequiredResultsAreRecoverable() throws {
+  @Test(arguments: [false, true])
+  func proposalsAndRequiredResultsAreRecoverable(receiptJSON: Bool) throws {
     try withScratchDirectory { scratch in
       _ = try Self.setup(scratch)
       let proposed = try SiltaBinary.run(
@@ -87,10 +91,10 @@ struct TaskCommandTests {
       #expect(empty.termination == .exit(1))
       #expect(empty.stdout.contains("result"))
       let dropped = try SiltaBinary.run(
-        ["task", "drop", "AC-1", "-m", "Not needed.", "--json"],
+        ["task", "drop", "AC-1", "-m", "Not needed."] + (receiptJSON ? ["--json"] : []),
         in: scratch, environment: Self.actor)
-      #expect(dropped.termination == .exit(0))
-      Golden.forTests().check(dropped.stdout, "task-drop.json")
+      #expect(dropped.termination == .exit(0) && dropped.stderr.isEmpty)
+      Golden.forTests().check(dropped.stdout, "task-drop.\(receiptJSON ? "json" : "txt")")
     }
   }
 
@@ -237,7 +241,7 @@ extension TaskCommandTests {
         (["task", "start", "AC-1", "--steal"], "silta task start 'AC-1' --steal"),
         (
           ["task", "done", "AC-2", "--force", "-m", "Acme done"],
-          "silta task done 'AC-2' --force -F <file>"
+          "silta task done 'AC-2' --force -F -"
         ),
         (
           ["task", "done", "AC-7", "--allow-secret"],

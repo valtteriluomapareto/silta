@@ -110,7 +110,7 @@ struct LocationDistanceTests {
       let runner = ScriptedGitRunner(
         script: commonSteps(repo),
         beforeRequest: { request in
-          if request.arguments.contains("--verify"), request.arguments.last == "HEAD" {
+          if request.arguments.contains("--verify"), request.arguments.last == "HEAD^{commit}" {
             try store.write { tx in
               try tx.database.execute(
                 sql: """
@@ -180,8 +180,8 @@ struct LocationDistanceTests {
       step(
         ["rev-parse", "--verify", "--quiet", "--end-of-options", "origin/portal^{commit}"],
         "bbbbbbbb", repo),
-      step(["symbolic-ref", "--quiet", "--short", "HEAD"], "", repo, status: 1),
-      step(["rev-parse", "--verify", "HEAD"], "aaaaaaaa", repo),
+      step(["symbolic-ref", "--quiet", "HEAD"], "", repo, status: 1),
+      step(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], "aaaaaaaa", repo),
     ]
   }
 

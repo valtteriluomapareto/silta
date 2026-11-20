@@ -111,13 +111,13 @@ struct BriefDiscussion {
     let postKind = item.postKind ?? item.kind
     let kind = item.kind == "discussion" && postKind != item.kind ? " (\(postKind))" : ""
     let question = item.kind == "answer" ? item.replyTo.map { " to " + $0 } ?? "" : ""
-    let masked = SecretGuard.redacted(text).trimmingCharacters(in: .newlines)
+    let masked = HumanText.body(text).trimmingCharacters(in: .newlines)
     let cut = masked.count > Self.excerpt
     let body = cut ? String(masked.prefix(Self.excerpt - 1)) + "…" : masked
     let header = "\(item.kind) \(ref)\(kind)\(question) on \(task)"
     let read = "\(command) task show \(shellWord(task)) --timeline"
     let marker = item.next.contains(read) ? "(trimmed)\n" : "(trimmed; \(read))\n"
-    return header + " by \(TaskError.shown(author)):\n" + Self.quoted(body)
+    return header + " by \(TaskError.shown(author)):\n" + Self.quoteLines(body)
       + (cut ? marker : "")
       + (item.kind == "discussion" ? "clears on your next write to \(task)\n" : "")
       + next.joined()
@@ -140,8 +140,11 @@ struct BriefDiscussion {
 
   /// Masks, then quotes every line so comment text cannot pose as brief structure.
   static func quoted(_ body: String) -> String {
-    SecretGuard.redacted(body).trimmingCharacters(in: .newlines)
-      .split(separator: "\n", omittingEmptySubsequences: false)
-      .map { "> " + TaskError.shown(String($0)) + "\n" }.joined()
+    quoteLines(HumanText.body(body).trimmingCharacters(in: .newlines))
+  }
+
+  private static func quoteLines(_ text: String) -> String {
+    text.split(separator: "\n", omittingEmptySubsequences: false)
+      .map { "> " + $0.replacingOccurrences(of: "\t", with: " ") + "\n" }.joined()
   }
 }

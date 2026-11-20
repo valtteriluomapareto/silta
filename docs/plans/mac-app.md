@@ -1,4 +1,4 @@
-# Silta for Mac: a read-only viewer
+# Silta for Mac: views and navigation
 
 Status: active
 
@@ -6,9 +6,9 @@ Status: active
 
 A native macOS 26 app shows the human what waits on them, what agents are doing, the
 workspace map and its docs. It is the human's own surface (D38), built the way spec
-§4.1 and §17 describe the M5 app: it links `SiltaCore` and reads through the same
-services as the CLI. The first version is read-only. Each action is a ref or a command
-the human copies.
+§4.1 and §17 describe the app. It links `SiltaCore` and uses the same services as
+the CLI. This plan covers reading, navigation and copyable refs and commands.
+The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
 
 ## Inputs
 
@@ -38,9 +38,24 @@ the human copies.
   progress, and a task inspector shows the plan, claim,
   properties and discussion.
 - **Workspace:** apps and connections with a connection inspector, read from the
-  workspace model rather than YAML.
+  workspace model rather than YAML. Paper "Map v2":
+  - The map keeps app columns in call order. Services sit in one row under the apps,
+    ordered by their callers' columns. Lines to services are faint and unlabelled until
+    an app, service or connection is selected, so they are clicked through their app or
+    service; each app's VoiceOver label still lists them.
+  - The List shows one flat row per app in the same call order, with its open count and
+    the services it uses. Opening a row adds who calls it, what it calls (with doc
+    counts) and how it uses each service. Services follow, most shared first; those used
+    by one app fold into one line.
 - **Docs:** a three-column view with Document, Changes and Comments tabs, a revision
-  menu and paging.
+  menu and paging. Paper "Docs v2":
+  - The list shows each document once, grouped by kind, with what it is about and its
+    revision state under the title.
+  - An About menu narrows the list to one app, service or topic. It uses the same exact
+    match as `silta doc ls --about`, so docs about an app's connections are not
+    included and are reached from Workspace.
+  - The reader lists About refs in one wrapping row. Clicking one filters the list, and
+    its context menu copies the ref. Markdown tables are drawn as tables.
 - **Copy:**
   - a ref chip on every item;
   - command blocks whose placeholders fail safe if left unfilled: proposal refs use
@@ -101,10 +116,25 @@ the human copies.
   human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
   nothing is pre-filled for drop or reject, and there's no `-F -`.
-- **Layout:** `NavigationSplitView`, `.inspector`, native search in the toolbar, placed
-  before the inspector toggle. The window toolbar holds the screen's controls; the
-  content starts with one large title and its count line (`navigationTitle` still names
-  the window). The app accent is tide `#0B6E8E`, from the asset catalog.
+- **Layout:** `NavigationSplitView`, with native search in the toolbar placed before the
+  inspector toggle. The toolbar belongs to the detail column and starts with a flexible
+  spacer, so its controls sit at the window's trailing edge. The inspector is a 340 pt
+  Sea glass card beside the content (`seaInspector`), not a system `.inspector` column,
+  so it shares the window's shore. Dragging the gap before it resizes it between 300
+  and 500 pt (double-click resets); the width is remembered, and at the minimum window
+  width the Board lanes scroll sideways. Automated control runs (snapshots, driver runs)
+  pin 340 pt; a hand-launched fixture keeps the human's width. The content
+  starts with one large title and its count line (`navigationTitle` still names the
+  window). The app accent is tide `#0B6E8E`, from the asset catalog.
+- **Appearance:** System, Light or Dark, from View ▸ Appearance or Settings (⌘,),
+  stored in defaults and applied app-wide from launch. Automated control runs keep the
+  launch flags' choice; a fixture launched with `-SiltaDark` starts in dark.
+- **Discussion (Paper "Discussion v1"):** the task inspector groups posts into threads:
+  a root keeps its author's rail and its replies sit inside it. More than two replies
+  fold to the newest. A post over four lines clamps with Show more. Resolved threads,
+  which Core's normal read only counts, come from one Core read with it and fold to one
+  line. Reply opens a box inside the thread that posts with `replyTo`; on an open
+  question to the human it answers instead.
 - **Sea glass surfaces:** an opaque shore gradient is the window background, under the
   system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
   Reduce Transparency makes them opaque and drops the gradient's glows; Increase
@@ -130,17 +160,16 @@ the human copies.
 
 Delivery order is My work, Board, Workspace, then Docs: one screen per PR. A6a is the
 one cross-screen exception, because it restyles the shared shell.
-Use a short `task plan` and implementation reviews following
-[AGENTS.md Reviews](../../AGENTS.md#dogfooding) and the
-[persona-review skill](../../skills/persona-review/SKILL.md). Logic remains test-first; SwiftUI layout gets view-model tests afterwards.
-No planted faults except for guard tests. Split only when a diff substantially
-exceeds about 1,000 lines. Add navigation, observable state and development hooks
+Follow the [workflow](../../AGENTS.md#workflow) and [review rules](../../AGENTS.md#reviews).
+Use the test-first flow for logic and view-model tests for SwiftUI layout.
+Use [AGENTS.md](../../AGENTS.md#keep-it-lean) for fault probes and PR size.
+Add navigation, observable state and development hooks
 only when a screen needs them. The [control-plane guide](../mac-app-control.md)
 covers isolated fixtures, versioned model state and offscreen root PNGs. The
 terminal driver can also exercise shared UI handlers and capture an owned window
-when Screen Recording and the window session permit.
-Merge main only for a conflict or a needed landed change. After merging, submit
-the task and report which tasks the maintainer can close; do not mark them done.
+when Screen Recording and the window session permit. Follow the
+[dogfooding workflow](../../AGENTS.md#dogfooding) to submit the task before merge
+and finish it after merge.
 
 ## Validation
 
