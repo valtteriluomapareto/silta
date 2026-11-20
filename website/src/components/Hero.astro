@@ -1,0 +1,263 @@
+---
+import Terminal, { type Line } from './Terminal.astro';
+import { withBase } from '../utils';
+import { INSTALL_URL } from '../consts';
+
+const brief: Line[] = [
+	'$ silta brief',
+	[['acme / mobile / mobile', 'cmd'], ' [high: single]'],
+	'task: AC-23',
+	'doing: Refresh expired tokens',
+	'handoff AC-23/1 by agent:claude:7f3e',
+	[['> The API returns 401 with', 'cmd']],
+	[['> error=token_expired, not 403.', 'cmd']],
+	['neighbour: ', ['mobile → platform-api', 'hl']],
+];
+---
+
+<section class="hero" aria-labelledby="hero-title">
+	<div class="inner">
+		<div class="copy">
+			<p class="eyebrow">Finnish for “bridge”</p>
+			<h1 id="hero-title">
+				Every agent session starts with the{' '}
+				<span class="accent">whole picture.</span>
+			</h1>
+			<p class="lead">
+				Silta is a local context hub and backlog for Claude Code, Codex and you.
+				One command gives any agent its task, plan, last handoff and the apps
+				around it.
+			</p>
+			<div class="actions">
+				<div class="cta-row">
+					<a class="install" href={INSTALL_URL}>
+						<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+							<path
+								d="M12 4v12M6 11l6 6 6-6M5 20h14"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							></path>
+						</svg>
+						Install Silta
+					</a>
+					<p class="cta-note">
+						<strong>Free and open source</strong>
+						<span>MIT. Runs on your Mac. No account.</span>
+					</p>
+				</div>
+				<a class="arrow-link" href="#how-it-works">
+					<span>See a change of watch</span>
+					<svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M12 5v14M6 13l6 6 6-6"
+							fill="none"
+							stroke="var(--color-accent)"
+							stroke-width="2.2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						></path>
+					</svg>
+				</a>
+				<p class="requirements">
+					For macOS 26 or later · Works with Claude Code and Codex
+				</p>
+			</div>
+		</div>
+		<div class="visual">
+			<div class="screenshot">
+				<img
+					src={withBase('board-light.png')}
+					width="1600"
+					height="956"
+					alt="Silta Dev showing the Acme board: todo, doing and review columns, with tasks claimed by Claude and Codex"
+					fetchpriority="high"
+				/>
+			</div>
+			<Terminal
+				class="brief"
+				size="hero"
+				title="~/work/mobile"
+				label="An agent runs silta brief in the mobile repo"
+				lines={brief}
+			/>
+		</div>
+	</div>
+</section>
+
+<style>
+	.hero {
+		overflow: clip;
+	}
+	.inner {
+		display: flex;
+		flex-direction: column;
+		gap: 44px;
+		max-width: 1440px;
+		margin-inline: auto;
+		padding: 48px var(--page-gutter) 56px;
+	}
+	.copy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		max-width: 600px;
+	}
+	.copy .eyebrow {
+		padding-bottom: 24px;
+	}
+	h1 {
+		font-size: 40px;
+		font-weight: 800;
+		line-height: 44px;
+		letter-spacing: var(--tracking-tighter);
+	}
+	.accent {
+		color: var(--color-accent);
+	}
+	.lead {
+		max-width: 540px;
+		padding-top: 20px;
+		color: var(--color-label-secondary);
+		font-size: var(--text-body);
+		line-height: 26px;
+	}
+	.actions {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 18px;
+		padding-top: 32px;
+	}
+	.cta-row {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 14px;
+	}
+	.install {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 14px 22px;
+		border-radius: 13px;
+		background: var(--color-label);
+		color: var(--color-label-dark);
+		font-size: var(--text-body);
+		font-weight: 600;
+		line-height: 22px;
+	}
+	.install:hover {
+		background: var(--color-surface-dark-2);
+	}
+	.cta-note {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.cta-note strong {
+		font-size: var(--text-body);
+		font-weight: 700;
+		line-height: 22px;
+	}
+	.cta-note span {
+		color: var(--color-label-secondary);
+		font-size: var(--text-caption);
+		line-height: 16px;
+	}
+	.requirements {
+		color: var(--color-label-tertiary);
+		font-size: var(--text-caption);
+		line-height: 16px;
+	}
+
+	/* The screenshot bleeds off the right edge; the brief overlaps its lower
+	   left corner. */
+	.visual {
+		position: relative;
+		flex-shrink: 0;
+		width: 100%;
+		min-height: 400px;
+	}
+	.screenshot {
+		width: calc(100% + 170px);
+		max-width: 860px;
+		margin-left: 24px;
+		overflow: hidden;
+		border: 1px solid var(--color-separator);
+		border-radius: 14px;
+		box-shadow:
+			0 40px 80px -32px rgb(14 28 34 / 30%),
+			0 8px 24px -12px rgb(14 28 34 / 18%);
+	}
+	.screenshot img {
+		width: 100%;
+		height: auto;
+		aspect-ratio: 860 / 514;
+		object-fit: cover;
+		object-position: left top;
+	}
+	.visual :global(.brief) {
+		position: relative;
+		width: min(330px, 100%);
+		margin-top: -135px;
+	}
+
+	@media (min-width: 768px) {
+		.inner {
+			padding-block: 72px 88px;
+		}
+		h1 {
+			font-size: 54px;
+			line-height: 58px;
+		}
+		.lead {
+			padding-top: 26px;
+			font-size: var(--text-lead);
+			line-height: 29px;
+		}
+		.actions {
+			gap: 20px;
+			padding-top: 40px;
+		}
+		.cta-row {
+			flex-direction: row;
+			align-items: center;
+			gap: 18px;
+		}
+		.screenshot {
+			margin-left: 40px;
+		}
+		.visual :global(.brief) {
+			width: 430px;
+			margin-top: -246px;
+		}
+	}
+
+	@media (min-width: 1200px) {
+		.inner {
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			gap: 56px;
+			padding: 96px 0 104px var(--page-gutter);
+		}
+		.copy {
+			flex: 0 0 600px;
+		}
+		h1 {
+			font-size: var(--text-display);
+			line-height: 64px;
+		}
+		.visual {
+			flex: 0 1 760px;
+			min-width: 0;
+			min-height: 560px;
+		}
+		.screenshot {
+			width: 860px;
+		}
+	}
+</style>

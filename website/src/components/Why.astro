@@ -1,0 +1,155 @@
+---
+const problems = [
+	{
+		title: 'Every session starts blind',
+		body: 'The agent in the mobile app doesn’t know which backend branch serves it, what was decided last week, or what another agent already started.',
+	},
+	{
+		title: 'Context travels by copy and paste',
+		body: 'You relay notes between chats, Claude Code and Codex by hand, and the details that mattered get lost on the way.',
+	},
+	{
+		title: 'Plans leak into the wrong places',
+		body: 'PLAN.md files land in product repos, and agent-made work items fill the team tracker you share with people.',
+	},
+];
+---
+
+<section class="why" aria-labelledby="why-title">
+	<div class="container stack">
+		<header class="section-header">
+			<p class="eyebrow">Why Silta</p>
+			<h2 id="why-title" class="section-title">
+				Coding agent work loses its thread.
+			</h2>
+			<p class="section-lead">
+				Agents are fast inside one session. Between sessions, between repos and
+				between tools, the picture falls apart, and you end up carrying it by
+				hand.
+			</p>
+		</header>
+		<ol class="card-grid">
+			{problems.map((problem, index) => (
+				<li class="card">
+					<span class="number" aria-hidden="true">
+						{String(index + 1).padStart(2, '0')}
+					</span>
+					<h3>{problem.title}</h3>
+					<p class="card-body">{problem.body}</p>
+				</li>
+			))}
+		</ol>
+		<div class="band">
+			<div class="band-copy">
+				<p class="band-eyebrow">The bridge</p>
+				<p class="band-title">Record it once. Read it where agents work.</p>
+				<p class="band-body">
+					Silta connects repos, sessions that never meet, and you with your
+					agents. Plans and decisions live on the task, not in chats or repos.
+				</p>
+			</div>
+			<svg
+				class="arcs"
+				width="420"
+				height="210"
+				viewBox="0 0 420 210"
+				aria-hidden="true"
+			>
+				<path
+					d="M10 210 A200 200 0 0 1 410 210"
+					fill="none"
+					stroke="rgb(255 255 255 / 12%)"
+					stroke-width="28"
+				></path>
+				<path
+					d="M80 210 A130 130 0 0 1 340 210"
+					fill="none"
+					stroke="rgb(255 255 255 / 8%)"
+					stroke-width="20"
+				></path>
+			</svg>
+		</div>
+	</div>
+</section>
+
+<style>
+	.why {
+		padding-block: var(--section-padding);
+	}
+	.stack {
+		display: flex;
+		flex-direction: column;
+		gap: 36px;
+	}
+	.number {
+		color: var(--color-label-tertiary);
+		font-family: var(--font-mono);
+		font-size: var(--text-caption);
+		font-weight: 500;
+		line-height: 16px;
+	}
+	h3 {
+		font-size: 20px;
+		font-weight: 700;
+		line-height: 26px;
+		letter-spacing: var(--tracking-tight);
+	}
+	.band {
+		position: relative;
+		overflow: hidden;
+		padding: 30px 24px;
+		border-radius: var(--radius-xl);
+		background: var(--color-accent);
+		color: var(--color-label-dark);
+	}
+	.band-copy {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		max-width: 640px;
+	}
+	.band-eyebrow {
+		color: rgb(255 255 255 / 70%);
+		font-size: var(--text-caption);
+		font-weight: 600;
+		line-height: 16px;
+		letter-spacing: var(--tracking-wide);
+		text-transform: uppercase;
+	}
+	.band-title {
+		font-size: 24px;
+		font-weight: 800;
+		line-height: 30px;
+		letter-spacing: -0.025em;
+	}
+	.band-body {
+		color: rgb(255 255 255 / 78%);
+		font-size: var(--text-body);
+		line-height: 26px;
+	}
+	.arcs {
+		position: absolute;
+		right: -150px;
+		bottom: -120px;
+		max-width: none;
+	}
+
+	@media (min-width: 768px) {
+		.stack {
+			gap: var(--spacing-2xl);
+		}
+		.band {
+			padding: 44px 52px;
+		}
+		.band-title {
+			font-size: 30px;
+			line-height: 36px;
+		}
+		.arcs {
+			right: -40px;
+			bottom: -70px;
+		}
+	}
+</style>

@@ -1,0 +1,43 @@
+name: Website
+
+# Deploys the website to GitHub Pages after a merge that changed it, or on a manual run.
+# Pull requests build it through CI instead. See website/README.md#deploys.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/website.yml'
+      - '.github/workflows/website-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time: a newer run waits, and a deploy is never cancelled halfway through.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/website-build.yml
+    with:
+      pages-artifact: true
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

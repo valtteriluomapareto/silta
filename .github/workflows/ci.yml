@@ -16,11 +16,46 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # PRs, the weekly run and manual runs: `scripts/verify.sh full` split in three parallel jobs,
-# with `verify` as the required check. A push to main only refills the shared caches: with
-# squash merges and the up-to-date rule its tree is the one its PR just verified (D19).
+# plus the website build, with `verify` as the required check. A push to main only refills
+# the shared caches: with squash merges and the up-to-date rule its tree is the one its PR
+# just verified (D19). `changes` picks the jobs a PR or push needs (CONTRIBUTING.md#commands).
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read   # paths-filter lists a PR's files through the API
+    # The filter step runs only for PRs and pushes; the weekly and manual runs get 'true'.
+    outputs:
+      code: ${{ steps.filter.outputs.code || 'true' }}
+      website: ${{ steps.filter.outputs.website || 'true' }}
+    steps:
+      - name: Check out repository
+        if: github.event_name == 'push'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Detect changed areas
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - '**'
+              - '!website/**'
+              - '!.github/workflows/website.yml'
+              - '!.github/workflows/website-build.yml'
+            website:
+              - 'website/**'
+              - '.github/workflows/website.yml'
+              - '.github/workflows/website-build.yml'
+              - '.github/workflows/ci.yml'
+
   swift:
-    if: github.event_name != 'push'
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27   # GitHub public-preview image with Xcode 27.1 (D18)
     timeout-minutes: 35
     steps:
@@ -64,7 +99,8 @@ jobs:
           if-no-files-found: ignore
 
   evals:
-    if: github.event_name != 'push'
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -80,7 +116,8 @@ jobs:
         run: scripts/verify.sh evals
 
   app:
-    if: github.event_name != 'push'
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -98,29 +135,42 @@ jobs:
           path: .build/app/run.*/Test.xcresult
           if-no-files-found: ignore
 
+  website:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.website == 'true'
+    uses: ./.github/workflows/website-build.yml
+
   # A job whose needs failed is skipped, and a skipped required check counts as passing,
-  # so this always runs (except on push, which verifies nothing) and accepts only three
-  # successes.
+  # so this always runs (except on push, which verifies nothing). Each job must succeed,
+  # or be skipped because `changes` found nothing for it.
   verify:
-    needs: [swift, evals, app]
+    needs: [changes, swift, evals, app, website]
     if: always() && github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require all jobs to succeed
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require the needed jobs to succeed
         env:
+          CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          WEBSITE: ${{ needs.changes.outputs.website }}
           SWIFT: ${{ needs.swift.result }}
           EVALS: ${{ needs.evals.result }}
           APP: ${{ needs.app.result }}
-        run: |
-          echo "swift: $SWIFT, evals: $EVALS, app: $APP"
-          [[ "$SWIFT" == success && "$EVALS" == success && "$APP" == success ]]
+          SITE: ${{ needs.website.result }}
+        run: python3 -B scripts/ci/check_verify_gate.py
 
   # PRs can read caches saved on main but not each other's, so main keeps the shared
   # prior-writer cache filled: after each merge, and weekly so a runner-image toolchain
   # change refills it before the next merge. On a hit this only looks the key up.
   warm-caches:
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    needs: changes
+    if: >-
+      github.event_name == 'schedule'
+      || (github.event_name == 'push' && needs.changes.outputs.code == 'true')
     runs-on: xcode-27
     timeout-minutes: 30
     steps:

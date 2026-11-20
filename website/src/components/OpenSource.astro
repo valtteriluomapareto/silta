@@ -1,0 +1,125 @@
+---
+import GitHubIcon from './GitHubIcon.astro';
+import { GITHUB_URL, SPEC_URL } from '../consts';
+---
+
+<section class="open" aria-labelledby="open-title">
+	<div class="container">
+		<div class="card">
+			<div class="copy">
+				<p class="eyebrow">Open source</p>
+				<h2 id="open-title">
+					Open, tested with real agents, built with itself.
+				</h2>
+				<p class="body">
+					MIT licensed. The guide, <code>--json</code> shapes, error codes and
+					exit codes that agents read are pinned by golden tests. An eval
+					harness runs Claude Code, Codex and open models against it. Silta’s
+					own backlog runs in Silta.
+				</p>
+			</div>
+			<div class="buttons">
+				<a class="button primary" href={GITHUB_URL}>
+					<GitHubIcon />
+					View on GitHub
+				</a>
+				<a class="button secondary" href={SPEC_URL}>
+					Read the design spec
+				</a>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.open {
+		padding: 56px 0 16px;
+	}
+	.card {
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
+		padding: 28px 24px;
+		border-radius: var(--radius-xl);
+		background: var(--color-bg-grouped);
+	}
+	.copy {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		max-width: 620px;
+	}
+	h2 {
+		font-size: 24px;
+		font-weight: 800;
+		line-height: 30px;
+		letter-spacing: -0.025em;
+	}
+	.body {
+		color: var(--color-label-secondary);
+		font-size: 16px;
+		line-height: 25px;
+	}
+	code {
+		font-family: var(--font-mono);
+		font-size: var(--text-mono);
+	}
+	.buttons {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		width: 100%;
+		max-width: 302px;
+	}
+	.button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 12px 18px;
+		border: 1px solid transparent;
+		border-radius: var(--radius-md);
+		font-size: var(--text-subheadline);
+		font-weight: 600;
+		line-height: 18px;
+	}
+	.primary {
+		background: var(--color-label);
+		color: var(--color-label-dark);
+	}
+	.primary:hover {
+		background: var(--color-surface-dark-2);
+	}
+	.secondary {
+		border-color: rgb(14 28 34 / 22%);
+		background: var(--color-bg);
+	}
+	.secondary:hover {
+		border-color: var(--color-label);
+	}
+
+	@media (min-width: 768px) {
+		.open {
+			padding: 104px 0 56px;
+		}
+		.card {
+			padding: 44px 48px;
+		}
+		h2 {
+			font-size: 30px;
+			line-height: 36px;
+		}
+	}
+
+	@media (min-width: 1080px) {
+		.card {
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			gap: 56px;
+		}
+		.buttons {
+			flex: 0 0 240px;
+		}
+	}
+</style>

@@ -1,0 +1,84 @@
+---
+import Wordmark from './Wordmark.astro';
+import GitHubIcon from './GitHubIcon.astro';
+import { withBase } from '../utils';
+import { DOCS_URL, GITHUB_URL } from '../consts';
+
+const links = [
+	{ label: 'How it works', href: withBase('#how-it-works') },
+	{ label: 'Features', href: withBase('#features') },
+	{ label: 'Docs', href: DOCS_URL },
+];
+---
+
+<header class="nav">
+	<a class="brand" href={withBase()} aria-label="Silta home">
+		<Wordmark />
+	</a>
+	<nav aria-label="Primary">
+		<ul class="links">
+			{links.map((link) => (
+				<li class="text-link">
+					<a href={link.href}>{link.label}</a>
+				</li>
+			))}
+			<li>
+				<a class="github" href={GITHUB_URL}>
+					<GitHubIcon />
+					<span>GitHub</span>
+				</a>
+			</li>
+		</ul>
+	</nav>
+</header>
+
+<style>
+	.nav {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px var(--page-gutter);
+		border-bottom: 1px solid var(--color-separator);
+	}
+	.links {
+		display: flex;
+		align-items: center;
+		gap: 32px;
+	}
+	.text-link {
+		display: none;
+	}
+	.text-link a {
+		color: var(--color-label-secondary);
+		font-size: var(--text-subheadline);
+		font-weight: 500;
+		line-height: 18px;
+	}
+	.text-link a:hover {
+		color: var(--color-label);
+	}
+	.github {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 9px 16px;
+		border-radius: var(--radius-full);
+		background: var(--color-label);
+		color: var(--color-label-dark);
+		font-size: var(--text-mono);
+		font-weight: 600;
+		line-height: 18px;
+	}
+	.github:hover {
+		background: var(--color-surface-dark-2);
+	}
+
+	@media (min-width: 768px) {
+		.nav {
+			padding-block: 22px;
+		}
+		.text-link {
+			display: block;
+		}
+	}
+</style>

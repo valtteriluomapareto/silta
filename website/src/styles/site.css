@@ -1,0 +1,324 @@
+/*
+ * Silta website: design tokens, base styles and shared primitives.
+ *
+ * The tokens mirror the design tokens of the Paper file "Silta", page
+ * "Website", one custom property per Paper token with the same name and
+ * value. Font families add their webfont names and fallbacks. See
+ * website/README.md for the mapping and how to update it.
+ *
+ * The site is light only: the design has no dark variant.
+ */
+
+:root {
+	color-scheme: light;
+
+	/* Colors */
+	--color-bg: #ffffff;
+	--color-bg-grouped: #f0f5f6;
+	--color-label: #0e1c22;
+	--color-label-secondary: rgb(14 28 34 / 64%);
+	--color-label-tertiary: rgb(14 28 34 / 42%);
+	--color-separator: rgb(14 28 34 / 12%);
+	--color-surface-dark: #0e1c22;
+	--color-surface-dark-2: #16282f;
+	--color-label-dark: #ffffff;
+	--color-label-secondary-dark: rgb(230 242 245 / 62%);
+	--color-accent: #0b6e8e;
+	--color-accent-dark: #3ba3c2;
+	--color-accent-tint: #e6f2f5;
+	--color-accent-soft: #9ccfdd;
+	--color-signal: #b7791f;
+
+	/* Font families */
+	--font-sans:
+		'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		Roboto, sans-serif;
+	--font-mono:
+		'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo,
+		monospace;
+
+	/* Font sizes */
+	--text-caption: 13px;
+	--text-mono: 14px;
+	--text-subheadline: 15px;
+	--text-body: 17px;
+	--text-lead: 19px;
+	--text-title3: 22px;
+	--text-title1: 40px;
+	--text-display: 62px;
+
+	/* Letter spacing */
+	--tracking-tighter: -0.03em;
+	--tracking-tight: -0.02em;
+	--tracking-wide: 0.06em;
+
+	/* Breakpoints (the two artboard widths) and content width */
+	--breakpoint-compact: 390px;
+	--breakpoint-desktop: 1440px;
+	--container-content: 1120px;
+
+	/* Spacing */
+	--spacing-sm: 8px;
+	--spacing-md: 16px;
+	--spacing-lg: 24px;
+	--spacing-xl: 32px;
+	--spacing-2xl: 48px;
+
+	/* Radius */
+	--radius-sm: 8px;
+	--radius-md: 12px;
+	--radius-lg: 20px;
+	--radius-xl: 28px;
+	--radius-full: 999px;
+
+	/* Site-only values, derived from the design rather than Paper tokens */
+	--page-gutter: 20px;
+	--section-padding: 64px;
+	--focus-ring: 2px solid var(--color-accent);
+	--hairline-dark: rgb(230 242 245 / 10%);
+}
+
+@media (min-width: 768px) {
+	:root {
+		--page-gutter: 40px;
+		--section-padding: 104px;
+	}
+}
+
+@media (min-width: 1280px) {
+	:root {
+		--page-gutter: 80px;
+	}
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+}
+
+body {
+	margin: 0;
+	background: var(--color-bg);
+	color: var(--color-label);
+	font-family: var(--font-sans);
+	font-size: var(--text-body);
+	line-height: 1.5;
+	font-synthesis: none;
+	overflow-wrap: anywhere;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+pre,
+figure {
+	margin: 0;
+}
+
+ul,
+ol {
+	padding: 0;
+	list-style: none;
+}
+
+img,
+svg {
+	display: block;
+	max-width: 100%;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+}
+
+:focus-visible {
+	outline: var(--focus-ring);
+	outline-offset: 3px;
+	border-radius: 4px;
+}
+
+.on-dark :focus-visible,
+.on-dark:focus-visible {
+	outline-color: var(--color-accent-dark);
+}
+
+/* The skip link moves focus to <main>; it needs no ring of its own. */
+main:focus {
+	outline: none;
+}
+
+.skip-link {
+	position: absolute;
+	top: 12px;
+	left: 12px;
+	z-index: 10;
+	padding: 10px 16px;
+	border-radius: var(--radius-sm);
+	background: var(--color-label);
+	color: var(--color-label-dark);
+	font-size: var(--text-subheadline);
+	font-weight: 600;
+	transform: translateY(-200%);
+}
+
+.skip-link:focus {
+	transform: none;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* A section's padded, centred content column. */
+.container {
+	width: 100%;
+	max-width: calc(var(--container-content) + 2 * var(--page-gutter));
+	margin-inline: auto;
+	padding-inline: var(--page-gutter);
+}
+
+/* Eyebrow: a small dot and an uppercase label above a heading. */
+.eyebrow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--color-label-secondary);
+	font-size: var(--text-caption);
+	font-weight: 600;
+	line-height: 16px;
+	letter-spacing: var(--tracking-wide);
+	text-transform: uppercase;
+}
+
+.eyebrow::before {
+	content: '';
+	flex-shrink: 0;
+	width: 7px;
+	height: 7px;
+	border-radius: var(--radius-full);
+	background: var(--color-accent);
+}
+
+/* Centred section header: eyebrow, title and an optional lead. */
+.section-header {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	max-width: 760px;
+	margin-inline: auto;
+	text-align: center;
+}
+
+.section-title {
+	font-size: 30px;
+	font-weight: 800;
+	line-height: 36px;
+	letter-spacing: var(--tracking-tighter);
+}
+
+.section-lead {
+	color: var(--color-label-secondary);
+	font-size: var(--text-body);
+	line-height: 26px;
+}
+
+@media (min-width: 768px) {
+	.section-title {
+		font-size: var(--text-title1);
+		line-height: 46px;
+	}
+
+	.section-lead {
+		font-size: var(--text-lead);
+		line-height: 29px;
+	}
+}
+
+/* Card with a hairline border, used by the Why and Features grids. */
+.card {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 22px;
+	border: 1px solid var(--color-separator);
+	border-radius: var(--radius-lg);
+}
+
+@media (min-width: 768px) {
+	.card {
+		padding: 28px;
+	}
+}
+
+.card-grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 12px;
+}
+
+@media (min-width: 768px) {
+	.card-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 20px;
+	}
+}
+
+@media (min-width: 1080px) {
+	.card-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+.card-body {
+	color: var(--color-label-secondary);
+	font-size: var(--text-subheadline);
+	line-height: 23px;
+}
+
+/* Text link with a trailing arrow icon. */
+.arrow-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	font-size: var(--text-subheadline);
+	font-weight: 600;
+	line-height: 18px;
+}
+
+.arrow-link:hover span {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}

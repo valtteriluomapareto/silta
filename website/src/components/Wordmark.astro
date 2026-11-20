@@ -1,0 +1,72 @@
+---
+// The Silta mark and name. `dark` uses the mark's dark-ground colours, as in
+// docs/assets/silta-mark-dark.svg.
+interface Props {
+	tone?: 'light' | 'dark';
+}
+
+const { tone = 'light' } = Astro.props;
+const fills =
+	tone === 'dark'
+		? { back: '#E6F2F5', front: '#3BA3C2', bar: '#0E1C22', barOpacity: 0.35 }
+		: { back: '#9CCFDD', front: '#0B6E8E', bar: '#FFFFFF', barOpacity: 0.45 };
+---
+
+<span class:list={['wordmark', tone]}>
+	<svg
+		width="30"
+		height="24"
+		viewBox="180 216 686 548"
+		aria-hidden="true"
+		focusable="false"
+	>
+		<rect
+			x="282"
+			y="236"
+			width="564"
+			height="300"
+			rx="42"
+			fill={fills.back}
+		></rect>
+		<path
+			d="M242 320 H742 A42 42 0 0 1 784 362 V744 H646 A154 154 0 0 0 338 744 H200 V362 A42 42 0 0 1 242 320 Z"
+			fill={fills.front}
+		></path>
+		<rect
+			x="262"
+			y="392"
+			width="232"
+			height="34"
+			rx="17"
+			fill={fills.bar}
+		></rect>
+		<rect
+			x="262"
+			y="458"
+			width="348"
+			height="34"
+			rx="17"
+			fill={fills.bar}
+			fill-opacity={fills.barOpacity}
+		></rect>
+	</svg>
+	<span class="name">Silta</span>
+</span>
+
+<style>
+	.wordmark {
+		display: inline-flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.name {
+		font-size: 19px;
+		font-weight: 700;
+		line-height: 24px;
+		letter-spacing: var(--tracking-tight);
+		color: var(--color-label);
+	}
+	.dark .name {
+		color: var(--color-label-dark);
+	}
+</style>

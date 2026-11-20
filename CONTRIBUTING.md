@@ -11,6 +11,7 @@ This covers setup, commands and the merge workflow. Agents should start with
 | SwiftLint | 0.65.1 | [`scripts/ci/install-swift-tools.sh`](scripts/ci/install-swift-tools.sh) |
 | swift-format | 603.0.0 | same |
 | Python | system `python3` | guard scripts and offline agent-eval tooling |
+| Node | 24.22.3, for the website only | [`website/.nvmrc`](website/.nvmrc); npm packages by `website/package-lock.json` |
 
 CI selects exactly this Xcode (`scripts/ci/select-xcode.sh`) and installs the
 SHA-checked tools. Use the same pinned tools locally; Homebrew's current versions
@@ -29,7 +30,7 @@ export PATH="$(paste -sd: "$silta_tools/path"):$PATH"
 
 | Command | What it does | What it doesn't prove |
 |---|---|---|
-| `scripts/run-guards.sh` | Guard self-tests, then the repository guards: app boundary, control release, app pins, core boundary, determinism, test waits, plan references, core hygiene, `try?` reasons, coded errors, package features, package graph, docs links, plans board | That the code builds or behaves |
+| `scripts/run-guards.sh` | Guard self-tests, then the repository guards: app boundary, control release, app pins, core boundary, determinism, test waits, plan references, core hygiene, `try?` reasons, coded errors, package features, package graph, docs links, website links, plans board | That the code builds or behaves |
 | `python3 -B -m unittest discover -s scripts/tests` | Guard self-tests: each guard passes a clean tree and fails a planted violation | — |
 | `scripts/lint-check.sh` | swift-format and SwiftLint in `--strict` mode, no changes | Behaviour |
 | `scripts/lint-fix.sh` | Apply swift-format and SwiftLint fixes | — |
@@ -45,13 +46,23 @@ and timeouts are unchanged. The wall-clock tier runs separately and serially.
 
 CI runs `full-swift`, `evals` and `app` as three parallel jobs on the `xcode-27` runner, and a
 `verify` job, the required check, passes only when all succeed. Three macOS jobs per run
-also means three chances to wait for a preview runner. The `swift` job reuses the prior-writer
-binaries from the Actions cache, keyed by `scripts/ci/prior-writer-cache-key.sh` on the
-Swift toolchain and `scripts/build-prior-writer.sh`; the weekly scheduled run builds them
-from source. A push to `main` runs only `warm-caches`, which fills that cache in `main`'s
-scope where every PR can read it; it verifies nothing, because the PR already verified the
-same tree. That holds only while the `main` ruleset has no bypass actors; if one is added,
-restore the full push run (D19).
+also means three chances to wait for a preview runner. A first `changes` job sorts the
+changed files of a PR or push. A change only to `website/` or the website workflows skips
+the three macOS jobs and runs the website build from
+[`website-build.yml`](.github/workflows/website-build.yml) on Linux instead. Any other
+change runs the macOS jobs; a change to both, or to `ci.yml`, runs both. `verify` accepts
+a skipped job only when `changes` asked for the skip
+([`check_verify_gate.py`](scripts/ci/check_verify_gate.py), covered by the guard
+self-tests). The weekly and manual runs run everything. The
+[website README](website/README.md#deploys) covers the website build and its deploys.
+
+The `swift` job reuses the prior-writer binaries from the Actions cache, keyed by
+`scripts/ci/prior-writer-cache-key.sh` on the Swift toolchain and
+`scripts/build-prior-writer.sh`; the weekly scheduled run builds them from source. In CI, a push
+to `main` runs only `changes` and `warm-caches`, which fills that cache in `main`'s scope
+where every PR can read it; a website-only merge skips `warm-caches`. The push verifies
+nothing, because the PR already verified the same tree. That holds only while the `main` ruleset has no
+bypass actors; if one is added, restore the full push run (D19).
 
 Each script's header comment says how to run it. What each target and folder holds is
 in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).

@@ -154,6 +154,10 @@ They're summarised here so every decision has one index.
     file, so a manifest change without a matching resolve fails.
   - **↳ update 2026-11-17:** The Mac document reader uses Foundation's Markdown
     parser and SwiftUI text. MarkdownUI is not used or added as a package dependency.
+  - **↳ update 2026-11-20:** The website in `website/` is the only Node code. Node is
+    pinned exactly in `website/.nvmrc`, which CI reads too. npm packages are pinned by
+    the committed `package-lock.json` and installed with `npm ci`. Astro is plain CSS
+    and HTML with no UI framework; it is hosted on GitHub Pages.
 - **D19: Branch and merge flow.**
   - Branches are `<agent>/<slice>-<slug>`, squash-merged on green CI.
   - Until the first code lands, documentation changes may be committed directly to
@@ -173,6 +177,14 @@ They're summarised here so every decision has one index.
     read (PR-scoped caches are invisible to other PRs). The weekly scheduled run and manual
     runs still verify `main` in full. If the ruleset ever gains a bypass, restore the push
     run.
+  - **↳ update 2026-11-20:** CI is scoped by path. A `changes` job lists the changed
+    files; a change only to `website/` or its workflows skips the three macOS jobs and runs
+    the Linux website build instead, and `verify` accepts a skip only where `changes`
+    asked for one. Path filters on the workflow triggers were rejected: a run that never
+    starts leaves the required `verify` check missing, and the PR cannot merge. `verify`
+    stays the one required check, so the website build gates website PRs without a
+    ruleset change. The website deploys from its own workflow on a push to `main`; the build is a
+    separate reusable workflow, so CI never holds deploy permissions.
 - **D20: Dogfood from DF0** (spec §22.1).
   - GitHub issues are the public record, and Silta is the working layer. Tasks link
     their issue with a `url:` link and are not promoted, so they stay editable.
