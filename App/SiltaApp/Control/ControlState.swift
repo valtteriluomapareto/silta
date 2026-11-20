@@ -44,6 +44,7 @@
     let run: String
     let revision: Int
     let fixture = "v2"
+    let fixtureNow = AppV2Fixture.now.ISO8601Format(.init(includingFractionalSeconds: true))
     let appearance: String
     let screen: String
     let route: String
@@ -90,7 +91,7 @@
       idle = readiness.idle
     }
 
-    @MainActor private static func readiness(_ model: AppModel) -> (phase: String, idle: Bool) {
+    @MainActor static func readiness(_ model: AppModel) -> (phase: String, idle: Bool) {
       let documentPhase =
         model.route == .docs
         ? model.documents.phase(
@@ -101,32 +102,23 @@
         ? model.workspaceDocuments.phase(
           workspace: model.workspace, version: model.visibleData?.version,
           connections: model.visibleData?.map?.connections.map(\.attachment) ?? []) : nil
+      let taskPhase =
+        model.route == .board && model.boardInspectorPresented
+        ? model.boardSelection.map {
+          model.taskDetail.phase(
+            workspace: model.workspace, ref: $0.taskRef, version: model.visibleData?.version)
+        } : nil
       let phase =
         model.isLoading
         ? "loading"
         : model.failure != nil
           ? "failed"
-          : workspacePhase?.rawValue ?? documentPhase?.rawValue
+          : workspacePhase?.rawValue ?? documentPhase?.rawValue ?? taskPhase?.rawValue
             ?? (model.data != nil ? "ready" : "starting")
-      let taskSettled =
-        model.route != .board || !model.boardInspectorPresented
-        || model.boardSelection == nil
-        || (model.taskDetail.value?.ref == model.boardSelection?.taskRef
-          || model.taskDetail.failure != nil)
-      let documentSettled =
-        documentPhase == nil || model.failure != nil
-        || documentPhase == .ready || documentPhase == .failed
-      let workspaceSettled =
-        workspacePhase == nil || model.failure != nil
-        || workspacePhase == .ready || workspacePhase == .failed
-      let idle =
-        workspaceSettled && documentSettled && !model.isLoading && !model.taskDetail.isLoading
-        && taskSettled
-        && (model.data != nil || model.failure != nil)
-      return (phase, idle)
+      return (phase, model.actions.sending.isEmpty && (phase == "ready" || phase == "failed"))
     }
 
-    @MainActor private static func navigation(_ model: AppModel)
+    @MainActor static func navigation(_ model: AppModel)
       -> (selection: Selection?, inspectorOpen: Bool)
     {
       switch model.route {
@@ -156,7 +148,7 @@
     }
 
     enum CodingKeys: String, CodingKey {
-      case snapshotVersion, run, revision, fixture, appearance, screen, route, selection
+      case snapshotVersion, run, revision, fixture, fixtureNow, appearance, screen, route, selection
       case inspectorOpen, counts, refresh, idle, pid, windowNumber, seq, settledSeq
     }
     func encode(to encoder: any Encoder) throws {
@@ -169,6 +161,7 @@
       try values.encode(run, forKey: .run)
       try values.encode(revision, forKey: .revision)
       try values.encode(fixture, forKey: .fixture)
+      try values.encode(fixtureNow, forKey: .fixtureNow)
       try values.encode(appearance, forKey: .appearance)
       try values.encode(screen, forKey: .screen)
       try values.encode(route, forKey: .route)

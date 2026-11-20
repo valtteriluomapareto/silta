@@ -164,12 +164,12 @@ Follow the [workflow](../../AGENTS.md#workflow) and [review rules](../../AGENTS.
 Use the test-first flow for logic and view-model tests for SwiftUI layout.
 Use [AGENTS.md](../../AGENTS.md#keep-it-lean) for fault probes and PR size.
 Add navigation, observable state and development hooks
-only when a screen needs them. The minimal [control support](mac-app-control.md)
-provides isolated fixtures, versioned model state and offscreen root PNGs. The
-terminal driver waits on model state and can capture a real owned window when
-Screen Recording and the window session permit. The control plan also covers
-live fixture actions. Follow the [dogfooding workflow](../../AGENTS.md#dogfooding)
-to submit the task before merge and finish it after merge.
+only when a screen needs them. The [control-plane guide](../mac-app-control.md)
+covers isolated fixtures, versioned model state and offscreen root PNGs. The
+terminal driver can also exercise shared UI handlers and capture an owned window
+when Screen Recording and the window session permit. Follow the
+[dogfooding workflow](../../AGENTS.md#dogfooding) to submit the task before merge
+and finish it after merge.
 
 ## Validation
 

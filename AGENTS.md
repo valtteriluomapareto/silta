@@ -61,7 +61,8 @@ through. Fix the change, or propose a decision first.
    exception with `// guard:allow-nondeterminism <reason>`.
 3. **Tests never wait on the wall clock.** That means no `sleep`, `Task.sleep` or
    `asyncAfter`; use the fake clock. This covers `Tests/`, `App/SiltaAppTests` and `SiltaTestSupport`.
-   Enforced by `check_test_waits.py`.
+   Enforced for Swift by `check_test_waits.py`. Python driver tests use events
+   and bounded deadlines with temporary directories.
 4. **Code comments don't refer to plans, phases, milestones or review rounds.**
    Enforced by `check_no_plan_refs.py`.
 5. **No crashes or hidden state in shipped code.** That means:
@@ -233,7 +234,7 @@ previous installs.
 Use `scripts/silta-app.sh launch --route …` to reach a state in a private Debug
 fixture. Read its `state.json` through `state` or use `wait` for a predicate. Use
 offscreen snapshots for layout and an owned-window `shot` for glass when available.
-Stop only the fixture run you launched. See the [control-plane guide](docs/plans/mac-app-control.md#drive-a-fixture-from-the-terminal)
+Stop only the fixture run you launched. See the [control-plane guide](docs/mac-app-control.md#drive-a-fixture-from-the-terminal)
 for commands and evidence. Real UI checks never block a PR.
 
 ## Parallel agents and worktrees

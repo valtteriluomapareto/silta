@@ -2318,6 +2318,10 @@ HTTP(S) destination beside the label. Activation checks that the URL still has
 an HTTP(S) scheme and a host. Other destinations appear as selectable labels.
 These projections do not change CLI JSON.
 
+The Debug app's [control plane](mac-app-control.md) runs against an isolated
+fixture. Its windowed actions delegate to the app's handlers, and their copy
+results stay in the run's private response files.
+
 **Dependencies:** GRDB.swift, swift-argument-parser and Yams (parsing only; export
 uses its own emitter), all MIT or Apache-2. Git runs as a subprocess.
 

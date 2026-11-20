@@ -20,7 +20,8 @@ class AppBoundaryTests(unittest.TestCase):
         self.assertEqual(self.check("import SwiftUI\nimport AppKit\nimport SiltaAppSupport"), [])
 
     def test_forbidden_dependencies(self):
-        for module in ["SiltaCore", "GRDB", "ArgumentParser", "SiltaTestSupport"]:
+        for module in ["SiltaCore", "GRDB", "ArgumentParser", "SiltaTestSupport",
+                       "Dispatch", "CoreFoundation"]:
             self.assertTrue(self.check("import " + module), module)
 
     def test_scoped_import_and_comments(self):

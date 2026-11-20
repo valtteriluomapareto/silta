@@ -11,7 +11,6 @@
 
     final class Probe: NSView {
       private weak var observedWindow: NSWindow?
-      private var isClosing = false
       private let report: (NSWindow?) -> Void
 
       init(report: @escaping (NSWindow?) -> Void) {
@@ -31,25 +30,33 @@
             self, name: NSWindow.willCloseNotification, object: observedWindow)
         }
         observedWindow = window
-        isClosing = false
         if let window {
-          NotificationCenter.default.addObserver(
-            self, selector: #selector(windowUpdated(_:)), name: NSWindow.didUpdateNotification,
-            object: window)
           NotificationCenter.default.addObserver(
             self, selector: #selector(windowClosing(_:)), name: NSWindow.willCloseNotification,
             object: window)
+          if window.windowNumber <= 0 {
+            NotificationCenter.default.addObserver(
+              self, selector: #selector(windowNumberAssigned(_:)),
+              name: NSWindow.didUpdateNotification, object: window)
+          }
         }
         report(window)
       }
 
-      @objc private func windowUpdated(_ notification: Notification) {
-        if !isClosing { report(window) }
+      @objc private func windowNumberAssigned(_ notification: Notification) {
+        guard let window = observedWindow, window.windowNumber > 0 else { return }
+        stopWaitingForNumber(window)
+        report(window)
       }
 
       @objc private func windowClosing(_ notification: Notification) {
-        isClosing = true
+        if let observedWindow { stopWaitingForNumber(observedWindow) }
         report(nil)
+      }
+
+      private func stopWaitingForNumber(_ window: NSWindow) {
+        NotificationCenter.default.removeObserver(
+          self, name: NSWindow.didUpdateNotification, object: window)
       }
     }
   }

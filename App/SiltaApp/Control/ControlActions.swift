@@ -4,7 +4,6 @@
 
   @MainActor struct ControlActions {
     let model: AppModel
-    var copy: @MainActor (String) -> Bool = CopyValue.writeToPasteboard
 
     func perform(_ action: ControlAction) async -> ControlOutcome {
       switch action {
@@ -29,7 +28,6 @@
         }
       }
       let target = Target(model, allowDefaultDocument: model.documentSelection == nil)
-      await loadSelection(reload: action == .refresh)
       return await settle(target)
     }
 
@@ -43,28 +41,17 @@
 
     private func copySelection() -> ControlOutcome {
       guard let ref = Target(model).selection?.ref else { return .refused(.unavailable) }
-      return copy(ref) ? .accepted : .refused(.copyFailed)
+      return .copied(ref)
     }
 
     private func copyReviewCommand() -> ControlOutcome {
       guard model.route == .board, model.boardInspectorPresented,
+        ControlState.readiness(model).phase == "ready",
         let task = model.taskDetail.value, task.ref == model.boardSelection?.taskRef,
         task.status == "review", let workspace = model.workspace,
         let command = model.reader?.commands(forReview: task, workspace: workspace).first
       else { return .refused(.unavailable) }
-      return copy(command.text) ? .accepted : .refused(.copyFailed)
-    }
-
-    private func loadSelection(reload: Bool) async {
-      switch model.route {
-      case .board where model.boardInspectorPresented:
-        if reload || !model.taskDetail.isCurrent(version: model.visibleData?.version) {
-          await model.loadTaskDetail()
-        }
-      case .docs: await model.loadDocuments()
-      case .workspace: await model.loadWorkspaceDocuments()
-      default: break
-      }
+      return .copied(command.text)
     }
 
     private func settle(_ target: Target) async -> ControlOutcome {
@@ -87,15 +74,9 @@
       guard target == Target(model, allowDefaultDocument: target.allowDefaultDocument) else {
         return .refused(.superseded)
       }
-      let state = ControlState(model: model, run: "", revision: 0, dark: false)
-      guard state.idle else { return nil }
-      guard state.refresh.phase == "ready" else { return .refused(.readFailed) }
-      if model.route == .board, model.boardInspectorPresented, model.boardSelection != nil,
-        !model.taskDetail.isCurrent(version: model.visibleData?.version)
-      {
-        return .refused(.readFailed)
-      }
-      return .accepted
+      let readiness = ControlState.readiness(model)
+      guard readiness.idle else { return nil }
+      return readiness.phase == "ready" ? .accepted : .refused(.readFailed)
     }
 
     private struct Target: Equatable {
@@ -108,11 +89,11 @@
       let allowDefaultDocument: Bool
 
       init(_ model: AppModel, allowDefaultDocument: Bool = false) {
-        let state = ControlState(model: model, run: "", revision: 0, dark: false)
+        let navigation = ControlState.navigation(model)
         workspace = model.workspace
         route = model.route
-        selection = allowDefaultDocument && route == .docs ? nil : state.selection
-        inspector = state.inspectorOpen
+        selection = allowDefaultDocument && route == .docs ? nil : navigation.selection
+        inspector = navigation.inspectorOpen
         about = route == .docs ? model.docsAbout : nil
         archived = route == .docs && model.includeArchivedDocuments
         self.allowDefaultDocument = allowDefaultDocument
