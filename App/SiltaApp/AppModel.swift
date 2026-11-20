@@ -146,7 +146,9 @@ final class AppModel {
       let request, documents.isCurrentList(request)
     else { return }
     if documents.ref == nil {
-      documents.ref = documents.groups(search: "").first?.preferred?.ref
+      documents.ref =
+        DocsContent.sections(documents.groups(search: "")).first?.groups.first?
+        .preferred?.ref
     }
     await documents.show(reader, workspace: workspace, version: version, force: force)
   }
@@ -164,6 +166,11 @@ final class AppModel {
     docsAbout = about
     documents.view = view
     select(document: ref)
+  }
+
+  /// Narrows the list from the reader while keeping the open document and tab.
+  func filterDocuments(about: String) {
+    docsAbout = about
   }
 
   func openDocuments(about: String) {

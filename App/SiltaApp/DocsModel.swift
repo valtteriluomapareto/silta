@@ -66,6 +66,8 @@ import SiltaAppSupport
   private(set) var lines: AppDocumentLines?
   var proposedOnly = false
   private(set) var entries: [AppDocument] = []
+  /// Topics seen in this workspace's lists, kept while a filter hides their documents.
+  private(set) var topics: Set<String> = []
   private(set) var nextList: Int?
   private(set) var document: AppDocument?
   private(set) var versions: [AppDocument] = []
@@ -123,6 +125,7 @@ import SiltaAppSupport
     versions = []
     nextVersions = nil
     entries = []
+    topics = []
     nextList = nil
     listFailure = nil
     listFailureVersion = nil
@@ -143,6 +146,7 @@ import SiltaAppSupport
     {
       return listGeneration
     }
+    if scope?.workspace != workspace { topics = [] }
     if scope != requestedScope {
       listLoaded = false
       entries = []
@@ -160,6 +164,9 @@ import SiltaAppSupport
       let result = try await readList(reader, workspace, about, true, offset)
       guard token == listGeneration, !Task.isCancelled else { return nil }
       entries = append ? entries + result.entries : result.entries
+      let seen = Set(result.entries.flatMap { $0.about ?? [] }.filter { $0.hasPrefix("topic:") })
+      // An unfiltered first page replaces the topics, so removed ones leave the menu.
+      topics = about == nil && !append ? seen : topics.union(seen)
       nextList = result.nextOffset
       listFailure = nil
       listFailureVersion = nil

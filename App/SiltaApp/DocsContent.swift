@@ -6,15 +6,11 @@ import SiltaAppSupport
     let id: String
     let groups: [DocsModel.Group]
     var title: String {
-      if id == "unknown" { return "Attachments not recorded" }
-      if id == "none" { return "No attachments" }
-      if id.hasPrefix("app:") { return String(id.dropFirst(4)) }
-      if id.hasPrefix("topic:") { return "Topic " + id.dropFirst(6) }
-      if id.hasPrefix("edge:") {
-        let parts = id.dropFirst(5).split(separator: "/", maxSplits: 2)
-        if parts.count == 3 { return "\(parts[0]) → \(parts[1]) · \(parts[2])" }
-      }
-      return id
+      let names = [
+        "contract": "Contracts", "flow": "Flows", "reference": "References",
+        "runbook": "Runbooks", "other": "Other kinds", "none": "Kind not recorded",
+      ]
+      return (names[id] ?? id) + " · \(groups.count)"
     }
   }
 
@@ -23,28 +19,123 @@ import SiltaAppSupport
       .sorted { $0.id < $1.id }
   }
 
+  struct AboutOption {
+    let ref: String
+    let name: String
+  }
+  struct AboutSection: Identifiable {
+    let title: String
+    let options: [AboutOption]
+    var id: String { title }
+  }
+
+  /// Live apps and services from the map, then topics seen in this workspace's documents.
+  static func aboutOptions(map: AppWorkspaceMap?, topics: Set<String>) -> [AboutSection] {
+    let sections = [
+      AboutSection(
+        title: "Apps",
+        options: (map?.apps ?? []).map { AboutOption(ref: $0.attachment, name: $0.name) }),
+      AboutSection(
+        title: "Services",
+        options: (map?.services ?? []).map { AboutOption(ref: $0.attachment, name: $0.name) }),
+      AboutSection(
+        title: "Topics",
+        options: topics.sorted().map { AboutOption(ref: $0, name: name($0)) }),
+    ]
+    return sections.filter { !$0.options.isEmpty }
+  }
+
+  /// The map's name for a live app or service ref, else the readable ref.
+  static func aboutLabel(_ ref: String, map: AppWorkspaceMap?) -> String {
+    map?.apps.first { $0.attachment == ref }?.name
+      ?? map?.services.first { $0.attachment == ref }?.name ?? name(ref)
+  }
+
+  /// One section per kind, so a document is listed once however many refs it is about.
   static func sections(_ groups: [DocsModel.Group]) -> [Section] {
-    var result: [String: [DocsModel.Group]] = [:]
-    for group in groups {
-      let refs = group.preferred?.about
-      let keys = refs.map { $0.isEmpty ? ["none"] : $0 } ?? ["unknown"]
-      for key in Set(keys) { result[key, default: []].append(group) }
+    let kinds = ["contract", "flow", "reference", "runbook", "other", "none"]
+    func kind(_ group: DocsModel.Group) -> String {
+      guard let kind = group.preferred?.kind else { return "none" }
+      return kinds.prefix(4).contains(kind) ? kind : "other"
     }
-    let kinds = ["edge:", "app:", "topic:", "none", "unknown"]
-    func rank(_ id: String) -> Int { kinds.firstIndex { id.hasPrefix($0) } ?? kinds.count }
-    return result.map { Section(id: $0.key, groups: $0.value) }.sorted {
-      rank($0.id) == rank($1.id) ? $0.id < $1.id : rank($0.id) < rank($1.id)
+    func name(_ group: DocsModel.Group) -> String { group.preferred?.title ?? group.id }
+    let sorted = groups.sorted {
+      let order = name($0).localizedStandardCompare(name($1))
+      return order == .orderedSame ? $0.id < $1.id : order == .orderedAscending
     }
+    let byKind = Dictionary(grouping: sorted, by: kind)
+    return kinds.compactMap { id in byKind[id].map { Section(id: id, groups: $0) } }
+  }
+
+  /// What the document is about, then its revision state, for the list row.
+  static func subtitle(_ group: DocsModel.Group) -> String {
+    guard let document = group.preferred else { return "" }
+    return ([about(document.about)] + revisionParts(group)).joined(separator: " · ")
+  }
+
+  static func about(_ refs: [String]?) -> String {
+    guard let refs else { return "Attachments not recorded" }
+    if refs.isEmpty { return "Whole workspace" }
+    let edges = refs.compactMap(edge)
+    if refs.count == 1, let edge = edges.first {
+      return name(edge.source) + " → " + name(edge.target)
+    }
+    var apps: [String] = []
+    var others: [String] = []
+    for ref in refs {
+      if let edge = edge(ref) {
+        apps += [edge.source, edge.target].filter { !$0.hasPrefix("service:") }.map(name)
+      } else if ref.hasPrefix("app:") {
+        apps.append(name(ref))
+      } else {
+        others.append(name(ref))
+      }
+    }
+    apps = apps.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
+    let head = apps.count > 1 ? ["\(apps.count) apps"] : apps
+    return (head + others).joined(separator: " · ")
+  }
+
+  /// Splits `edge:source/target/kind` before decoding, so an encoded `/` stays in its part.
+  static func edge(_ ref: String) -> Edge? {
+    guard ref.hasPrefix("edge:") else { return nil }
+    let parts = ref.dropFirst(5).split(separator: "/", maxSplits: 2).map(String.init)
+    guard parts.count == 3 else { return nil }
+    return Edge(source: parts[0], target: parts[1], kind: parts[2])
+  }
+
+  /// The still-encoded parts of an `edge:` ref.
+  struct Edge {
+    let source: String
+    let target: String
+    let kind: String
+  }
+
+  /// A readable, decoded name for an attachment ref or a raw edge endpoint.
+  static func name(_ ref: String) -> String {
+    if let edge = edge(ref) {
+      return name(edge.source) + " → " + name(edge.target) + " · " + name(edge.kind)
+    }
+    guard let colon = ref.firstIndex(of: ":") else { return ref.removingPercentEncoding ?? ref }
+    let kind = ref[..<colon]
+    let value = String(ref[ref.index(after: colon)...])
+    let decoded = value.removingPercentEncoding ?? value
+    return kind == "topic" ? "#" + decoded : decoded
   }
 
   static func row(_ group: DocsModel.Group) -> String {
     guard let document = group.preferred else { return "" }
+    return ([document.kind ?? "Kind not recorded"] + revisionParts(group))
+      .joined(separator: " · ")
+  }
+
+  /// Accepted revision, pending proposals and archive state, shared by both row styles.
+  private static func revisionParts(_ group: DocsModel.Group) -> [String] {
+    guard let document = group.preferred else { return [] }
     let pending = group.entries.filter { $0.state == "proposed" }
       .map { "@\($0.revision) proposed" }
     let revision = document.state == "proposed" ? [] : ["@\(document.revision)"]
-    return
-      ([document.kind ?? "Kind not recorded"] + revision + pending
-      + (document.archived ? ["archived"] : [])).joined(separator: " · ")
+    return revision + pending + (document.archived ? ["archived"] : [])
   }
 
   static func readerText(_ document: AppDocument?, body: String, diagnostic: String) -> String {
