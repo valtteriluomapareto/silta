@@ -98,6 +98,57 @@ extension CodeCommandTests {
     }
   }
 
+  @Test(arguments: [2450, 3500])
+  func byteCappedReadsGiveTheFirstUnreadLineAndTotal(width: Int) throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let padding = String(repeating: "x ", count: width / 2)
+      let lines = (1...450).map { "Acme line \($0) " + padding }
+      let path = "wide.txt"
+      try Data(lines.joined(separator: "\n").utf8).write(
+        to: repo.appending(path: "apps/console/" + path))
+      try commitAll(repo, scratch)
+      let command = ["--json", "code", "show", "console@HEAD", path]
+      let first = try SiltaBinary.run(command, in: scratch)
+      let output = try #require(try envelope(first.stdout)["output"] as? String)
+      let warning = try warnings(first.stdout)["output_truncated"]
+      let count = output.split(separator: "\n").count
+      #expect(count == (width == 2450 ? 400 : 298))
+      withKnownIssue("Byte truncation loses the line count and continuation.") {
+        #expect(
+          warning == "Output cut after \(count) of 450 lines; "
+            + "read the rest with --lines \(count + 1)-450.")
+      }
+      if let range = warning?.split(separator: " ").last, range.first?.isNumber == true {
+        let next = try SiltaBinary.run(
+          command + ["--lines", String(range.dropLast())], in: scratch)
+        #expect(
+          try envelope(next.stdout)["output"] as? String
+            == lines.dropFirst(count).joined(separator: "\n"))
+      }
+    }
+  }
+
+  @Test func aSingleWideLineIsDiagnosedAtItsActualLineNumber() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let path = "wide.txt"
+      let line = String(repeating: "é", count: 525_000)
+      try Data(("first\n" + line + "\nlast").utf8).write(
+        to: repo.appending(path: "apps/console/" + path))
+      try commitAll(repo, scratch)
+      let command = ["--json", "code", "show", "console@HEAD", path, "--lines"]
+      let oversized = try SiltaBinary.run(command + ["2-2"], in: scratch)
+      let warnings = try warnings(oversized.stdout)
+      #expect(try envelope(oversized.stdout)["output"] as? String == "")
+      withKnownIssue("A range retry cannot fit an oversized physical line.") {
+        #expect(warnings["output_truncated"]?.contains("Line 2 exceeds 1 MiB") == true)
+      }
+      let later = try SiltaBinary.run(command + ["3-3"], in: scratch)
+      #expect(try envelope(later.stdout)["output"] as? String == "last")
+    }
+  }
+
   @Test func grepUsesExtendedRegularExpressions() throws {
     try withScratchDirectory { scratch in
       _ = try setup(scratch)

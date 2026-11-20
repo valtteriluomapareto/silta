@@ -47,6 +47,36 @@ struct NextCommandTests {
     }
   }
 
+  @Test func collectsIndentedScalarStreamAndApprovalHints() throws {
+    try withScratchDirectory { directory in
+      try """
+      next: silta task ls
+        next: silta ws show
+        ask human: silta task triage
+        next: ask human: Review Acme. After approval: silta app ls; or silta repo ls
+        > next: silta acme-unknown
+      """.write(to: directory.appending(path: "sample.txt"), atomically: true, encoding: .utf8)
+      try #"{"nested":{"next":"silta code ls"},"next":["silta where"]}"#
+        .write(to: directory.appending(path: "sample.json"), atomically: true, encoding: .utf8)
+      try """
+      {"next":"silta task show"}
+      {"next":["silta guide"]}
+      """.write(to: directory.appending(path: "sample.jsonl"), atomically: true, encoding: .utf8)
+      let groups: Set<String> = [
+        "silta", "silta task", "silta ws", "silta app", "silta repo", "silta code",
+      ]
+      let paths = try Set(
+        Self.hints(in: directory).compactMap { Self.commandPath($0, groups: groups) })
+      withKnownIssue("Recovery shapes were skipped by the golden checker.") {
+        #expect(
+          paths == [
+            "silta task ls", "silta ws show", "silta task triage", "silta app ls", "silta repo ls",
+            "silta code ls", "silta where", "silta task show", "silta guide",
+          ])
+      }
+    }
+  }
+
   private static func hints(in directory: URL) throws -> [String] {
     let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
     return try names.flatMap { name -> [String] in

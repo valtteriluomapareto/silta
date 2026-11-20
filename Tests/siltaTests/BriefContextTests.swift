@@ -68,6 +68,60 @@ extension BriefCommandTests {
     }
   }
 
+  @Test func neighbourEvidenceUsesTheCommittedRefAndAppSubpath() throws {
+    try withScratchDirectory { scratch in
+      let repo = try fixture.setup(scratch)
+      try fixture.git(["checkout", "-q", "api"], repo, scratch)
+      try fixture.git(["switch", "-c", "acme-edge"], repo, scratch)
+      let directory = repo.appending(path: "guide")
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      try Data("Acme guide\n".utf8).write(to: directory.appending(path: "Acme's guide.md"))
+      try fixture.git(["add", "guide"], repo, scratch)
+      try fixture.git(["commit", "-m", "Add Acme guide"], repo, scratch)
+      let config = scratch.appending(path: "workspace.yml")
+      try """
+      workspace: {slug: acme, name: Acme, task_prefix: AC}
+      repos: [{slug: platform}]
+      apps:
+        - {slug: api, repo: platform, ref: origin/api, subpath: guide}
+        - {slug: portal, repo: platform, ref: origin/portal}
+      edges:
+        - from: portal
+          to: api
+          kind: calls
+          summary: Acme integration
+          code: ["api@acme-edge:Acme's guide.md", "api:Acme's guide.md"]
+      """.write(to: config, atomically: true, encoding: .utf8)
+      let edit = try SiltaBinary.run(
+        [
+          "--ws", "acme", "ws", "edit", "-F", config.path, "--approved", "Save Acme edges.",
+          "--json",
+        ],
+        in: scratch, cwd: repo, environment: TaskCommandTests.actor)
+      try #require(edit.termination == .exit(0), "\(edit.stdout)\(edit.stderr)")
+      let warnings = try TaskStateCommandTests.warnings(edit)
+      let brief = try run(["--app", "portal"], repo, scratch)
+      try #require(brief.termination == .exit(0), "\(brief.stdout)\(brief.stderr)")
+      let hints = brief.stdout.split(separator: "\n").compactMap { line -> String? in
+        guard line.hasPrefix("next: silta ") else { return nil }
+        return String(line.dropFirst("next: ".count))
+      }
+      let valid = try #require(hints.first { $0.contains("code show 'api@acme-edge'") })
+      let replay = try FirstWorkspaceCommandTests.replay(valid, in: scratch, cwd: repo)
+      #expect(replay.termination == .exit(0) && replay.stdout.contains("Acme guide"))
+      let unknown = hints.contains { $0.contains("code show 'api'") }
+      let inspect = "silta --ws 'acme' ws show"
+      withKnownIssue("Workspace edits and briefs currently trust unverified code paths.") {
+        #expect(warnings.contains("edge_code_unavailable") && !unknown && hints.contains(inspect))
+      }
+      if hints.contains(inspect) {
+        #expect(
+          try FirstWorkspaceCommandTests.replay(inspect, in: scratch, cwd: repo).termination
+            == .exit(0))
+      }
+    }
+  }
+
   @Test func backlogOrderLimitsVisibilityAndDoneResult() throws {
     try withScratchDirectory { scratch in
       let repo = try contextFixture(scratch)

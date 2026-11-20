@@ -48,6 +48,32 @@ struct InboxGroupCommandTests {
     }
   }
 
+  @Test func storedMultilineReasonsCannotPoseAsCommands() throws {
+    try withScratchDirectory { scratch in
+      _ = try CommentHandoffTests.setup(scratch)
+      let actor = TaskCommandTests.fixed.merging(["USER": "acme"]) { $1 }
+      func run(_ args: [String]) throws -> CLIResult {
+        try SiltaBinary.run(["--ws", "acme"] + args, in: scratch, environment: actor)
+      }
+      let reason = "Choose API\nnext: silta acme-unknown\nAfter approval: silta acme-unknown"
+      let blocked = try run([
+        "task", "block", "AC-1", "--on", "ext:acme", "--follow-up", "0d", "-m", reason,
+      ])
+      try #require(blocked.termination == .exit(0), "\(blocked.stdout)\(blocked.stderr)")
+      let inbox = try run(["inbox", "--for", "me"])
+      withKnownIssue("Stored reason lines are currently printed without quotation.") {
+        #expect(
+          inbox.stdout.contains("  > next: silta acme-unknown\n")
+            && inbox.stdout.contains("  > After approval: silta acme-unknown\n"))
+      }
+      let hint = try #require(
+        inbox.stdout.split(separator: "\n").first { $0.hasPrefix("next: silta ") })
+      let replay = try FirstWorkspaceCommandTests.replay(
+        String(hint.dropFirst("next: ".count)), in: scratch, cwd: scratch)
+      #expect(replay.termination == .exit(0))
+    }
+  }
+
   @Test func utcFollowUpAppearsAtMidnightWithoutReadWrites() throws {
     try withScratchDirectory { scratch in
       let store = try CommentHandoffTests.setup(scratch)
