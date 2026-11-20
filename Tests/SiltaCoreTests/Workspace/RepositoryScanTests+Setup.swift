@@ -18,7 +18,7 @@ extension RepositoryScanTests {
         identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
       #expect(git.isExhausted)
       #expect(outcome.repositories == ["service"])
-      #expect(outcome.apps == ["service-v1-2"])
+      #expect(outcome.apps.map(\.slug) == ["service-v1-2"])
       #expect(outcome.warnings.map(\.code) == ["scan_skipped_app", "scan_skipped_app"])
       #expect(outcome.warnings.contains { $0.message.contains("\"service\"") })
       #expect(outcome.warnings.contains { $0.message.contains("\"service-v1-2\"") })

@@ -9,7 +9,7 @@ package struct WorkspaceConfig {
     "workspace": ["slug", "name", "task_prefix"],
     "settings": WorkspaceSettings.CodingKeys.allCases.map(\.rawValue),
     "repos": ["slug", "remote"],
-    "apps": ["slug", "repo", "ref", "prod_ref", "subpath", "summary", "lifecycle"],
+    "apps": ["slug", "name", "repo", "ref", "prod_ref", "subpath", "summary", "lifecycle"],
     "environments": ["app", "name", "url"],
     "edges": ["from", "to", "kind", "summary", "code"],
     "topics": ["slug", "aliases"],
@@ -25,6 +25,10 @@ package struct WorkspaceConfig {
 
   /// Parses YAML and collects key, type, identity and relationship problems with source lines.
   package static func parse(_ yaml: String) throws -> WorkspaceConfig {
+    try parse(yaml, keepingAppNames: [:])
+  }
+
+  static func parse(_ yaml: String, keepingAppNames: [String: String]) throws -> WorkspaceConfig {
     let root: Node
     do {
       guard let document = try Yams.compose(yaml: yaml) else {
@@ -45,7 +49,7 @@ package struct WorkspaceConfig {
     } catch {
       throw WorkspaceError.invalid(["line 1: invalid YAML"])
     }
-    var validation = WorkspaceValidation(root: root)
+    var validation = WorkspaceValidation(root: root, appNames: keepingAppNames)
     validation.run()
     guard validation.problems.isEmpty else {
       throw WorkspaceError.invalid(
@@ -105,6 +109,7 @@ package struct WorkspaceConfig {
 
 private struct WorkspaceValidation {
   let root: Node
+  let appNames: [String: String]
 
   var problems: [String] = []
   var hasInvalidSubpath = false
@@ -166,7 +171,7 @@ private struct WorkspaceValidation {
     for key in WorkspaceConfig.required[section] ?? [] where entry[key] == nil {
       problem(entry, "\(section).\(key) is required")
     }
-    validateValues(entry)
+    validateValues(entry, section: section)
     for key in ["slug", "task_prefix"] {
       if let value = entry[key]?.string, !WorkspaceConfig.isValidIdentifier(value) {
         problem(entry[key] ?? entry, "invalid \(key)")
@@ -187,10 +192,12 @@ private struct WorkspaceValidation {
     }
   }
 
-  mutating func validateValues(_ entry: Node) {
+  mutating func validateValues(_ entry: Node, section: String) {
     for (keyNode, value) in entry.mapping ?? Node.Mapping([]) {
       let key = keyNode.string ?? ""
-      if ["code", "aliases", "include", "exclude"].contains(key) {
+      if section == "apps", key == "name" {
+        validateAppName(value, slug: entry["slug"]?.string)
+      } else if ["code", "aliases", "include", "exclude"].contains(key) {
         if value.sequence == nil || value.array().contains(where: { $0.tag != Tag(.str) }) {
           problem(value, "\(key) must be a list of strings")
         }
@@ -206,6 +213,22 @@ private struct WorkspaceValidation {
         hasInvalidSubpath = true
         problem(value, "subpath must be relative, without .. components or NUL")
       }
+    }
+  }
+
+  private mutating func validateAppName(_ value: Node, slug: String?) {
+    guard value.tag == Tag(.str), let name = value.string else {
+      problem(value, "app name must be a string")
+      return
+    }
+    if let slug, let stored = appNames[slug], name.utf8.elementsEqual(stored.utf8) { return }
+    let controls = CharacterSet.controlCharacters.union(.newlines)
+    if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || name.count > 120 || name.rangeOfCharacter(from: controls) != nil
+    {
+      problem(
+        value,
+        "app name must be one nonblank line of at most 120 characters without control characters")
     }
   }
 

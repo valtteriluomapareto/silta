@@ -1,0 +1,1 @@
+{"data":{"app_names":[{"name":"Acme Platform","slug":"platform"}],"apps":["platform","portal"],"next":["silta --ws 'acme' ws show"],"next_by":"agent","repositories":["platform"],"workspace":"acme"},"ok":true,"schema":1,"warnings":[]}

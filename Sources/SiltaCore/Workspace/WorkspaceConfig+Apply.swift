@@ -99,7 +99,8 @@ private struct WorkspaceWriter {
           "workspace_id": workspace.databaseValue, "slug": text(app, "slug"),
         ],
         values: [
-          "name": text(app, "slug"), "repo_id": repos[app["repo"]?.string ?? ""].databaseValue,
+          "name": (app["name"]?.string ?? app["slug"]?.string).databaseValue,
+          "repo_id": repos[app["repo"]?.string ?? ""].databaseValue,
           "ref": text(app, "ref"), "prod_ref": text(app, "prod_ref"),
           "subpath": text(app, "subpath"),
           "summary": text(app, "summary"),
