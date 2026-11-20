@@ -117,6 +117,30 @@ extension BriefCommandTests {
     }
   }
 
+  @Test func locallyAvailableEdgeReferencesMustBeSafeToPrint() throws {
+    try withScratchDirectory { scratch in
+      let repo = try contextFixture(scratch)
+      let token = "ghp_" + String(repeating: "Q", count: 36)
+      let names = ["Acme\u{2028}split.txt", token + ".txt"]
+      for name in names {
+        try Data("Acme guide\n".utf8).write(to: repo.appending(path: name))
+      }
+      try fixture.git(["add", "--"] + names, repo, scratch)
+      try fixture.git(["commit", "-m", "Add Acme file names"], repo, scratch)
+      let bytes = try JSONEncoder().encode(names.map { "api@api:" + $0 })
+      let references = try #require(String(data: bytes, encoding: .utf8))
+      try store(scratch).write {
+        try $0.database.execute(
+          sql: "UPDATE edge SET code_refs=? WHERE uid='out'", arguments: [references])
+      }
+      let report = try run(["--app", "api"], repo, scratch)
+      #expect(report.termination == .exit(0))
+      #expect(!report.stdout.contains(token) && !report.stdout.contains("split.txt"))
+      #expect(!report.stdout.contains("next: silta --ws 'acme' code show"))
+      #expect(report.stdout.contains("next: silta --ws 'acme' ws show"))
+    }
+  }
+
   private func committedEdgeFixture(_ scratch: URL) throws -> URL {
     let repo = try fixture.setup(scratch)
     try fixture.git(["checkout", "-q", "api"], repo, scratch)

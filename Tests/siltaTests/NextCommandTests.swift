@@ -53,7 +53,7 @@ struct NextCommandTests {
       next: silta task ls
         next: silta ws show
         ask human: silta task triage
-        next: ask human: Review Acme. After approval: silta app ls; or silta repo ls
+        next: ask human: OK. After approval: silta app ls; or silta repo ls
         > next: silta acme-unknown
       """.write(to: directory.appending(path: "sample.txt"), atomically: true, encoding: .utf8)
       try #"{"nested":{"next":"silta code ls"},"next":["silta where"]}"#
@@ -127,13 +127,22 @@ struct NextCommandTests {
   }
 
   private static func recoveryCommands(_ hint: String) -> [String] {
-    if hint.hasPrefix("After approval: ") || hint.hasPrefix("ask human: "),
+    let asks = hint.hasPrefix("ask human: ")
+    let action = asks ? String(hint.dropFirst("ask human: ".count)) : hint
+    if action.hasPrefix("silta ") { return [action] }
+    guard asks || hint.hasPrefix("After approval: "),
       let approval = hint.range(of: "After approval: ")
-    {
-      return hint[approval.upperBound...].components(separatedBy: "; or ")
+    else { return [action] }
+    let commands = hint[approval.upperBound...]
+    let separators = commands.matches(of: #/'[^']*'|"(?:\\.|[^"\\])*"|\\.|; or /#)
+      .filter { $0.output == "; or " }
+    var start = commands.startIndex
+    var parts: [String] = []
+    for separator in separators {
+      parts.append(String(commands[start..<separator.range.lowerBound]))
+      start = separator.range.upperBound
     }
-    if hint.hasPrefix("ask human: ") { return [String(hint.dropFirst("ask human: ".count))] }
-    return [hint]
+    return parts + [String(commands[start...])]
   }
 
   private static func commandPath(_ hint: String, groups: Set<String>) -> String? {

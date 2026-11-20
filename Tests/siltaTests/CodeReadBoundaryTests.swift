@@ -126,6 +126,32 @@ extension CodeCommandTests {
     }
   }
 
+  @Test func everyByteCappedWindowGivesAConcreteContinuation() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      let padding = String(repeating: "x ", count: 1750)
+      let file = (1...1200).map { "Acme \($0) " + padding }.joined(separator: "\n")
+      let name = "several-windows.txt"
+      try Data(file.utf8).write(to: repo.appending(path: "apps/console/" + name))
+      try commitAll(repo, scratch)
+      let show = ["--json", "code", "show", "console@HEAD", name]
+      var range: [String] = []
+      var output = ""
+      for _ in 0..<6 {
+        let page = try SiltaBinary.run(show + range, in: scratch)
+        try #require(page.termination == .exit(0), "\(page.stdout)\(page.stderr)")
+        output += try #require(try envelope(page.stdout)["output"] as? String)
+        guard let cut = try warnings(page.stdout)["output_truncated"] else {
+          #expect(output == file)
+          return
+        }
+        let next = try #require(cut.firstMatch(of: /--lines ([0-9]+-[0-9]+)/)?.output.1)
+        range = ["--lines", String(next)]
+      }
+      Issue.record("The printed continuations did not reach the last line.")
+    }
+  }
+
   @Test func aSingleWideLineIsDiagnosedAtItsActualLineNumber() throws {
     try withScratchDirectory { scratch in
       let repo = try setup(scratch)

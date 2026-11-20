@@ -7,13 +7,13 @@ package struct EdgeCodeEvidence {
   private static let limit = 16
   private let reader: CodeService
   private let workspace: String
-  private var attempted: Set<String> = []
-  private var commands: [String: String] = [:]
+  private var attempted: Set<Data> = []
+  private var commands: [Data: String] = [:]
 
-  init(workspace: String, environment: SiltaEnvironment) {
+  init(workspace: String, environment: SiltaEnvironment, git: any GitRunner) {
     self.workspace = workspace
     reader = CodeService(
-      workspace: workspace, store: environment.db, git: environment.git,
+      workspace: workspace, store: environment.db, git: git,
       at: environment.clock.now(), localOnly: true)
   }
 
@@ -26,14 +26,15 @@ package struct EdgeCodeEvidence {
   }
 
   mutating func command(_ raw: String) async -> String? {
-    if attempted.contains(raw) { return commands[raw] }
+    let key = Data(raw.utf8)
+    if attempted.contains(key) { return commands[key] }
     guard attempted.count < Self.limit, !Task.isCancelled else { return nil }
-    attempted.insert(raw)
+    attempted.insert(key)
     guard let (target, operation) = Self.parse(raw) else { return nil }
     let available = try? await reader.validateEvidence(operation, target: target)  // Unavailable.
     guard available == true else { return nil }
     let command = operation.command(workspace: workspace, target: target, prod: false)
-    commands[raw] = command
+    commands[key] = command
     return command
   }
 
@@ -41,7 +42,7 @@ package struct EdgeCodeEvidence {
   package static func warnings(workspace: String, environment: SiltaEnvironment) async
     -> [OutputWarning]
   {
-    var probe = Self(workspace: workspace, environment: environment)
+    var probe = Self(workspace: workspace, environment: environment, git: environment.git)
     let references: [String]
     do {
       references = try environment.db.read { db in
@@ -54,16 +55,21 @@ package struct EdgeCodeEvidence {
       return [probe.warning("Could not inspect saved edge code references.")]
     }
     var warnings: [OutputWarning] = []
-    for reference in references where !probe.attempted.contains(reference) {
+    for reference in references where !probe.attempted.contains(Data(reference.utf8)) {
       guard probe.attempted.count < Self.limit, !Task.isCancelled else {
         warnings.append(probe.warning("Some edge code references were not checked."))
         break
       }
       if await probe.command(reference) == nil {
-        let label = HumanText.line(reference).prefix(160)
-        warnings.append(
-          probe.warning(
-            "Edge code reference \(String(label).debugDescription) is unavailable locally."))
+        let detail =
+          if Self.parse(reference) != nil {
+            "Edge code reference "
+              + String(HumanText.line(reference).prefix(160)).debugDescription
+              + " is unavailable locally."
+          } else {
+            "An edge code reference could not be read or printed safely."
+          }
+        warnings.append(probe.warning(detail))
       }
     }
     return warnings
@@ -80,8 +86,11 @@ package struct EdgeCodeEvidence {
     else { return nil }
     let target = String(value[..<colon])
     let file = value[value.index(after: colon)...].split(separator: "#", maxSplits: 1)
-    guard let path = file.first else { return nil }
+    guard let leaf = file.first else { return nil }
+    let path = String(leaf)
+    guard RestoreService.canNameInRecovery(target), RestoreService.canNameInRecovery(path)
+    else { return nil }
     let lines = file.count == 2 ? String(file[1].dropFirst()) : nil
-    return (target, .show(String(path), lines: lines))
+    return (target, .show(path, lines: lines))
   }
 }

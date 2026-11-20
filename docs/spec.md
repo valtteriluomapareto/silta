@@ -1723,8 +1723,9 @@ assembly, fails immediately on database contention and never populates `where_ca
 A strict, zero-leeway watchdog timer alone owns that deadline; output can follow it only
 by that timer's latency. The watchdog appends a best-effort body-free timeout record, then exits without running
 exit handlers. Timeout and completion have exclusive log/output ownership; completion
-cancels the watchdog explicitly before output. A child Git deadline is recorded as
-`hook_timeout` even when it finishes before the process deadline. Hook log appends are
+cancels the watchdog explicitly before output. A required Git read reaching its
+deadline records `hook_timeout` even when the process finishes in time. Optional
+edge checks use the same budget and fall back to workspace inspection. Hook log appends are
 nonblocking and
 skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NONBLOCK`.
 

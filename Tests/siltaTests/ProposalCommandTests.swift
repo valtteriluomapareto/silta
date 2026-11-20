@@ -110,13 +110,21 @@ struct ProposalCommandTests {
     }
   }
 
-  @Test(arguments: [false, true])
-  func planImportStdinHintReplaysAfterApproval(split: Bool) throws {
+  @Test(arguments: [false, true], [false, true])
+  func planImportStdinHintReplaysAfterApproval(split: Bool, json: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix)
+            VALUES('acme-other-ws','acme-other','Acme Other','AD')
+            """)
+      }
+      try WorkspaceSelection.use("acme-other", in: store)
       let plan = scratch.appending(path: "acme-input.md")
       try "# Acme\n\n- First\n- Second\n".write(to: plan, atomically: true, encoding: .utf8)
-      let prefix = shellWord(try SiltaBinary.url().path) + " --json"
+      let prefix = shellWord(try SiltaBinary.url().path) + (json ? " --json" : "")
       func run(_ command: String) throws -> CLIResult {
         try SiltaBinary.runProcess(
           URL(filePath: "/bin/sh"), ["-c", command + " < " + shellWord(plan.path)],
@@ -124,12 +132,10 @@ struct ProposalCommandTests {
       }
       let refused = try run(prefix + " --ws acme task from-plan -" + (split ? " --split" : ""))
       try #require(refused.termination == .exit(3), "\(refused.stdout)\(refused.stderr)")
-      let failure = try TaskStateCommandTests.error(refused)
-      let hints = try #require(failure["next"] as? [String])
-      let hint = try #require(hints.first { $0.contains("silta --ws 'acme' task from-plan") })
+      let (hint, message) = try importRecovery(refused, json: json)
       let expected = "task from-plan -" + (split ? " --split" : "") + " --approved"
       #expect(hint.contains(expected))
-      #expect((failure["message"] as? String)?.contains("Supply the same plan on stdin") == true)
+      #expect(message.contains("Supply the same plan on stdin"))
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 0)
       #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
       guard hint.contains(expected) else { return }
@@ -139,10 +145,31 @@ struct ProposalCommandTests {
           + String(hint[command.lowerBound...].dropFirst("silta".count))
           .replacingOccurrences(of: "\"<the human's words>\"", with: "'Import Acme work'"))
       #expect(approved.termination == .exit(0), "\(approved.stdout)\(approved.stderr)")
+      let tasks = try store.read {
+        try String.fetchAll(
+          $0,
+          sql: """
+            SELECT w.slug || ':' || t.status FROM task t JOIN workspace w ON w.id=t.workspace_id
+            """)
+      }
+      #expect(tasks == Array(repeating: "acme:todo", count: split ? 3 : 1))
       #expect(
-        try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == (split ? 3 : 1)
-      )
+        try store.read { try String.fetchAll($0, sql: "SELECT workspace FROM approval") } == [
+          "acme"
+        ])
     }
+  }
+
+  private func importRecovery(_ refused: CLIResult, json: Bool) throws -> (String, String) {
+    if json {
+      let failure = try TaskStateCommandTests.error(refused)
+      let hints = try #require(failure["next"] as? [String])
+      let hint = try #require(hints.first { $0.contains("silta --ws 'acme' task from-plan") })
+      return (hint, try #require(failure["message"] as? String))
+    }
+    let prefix = "ask human: "
+    let line = try #require(refused.stderr.split(separator: "\n").first { $0.hasPrefix(prefix) })
+    return (String(line.dropFirst(prefix.count)), refused.stderr)
   }
 
   // The guide's promise: a subtask of a task the agent still claims is todo, not a

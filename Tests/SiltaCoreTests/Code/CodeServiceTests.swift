@@ -270,19 +270,14 @@ extension CodeServiceTests {
   @Test func validatingLocalEvidenceDoesNotReadBlobContentOrEnableLazyFetch() async throws {
     try await withScratchDirectory { home in
       let store = try setup(home)
-      let commit = try #require(reads(home).first)
       let prefix = ["--no-pager", "-c", "format.pretty=medium"]
       let git = ScriptedGitRunner(script: [
         (
-          .init(arguments: commit.0.arguments, directory: home, timeout: 0.25, lazyFetch: false),
-          commit.1
-        ),
-        (
           .init(
-            arguments: prefix + ["cat-file", "-t", "--", sha + ":README.md"],
-            directory: home, timeout: 0.25, lazyFetch: false),
+            arguments: prefix + ["cat-file", "-t", "--", "origin/api^{commit}:README.md"],
+            directory: home, timeout: 0.25, lazyFetch: false, capture: .init(byteLimit: 1024)),
           .success(.init(termination: .exit(0), stdout: Data("blob\n".utf8)))
-        ),
+        )
       ])
       let reader = CodeService(
         workspace: "acme", store: store, git: git, at: WorkspaceConfigTests.instant, localOnly: true

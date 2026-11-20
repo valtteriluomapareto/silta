@@ -49,11 +49,12 @@ package struct CodeService {
   /// Probes the same selected ref and literal path as code show without loading the blob.
   func validateEvidence(_ operation: CodeRead, target: String) async throws -> Bool {
     let (selection, ref) = try selectedRead(operation, target: target, prod: false)
-    let sha = try await resolve(ref, selection: selection, operation: operation)
     let subpath = CodeRead.normalized(selection.subpath)
     let leaf = CodeRead.normalized(operation.path)
     let path = subpath.isEmpty ? leaf : subpath + "/" + leaf
-    let result = try await run(["cat-file", "-t", "--", sha + ":" + path], selection, operation)
+    let result = try await run(
+      ["cat-file", "-t", "--", ref + "^{commit}:" + path], selection, operation,
+      capture: .init(byteLimit: 1024))
     return result.termination == .exit(0) && result.stdout.elementsEqual("blob\n".utf8)
   }
 

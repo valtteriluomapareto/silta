@@ -238,7 +238,14 @@ extension CodeRead {
       if range.upperBound <= end {
         warnings = []
       } else if result.stdoutTruncated {
-        warnings = [count == 0 ? oversizedLine(end + 1) : byteWarning]
+        warnings = [
+          count == 0
+            ? oversizedLine(end + 1)
+            : .init(
+              code: "output_truncated",
+              message:
+                "Git output exceeded 1 MiB. Continue with --lines \(end + 1)-\(range.upperBound).")
+        ]
       } else {
         warnings = [
           .init(
@@ -256,7 +263,7 @@ extension CodeRead {
     let output =
       count > Self.showLimit ? lines.prefix(Self.showLimit).joined(separator: "\n") + "\n" : text
     guard result.stdoutTruncated || count > Self.showLimit else { return (output, []) }
-    if count == 0 { return (output, [oversizedLine(end + 1)]) }
+    if count == 0 { return (output, [oversizedLine(end + 1, total: result.stdoutLineCount)]) }
     let shown = min(count, Self.showLimit)
     let total = result.stdoutTruncated ? result.stdoutLineCount : count
     let message =
@@ -266,11 +273,11 @@ extension CodeRead {
     return (output, [.init(code: "output_truncated", message: message)])
   }
 
-  private func oversizedLine(_ line: Int) -> OutputWarning {
-    .init(
-      code: "output_truncated",
-      message: "Line \(line) exceeds 1 MiB and cannot be displayed. "
-        + "Use --lines \(line + 1) to read the next line if present.")
+  private func oversizedLine(_ line: Int, total: Int? = nil) -> OutputWarning {
+    let problem = "Line \(line) exceeds 1 MiB and cannot be displayed."
+    let continuation = " Use --lines \(line + 1) to read the next line"
+    let hint = total.map { $0 > line ? continuation + "." : "" } ?? continuation + " if present."
+    return .init(code: "output_truncated", message: problem + hint)
   }
 
   private static func completeRecords(_ result: GitResult, delimiter: UInt8) -> String {
@@ -282,7 +289,7 @@ extension CodeRead {
   private var byteWarning: OutputWarning {
     let hint: String
     switch self {
-    case .show: hint = "Choose a smaller or later range with --lines A-B."
+    case .show: return .init(code: "output_truncated", message: "Git output exceeded 1 MiB.")
     case .grep: hint = "Narrow it with a pathspec or a narrower pattern."
     case .log: hint = "Use a smaller -n or specify a path."
     case .list: hint = "Specify a subdirectory."
