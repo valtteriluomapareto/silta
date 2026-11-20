@@ -15,6 +15,7 @@
 | Reviewing plans and implementations | [`../skills/persona-review/SKILL.md`](../skills/persona-review/SKILL.md) |
 | Briefing another agent on a slice | [`agent-brief.md`](agent-brief.md) |
 | The Mac app icon: design, layers and how to regenerate it | [`app-icon.md`](app-icon.md) |
+| The website: develop, update copy and screenshots, deploy | [`../website/README.md`](../website/README.md) |
 | Building Silta with Silta | [`dogfood/README.md`](dogfood/README.md) (below) |
 | Pull requests and slice issues | [`../.github/pull_request_template.md`](../.github/pull_request_template.md), [`../.github/ISSUE_TEMPLATE/slice.yml`](../.github/ISSUE_TEMPLATE/slice.yml) |
 | The agent manual, as agents read it | `silta guide`; its text is in `Sources/silta/Commands/GuideCommand.swift` (spec §11) |
@@ -24,7 +25,7 @@
 | You changed… | Also update |
 |---|---|
 | A command, flag, JSON shape, error code or exit code | `spec.md` §16, the golden tests, and `silta guide` text; parity tests check the spec against code |
-| A command, flag or user-visible behavior | Check `../README.md` and `getting-started.md` |
+| A command, flag or user-visible behavior | Check `../README.md`, `getting-started.md` and the website copy in `../website/src/components/` |
 | Workspace configuration fields or shape | `getting-started.md`, `examples/acme-workspace.yaml`, and its CLI test |
 | The data model or a migration | `spec.md` §6, and add a new migration (never edit a shipped one) |
 | A design choice or trade-off | `decisions.md`: a new D# entry, or a dated "↳ update" under the old one |
@@ -33,6 +34,7 @@
 | A script's arguments or environment | Its header comment |
 | A target or a `SiltaCore` feature folder | The layout table in `coding-guidelines.md` §5 |
 | The dogfooding stage | The stage line in `AGENTS.md` |
+| An image in `docs/assets/` | Its copy in `../website/public/`, if the website uses it |
 
 ## Active plans
 

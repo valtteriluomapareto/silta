@@ -16,11 +16,64 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # PRs, the weekly run and manual runs: `scripts/verify.sh full` split in three parallel jobs,
-# with `verify` as the required check. A push to main only refills the shared caches: with
-# squash merges and the up-to-date rule its tree is the one its PR just verified (D19).
+# plus the website build, with `verify` as the required check. A push to main only refills
+# the shared caches: with squash merges and the up-to-date rule its tree is the one its PR
+# just verified (D19).
+#
+# `changes` decides which jobs a PR or push needs: website/ and website.yml changes need only
+# the website build, and every other change needs the Swift jobs. Path filters on the
+# triggers would leave the required `verify` check missing, so the jobs are skipped here
+# instead and `verify` accepts a skip only where `changes` asked for one.
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read   # paths-filter lists a PR's files through the API
+    outputs:
+      code: ${{ steps.result.outputs.code }}
+      website: ${{ steps.result.outputs.website }}
+    steps:
+      - name: Check out repository
+        if: github.event_name == 'push'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Detect changed areas
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          filters: |
+            code:
+              - '**'
+              - '!website/**'
+              - '!.github/workflows/website.yml'
+            website:
+              - 'website/**'
+              - '.github/workflows/website.yml'
+
+      # The weekly run and manual runs verify everything.
+      - name: Choose jobs
+        id: result
+        env:
+          EVENT: ${{ github.event_name }}
+          CODE: ${{ steps.filter.outputs.code }}
+          WEBSITE: ${{ steps.filter.outputs.website }}
+        run: |
+          if [[ "$EVENT" == pull_request || "$EVENT" == push ]]; then
+            echo "code=$CODE" >> "$GITHUB_OUTPUT"
+            echo "website=$WEBSITE" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "website=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "event: $EVENT, code: ${CODE:-forced}, website: ${WEBSITE:-forced}"
+
   swift:
-    if: github.event_name != 'push'
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27   # GitHub public-preview image with Xcode 27.1 (D18)
     timeout-minutes: 35
     steps:
@@ -64,7 +117,8 @@ jobs:
           if-no-files-found: ignore
 
   evals:
-    if: github.event_name != 'push'
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -80,7 +134,8 @@ jobs:
         run: scripts/verify.sh evals
 
   app:
-    if: github.event_name != 'push'
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -98,29 +153,56 @@ jobs:
           path: .build/app/run.*/Test.xcresult
           if-no-files-found: ignore
 
+  # The website build, from website.yml. It never deploys from here.
+  website:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.website == 'true'
+    uses: ./.github/workflows/website.yml
+    with:
+      ci: true
+    # A ceiling for the called workflow, which declares its deploy job's scopes even
+    # though `ci: true` skips that job. The build job itself runs with contents: read.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
   # A job whose needs failed is skipped, and a skipped required check counts as passing,
-  # so this always runs (except on push, which verifies nothing) and accepts only three
-  # successes.
+  # so this always runs (except on push, which verifies nothing). Each job must succeed,
+  # or be skipped because `changes` found nothing for it.
   verify:
-    needs: [swift, evals, app]
+    needs: [changes, swift, evals, app, website]
     if: always() && github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require all jobs to succeed
+      - name: Require the needed jobs to succeed
         env:
+          CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          WEBSITE: ${{ needs.changes.outputs.website }}
           SWIFT: ${{ needs.swift.result }}
           EVALS: ${{ needs.evals.result }}
           APP: ${{ needs.app.result }}
+          SITE: ${{ needs.website.result }}
         run: |
-          echo "swift: $SWIFT, evals: $EVALS, app: $APP"
-          [[ "$SWIFT" == success && "$EVALS" == success && "$APP" == success ]]
+          echo "changes: $CHANGES (code: $CODE, website: $WEBSITE)"
+          echo "swift: $SWIFT, evals: $EVALS, app: $APP, website: $SITE"
+          [[ "$CHANGES" == success ]] || exit 1
+          expect() {
+            if [[ "$1" == true ]]; then [[ "$2" == success ]]; else [[ "$2" == skipped ]]; fi
+          }
+          expect "$CODE" "$SWIFT" && expect "$CODE" "$EVALS" && expect "$CODE" "$APP" \
+            && expect "$WEBSITE" "$SITE"
 
   # PRs can read caches saved on main but not each other's, so main keeps the shared
   # prior-writer cache filled: after each merge, and weekly so a runner-image toolchain
   # change refills it before the next merge. On a hit this only looks the key up.
   warm-caches:
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    needs: changes
+    if: >-
+      github.event_name == 'schedule'
+      || (github.event_name == 'push' && needs.changes.outputs.code == 'true')
     runs-on: xcode-27
     timeout-minutes: 30
     steps:

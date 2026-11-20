@@ -2,3 +2,5 @@ dist/
 .astro/
 node_modules/
 package-lock.json
+# Repository markdown follows the docs style, not Prettier.
+*.md

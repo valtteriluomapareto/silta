@@ -45,13 +45,21 @@ and timeouts are unchanged. The wall-clock tier runs separately and serially.
 
 CI runs `full-swift`, `evals` and `app` as three parallel jobs on the `xcode-27` runner, and a
 `verify` job, the required check, passes only when all succeed. Three macOS jobs per run
-also means three chances to wait for a preview runner. The `swift` job reuses the prior-writer
-binaries from the Actions cache, keyed by `scripts/ci/prior-writer-cache-key.sh` on the
-Swift toolchain and `scripts/build-prior-writer.sh`; the weekly scheduled run builds them
-from source. A push to `main` runs only `warm-caches`, which fills that cache in `main`'s
-scope where every PR can read it; it verifies nothing, because the PR already verified the
-same tree. That holds only while the `main` ruleset has no bypass actors; if one is added,
-restore the full push run (D19).
+also means three chances to wait for a preview runner. A first `changes` job sorts the
+changed files of a PR or push. A change only to `website/` or
+`.github/workflows/website.yml` skips the three macOS jobs and runs the website build from
+[`website.yml`](.github/workflows/website.yml) on Linux instead; any other change runs the
+macOS jobs, and a change to both runs both. `verify` accepts a skipped job only when
+`changes` asked for the skip. The weekly and manual runs run everything. The
+[website README](website/README.md#deploys) covers the website build and its deploys.
+
+The `swift` job reuses the prior-writer binaries from the Actions cache, keyed by
+`scripts/ci/prior-writer-cache-key.sh` on the Swift toolchain and
+`scripts/build-prior-writer.sh`; the weekly scheduled run builds them from source. A push
+to `main` runs only `changes` and `warm-caches`, which fills that cache in `main`'s scope
+where every PR can read it; a website-only merge skips it. It verifies nothing, because
+the PR already verified the same tree. That holds only while the `main` ruleset has no
+bypass actors; if one is added, restore the full push run (D19).
 
 Each script's header comment says how to run it. What each target and folder holds is
 in [coding guidelines §5](docs/coding-guidelines.md#5-layout-and-naming-d25).
