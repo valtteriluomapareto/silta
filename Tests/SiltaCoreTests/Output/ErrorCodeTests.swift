@@ -12,8 +12,8 @@ struct ErrorCodeTests {
     1: "Read `silta <cmd> --help` and fix the call",
     2: "Check the ref, or carry on without silta",
     3:
-      "Stop and ask the human in chat; rerun with `--approved \"<their words>\"` "
-      + "after they say yes",
+      "Ask the human in chat. They run `ws rm` directly. For other commands, "
+      + "rerun with `--approved \"<their words>\"` after they say yes.",
     4: "Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity",
     5: "Retry once after a few seconds",
     6: "Re-read, then decide; don't steal, and don't unblock while blockers are open",

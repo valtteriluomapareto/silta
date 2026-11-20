@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Build a pinned earlier writer for the full compatibility acceptance tests.
-# Usage: scripts/build-prior-writer.sh <output-directory> [prior|v6|v8]
+# Usage: scripts/build-prior-writer.sh <output-directory> [prior|v6|v8|v9]
 #   prior  the pre-docs writer (default)
 #   v6     the last writer before format 7
 #   v8     the last writer before app and topic slug history
+#   v9     the last writer before workspace removal
 # The binary lands at <output-directory>/silta.
 #
 # With SILTA_PRIOR_WRITER_CACHE set, a verified binary from <cache>/<commit>/ is reused.
@@ -12,12 +13,13 @@
 # this file, so the pinned commits live only here.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-[[ $# -ge 1 && $# -le 2 ]] || { echo 'usage: build-prior-writer.sh <output-directory> [prior|v6|v8]' >&2; exit 64; }
+[[ $# -ge 1 && $# -le 2 ]] || { echo 'usage: build-prior-writer.sh <output-directory> [prior|v6|v8|v9]' >&2; exit 64; }
 case "${2:-prior}" in
   prior) prior_commit=dc868192e3877a29d79dc54681f0f57b72c3f56f ;;
   v6) prior_commit=b65eab8994b7ada9f54495f9c050ebe5a3090d74 ;;
   v8) prior_commit=605a8a69d553be1207f1fecb649dc8e30ba70724 ;;
-  *) echo "build-prior-writer: unknown writer '$2'; use prior, v6 or v8" >&2; exit 64 ;;
+  v9) prior_commit=9e956c388729d35d23ae4d9317a901e0f7cfa1db ;;
+  *) echo "build-prior-writer: unknown writer '$2'; use prior, v6, v8 or v9" >&2; exit 64 ;;
 esac
 out="$1"
 mkdir -p "$out"

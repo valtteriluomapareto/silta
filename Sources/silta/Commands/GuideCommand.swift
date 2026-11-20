@@ -235,6 +235,9 @@ extension GuideCommand {
         Set a display label with the optional `name` key under `apps` in workspace YAML. \
         Remove the key to use the slug as the label. Read both with `silta --ws acme ws show` \
         and use the slug in commands and references.
+        For a mistaken workspace, preview with `silta ws rm acme --dry-run`. The human runs \
+        `silta ws rm acme` in their terminal. The saved default or a live registered clone \
+        requires `--allow-active`. Use the printed recovery preview to restore just that workspace.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \
         A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not \

@@ -83,6 +83,7 @@ Legacy brief exposure unknown: 0 calls.
 - `silta task unblock`
 - `silta where`
 - `silta ws ls`
+- `silta ws rm`
 - `silta ws show`
 - `silta ws use`
 

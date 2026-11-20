@@ -58,6 +58,7 @@ Human-only commands include `task promote`, `task triage`, `doc triage`, `doc ed
 Keep the baseline comment from `ws show` or a retained editor draft when applying workspace YAML. On `conflict`, review fresh `ws show` output and reapply your edits there. Unstamped YAML uses the configuration at command start.
 To rename an app or topic, change its `slug` and list the old slug in `previous`. Preview adds, removals, renames and blockers with `silta --ws acme ws edit --dry-run -F <file>` before requesting approval.
 Set a display label with the optional `name` key under `apps` in workspace YAML. Remove the key to use the slug as the label. Read both with `silta --ws acme ws show` and use the slug in commands and references.
+For a mistaken workspace, preview with `silta ws rm acme --dry-run`. The human runs `silta ws rm acme` in their terminal. The saved default or a live registered clone requires `--allow-active`. Use the printed recovery preview to restore just that workspace.
 Usually propose nothing; never more than two proposals per session, only ideas you would bet the human wants. `task add --start` is only for work the human requested. A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not as a proposal, so it needs no --approved; submit, block and handoff release the claim. When the human asked in this chat to add the task for later, pass their words as --approved so it becomes todo without triage; do not ask again.
 If brief shows `proposals: ask`, do not propose: name each idea and its exact `silta --ws acme task add` command in your message, then add only the approved ideas with --approved. Without a human, list ideas under "What's left" in a handoff/result, never in a question, TODO comment or file.
 When no answer can come, leave a question for @me listing pending commands, write a handoff and pick other work; do not wait. Under `proposals: ask`, keep unapproved ideas in the handoff/result instead of that question. For "what needs me?", run `silta --ws acme inbox --for me` and relay the displayed choices in one short message. Apply "the rest" only to proposals you showed; ask before running triage.
@@ -104,7 +105,7 @@ Read the error's code, next_by and next commands. A command's next_by can overri
   invalid  exit 1, next by agent: Read `silta <cmd> --help` and fix the call
   not_found  exit 2, next by agent: Check the ref, or carry on without silta
   unregistered  exit 2, next by agent: Check the ref, or carry on without silta
-  human_only  exit 3, next by human: Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes
+  human_only  exit 3, next by human: Ask the human in chat. They run `ws rm` directly. For other commands, rerun with `--approved "<their words>"` after they say yes.
   read_only_promoted  exit 3, next by agent: Leave it to its tracker and pick other work
   ambiguous_location  exit 4, next by agent: Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity
   busy  exit 5, next by agent: Retry once after a few seconds

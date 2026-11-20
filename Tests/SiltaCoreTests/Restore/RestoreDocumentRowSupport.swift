@@ -44,7 +44,7 @@ enum RestoreDocumentRowSupport {
       let current = try ExportDocumentSnapshot.read(tx.database, workspace: 17)
       var writer = RestoreWriter(tx: tx, tree: tree, slug: "acme")
       writer.workspace = 17
-      try writer.deleteDocuments(workspace: 17)
+      try WorkspaceOwnedRows.removeDocuments(17, in: tx.database)
       try tx.database.execute(sql: "DELETE FROM link WHERE workspace_id=17")
       // The base rows keep their UID while replacement gives the source task a new id.
       try tx.database.execute(sql: "UPDATE task SET id=1700 WHERE id=700")

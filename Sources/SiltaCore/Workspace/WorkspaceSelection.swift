@@ -96,6 +96,7 @@ package enum WorkspaceSelection {
   package static func use(_ slug: String, in store: DatabaseStore) throws {
     let selected = try resolve(slug, in: store)
     try store.write { transaction in
+      _ = try resolve(selected, in: transaction.database)
       try transaction.database.execute(
         sql: """
           INSERT INTO meta(key,value)
