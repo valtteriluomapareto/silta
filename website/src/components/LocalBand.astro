@@ -1,0 +1,108 @@
+---
+import { DATA_URL } from '../consts';
+
+const chips = [
+	'~/.silta · SQLite',
+	'no server',
+	'no sync',
+	'silta backup · silta export',
+];
+---
+
+<section class="local on-dark" aria-labelledby="local-title">
+	<div class="container stack">
+		<p class="eyebrow">Local first</p>
+		<h2 id="local-title">Your context never leaves your Mac.</h2>
+		<ul class="chips">
+			{chips.map((chip) => (
+				<li>{chip}</li>
+			))}
+		</ul>
+		<p class="body">
+			Workspaces, tasks and decisions live in one local database. Nothing is
+			uploaded, and there is no account to create. Snapshot it any time, or
+			export a workspace as plain text files you can read and diff.
+		</p>
+		<a class="arrow-link" href={DATA_URL}>
+			<span>How Silta keeps your data</span>
+			<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+				<path
+					d="M5 12h14M13 6l6 6-6 6"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				></path>
+			</svg>
+		</a>
+	</div>
+</section>
+
+<style>
+	.local {
+		padding-block: var(--section-padding);
+		background: var(--color-surface-dark);
+		color: var(--color-label-dark);
+	}
+	.stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 22px;
+		text-align: center;
+	}
+	.eyebrow {
+		color: var(--color-label-secondary-dark);
+	}
+	.eyebrow::before {
+		background: var(--color-accent-dark);
+	}
+	h2 {
+		font-size: 30px;
+		font-weight: 800;
+		line-height: 36px;
+		letter-spacing: var(--tracking-tighter);
+	}
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 8px;
+	}
+	.chips li {
+		padding: 8px 14px;
+		border: 1px solid var(--hairline-dark);
+		border-radius: var(--radius-full);
+		background: var(--color-surface-dark-2);
+		font-family: var(--font-mono);
+		font-size: var(--text-caption);
+		line-height: 16px;
+	}
+	.body {
+		max-width: 720px;
+		color: var(--color-label-secondary-dark);
+		font-size: 16px;
+		line-height: 25px;
+	}
+	.arrow-link {
+		color: var(--color-accent-dark);
+	}
+
+	@media (min-width: 768px) {
+		.stack {
+			gap: 28px;
+		}
+		h2 {
+			font-size: 44px;
+			line-height: 50px;
+		}
+		.chips {
+			gap: 10px;
+		}
+		.body {
+			font-size: var(--text-body);
+			line-height: 27px;
+		}
+	}
+</style>

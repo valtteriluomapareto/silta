@@ -1,0 +1,36 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { withBase } from '../utils';
+---
+
+<MarketingLayout
+	title="Page not found · Silta"
+	description="This page does not exist on the Silta website."
+>
+	<Nav slot="header" />
+	<section class="container not-found" aria-labelledby="not-found-title">
+		<p class="eyebrow">404</p>
+		<h1 id="not-found-title" class="section-title">
+			This page doesn’t exist.
+		</h1>
+		<a class="arrow-link" href={withBase()}>
+			<span>Back to the home page</span>
+		</a>
+	</section>
+	<Footer slot="footer" />
+</MarketingLayout>
+
+<style>
+	.not-found {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 16px;
+		padding-block: var(--section-padding);
+	}
+	.arrow-link {
+		color: var(--color-accent);
+	}
+</style>

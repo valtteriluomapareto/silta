@@ -1,0 +1,170 @@
+---
+import { INSTALL_COMMAND } from '../consts';
+---
+
+<section class="closing" aria-labelledby="closing-title">
+	<div class="container stack">
+		<h2 id="closing-title">Come onto the bridge.</h2>
+		<p class="lead">
+			Build it once from source. Your next agent session starts with the
+			picture.
+		</p>
+		<div class="command on-dark">
+			<code>
+				<span class="prompt" aria-hidden="true">
+					{'$ '}
+				</span>
+				<span class="wide">
+					git clone …/silta &amp;&amp; scripts/install-dev.sh
+				</span>
+				<span class="narrow">scripts/install-dev.sh</span>
+			</code>
+			<button type="button" class="copy" data-copy={INSTALL_COMMAND} hidden>
+				<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+					<rect
+						x="8"
+						y="8"
+						width="12"
+						height="12"
+						rx="2.5"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					></rect>
+					<path
+						d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					></path>
+				</svg>
+				<span class="copy-label">Copy</span>
+				<span class="visually-hidden"> the install commands</span>
+			</button>
+			<span class="visually-hidden" role="status" data-copy-status></span>
+		</div>
+		<p class="note">macOS 26 · Xcode 27.1 · Free and open source</p>
+	</div>
+</section>
+
+<script>
+	// Progressive enhancement: the button only appears where the Clipboard API
+	// is available.
+	for (const button of document.querySelectorAll<HTMLButtonElement>(
+		'button[data-copy]',
+	)) {
+		if (!navigator.clipboard) continue;
+		const status = button.parentElement?.querySelector('[data-copy-status]');
+		const label = button.querySelector('.copy-label');
+		button.hidden = false;
+		button.addEventListener('click', async () => {
+			try {
+				await navigator.clipboard.writeText(button.dataset.copy ?? '');
+				if (label) label.textContent = 'Copied';
+				if (status) status.textContent = 'Install commands copied.';
+			} catch {
+				if (status) status.textContent = 'Copy failed; select the command.';
+			}
+			setTimeout(() => {
+				if (label) label.textContent = 'Copy';
+				if (status) status.textContent = '';
+			}, 2000);
+		});
+	}
+</script>
+
+<style>
+	.closing {
+		padding: 48px 0 72px;
+	}
+	.stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 18px;
+		text-align: center;
+	}
+	h2 {
+		font-size: 32px;
+		font-weight: 800;
+		line-height: 38px;
+		letter-spacing: var(--tracking-tighter);
+	}
+	.lead {
+		max-width: 641px;
+		color: var(--color-label-secondary);
+		font-size: var(--text-body);
+		line-height: 26px;
+	}
+	.command {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		max-width: 100%;
+		padding: 14px 22px;
+		border-radius: 14px;
+		background: var(--color-surface-dark);
+		color: var(--color-label-dark);
+	}
+	code {
+		font-family: var(--font-mono);
+		font-size: var(--text-subheadline);
+		line-height: 18px;
+		text-align: left;
+	}
+	.prompt {
+		color: var(--color-accent-dark);
+	}
+	.wide {
+		display: none;
+	}
+	.copy {
+		display: none;
+		align-items: center;
+		gap: 6px;
+		padding: 7px 12px;
+		border: 0;
+		border-radius: 9px;
+		background: var(--color-surface-dark-2);
+		color: var(--color-label-dark);
+		font-size: var(--text-caption);
+		font-weight: 600;
+		line-height: 16px;
+		cursor: pointer;
+	}
+	.copy:hover {
+		background: #20363e;
+	}
+	.note {
+		padding-top: 8px;
+		color: var(--color-label-tertiary);
+		font-size: var(--text-caption);
+		line-height: 16px;
+	}
+
+	@media (min-width: 768px) {
+		.closing {
+			padding: 72px 0 112px;
+		}
+		h2 {
+			font-size: 44px;
+			line-height: 50px;
+		}
+		.lead {
+			font-size: var(--text-lead);
+			line-height: 29px;
+		}
+		.command {
+			padding: 14px 16px 14px 22px;
+		}
+		.wide {
+			display: inline;
+		}
+		.narrow {
+			display: none;
+		}
+		.copy:not([hidden]) {
+			display: flex;
+		}
+	}
+</style>

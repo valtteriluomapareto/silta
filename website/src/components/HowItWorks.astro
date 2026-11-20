@@ -1,0 +1,213 @@
+---
+import Terminal, { type Line } from './Terminal.astro';
+
+interface Step {
+	who: string;
+	title: string;
+	body: string;
+	terminal: { title: string; label: string; lines: Line[] };
+}
+
+const steps: Step[] = [
+	{
+		who: 'Claude Code · Tuesday afternoon',
+		title: 'Claim it, plan it, read across apps.',
+		body: 'The agent claims a task in the mobile repo and stores its plan on the task. It reads the API, which lives on another branch of another repo, without leaving its checkout.',
+		terminal: {
+			title: '~/work/mobile · claude',
+			label: 'Claude Code claims AC-23, plans it and greps the API app',
+			lines: [
+				'$ silta task add --start "Refresh expired tokens" --app mobile',
+				'AC-23 doing',
+				"$ silta task plan AC-23 -F - <<'PLAN'",
+				[['- [ ] Read how the API rotates refresh tokens', 'cmd']],
+				[['- [ ] Retry once on 401 with the refreshed token', 'cmd']],
+				[['- [ ] Cover the expired-token path with a test', 'cmd']],
+				[['PLAN', 'cmd']],
+				'AC-23 plan revision 1 (3 steps)',
+				"$ silta code grep platform-api -- 'Refresh'",
+				'platform-api@origin/api 5e0c2a9',
+				['src/Api/Controllers/AuthController.cs:9: ', ['Refresh(…)', 'cmd']],
+			],
+		},
+	},
+	{
+		who: 'Claude Code · end of the session',
+		title: 'Leave a handoff, not a chat log.',
+		body: 'The session runs out before the work is done. A handoff on the task says what is left and what was learned, and it releases the claim for whoever comes next.',
+		terminal: {
+			title: '~/work/mobile · claude',
+			label: 'Claude Code ticks a step and leaves a handoff on AC-23',
+			lines: [
+				'$ silta task plan AC-23 --step 1 --done',
+				'AC-23 step 1 done: Read how the API rotates refresh tokens (1/3)',
+				'$ silta comment AC-23 --kind handoff -m "Retry logic is in',
+				[['  lib/auth/session.dart; the widget test is still missing.', 'cmd']],
+				[['  The API returns 401 with error=token_expired, not 403."', 'cmd']],
+				['AC-23/1 handoff; ', ['claim released', 'hl']],
+			],
+		},
+	},
+	{
+		who: 'Codex · Wednesday morning',
+		title: 'Pick up where it stopped.',
+		body: 'A different agent, the next day. Its first command shows where it is, the handoff waiting for it, the plan so far and the neighbouring app to read next.',
+		terminal: {
+			title: '~/work/mobile · codex',
+			label: 'Codex runs silta brief for AC-23 the next morning',
+			lines: [
+				'$ silta brief --task AC-23',
+				[['acme / mobile / mobile', 'cmd'], ' [high: single]'],
+				'task: AC-23',
+				'handoff AC-23/1 by agent:claude:7f3e at 2026-11-19T16:02Z:',
+				[['> Retry logic is in lib/auth/session.dart; the widget test', 'cmd']],
+				[['> is still missing. The API returns 401, not 403.', 'cmd']],
+				'plan (revision 1):',
+				'1 done',
+				'2. [ ] Retry once on 401 with the refreshed token',
+				'3. [ ] Cover the expired-token path with a test',
+				['neighbour: ', ['edge:mobile/platform-api/http-api', 'hl']],
+			],
+		},
+	},
+];
+---
+
+<section id="how-it-works" class="how" aria-labelledby="how-title">
+	<div class="container stack">
+		<header class="section-header">
+			<p class="eyebrow">A change of watch</p>
+			<h2 id="how-title" class="section-title">
+				One task, two agents, <br class="desktop-break" />
+				nothing pasted between them.
+			</h2>
+		</header>
+		<ol class="steps">
+			{steps.map((step, index) => (
+				<li class="step">
+					<div class="step-copy">
+						<p class="who">
+							<span class="badge" aria-hidden="true">
+								{index + 1}
+							</span>
+							<span>
+								<span class="visually-hidden">Step {index + 1}: </span>
+								{step.who}
+							</span>
+						</p>
+						<h3>{step.title}</h3>
+						<p class="body">{step.body}</p>
+					</div>
+					<Terminal
+						class="step-terminal"
+						title={step.terminal.title}
+						label={step.terminal.label}
+						lines={step.terminal.lines}
+					/>
+				</li>
+			))}
+		</ol>
+	</div>
+</section>
+
+<style>
+	.how {
+		padding-block: var(--section-padding);
+		background: var(--color-bg-grouped);
+		scroll-margin-top: 0;
+	}
+	.stack {
+		display: flex;
+		flex-direction: column;
+		gap: 36px;
+	}
+	.desktop-break {
+		display: none;
+	}
+	.steps {
+		display: flex;
+		flex-direction: column;
+		gap: 36px;
+	}
+	.step {
+		display: flex;
+		flex-direction: column;
+		gap: 22px;
+	}
+	.step-copy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 14px;
+	}
+	.who {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		color: var(--color-label-secondary);
+		font-size: var(--text-mono);
+		font-weight: 600;
+		line-height: 18px;
+	}
+	.badge {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: var(--radius-full);
+		background: var(--color-accent-tint);
+		color: var(--color-accent);
+		font-weight: 700;
+	}
+	h3 {
+		font-size: 24px;
+		font-weight: 800;
+		line-height: 30px;
+		letter-spacing: -0.025em;
+	}
+	.body {
+		color: var(--color-label-secondary);
+		font-size: 16px;
+		line-height: 25px;
+	}
+
+	@media (min-width: 768px) {
+		.stack {
+			gap: 72px;
+		}
+		.desktop-break {
+			display: inline;
+		}
+		.steps {
+			gap: 72px;
+		}
+		h3 {
+			font-size: 28px;
+			line-height: 34px;
+		}
+		.body {
+			font-size: var(--text-body);
+			line-height: 27px;
+		}
+	}
+
+	@media (min-width: 1080px) {
+		.step {
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			gap: 64px;
+		}
+		.step:nth-child(even) {
+			flex-direction: row-reverse;
+		}
+		.step-copy {
+			flex: 0 0 420px;
+		}
+		.step :global(.step-terminal) {
+			flex: 0 1 620px;
+		}
+	}
+</style>

@@ -1,0 +1,122 @@
+---
+// Icons are decorative 24×24 strokes; `tone` picks the tile colours.
+type Tone = 'lead' | 'accent' | 'signal';
+
+const features: { title: string; body: string; tone: Tone; icon: string }[] = [
+	{
+		title: 'A brief at session start',
+		body: 'The task, its plan, the newest handoff, the app and its neighbours, in a small token budget. Claude Code gets it from a SessionStart hook.',
+		tone: 'lead',
+		icon: '<circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2l-1.9 4.6-4.6 1.9 1.9-4.6z" fill="currentColor" stroke="none"/>',
+	},
+	{
+		title: 'A map of your workspace',
+		body: 'Repos, apps (even several on branches of one repo), environments, services and the connections between them, each pointing to its code.',
+		tone: 'accent',
+		icon: '<circle cx="5" cy="7" r="2.5"/><circle cx="19" cy="7" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 7h9M6.3 9.2l4.4 6.6M17.7 9.2l-4.4 6.6" stroke-linecap="round"/>',
+	},
+	{
+		title: 'Read across apps',
+		body: 'Grep, show, list and log another app’s committed code at its branch. No second checkout, no branch switching.',
+		tone: 'accent',
+		icon: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21" stroke-linecap="round"/>',
+	},
+	{
+		title: 'A backlog agents can use',
+		body: 'Claims, plans with tickable steps, questions, answers, handoffs and results. Agents propose work; you decide what gets done.',
+		tone: 'accent',
+		icon: '<path d="M4 6.5l1.8 1.8L9 5M4 13.5l1.8 1.8L9 12M12 7h8M12 14h8M12 20h8M5 20h3" stroke-linecap="round" stroke-linejoin="round"/>',
+	},
+	{
+		title: 'You stay in charge',
+		body: 'Human-only commands need your words in chat. Questions, proposals and blocked work wait for you in one inbox.',
+		tone: 'signal',
+		icon: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z" stroke-linejoin="round"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4" stroke-linecap="round" stroke-linejoin="round"/>',
+	},
+	{
+		title: 'A native Mac app',
+		body: 'Silta Dev shows My work, the board, the workspace map and Docs. Answer, accept and unblock without a terminal.',
+		tone: 'accent',
+		icon: '<rect x="3" y="4" width="18" height="15" rx="3"/><path d="M9 4v15"/>',
+	},
+];
+---
+
+<section id="features" class="features" aria-labelledby="features-title">
+	<div class="container stack">
+		<header class="section-header">
+			<p class="eyebrow">What you get</p>
+			<h2 id="features-title" class="section-title">
+				A bridge your agents can stand on.
+			</h2>
+		</header>
+		<ul class="card-grid">
+			{features.map((feature) => (
+				<li class:list={['card', 'feature', feature.tone]}>
+					<span class="tile" aria-hidden="true">
+						<svg
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							set:html={feature.icon}
+						/>
+					</span>
+					<h3>{feature.title}</h3>
+					<p class="card-body">{feature.body}</p>
+				</li>
+			))}
+		</ul>
+	</div>
+</section>
+
+<style>
+	.features {
+		padding-block: var(--section-padding);
+	}
+	.stack {
+		display: flex;
+		flex-direction: column;
+		gap: 36px;
+	}
+	.feature {
+		gap: 14px;
+	}
+	.feature.lead {
+		border-color: rgb(11 110 142 / 18%);
+		background: var(--color-accent-tint);
+	}
+	.tile {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-md);
+		background: var(--color-accent-tint);
+		color: var(--color-accent);
+	}
+	.lead .tile {
+		background: var(--color-accent);
+		color: var(--color-label-dark);
+	}
+	.signal .tile {
+		background: rgb(183 121 31 / 12%);
+		color: var(--color-signal);
+	}
+	h3 {
+		font-size: var(--text-lead);
+		font-weight: 700;
+		line-height: 24px;
+		letter-spacing: var(--tracking-tight);
+	}
+
+	@media (min-width: 768px) {
+		.stack {
+			gap: 56px;
+		}
+	}
+</style>

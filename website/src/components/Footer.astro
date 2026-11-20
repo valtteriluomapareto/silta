@@ -1,0 +1,120 @@
+---
+import Wordmark from './Wordmark.astro';
+import {
+	CONTRIBUTING_URL,
+	GETTING_STARTED_URL,
+	GITHUB_URL,
+	HUMAN_GUIDE_URL,
+	LICENSE_URL,
+	SPEC_URL,
+} from '../consts';
+
+const links = [
+	{ label: 'Getting started', href: GETTING_STARTED_URL },
+	{ label: 'Human’s guide', href: HUMAN_GUIDE_URL },
+	{ label: 'Spec', href: SPEC_URL },
+	{ label: 'Contributing', href: CONTRIBUTING_URL },
+	{ label: 'GitHub', href: GITHUB_URL },
+];
+---
+
+<footer class="footer on-dark">
+	<div class="inner">
+		<div class="top">
+			<div class="about">
+				<Wordmark tone="dark" />
+				<p>
+					A local context hub and backlog for coding agents. <em>Silta</em> is
+					Finnish for bridge.
+				</p>
+			</div>
+			<nav aria-label="Documentation">
+				<ul class="links">
+					{links.map((link) => (
+						<li>
+							<a href={link.href}>{link.label}</a>
+						</li>
+					))}
+				</ul>
+			</nav>
+		</div>
+		<div class="bottom">
+			<p>
+				© 2026 Valtteri Luoma · <a href={LICENSE_URL}>MIT License</a>
+			</p>
+			<p>Made in Finland</p>
+		</div>
+	</div>
+</footer>
+
+<style>
+	.footer {
+		background: var(--color-surface-dark);
+		color: var(--color-label-secondary-dark);
+	}
+	.inner {
+		display: flex;
+		flex-direction: column;
+		gap: 28px;
+		max-width: 1440px;
+		margin-inline: auto;
+		padding: 40px var(--page-gutter) 28px;
+	}
+	.top {
+		display: flex;
+		flex-direction: column;
+		gap: 28px;
+	}
+	.about {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		max-width: 360px;
+		font-size: var(--text-mono);
+		line-height: 21px;
+	}
+	.links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px 20px;
+	}
+	.links a {
+		display: block;
+		font-size: var(--text-mono);
+		font-weight: 500;
+		line-height: 18px;
+	}
+	.links a:hover,
+	.bottom a:hover {
+		color: var(--color-label-dark);
+	}
+	.bottom {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding-top: 24px;
+		border-top: 1px solid var(--hairline-dark);
+		color: rgb(230 242 245 / 45%);
+		font-size: var(--text-caption);
+		line-height: 16px;
+	}
+
+	@media (min-width: 768px) {
+		.inner {
+			gap: 40px;
+			padding: 56px var(--page-gutter) 40px;
+		}
+		.top {
+			flex-direction: row;
+			align-items: flex-start;
+			justify-content: space-between;
+		}
+		.links {
+			gap: 12px 28px;
+		}
+		.bottom {
+			flex-direction: row;
+			justify-content: space-between;
+		}
+	}
+</style>

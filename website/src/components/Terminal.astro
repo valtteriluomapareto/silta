@@ -1,0 +1,121 @@
+---
+// A dark terminal window with a title bar and a transcript.
+//
+// Each line is a list of segments. A plain string is output text (dimmed);
+// a tuple marks a segment as a command (`cmd`, bright) or a highlight (`hl`,
+// accent). A line that is a single string is plain output. A line starting
+// with `$ ` gets an accent prompt and a bright command.
+export type Segment = string | [text: string, kind: 'cmd' | 'hl'];
+export type Line = string | Segment[];
+
+interface Props {
+	title: string;
+	lines: Line[];
+	label: string;
+	size?: 'hero' | 'step';
+	class?: string;
+}
+
+const { title, lines, label, size = 'step', class: className } = Astro.props;
+
+function segments(line: Line): Segment[] {
+	if (Array.isArray(line)) return line;
+	if (line.startsWith('$ ')) return [['$', 'hl'], ' ', [line.slice(2), 'cmd']];
+	return [line];
+}
+---
+
+<figure class:list={['terminal', size, className]}>
+	<div class="bar" aria-hidden="true">
+		<span class="dot"></span>
+		<span class="dot"></span>
+		<span class="dot"></span>
+		<span class="title">{title}</span>
+	</div>
+	<figcaption class="visually-hidden">{label}</figcaption>
+	<pre class="body" tabindex="0"><code>{lines.map((line, index) => (
+		<>{index > 0 && '\n'}{segments(line).map((segment) =>
+			typeof segment === 'string' ? segment : (
+				<span class={segment[1]}>{segment[0]}</span>
+			),
+		)}</>
+	))}</code></pre>
+</figure>
+
+<style>
+	.terminal {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		overflow: hidden;
+		border-radius: 14px;
+		background: var(--color-surface-dark);
+		box-shadow: 0 24px 48px -28px rgb(14 28 34 / 40%);
+	}
+	.terminal.hero {
+		box-shadow: 0 32px 64px -24px rgb(14 28 34 / 45%);
+	}
+	.bar {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		padding: 12px 16px;
+		border-bottom: 1px solid var(--hairline-dark);
+	}
+	.dot {
+		flex-shrink: 0;
+		width: 10px;
+		height: 10px;
+		border-radius: var(--radius-full);
+		background: rgb(230 242 245 / 22%);
+	}
+	.title {
+		padding-left: 8px;
+		color: var(--color-label-secondary-dark);
+		font-family: var(--font-mono);
+		font-size: 12px;
+		line-height: 16px;
+		white-space: nowrap;
+	}
+	.body {
+		overflow-x: auto;
+		padding: 14px 16px 16px;
+		color: var(--color-label-secondary-dark);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		line-height: 18px;
+		white-space: pre;
+		overflow-wrap: normal;
+		scrollbar-width: thin;
+		scrollbar-color: rgb(230 242 245 / 22%) transparent;
+	}
+	.body:focus-visible {
+		outline: 2px solid var(--color-accent-dark);
+		outline-offset: -4px;
+	}
+	code {
+		font: inherit;
+	}
+	.cmd {
+		color: var(--color-label-dark);
+	}
+	.hl {
+		color: var(--color-accent-dark);
+	}
+
+	.hero .body {
+		padding: 16px 18px 18px;
+	}
+
+	@media (min-width: 768px) {
+		.step .body {
+			padding: 18px 20px 20px;
+			font-size: 13px;
+			line-height: 22px;
+		}
+		.hero .body {
+			font-size: 13px;
+			line-height: 21px;
+		}
+	}
+</style>
