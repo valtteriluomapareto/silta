@@ -211,6 +211,10 @@ extension GuideCommand {
         API/schema/migration choices, and ask only about anything another app or the customer \
         sees, deleting what you did not create, anything irreversible, and money; repository \
         rules and human-only gates still apply.
+        Use `task edit <ref> --app <slug>` to correct a task's primary app. \
+        Ask when the move changes another app's backlog. For a different repository, \
+        start the task from the target checkout. If the target is a different session, \
+        the current claimant hands off first.
         Put all approvals, proposals to triage and questions in one message. Except for the \
         task-creation exception below, approval words mean only what the human wrote in this \
         chat in reply to your message that named that exact command. One answer covers the \

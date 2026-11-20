@@ -203,7 +203,7 @@ Choose a fence longer than any tilde run in the values.
 Empty fields hold one blank line; changed plans make revisions.
 Agents can't clear a stored Plan or Result.
 
-USAGE: silta task edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> [-F <F>] [--print] [--allow-secret]
+USAGE: silta task edit [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <ref> [-F <F>] [--print] [--allow-secret] [--app <app>]
 
 ARGUMENTS:
   <ref>                   The task reference.
@@ -222,6 +222,9 @@ OPTIONS:
   --print                 Print the current document without editing; needs no
                           approval.
   --allow-secret          Retain secrets with human approval.
+  --app <app>             Set the primary app, or use none to clear it. Use
+                          app:none for a legacy app. Use without -F, --print or
+                          --allow-secret.
   --version               Show the version.
   -h, --help              Show help information.
 
