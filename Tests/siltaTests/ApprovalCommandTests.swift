@@ -102,7 +102,8 @@ struct ApprovalCommandTests {
       ] {
         let result = try SiltaBinary.run(args, in: scratch)
         #expect(result.termination == .exit(0))
-        #expect(result.stdout.hasPrefix("workspace:"))
+        #expect(result.stdout.hasPrefix("# silta-base: "))
+        #expect(result.stdout.contains("\nworkspace: "))
         #expect(result.stderr.contains("approval_unused"))
       }
       let failed = try SiltaBinary.run(

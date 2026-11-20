@@ -7,29 +7,112 @@ struct ScanRegistration {
   let repo: String
   let workspace: String
   let path: String?
-  let isIdentity: Bool
+  private let evidence: Evidence
 
-  /// An exact canonical binding wins over origin evidence. Keep competing origin rows
-  /// visible so a pathless declaration won't be chosen in an ambiguous workspace.
-  static func matching(path: String, origin: String?, in db: Database) throws -> [Self] {
-    let stableOrigin = origin.map(identifiableOrigin) ?? false
-    let rows = try Row.fetchAll(
+  var isIdentity: Bool { evidence == .identity }
+  var permitsSlugFallback: Bool { evidence == .relativeOrigin }
+
+  private enum Evidence {
+    case identity
+    case relativeOrigin
+    case possibleAlias
+  }
+
+  private init(_ row: Row, evidence: Evidence) {
+    id = row["id"]
+    repo = row["repo"]
+    workspace = row["workspace"]
+    path = row["path"]
+    self.evidence = evidence
+  }
+
+  private static let registrations = """
+    SELECT repo.id, repo.slug AS repo, workspace.slug AS workspace, repo_path.path, repo.remote_url
+    FROM repo JOIN workspace ON workspace.id=repo.workspace_id
+    LEFT JOIN repo_path ON repo_path.repo_id=repo.id
+    """
+
+  /// Canonical path ownership wins. Otherwise keep all plausible declarations
+  /// visible, including pathless repositories configured without a remote.
+  static func matching(path: String, slug: String, origin: String?, in db: Database) throws
+    -> [Self]
+  {
+    let bound = try Row.fetchAll(
       db,
-      sql: """
-        SELECT repo.id, repo.slug AS repo, workspace.slug AS workspace, repo_path.path
-        FROM repo JOIN workspace ON workspace.id=repo.workspace_id
-        LEFT JOIN repo_path ON repo_path.repo_id=repo.id
-        WHERE repo_path.path=? OR (repo.remote_url=? AND repo.remote_url<>'')
+      sql: registrations + " WHERE repo_path.path=? ORDER BY workspace.slug, repo.slug",
+      arguments: [path])
+    if !bound.isEmpty { return bound.map { Self($0, evidence: .identity) } }
+    let stableOrigin = origin.map(identifiableOrigin) ?? false
+    let normalizedOrigin = origin.flatMap(hostedOrigin)
+    return try Row.fetchAll(
+      db,
+      sql: registrations + """
+
+        WHERE (repo_path.path IS NULL AND repo.slug=?) OR (? IS NOT NULL AND repo.remote_url<>'')
         ORDER BY workspace.slug, repo.slug
-        """, arguments: [path, origin]
-    ).map {
-      let binding: String? = $0["path"]
-      return Self(
-        id: $0["id"], repo: $0["repo"], workspace: $0["workspace"], path: binding,
-        isIdentity: binding == path || stableOrigin)
+        """,
+      arguments: [slug, origin]
+    ).compactMap { row -> Self? in
+      let binding: String? = row["path"]
+      let remote: String? = row["remote_url"]
+      let repo: String = row["repo"]
+      let exactOrigin = remote != nil && remote != "" && remote == origin
+      let alias = normalizedOrigin != nil && remote.flatMap(hostedOrigin) == normalizedOrigin
+      let pathless = binding == nil && repo == slug && (remote == nil || remote == "")
+      let evidence: Evidence
+      if pathless || (exactOrigin && stableOrigin)
+        || (alias && normalizedOrigin?.hasStandardHosting == true)
+      {
+        evidence = .identity
+      } else if exactOrigin {
+        evidence = .relativeOrigin
+      } else if alias {
+        evidence = .possibleAlias
+      } else {
+        return nil
+      }
+      return Self(row, evidence: evidence)
     }
-    let bound = rows.filter { $0.path == path }
-    return bound.isEmpty ? rows : bound
+  }
+
+  private struct HostedOrigin: Equatable {
+    let host: String
+    let path: Substring
+
+    /// These services address repositories by the same path in their standard clone URLs.
+    var hasStandardHosting: Bool {
+      host == "github.com" || host == "gitlab.com" || host == "bitbucket.org"
+    }
+  }
+
+  /// A possible hosting alias. Generic SSH paths can be absolute or relative.
+  private static func hostedOrigin(_ origin: String) -> HostedOrigin? {
+    let host: String
+    let path: Substring
+    if let scp = origin.wholeMatch(of: #/git@([a-zA-Z0-9.-]+):([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_./-]+)/#)
+    {
+      host = String(scp.1)
+      path = scp.2
+    } else {
+      guard let url = URLComponents(string: origin),
+        let hostname = url.host, hostname.wholeMatch(of: /[a-zA-Z0-9.-]+/) != nil,
+        url.query == nil, url.fragment == nil, url.password == nil
+      else { return nil }
+      switch url.scheme?.lowercased() {
+      case "https":
+        guard url.user == nil, url.port == nil || url.port == 443 else { return nil }
+      case "ssh":
+        guard url.user == "git", url.port == nil || url.port == 22 else { return nil }
+      default: return nil
+      }
+      host = hostname
+      path = url.percentEncodedPath.dropFirst()
+    }
+    guard path.wholeMatch(of: /[a-zA-Z0-9_.-]+(\/[a-zA-Z0-9_.-]+)+/) != nil,
+      !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." || $0 == ".git" })
+    else { return nil }
+    let repository = path.hasSuffix(".git") ? path.dropLast(4) : path
+    return HostedOrigin(host: host.lowercased(), path: repository)
   }
 
   /// Git treats paths without a scheme or an scp-style host as local paths.

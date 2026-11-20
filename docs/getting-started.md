@@ -87,7 +87,9 @@ Add deployment environments and the APIs or external services each app calls.
 
 See the [annotated Acme workspace](examples/acme-workspace.yaml) for the complete YAML
 shape, including several apps on branches of one repository. Start from the YAML shown
-for your workspace: saving replaces the configuration, and omitted rows are removed.
+for your workspace and keep its baseline comment. Saving replaces the configuration,
+and omitted rows are removed. If the file is stale, get fresh `ws show` output and reapply
+your changes there before retrying.
 
 Run `silta ws edit acme` to open your editor with the current YAML; no approval flag is
 needed at your own terminal. If an agent fills in the configuration, approve it in chat

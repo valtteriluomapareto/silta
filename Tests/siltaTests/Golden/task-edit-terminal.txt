@@ -1,2 +1,2 @@
-error: Editing needs terminal input and terminal stderr. Supply -F <file> or -F - for stdin. [usage]
-next: silta task edit --help
+error: Editing needs terminal input and terminal stderr. Use --print for the current document, then supply -F <file> or -F - for stdin. [usage]
+next: silta --ws 'acme' task edit 'AC-1' --print

@@ -60,6 +60,11 @@ struct EditorCommandTests {
       let configuration = try SiltaBinary.run(
         ["--ws", "acme", "ws", "show"], in: scratch, environment: env)
       try #require(configuration.termination == .exit(0), "\(configuration.stderr)")
+      #expect(configuration.stdout.hasPrefix("# silta-base: "))
+      let quiet = try SiltaBinary.run(["--ws", "acme", "ws", "show", "--quiet"], in: scratch)
+      let json = try SiltaBinary.run(["--ws", "acme", "ws", "show", "--json"], in: scratch)
+      #expect(quiet.stdout == configuration.stdout)
+      #expect(try TaskStateCommandTests.data(json)["yaml"] as? String == configuration.stdout)
       let file = scratch.appending(path: "workspace.yaml")
       try configuration.stdout.write(to: file, atomically: true, encoding: .utf8)
       let output = try SiltaBinary.run(
@@ -70,8 +75,8 @@ struct EditorCommandTests {
     }
   }
 
-  @Test(arguments: [false, true])
-  func staleWorkspaceSnapshotKeepsTheCurrentConfiguration(unchanged: Bool) throws {
+  @Test(arguments: [false, true], [false, true])
+  func staleWorkspaceSnapshotKeepsTheCurrentConfiguration(unchanged: Bool, indented: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
       let old = try SiltaBinary.run(["--ws", "acme", "ws", "show"], in: scratch)
@@ -88,7 +93,7 @@ struct EditorCommandTests {
       try #require(first.termination == .exit(0), "\(first.stdout)")
       let draft =
         unchanged ? old.stdout : old.stdout.replacingOccurrences(of: "Acme", with: "Edited")
-      try draft.write(to: file, atomically: true, encoding: .utf8)
+      try ((indented ? " " : "") + draft).write(to: file, atomically: true, encoding: .utf8)
       let stale = try SiltaBinary.run(edit, in: scratch, environment: TaskCommandTests.actor)
       let currentService = try store.read {
         try String.fetchOne($0, sql: "SELECT slug FROM service")
@@ -96,24 +101,85 @@ struct EditorCommandTests {
       let approvalCount = try store.read {
         try Int.fetchOne($0, sql: "SELECT count(*) FROM approval")
       }
-      withKnownIssue("A stale ws show snapshot is accepted as a new write") {
-        #expect(stale.termination == .exit(6))
-        #expect(currentService == "mailer")
-        #expect(approvalCount == 1)
-      }
+      #expect(stale.termination == .exit(indented ? 1 : 6))
+      let error = try TaskStateCommandTests.error(stale)
+      #expect(error["code"] as? String == (indented ? "invalid" : "conflict"))
+      #expect(error["next"] as? [String] == ["silta --ws 'acme' ws show"])
+      try Self.followRecovery(stale.stdout, in: scratch)
+      #expect(currentService == "mailer")
+      #expect(approvalCount == 1)
     }
   }
 
   @Test func nonTerminalTaskEditPointsToTheScopedDocument() throws {
     try withScratchDirectory { scratch in
-      try Self.seed(scratch)
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            INSERT INTO workspace(uid,slug,name,task_prefix) VALUES('other','other','Other','OT')
+            """)
+      }
+      let added = try SiltaBinary.run(
+        ["--ws", "other", "task", "add", "Other task", "--start"], in: scratch,
+        environment: TaskCommandTests.actor)
+      try #require(added.termination == .exit(0), "\(added.stderr)")
+      let args = ["--ws", "other", "task", "edit", "OT-1"]
+      let json = try SiltaBinary.run(args + ["--json"], in: scratch)
+      #expect(json.termination == .exit(1))
+      let error = try TaskStateCommandTests.error(json)
+      let expected = "silta --ws 'other' task edit 'OT-1' --print"
+      #expect(error["next"] as? [String] == [expected])
+      try Self.followRecovery(json.stdout, in: scratch)
+      let text = try SiltaBinary.run(args, in: scratch)
+      #expect(text.termination == .exit(1))
+      #expect(text.stderr.contains("next: " + expected))
+      let invalid = try SiltaBinary.run(
+        ["--ws", "other", "task", "edit", "AC-1", "--json"], in: scratch)
+      #expect(
+        try TaskStateCommandTests.error(invalid)["next"] as? [String] == [
+          "silta --ws 'other' task edit --help"
+        ])
+    }
+  }
+
+  @Test func invalidHomePreservesTheNonTerminalTaskEditUsageError() throws {
+    try withScratchDirectory { scratch in
       let result = try SiltaBinary.run(
-        Self.taskEdit + ["--json"], in: scratch, environment: Self.editor("echo"))
+        Self.taskEdit + ["--json"], in: scratch, environment: ["SILTA_HOME": "relative"])
       #expect(result.termination == .exit(1))
       let error = try TaskStateCommandTests.error(result)
-      withKnownIssue("Non-terminal task editing only points at generic help") {
-        #expect(error["next"] as? [String] == ["silta --ws 'acme' task edit 'AC-1' --print"])
+      #expect(error["code"] as? String == "usage")
+      #expect(error["next"] as? [String] == ["silta task edit --help"])
+      #expect(error["next_by"] as? String == "agent")
+    }
+  }
+
+  @Test func malformedWorkspaceBaselinesRefuseWithoutMutation() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let shown = try SiltaBinary.run(["ws", "show", "acme"], in: scratch)
+      let stamp = try #require(shown.stdout.split(separator: "\n").first)
+      let file = scratch.appending(path: "workspace.yaml")
+      let yaml = shown.stdout.dropFirst(stamp.count + 1)
+      let invalid = [
+        "# silta-base: invalid\n" + yaml,
+        String(stamp) + "\n" + shown.stdout,
+        "# comment\n" + shown.stdout,
+      ]
+      for draft in invalid {
+        try draft.write(to: file, atomically: true, encoding: .utf8)
+        let result = try SiltaBinary.run(
+          Self.wsEdit + ["-F", file.path, "--json"], in: scratch,
+          environment: TaskCommandTests.actor)
+        #expect(result.termination == .exit(1))
+        let error = try TaskStateCommandTests.error(result)
+        #expect(error["code"] as? String == "invalid")
+        #expect(error["next"] as? [String] == ["silta --ws 'acme' ws show"])
+        try Self.followRecovery(result.stdout, in: scratch)
       }
+      #expect(try SiltaBinary.run(["ws", "show", "acme"], in: scratch).stdout == shown.stdout)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 0)
     }
   }
 

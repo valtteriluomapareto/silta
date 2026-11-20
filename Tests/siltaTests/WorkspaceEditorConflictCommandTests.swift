@@ -6,13 +6,18 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkspaceEditorConflictCommandTests {
-  @Test(arguments: [false, true])
-  func competingSaveKeepsTheAttemptInAPrivateFile(json: Bool) throws {
+  @Test(arguments: [false, true], [false, true])
+  func competingSaveKeepsTheAttemptInAPrivateFile(json: Bool, stamped: Bool) throws {
     try withScratchDirectory { scratch in
       let store = try TaskCommandTests.setup(scratch)
+      let shown = try SiltaBinary.run(["ws", "show", "acme"], in: scratch)
+      let stamp = try #require(shown.stdout.split(separator: "\n").first)
+      #expect(stamp.hasPrefix("# silta-base: "))
       let original = "workspace: {slug: acme, name: Acme, task_prefix: AC}\n"
       let attempted = original.replacingOccurrences(of: "name: Acme", with: "name: Edited")
-      let editor = try Self.editor(in: scratch, original: original, attempted: attempted)
+      let retained = String(stamp) + "\n" + attempted
+      let editor = try Self.editor(
+        in: scratch, original: original, attempted: stamped ? retained : attempted)
       let env = TaskCommandTests.actor.merging(["EDITOR": editor]) { _, value in value }
       let args = EditorCommandTests.wsEdit + (json ? ["--json"] : [])
       let run = try EditorTerminalFixture.run(args, in: scratch, environment: env)
@@ -23,7 +28,14 @@ struct WorkspaceEditorConflictCommandTests {
       defer {
         try? FileManager.default.removeItem(at: directory)  // fixture cleanup
       }
-      #expect(try String(contentsOf: buffer, encoding: .utf8) == attempted)
+      #expect(try String(contentsOf: buffer, encoding: .utf8) == retained)
+      let replay = try SiltaBinary.run(
+        EditorCommandTests.wsEdit + ["-F", buffer.path, "--json"], in: scratch, environment: env)
+      #expect(replay.termination == .exit(6))
+      #expect(
+        try TaskStateCommandTests.error(replay)["next"] as? [String] == [
+          "silta --ws 'acme' ws show"
+        ])
       let attributes = try FileManager.default.attributesOfItem(
         atPath: directory.path)
       #expect(attributes[.posixPermissions] as? Int == 0o700)
@@ -40,6 +52,41 @@ struct WorkspaceEditorConflictCommandTests {
           .joined(separator: "\n").replacingOccurrences(of: path, with: "<buffer>")
         Golden.forTests().check(lines + "\n", "ws-edit-stale.txt")
       }
+    }
+  }
+
+  @Test func pastingAnOldSnapshotIntoTheEditorKeepsTheCompetingSave() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let args = EditorCommandTests.wsEdit + ["--json"]
+      let env = TaskCommandTests.actor
+      let shown = try SiltaBinary.run(["ws", "show", "acme"], in: scratch)
+      let file = scratch.appending(path: "workspace.yaml")
+      let winner = shown.stdout.replacingOccurrences(of: "services: []", with: "services: [mailer]")
+      try winner.write(to: file, atomically: true, encoding: .utf8)
+      let saved = try SiltaBinary.run(args + ["-F", file.path], in: scratch, environment: env)
+      try #require(saved.termination == .exit(0), "\(saved.stdout)")
+      let proposed = shown.stdout.replacingOccurrences(of: "Acme", with: "Edited")
+      try proposed.write(to: file, atomically: true, encoding: .utf8)
+      let capture = scratch.appending(path: "editor-buffer")
+      let copy = "cp " + shellWord(file.path)
+      let command = #"""
+        printf '%s' "$1" > \#(shellWord(capture.path)); \#(copy) "$1"
+        """#
+      let editor = "/bin/sh -c " + shellWord(command) + " silta-editor"
+      let session = try EditorTerminalFixture.run(
+        args, in: scratch, environment: env.merging(["EDITOR": editor]) { _, value in value })
+      let path = try String(contentsOf: capture, encoding: .utf8)
+      let buffer = URL(filePath: path)
+      defer {
+        let directory = buffer.deletingLastPathComponent()
+        try? FileManager.default.removeItem(at: directory)  // fixture cleanup
+      }
+      #expect(session.result.termination == .exit(6))
+      #expect(try String(contentsOf: buffer, encoding: .utf8) == proposed)
+      #expect(
+        try store.read { try String.fetchOne($0, sql: "SELECT slug FROM service") } == "mailer")
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") } == 1)
     }
   }
 

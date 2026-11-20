@@ -36,9 +36,12 @@ struct TaskEditCommand: OutputCommand {
   @Flag(help: "Retain secrets with human approval.")
   var allowSecret = false
 
-  func validate() throws {
-    if file == nil && !print { try TerminalEditor.validate() }
-  }
+  var missingTerminal: Bool { file == nil && !print && !TerminalEditor.hasTerminal }
+
+  static let terminalUsage = UsageError.usage(
+    message: "Editing needs terminal input and terminal stderr. Use --print for the current "
+      + "document, then supply -F <file> or -F - for stdin.",
+    command: "silta task edit")
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let service = TaskService(
@@ -55,6 +58,7 @@ struct TaskEditCommand: OutputCommand {
           ref: printed.task.ref, status: printed.task.status, document: printed.document)
       ).reporting(context.taskWorkspace(global.ws))
     }
+    guard !missingTerminal else { throw terminalFailure(service) }
     let result = try service.edit(ref, allowSecret: allowSecret) { original in
       if let file { return try BodyInput.read(file) }
       return try edit(original, environment: context.environment)
@@ -65,6 +69,23 @@ struct TaskEditCommand: OutputCommand {
         ? "unchanged" : "edited: " + result.result.changed.joined(separator: ", "),
       approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
+  }
+
+  private func terminalFailure(_ service: TaskService) -> CommandFailure {
+    let usage = Self.terminalUsage
+    guard let workspace = service.resolvedWorkspace(), WorkspaceConfig.isValidIdentifier(workspace),
+      RestoreService.canNameInRecovery(workspace)
+    else { return CommandFailure(error: usage, next: usage.next) }
+    do {
+      let task = try service.show(ref)
+      guard RestoreService.canNameInRecovery(task.ref) else {
+        return CommandFailure(error: usage, next: usage.next)
+      }
+      let command = "silta task edit " + shellWord(task.ref) + " --print"
+      return CommandFailure(error: usage, next: [workspaceCommand(command, workspace: workspace)])
+    } catch {
+      return CommandFailure(error: usage, next: usage.next)
+    }
   }
 
   private func edit(_ original: String, environment: SiltaEnvironment) throws -> String? {

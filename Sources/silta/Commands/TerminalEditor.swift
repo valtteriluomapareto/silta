@@ -5,8 +5,12 @@ import SiltaCore
 
 /// Starts the user's configured shell command with a terminal separate from CLI output.
 enum TerminalEditor {
+  static var hasTerminal: Bool {
+    isatty(STDIN_FILENO) != 0 && isatty(STDERR_FILENO) != 0
+  }
+
   static func validate() throws {
-    guard isatty(STDIN_FILENO) != 0, isatty(STDERR_FILENO) != 0 else {
+    guard hasTerminal else {
       throw ValidationError(
         "Editing needs terminal input and terminal stderr. Supply -F <file> or -F - for stdin.")
     }

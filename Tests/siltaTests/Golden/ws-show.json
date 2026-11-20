@@ -1,1 +1,1 @@
-{"data":{"workspace":"acme","yaml":"workspace: {\"name\":\"Acme\",\"slug\":\"acme\",\"task_prefix\":\"AC\"}\nsettings: {}\nrepos: []\napps: []\nenvironments: []\nservices: []\nedges: []\ntopics: []\nsources: []\n"},"ok":true,"schema":1,"warnings":[]}
+{"data":{"workspace":"acme","yaml":"# silta-base: 36f021f2e85c54d0bbc3666cd75876480fba4bdad094ef6a7e0283c7c993163c\nworkspace: {\"name\":\"Acme\",\"slug\":\"acme\",\"task_prefix\":\"AC\"}\nsettings: {}\nrepos: []\napps: []\nenvironments: []\nservices: []\nedges: []\ntopics: []\nsources: []\n"},"ok":true,"schema":1,"warnings":[]}

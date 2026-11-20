@@ -2001,7 +2001,7 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   Command logs use the resolved existing workspace (§19), including the captured
   outside default after a location no-match. Ambiguous/broken selection, or absence
   of both location and default, carries no workspace tag.
-  `where`, `brief` and status retain their location-first rules. Help, usage errors
+  `where`, `brief` and status retain their location-first rules. Help and parse errors
   and commands without workspace scope do not infer a workspace.
 - Bodies come from `-m <text>` or `-F <file|->`. The positional source to
   `task from-plan` follows the same file and stdin rules as `-F`. Supplied file or
@@ -2013,9 +2013,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   when its first extra byte arrives. Content checks for each command still apply.
   Interactive `task edit` and `ws edit` require terminal input and terminal stderr. Both editor output streams
   go to that terminal, leaving Silta's stdout for its own output. These commands
-  return `usage` and point to `-F` without a terminal or file input. Editor startup
-  failures return `env` with help for the edit command. `task edit --print`
-  remains available without a terminal.
+  return `usage` and point to `-F` without a terminal or file input. A task edit also
+  points to the scoped `--print` command when the task can be read, or to command help
+  when it cannot. Editor startup failures return `env` with help for the edit command.
 - Refs follow §5.1.
 - Human-readable text and quiet views of stored content mask secrets before
   replacing terminal control characters with spaces. Multiline bodies preserve
@@ -2239,7 +2239,8 @@ would give an invalid workspace slug or task prefix. Its JSON includes `next` an
 A successful scan lists the workspace and its sorted registered repository and app
 slugs. Text tells a human how to open the workspace editor and tells agents to ask
 before editing. Text and JSON give one read-only, workspace-scoped `ws show` next.
-A bare `init` prepares the database and points to scan help.
+A scan with a missing root or no Git repositories returns `invalid` and creates
+no workspace. A bare `init` prepares the database and points to scan help.
 
 ## 17. Storage, concurrency, technology
 
@@ -2259,9 +2260,14 @@ Every CLI call is its own short-lived process, and several agents run at once.
   `seq_counter` scope `comment:doc_rev:<id>`, allocated with their row.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
 - **Workspace edits** capture the selected configuration before launching the editor
-  or reading `-F`. The save verifies the baseline in its write transaction. A
-  competing change returns `conflict`. A stale interactive edit keeps its private
-  YAML file and points to the current configuration for review.
+  or reading `-F`. The save verifies the baseline in its write transaction. Every
+  `ws show` projection carries a YAML comment tied to the workspace identity and
+  canonical configuration. Keep this comment when editing a file or pasting it
+  into the interactive editor. A stale comment or a competing change returns `conflict`. Malformed or duplicate baseline
+  comments return `invalid`. A stale interactive edit keeps its private YAML file
+  with the original baseline. Review fresh `ws show` output and reapply your edits
+  there before retrying. Hand-authored YAML with no baseline comment uses the
+  configuration at command start.
 - **Read commands never change `silta.db`'s contents and never migrate.** Archiving is
   computed, and caches are best-effort writes to `index.db`. A read may recreate the
   `-wal`/`-shm` files that another SQLite client, or copying `silta.db` alone, left
@@ -3028,15 +3034,20 @@ names another; a message about a derived prefix names where it came from, the sl
 identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
 naming options can refresh an existing workspace of the same slug when the clones
 all match its registered repos, preserving its prefix. Slug and prefix clashes compare case-insensitively, as does `--ws`.
-An exact clone binding, exact network origin, or exact absolute local origin
-is evidence of existing configuration. A matching relative local origin or a
-workspace name alone calls for inspection before selecting a target. Before creating a workspace, a scan checks all clone paths together.
+An exact clone path binding takes priority. Other evidence includes an exact
+network or absolute local origin, equivalent HTTPS and Git SSH repository paths
+on github.com, gitlab.com and bitbucket.org, and a pathless repository with a
+matching slug and no configured origin. A possible alias on another host, a
+matching relative local origin or a workspace name alone calls for inspection
+before selecting a target. A scan checks all clone
+paths together before creating a workspace.
 A unique match to one workspace and one distinct repo per clone offers a scoped
 rescan when the repo paths agree or are unbound. If the scan includes competing
 registrations, a different bound clone, or a mix of registered and unfamiliar
 clones, the user inspects the matching workspaces and chooses what to scan.
-Existing workspace data is preserved. A naming conflict with no repository match
-still offers the applicable naming option. Options without `--scan` are refused.
+Existing workspace data is preserved. A slug or prefix collision without a
+repository match points to the holding workspace's configuration. Options
+without `--scan` are refused.
 `--slug` and `--prefix` are invalid with `--ws`, which rescans. A directory name that is
 not a valid workspace slug, or does not yield a valid prefix, fails with an error that
 names `--slug` or `--prefix` as the fix and carries the scanned roots in a runnable

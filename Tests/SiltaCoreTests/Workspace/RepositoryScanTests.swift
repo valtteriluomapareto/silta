@@ -55,22 +55,26 @@ struct RepositoryScanTests {
       let candidate = try Self.path(repo)
       let git = ScriptedGitRunner(script: depth <= 2 ? Self.script(candidate) : [])
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
+      let identity = (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant)
+      if depth > 2 {
+        await #expect(throws: ScanError.noRepositories([root.path])) {
+          try await RepositoryScan.scan(
+            [root], target: .derived, store: store, git: git, identity: identity)
+        }
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+        return
+      }
       let outcome = try await RepositoryScan.scan(
-        [root], target: .derived, store: store, git: git,
-        identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
+        [root], target: .derived, store: store, git: git, identity: identity)
       #expect(outcome.workspace == "acme")
       #expect(git.isExhausted)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo") } == 1)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM app") } == 3)
       #expect(
-        try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo") }
-          == (depth <= 2 ? 1 : 0))
-      if depth <= 2 {
-        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM app") } == 3)
-        #expect(
-          try store.read {
-            try String.fetchAll(
-              $0, sql: "SELECT prod_ref FROM app WHERE prod_ref IS NOT NULL ORDER BY prod_ref")
-          } == ["origin/api-prod", "origin/portal-prod"])
-      }
+        try store.read {
+          try String.fetchAll(
+            $0, sql: "SELECT prod_ref FROM app WHERE prod_ref IS NOT NULL ORDER BY prod_ref")
+        } == ["origin/api-prod", "origin/portal-prod"])
     }
   }
 
@@ -252,15 +256,22 @@ struct RepositoryScanTests {
       #expect(!FileManager.default.fileExists(atPath: store.path))
     }
   }
+}
 
+extension RepositoryScanTests {
   @Test func explicitWorkspaceMustAlreadyExist() async throws {
     try await withScratchDirectory { (home: URL) async throws in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
-      await #expect(throws: WorkspaceError.self) {
+      let repo = home.appending(path: "acme")
+      try FileManager.default.createDirectory(
+        at: repo.appending(path: ".git"), withIntermediateDirectories: true)
+      let git = ScriptedGitRunner(script: Self.script(try Self.path(repo)))
+      let refusal = await #expect(throws: WorkspaceError.self) {
         try await RepositoryScan.scan(
-          [home], target: .rescan("absent"), store: store, git: ScriptedGitRunner(script: []),
+          [repo], target: .rescan("absent"), store: store, git: git,
           identity: (SeededIDGenerator(seed: 1), WorkspaceConfigTests.instant))
       }
+      #expect(refusal?.code == .notFound)
       #expect(try WorkspaceSelection.list(in: store).isEmpty)
     }
   }

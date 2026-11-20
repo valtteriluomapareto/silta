@@ -40,8 +40,9 @@ package enum RepositoryScan {
     let directory = first.standardizedFileURL.lastPathComponent
     let naming = try naming(target, directory: directory, roots: paths)
     let (repos, skipped) = try await discover(Array(zip(paths, readable)), git: git)
-    if repos.isEmpty, let firstSkipped = skipped.first {
-      throw ScanError.unreadableRoot(firstSkipped)
+    if repos.isEmpty {
+      if let firstSkipped = skipped.first { throw ScanError.unreadableRoot(firstSkipped) }
+      throw ScanError.noRepositories(paths)
     }
     let request = ScanRequest(
       target: target, choice: ScanChoice(target), slug: naming.slug,
@@ -66,8 +67,7 @@ package enum RepositoryScan {
       let bindings = try implicitBindings(request, workspace: existing?["slug"], in: db)
       if case .named(let chosenSlug, _) = request.target, let existing {
         throw ScanError.slugExists(
-          request.slug, chosen: chosenSlug != nil, workspace: existing["slug"] as String,
-          roots: request.roots, choice: request.choice)
+          chosen: chosenSlug != nil, workspace: existing["slug"] as String)
       }
       if case .rescan = request.target, existing == nil { throw WorkspaceError.notFound }
       let workspace = existing.map { $0["slug"] as String } ?? request.slug
@@ -86,7 +86,7 @@ package enum RepositoryScan {
         try config.apply(in: tx, ids: request.identity.ids, at: request.identity.date)
       }
       let (registered, apps) = try registerPaths(
-        repos, workspace: workspace, bindings: bindings, in: db)
+        repos, workspace: workspace, bindings: bindings, created: existing == nil, in: db)
       if let existing { try tx.recordChange(kind: "workspace", rowID: existing["id"] as Int64) }
       return ScanOutcome(
         workspace: workspace, repositories: registered, apps: apps, warnings: warnings)
@@ -107,7 +107,7 @@ package enum RepositoryScan {
     if case .rescan = request.target { return [:] }
     let paths = request.repos.map { $0.path.path }
     let matches = try request.repos.map {
-      try ScanRegistration.matching(path: $0.path.path, origin: $0.remote, in: db)
+      try ScanRegistration.matching(path: $0.path.path, slug: $0.slug, origin: $0.remote, in: db)
     }
     let recovery = ScanRegistration.recovery(matches, paths: paths, roots: request.roots)
     if case .derived = request.target, let workspace, !paths.isEmpty {
@@ -142,7 +142,7 @@ package enum RepositoryScan {
   /// Binds each clone to its repo row, after refusing a path another workspace holds.
   private static func registerPaths(
     _ repos: [DiscoveredRepo], workspace: String, bindings: [String: ScanRegistration],
-    in db: Database
+    created: Bool, in db: Database
   ) throws -> (repositories: [String], apps: [String]) {
     let matches = try repos.map { repo in
       let path = repo.path.path
@@ -150,7 +150,7 @@ package enum RepositoryScan {
         throw ScanError.repoPathTaken(repo: holder.repo, path: path, workspace: holder.workspace)
       }
       if let binding = bindings[path] { return (id: binding.id, slug: binding.repo) }
-      return try registeredRepo(repo, workspace: workspace, in: db)
+      return try registeredRepo(repo, workspace: workspace, created: created, in: db)
     }
     guard Set(matches.map(\.id)).count == matches.count else {
       throw ScanError.registeredWorkspaces([workspace], roots: nil)
@@ -169,14 +169,10 @@ package enum RepositoryScan {
     return (matches.map(\.slug).sorted(), apps.sorted())
   }
 
-  private static func registeredRepo(_ repo: DiscoveredRepo, workspace: String, in db: Database)
-    throws -> (id: Int64, slug: String)
-  {
-    let matches = try ScanRegistration.matching(path: repo.path.path, origin: repo.remote, in: db)
-      .filter { $0.workspace == workspace }
-    if matches.count == 1, let match = matches.first, match.isIdentity,
-      match.path == nil || match.path == repo.path.path
-    {
+  private static func registeredRepo(
+    _ repo: DiscoveredRepo, workspace: String, created: Bool, in db: Database
+  ) throws -> (id: Int64, slug: String) {
+    if !created, let match = try existingBinding(repo, workspace: workspace, in: db) {
       return (match.id, match.repo)
     }
     guard
@@ -189,6 +185,27 @@ package enum RepositoryScan {
           """, arguments: [workspace, repo.slug])
     else { throw RepoError.configuration(repo: repo.slug, workspace: workspace) }
     return (row["id"], row["slug"])
+  }
+
+  /// Resolves existing registration evidence before a scoped rescan can use a repo's slug.
+  private static func existingBinding(_ repo: DiscoveredRepo, workspace: String, in db: Database)
+    throws -> ScanRegistration?
+  {
+    let path = repo.path.path
+    let matches = try ScanRegistration.matching(
+      path: path, slug: repo.slug, origin: repo.remote, in: db
+    )
+    .filter { $0.workspace == workspace }
+    if matches.count == 1, let match = matches.first, match.isIdentity,
+      match.path == nil || match.path == path
+        || match.path.map({ !FileManager.default.fileExists(atPath: $0 + "/.git") }) == true
+    {
+      return match
+    }
+    if matches.count > 1 || matches.contains(where: { !$0.permitsSlugFallback }) {
+      throw ScanError.registeredWorkspaces([workspace], roots: nil)
+    }
+    return nil
   }
 }
 
@@ -255,7 +272,7 @@ extension RepositoryScan {
       arguments: [prefix])
     {
       throw ScanError.prefixTaken(
-        prefix, derived: derived, workspace: holder, roots: request.roots, choice: request.choice)
+        prefix, derived: derived, workspace: holder)
     }
     return prefix
   }
@@ -368,7 +385,7 @@ extension RepositoryScan {
         sql: """
           SELECT EXISTS(
             SELECT 1 FROM repo LEFT JOIN repo_path ON repo_path.repo_id=repo.id
-            WHERE repo_path.repo_id IS NULL AND repo.remote_url<>''
+            WHERE repo_path.repo_id IS NULL
           )
           """) ?? false
     }
@@ -382,7 +399,9 @@ extension RepositoryScan {
       return nil
     }
     let found = try store.read {
-      try ScanRegistration.matching(path: main.path, origin: origin, in: $0).filter {
+      try ScanRegistration.matching(
+        path: main.path, slug: suggestedSlug(main.lastPathComponent), origin: origin, in: $0
+      ).filter {
         workspace == nil || $0.workspace == workspace
       }
     }

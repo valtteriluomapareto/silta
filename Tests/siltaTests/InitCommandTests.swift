@@ -1,4 +1,6 @@
 import Foundation
+import GRDB
+import SiltaCore
 import SiltaTestSupport
 import Testing
 
@@ -394,8 +396,7 @@ extension InitCommandTests {
   /// its `next` keeps the directory's slug.
   @Test func aDirectoryPrefixThatIsNotValidNamesThePrefixFlag() throws {
     try withScratchDirectory { scratch in
-      try FileManager.default.createDirectory(
-        at: scratch.appending(path: "a_b"), withIntermediateDirectories: true)
+      try Self.makeRepo(scratch.appending(path: "a_b"), in: scratch)
       let result = try SiltaBinary.run(
         ["init", "--scan", "a_b", "--json"], in: scratch, cwd: scratch)
       #expect(result.termination == .exit(1))
@@ -410,9 +411,7 @@ extension InitCommandTests {
     }
   }
 
-  /// Each naming refusal keeps the options already given, so running its first `next`
-  /// lands on the workspace the caller asked for.
-  @Test func everyNamingRefusalsNextKeepsTheChosenSlug() throws {
+  @Test func invalidNameHintsKeepTheOtherNamingOption() throws {
     try withScratchDirectory { scratch in
       let fixtures = try Self.fixtures(scratch)
       #expect(
@@ -420,18 +419,11 @@ extension InitCommandTests {
           .termination == .exit(0))
       let cases = [
         Refusal(
-          arguments: ["--slug", "acorn"], keeps: "--slug acorn", placeholder: "<prefix>",
-          replacement: "WK", created: "acorn", prefix: "WK", exit: 6),
-        Refusal(
           arguments: ["--slug", "bad-slug", "--prefix", "A_"], keeps: "--slug bad-slug",
           placeholder: "<prefix>", replacement: "WM", created: "bad-slug", prefix: "WM", exit: 1),
         Refusal(
           arguments: ["--slug", "My Projects", "--prefix", "WX"], keeps: "--prefix WX",
           placeholder: "<slug>", replacement: "fine", created: "fine", prefix: "WX", exit: 1),
-        Refusal(
-          arguments: ["--slug", "acme", "--prefix", "WZ"], keeps: "--prefix WZ",
-          placeholder: "<another-slug>", replacement: "other", created: "other", prefix: "WZ",
-          exit: 6),
       ]
       for (index, testCase) in cases.enumerated() {
         let root = scratch.appending(path: "refusal-\(index)")
@@ -451,6 +443,25 @@ extension InitCommandTests {
         let yaml = try #require(try Self.shownData(shown.stdout)["yaml"] as? String)
         #expect(yaml.contains("\"task_prefix\":\"\(testCase.prefix)\""))
       }
+    }
+  }
+
+  @Test(arguments: [["--slug", "acorn"], ["--slug", "acme", "--prefix", "WK"], []])
+  func unrelatedNamingCollisionsOfferRunnableInspection(options: [String]) throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let root = scratch.appending(path: options.isEmpty ? "acme" : "acorn")
+      try Self.makeRepo(root, in: scratch)
+      let result = try SiltaBinary.run(
+        ["init", "--scan", root.path, "--json"] + options, in: scratch)
+      #expect(result.termination == .exit(6))
+      let next = try #require(try TaskStateCommandTests.error(result)["next"] as? [String])
+      #expect(next.first == "silta --ws 'acme' ws show")
+      for command in next {
+        #expect(try Self.runNext(command, in: scratch).termination == .exit(0))
+      }
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 1)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 0)
     }
   }
 

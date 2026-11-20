@@ -223,6 +223,9 @@ extension GuideCommand {
         unless every task is ready, and proposed-task writes under `proposals: ask`. Before \
         `restore`, run `--dry-run` and show the human its lines. Restore drops work done after \
         the export. Never edit an export tree.
+        Keep the baseline comment from `ws show` or a retained editor draft when applying \
+        workspace YAML. On `conflict`, review fresh `ws show` output and reapply your edits there. \
+        Unstamped YAML uses the configuration at command start.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \
         A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not \

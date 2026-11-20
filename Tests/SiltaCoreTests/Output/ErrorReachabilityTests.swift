@@ -147,14 +147,11 @@ extension ScanError: ErrorExamples {
       .invalidPrefix("A_", origin: nil, roots: ["acme"], choice: .init(slug: "work")),
       .invalidPrefix("A-", origin: .directory("a-team"), roots: ["a-team"], choice: .none),
       .invalidPrefix("X-", origin: .slug("x-y"), roots: ["zed"], choice: .init(slug: "x-y")),
-      .slugExists(
-        "ACME", chosen: true, workspace: "acme", roots: ["api", "web"],
-        choice: .init(slug: "ACME", prefix: "WK")),
-      .prefixTaken(
-        "AC", derived: true, workspace: "acme", roots: ["acorn"], choice: .init(slug: "acorn")),
-      .prefixTaken(
-        "AC", derived: false, workspace: "acme", roots: ["acorn"],
-        choice: .init(prefix: "AC")),
+      .slugExists(chosen: true, workspace: "acme"),
+      .prefixTaken("AC", derived: true, workspace: "acme"),
+      .prefixTaken("AC", derived: false, workspace: "acme"),
+      .unreadableRoot("/projects/missing"),
+      .noRepositories(["/projects/empty"]),
       .repoPathTaken(repo: "api", path: "/projects/api", workspace: "acme"),
       .reservedSlug(path: "/projects/.none"),
     ]
