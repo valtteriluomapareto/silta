@@ -40,7 +40,7 @@ verbose output.
 | `website/` | `npm run validate` in `website/` ([website README](website/README.md)) |
 | App UI or Xcode project | `scripts/verify.sh app` (guards, lint, native Debug acceptance, Release build) |
 | Swift code outside `App/` | `scripts/verify.sh quick` (guards, lint, build with warnings as errors, tests) |
-| Storage, concurrency, location, agent-facing output | `scripts/verify.sh full` (adds stress, scenario and compatibility tiers, the wall-clock deadline tier alone, then the eval replays) |
+| Storage, concurrency, location, agent-facing output | `scripts/verify.sh full` (adds stress, scenario and compatibility tiers, the isolated wall-clock tier, eval replays and native app verification) |
 | `Evals/` (offline eval tooling) | `scripts/verify.sh evals` (builds the CLI, then the eval replay tests) |
 | A guard script | `python3 -B -m unittest discover -s scripts/tests` (self-tests) |
 

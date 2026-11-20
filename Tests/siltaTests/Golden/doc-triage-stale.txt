@@ -1,3 +1,4 @@
 error: Proposal doc:rules@2 has a stale base; inspect and repropose. [stale_rev]
 next: silta --ws 'acme' doc show 'doc:rules@2'
+next: silta --ws 'acme' doc show 'doc:rules' --json
 next: silta --ws 'acme' doc propose 'doc:rules' -F <file> -m <why> --base <rev> --title <title> --about <ref>

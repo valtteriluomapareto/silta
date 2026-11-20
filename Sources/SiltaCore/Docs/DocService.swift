@@ -22,7 +22,10 @@ package struct DocService {
     let range = try Self.lineRange(lines)
     do {
       let result = try read(selection.slug, revision: selection.revision, view: request.view)
-      let matches = SecretGuard.matches(in: result.output)
+      let title = result.bodyLayout?.title.map {
+        result.output.utf8.index(result.output.utf8.startIndex, offsetBy: $0.lowerBound)
+      }
+      let matches = SecretGuard.matches(in: result.output, armourFieldStart: title)
       let masked = SecretGuard.redacted(result.output, matches: matches)
       let window = bounded(masked, ref: result.ref, flags: request.view.flags, range: range)
       var selected = DocReadResult(ref: SecretGuard.redacted(result.ref), output: window.output)

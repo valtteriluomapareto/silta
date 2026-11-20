@@ -24,7 +24,7 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - §11 and D38: the app counts as `human:*`.
   - §17: writes take `BEGIN IMMEDIATE` and check `min_writer_version`.
   - §19: the command log.
-- [`mac-app.md`](mac-app.md): the read-only viewer, its store states and its control
+- [`mac-app.md`](mac-app.md): the app, its store states and its control
   support.
 
 ## Scope

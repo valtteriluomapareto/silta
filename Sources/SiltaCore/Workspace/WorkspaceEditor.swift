@@ -46,7 +46,7 @@ package enum WorkspaceEditor {
       throw WorkspaceEditConflict(workspace: nil)
     }
     try baseline.check(stamp: stamp)
-    let config = try WorkspaceConfig.parse(text)
+    let config = try WorkspaceConfig.parse(text, keepingAppNames: baseline.appNames)
     if baseline.slug != nil, text.utf8.elementsEqual(baseline.text.utf8) {
       try store.read(baseline.check)
       return nil
@@ -60,6 +60,8 @@ package enum WorkspaceEditor {
     let slug: String?
     let uid: String?
     let text: String
+    /// Unchanged legacy labels can survive an edit without relaxing validation of new text.
+    let appNames: [String: String]
 
     private static let marker = "# silta-base:"
     private static let prefix = marker + " "
@@ -144,7 +146,8 @@ package enum WorkspaceEditor {
       _ = try prepared?.get()
       if try WorkspaceSelection.list(in: store).isEmpty {
         return Baseline(
-          slug: nil, uid: nil, text: "workspace: {slug: acme, name: Acme, task_prefix: AC}\n")
+          slug: nil, uid: nil, text: "workspace: {slug: acme, name: Acme, task_prefix: AC}\n",
+          appNames: [:])
       }
     }
     let selected = try WorkspaceSelection.resolve(slug, in: store, prepared: prepared)
@@ -152,8 +155,19 @@ package enum WorkspaceEditor {
       guard let uid = try uid(in: db, slug: selected) else {
         throw WorkspaceError.unknown(selected)
       }
+      let appNames = try Row.fetchAll(
+        db,
+        sql: """
+          SELECT app.slug,app.name FROM app JOIN workspace ON workspace.id=app.workspace_id
+          WHERE workspace.slug=?
+          """, arguments: [selected]
+      ).reduce(into: [String: String]()) { names, row in
+        let app: String = row["slug"]
+        if WorkspaceConfig.isValidIdentifier(app) { names[app] = row["name"] }
+      }
       return Baseline(
-        slug: selected, uid: uid, text: try WorkspaceConfig.render(from: db, slug: selected))
+        slug: selected, uid: uid, text: try WorkspaceConfig.render(from: db, slug: selected),
+        appNames: appNames)
     }
   }
 
@@ -186,7 +200,7 @@ package enum WorkspaceEditor {
         let (stamp, text) = try Baseline.payload(changed, workspace: baseline.slug)
         do {
           try baseline.check(stamp: stamp)
-          let config = try WorkspaceConfig.parse(text)
+          let config = try WorkspaceConfig.parse(text, keepingAppNames: baseline.appNames)
           guard !unchanged else { return nil }
           return try save(
             config, baseline: baseline, store: store, identity: identity, approval: approval)

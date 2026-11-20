@@ -2,7 +2,7 @@ import Foundation
 import SiltaTestSupport
 import Testing
 
-struct AgentInstallReviewTests {
+struct AgentInstallCompatibilityTests {
   @Test(arguments: ["install", "uninstall"])
   func unownedFrontmatterIsNeverAdopted(operation: String) throws {
     try withScratchDirectory { scratch in

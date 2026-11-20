@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkspaceConfigTests {
@@ -234,6 +235,57 @@ struct WorkspaceConfigTests {
       ) { _ in status }
       #expect(result == nil)
       #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+  }
+}
+
+extension WorkspaceConfigTests {
+  @Test(arguments: [
+    "null", "false", "42", "[]", "\"\"", "\"  \"",
+    #""Acme\tPlatform""#, #""Acme\nPlatform""#, #""Acme\u0085Platform""#,
+    #""Acme\u202EPlatform""#, "\"" + String(repeating: "é", count: 121) + "\"",
+  ])
+  func invalidAppDisplayNamesHaveFieldDiagnostics(yamlValue: String) {
+    let yaml =
+      Self.minimal + """
+        repos: [{slug: platform}]
+        apps:
+          - slug: api
+            repo: platform
+            ref: origin/main
+            name: \(yamlValue)
+        """
+    do {
+      _ = try WorkspaceConfig.parse(yaml)
+      Issue.record("Invalid app display name was accepted.")
+    } catch let error as WorkspaceError {
+      #expect(error.code == .invalid)
+      #expect(error.message.contains("line 7: app name"))
+    } catch {
+      Issue.record("Unexpected error: \(error)")
+    }
+  }
+
+  @Test func appNamesKeepLiteralBytesAndAcceptTheLengthLimit() throws {
+    let maximum = String(repeating: "é", count: 120)
+    let yaml =
+      Self.minimal + """
+        repos: [{slug: platform}]
+        apps:
+          - {slug: K, name: K, repo: platform, ref: origin/main}
+          - {slug: api, name: \(maximum), repo: platform, ref: origin/api}
+        """
+    try withScratchDirectory { home in
+      let store = Self.store(home)
+      try Self.apply(yaml, to: store)
+      let rendered = try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") }
+      #expect(rendered.contains(#""name":"K""#))
+      #expect(rendered.contains(maximum))
+      try Self.apply(rendered, to: store)
+      let actual = try store.read {
+        try String.fetchOne($0, sql: "SELECT name FROM app WHERE slug='K'")
+      }
+      #expect(Array(try #require(actual).utf8) == Array("K".utf8))
     }
   }
 }

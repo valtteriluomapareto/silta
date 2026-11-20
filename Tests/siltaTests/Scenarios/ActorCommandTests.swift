@@ -4,9 +4,9 @@ import Testing
 
 @Suite(.blockingTestWork, .timeLimit(.minutes(3)), .tags(.slow), .enabled(if: slowTestsEnabled()))
 struct ActorCommandTests {
-  @Test func scenarioLogsExactActorAndSessionHandover() throws {
+  @Test func scenarioLogsActorPrecedenceAndSessions() throws {
     try withScratchDirectory { scratch in
-      let file = ScenarioRunner.repository.appending(path: "Tests/Scenarios/actor-handover.yaml")
+      let file = ScenarioRunner.repository.appending(path: "Tests/Scenarios/actor-precedence.yaml")
       _ = try ScenarioRunner.run(file, in: scratch)
       let logs = try String(
         contentsOf: scratch.appending(path: "silta-home/log/2023-11-14.jsonl"), encoding: .utf8)

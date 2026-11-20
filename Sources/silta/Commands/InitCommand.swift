@@ -16,6 +16,7 @@ struct InitCommand: OutputCommand {
   static let dataShape = Shape.object([
     "workspace": .optional(.string), "next": .array(.string), "next_by": .string,
     "repositories": .optional(.array(.string)), "apps": .optional(.array(.string)),
+    "app_names": .optional(.array(.object(["slug": .string, "name": .string]))),
   ])
 
   static let workspaceSource = WorkspaceSource.none
@@ -81,18 +82,23 @@ struct InitCommand: OutputCommand {
       text +=
         "\nRepositories: "
         + (outcome.repositories.isEmpty ? "none" : outcome.repositories.joined(separator: ", "))
-      text += "\nApps: " + (outcome.apps.isEmpty ? "none" : outcome.apps.joined(separator: ", "))
+      let apps = outcome.apps.map { app in
+        app.name.map { app.slug + " (" + HumanText.line($0) + ")" } ?? app.slug
+      }
+      text += "\nApps: " + (apps.isEmpty ? "none" : apps.joined(separator: ", "))
       text +=
         actor.isHuman
         ? "\nEdit from your terminal with silta ws edit " + shellWord(outcome.workspace) + "."
         : "\nAsk the human before editing the workspace configuration."
     }
     text += "\nnext: " + next
+    let namedApps = outcome?.apps.filter { $0.name != nil } ?? []
     var output = CommandOutput(
       text: text,
       data: InitData(
         workspace: workspace, next: [next], nextBy: "agent",
-        repositories: outcome?.repositories, apps: outcome?.apps),
+        repositories: outcome?.repositories, apps: outcome?.apps.map(\.slug),
+        appNames: namedApps.isEmpty ? nil : namedApps),
       warnings: outcome?.warnings ?? [])
     output.workspace = workspace
     return output
@@ -111,8 +117,11 @@ private struct InitData: Encodable {
 
   let apps: [String]?
 
+  let appNames: [ScanOutcome.App]?
+
   enum CodingKeys: String, CodingKey {
     case workspace, next, repositories, apps
     case nextBy = "next_by"
+    case appNames = "app_names"
   }
 }

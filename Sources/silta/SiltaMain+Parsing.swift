@@ -3,31 +3,32 @@ import Foundation
 import SiltaCore
 
 extension SiltaMain {
-  static func parseCommand(_ arguments: [String]) -> Result<any ParsableCommand, any Error> {
-    Result { try SiltaCommand.parseRoot(arguments) }
+  enum CommandParse {
+    case informational(Rendered)
+    case output(Result<any OutputCommand, any Error>)
   }
 
-  static func informationalResult(
-    _ parseResult: Result<any ParsableCommand, any Error>, arguments: [String], mode: OutputMode
-  ) -> Rendered? {
-    switch parseResult {
-    case .failure(let error) where SiltaCommand.exitCode(for: error) == .success:
-      return parseFailure(error, arguments: arguments, mode: mode)
-    case .success(var command) where !(command is any OutputCommand):
+  static func parseCommand(_ arguments: [String], mode: OutputMode) -> CommandParse {
+    let parsed = Result { try SiltaCommand.parseRoot(arguments) }
+    switch parsed {
+    case .success(var command):
+      if let output = command as? any OutputCommand { return .output(.success(output)) }
       do {
         try command.run()
-        return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
+        return .informational(Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil))
       } catch {
-        return parseFailure(error, arguments: arguments, mode: mode)
+        return .informational(parseFailure(error, arguments: arguments, mode: mode))
       }
-    default:
-      return nil
+    case .failure(let error) where SiltaCommand.exitCode(for: error) == .success:
+      return .informational(parseFailure(error, arguments: arguments, mode: mode))
+    case .failure(let error):
+      return .output(.failure(error))
     }
   }
 
   /// Parse refusals retain priority when environment setup also fails.
   static func startupFailure(
-    _ error: any Error, parsed: Result<any ParsableCommand, any Error>,
+    _ error: any Error, parsed: Result<any OutputCommand, any Error>,
     arguments: [String], mode: OutputMode
   ) -> Rendered {
     if case .failure(let error) = parsed {

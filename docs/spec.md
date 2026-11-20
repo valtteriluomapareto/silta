@@ -1568,8 +1568,7 @@ workspace. A setting that changes the rules gets one conditional sentence, and
   branch and sha.
 - **Reviews:** submit, read task discussion and reply to each finding with
   `--reply-to`, naming the change and proving test. Authors do not resolve findings
-  unless assigned that responsibility. M2 (not yet available): `inbox` → `inbox take`
-  → `task diff` → one `task review` with a lines file → replies → batch `comment resolve`.
+  unless assigned that responsibility.
 - **Refusal table:** what to do for each error code (§16). Never use `--force`,
   `--steal`, `where --set/--unset`, `task promote` or `--allow-secret` on your own initiative, only
   with the human's words through `--approved`. Never create tracker items, or plan
@@ -1637,9 +1636,9 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    group and the complete inbox recovery remains. Selection, rendering and trimming
    share one read snapshot. Text and JSON carry the same sections. Repeated protected
    document recovery commands appear once.
-4. **App card**: summary, environments (name and URL), a pointer to AGENTS.md at
-   the resolved worktree's repo root with its on-disk casing, including for subpath apps,
-   only when that file exists.
+4. **App card** shows the app slug with its distinct display name in parentheses,
+   its summary and environments (name and URL). It points to AGENTS.md at the resolved
+   worktree's repo root with its on-disk casing, including for subpath apps, when the file exists.
 5. **Neighbours**: edges in and out, printed with their canonical `edge:` refs and
    ordered by source app, target app, target service, kind and edge id. A configured
    path that resolves to a local blob at the selected app ref and subpath produces
@@ -2253,8 +2252,11 @@ elsewhere. The command supplies valid naming options when the checkout name
 would give an invalid workspace slug or task prefix. Its JSON includes `next` and
 `next_by` for the empty list.
 A successful scan lists the workspace and its sorted registered repository and app
-slugs. Text tells a human how to open the workspace editor and tells agents to ask
-before editing. Text and JSON give one read-only, workspace-scoped `ws show` next.
+slugs. Text shows a distinct app display name in parentheses beside its slug. JSON keeps
+the `apps` slug array and includes optional `app_names` rows with `slug` and `name`
+for the listed apps that have distinct names. Text tells a human how to open the
+workspace editor and tells agents to ask before editing. Text and JSON give one
+read-only, workspace-scoped `ws show` next.
 A scan with a missing root or no Git repositories returns `invalid` and creates
 no workspace. A bare `init` prepares the database and points to scan help.
 
@@ -2283,7 +2285,8 @@ Every CLI call is its own short-lived process, and several agents run at once.
   comments return `invalid`. A stale interactive edit keeps its private YAML file
   with the original baseline. Review fresh `ws show` output and reapply your edits
   there before retrying. Hand-authored YAML with no baseline comment uses the
-  configuration at command start.
+  configuration at command start. App entries accept an optional `name` display label
+  as described in [Appendix A](#appendix-a--example-workspace-silta-ws-edit-yaml).
 - **Read commands never change `silta.db`'s contents and never migrate.** Archiving is
   computed, and caches are best-effort writes to `index.db`. A read may recreate the
   `-wal`/`-shm` files that another SQLite client, or copying `silta.db` alone, left
@@ -2362,8 +2365,11 @@ revision before the write. It checks only the fields a write changes, each chang
 field whole rather than its changed lines; an unchanged field is never rescanned, so
 text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
-  - private-key armour, including PGP and SSH2, and the armour run after an opening
-    marker whose closing marker is missing
+  - private-key armour, including PGP and SSH2. An unfinished block starts with a
+    standalone opening marker, optionally inside a Markdown quote or list. Its
+    armour lines can carry Markdown prefixes. Inline mentions of an unmatched
+    marker stay readable. After a blank line, a quoted or listed block continues
+    only inside its Markdown container, preserving subsequent prose and spacing.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
@@ -3049,6 +3055,11 @@ New service slugs and edge kinds must be identifiers (letters/digits with intern
 `_` or `-`). Workspace edits retain the bytes and identities of existing service
 slugs and edge kinds. The service slug requirement applies to text exports and restores
 (§15).
+An app can have a `name` of at most 120 characters on one nonblank line without
+control characters. Omitting it uses the slug as the display name. `ws show` includes
+`name` only when it differs from `slug`. An existing name from an older export can
+be retained byte for byte during an edit. Changing it requires a valid name.
+Use the slug for `--app`, code references, edge endpoints and command hints.
 An app's `subpath` must be relative to the repository root and contain neither a
 `..` component nor a NUL byte. `ws edit` refuses invalid subpaths before writing.
 Existing non-doc links also protect app, edge, service and topic targets from removal.

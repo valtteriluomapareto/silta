@@ -145,6 +145,15 @@ class OutcomeGrading(unittest.TestCase):
                 record(e, body)
                 self.assertFalse(evals.backend_context(e))
 
+    def test_unavailable_legacy_observation_is_unknown(self):
+        observed = evidence()
+        record(observed, WRONG)
+        by_case = [evals.failure_metrics({'phases': []})['legacy_mentioned'],
+                   evals.failure_metrics(observed, enrich=False)['legacy_mentioned']]
+        observed['phases'][0]['state'] = None
+        by_case.append(evals.failure_metrics(observed)['legacy_mentioned'])
+        self.assertEqual(by_case, [None, None, None])
+
     def test_legacy_mentioned_metrics_are_boolean_and_summed(self):
         trials = []
         for number, (body, expected) in enumerate([
@@ -174,11 +183,11 @@ class OutcomeGrading(unittest.TestCase):
         e['baseline']['comments'] = copy.deepcopy(e['phases'][0]['state']['comments'])
         self.assertIs(evals.metrics(e)['legacy_mentioned'], False)
         e['phases'][0]['state'] = None
-        self.assertIs(evals.failure_metrics(e)['legacy_mentioned'], False)
+        self.assertIsNone(evals.failure_metrics(e)['legacy_mentioned'])
 
-    def test_legacy_mentioned_is_false_when_setup_has_no_evidence(self):
+    def failed_report(self, error):
         root = Path(__file__).resolve().parents[1]
-        with tempfile.TemporaryDirectory(prefix='si76-metric-failure-') as directory:
+        with tempfile.TemporaryDirectory(prefix='silta-eval-failure-') as directory:
             directory = Path(directory)
             binary = directory / 'fake-binary'
             binary.write_bytes(b'not executed')
@@ -187,13 +196,24 @@ class OutcomeGrading(unittest.TestCase):
                     '--harness', 'codex', '--scenario', 'start-cross-repo', '--repeats', '1',
                     '--output', str(output)]
             with patch.object(sys, 'argv', argv), patch.object(
-                    evals, 'run_trial', side_effect=RuntimeError('fixture setup failed')):
+                    evals, 'run_trial', side_effect=error), patch.object(
+                    evals, 'git', return_value='acme-commit'):
                 self.assertEqual(evals.main(), 1)
-            report = json.loads((output / 'report.json').read_text())
-            self.assertIs(report['trials'][0]['metrics']['legacy_mentioned'], False)
-            self.assertEqual(report['groups'][0]['legacy_mentioned'], 0)
-            self.assertIs(type(report['groups'][0]['legacy_mentioned']), int)
-        self.assertIs(evals.failure_metrics({'phases': []})['legacy_mentioned'], False)
+            return json.loads((output / 'report.json').read_text())
+
+    def test_legacy_mentioned_is_unknown_when_setup_has_no_evidence(self):
+        report = self.failed_report(RuntimeError('fixture setup failed'))
+        self.assertIsNone(report['trials'][0]['metrics']['legacy_mentioned'])
+        self.assertIsNone(report['groups'][0]['legacy_mentioned'])
+        self.assertIsNone(evals.failure_metrics({'phases': []})['legacy_mentioned'])
+
+    def test_infrastructure_failure_keeps_the_completed_grade(self):
+        result = {'metrics': evals.failure_metrics({'phases': []}, enrich=False),
+                  'violations': ['tool: synthetic write']}
+        result['metrics']['forbidden_attempts'] = 1
+        report = self.failed_report(evals.FailedTrial(result, 'fixture cleanup failed'))
+        self.assertEqual(report['trials'][0]['violations'], result['violations'])
+        self.assertEqual(report['trials'][0]['metrics']['forbidden_attempts'], 1)
 
     def test_comments_plans_and_handoffs_on_ac1_by_trial_actors_only(self):
         for table, kind in [('comments', 'comment'), ('comments', 'decision'),

@@ -119,8 +119,10 @@ struct RestoreGenerator {
       archived: false, current: 1)
     _ = try insertDocument(
       db, slug: "generated-pending", states: ["proposed"], archived: false, current: nil)
-    _ = try insertDocument(
-      db, slug: "generated-archived", states: ["accepted"], archived: true, current: 1)
+    let archivedStates = ["accepted"] + Array(repeating: "proposed", count: 1 + next(3))
+    let archived = try insertDocument(
+      db, slug: "generated-archived", states: archivedStates, archived: true, current: 1)
+    try insertArchivedDiscussion(db, document: archived, after: archivedStates.count)
     try db.execute(
       sql: """
         INSERT INTO link(uid,workspace_id,from_kind,from_id,rel,to_kind,to_id,created_by,created_at)
@@ -132,6 +134,34 @@ struct RestoreGenerator {
         uid("DL"), active, Self.documentInstant, uid("DV"), text(),
         #"[{"app":"portal","ref":"portal","sha":"0000000000000000000000000000000000000000"}]"#,
         Self.documentInstant, active,
+      ])
+  }
+
+  private mutating func insertArchivedDiscussion(
+    _ db: Database, document: Int64, after lastRevision: Int
+  ) throws {
+    let nextRevision = lastRevision + 2 + next(5)
+    let targets = #"[{"kind":"app","uid":"01HZAPP0000000000000000009"}]"#
+    try db.execute(
+      sql: """
+        INSERT INTO seq_counter(scope,next) VALUES('doc_rev:1:generated-archived',?);
+        UPDATE doc_rev SET about_refs='["app:portal"]',about_targets=?
+        WHERE doc_id=? AND rev>1;
+        """, arguments: [nextRevision, targets, document])
+    let proposed = try Int64.fetchOne(
+      db, sql: "SELECT id FROM doc_rev WHERE doc_id=? AND rev=?",
+      arguments: [document, lastRevision])
+    let firstComment = uid("DC")
+    try db.execute(
+      sql: """
+        INSERT INTO comment(uid,doc_rev_id,seq,kind,body_md,actor,created_at)
+        VALUES(?,?,1,'comment',?,'agent:codex:acme',?);
+        INSERT INTO comment(uid,doc_rev_id,seq,thread_id,kind,body_md,actor,created_at)
+        SELECT ?,doc_rev_id,3,id,'comment',?,'human:acme',? FROM comment WHERE uid=?;
+        """,
+      arguments: [
+        firstComment, proposed, text(), Self.documentInstant,
+        uid("DC"), text(), Self.documentInstant, firstComment,
       ])
   }
 
@@ -154,12 +184,14 @@ struct RestoreGenerator {
       try db.execute(
         sql: """
           INSERT INTO doc_rev(uid,doc_id,rev,base_rev,body_md,state,actor,created_at,
-            title,kind)
-          VALUES(?,?,?,?,?,?,'human:acme',?,?,'design')
+            title,kind,triaged_at,triaged_by)
+          VALUES(?,?,?,?,?,?,'human:acme',?,?,'design',?,?)
           """,
         arguments: [
           uid("DR"), document, index + 1, index == 0 ? nil : 1, text(), state,
           Self.documentInstant, slug,
+          ["accepted", "rejected"].contains(state) ? Self.documentInstant : nil,
+          ["accepted", "rejected"].contains(state) ? "human:acme" : nil,
         ])
     }
     return document

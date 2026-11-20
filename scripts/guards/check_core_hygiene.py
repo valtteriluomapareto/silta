@@ -18,7 +18,10 @@ from swift_source import run, split_swift, swift_files
 
 CORE_DIR = "Sources/SiltaCore"
 MARKER = "guard:allow-global"
-MODIFIERS = r"(?:(?:public|package|internal|fileprivate|private|nonisolated(?:\(unsafe\))?|@\w+)\s+)*"
+MODIFIERS = (
+    r"(?:(?:public|package|internal|fileprivate|private)(?:\(\s*set\s*\))?\s+"
+    r"|(?:nonisolated(?:\(unsafe\))?|@\w+)\s+)*"
+)
 STATIC_VAR = re.compile(r"\b(?:static|class)\s+" + MODIFIERS + r"var\b")
 TOP_LEVEL_VAR = re.compile(r"^" + MODIFIERS + r"var\b")
 OUTPUT = re.compile(

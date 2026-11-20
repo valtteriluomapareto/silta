@@ -121,6 +121,13 @@ class CoreBoundaryTests(GuardTestCase):
         self.tree.write("Sources/SiltaCore/View.swift", "import Foundation\nimport SwiftUI\n")
         self.assertEqual(len(check_core_boundary.check(self.tree.root)), 1)
 
+    def test_imports_after_semicolons_are_checked(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift",
+                        "import Foundation; import AppKit; import SwiftUI\n")
+        errors = check_core_boundary.check(self.tree.root)
+        self.assertEqual([error.split(":1: ")[1] for error in errors],
+                         ["SiltaCore imports AppKit", "SiltaCore imports SwiftUI"])
+
     def test_attributed_and_scoped_imports_fail(self) -> None:
         self.tree.write(
             "Sources/SiltaCore/A.swift",
@@ -164,6 +171,11 @@ class CoreHygieneTests(GuardTestCase):
             "enum E { static var shared = E()\n  nonisolated(unsafe) static var x: Int = 1\n}\n",
         )
         self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 4)
+
+    def test_a_setter_access_modifier_does_not_allow_static_storage(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift",
+                        "struct Acme { static private(set) var shared = 0 }\n")
+        self.assertEqual(len(check_core_hygiene.check(self.tree.root)), 1)
 
     def test_marker_allows_a_justified_global(self) -> None:
         self.tree.write("Sources/SiltaCore/A.swift", "static var hook = 0 // guard:allow-global test seam\n")
@@ -212,6 +224,21 @@ class CodedErrorsTests(GuardTestCase):
                 self.tree.write("Sources/SiltaCore/A.swift", f"enum Example: {conformance} {{}}\n")
                 self.assertEqual(len(check_coded_errors.check(self.tree.root)), 1)
 
+    def test_foundation_subclasses_and_plain_error_aliases_fail(self) -> None:
+        self.tree.write("Sources/SiltaCore/Errors.swift",
+                        "typealias Failure = Swift.Error\n"
+                        "typealias PublicFailure = Failure\n"
+                        "typealias Valid = CodedError\n")
+        self.tree.write("Sources/SiltaCore/A.swift",
+                        "final class Acme: Foundation.NSError {}\n"
+                        "enum Recoverable: RecoverableError {}\n"
+                        "enum DirectAlias: Failure {}\n"
+                        "enum IndirectAlias: PublicFailure {}\n"
+                        "enum ValidAlias: Valid {}\n")
+        errors = check_coded_errors.check(self.tree.root)
+        self.assertEqual([error.split(": ")[1].split()[0] for error in errors],
+                         ["Acme", "Recoverable", "DirectAlias", "IndirectAlias"])
+
     def test_marker_and_test_support_pass(self) -> None:
         self.tree.write("Sources/SiltaCore/A.swift", "public protocol CodedError: Error {}  // guard:allow-error root\n")
         self.tree.write("Sources/SiltaTestSupport/A.swift", "struct ScriptError: Error {}\n")
@@ -256,6 +283,25 @@ class CoreDeterminismTests(GuardTestCase):
                         "let epoch = Date(timeIntervalSince1970: 0)\n")
         self.assertEqual(check_core_determinism.check(self.tree.root), [])
 
+    def test_implicit_split_and_foundation_constructor_spellings_fail(self) -> None:
+        spellings = [
+            "func f(at: Date? = .now) {}", "record(at: .now)",
+            "func now() -> Date { .now }", "let value: Date = .init()",
+            "let id: UUID = .init()", "func id() -> UUID { .init() }",
+            "let value = Date\n    .now", "let value: Date =\n    .now",
+            "let value = NSDate()", "let id = NSUUID()",
+        ]
+        self.tree.write("Sources/SiltaCore/A.swift", "\n".join(spellings) + "\n")
+        self.assertEqual(len(check_core_determinism.check(self.tree.root)), len(spellings))
+
+    def test_fixed_constructors_and_injected_clock_chains_are_allowed(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift",
+                        "let time: Date = .init(timeIntervalSince1970: 0)\n"
+                        'let id: UUID = .init(uuidString: "Acme")\n'
+                        "let instant = clock\n   .now()\n"
+                        "let deadline = timer.wait(until: .now())\n")
+        self.assertEqual(check_core_determinism.check(self.tree.root), [])
+
     def test_marker_allows_the_system_seam(self) -> None:
         self.tree.write(
             "Sources/SiltaCore/SystemClock.swift",
@@ -281,6 +327,21 @@ class TestWaitsTests(GuardTestCase):
         self.tree.write("Tests/A.swift", "try await ContinuousClock().sleep(for: .seconds(1))\n")
         self.assertEqual(len(check_test_waits.check(self.tree.root)), 1)
 
+    def test_generic_posix_and_stored_wall_clock_waits_fail(self) -> None:
+        self.tree.write(
+            "Tests/A.swift",
+            "try await Task<Never, Never>.sleep(nanoseconds: 1)\n"
+            "Darwin.nanosleep(&request, nil)\n"
+            "let wall = ContinuousClock(); try await wall.sleep(for: .seconds(1))\n"
+            "let saved: SuspendingClock = .init()\n"
+            "try await saved.sleep(until: deadline)\n",
+        )
+        self.assertEqual(len(check_test_waits.check(self.tree.root)), 4)
+
+    def test_a_stored_fake_clock_is_not_a_wall_clock(self) -> None:
+        self.tree.write("Tests/A.swift", "let fake = FakeClock()\ntry await fake.sleep(for: duration)\n")
+        self.assertEqual(check_test_waits.check(self.tree.root), [])
+
     def test_marker_allows_a_justified_wait(self) -> None:
         self.tree.write("Tests/Stress/A.swift", "usleep(100) // guard:allow-wait real process race\n")
         self.assertEqual(check_test_waits.check(self.tree.root), [])
@@ -303,6 +364,19 @@ class NoPlanRefsTests(GuardTestCase):
         )
         self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), 5)
 
+
+    def test_exact_technical_references_are_not_slice_bookkeeping(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift",
+                        "// Build with C99 and deploy to K8s.\n"
+                        "// Use A4 paper and read an S3 bucket.\n"
+                        "// S3 fixes a review item.\n")
+        errors = check_no_plan_refs.check(self.tree.root)
+        self.assertEqual(len(errors), 2)
+        self.assertTrue(all(":3: " in error for error in errors))
+
+    def test_explicit_slice_reference_can_precede_a_technical_term(self) -> None:
+        self.tree.write("Sources/SiltaCore/A.swift", "// See slice S3 bucket handling.\n")
+        self.assertEqual(len(check_no_plan_refs.check(self.tree.root)), 1)
 
     def test_bare_slice_ids_fail(self) -> None:
         slices = ["S12a", "FR5", "A6b", "B1", "C1a", "K2", "DF3-a"]
