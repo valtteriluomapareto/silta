@@ -134,3 +134,4 @@ of all workspaces before changing or removing that data.
 | `ambiguous_location` | Inspect `silta where --path <dir>`, then retry with the suggested `--ws <workspace>` or `--app <app>`. |
 | `claimed` | Pick other work or ask the holding agent. A human may run `silta task start <ref> --steal` when that session is dead. |
 | Unknown workspace | Run `silta ws ls` and use an exact listed slug with `--ws <workspace>`. |
+
