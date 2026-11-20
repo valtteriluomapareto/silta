@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import SiltaTestSupport
 import Testing
 
@@ -58,6 +59,61 @@ extension RestoreRefusalTests {
       }
       #expect(try RestoreSupport.dump(store) == dump)
       #expect(try RestoreSupport.backups(home) == backups)
+    }
+  }
+
+  @Test(arguments: ["last-task", "counter", "padded", "destination"], [false, true])
+  func computedTaskCounterMustLeaveRoomForTheNextRef(kind: String, dryRun: Bool) throws {
+    try withScratchDirectory { scratch in
+      let sourceHome = scratch.appending(path: "source")
+      let source = try ExportFixture.make(sourceHome)
+      var snapshot = try ExportTree.parse(ExportTreeTests.render(source))
+      try Self.exhaustCounter(kind, in: &snapshot)
+      let tree = try RestoreSupport.write(
+        snapshot.files(), to: scratch.appending(path: "tree/acme"))
+      let home = kind == "destination" ? sourceHome : scratch.appending(path: "empty")
+      let store = kind == "destination" ? source : StorageSchemaTests.store(home)
+      if kind == "destination" {
+        try store.write { tx in
+          try tx.database.execute(
+            sql: "UPDATE seq_counter SET next=? WHERE scope='task:1'", arguments: [Int64.max])
+        }
+      }
+      let before = kind == "destination" ? try RestoreSupport.dump(store) : nil
+      let backups = try RestoreSupport.backups(home)
+      let restoration = Result {
+        try RestoreSupport.restore(tree, into: store, home: home, dryRun: dryRun)
+      }
+      let after = kind == "destination" ? try RestoreSupport.dump(store) : nil
+      let published = try RestoreSupport.backups(home)
+      let exists = FileManager.default.fileExists(atPath: store.path)
+      withKnownIssue("Restore admits a task counter with no available next ref") {
+        if case .failure(let error as any CodedError) = restoration {
+          #expect(error.code == (kind == "destination" ? .conflict : .invalid))
+          #expect(error.message.contains("counter"))
+        } else {
+          Issue.record("Expected a coded counter refusal.")
+        }
+        #expect(after == before)
+        #expect(published == backups)
+        #expect(exists == (kind == "destination"))
+      }
+    }
+  }
+
+  private static func exhaustCounter(_ kind: String, in snapshot: inout ExportSnapshot) throws {
+    if kind == "last-task" {
+      let index = try #require(snapshot.tasks.indices.last)
+      let sequence = String(Int64.max - 1)
+      let ref = "AC-" + sequence
+      snapshot.tasks[index].ref = ref
+      snapshot.tasks[index].row = snapshot.tasks[index].row
+        .replacing("seq", with: sequence, keys: ExportFormat.taskKeys)
+        .replacing("ref", with: ref, keys: ExportFormat.taskKeys)
+    } else if kind == "counter" || kind == "padded" {
+      let next = (kind == "padded" ? "0" : "") + String(Int64.max)
+      snapshot.workspace = snapshot.workspace.replacing(
+        "next_task_seq", with: next, keys: ExportFormat.workspaceKeys)
     }
   }
 

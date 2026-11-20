@@ -186,9 +186,43 @@ extension BodyInputCommandTests {
 
   private static func storedInput(in store: DatabaseStore) throws -> [String] {
     try store.read { db in
-      try ["task", "task_plan_rev", "workspace", "doc", "doc_rev", "approval"].flatMap { table in
+      try ["task", "task_plan_rev", "workspace", "doc", "doc_rev", "approval", "comment"].flatMap {
+        table in
         try Row.fetchAll(db, sql: "SELECT * FROM " + table + " ORDER BY id").map(\.description)
       }
+    }
+  }
+}
+
+extension BodyInputCommandTests {
+  @Test(arguments: ["task add", "comment"], [false, true])
+  func suppliedNulDoesNotWriteCommandBodies(command: String, stdin: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try Self.setupPlan(in: scratch)
+      let source = scratch.appending(path: "Acme private body")
+      let body = "Acme invisible\u{0}following"
+      try body.write(to: source, atomically: true, encoding: .utf8)
+      let before = try Self.storedInput(in: store)
+      let args = command == "comment" ? ["comment", "AC-1"] : ["task", "add", "Acme fixture"]
+      let invocation = ["--ws", "acme"] + args + ["-F", stdin ? "-" : source.path, "--json"]
+      let result: CLIResult
+      if stdin {
+        let script = #"input=$1; shift; /bin/cat "$input" | "$@""#
+        result = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"),
+          ["-c", script, "stdin-fixture", source.path, SiltaBinary.url().path] + invocation,
+          in: scratch, environment: TaskCommandTests.fixed)
+      } else {
+        result = try SiltaBinary.run(invocation, in: scratch, environment: TaskCommandTests.fixed)
+      }
+      let after = try Self.storedInput(in: store)
+      withKnownIssue("Task and comment file input accepts NUL") {
+        #expect(result.termination == .exit(1))
+        #expect(result.stdout.contains("Body input must not contain NUL bytes."))
+        #expect(after == before)
+        #expect(!result.stdout.contains("Acme invisible"))
+      }
+      #expect(!result.stdout.contains(source.path))
     }
   }
 }

@@ -50,6 +50,31 @@
       }
     }
 
+    @Test func replacedDatabaseInvalidatesAnExistingProbe() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppReaderTests.reader(scratch)
+        let probe = try reader.makeChangeProbe()
+        _ = try probe.version()
+        let file = URL(filePath: reader.environment.db.path)
+        let retired = scratch.appending(path: "previous.db")
+        let replacement = scratch.appending(path: "replacement.db")
+        try DatabaseQueue(path: file.path).writeWithoutTransaction {
+          try $0.execute(sql: "VACUUM INTO ?", arguments: [replacement.path])
+        }
+        try FileManager.default.moveItem(at: file, to: retired)
+        try FileManager.default.moveItem(at: replacement, to: file)
+        let sampled = Result { try probe.version() }
+        withKnownIssue("The app probe does not identify a replaced file") {
+          if case .failure(let error as AppReadError) = sampled {
+            #expect(error.message.contains("Database file changed while this connection was open"))
+          } else {
+            Issue.record("The replaced probe did not report file identity drift.")
+          }
+        }
+      }
+    }
+
     @Test func schemaCompatibilityIsRecheckedOnAnExistingProbe() throws {
       try withScratchDirectory { scratch in
         try AppFixtures.seed(in: scratch)

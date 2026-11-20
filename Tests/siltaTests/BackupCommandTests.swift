@@ -111,3 +111,29 @@ struct BackupCommandTests {
     }
   }
 }
+
+extension BackupCommandTests {
+  @Test func backupNamesTheSafeCauseOfAnUnavailableDestination() throws {
+    try withScratchDirectory { scratch in
+      try ExportCommandTests.seed(scratch)
+      let home = scratch.appending(path: "silta-home")
+      let backups = home.appending(path: "backups")
+      let original = home.appending(path: "saved-backups")
+      try FileManager.default.moveItem(at: backups, to: original)
+      let elsewhere = scratch.appending(path: "Acme private backup target")
+      try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: false)
+      try FileManager.default.createSymbolicLink(at: backups, withDestinationURL: elsewhere)
+      let result = try Self.run(scratch)
+      let error = try TaskStateCommandTests.error(result)
+      #expect(result.termination == .exit(9))
+      #expect(error["code"] as? String == "env")
+      #expect(error["next"] as? [String] == ["silta doctor"])
+      #expect(error["next_by"] as? String == "human")
+      withKnownIssue("Backup discards its safe failure cause") {
+        #expect((error["message"] as? String)?.contains("backup directory") == true)
+      }
+      #expect(!result.stdout.contains(elsewhere.path))
+      #expect(try FileManager.default.contentsOfDirectory(atPath: elsewhere.path).isEmpty)
+    }
+  }
+}
