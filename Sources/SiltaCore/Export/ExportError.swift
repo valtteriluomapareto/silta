@@ -100,7 +100,8 @@ package enum ExportError: CodedError, Equatable {
     case .invalidExport(let reason, let workspace):
       if Self.safeWorkspace(workspace) {
         "Cannot export workspace \(workspace): \(reason). "
-          + "Ask the human to inspect the configuration and correct it with ws edit. Nothing was written."
+          + "Ask the human to inspect the configuration and correct it with ws edit. "
+          + "Nothing was written."
       } else {
         "Cannot export this workspace: \(reason). Ask the human to inspect its configuration. "
           + "Nothing was written."
