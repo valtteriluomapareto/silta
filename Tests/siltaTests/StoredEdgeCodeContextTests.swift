@@ -15,8 +15,8 @@ struct StoredEdgeCodeContextTests {
       try InitCommandTests.commit(repo, "Acme one\nAcme two\nAcme three\nAcme four", in: home)
       try InitCommandTests.git(["branch", "feature/acme"], in: home, cwd: repo)
       let owner = slug + (branch ? "@feature/acme" : "")
-      let refs = try String(
-        decoding: JSONEncoder().encode([owner + ":README.md#L2-4"]), as: UTF8.self)
+      let encoded = try JSONEncoder().encode([owner + ":README.md#L2-4"])
+      let refs = try #require(String(data: encoded, encoding: .utf8))
       try store.write { tx in
         try tx.database.execute(sql: "UPDATE app SET slug=?", arguments: [slug])
         try tx.database.execute(sql: "UPDATE edge SET code_refs=?", arguments: [refs])
