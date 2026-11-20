@@ -76,6 +76,14 @@
       #expect(table.rows[3][2].runs.compactMap(\.link).count == 1)
       let listed = MarkdownContent("- item\n\n  | x | y |\n  |---|---|\n  | 1 | 2 |\n").blocks
       #expect(listed.compactMap(\.table).count == 1)
+      #expect(listed.first?.prefix == "•" && String(listed[0].text.characters) == "item")
+      let bare = MarkdownContent(
+        "See https://acme.example/docs and [https://a.example](https://b.example)"
+      )
+      .blocks
+      #expect(
+        bare.map { String($0.text.characters) }
+          == ["See https://acme.example/docs and https://a.example (https://b.example)"])
       let two = MarkdownContent("| a |\n|---|\n| 1 |\n\n| b |\n|---|\n| 2 |\n").blocks
       let gap = MarkdownContent("| a | b |\n|---|---|\n|  |  |\n| c | d |\n").blocks
       let gapRows = gap.compactMap(\.table).first?.rows.map { $0.map { String($0.characters) } }
@@ -92,7 +100,7 @@
       let parsed = try #require(content.blocks.compactMap(\.table).first)
       #expect(parsed.header.map { String($0.characters) } == ["Name", "Value"])
       #expect(parsed.rows.map { $0.map { String($0.characters) } } == [["amount", "42"]])
-      #expect(parsed.trailing == [false, true])
+      #expect(parsed.alignments == [.leading, .trailing])
       let fenced = MarkdownContent("```text\n" + table + "\n```")
       #expect(fenced.blocks.filter(\.code).count == 1)
       #expect(fenced.blocks.allSatisfy { $0.table == nil })

@@ -168,6 +168,11 @@ final class AppModel {
     select(document: ref)
   }
 
+  /// Narrows the list from the reader while keeping the open document and tab.
+  func filterDocuments(about: String) {
+    docsAbout = about
+  }
+
   func openDocuments(about: String) {
     docsAbout = about
     documents.ref = nil

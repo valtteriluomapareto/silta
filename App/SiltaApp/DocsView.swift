@@ -187,7 +187,7 @@ extension DocsView {
 
   private func attachment(_ ref: String) -> some View {
     Button {
-      model.openDocuments(about: ref)
+      model.filterDocuments(about: ref)
     } label: {
       HStack(spacing: 6) {
         if let color = DocsAboutMenu.color(ref, map: model.visibleData?.map) {

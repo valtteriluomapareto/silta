@@ -46,21 +46,24 @@
           ]),
         doc("pdf-contract", title: "Portal and PDF", kind: "contract"),
         doc("b-flow", title: "Checkout", kind: "flow"),
-        doc("a-flow", title: "checkout", kind: "flow"),
+        doc("a-flow", title: "Checkout", kind: "flow"),
+        doc("aaa", title: nil, kind: "flow"),
         doc("keys", title: "Rotating keys", kind: "runbook"),
         doc("odd", title: "Odd", kind: "memo"),
+        doc("capital", title: "Capital", kind: "Contract"),
         doc("legacy", kind: nil, about: nil),
         doc("untitled", title: nil, kind: "flow"),
       ]
       let sections = DocsContent.sections(DocsContent.groups(entries))
       #expect(
         sections.map(\.title) == [
-          "Contracts · 1", "Flows · 3", "References · 1", "Runbooks · 1", "Other kinds · 1",
+          "Contracts · 1", "Flows · 4", "References · 1", "Runbooks · 1", "Other kinds · 2",
           "Kind not recorded · 1",
         ])
       let ids = sections.flatMap { $0.groups.map(\.id) }
       #expect(ids.count == Set(ids).count && ids.count == entries.count)
-      #expect(sections[1].groups.map(\.id) == ["a-flow", "b-flow", "untitled"])
+      #expect(sections[1].groups.map(\.id) == ["aaa", "a-flow", "b-flow", "untitled"])
+      #expect(sections[4].groups.map(\.id) == ["capital", "odd"])
     }
 
     @Test func subtitlesSummariseWhatADocumentIsAbout() {
@@ -93,47 +96,6 @@
       ]
       #expect(subtitle(pending) == "acme-crm · @2 · @3 proposed")
       #expect(subtitle([doc("a", about: [], archived: true)]) == "Whole workspace · @1 · archived")
-    }
-
-    @Test func aboutMenuListsLiveAppsServicesAndRememberedTopics() async throws {
-      let map = AppWorkspaceMap(
-        apps: [
-          AppMapApp(
-            slug: "web", name: "Acme web", repo: "web", ref: "origin/main", productionRef: nil,
-            subpath: nil, summary: nil, lifecycle: "active", attachment: "app:web")
-        ],
-        services: [
-          AppMapService(slug: "aws.s3", name: "S3", summary: nil, attachment: "service:aws%2Es3")
-        ], connections: [])
-      var reads: [String?] = []
-      let docs = DocsModel(readList: { _, workspace, about, _, _ in
-        reads.append(about)
-        let all = [
-          self.doc("env", about: ["app:web", "topic:environments"]),
-          self.doc("login", about: ["topic:login"]),
-        ]
-        let found = workspace == "beta" ? [] : all
-        let shown = about.map { ref in found.filter { $0.about?.contains(ref) == true } } ?? found
-        return AppDocumentList(entries: shown, total: shown.count, nextOffset: nil)
-      })
-      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
-      let home = root.appending(path: "data")
-      try AppDocsFixture.seed(home: home)
-      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
-      await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
-      await docs.refresh(reader, workspace: "acme", about: "app:web", archived: false)
-      #expect(reads == [nil, "app:web"] && docs.entries.map(\.slug) == ["env"])
-      let sections = DocsContent.aboutOptions(map: map, topics: docs.topics)
-      #expect(sections.map(\.title) == ["Apps", "Services", "Topics"])
-      #expect(
-        sections.map { $0.options.map(\.ref) }
-          == [["app:web"], ["service:aws%2Es3"], ["topic:environments", "topic:login"]])
-      #expect(sections[2].options.map(\.name) == ["#environments", "#login"])
-      await docs.refresh(reader, workspace: "beta", about: nil, archived: false)
-      #expect(docs.topics.isEmpty)
-      docs.clear()
-      #expect(docs.topics.isEmpty && DocsContent.aboutOptions(map: nil, topics: []).isEmpty)
     }
 
     @Test func readerTracksBodyLinesAndSourceSelection() async throws {

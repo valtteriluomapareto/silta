@@ -26,7 +26,7 @@ struct DocsAboutMenu: View {
       } label: {
         HStack(spacing: 8) {
           Text("About").foregroundStyle(Color("SecondaryInk"))
-          Text(selected.map(DocsContent.name) ?? "Any app or topic")
+          Text(label(selected) ?? "Any app or topic")
             .fontWeight(selected == nil ? .medium : .semibold)
             .foregroundStyle(Color(selected == nil ? "Ink" : "TideText")).lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -37,7 +37,7 @@ struct DocsAboutMenu: View {
         }.font(.system(size: 12)).contentShape(.rect)
       }.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
         .accessibilityLabel("About")
-        .accessibilityValue(selected.map(DocsContent.name) ?? "Any app or topic")
+        .accessibilityValue(label(selected) ?? "Any app or topic")
       if selected != nil {
         Button("Clear filter", systemImage: "xmark") { model.docsAbout = nil }
           .labelStyle(.iconOnly).buttonStyle(.plain).font(.system(size: 10, weight: .semibold))
@@ -54,11 +54,17 @@ struct DocsAboutMenu: View {
         selected == nil ? Color("Ink").opacity(0.08) : Color("TideText").opacity(0.2)))
   }
 
+  private func label(_ ref: String?) -> String? {
+    ref.map { DocsContent.aboutLabel($0, map: model.visibleData?.map) }
+  }
+
   /// The map colour of an app ref, or a quiet colour for a service, or nil for other refs.
   static func color(_ ref: String, map: AppWorkspaceMap?) -> Color? {
     if ref.hasPrefix("service:") { return Color("SecondaryInk") }
     guard ref.hasPrefix("app:") else { return nil }
-    let index = map?.apps.firstIndex { $0.attachment == ref } ?? 0
+    guard let index = map?.apps.firstIndex(where: { $0.attachment == ref }) else {
+      return Color("SecondaryInk")
+    }
     return Color(SidebarContent.appColor(index: index))
   }
 }

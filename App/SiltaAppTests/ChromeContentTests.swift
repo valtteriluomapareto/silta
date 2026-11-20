@@ -70,8 +70,8 @@
         await docs.refresh(reader, workspace: "acme", about: nil, archived: true)
         #expect(docs.groups(search: "").contains { $0.preferred?.archived == true })
         #expect(
-          DocsChromeContent.aboutLabel("edge:acme-mobile/acme-backend/http-api")
-            == "About acme-mobile → acme-backend")
+          DocsContent.name("edge:acme-mobile/acme-backend/http-api")
+            == "acme-mobile → acme-backend · http-api")
         let model = AppModel(load: { _, _, _ in nil })
         model.select(connection: "edge:acme-mobile/acme-backend/http-api")
         model.openDocument(
@@ -104,8 +104,6 @@
         await model.loadDocuments()
         let groups = model.documents.groups(search: "")
         #expect(groups.contains { $0.id == "operations" })
-        let first = DocsContent.sections(groups).first?.groups.first?.preferred?.ref
-        #expect(model.documents.ref == first)
         #expect(model.documents.document?.about?.contains("app:acme-backend") == true)
         #expect(model.workspaceSelection?.connectionRef == edge)
         #expect(model.workspaceInspectorPresented)

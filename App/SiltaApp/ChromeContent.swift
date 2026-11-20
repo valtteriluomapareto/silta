@@ -80,14 +80,6 @@ nonisolated enum SidebarContent {
     return parts.joined(separator: " · ") + (stale ? " (stale)" : "")
   }
 
-  static func aboutLabel(_ ref: String) -> String {
-    if ref.hasPrefix("edge:") {
-      let parts = ref.dropFirst(5).split(separator: "/", maxSplits: 2)
-      if parts.count == 3 { return "About \(parts[0]) → \(parts[1])" }
-    }
-    return "About " + ref
-  }
-
   static func banner(document: AppDocument?, revisions: [AppDocument], partial: Bool, now: Date)
     -> Banner?
   {

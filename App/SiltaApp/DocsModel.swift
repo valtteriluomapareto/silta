@@ -164,7 +164,9 @@ import SiltaAppSupport
       let result = try await readList(reader, workspace, about, true, offset)
       guard token == listGeneration, !Task.isCancelled else { return nil }
       entries = append ? entries + result.entries : result.entries
-      topics.formUnion(result.entries.flatMap { $0.about ?? [] }.filter { $0.hasPrefix("topic:") })
+      let seen = Set(result.entries.flatMap { $0.about ?? [] }.filter { $0.hasPrefix("topic:") })
+      // An unfiltered first page replaces the topics, so removed ones leave the menu.
+      topics = about == nil && !append ? seen : topics.union(seen)
       nextList = result.nextOffset
       listFailure = nil
       listFailureVersion = nil

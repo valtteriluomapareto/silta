@@ -59,7 +59,8 @@ struct DocumentMarkdown: View {
   }
 }
 
-/// A GitHub table with a semibold header row, scrolling sideways when it is wider than the reader.
+/// A GitHub table with a semibold header row. Columns fit their content and the last one
+/// wraps; the table scrolls sideways only when the other columns alone are too wide.
 private struct MarkdownTable: View {
   let table: MarkdownContent.Table
 
@@ -90,11 +91,36 @@ private struct MarkdownTable: View {
       ForEach(cells.indices, id: \.self) { column in
         Text(cells[column]).font(.system(size: 12, weight: header ? .semibold : .regular))
           .foregroundStyle(Color(header ? "SecondaryInk" : "Ink"))
+          .multilineTextAlignment(text(table.alignments[column]))
           .fixedSize(horizontal: column < cells.count - 1, vertical: false)
-          .gridColumnAlignment(table.trailing[column] ? .trailing : .leading)
+          .gridColumnAlignment(horizontal(table.alignments[column]))
           .padding(.horizontal, 10).padding(.vertical, 7)
-          .frame(maxWidth: column == cells.count - 1 ? .infinity : nil, alignment: .leading)
+          .frame(
+            minWidth: column == cells.count - 1 ? 160 : nil,
+            idealWidth: column == cells.count - 1 ? 160 : nil,
+            maxWidth: column == cells.count - 1 ? .infinity : nil,
+            alignment: Alignment(
+              horizontal: horizontal(table.alignments[column]), vertical: .center)
+          )
+          .accessibilityAddTraits(header ? .isHeader : [])
       }
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func horizontal(_ alignment: MarkdownContent.Alignment) -> HorizontalAlignment {
+    switch alignment {
+    case .leading: .leading
+    case .center: .center
+    case .trailing: .trailing
+    }
+  }
+
+  private func text(_ alignment: MarkdownContent.Alignment) -> TextAlignment {
+    switch alignment {
+    case .leading: .leading
+    case .center: .center
+    case .trailing: .trailing
     }
   }
 }

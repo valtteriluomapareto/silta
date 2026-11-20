@@ -9,10 +9,11 @@ nonisolated struct MarkdownContent {
     let prefix: String?
     var table: Table?
   }
+  enum Alignment { case leading, center, trailing }
   struct Table {
     let header: [AttributedString]
     let rows: [[AttributedString]]
-    let trailing: [Bool]
+    let alignments: [Alignment]
   }
   let blocks: [Block]
 
@@ -114,7 +115,9 @@ nonisolated private struct TableBuilder {
         id: position, text: AttributedString(), header: nil, code: false, prefix: nil,
         table: MarkdownContent.Table(
           header: row(0), rows: rows == 0 ? [] : (1...rows).map(row),
-          trailing: columns.map { $0.alignment == .right }))
+          alignments: columns.map {
+            $0.alignment == .right ? .trailing : $0.alignment == .center ? .center : .leading
+          }))
     }
   }
   private(set) var tables: [Pending] = []
