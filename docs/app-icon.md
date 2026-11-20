@@ -21,6 +21,10 @@ alternatives that were considered.
   the error and success colours inside the app. Status-arch marks were also rejected,
   because tide shrank to a single tile and the icon read as black and white.
 
+The README logo, `docs/assets/silta-mark-light.svg` and `silta-mark-dark.svg`, draws the
+four layers below in design coordinates without the background tile, using the light
+and dark fills. Update it with any change to the layers or colours.
+
 ## Geometry
 
 The design grid is 1024 × 1024 with the icon tile at 100…924 (824 wide, corner 185).
