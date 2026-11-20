@@ -91,25 +91,32 @@ package struct SystemGitRunner: GitRunner {
     } catch {
       throw SeamError.gitUnavailable
     }
-    let termination: GitTermination
-    if exited.wait(timeout: .now() + request.timeout) == .timedOut {
+    let deadline = DispatchTime.now() + request.timeout
+    let termination = waitForChild(process, exited: exited, deadline: deadline)
+    return try readCapture(
+      termination, from: outURL, errors: errURL, limit: request.capture, deadline: deadline)
+  }
+
+  private func waitForChild(
+    _ process: Process, exited: DispatchSemaphore, deadline: DispatchTime
+  ) -> GitTermination {
+    if exited.wait(timeout: deadline) == .timedOut {
       process.terminate()
       if exited.wait(timeout: .now() + killAfter) == .timedOut {
         kill(process.processIdentifier, SIGKILL)
         exited.wait()
       }
-      termination = .timedOut
-    } else {
-      termination =
-        process.terminationReason == .exit
-        ? .exit(process.terminationStatus) : .signal(process.terminationStatus)
+      process.waitUntilExit()
+      return .timedOut
     }
     process.waitUntilExit()
-    return try readCapture(termination, from: outURL, errors: errURL, limit: request.capture)
+    return process.terminationReason == .exit
+      ? .exit(process.terminationStatus) : .signal(process.terminationStatus)
   }
 
   private func readCapture(
-    _ termination: GitTermination, from stdout: URL, errors stderr: URL, limit: GitCapture?
+    _ termination: GitTermination, from stdout: URL, errors stderr: URL, limit: GitCapture?,
+    deadline: DispatchTime
   ) throws -> GitResult {
     guard let limit else {
       return try GitResult(
@@ -123,19 +130,28 @@ package struct SystemGitRunner: GitRunner {
     // Inherited stdout can still grow after the direct child exits.
     let end = try out.seekToEnd()
     try out.seek(toOffset: 0)
-    let skipped = termination == .timedOut ? 0 : try skipLines(limit.skipLines, in: out, end: end)
+    let skipped =
+      termination == .timedOut ? 0 : try skipLines(limit.skipLines, in: out, end: end) ?? 0
     let available = end - (try out.offset())
     let kept = Int(min(available, UInt64(limit.byteLimit)))
     let bytes = kept == 0 ? Data() : try out.read(upToCount: kept) ?? Data()
+    let truncated = available > UInt64(limit.byteLimit)
+    var count: Int?
+    if truncated, limit.countLines, termination == .exit(0) {
+      try out.seek(toOffset: 0)
+      count = try skipLines(Int.max, in: out, end: end, deadline: deadline)
+    }
     return try GitResult(
       termination: termination, stdout: bytes,
       stderr: err.read(upToCount: limit.byteLimit) ?? Data(),
-      stdoutTruncated: available > UInt64(limit.byteLimit), stdoutSkippedLines: skipped)
+      stdoutTruncated: truncated, stdoutSkippedLines: skipped, stdoutLineCount: count)
   }
 
   /// Seek to a later line using fixed-size blocks, including across an oversized line.
   /// If the requested line is beyond EOF, report the actual number of preceding lines.
-  private func skipLines(_ count: Int, in file: FileHandle, end: UInt64) throws -> Int {
+  private func skipLines(
+    _ count: Int, in file: FileHandle, end: UInt64, deadline: DispatchTime = .distantFuture
+  ) throws -> Int? {
     guard count > 0 else { return 0 }
     var offset: UInt64 = 0
     var skipped = 0
@@ -143,6 +159,7 @@ package struct SystemGitRunner: GitRunner {
     while offset < end,
       let chunk = try file.read(upToCount: Int(min(end - offset, 32 * 1024))), !chunk.isEmpty
     {
+      guard DispatchTime.now() < deadline else { return nil }
       var start = chunk.startIndex
       while let newline = chunk[start...].firstIndex(of: 10) {
         skipped += 1

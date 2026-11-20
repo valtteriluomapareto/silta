@@ -1,2 +1,2 @@
-error: Cannot export this workspace: the service slug is not an identifier. Nothing was written. [invalid]
-next: silta ws ls
+error: Cannot export workspace acme: the service slug is not an identifier. Ask the human to inspect the configuration and correct it with ws edit. Nothing was written. [invalid]
+next: silta --ws 'acme' ws show

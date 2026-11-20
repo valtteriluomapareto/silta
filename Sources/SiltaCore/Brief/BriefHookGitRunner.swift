@@ -13,6 +13,11 @@ package struct BriefHookGitRunner: GitRunner {
     self.onTimeout = onTimeout
   }
 
+  /// Optional evidence may fall back while the hook's required context still succeeds.
+  func optionalReads() -> Self {
+    Self(runner: runner, deadline: deadline, onTimeout: {})
+  }
+
   /// Runs without lazy fetching. Expired budgets avoid spawning and still notify the caller.
   package func run(_ request: GitRequest) async throws -> GitResult {
     let seconds = deadline.childSeconds
@@ -23,7 +28,8 @@ package struct BriefHookGitRunner: GitRunner {
     let result = try await runner.run(
       .init(
         arguments: request.arguments,
-        directory: request.directory, timeout: min(request.timeout, seconds), lazyFetch: false))
+        directory: request.directory, timeout: min(request.timeout, seconds), lazyFetch: false,
+        capture: request.capture))
     if result.termination == .timedOut { onTimeout() }
     return result
   }

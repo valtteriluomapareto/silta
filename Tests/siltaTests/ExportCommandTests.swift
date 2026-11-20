@@ -58,6 +58,36 @@ struct ExportCommandTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func refusedIdentifierOffersSafeWorkspaceInspection(malformedWorkspace: Bool) throws {
+    try withScratchDirectory { scratch in
+      try Self.seed(scratch)
+      let store = DatabaseStore(
+        home: scratch.appending(path: "silta-home"),
+        clock: FakeClock(now: Date(timeIntervalSince1970: 1_700_000_000)), jitter: { 0 })
+      let outsideIdentifier = "acme/research"
+      let workspace = malformedWorkspace ? outsideIdentifier : "acme"
+      try store.write {
+        let field = malformedWorkspace ? "slug" : "task_prefix"
+        try $0.database.execute(
+          sql: "UPDATE workspace SET \(field)=? WHERE slug='acme'", arguments: [outsideIdentifier])
+      }
+      let result = try SiltaBinary.run(["--ws", workspace, "export", "--json"], in: scratch)
+      let error = try TaskStateCommandTests.error(result)
+      let message = try #require(error["message"] as? String)
+      let hints = try #require(error["next"] as? [String])
+      let next = malformedWorkspace ? "silta ws show --help" : "silta --ws 'acme' ws show"
+      #expect(message.contains(malformedWorkspace ? "workspace slug" : "task prefix"))
+      #expect(!message.contains(outsideIdentifier))
+      #expect(hints == [next])
+      guard hints == [next] else { return }
+      let replay = try FirstWorkspaceCommandTests.replay(next, in: scratch, cwd: scratch)
+      #expect(replay.termination == .exit(0), "\(replay.stdout)\(replay.stderr)")
+      #expect(
+        !FileManager.default.fileExists(atPath: scratch.appending(path: "silta-home/exports").path))
+    }
+  }
+
   @Test func aLeftoverWorkDirectoryIsAWarning() throws {
     try withScratchDirectory { scratch in
       try Self.seed(scratch)

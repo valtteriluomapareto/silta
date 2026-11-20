@@ -571,9 +571,9 @@ symlinks resolved, case-folded on case-insensitive volumes.
 Under `proposals: ask`, every agent write that would create a `proposed` task is
 human-only: `task add`, `--parent` on a task the agent doesn't claim, and
 `from-plan`, with or without `--split`. `human_only` names the setting. The
-`task add` retry uses `-F -` for stdin or inline text. Supply the body again on
-stdin. A human's request in chat for the
-write is its go-ahead. Proposals that already exist when the setting changes stay in
+`task add` retry uses `-F -` for stdin or inline text. A plan imported from stdin
+retries with `task from-plan -` and its import options. Supply the same input again
+after approval. A human's request in chat for the write is its go-ahead. Proposals that already exist when the setting changes stay in
 triage, or leave the inbox after 14 days as usual.
 
 `--parent` needs an open (not `done` or `dropped`), unpromoted parent. A subtask takes
@@ -922,7 +922,8 @@ inbox is short and grouped:
   item, including older proposals.
 - Every item shows its refs and the commands that answer it, e.g.
   `silta task triage --accept AC-4 --drop AC-7 --approved "<the human's words>"`. The
-  agent asks first, and maps "the rest" only to items it showed.
+  agent asks first, and maps "the rest" only to items it showed. Each line of a
+  stored `ask:` reason is quoted in text output.
 
 **Available query:** text identifies current local attention and says tracker
 status is not refreshed; JSON uses `scope: "local"`. Review requests wait for M2.
@@ -1232,8 +1233,8 @@ silta code ls   <app>[@<ref>] [<dir>]
   pinned toolchain ships 2.54), resolved once and checked by `doctor`; environment
   `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`. Inherited `GIT_*`
   overrides are removed. Code reads retain normal Git lazy fetching for promised
-  objects in partial clones; only location requests suppress it (§7). A 10 s
-  timeout per call (fetch 60 s).
+  objects in partial clones. Location requests (§7) and edge evidence checks (§12)
+  suppress it. Code reads time out after 10 s per call (fetch 60 s).
 - Output carries the resolved sha and depends only on that commit: attributes
   (`.gitattributes`) come from the commit too, never from the clone's working tree.
 - JSON data is `{app, ref, sha, output}`; `output` is UTF-8 text, with bytes that
@@ -1270,9 +1271,12 @@ silta code ls   <app>[@<ref>] [<dir>]
   much was cut and how to narrow the read (`--lines A-B` for show; a pathspec or a
   narrower pattern for grep). Git content reads capture at most 1 MiB per output
   stream in memory. When the byte ceiling cuts the result, Silta prints complete
-  records within that bound. The `output_truncated` warning reports the byte
-  limit and how to narrow the read. `show --lines` applies the cap starting at
-  the requested line. Git can write the full streams to temporary disk.
+  records within that bound. An unwindowed `show` gives the total when it can count
+  the lines in the remaining Git deadline, and gives a continuation from the first
+  unread line. `show --lines` applies the cap starting at the requested line. If
+  the first requested line itself exceeds the cap, the warning names that line
+  and gives the next line to read if present. Git can write the full streams to
+  temporary disk.
 - A git call over its 10 s timeout is `env` with `next_by: agent`: narrow the read
   (a path, pathspec, pattern or `--lines`) and retry.
 - When the repo hasn't been fetched for 24 h, output warns (`ref_stale`): "fetched N h
@@ -1637,11 +1641,13 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    the resolved worktree's repo root with its on-disk casing, including for subpath apps,
    only when that file exists.
 5. **Neighbours**: edges in and out, printed with their canonical `edge:` refs and
-   ordered by source app, target app, target service, kind and edge id. Configured code references produce complete, quoted
-   `silta code show …` commands, including ref and line selection. With no usable
-   code references, offer `silta code ls` on the other app. Service edges omit a
-   redundant directory command for the current app. Repeated code commands appear
-   only once; valid references survive unsupported elements in the same list.
+   ordered by source app, target app, target service, kind and edge id. A configured
+   path that resolves to a local blob at the selected app ref and subpath produces
+   a complete, quoted `silta code show …` command. Unavailable references and
+   neighbours with no configured code point to the workspace's `ws show`. Service
+   edges with no code omit the pointer. Checks are bounded, use local Git objects,
+   and reuse results for repeated references. Each command appears once. A
+   successful `ws edit` warns if a saved edge's code cannot be verified locally.
 6. **Open tasks** for this app and its topics (top 8), ordered by priority then
    task sequence ascending, after explicit-topic matches, which rank first. When
    the selection exceeds eight, an omitted count is followed by one `next:` line per
@@ -1717,8 +1723,9 @@ assembly, fails immediately on database contention and never populates `where_ca
 A strict, zero-leeway watchdog timer alone owns that deadline; output can follow it only
 by that timer's latency. The watchdog appends a best-effort body-free timeout record, then exits without running
 exit handlers. Timeout and completion have exclusive log/output ownership; completion
-cancels the watchdog explicitly before output. A child Git deadline is recorded as
-`hook_timeout` even when it finishes before the process deadline. Hook log appends are
+cancels the watchdog explicitly before output. A required Git read reaching its
+deadline records `hook_timeout` even when the process finishes in time. Optional
+edge checks use the same budget and fall back to workspace inspection. Hook log appends are
 nonblocking and
 skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NONBLOCK`.
 
@@ -1786,7 +1793,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   keyed by `uid`; display refs are included for readability. Machine-local state is
   never written: repo paths, worktree overrides and task worktrees. Values the user
   configured or that record an approval, such as a source `root` or an approval's
-  command, are written as stored, paths included, so a restore is exact.
+  command, are written as stored, paths included, so a restore is exact. Invalid
+  identifiers refuse publication and name the field. A safely printable workspace
+  slug gives a scoped `ws show` for inspection before a human corrects the configuration.
 
   ```
   <root>/<workspace>/

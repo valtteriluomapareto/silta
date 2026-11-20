@@ -52,7 +52,7 @@ extension BriefCommandTests {
       #expect(open.components(separatedBy: "AC-2").count == 2)
       #expect(result.stdout.contains("glossary: messages = messaging, push"))
       #expect(result.stdout.contains("code show 'api' --lines 1 -- 'README.md'"))
-      #expect(result.stdout.contains("code ls 'portal'"))
+      #expect(result.stdout.contains("next: silta --ws 'acme' ws show"))
       #expect(result.stdout.contains("service:push"))
       #expect(!result.stdout.contains("code ls 'api'"))
       let explicit = try run(
@@ -66,6 +66,91 @@ extension BriefCommandTests {
       #expect(unknown.stdout.contains("silta --ws 'acme' ws show"))
       #expect(try run(["--topic", "absent", "--hook"], repo, scratch).stdout.isEmpty)
     }
+  }
+
+  @Test func neighbourEvidenceUsesTheCommittedRefAndAppSubpath() throws {
+    try withScratchDirectory { scratch in
+      let repo = try committedEdgeFixture(scratch)
+      let config = scratch.appending(path: "workspace.yml")
+      try """
+      workspace: {slug: acme, name: Acme, task_prefix: AC}
+      repos: [{slug: platform}]
+      apps:
+        - {slug: api, repo: platform, ref: origin/api, subpath: guide}
+        - {slug: portal, repo: platform, ref: origin/portal}
+      edges:
+        - from: portal
+          to: api
+          kind: calls
+          summary: Acme integration
+          code: ["api@acme-edge:Acme's guide.md", "api:Acme's guide.md"]
+      """.write(to: config, atomically: true, encoding: .utf8)
+      let edit = try SiltaBinary.run(
+        [
+          "--ws", "acme", "ws", "edit", "-F", config.path, "--approved", "Save Acme edges.",
+          "--json",
+        ],
+        in: scratch, cwd: repo, environment: TaskCommandTests.actor)
+      try #require(edit.termination == .exit(0), "\(edit.stdout)\(edit.stderr)")
+      let warnings = try #require(
+        try TaskStateCommandTests.object(edit)["warnings"] as? [[String: String]])
+      let warning = try #require(
+        warnings.first { $0["code"] == "edge_code_unavailable" }?["message"])
+      #expect(
+        warnings.count == 1 && warning.contains("api:") && warning.contains("guide.md"),
+        "\(warning)")
+      let inspect = try #require(warning.firstMatch(of: /Inspect it with (silta .+)\.$/)?.output.1)
+      let brief = try run(["--app", "portal"], repo, scratch)
+      try #require(brief.termination == .exit(0), "\(brief.stdout)\(brief.stderr)")
+      let hints = brief.stdout.split(separator: "\n").compactMap { line -> String? in
+        guard line.hasPrefix("next: silta ") else { return nil }
+        return String(line.dropFirst("next: ".count))
+      }
+      let valid = try #require(hints.first { $0.contains("code show 'api@acme-edge'") })
+      let replay = try FirstWorkspaceCommandTests.replay(valid, in: scratch, cwd: repo)
+      #expect(replay.termination == .exit(0) && replay.stdout.contains("Acme guide"))
+      let unknown = hints.contains { $0.contains("code show 'api'") }
+      #expect(!unknown)
+      let fallback = try #require(hints.first { $0 == inspect })
+      let configRead = try FirstWorkspaceCommandTests.replay(fallback, in: scratch, cwd: repo)
+      #expect(configRead.termination == .exit(0) && configRead.stdout.contains("Acme integration"))
+    }
+  }
+
+  @Test func locallyAvailableEdgeReferencesMustBeSafeToPrint() throws {
+    try withScratchDirectory { scratch in
+      let repo = try contextFixture(scratch)
+      let token = "ghp_" + String(repeating: "Q", count: 36)
+      let names = ["Acme\u{2028}split.txt", token + ".txt"]
+      for name in names {
+        try Data("Acme guide\n".utf8).write(to: repo.appending(path: name))
+      }
+      try fixture.git(["add", "--"] + names, repo, scratch)
+      try fixture.git(["commit", "-m", "Add Acme file names"], repo, scratch)
+      let bytes = try JSONEncoder().encode(names.map { "api@api:" + $0 })
+      let references = try #require(String(data: bytes, encoding: .utf8))
+      try store(scratch).write {
+        try $0.database.execute(
+          sql: "UPDATE edge SET code_refs=? WHERE uid='out'", arguments: [references])
+      }
+      let report = try run(["--app", "api"], repo, scratch)
+      #expect(report.termination == .exit(0))
+      #expect(!report.stdout.contains(token) && !report.stdout.contains("split.txt"))
+      #expect(!report.stdout.contains("next: silta --ws 'acme' code show"))
+      #expect(report.stdout.contains("next: silta --ws 'acme' ws show"))
+    }
+  }
+
+  private func committedEdgeFixture(_ scratch: URL) throws -> URL {
+    let repo = try fixture.setup(scratch)
+    try fixture.git(["checkout", "-q", "api"], repo, scratch)
+    try fixture.git(["switch", "-c", "acme-edge"], repo, scratch)
+    let directory = repo.appending(path: "guide")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try Data("Acme guide\n".utf8).write(to: directory.appending(path: "Acme's guide.md"))
+    try fixture.git(["add", "guide"], repo, scratch)
+    try fixture.git(["commit", "-m", "Add Acme guide"], repo, scratch)
+    return repo
   }
 
   @Test func backlogOrderLimitsVisibilityAndDoneResult() throws {

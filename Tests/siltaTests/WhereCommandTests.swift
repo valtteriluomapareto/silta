@@ -81,6 +81,33 @@ struct WhereCommandTests {
     }
   }
 
+  @Test func taskCanStartInAnUnbornBranch() throws {
+    try withScratchDirectory { scratch in
+      let repo = try setup(scratch)
+      try git(["switch", "--orphan", "acme-unborn"], repo, scratch)
+      func task(_ args: [String]) throws -> CLIResult {
+        try SiltaBinary.run(
+          ["--ws", "acme", "--json", "task"] + args, in: scratch, cwd: repo,
+          environment: ["SILTA_ACTOR": "agent:codex:acme"])
+      }
+      let added = try data(task(["add", "--app", "api", "Acme work"]))
+      let ref = try #require(added["ref"] as? String)
+      let accepted = try task(["triage", "--accept", ref, "--approved", "Accept Acme work."])
+      try #require(accepted.termination == .exit(0), "\(accepted.stdout)")
+      let started = try task(["start", ref])
+      try #require(started.termination == .exit(0), "\(started.stdout)")
+      let taskData = try data(task(["show", ref]))
+      #expect(taskData["branch"] as? String == "acme-unborn")
+      let topLevel = try SiltaBinary.runProcess(
+        URL(filePath: "/usr/bin/git"), ["rev-parse", "--show-toplevel"], in: scratch, cwd: repo)
+      #expect(topLevel.termination == .exit(0))
+      #expect(taskData["worktree"] as? String == topLevel.stdout.trimmingCharacters(in: .newlines))
+      let refused = try task(["done", ref, "-m", "Acme finished"])
+      #expect(try TaskStateCommandTests.error(refused)["code"] as? String == "env")
+      #expect(try data(task(["show", ref]))["status"] as? String == "doing")
+    }
+  }
+
   @Test func taskAndOverridePrecedenceAndApprovalAtomicity() throws {
     try withScratchDirectory { scratch in
       let repo = try setup(scratch)

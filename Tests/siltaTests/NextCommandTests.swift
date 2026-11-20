@@ -47,6 +47,34 @@ struct NextCommandTests {
     }
   }
 
+  @Test func collectsIndentedScalarStreamAndApprovalHints() throws {
+    try withScratchDirectory { directory in
+      try """
+      next: silta task ls
+        next: silta ws show
+        ask human: silta task triage
+        next: ask human: OK. After approval: silta app ls; or silta repo ls
+        > next: silta acme-unknown
+      """.write(to: directory.appending(path: "sample.txt"), atomically: true, encoding: .utf8)
+      try #"{"nested":{"next":"silta code ls"},"next":["silta where"]}"#
+        .write(to: directory.appending(path: "sample.json"), atomically: true, encoding: .utf8)
+      try """
+      {"next":"silta task show"}
+      {"next":["silta guide"]}
+      """.write(to: directory.appending(path: "sample.jsonl"), atomically: true, encoding: .utf8)
+      let groups: Set<String> = [
+        "silta", "silta task", "silta ws", "silta app", "silta repo", "silta code",
+      ]
+      let paths = try Set(
+        Self.hints(in: directory).compactMap { Self.commandPath($0, groups: groups) })
+      #expect(
+        paths == [
+          "silta task ls", "silta ws show", "silta task triage", "silta app ls", "silta repo ls",
+          "silta code ls", "silta where", "silta task show", "silta guide",
+        ])
+    }
+  }
+
   private static func hints(in directory: URL) throws -> [String] {
     let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
     return try names.flatMap { name -> [String] in
@@ -56,7 +84,7 @@ struct NextCommandTests {
       switch file.pathExtension {
       case "txt":
         return try textHints(from: file)
-      case "json":
+      case "json", "jsonl":
         return try jsonHints(from: file)
       default:
         return []
@@ -66,9 +94,15 @@ struct NextCommandTests {
 
   private static func textHints(from file: URL) throws -> [String] {
     let contents = try String(contentsOf: file, encoding: .utf8)
-    return contents.split(separator: "\n").compactMap { line in
-      let prefixes = ["next: ", "ask human: "]
-      return prefixes.first { line.hasPrefix($0) }.map { String(line.dropFirst($0.count)) }
+    return contents.split(separator: "\n").flatMap { original -> [String] in
+      let line = original.drop(while: { $0 == " " || $0 == "\t" })
+      if line.hasPrefix("next: ") {
+        return recoveryCommands(String(line.dropFirst("next: ".count)))
+      }
+      if line.hasPrefix("ask human: ") || line.hasPrefix("After approval: ") {
+        return recoveryCommands(String(line))
+      }
+      return []
     }
   }
 
@@ -85,10 +119,30 @@ struct NextCommandTests {
 
   private static func nestedHints(_ value: Any) -> [String] {
     if let object = value as? [String: Any] {
-      return (object["next"] as? [String] ?? []) + object.values.flatMap(nestedHints)
+      let next = object["next"] as? [String] ?? (object["next"] as? String).map { [$0] } ?? []
+      return next.flatMap(recoveryCommands) + object.values.flatMap(nestedHints)
     }
     if let list = value as? [Any] { return list.flatMap(nestedHints) }
     return []
+  }
+
+  private static func recoveryCommands(_ hint: String) -> [String] {
+    let asks = hint.hasPrefix("ask human: ")
+    let action = asks ? String(hint.dropFirst("ask human: ".count)) : hint
+    if action.hasPrefix("silta ") { return [action] }
+    guard asks || hint.hasPrefix("After approval: "),
+      let approval = hint.range(of: "After approval: ")
+    else { return [action] }
+    let commands = hint[approval.upperBound...]
+    let separators = commands.matches(of: #/'[^']*'|"(?:\\.|[^"\\])*"|\\.|; or /#)
+      .filter { $0.output == "; or " }
+    var start = commands.startIndex
+    var parts: [String] = []
+    for separator in separators {
+      parts.append(String(commands[start..<separator.range.lowerBound]))
+      start = separator.range.upperBound
+    }
+    return parts + [String(commands[start...])]
   }
 
   private static func commandPath(_ hint: String, groups: Set<String>) -> String? {
