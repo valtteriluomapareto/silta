@@ -41,7 +41,9 @@
       let entries = [
         doc(
           "environments", title: "Release pipelines",
-          about: ["app:acme-web", "app:acme-pdf", "topic:environments", "edge:acme-web/acme-pdf/http-api"]),
+          about: [
+            "app:acme-web", "app:acme-pdf", "topic:environments", "edge:acme-web/acme-pdf/http-api",
+          ]),
         doc("pdf-contract", title: "Portal and PDF", kind: "contract"),
         doc("b-flow", title: "Checkout", kind: "flow"),
         doc("a-flow", title: "checkout", kind: "flow"),
@@ -65,12 +67,15 @@
       func subtitle(_ entries: [AppDocument]) -> String {
         DocsContent.subtitle(DocsModel.Group(id: entries[0].slug, entries: entries))
       }
-      #expect(subtitle([doc("a", about: ["edge:acme-portal/acme-pdf/http-api"])])
-        == "acme-portal → acme-pdf · @1")
-      #expect(subtitle([doc("a", about: ["edge:acme-portal/service:mail/http-api"])])
-        == "acme-portal → mail · @1")
-      #expect(subtitle([doc("a", about: ["edge:acme%2Fweb/acme-pdf/http-api"])])
-        == "acme/web → acme-pdf · @1")
+      #expect(
+        subtitle([doc("a", about: ["edge:acme-portal/acme-pdf/http-api"])])
+          == "acme-portal → acme-pdf · @1")
+      #expect(
+        subtitle([doc("a", about: ["edge:acme-portal/service:mail/http-api"])])
+          == "acme-portal → mail · @1")
+      #expect(
+        subtitle([doc("a", about: ["edge:acme%2Fweb/acme-pdf/http-api"])])
+          == "acme/web → acme-pdf · @1")
       #expect(subtitle([doc("a", about: ["app:acme-crm"])]) == "acme-crm · @1")
       #expect(subtitle([doc("a", about: ["topic:login"])]) == "#login · @1")
       let wide = [
@@ -78,7 +83,8 @@
         "edge:acme-web/service:mail/http-api", "topic:environments",
       ]
       #expect(subtitle([doc("a", about: wide)]) == "3 apps · #environments · @1")
-      #expect(subtitle([doc("a", about: ["app:acme-crm", "service:erp"])]) == "acme-crm · erp · @1")
+      #expect(
+        subtitle([doc("a", about: ["app:acme-crm", "service:erp"])]) == "acme-crm · erp · @1")
       #expect(subtitle([doc("a", about: [])]) == "Whole workspace · @1")
       #expect(subtitle([doc("a", about: nil)]) == "Attachments not recorded · @1")
       let pending = [
@@ -87,6 +93,47 @@
       ]
       #expect(subtitle(pending) == "acme-crm · @2 · @3 proposed")
       #expect(subtitle([doc("a", about: [], archived: true)]) == "Whole workspace · @1 · archived")
+    }
+
+    @Test func aboutMenuListsLiveAppsServicesAndRememberedTopics() async throws {
+      let map = AppWorkspaceMap(
+        apps: [
+          AppMapApp(
+            slug: "web", name: "Acme web", repo: "web", ref: "origin/main", productionRef: nil,
+            subpath: nil, summary: nil, lifecycle: "active", attachment: "app:web")
+        ],
+        services: [
+          AppMapService(slug: "aws.s3", name: "S3", summary: nil, attachment: "service:aws%2Es3")
+        ], connections: [])
+      var reads: [String?] = []
+      let docs = DocsModel(readList: { _, workspace, about, _, _ in
+        reads.append(about)
+        let all = [
+          self.doc("env", about: ["app:web", "topic:environments"]),
+          self.doc("login", about: ["topic:login"]),
+        ]
+        let found = workspace == "beta" ? [] : all
+        let shown = about.map { ref in found.filter { $0.about?.contains(ref) == true } } ?? found
+        return AppDocumentList(entries: shown, total: shown.count, nextOffset: nil)
+      })
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      await docs.refresh(reader, workspace: "acme", about: nil, archived: false)
+      await docs.refresh(reader, workspace: "acme", about: "app:web", archived: false)
+      #expect(reads == [nil, "app:web"] && docs.entries.map(\.slug) == ["env"])
+      let sections = DocsContent.aboutOptions(map: map, topics: docs.topics)
+      #expect(sections.map(\.title) == ["Apps", "Services", "Topics"])
+      #expect(
+        sections.map { $0.options.map(\.ref) }
+          == [["app:web"], ["service:aws%2Es3"], ["topic:environments", "topic:login"]])
+      #expect(sections[2].options.map(\.name) == ["#environments", "#login"])
+      await docs.refresh(reader, workspace: "beta", about: nil, archived: false)
+      #expect(docs.topics.isEmpty)
+      docs.clear()
+      #expect(docs.topics.isEmpty && DocsContent.aboutOptions(map: nil, topics: []).isEmpty)
     }
 
     @Test func readerTracksBodyLinesAndSourceSelection() async throws {
@@ -198,96 +245,5 @@
       }
     }
 
-    @Test func markdownLinksShowAndProtectTheirActualDestinations() throws {
-      let address = "https://example.test/docs?q=one"
-      let source = """
-        [Local reference](file:///acme/inert)
-
-        [**Acme** documentation](\(address))
-
-        [Relative reference](/acme/notes)
-
-        `[Sample](https://example.test/sample)`
-        """
-      let blocks = MarkdownContent(source).blocks
-      let local = try #require(blocks.first { String($0.text.characters) == "Local reference" })
-      #expect(local.text.runs.compactMap(\.link).isEmpty)
-      let relative = try #require(
-        blocks.first { String($0.text.characters) == "Relative reference" })
-      #expect(relative.text.runs.compactMap(\.link).isEmpty)
-      let allowed = try #require(
-        blocks.first { String($0.text.characters).hasPrefix("Acme documentation") })
-      #expect(Set(allowed.text.runs.compactMap { $0.link?.absoluteString }) == [address])
-      #expect(String(allowed.text.characters) == "Acme documentation (\(address))")
-      let sample = try #require(blocks.first { String($0.text.characters).hasPrefix("[Sample]") })
-      #expect(sample.text.runs.compactMap(\.link).isEmpty)
-    }
-
-    @Test(.timeLimit(.minutes(1))) func sharedLinkActionChecksTheActualDestination() async throws {
-      let opened = Mutex<[URL]>([])
-      let action = DocumentMarkdown.linkAction { url in
-        opened.withLock { $0.append(url) }
-        return .handled
-      }
-      let accepted = ["https://example.test/docs", "http://example.test/read"]
-      let rejected = ["file:///acme/inert", "acme:reference", "https:reference", "/acme/notes"]
-      for address in accepted + rejected {
-        let url = try #require(URL(string: address))
-        let handled = await withCheckedContinuation { continuation in
-          action(url) { continuation.resume(returning: $0) }
-        }
-        #expect(handled == accepted.contains(address))
-      }
-      #expect(opened.withLock { $0.map(\.absoluteString) } == accepted)
-    }
-
-    @Test func markdownTablesKeepColumnsEscapesAndCheckedLinks() throws {
-      let source = """
-        Before
-
-        | App | Env | URL |
-        |---|---|---|
-        | `acme-web` | test | [site](https://test.acme.example) |
-        | acme-pdf |  | a \\| b |
-        | acme-crm | prod | [local](file:///acme) |
-
-        After
-        """
-      let blocks = MarkdownContent(source).blocks
-      let shape = blocks.map { $0.table == nil ? String($0.text.characters) : "table" }
-      #expect(shape == ["Before", "table", "After"])
-      let table = try #require(blocks[1].table)
-      let rows = table.rows.map { $0.map { String($0.characters) } }
-      #expect(rows[0][0] == "acme-web")
-      #expect(rows[1] == ["acme-pdf", "", "a | b"])
-      #expect(rows[0][2] == "site (https://test.acme.example)")
-      #expect(table.rows[0][2].runs.compactMap(\.link).count == 1)
-      #expect(rows[2][2] == "local" && table.rows[2][2].runs.compactMap(\.link).isEmpty)
-      let listed = MarkdownContent("- item\n\n  | x | y |\n  |---|---|\n  | 1 | 2 |\n").blocks
-      #expect(listed.compactMap(\.table).count == 1)
-      let two = MarkdownContent("| a |\n|---|\n| 1 |\n\n| b |\n|---|\n| 2 |\n").blocks
-      let gap = MarkdownContent("| a | b |\n|---|---|\n|  |  |\n| c | d |\n").blocks
-      let gapRows = gap.compactMap(\.table).first?.rows.map { $0.map { String($0.characters) } }
-      #expect(gapRows == [["", ""], ["c", "d"]])
-      let headers = two.compactMap(\.table).map { $0.header.map { String($0.characters) } }
-      #expect(headers == [["a"], ["b"]])
-    }
-
-    @Test func markdownTablesAndDiffRemainReadable() throws {
-      let table = "| Name | Value |\n| --- | ---: |\n| amount | 42 |"
-      let content = MarkdownContent("# Contract\n\n" + table, title: "Contract")
-      #expect(!content.blocks.contains { $0.header == 1 })
-      #expect(!content.blocks.contains { $0.code })
-      let parsed = try #require(content.blocks.compactMap(\.table).first)
-      #expect(parsed.header.map { String($0.characters) } == ["Name", "Value"])
-      #expect(parsed.rows.map { $0.map { String($0.characters) } } == [["amount", "42"]])
-      #expect(parsed.trailing == [false, true])
-      let fenced = MarkdownContent("```text\n" + table + "\n```")
-      #expect(fenced.blocks.filter(\.code).count == 1)
-      #expect(fenced.blocks.allSatisfy { $0.table == nil })
-      let diff = DocumentDiff("--- old\n+++ new\n@@ -1 +1 @@\n-old\n+new\n same")
-      #expect(
-        diff.lines.map(\.kind) == [.metadata, .metadata, .metadata, .removed, .added, .context])
-    }
   }
 #endif

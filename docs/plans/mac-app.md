@@ -48,7 +48,14 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
     counts) and how it uses each service. Services follow, most shared first; those used
     by one app fold into one line.
 - **Docs:** a three-column view with Document, Changes and Comments tabs, a revision
-  menu and paging.
+  menu and paging. Paper "Docs v2":
+  - The list shows each document once, grouped by kind, with what it is about and its
+    revision state under the title.
+  - An About menu narrows the list to one app, service or topic. It uses the same exact
+    match as `silta doc ls --about`, so docs about an app's connections are not
+    included and are reached from Workspace.
+  - The reader lists About refs in one wrapping row. Clicking one filters the list, and
+    its context menu copies the ref. Markdown tables are drawn as tables.
 - **Copy:**
   - a ref chip on every item;
   - command blocks whose placeholders fail safe if left unfilled: proposal refs use

@@ -104,6 +104,8 @@
         await model.loadDocuments()
         let groups = model.documents.groups(search: "")
         #expect(groups.contains { $0.id == "operations" })
+        let first = DocsContent.sections(groups).first?.groups.first?.preferred?.ref
+        #expect(model.documents.ref == first)
         #expect(model.documents.document?.about?.contains("app:acme-backend") == true)
         #expect(model.workspaceSelection?.connectionRef == edge)
         #expect(model.workspaceInspectorPresented)
