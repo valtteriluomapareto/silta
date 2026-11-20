@@ -474,9 +474,9 @@ def hook_timeouts(data):
 def hook_control(env, cwd, run=None):
     """Session-start output for the fixture's policy control.
 
-    Past its process deadline the hook exits 0 with no output (spec §12), so a loaded
+    Past its deadlines the hook exits 0 with no or degraded output (spec §12), so a loaded
     machine can empty the control. Only an attempt the CLI logged as `hook_timeout` is
-    repeated; empty output without that record stays the evidence."""
+    repeated; any output without that record stays the evidence."""
     run = run or silta
     hook_env = dict(env, SILTA_ACTOR='agent:claude', SILTA_SESSION='eval-control',
                     CLAUDE_ENV_FILE=str(Path(env['HOME']) / '.claude/control.env'))
