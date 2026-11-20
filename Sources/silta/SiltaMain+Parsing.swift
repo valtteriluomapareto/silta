@@ -25,6 +25,22 @@ extension SiltaMain {
     }
   }
 
+  /// Parse refusals retain priority when environment setup also fails.
+  static func startupFailure(
+    _ error: any Error, parsed: Result<any ParsableCommand, any Error>,
+    arguments: [String], mode: OutputMode
+  ) -> Rendered {
+    if case .failure(let error) = parsed {
+      return parseFailure(error, arguments: arguments, mode: mode)
+    }
+    if case .success(let command) = parsed,
+      (command as? TaskEditCommand)?.missingTerminal == true
+    {
+      return OutputRouter.render(.failure(TaskEditCommand.terminalUsage), mode: mode)
+    }
+    return OutputRouter.render(.failure(error), mode: mode)
+  }
+
   /// The output mode, read from the raw arguments so a parse error can still answer in
   /// JSON. ArgumentParser itself accepts the flags before or after the subcommand.
   /// Nothing after `--` counts.

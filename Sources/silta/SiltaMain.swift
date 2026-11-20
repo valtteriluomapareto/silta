@@ -75,15 +75,7 @@ enum SiltaMain {
         watchdog?.failed(milliseconds: elapsedMilliseconds(started.duration(to: timer.now)))
         return Rendered(stdout: "", stderr: "", exitCode: 0, errorCode: nil)
       }
-      if case .failure(let error) = parseResult {
-        return parseFailure(error, arguments: arguments, mode: mode)
-      }
-      if case .success(let command) = parseResult,
-        (command as? TaskEditCommand)?.missingTerminal == true
-      {
-        return OutputRouter.render(.failure(TaskEditCommand.terminalUsage), mode: mode)
-      }
-      return OutputRouter.render(.failure(error), mode: mode)
+      return startupFailure(error, parsed: parseResult, arguments: arguments, mode: mode)
     }
   }
 
