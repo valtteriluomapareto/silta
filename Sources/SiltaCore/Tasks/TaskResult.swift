@@ -21,7 +21,25 @@ package struct TaskResult: Encodable, Sendable {
   /// Whether this write recorded human consent; CLI metadata only, never encoded.
   package var approvalUsed = false
 
+  package var appChange: TaskAppChange?
+
   private enum CodingKeys: String, CodingKey {
     case ref, status
+    case appChange = "app_change"
+  }
+}
+
+/// An explicit change to this task's primary app and any children left on its former app.
+package struct TaskAppChange: Encodable, Sendable {
+  package let from: String?
+  package let to: String?
+  package let childrenOnPreviousApp: [String]
+
+  package var previous: String { from.map { "app:" + $0 } ?? "none" }
+  package var text: String { previous + " -> " + (to.map { "app:" + $0 } ?? "none") }
+
+  private enum CodingKeys: String, CodingKey {
+    case from, to
+    case childrenOnPreviousApp = "children_on_previous_app"
   }
 }

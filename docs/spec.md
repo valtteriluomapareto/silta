@@ -590,6 +590,19 @@ Under `proposals: ask` without approval, they also preview `todo`, with a warnin
 that the real run needs the human's go-ahead in chat and creates `todo`. Split
 children preview the same status; refusals and consent warnings name the task count.
 
+Change a task's primary app with `task edit <ref> --app <slug>`. Use
+`--app none` for non-code work. The explicit `app:<slug>` form can select a legacy
+app named `none`. This mode takes neither an editor nor a body file. It cannot be
+combined with `-F`, `--print` or `--allow-secret`. Done, dropped and promoted
+tasks refuse. The regular edit gate applies, including a live foreign claim refusal.
+For a move that affects another app's backlog, follow the ask rules in §11.
+
+Changing between repositories clears the task's recorded branch and worktree.
+Start it from the target repository to record the task's new Git location.
+If the target has a different session, the current claimant hands off first.
+Children keep their app. The receipt names those still on the task's previous
+app, and the task timeline records the old and new app once.
+
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
 just created; `--status proposed` lists everyone's (it implies `--proposed`). Promoted
 tasks are left out unless `--promoted` is given. `task ls` sorts by priority (1–3, 1
@@ -2050,7 +2063,8 @@ that was deleted before their write.
   refuses embedded NUL bytes. These commands
   return `usage` and point to `-F` without a terminal or file input. A task edit also
   points to the scoped `--print` command when the task can be read, or to command help
-  when it cannot. Editor startup failures return `env` with help for the edit command.
+  when it cannot. The separate `task edit --app` mode needs no terminal or input file.
+  Editor startup failures return `env` with help for the edit command.
 - Refs follow §5.1.
 - Human-readable text and quiet views of stored content mask secrets before
   replacing terminal control characters with spaces. Multiline bodies preserve
@@ -2137,6 +2151,9 @@ selected when following a hint. Early human-only refusals preserve an explicit
 `--ws` without reading storage. Invalid task values, an unreadable `-F` file
 included, point to the failed command's help. A busy retry names only the parsed command path, without body-bearing
 arguments.
+
+- The `task edit --app` receipt includes `app_change` on change, with `from` and `to`
+  app slugs when set and `children_on_previous_app` listing the matching child refs.
 
 **Streams and global flags:**
 - Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on
