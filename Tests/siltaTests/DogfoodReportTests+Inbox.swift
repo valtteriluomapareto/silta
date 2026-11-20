@@ -5,17 +5,45 @@ import SiltaTestSupport
 import Testing
 
 extension DogfoodReportTests {
-  @Test func cappedHumanInboxReportsExactSizeAndPartialMeasurements() throws {
+  @Test func completeHumanInboxMeasuresTheOldestVisibleRevision() throws {
     try withScratchDirectory { scratch in
       let store = try Self.setup(scratch)
-      try store.write { try Self.seedInboxQuestions(2...13, in: $0) }
+      try store.write { tx in
+        try Self.seedInboxQuestions(2...13, in: tx)
+        try Self.seedInboxDocuments(in: tx)
+      }
       let result = try Self.run(
         ["--since", "2023-11-25"], scratch: scratch, tools: Self.tools(scratch))
-      #expect(result.termination == .exit(0))
-      #expect(result.stdout.contains("Questions to @me: at least 12."))
-      #expect(result.stdout.contains("Inbox size: 14 items. Oldest item: unknown."))
+      #expect(result.termination == .exit(0), "\(result.stderr)")
+      withKnownIssue("The report only examines the capped inbox and newest grouped dates.") {
+        #expect(result.stdout.contains("Questions to @me: 13."))
+        #expect(result.stdout.contains("Inbox size: 15 items. Oldest item: 12 days."))
+      }
       #expect(!result.stdout.contains("Acme inbox private"))
     }
+  }
+
+  private static func seedInboxDocuments(in tx: StorageTransaction) throws {
+    try tx.database.execute(
+      sql: """
+        UPDATE task SET created_at='2023-11-26T00:00:00.000Z' WHERE uid='silta-task-6';
+        INSERT INTO doc(id,uid,workspace_id,slug,title,kind,archived,created_at,updated_at)
+        VALUES
+          (41,'silta-unresolved-rules',2,'active-rules','Acme rules','reference',0,'',''),
+          (42,'silta-archived-rules',2,'archived-rules','Acme archive','reference',1,'','');
+        INSERT INTO doc_rev(uid,doc_id,rev,state,actor,body_md,created_at)
+        VALUES
+          ('silta-early',41,1,'proposed','agent:codex:acme','Acme inbox private',
+            '2023-11-01T00:00:00.000Z'),
+          ('silta-old',41,2,'proposed','agent:codex:acme','Acme inbox private',
+            '2023-11-18T00:00:00.000Z'),
+          ('silta-middle',41,3,'proposed','agent:codex:acme','Acme inbox private',
+            '2023-11-23T00:00:00.000Z'),
+          ('silta-new',41,4,'proposed','agent:codex:acme','Acme inbox private',
+            '2023-11-26T00:00:00.000Z'),
+          ('silta-archived',42,1,'proposed','agent:codex:acme','Acme inbox private',
+            '2023-11-19T00:00:00.000Z');
+        """)
   }
 
   @Test func undatedHumanInboxItemKeepsOldestUnknown() throws {

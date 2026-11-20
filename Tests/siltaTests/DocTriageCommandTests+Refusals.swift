@@ -22,6 +22,11 @@ extension DocTriageCommandTests {
       let before = try Self.truth(store)
       let next = try Self.checkRefusal(args, name: stale ? "stale" : "overlap", in: scratch)
       #expect(try Self.truth(store) == before)
+      if stale {
+        withKnownIssue("The stale refusal omits the read that supplies the accepted baseline.") {
+          #expect(next.contains("silta --ws 'acme' doc show 'doc:rules' --json"))
+        }
+      }
       try Self.replayRefusal(next, store: store, scratch: scratch)
     }
   }
