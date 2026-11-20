@@ -5,7 +5,10 @@ import SiltaCore
 struct WsEditCommand: WorkspaceArgumentCommand {
   static let configuration = CommandConfiguration(
     commandName: "edit", abstract: "Edit workspace YAML (human-only).",
-    discussion: "Update Acme YAML (human): silta ws edit acme -F acme.yml")
+    discussion: "Keep the baseline comment from ws show or a retained editor draft. "
+      + "If stale, review a fresh ws show before reapplying your edits. "
+      + "An unstamped file uses the configuration at command start.\n"
+      + "Update Acme YAML (human): silta ws edit acme -F acme.yml")
 
   static let dataShape = Shape.object(["workspace": .optional(.string)])
 

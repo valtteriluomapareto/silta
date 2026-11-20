@@ -66,15 +66,28 @@ struct WorkspaceEditorTests {
         try? FileManager.default.removeItem(at: file.deletingLastPathComponent())  // fixture buffer
       }
       let retained = try String(contentsOf: file, encoding: .utf8)
-      let service = try store.read { try String.fetchOne($0, sql: "SELECT slug FROM service") }
-      let approvals = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM approval") }
       #expect(failure?.code == .conflict)
       #expect(failure?.nextBy == .agent)
       #expect(failure?.next == (initiallyExists ? ["silta --ws 'acme' ws show"] : ["silta ws ls"]))
       #expect(failure?.message.contains(file.path) == true)
-      #expect(retained == proposed)
-      #expect(service == "mailer")
-      #expect(approvals == 0)
+      #expect(retained.hasPrefix("# silta-base: "))
+      #expect(retained.suffix(proposed.count) == proposed)
+      let replayed = Result {
+        try WorkspaceEditor.apply(
+          retained, slug: initiallyExists ? "acme" : nil, store: store,
+          actor: TaskServiceTests.agent,
+          identity: (SeededIDGenerator(seed: 2), WorkspaceConfigTests.instant),
+          approved: "yes, update the Acme fixture")
+      }
+      let currentService = try store.read {
+        try String.fetchOne($0, sql: "SELECT slug FROM service")
+      }
+      let approvalCount = try store.read {
+        try Int.fetchOne($0, sql: "SELECT count(*) FROM approval")
+      }
+      #expect(throws: WorkspaceEditConflict.self) { try replayed.get() }
+      #expect(currentService == "mailer")
+      #expect(approvalCount == 0)
     }
   }
   @Test(arguments: [false, true])

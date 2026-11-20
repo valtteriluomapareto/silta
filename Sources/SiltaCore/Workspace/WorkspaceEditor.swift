@@ -1,3 +1,4 @@
+import CryptoKit
 package import Foundation
 import GRDB
 
@@ -17,6 +18,12 @@ package enum WorkspaceEditor {
       baseline, store: store, identity: identity, approval: (approval, command), editor: editor)
   }
 
+  /// Renders a saved snapshot with the baseline required to apply it.
+  package static func snapshot(slug: String, store: DatabaseStore) throws -> String {
+    let baseline = try capture(slug: slug, store: store, prepared: nil)
+    return baseline.stamped(baseline.text)
+  }
+
   /// Captures the configuration before evaluating the supplied YAML input.
   package static func apply(
     _ input: @autoclosure () throws -> String, slug: String?, store: DatabaseStore, actor: ActorID,
@@ -28,8 +35,16 @@ package enum WorkspaceEditor {
     let retry = retryFromStdin ? base + " -F -" : command
     let approval = try actor.requireHuman(command: retry, approved: approved)
     let captured = Result { try capture(slug: slug, store: store, prepared: prepared) }
-    let text = try input()
-    let baseline = try captured.get()
+    let document = try input()
+    let workspace = (try? captured.get())?.slug ?? slug  // Only scopes malformed input recovery.
+    let (stamp, text) = try Baseline.payload(document, workspace: workspace)
+    let baseline: Baseline
+    do { baseline = try captured.get() } catch let error as WorkspaceError
+      where error.code == .notFound && slug == nil && stamp == "new"
+    {
+      throw WorkspaceEditConflict(workspace: nil)
+    }
+    try baseline.check(stamp: stamp)
     let config = try WorkspaceConfig.parse(text)
     if baseline.slug != nil, text.utf8.elementsEqual(baseline.text.utf8) {
       try store.read(baseline.check)
@@ -44,6 +59,58 @@ package enum WorkspaceEditor {
     let slug: String?
     let uid: String?
     let text: String
+
+    private static let marker = "# silta-base:"
+    private static let prefix = marker + " "
+
+    private var token: String {
+      guard let uid else { return "new" }
+      return SHA256.hash(data: Data((uid + "\0" + text).utf8))
+        .map { String(format: "%02x", $0) }.joined()
+    }
+
+    func stamped(_ document: String) -> String {
+      Self.prefix + token + "\n" + document
+    }
+
+    static func payload(_ document: String, workspace: String?) throws
+      -> (stamp: Substring?, text: String)
+    {
+      let headers = baselineHeaders(in: document)
+      guard let header = headers.first else { return (nil, document) }
+      let invalidStamp = CommandFailure(
+        error: WorkspaceError.invalid(["line 1: malformed workspace baseline"]),
+        next: [workspaceEditRead(workspace)])
+      guard headers.count == 1, document.hasPrefix(header), header.hasPrefix(Self.prefix),
+        let newline = document.utf8.firstIndex(of: 0x0A)
+      else { throw invalidStamp }
+      let supplied = header.dropFirst(Self.prefix.count)
+      guard supplied == "new" || supplied.wholeMatch(of: /[0-9a-f]{64}/) != nil
+      else { throw invalidStamp }
+      let text = String(document[document.utf8.index(after: newline)...])
+      return (supplied, text)
+    }
+
+    private static func baselineHeaders(in document: String) -> [Substring] {
+      var leading = true
+      return document.split(whereSeparator: \.isNewline).filter { line in
+        let candidate = leading ? line.drop(while: headerWhitespace) : line
+        guard candidate.first == "#" else {
+          if !candidate.isEmpty { leading = false }
+          return false
+        }
+        let comment = candidate.dropFirst().drop(while: headerWhitespace)
+        return comment == "silta-base" || comment.hasPrefix("silta-base:")
+      }
+    }
+
+    private static func headerWhitespace(_ character: Character) -> Bool {
+      character == " " || character == "\t" || character == "\u{FEFF}"
+    }
+
+    func check(stamp: Substring?) throws {
+      if let stamp, stamp != token { throw WorkspaceEditConflict(workspace: slug) }
+    }
 
     func check(in db: Database) throws {
       if let slug {
@@ -114,26 +181,48 @@ package enum WorkspaceEditor {
         if let rejected, unchanged || changed.utf8.elementsEqual(rejected.text.utf8) {
           throw unchangedFailure(rejected.error, baseline: baseline)
         }
+        let (stamp, text) = try Baseline.payload(changed, workspace: baseline.slug)
         do {
-          let config = try WorkspaceConfig.parse(changed)
+          try baseline.check(stamp: stamp)
+          let config = try WorkspaceConfig.parse(text)
           guard !unchanged else { return nil }
           return try save(
             config, baseline: baseline, store: store, identity: identity, approval: approval)
         } catch var conflict as WorkspaceEditConflict {
           retain = true
+          try stampDraft(changed, stamp: stamp, baseline: baseline, at: file)
           conflict.buffer = file
           throw conflict
         } catch let error as WorkspaceError {
           guard !unchanged else { throw unchangedFailure(error, baseline: baseline) }
           rejected = (changed, error)
-          content =
-            "# " + error.message.replacingOccurrences(of: "; ", with: "\n# ") + "\n" + changed
+          let annotated =
+            "# " + error.message.replacingOccurrences(of: "; ", with: "\n# ") + "\n" + text
+          content = stamp == nil ? annotated : baseline.stamped(annotated)
         }
       }
     } catch let error as any CodedError {
       throw error
     } catch {
       throw WorkspaceError.editor
+    }
+  }
+
+  private static func stampDraft(
+    _ draft: String, stamp: Substring?, baseline: Baseline, at file: URL
+  )
+    throws
+  {
+    guard stamp == nil else { return }
+    do {
+      try baseline.stamped(draft).write(to: file, atomically: true, encoding: .utf8)
+    } catch {
+      let location = RestoreService.canNameInRecovery(file.path) ? " at " + file.path : ""
+      throw CommandFailure(
+        error: WorkspaceEditConflict(workspace: baseline.slug),
+        next: [workspaceEditRead(baseline.slug)],
+        message: "Workspace configuration changed while editing. Copy your edits from the private "
+          + "draft kept\(location) onto a fresh workspace snapshot.")
     }
   }
 

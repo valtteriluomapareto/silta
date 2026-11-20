@@ -19,7 +19,7 @@ struct WsShowCommand: WorkspaceArgumentCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     let store = context.environment.db
     let slug = try context.workspace(workspace ?? global.ws)
-    let yaml = try store.read { try WorkspaceConfig.render(from: $0, slug: slug) }
+    let yaml = try WorkspaceEditor.snapshot(slug: slug, store: store)
     return CommandOutput(text: yaml, quiet: yaml, data: Data(workspace: slug, yaml: yaml))
       .reporting(slug)
   }

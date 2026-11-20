@@ -176,8 +176,7 @@ struct ScanNamingTests {
       #expect(error?.code == .conflict)
       #expect(error?.message.contains("acme") == true)
       #expect(error?.message.contains("derived") == true)
-      #expect(error?.next.first?.contains("--prefix") == true)
-      #expect(error?.next.first?.contains(repo.path) == true)
+      #expect(error?.next == ["silta --ws 'acme' ws show", "silta init --help"])
       #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
     }
   }
@@ -195,12 +194,12 @@ struct ScanNamingTests {
       }
       #expect(error?.code == .conflict)
       #expect(error?.message.contains("acme") == true)
-      #expect(error?.next.first?.contains("--prefix") == true)
+      #expect(error?.next == ["silta --ws 'acme' ws show", "silta init --help"])
       #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
     }
   }
 
-  @Test func slugExistsOffersAnotherSlugThenTheRescan() async throws {
+  @Test func slugExistsOffersInspectionAndHelp() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
       try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
@@ -216,14 +215,8 @@ struct ScanNamingTests {
           directories, slug: "acme", store: store, git: ScriptedGitRunner(script: script))
       }
       #expect(error?.code == .conflict)
-      #expect(error?.message.contains("already registered") == true)
-      #expect(error?.next.count == 2)
-      #expect(error?.next.first?.contains("--slug <another-slug>") == true)
-      #expect(error?.next.last?.hasSuffix("--ws 'acme'") == true)
-      for next in error?.next ?? []
-      where next.contains("<another-slug>") == false {
-        #expect(next.contains(api.path) && next.contains(web.path))
-      }
+      #expect(error?.message.contains("inspect its repository configuration") == true)
+      #expect(error?.next == ["silta --ws 'acme' ws show", "silta init --help"])
     }
   }
 
@@ -307,10 +300,11 @@ extension ScanNamingTests {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
       let root = home.appending(path: "zed")
-      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+      let clone = try Self.clone(root)
       let error = await Self.refusal {
         _ = try await Self.create(
-          [root], slug: "x-y", store: store, git: ScriptedGitRunner(script: []))
+          [root], slug: "x-y", store: store,
+          git: ScriptedGitRunner(script: RepositoryScanTests.script(clone)))
       }
       #expect(error?.code == .invalid)
       #expect(
@@ -342,9 +336,7 @@ extension ScanNamingTests {
     }
   }
 
-  /// `--prefix` alone cannot name an existing workspace: the refusal says the
-  /// option is for a new workspace and puts the rescan first.
-  @Test func prefixOnlyOnAnExistingWorkspaceSaysItAppliesToANewOne() async throws {
+  @Test func prefixOnlyOnAnExistingWorkspaceOffersInspection() async throws {
     try await withScratchDirectory { home in
       let store = WorkspaceConfigTests.store(home.appending(path: "db"))
       try WorkspaceConfigTests.apply(WorkspaceConfigTests.minimal, to: store)
@@ -356,9 +348,8 @@ extension ScanNamingTests {
           git: ScriptedGitRunner(script: RepositoryScanTests.script(path)))
       }
       #expect(error?.code == .conflict)
-      #expect(error?.message.contains("--prefix applies only to a new workspace") == true)
-      #expect(error?.next.first?.hasSuffix("--ws 'acme'") == true)
-      #expect(error?.next.count == 2)
+      #expect(error?.message.contains("Use --slug to name a new workspace with --prefix") == true)
+      #expect(error?.next == ["silta --ws 'acme' ws show", "silta init --help"])
       #expect(try WorkspaceSelection.list(in: store).map(\.slug) == ["acme"])
     }
   }

@@ -182,7 +182,7 @@ struct FirstWorkspaceCommandTests {
       try InitCommandTests.makeRepo(repo, in: scratch)
       let result = try SiltaBinary.run(
         ["init", "--scan", repo.path, missing.path, "--json"], in: scratch)
-      #expect(result.termination == .exit(9))
+      #expect(result.termination == .exit(1))
       let error = try TaskStateCommandTests.error(result)
       #expect((error["message"] as? String)?.contains(missing.path) == true)
       #expect(
@@ -196,10 +196,12 @@ struct FirstWorkspaceCommandTests {
       let missing = scratch.appending(path: "Missing Acme")
       let result = try SiltaBinary.run(["init", "--scan", missing.path, "--json"], in: scratch)
       let error = try TaskStateCommandTests.error(result)
-      #expect(result.termination == .exit(9) && error["code"] as? String == "env")
+      #expect(result.termination == .exit(1) && error["code"] as? String == "invalid")
       #expect((error["message"] as? String)?.contains(missing.path) == true)
       #expect(error["next"] as? [String] == ["silta init --help"])
       #expect(error["next_by"] as? String == "agent")
+      #expect(
+        try Self.replay("silta init --help", in: scratch, cwd: scratch).termination == .exit(0))
     }
   }
 
@@ -223,6 +225,12 @@ struct FirstWorkspaceCommandTests {
     }
   }
 
+  private static func canonicalPath(_ directory: URL) throws -> String {
+    let values = try directory.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
+    return values.volumeSupportsCaseSensitiveNames == false
+      ? directory.path.lowercased() : directory.path
+  }
+
   static func replay(_ hint: String, in scratch: URL, cwd: URL, json: Bool = false) throws
     -> CLIResult
   {
@@ -230,5 +238,166 @@ struct FirstWorkspaceCommandTests {
     let command = binary + (json ? " --json" : "") + String(hint.dropFirst("silta".count))
     return try SiltaBinary.runProcess(
       URL(filePath: "/bin/sh"), ["-c", command], in: scratch, cwd: cwd)
+  }
+}
+
+extension FirstWorkspaceCommandTests {
+  @Test(arguments: [false, true])
+  func whereFindsAPathlessCloneDeclaration(withRemote: Bool) throws {
+    try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "ac-platform")
+      try InitCommandTests.makeRepo(repo, in: scratch)
+      try InitCommandTests.git(
+        ["remote", "add", "origin", "git@github.com:acme-fixture-org/probe-platform.git"],
+        in: scratch, cwd: repo
+      )
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO repo(uid,workspace_id,slug,remote_url)
+            SELECT 'acme-existing-repo',id,?,? FROM workspace WHERE slug='acme'
+            """,
+          arguments: [
+            withRemote ? "declared-platform" : "ac-platform",
+            withRemote ? "https://GITHUB.com/acme-fixture-org/probe-platform" : nil,
+          ])
+      }
+      let result = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: repo)
+      let error = try TaskStateCommandTests.error(result)
+      let next = try #require((error["next"] as? [String])?.first)
+      #expect(next.hasPrefix("silta --ws 'acme' init --scan "))
+      let brief = try SiltaBinary.run(["brief", "--json"], in: scratch, cwd: repo)
+      #expect(brief.stdout.contains("silta --ws 'acme' init --scan "))
+      let scan = try SiltaBinary.run(["init", "--scan", ".", "--json"], in: scratch, cwd: repo)
+      #expect(scan.termination == .exit(6))
+      let scanHint = try #require(
+        try (TaskStateCommandTests.error(scan)["next"] as? [String])?.first)
+      #expect(scanHint.hasPrefix("silta --ws 'acme' init --scan "))
+      for hint in [next, scanHint] {
+        let repaired = try Self.replay(hint, in: scratch, cwd: repo)
+        #expect(repaired.termination == .exit(0), "\(repaired.stderr)")
+      }
+      let canonical = try Self.canonicalPath(repo)
+      try store.read { (db: Database) throws in
+        #expect(try Int.fetchOne(db, sql: "SELECT count(*) FROM workspace") == 1)
+        #expect(try String.fetchOne(db, sql: "SELECT uid FROM repo") == "acme-existing-repo")
+        #expect(
+          try String.fetchOne(db, sql: "SELECT path FROM repo_path") == canonical)
+      }
+    }
+  }
+
+  @Test func competingOriginsAndPathlessSlugsRequireInspectionUntilAnExactPathExists() throws {
+    try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "ac-platform")
+      try InitCommandTests.makeRepo(repo, in: scratch)
+      try InitCommandTests.git(
+        ["remote", "add", "origin", "git@github.com:acme-fixture-org/probe-platform.git"],
+        in: scratch, cwd: repo
+      )
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO repo(uid,workspace_id,slug,remote_url)
+            SELECT 'repo-origin',id,'declared-platform',? FROM workspace WHERE slug='acme';
+            INSERT INTO repo(uid,workspace_id,slug)
+            SELECT 'repo-slug',id,'ac-platform' FROM workspace WHERE slug='acme'
+            """, arguments: ["https://github.com/acme-fixture-org/probe-platform.git"])
+      }
+      let arguments = ["--ws", "acme", "init", "--scan", ".", "--json"]
+      let refusal = try SiltaBinary.run(arguments, in: scratch, cwd: repo)
+      #expect(refusal.termination == .exit(6))
+      #expect(
+        try TaskStateCommandTests.error(refusal)["next"] as? [String] == [
+          "silta --ws 'acme' ws show"
+        ])
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 0)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: "INSERT INTO repo_path(repo_id,path) SELECT id,? FROM repo WHERE uid='repo-origin'",
+          arguments: [try Self.canonicalPath(repo)])
+      }
+      let exact = try SiltaBinary.run(arguments, in: scratch, cwd: repo)
+      try #require(exact.termination == .exit(0), "\(exact.stdout)")
+      #expect(
+        try TaskStateCommandTests.data(exact)["repositories"] as? [String] == ["declared-platform"])
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 1)
+    }
+  }
+
+  @Test(arguments: [
+    "https://github.com/acme-fixture-org/Probe-platform.git",
+    "https://github.com:8443/acme-fixture-org/probe-platform.git",
+  ])
+  func differentHostedOriginsDoNotMatch(declaredOrigin: String) throws {
+    try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "ac-platform")
+      try InitCommandTests.makeRepo(repo, in: scratch)
+      try InitCommandTests.git(
+        ["remote", "add", "origin", "https://github.com/acme-fixture-org/probe-platform.git"],
+        in: scratch, cwd: repo)
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO repo(uid,workspace_id,slug,remote_url)
+            SELECT 'repo-origin',id,'declared-platform',? FROM workspace WHERE slug='acme'
+            """, arguments: [declaredOrigin])
+      }
+      let result = try SiltaBinary.run(["init", "--scan", ".", "--json"], in: scratch, cwd: repo)
+      #expect(result.termination == .exit(6))
+      let error = try TaskStateCommandTests.error(result)
+      #expect(error["next"] as? [String] == ["silta --ws 'acme' ws show", "silta init --help"])
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 0)
+    }
+  }
+
+  @Test func possibleAliasOnAGenericHostOffersInspectionWithoutBinding() throws {
+    try withScratchDirectory { scratch in
+      let repo = scratch.appending(path: "ac-platform")
+      try InitCommandTests.makeRepo(repo, in: scratch)
+      try InitCommandTests.git(
+        ["remote", "add", "origin", "git@example.invalid:acme/platform.git"], in: scratch, cwd: repo
+      )
+      let store = try TaskCommandTests.setup(scratch)
+      try store.write { tx in
+        try tx.database.execute(
+          sql: """
+            INSERT INTO repo(uid,workspace_id,slug,remote_url)
+            SELECT 'acme-existing-repo',id,'declared-platform',? FROM workspace WHERE slug='acme'
+            """, arguments: ["ssh://git@example.invalid/acme/platform.git"])
+      }
+      let cases = [
+        (["where"], Int32(2)),
+        (["init", "--scan", "."], Int32(6)),
+        (["--ws", "acme", "init", "--scan", "."], Int32(6)),
+      ]
+      let inspect = "silta --ws 'acme' ws show"
+      for (args, exit) in cases {
+        let result = try SiltaBinary.run(args + ["--json"], in: scratch, cwd: repo)
+        #expect(result.termination == .exit(exit))
+        #expect(try TaskStateCommandTests.error(result)["next"] as? [String] == [inspect])
+      }
+      #expect(try Self.replay(inspect, in: scratch, cwd: repo).termination == .exit(0))
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM workspace") } == 1)
+      #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 0)
+    }
+  }
+
+  @Test func emptyScanDoesNotCreateAWorkspaceOrDatabase() throws {
+    try withScratchDirectory { scratch in
+      let result = try SiltaBinary.run(["init", "--scan", ".", "--json"], in: scratch)
+      #expect(result.termination == .exit(1))
+      let error = try TaskStateCommandTests.error(result)
+      #expect(error["code"] as? String == "invalid")
+      #expect(error["next"] as? [String] == ["silta init --help"])
+      #expect(
+        try Self.replay("silta init --help", in: scratch, cwd: scratch).termination == .exit(0))
+      #expect(
+        !FileManager.default.fileExists(
+          atPath: scratch.appending(path: "silta-home/silta.db").path))
+    }
   }
 }

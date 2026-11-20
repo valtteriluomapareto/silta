@@ -62,10 +62,10 @@ package enum ScanError: CodedError, Equatable {
 
   /// The slug the scan would create already names a workspace. `chosen` says
   /// whether `--slug` named it or the directory did and only `--prefix` was given.
-  case slugExists(String, chosen: Bool, workspace: String, roots: [String], choice: ScanChoice)
+  case slugExists(chosen: Bool, workspace: String)
 
   /// Another workspace already uses the task prefix.
-  case prefixTaken(String, derived: Bool, workspace: String, roots: [String], choice: ScanChoice)
+  case prefixTaken(String, derived: Bool, workspace: String)
 
   /// Another workspace already binds the clone's path.
   case repoPathTaken(repo: String, path: String, workspace: String)
@@ -79,16 +79,18 @@ package enum ScanError: CodedError, Equatable {
   /// The named directory can't be read.
   case unreadableRoot(String)
 
+  /// The scan found no Git clones.
+  case noRepositories([String])
+
   /// A clone's slug is `none`, the word that means non-code work.
   case reservedSlug(path: String)
 
   package var code: ErrorCode {
     switch self {
-    case .invalidSlug, .invalidPrefix: .invalid
+    case .invalidSlug, .invalidPrefix, .unreadableRoot, .noRepositories: .invalid
     case .slugExists, .prefixTaken, .repoPathTaken, .reservedSlug, .registeredWorkspaces,
       .unverifiedWorkspace:
       .conflict
-    case .unreadableRoot: .env
     }
   }
 
@@ -113,14 +115,13 @@ package enum ScanError: CodedError, Equatable {
       case nil:
         return "Invalid task prefix \(value.debugDescription); use \(shape)."
       }
-    case .slugExists(_, let chosen, let workspace, _, _):
+    case .slugExists(let chosen, let workspace):
       return chosen
-        ? "Workspace \(workspace.debugDescription) already exists; choose another --slug, or "
-          + "rescan it to refresh only the repos already registered there."
-        : "Workspace \(workspace.debugDescription) already exists; --prefix applies only to a "
-          + "new workspace, so rescan it to refresh the repos already registered there, or pass "
-          + "--slug to choose another name."
-    case .prefixTaken(let prefix, let derived, let workspace, _, _):
+        ? "Workspace \(workspace.debugDescription) already exists; inspect its repository "
+          + "configuration before choosing another --slug."
+        : "Workspace \(workspace.debugDescription) already exists; inspect its repository "
+          + "configuration. Use --slug to name a new workspace with --prefix."
+    case .prefixTaken(let prefix, let derived, let workspace):
       return derived
         ? "Task prefix \(prefix.debugDescription) is already used by workspace "
           + "\(workspace.debugDescription); it was derived from the workspace name, so pass "
@@ -142,6 +143,9 @@ package enum ScanError: CodedError, Equatable {
     case .unreadableRoot(let path):
       return
         "Cannot read scan directory \(path.debugDescription). Choose an existing readable directory."
+    case .noRepositories(let paths):
+      return "No Git repositories found in " + paths.map(\.debugDescription).joined(separator: ", ")
+        + ". Choose a directory containing a Git clone."
     case .reservedSlug(let path):
       return "Clone at \(path.debugDescription) has the repo slug \(TaskDraft.noneApp), which "
         + "means non-code work in --app \(TaskDraft.noneApp); give the clone's directory a "
@@ -149,20 +153,15 @@ package enum ScanError: CodedError, Equatable {
     }
   }
 
-  /// Every command repeats the naming options already given, so it lands on the
-  /// same workspace the caller asked for, and carries the roots as typed.
+  /// A verified match can name a rescan. Naming collisions point to inspection.
   package var next: [String] {
     switch self {
     case .invalidSlug(_, _, _, let roots, let choice):
       return [command(roots: roots, "--slug <slug>", ScanChoice.prefix(choice))]
     case .invalidPrefix(_, _, let roots, let choice):
       return [command(roots: roots, ScanChoice.slug(choice), "--prefix <prefix>")]
-    case .slugExists(_, let chosen, let workspace, let roots, let choice):
-      let another = command(roots: roots, "--slug <another-slug>", ScanChoice.prefix(choice))
-      let rescan = "silta init --scan \(roots.scanArguments) --ws \(shellWord(workspace))"
-      return chosen ? [another, rescan] : [rescan, another]
-    case .prefixTaken(_, _, _, let roots, let choice):
-      return [command(roots: roots, ScanChoice.slug(choice), "--prefix <prefix>")]
+    case .slugExists(_, let workspace), .prefixTaken(_, _, let workspace):
+      return ["silta --ws " + shellWord(workspace) + " ws show", "silta init --help"]
     case .repoPathTaken(_, let path, let workspace):
       return ["silta --ws \(shellWord(workspace)) init --scan \(shellWord(path))"]
     case .registeredWorkspaces(let workspaces, let roots):
@@ -172,14 +171,8 @@ package enum ScanError: CodedError, Equatable {
       return workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
     case .unverifiedWorkspace(let workspace):
       return ["silta --ws " + shellWord(workspace) + " ws show"]
-    case .reservedSlug, .unreadableRoot: return ["silta init --help"]
+    case .reservedSlug, .unreadableRoot, .noRepositories: return ["silta init --help"]
     }
-  }
-
-  /// The caller can choose a readable scan root.
-  package var nextBy: NextBy {
-    if case .unreadableRoot = self { return .agent }
-    return code.nextBy
   }
 
   /// A scan command followed by the naming options the caller already gave.

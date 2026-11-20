@@ -518,7 +518,9 @@ extension HelpCommandTests {
     let examples = try examples(in: scratch)
     var placeholders = ["COMMIT_SHA": commitSHA]
     let expectedErrors = [
-      "silta init": (code: "env", reason: "The example scan paths are outside the Acme fixture.")
+      "silta init": (
+        code: "invalid", reason: "The example scan paths are outside the Acme fixture."
+      )
     ]
     #expect(!examples.isEmpty, "no existing examples were found")
     for example in examples {
