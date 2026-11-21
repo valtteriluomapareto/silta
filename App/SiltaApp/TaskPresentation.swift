@@ -83,7 +83,9 @@ nonisolated enum TaskPresentation {
     let next = "Another agent can now start it without stealing the claim."
     guard let expiry = task.claimExpiresAt else {
       return ClaimBanner(
-        title: "Claim expired", body: name + "'s claim has no readable heartbeat. " + next)
+        title: "Claim unreadable",
+        body: name + "'s claim has no readable heartbeat, so Core refuses to start the task. "
+          + "Run `silta doctor` to repair it.")
     }
     let lapsed = expiry.ISO8601Format(.init(includingFractionalSeconds: true))
     let wrote = RelativeAge.text(task.claimedAt, now: now) ?? "just now"
