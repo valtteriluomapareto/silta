@@ -425,6 +425,7 @@ extension AppModel {
     taskDetail.clear()
     actions.selectedProposals = []
     droppingProposals = false
+    actions.selectedDocuments = []
     boardSelection = nil
     boardInspectorPresented = false
     workspaceSelection = nil

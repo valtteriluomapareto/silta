@@ -276,15 +276,19 @@ extension DocsView {
           }
         }
       }
+      // A refused triage stays visible after the refresh, even once the revision was
+      // decided elsewhere.
+      if docs.view == .changes,
+        let failure = model.target(AppModel.documentsTarget).flatMap({ model.actions.failures[$0] })
+      {
+        ActionFailureView(failure: failure)
+      }
       if docs.view == .changes, let doc = docs.document, doc.state == "proposed",
         let reader = model.reader, let workspace = model.workspace
       {
         if model.writer != nil {
           let target = model.target(AppModel.documentsTarget)
           let sending = target.map { model.actions.isSending($0) } ?? false
-          if let failure = target.flatMap({ model.actions.failures[$0] }) {
-            ActionFailureView(failure: failure)
-          }
           HStack(spacing: 12) {
             Text("Accepting makes @\(doc.revision) the current revision.")
               .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))

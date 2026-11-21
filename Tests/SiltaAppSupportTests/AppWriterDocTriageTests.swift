@@ -24,9 +24,14 @@
         try await AppWriter(reader: reader).send(
           .triageDocuments(accept: [], reject: [ref]), workspace: "acme")
         #expect(try Self.state(reader, ref) == "rejected")
+        let slug = String(ref.dropFirst("doc:".count).prefix { $0 != "@" })
+        let decided = try reader.documentVersions("doc:" + slug, workspace: "acme").entries
+          .first { $0.ref == ref }
+        #expect(decided?.triagedBy == "human:acme")
         let log = try String(
           contentsOf: scratch.appending(path: "silta-home/log/2026-11-16.jsonl"), encoding: .utf8)
         #expect(log.contains("\"command\":\"app doc-triage\""))
+        #expect(log.contains("\"actor\":\"human:acme\""))
       }
     }
 

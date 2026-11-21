@@ -39,6 +39,34 @@
       }
     }
 
+    @Test func acceptingFromDocsUpdatesTheOpenRevision() async throws {
+      let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: root) }  // cleanup
+      let home = root.appending(path: "data")
+      try AppDocsFixture.seed(home: home)
+      let reader = try AppReader(home: home, user: "acme", now: { AppV2Fixture.now })
+      let session = AppReadSession(reader: reader, now: { AppV2Fixture.now })
+      let writer = AppWriter(reader: reader)
+      let model = AppModel(
+        reader: reader, now: { AppV2Fixture.now },
+        writer: { write, workspace in try await writer.send(write, workspace: workspace) },
+        load: { previous, workspace, force in
+          try session.load(previous: previous, workspace: workspace, force: force)
+        })
+      await model.refresh().value
+      model.openDocument("doc:push-categories@1")
+      await model.loadDocuments(force: true)
+      #expect(model.documents.document?.state == "proposed")
+      model.actions.selectedDocuments = ["doc:push-categories@1"]
+      await model.triageDocuments(accept: ["doc:push-categories@1"], reject: [])?.value
+      #expect(model.documents.document?.state == "accepted")
+      #expect(model.actions.selectedDocuments.isEmpty)
+      await model.selectWorkspace("acme").value
+      model.actions.selectedDocuments = ["doc:order-contract@3"]
+      await model.selectWorkspace("other").value
+      #expect(model.actions.selectedDocuments.isEmpty)
+    }
+
     private func fixtureModel(
       _ writes: ControlledWrites, _ body: (AppModel) async throws -> Void
     ) async throws {

@@ -89,6 +89,11 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     parent creates a todo task as the human in one Core write (`app add`); the app never
     starts or claims it. "Copy agent prompt after creating" copies the prompt that hands
     it to an agent (Paper "App features v1"); the app launches nothing (D4).
+  - **Doc proposals:** My work's rows have checkboxes, none ticked at first, with "Reject
+    N" and "Accept N"; the Docs Changes tab has "Reject @N" and "Accept @N" for the open
+    revision. A row triages the newest proposed revision of its document. The selection
+    is pruned after each write and cleared on a workspace switch, and follows the whole
+    inbox while Show all is on. No confirm step, as for task proposals.
   - **My work review card:** Open task, the PR link, and Mark done / Request changes /
     Drop. Mark done needs a nonblank result; an empty merge commit records none
     (`--no-sha`), and a typed one is checked in the worktree or else the app's registered
