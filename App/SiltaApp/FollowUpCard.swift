@@ -36,6 +36,10 @@ struct FollowUpCard: View {
       if let failure = target.flatMap({ model.actions.failures[$0] }) {
         ActionFailureView(failure: failure).padding(.leading, 32)
       }
+      if let progress = followUp.progress {
+        Text(progress).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+          .padding(.leading, 32)
+      }
       footer.padding(.leading, 32)
     }
   }
@@ -49,7 +53,9 @@ struct FollowUpCard: View {
           .keyboardShortcut(.cancelAction)
         Button(sending ? "Unblocking…" : "Unblock") {
           Task {
-            await model.unblockAnyway(ref)?.value
+            guard let running = model.unblockAnyway(ref, confirmed: followUp.openBlockers)
+            else { return }
+            await running.value
             if let target, model.actions.failures[target] == nil { confirmingUnblock = false }
           }
         }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
@@ -88,7 +94,8 @@ struct FollowUpCard: View {
 
   private func drop() {
     Task {
-      await model.dropTask(ref)?.value
+      guard let running = model.dropTask(ref) else { return }
+      await running.value
       if let target, model.actions.failures[target] == nil { askingWhy = false }
     }
   }

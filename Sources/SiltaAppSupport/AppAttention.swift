@@ -46,9 +46,26 @@ public struct AppBlockedTask: Equatable, Sendable {
   public let on: [String]
   /// The stored UTC follow-up day.
   public let followUpAt: String?
+  /// Blockers keeping it from being ready, by Core's rule: parties, URLs and tasks not
+  /// done, tasks as bare refs.
+  public internal(set) var open: [String] = []
+  /// Dropped blocker tasks, as bare refs.
+  public internal(set) var dropped: [String] = []
 }
 
 extension AppAttention {
+  /// The entry with each blocked task's open and dropped blockers filled in.
+  func withUnmet(_ unmet: [String: (open: [String], dropped: [String])]) -> AppAttention {
+    var copy = self
+    copy.blocked = blocked.map { task in
+      var task = task
+      task.open = unmet[task.ref]?.open ?? []
+      task.dropped = unmet[task.ref]?.dropped ?? []
+      return task
+    }
+    return copy
+  }
+
   init(_ item: InboxItem) {
     self.init(
       kind: item.kind, target: item.target, ref: item.ref,

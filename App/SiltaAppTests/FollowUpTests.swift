@@ -45,12 +45,38 @@
           snapshot: try later.snapshot(workspace: "acme"), search: "", now: now)
         let due = try #require(content.followUps.first)
         #expect(!due.replan && due.title == "Follow up: Paginate the orders endpoint")
-        #expect(due.subtitle == "Follow-up was due 2026-11-23 · blocked 8 days")
+        #expect(due.subtitle == "Follow-up was due 2 days ago · blocked 8 days")
+        #expect(FollowUp.dueDay("2026-11-25", now: now) == "today")
+        #expect(FollowUp.dueDay("2026-11-24", now: now) == "yesterday")
+        #expect(FollowUp.dueDay("2026-11-26", now: now) == "2026-11-26")
         #expect(
           MyWorkContent(
             snapshot: try later.snapshot(workspace: "acme"), search: "design",
             now: now
           ).followUps.count == 1)
+      }
+    }
+
+    @Test func aTaskWithTwoPartiesGetsOneCardAndDoneBlockersStayLinked() throws {
+      try fixture { home in
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "task", "block", "AC-16", "--on", "ext:design-team", "--on",
+            "ext:legal", "--on", "AC-18", "-m", "Needs copy and sign-off.",
+          ], home: home)
+        try AppTestCLI.run(
+          ["--ws", "acme", "task", "done", "AC-18", "--no-sha", "-m", "Done."], home: home,
+          seed: 153)
+        let now = AppV2Fixture.now.addingTimeInterval(8.5 * 86_400)
+        let later = try AppReader(home: home, user: "acme", now: { now })
+        let content = MyWorkContent(
+          snapshot: try later.snapshot(workspace: "acme"), search: "", now: now)
+        let cards = content.followUps.filter { $0.task.ref == "AC-16" }
+        #expect(cards.count == 1)
+        let card = try #require(cards.first)
+        #expect(Set(card.openBlockers) == ["ext:design-team", "ext:legal"])
+        #expect(card.progress == "AC-18 is done; 2 of 3 blockers still open.")
+        #expect(!card.unblockWarning.contains("AC-18"))
       }
     }
 
@@ -60,7 +86,7 @@
         let snooze = model.snooze("AC-17", days: 14)
         let first = await writes.next()
         #expect(first.write == .snooze(ref: "AC-17", days: 14))
-        #expect(model.unblockAnyway("AC-17") == nil)
+        #expect(model.unblockAnyway("AC-17", confirmed: []) == nil)
         first.continuation.resume(returning: nil)
         await snooze?.value
         let reason = try #require(model.target(AppModel.dropTaskReasonTarget("AC-17")))

@@ -73,6 +73,21 @@ extension TaskService {
       why: SecretGuard.redacted(latest.why), ready: ready, dropped: dropped)
   }
 
+  /// What keeps each named blocked task from being ready, read in one transaction; a task
+  /// that isn't blocked has no entry.
+  package func unmetBlockers(_ refs: [String]) throws -> [String: (
+    open: [String], dropped: [String]
+  )] {
+    let slug = try selected()
+    return try environment.db.read { db in
+      try refs.reduce(into: [:]) { states, ref in
+        let task = try Self.lookup(ref, workspace: slug, in: db)
+        guard task.status == "blocked" else { return }
+        states[ref] = try Self.unmet(task, in: db)
+      }
+    }
+  }
+
   /// What keeps a block from being ready: parties, URLs and tasks not done (a promoted one
   /// included) in `open`, dropped tasks in `dropped`. Tasks are bare refs (`AC-2`).
   static func unmet(_ task: TaskDetails, in db: Database) throws

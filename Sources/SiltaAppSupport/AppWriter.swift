@@ -117,7 +117,9 @@ public struct AppWriter: Sendable {
       _ = try service.triage(batch)
     case .unblock(let ref):
       _ = try service.unblock([ref], requireReady: true)
-    case .unblockAnyway(let ref):
+    case .unblockAnyway(let ref, let confirmed):
+      let open = try service.unmetBlockers([ref])[ref]?.open ?? []
+      guard Set(open) == Set(confirmed) else { throw TaskError.edited(ref) }
       _ = try service.unblock([ref])
     case .snooze(let ref, let days):
       let task = try service.show(ref)

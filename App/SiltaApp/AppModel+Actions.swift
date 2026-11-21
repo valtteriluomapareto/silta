@@ -84,8 +84,10 @@ extension AppModel {
   }
 
   /// Returns a blocked task to todo even with open blockers; the view confirms first.
-  @discardableResult func unblockAnyway(_ ref: String) -> Task<Void, Never>? {
-    perform(.unblockAnyway(ref: ref), for: Self.followUpTarget(ref))
+  @discardableResult func unblockAnyway(_ ref: String, confirmed: [String])
+    -> Task<Void, Never>?
+  {
+    perform(.unblockAnyway(ref: ref, confirmed: confirmed), for: Self.followUpTarget(ref))
   }
 
   /// Drops a blocked task with its drop reason draft, which clears only on success.

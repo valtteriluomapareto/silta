@@ -22,7 +22,10 @@
           try AppWriter(reader: reader).perform(.snooze(ref: "AC-15", days: 7), workspace: "acme")
         }
         #expect(try reader.task("AC-15", workspace: "acme").status == "todo")
-        _ = refused
+        #expect(refused.code == .conflict)
+        let log = try String(
+          contentsOf: scratch.appending(path: "silta-home/log/2026-11-16.jsonl"), encoding: .utf8)
+        #expect(log.contains("\"command\":\"app block\""))
       }
     }
 
@@ -33,7 +36,13 @@
         var block = TaskBlock(why: "Needs the final copy.")
         block.on = ["ext:design-team"]
         _ = try AppWriterTests.agent(reader, .human(name: "acme")).block("AC-16", block)
-        try AppWriter(reader: reader).perform(.unblockAnyway(ref: "AC-16"), workspace: "acme")
+        let changed = try AppWriterTests.failure {
+          try AppWriter(reader: reader).perform(
+            .unblockAnyway(ref: "AC-16", confirmed: []), workspace: "acme")
+        }
+        #expect(changed.code == .conflict)
+        try AppWriter(reader: reader).perform(
+          .unblockAnyway(ref: "AC-16", confirmed: ["ext:design-team"]), workspace: "acme")
         let task = try reader.task("AC-16", workspace: "acme")
         #expect(task.status == "todo" && task.waiting == nil)
         #expect(!task.links.contains { $0.rel == "blocked_by" })
@@ -81,6 +90,7 @@
         #expect(due.blocked.map(\.ref) == ["AC-16"])
         #expect(due.blocked.first?.followUpAt == "2026-11-23")
         #expect(due.blocked.first?.on == ["ext:design-team"])
+        #expect(due.blocked.first?.open == ["ext:design-team"])
       }
     }
   }

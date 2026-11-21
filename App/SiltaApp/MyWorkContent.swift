@@ -82,9 +82,15 @@ nonisolated struct MyWorkContent {
     tasks = items.filter {
       $0.kind == "proposal" && matches($0, extra: [byRef[$0.ref ?? ""]?.app ?? ""])
     }.map { Self.proposal($0, task: byRef[$0.refs.first ?? $0.ref ?? ""]) }
+    // Core lists a due task once per external blocker; one card per task is enough.
+    var seen = Set<String>()
     followUps = items.filter { ["due", "replan"].contains($0.kind) }.flatMap { item in
-      item.blocked.filter { matches(item, extra: [$0.ref, $0.title, $0.why ?? ""] + $0.on) }
-        .map { FollowUp(item: item, task: $0, board: byRef[$0.ref], now: now) }
+      item.blocked.filter { task in
+        seen.insert(task.ref).inserted
+          && AppSearch.matches(
+            search,
+            values: [item.kind, item.target ?? "", task.ref, task.title, task.why ?? ""] + task.on)
+      }.map { FollowUp(item: item, task: $0, board: byRef[$0.ref], now: now) }
     }
     other = items.filter {
       !["question", "answer", "doc_proposal", "proposal", "due", "replan"].contains($0.kind)
@@ -178,22 +184,22 @@ nonisolated struct FollowUp: Identifiable, Equatable {
     let age = waiting.map { $0.ageDays == 1 ? "blocked 1 day" : "blocked \($0.ageDays) days" }
     let lead =
       replan
-      ? "A blocker was dropped: " + dropped.joined(separator: ", ")
-      : "Follow-up was due " + (task.followUpAt ?? "")
+      ? "A blocker was dropped: " + task.dropped.joined(separator: ", ")
+      : "Follow-up was due " + Self.dueDay(task.followUpAt, now: now)
     return ([lead] + [age].compactMap { $0 }).joined(separator: " · ")
   }
 
-  /// Dropped blocker tasks, as bare refs.
-  var dropped: [String] { (board?.waiting?.dropped ?? []).map(Self.bare) }
+  /// The blockers Unblock anyway unlinks: Core's open ones, done tasks left out.
+  var openBlockers: [String] { task.open }
 
-  /// The blockers Unblock anyway unlinks: every current blocker but dropped tasks.
-  var openBlockers: [String] {
-    let dropped = Set(dropped)
-    return task.on.map(Self.bare).filter { !dropped.contains($0) }
-  }
-
-  private static func bare(_ blocker: String) -> String {
-    blocker.hasPrefix("task:") ? String(blocker.dropFirst("task:".count)) : blocker
+  /// How many blockers are done, such as `AC-19 is done; 1 of 2 blockers still open.`
+  var progress: String? {
+    let done = task.on.map(Self.bare).filter {
+      !task.open.contains($0) && !task.dropped.contains($0)
+    }
+    guard !done.isEmpty else { return nil }
+    return done.joined(separator: ", ") + (done.count == 1 ? " is" : " are") + " done; "
+      + "\(task.open.count) of \(task.on.count) blockers still open."
   }
 
   /// The confirm step's sentence before Unblock anyway.
@@ -203,5 +209,30 @@ nonisolated struct FollowUp: Identifiable, Equatable {
       ? "Unblocking returns it to Todo."
       : "Unblocking returns it to Todo and unlinks its open "
         + (open.count == 1 ? "blocker " : "blockers ") + open.joined(separator: ", ") + "."
+  }
+
+  private static func bare(_ blocker: String) -> String {
+    blocker.hasPrefix("task:") ? String(blocker.dropFirst("task:".count)) : blocker
+  }
+
+  /// A follow-up day relative to now: `today`, `yesterday`, `3 days ago`, or the day.
+  static func dueDay(_ day: String?, now: Date) -> String {
+    guard let day else { return "" }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = .gmt
+    formatter.dateFormat = "yyyy-MM-dd"
+    guard let date = formatter.date(from: day) else { return day }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .gmt
+    let days =
+      calendar.dateComponents([.day], from: date, to: calendar.startOfDay(for: now))
+      .day ?? 0
+    switch days {
+    case 0: return "today"
+    case 1: return "yesterday"
+    case 2...: return "\(days) days ago"
+    default: return day
+    }
   }
 }

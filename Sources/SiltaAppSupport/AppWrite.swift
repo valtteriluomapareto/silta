@@ -9,8 +9,9 @@ public enum AppWrite: Equatable, Sendable {
     to: [String] = [])
   /// Moves a blocked task's follow-up `days` ahead, keeping its blockers and reason.
   case snooze(ref: String, days: Int)
-  /// Returns a blocked task to todo even with open blockers, which are unlinked.
-  case unblockAnyway(ref: String)
+  /// Returns a blocked task to todo even with open blockers, which are unlinked. Refuses as
+  /// `conflict` when the open blockers are no longer the `confirmed` ones.
+  case unblockAnyway(ref: String, confirmed: [String])
   /// Drops a task, with an optional reason recorded as its result. Only `send` runs it.
   case dropTask(ref: String, why: String?)
   /// Creates a todo task as the human; the app never starts or claims it.

@@ -103,10 +103,13 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     draft that clears only when the drop succeeds. The selection is dropped for refs that
     leave the list.
   - **My work `ready` item:** "Unblock". Core unblocks a human's task even with an open
-    blocker, so the app offers it only on `ready` items. `replan` items keep their
-    read command. The write passes Core's `requireReady`, so a blocker added since the
-    read refuses as `blocked` instead of being cleared. Unblock has its own target, apart
-    from the task's comment draft.
+    blocker, so the plain Unblock is offered only on `ready` items. The write passes
+    Core's `requireReady`, so a blocker added since the read refuses as `blocked` instead
+    of being cleared. Unblock has its own target, apart from the task's comment draft.
+    Due and `replan` items get follow-up cards (see Out): "Unblock anyway" sends the open
+    blockers the confirm step named and refuses as `conflict` when Core's open blockers
+    differ, so it never unlinks one the human didn't see. Snooze re-blocks with Core's
+    masked current reason, which keeps the blockers and the episode's age.
   - **Errors** show in the card or inspector with the code, the message and "Copy
     command".
 - **Fixture:**

@@ -65,6 +65,9 @@ public struct AppReader: Sendable {
       }
       let reviews = tasks.filter { $0.status == "review" }
       let inbox = try service.inbox(for: "me")
+      let blockedRefs = inbox.items.filter { ["due", "replan"].contains($0.kind) }
+        .flatMap { $0.tasks ?? [] }.map(\.ref)
+      let unmet = try service.unmetBlockers(Array(Set(blockedRefs)))
       let questions = try service.questionInbox().map(AppAttention.init)
       return AppSnapshot(
         board: AppBoard(
@@ -73,7 +76,8 @@ public struct AppReader: Sendable {
           doneThisWeek: completed, proposals: tasks.filter { $0.status == "proposed" },
           questions: questions, appOpenCounts: counts),
         work: AppWork(
-          items: inbox.items.map(AppAttention.init), remaining: inbox.remaining,
+          items: inbox.items.map { AppAttention($0).withUnmet(unmet) },
+          remaining: inbox.remaining,
           moreCommand: inbox.more, reviews: reviews))
     }
   }
