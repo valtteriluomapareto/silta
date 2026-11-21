@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 import SiltaCore
 
 /// Task values shared by board cards, review attention and the inspector.
@@ -199,4 +199,28 @@ public struct AppTaskLink: Equatable, Sendable {
   public let rel: String
   /// Masked canonical target reference.
   public let target: String
+}
+
+extension AppTask {
+  /// How long a claim lasts without a heartbeat, as Core enforces it.
+  public static var claimDuration: TimeInterval { TaskService.claimDuration }
+
+  /// When the claim stops protecting the task, by Core's rule; nil when unclaimed or the
+  /// heartbeat is unreadable.
+  public var claimExpiresAt: Date? {
+    guard claimedBy != nil, let claimedAt else { return nil }
+    return try? TaskService.claimExpiry(claimedAt)  // unreadable: Core says corrupt, shown stale
+  }
+
+  /// Seconds since the claim's last heartbeat; nil when unclaimed or unreadable.
+  public func claimAge(at now: Date) -> TimeInterval? {
+    claimExpiresAt.map { max(0, now.timeIntervalSince($0) + Self.claimDuration) }
+  }
+
+  /// The claim no longer protects the task, so another agent can start it without
+  /// stealing. An unreadable heartbeat counts as expired, as Doctor treats it as stale.
+  public func claimExpired(at now: Date) -> Bool {
+    guard claimedBy != nil else { return false }
+    return claimExpiresAt.map { now >= $0 } ?? true
+  }
 }

@@ -27,7 +27,16 @@ struct TaskInspector: View {
             }
             Text(task.title).font(.system(size: 20, weight: .bold)).tracking(-0.2)
               .textSelection(.enabled)
-            if let handoff = TaskFacts.handoff(task) { HandoffNote(text: handoff) }
+            if let now = model.visibleData?.checkedAt,
+              let banner = TaskPresentation.claimBanner(task, now: now)
+            {
+              ClaimBannerView(
+                banner: banner, prompt: task.claimExpiresAt == nil ? nil : resumePrompt(task),
+                worktree: task.worktree)
+            }
+            if let handoff = TaskFacts.handoff(task) {
+              HandoffNote(text: handoff, prompt: resumePrompt(task))
+            }
             if let waiting = TaskFacts.waiting(task) { WaitingSection(waiting: waiting) }
             properties(task)
             if !task.description.isEmpty { DocumentMarkdown(task.description) }
@@ -134,6 +143,12 @@ struct TaskInspector: View {
       String(model.visibleData?.version ?? 0),
     ]
     .joined(separator: ":")
+  }
+
+  private func resumePrompt(_ task: AppTask) -> String? {
+    guard let reader = model.reader, let workspace = model.workspace else { return nil }
+    let name = model.visibleData?.workspaces.first { $0.slug == workspace }?.name ?? workspace
+    return reader.agentPrompt(task: task.ref, workspace: workspace, name: name)
   }
 
   private func properties(_ task: AppTask) -> some View {

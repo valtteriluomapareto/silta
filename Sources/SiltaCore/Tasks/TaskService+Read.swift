@@ -148,25 +148,7 @@ extension TaskService {
       let resolved = try Self.hiddenResolvedThreads(task, displayed: comments, in: db)
       if resolved > 0 { task.resolvedThreads = resolved }
     }
-    if task.status == "doing", task.claimedBy == nil, task.externalRef == nil,
-      let body = try String.fetchOne(
-        db,
-        sql: """
-          SELECT body FROM task_event WHERE task_id=? AND kind='claim' ORDER BY id DESC LIMIT 1
-          """, arguments: [task.id]), body.hasPrefix("released ")
-    {
-      task.resumeAvailable = true
-      let ref = String(body.dropFirst("released ".count))
-      let live =
-        try Bool.fetchOne(
-          db,
-          sql: """
-            SELECT EXISTS(SELECT 1 FROM comment
-            WHERE task_id=? AND ? || '/' || seq=? AND deleted_at IS NULL)
-            """,
-          arguments: [task.id, task.ref, ref]) ?? false
-      if live { task.handedOff = ref }
-    }
+    try Self.resume(&task, in: db)
     if timeline {
       task.timeline = try Row.fetchAll(
         db,
@@ -232,6 +214,42 @@ extension TaskService {
           """, arguments: [workspaceRow["id"] as Int64, seq])
     else { throw TaskError.notFound("task " + raw) }
     return TaskDetails(row: row)
+  }
+
+  /// Board rows with the resume state a detail read gives, read in one transaction, so a
+  /// list view can tell a released claim from a promoted task. The list read itself, and
+  /// so `task ls --json`, stays unchanged.
+  package func withResumeState(_ tasks: [TaskDetails]) throws -> [TaskDetails] {
+    try environment.db.read { db in
+      try tasks.map { task in
+        var task = task
+        try Self.resume(&task, in: db)
+        return task
+      }
+    }
+  }
+
+  /// Marks a Doing task whose last claim event was a release as resumable, naming the
+  /// handoff comment while it still exists. A promoted task belongs to its tracker.
+  static func resume(_ task: inout TaskDetails, in db: Database) throws {
+    guard task.status == "doing", task.claimedBy == nil, task.externalRef == nil,
+      let body = try String.fetchOne(
+        db,
+        sql: """
+          SELECT body FROM task_event WHERE task_id=? AND kind='claim' ORDER BY id DESC LIMIT 1
+          """, arguments: [task.id]), body.hasPrefix("released ")
+    else { return }
+    task.resumeAvailable = true
+    let ref = String(body.dropFirst("released ".count))
+    let live =
+      try Bool.fetchOne(
+        db,
+        sql: """
+          SELECT EXISTS(SELECT 1 FROM comment
+          WHERE task_id=? AND ? || '/' || seq=? AND deleted_at IS NULL)
+          """,
+        arguments: [task.id, task.ref, ref]) ?? false
+    if live { task.handedOff = ref }
   }
 
   static func decorate(_ original: TaskDetails, at date: Date, in db: Database) throws

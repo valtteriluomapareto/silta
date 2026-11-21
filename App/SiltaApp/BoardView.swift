@@ -148,7 +148,8 @@ struct BoardView: View {
           let metadata = TaskPresentation.cardMetadata(
             task, asked: asked, questionAuthor: content.questionAuthor(for: task.ref), now: now)
         {
-          Text(metadata).font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
+          Text(metadata).font(.system(size: 11))
+            .foregroundStyle(Color(task.claimExpired(at: now) ? "Warning" : "SecondaryInk"))
             .lineLimit(2).help(metadata)
         }
       }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(

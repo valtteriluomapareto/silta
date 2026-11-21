@@ -44,7 +44,7 @@ public struct AppReader: Sendable {
       let service = TaskService(environment: environment, workspace: workspace)
       var filter = TaskFilter()
       filter.proposed = true
-      let tasks = try service.list(filter).map {
+      let tasks = try service.withResumeState(service.list(filter)).map {
         AppTask($0, submission: $0.status == "review" ? try service.reviewSubmission($0.ref) : nil)
       }
       let at = environment.clock.now()
