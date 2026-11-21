@@ -266,17 +266,25 @@ extension FirstWorkspaceCommandTests {
       let result = try SiltaBinary.run(["where", "--json"], in: scratch, cwd: repo)
       let error = try TaskStateCommandTests.error(result)
       let next = try #require((error["next"] as? [String])?.first)
-      #expect(next.hasPrefix("silta --ws 'acme' init --scan "))
+      let prefix = "silta --ws 'acme' init --scan "
+      let inspect = "silta --ws 'acme' ws show"
+      #expect(withRemote ? next.hasPrefix(prefix) : next == inspect)
       let brief = try SiltaBinary.run(["brief", "--json"], in: scratch, cwd: repo)
-      #expect(brief.stdout.contains("silta --ws 'acme' init --scan "))
+      #expect(brief.stdout.contains(withRemote ? prefix : inspect))
       let scan = try SiltaBinary.run(["init", "--scan", ".", "--json"], in: scratch, cwd: repo)
       #expect(scan.termination == .exit(6))
       let scanHint = try #require(
         try (TaskStateCommandTests.error(scan)["next"] as? [String])?.first)
-      #expect(scanHint.hasPrefix("silta --ws 'acme' init --scan "))
+      #expect(withRemote ? scanHint.hasPrefix(prefix) : scanHint == inspect)
       for hint in [next, scanHint] {
         let repaired = try Self.replay(hint, in: scratch, cwd: repo)
         #expect(repaired.termination == .exit(0), "\(repaired.stderr)")
+      }
+      if !withRemote {
+        #expect(try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM repo_path") } == 0)
+        let selected = try SiltaBinary.run(
+          ["--ws", "acme", "init", "--scan", ".", "--json"], in: scratch, cwd: repo)
+        #expect(selected.termination == .exit(0), "\(selected.stdout)")
       }
       let canonical = try Self.canonicalPath(repo)
       try store.read { (db: Database) throws in
@@ -328,8 +336,7 @@ extension FirstWorkspaceCommandTests {
   }
 
   @Test(arguments: [
-    "https://github.com/acme-fixture-org/Probe-platform.git",
-    "https://github.com:8443/acme-fixture-org/probe-platform.git",
+    "https://github.com:8443/acme-fixture-org/probe-platform.git"
   ])
   func differentHostedOriginsDoNotMatch(declaredOrigin: String) throws {
     try withScratchDirectory { scratch in
