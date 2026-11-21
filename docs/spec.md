@@ -2416,13 +2416,15 @@ alternatives considered are summarized in [D12](decisions.md#technology).
 
 **Secret guard (M1).** It scans every task text, comment, plan, result and doc
 revision before the write. It checks only the fields a write changes, each changed
-field whole rather than its changed lines; an unchanged field is never rescanned, so
+field whole rather than its changed lines. Rule updates do not rescan unchanged
+stored fields. Material missed by an older rule stays until the field is edited, and
 text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
   - private-key armour, including PGP and SSH2. An unfinished block can start on
     its own line, or carry enough base64 evidence after an inline or annotated
-    opening marker. Literal escaped line breaks and flattened payloads count.
-    Format-specific preambles can precede the payload. Inline redaction stops at
+    opening marker. Flattened payloads start at the marker or its annotation.
+    Single and double escaped line breaks count, with the enclosing field kept intact.
+    Format-specific preambles can precede a payload. Inline redaction stops at
     the last payload character. The first payload line and a continuation after
     a blank need enough base64 to distinguish them from short prose. A quote or
     list continues across a blank only inside its Markdown container.
