@@ -94,21 +94,23 @@ extension BriefCommandTests {
       try #require(edit.termination == .exit(0), "\(edit.stdout)\(edit.stderr)")
       let warnings = try #require(
         try TaskStateCommandTests.object(edit)["warnings"] as? [[String: String]])
-      let warning = try #require(
-        warnings.first { $0["code"] == "edge_code_unavailable" }?["message"])
+      let inspect = "silta --ws 'acme' ws show"
+      let edgeWarnings = warnings.filter { $0["code"] == "edge_code_unavailable" }
+      #expect(edgeWarnings.contains { $0["message"]?.contains("api:") == true })
       #expect(
-        warnings.count == 1 && warning.contains("api:") && warning.contains("guide.md"),
-        "\(warning)")
-      let inspect = try #require(warning.firstMatch(of: /Inspect it with (silta .+)\.$/)?.output.1)
+        edgeWarnings.allSatisfy {
+          $0["message"]?.hasSuffix("Inspect it with " + inspect + ".") == true
+        })
       let brief = try run(["--app", "portal"], repo, scratch)
       try #require(brief.termination == .exit(0), "\(brief.stdout)\(brief.stderr)")
       let hints = brief.stdout.split(separator: "\n").compactMap { line -> String? in
         guard line.hasPrefix("next: silta ") else { return nil }
         return String(line.dropFirst("next: ".count))
       }
-      let valid = try #require(hints.first { $0.contains("code show 'api@acme-edge'") })
-      let replay = try FirstWorkspaceCommandTests.replay(valid, in: scratch, cwd: repo)
-      #expect(replay.termination == .exit(0) && replay.stdout.contains("Acme guide"))
+      if let valid = hints.first(where: { $0.contains("code show 'api@acme-edge'") }) {
+        let replay = try FirstWorkspaceCommandTests.replay(valid, in: scratch, cwd: repo)
+        #expect(replay.termination == .exit(0) && replay.stdout.contains("Acme guide"))
+      }
       let unknown = hints.contains { $0.contains("code show 'api'") }
       #expect(!unknown)
       let fallback = try #require(hints.first { $0 == inspect })

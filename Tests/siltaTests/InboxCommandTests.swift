@@ -31,18 +31,19 @@ struct InboxCommandTests {
       let data = try TaskStateCommandTests.data(own)
       let items = try #require(data["items"] as? [[String: Any]])
       #expect(items.first?["kind"] as? String == "answer")
-      #expect(items.first?["next"] as? [String] == ["silta --ws 'acme' comment accept 'AC-1/2'"])
-      #expect(try run(["--ws", "acme", "comment", "accept", "AC-1/2"]).termination == .exit(0))
+      let confirmation =
+        "ask human: Does AC-1/2 relay your confirmed answer to AC-1/1? Only if yes: "
+        + "silta --ws 'acme' comment resolve 'AC-1/1' -m \"<confirmed answer>\""
+      let read = "silta --ws 'acme' task show 'AC-1' --timeline"
+      #expect(items.first?["next"] as? [String] == [confirmation, read])
       #expect(
-        try run(args).stdout == "No attention for human:acme.\n"
-          + InboxCorrectionCommandTests.scope + "\n")
-      _ = try run(["comment", "reopen", "AC-1/1"])
-      #expect(
-        try run(["--ws", "acme", "comment", "resolve", "AC-1/1", "-m", "Relayed v2 in chat."])
+        try run(["--ws", "acme", "comment", "resolve", "AC-1/1", "-m", "Human confirmed v2."])
           .termination == .exit(0))
-      #expect(
-        try run(args + ["--all"]).stdout == "No attention for human:acme.\n"
-          + InboxCorrectionCommandTests.scope + "\n")
+      for options in [args, args + ["--all"]] {
+        #expect(
+          try run(options).stdout == "No attention for human:acme.\n"
+            + InboxCorrectionCommandTests.scope + "\n")
+      }
       let help = try run(["comment", "--help"])
       #expect(help.stdout.contains("silta guide questions"))
     }

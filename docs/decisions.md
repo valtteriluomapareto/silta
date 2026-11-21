@@ -392,6 +392,7 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     [spec §8.1](spec.md#81-discussion-and-reviews) also treat unfinished fences as
     prose so incomplete examples cannot silently redirect questions, and count only
     hidden resolved history so a visible handoff does not imply missing work.
+  - For a human-directed question, the asker's own relay requires chat confirmation before explicit resolution.
 - **D38: The human works through agents.**
   - The human talks to an agent, which runs `silta` for them. They don't use the CLI
     themselves for routine work. The Mac app (M5) is their own surface and counts

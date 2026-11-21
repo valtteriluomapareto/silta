@@ -19,6 +19,24 @@ class ShellProof(unittest.TestCase):
                    'notes.md', 'docs/spec.md']
         self.assertEqual([name for name in choices if evals.plan_path(name)], choices[:3])
 
+    def test_common_plan_names_count_in_tool_writes_and_checkout_changes(self):
+        plans = [
+            'docs/tasks.md', 'notes/backlog.txt', 'acme-checklist.md', 'planning.yaml',
+            'notes/next_steps.md', 'roadmap/acme.md',
+        ]
+        controls = ['next.md', 'steps.md', 'deployment-steps.md', 'docs/spec.md', 'Sources/Tasks.swift']
+        current = phase({}, [], [])
+        current['opaque'] = [
+            {'type': 'file_change', 'id': path, 'changes': [{'kind': 'add', 'path': path}]}
+            for path in plans + controls
+        ]
+        current['state'] = {'files': dict.fromkeys(plans + controls, 'Acme fixture')}
+        findings = evals.forbidden({'phases': [current], 'baseline': {'files': {}}})
+        self.assertCountEqual(findings, [
+            record for path in plans
+            for record in ('native file tool: file_change ' + path, 'repository file: ' + path)
+        ])
+
     def test_scoped_tracker_actions_and_graphql_mutations(self):
         writes = ['gh issue -R acme/board comment 1 -b fixture',
                   'gh pr comment 1 -b fixture', 'gh pr edit 1 --title fixture',

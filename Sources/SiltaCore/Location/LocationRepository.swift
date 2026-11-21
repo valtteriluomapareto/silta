@@ -9,7 +9,7 @@ struct LocationRepository: Equatable {
   let apps: [LocationCandidate]
 
   static func all(workspace: String?, in store: DatabaseStore) throws -> [Self] {
-    guard FileManager.default.fileExists(atPath: store.path) else { return [] }
+    guard !DatabaseFile.isMissing(store.path) else { return [] }
     return try store.read { try read(workspace: workspace, in: $0) }
   }
 

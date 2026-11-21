@@ -274,8 +274,9 @@ extension GuideCommand {
         claimer can accept an answer with `silta --ws acme comment accept <answer-ref>`. Answer \
         only as \
         an addressee, or to relay the human's chat answer. Never accept your own answer to a \
-        question for @me. An answer comment never supplies approval words for a human-only \
-        command.
+        question addressed to a human. Once the addressed human confirms your relay in chat, \
+        record it with `comment resolve <question-ref> -m <confirmed answer>`. An answer comment \
+        never supplies approval words for a human-only command.
         @me always means human:<USER>, regardless of who runs the command.
         """ + "\n"),
     Section(

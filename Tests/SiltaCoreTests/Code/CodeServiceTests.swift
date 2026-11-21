@@ -275,7 +275,7 @@ extension CodeServiceTests {
         (
           .init(
             arguments: prefix + ["cat-file", "-t", "--", "origin/api^{commit}:README.md"],
-            directory: home, timeout: 0.25, lazyFetch: false, capture: .init(byteLimit: 1024)),
+            directory: home, timeout: 2, lazyFetch: false, capture: .init(byteLimit: 1024)),
           .success(.init(termination: .exit(0), stdout: Data("blob\n".utf8)))
         )
       ])
