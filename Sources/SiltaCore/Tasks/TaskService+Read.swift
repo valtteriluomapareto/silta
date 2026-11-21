@@ -81,25 +81,59 @@ extension TaskService {
     }
   }
 
-  /// The normal read plus the resolved threads it hides, each root followed by its
-  /// replies, in one transaction and without the event timeline. A deleted root without
-  /// live replies stays hidden, as in the normal read. The Mac app shows these folded.
-  package func showWithResolvedThreads(_ ref: String) throws
-    -> (task: TaskDetails, resolved: [CommentDetails])
-  {
+  /// The Mac inspector's read, in one transaction and without the event timeline: the
+  /// normal read, the resolved threads it hides, the tasks it names and what keeps a
+  /// block from being ready. A deleted resolved root without live replies stays hidden,
+  /// as in the normal read.
+  package func inspect(_ ref: String) throws -> TaskInspection {
     let slug = try selected()
     return try environment.db.read { db in
       let task = try read(ref, workspace: slug, timeline: false, in: db)
-      guard task.resolvedThreads != nil else { return (task, []) }
-      let posts = try Self.discussion(task, timeline: true, in: db)
-      let shown = Set((task.comments ?? []).map(\.ref))
-      let roots = posts.filter { root in
-        guard root.replyTo == nil, root.resolvedAt != nil, !shown.contains(root.ref) else {
-          return false
-        }
-        return !root.deleted || posts.contains { $0.replyTo == root.ref && !$0.deleted }
+      let unmet =
+        task.status == "blocked" ? try Self.unmet(task, in: db) : (open: [], dropped: [])
+      return TaskInspection(
+        task: task, resolved: try Self.resolvedThreads(task, in: db),
+        related: try Self.relatives(task, in: db), open: unmet.open, dropped: unmet.dropped)
+    }
+  }
+
+  /// Posts of the resolved threads the normal read hides, each root before its replies.
+  private static func resolvedThreads(_ task: TaskDetails, in db: Database) throws
+    -> [CommentDetails]
+  {
+    guard task.resolvedThreads != nil else { return [] }
+    let posts = try discussion(task, timeline: true, in: db)
+    let shown = Set((task.comments ?? []).map(\.ref))
+    let roots = posts.filter { root in
+      guard root.replyTo == nil, root.resolvedAt != nil, !shown.contains(root.ref) else {
+        return false
       }
-      return (task, roots.flatMap { root in [root] + posts.filter { $0.replyTo == root.ref } })
+      return !root.deleted || posts.contains { $0.replyTo == root.ref && !$0.deleted }
+    }
+    return roots.flatMap { root in [root] + posts.filter { $0.replyTo == root.ref } }
+  }
+
+  /// The parent, subtasks and blocker tasks of a task, in sequence order. No visibility
+  /// filter applies: a promoted, archived or proposed relative is still named.
+  private static func relatives(_ task: TaskDetails, in db: Database) throws -> [TaskRelative] {
+    let blockers = try blockLinks(task, in: db).filter { ($0["to_kind"] as String) == "task" }
+      .map { $0["to_id"] as Int64 }
+    let marks = Array(repeating: "?", count: blockers.count).joined(separator: ",")
+    let rows = try Row.fetchAll(
+      db,
+      sql: query + """
+        \nWHERE task.workspace_id=? AND task.id<>? AND (task.parent_id=?
+          OR task.id=(SELECT parent_id FROM task WHERE id=?)
+          \(blockers.isEmpty ? "" : "OR task.id IN (\(marks))"))
+        ORDER BY task.seq
+        """,
+      arguments: StatementArguments(
+        [task.workspaceID, task.id, task.id, task.id] + blockers))
+    return rows.map {
+      let relative = TaskDetails(row: $0)
+      return TaskRelative(
+        ref: relative.ref, title: relative.title, status: relative.status,
+        parent: relative.parent, externalRef: relative.externalRef)
     }
   }
 

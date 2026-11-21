@@ -212,7 +212,8 @@ extension GuideCommand {
         sees, deleting what you did not create, anything irreversible, and money; repository \
         rules and human-only gates still apply.
         Use `task edit <ref> --app <slug>` to correct a task's primary app. \
-        Ask when the move changes another app's backlog. For a different repository, \
+        Ask before choosing the destination app unless the human already named it. \
+        For a different repository, \
         start the task from the target checkout. If the target is a different session, \
         the current claimant hands off first.
         Put all approvals, proposals to triage and questions in one message. Except for the \
