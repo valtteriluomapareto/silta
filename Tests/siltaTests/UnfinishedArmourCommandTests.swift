@@ -10,7 +10,10 @@ struct UnfinishedArmourCommandTests {
   private static let token = String(repeating: "Q", count: 64)
   private static let masked = "[REDACTED:private_key]"
 
-  @Test(arguments: ["escapedLF", "escapedCRLF", "annotated", "flat", "nbsp", "bom", "prose"])
+  @Test(arguments: [
+    "escapedLF", "escapedCRLF", "escapedBlank", "escapedSlash", "escapedPGP", "annotated",
+    "flat", "flatChunks", "nbsp", "bom", "prose", "hash", "sibling", "dedentedQuote",
+  ])
   func unfinishedArmourStorageAndExport(form: String) throws {
     try withScratchDirectory { scratch in
       let store = try AcmeDocAttachments.make(in: scratch)
@@ -34,13 +37,16 @@ struct UnfinishedArmourCommandTests {
       let result = try Self.run(["export"], in: scratch)
       try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
       let exported = try Self.exports(in: scratch)
-      #expect(warned == [true, true, true])
+      #expect(warned == Array(repeating: body != expected, count: 3))
       #expect(stored == [expected, expected, expected])
       #expect(exported.task.contains("\n" + expected + "\n"))
       #expect(exported.comment == expected)
       #expect(exported.doc.contains("\n" + expected + "\n"))
+      let second = String(repeating: "Z", count: 64)
       #expect(
-        ![exported.task, exported.comment, exported.doc].contains { $0.contains(Self.token) })
+        ![exported.task, exported.comment, exported.doc].contains {
+          $0.contains(Self.token) || $0.contains(second)
+        })
     }
   }
 
@@ -62,15 +68,23 @@ struct UnfinishedArmourCommandTests {
   }
 
   private static func example(_ form: String) -> (String, String) {
+    let second = String(repeating: "Z", count: 64)
     switch form {
-    case "escapedLF", "escapedCRLF":
-      let prefix = #"Acme 🦊 {"credential":""#
-      let suffix = #"","keep":true}"#
-      let newline = form == "escapedLF" ? #"\n"# : #"\r\n"#
-      return (prefix + marker + newline + token + suffix, prefix + masked + suffix)
-    case "flat":
+    case "escapedLF", "escapedCRLF", "escapedBlank", "escapedSlash", "escapedPGP":
+      return escapedExample(form)
+    case "flat", "flatChunks":
       let suffix = "\" Acme safe tail."
-      return (marker + " " + token + suffix, masked + suffix)
+      let body = form == "flatChunks" ? token + " " + second : token
+      return (marker + " " + body + suffix, masked + suffix)
+    case "hash":
+      let input = marker + " as described for commit " + String(repeating: "a", count: 40) + "."
+      return (input, input)
+    case "sibling":
+      let suffix = "\n\n- " + String(repeating: "w", count: 64) + "\nKeep this."
+      return ("- " + marker + "\n  " + token + suffix, "- " + masked + suffix)
+    case "dedentedQuote":
+      let suffix = "\n\n> " + String(repeating: "w", count: 64) + "\nKeep this."
+      return ("> > " + marker + "\n> > " + token + suffix, "> > " + masked + suffix)
     case "prose":
       let suffix = "\n\nComment: see the guide below\n\nDone."
       return (marker + suffix, masked + suffix)
@@ -80,6 +94,24 @@ struct UnfinishedArmourCommandTests {
     default:
       return (marker + " (truncated)\n" + token, masked)
     }
+  }
+
+  private static func escapedExample(_ form: String) -> (String, String) {
+    let second = String(repeating: "Z", count: 64)
+    let prefix = #"Acme 🦊 {"credential":""#
+    let suffix = #"","keep":true}"#
+    let newline = form == "escapedCRLF" ? #"\r\n"# : #"\n"#
+    let opener =
+      form == "escapedPGP" ? "-----BE" + "GIN PGP PRIVATE KEY BLOCK-----" : marker
+    var body = token
+    if form == "escapedBlank" {
+      body += newline + newline + second
+    } else if form == "escapedSlash" {
+      body += #"\/"# + second
+    } else if form == "escapedPGP" {
+      body = "Version: Acme" + newline + newline + token + newline + second
+    }
+    return (prefix + opener + newline + body + suffix, prefix + masked + suffix)
   }
 
   private struct Exported {

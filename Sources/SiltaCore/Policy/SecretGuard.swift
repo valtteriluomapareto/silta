@@ -215,7 +215,7 @@ extension SecretGuard {
     let standalone =
       prefix.endIndex == before.endIndex && suffix.allSatisfy(armourSpace)
       && (suffix.endIndex == text.endIndex || suffix.endIndex < limit)
-    let inline = inlineArmourEnd(suffix, in: text)
+    let inline = inlineArmourEnd(suffix, label: opening.label, in: text)
     if let inline, !suffix[inline...].allSatisfy(armourSpace) { return inline }
     let end = armourRunEnd(
       after, openingPrefix: prefix, label: opening.label,
@@ -224,21 +224,92 @@ extension SecretGuard {
   }
 
   /// Ends at payload bytes so an enclosing quote and subsequent fields survive.
-  private static func inlineArmourEnd(_ suffix: Substring, in text: String) -> String.Index? {
-    let boundary = suffix.prefix(while: { !$0.isNewline && !#"'"`"#.contains($0) })
-    var rest = boundary.drop(while: armourSpace)
-    var end: String.Index?
-    while let separator = rest.prefixMatch(of: /\\(?:r\\)?n/),
-      let payload = rest[separator.range.upperBound...].prefixMatch(of: /([A-Za-z0-9+\/]+)={0,2}/),
-      end != nil || payload.1.utf8.count >= 16
-    {
-      end = payload.range.upperBound
-      rest = rest[payload.range.upperBound...]
+  private static func inlineArmourEnd(
+    _ suffix: Substring, label: Substring, in text: String
+  ) -> String.Index? {
+    let boundary =
+      suffix.prefixMatch(of: /(?:\\[^\r\n]|[^\\'"\x60\r\n])*/)?.output ?? suffix.prefix(0)
+    let body = boundary.drop(while: armourSpace)
+    let separator = /\\(?:r\\)?n/
+    if body.prefixMatch(of: separator) != nil {
+      return escapedArmourEnd(body, label: label)
     }
-    if let end { return end }
-    return boundary.matches(of: /[A-Za-z0-9+\/]{40,}={0,2}/).first {
-      !isWholeReferenceIdentifier($0.range, in: text)
-    }?.range.upperBound
+
+    let chunks = /([A-Za-z0-9+\/]{40,})={0,2}/
+    guard
+      let first = body.matches(of: chunks).first(where: { match in
+        let precededByProse = match.range.lowerBound != body.startIndex
+        return !(precededByProse && isCommitSHA(match.1))
+          && !isWholeReferenceIdentifier(match.range, in: text)
+      })
+    else { return nil }
+    var end = first.range.upperBound
+    let continuation = /[ \t]+([A-Za-z0-9+\/]{16,})={0,2}/
+    while let chunk = body[end...].prefixMatch(of: continuation),
+      !isWholeReferenceIdentifier(chunk.1.startIndex..<chunk.1.endIndex, in: text)
+    {
+      end = chunk.range.upperBound
+    }
+    return end
+  }
+
+  private static func isCommitSHA(_ word: Substring) -> Bool {
+    [40, 64].contains(word.utf8.count) && word.wholeMatch(of: /[A-Fa-f0-9]+/) != nil
+  }
+
+  private static func escapedArmourEnd(_ body: Substring, label: Substring) -> String.Index? {
+    let separator = /\\(?:r\\)?n/
+    let payload = /((?:[A-Za-z0-9+\/]|\\\/)+)={0,2}/
+    var start = body.startIndex
+    var end: String.Index?
+    var afterBlank = false
+    var continuedHeader = false
+    while let newline = body[start...].prefixMatch(of: separator) {
+      let rest = body[newline.range.upperBound...]
+      let next = rest.firstMatch(of: separator)?.range.lowerBound
+      let line = rest[..<(next ?? rest.endIndex)]
+      start = line.endIndex
+      if line.allSatisfy(armourSpace) {
+        afterBlank = true
+        continuedHeader = false
+        continue
+      }
+      if end == nil, continuedHeader || armourHeader(line, label: label) {
+        continuedHeader = label.hasPrefix("SSH2 ") && line.hasSuffix(#"\\"#)
+        continue
+      }
+      let tail = line.drop(while: armourSpace)
+      if end != nil, label.hasPrefix("PGP "),
+        let checksum = tail.prefixMatch(of: /=[A-Za-z0-9+\/]{4}/),
+        tail[checksum.range.upperBound...].allSatisfy(armourSpace)
+      {
+        end = checksum.range.upperBound
+        break
+      }
+      let minimum = end == nil || afterBlank ? 16 : 1
+      guard let match = tail.prefixMatch(of: payload),
+        match.1.utf8.lazy.filter({ $0 != 92 }).count >= minimum,
+        next == nil || tail[match.range.upperBound...].allSatisfy(armourSpace)
+      else { break }
+      end = match.range.upperBound
+      afterBlank = false
+    }
+    return end
+  }
+
+  private static func continuesArmour(
+    _ prefix: Substring, after blankPrefix: Substring, opening: Substring
+  ) -> Bool {
+    let quoteDepth = opening.count { $0 == ">" }
+    guard prefix.count(where: { $0 == ">" }) == quoteDepth else { return false }
+    func afterQuotes(_ value: Substring) -> Substring {
+      guard let last = value.lastIndex(of: ">") else { return value }
+      return value[value.index(after: last)...]
+    }
+    let listPrefix = afterQuotes(opening)
+    guard !listPrefix.allSatisfy(armourSpace) else { return true }
+    if blankPrefix == opening, prefix == opening { return true }
+    return afterQuotes(prefix).prefix(while: armourSpace).count >= listPrefix.count
   }
 
   /// Reads contiguous armour and its format-specific preamble, retaining original indices.
@@ -246,12 +317,10 @@ extension SecretGuard {
     _ body: Substring, openingPrefix: Substring, label: Substring, minimumFirst: Int,
     initialPayload: String.Index?
   ) -> String.Index? {
-    let quoted = openingPrefix.contains(">")
-    let listIndent = openingPrefix.allSatisfy(armourSpace) ? 0 : openingPrefix.count
     var end = initialPayload
     var cursor = body.firstIndex(where: \.isNewline) ?? body.endIndex
     var continuedHeader = false
-    var afterSeparator = false
+    var blankPrefix: Substring?
     while cursor < body.endIndex {
       let next = body.index(after: cursor)
       cursor = body[next...].firstIndex(where: \.isNewline) ?? body.endIndex
@@ -260,24 +329,23 @@ extension SecretGuard {
       let line = original[prefix.endIndex...]
       if line.isEmpty {
         continuedHeader = false
-        afterSeparator = true
+        blankPrefix = prefix
         continue
       }
-      if afterSeparator {
-        if quoted, !prefix.contains(">") { break }
-        if !quoted, prefix.count < listIndent, prefix.allSatisfy(armourSpace) { break }
+      if let blankPrefix, !continuesArmour(prefix, after: blankPrefix, opening: openingPrefix) {
+        break
       }
       if end == nil, continuedHeader || armourHeader(line, label: label) {
         continuedHeader = label.hasPrefix("SSH2 ") && line.last == "\\"
         continue
       }
       let payload = line.wholeMatch(of: /([A-Za-z0-9+\/]+)={0,2}[ \t]*/)
-      let minimum = end == nil ? minimumFirst : (afterSeparator ? 16 : 1)
+      let minimum = end == nil ? minimumFirst : (blankPrefix == nil ? 1 : 16)
       let checksum =
         end != nil && label.hasPrefix("PGP ")
         && line.wholeMatch(of: /=[A-Za-z0-9+\/]{4}[ \t]*/) != nil
       guard checksum || (payload?.1.utf8.count ?? 0) >= minimum else { break }
-      afterSeparator = false
+      blankPrefix = nil
       end = cursor
     }
     return end
