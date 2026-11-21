@@ -78,6 +78,17 @@ public struct AppReader: Sendable {
     }
   }
 
+  /// Reads every current human inbox entry past the cap, proposals older than 14 days
+  /// included, as `inbox --for me --all` does. The snapshot keeps the capped read for the
+  /// waiting badge.
+  public func fullInbox(workspace: String) throws -> [AppAttention] {
+    try Self.checked(home: environment.home.url) {
+      try checkSchema()
+      let service = TaskService(environment: environment, workspace: workspace)
+      return try service.inbox(for: "me", all: true).items.map(AppAttention.init)
+    }
+  }
+
   /// Reads task properties, parsed plan, discussion, relatives and blocker states through
   /// the core service in one read.
   public func task(_ ref: String, workspace: String) throws -> AppTask {
