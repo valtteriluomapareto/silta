@@ -62,7 +62,7 @@
       try DebugTaskFixture.annotate(
         8,
         result: "Order totals are stored and returned as integer cents. The API keeps a decimal "
-          + "field for one release. Verified with OrderTotalsTests.\n\nFriction: the fixture "
+          + "field for one release. Verified with OrderTotalsTests.\n\nFriction: The fixture "
           + "had no multi-currency orders, so rounding was checked by hand.",
         doneBranch: "main", doneDirty: true, in: tx)
     }

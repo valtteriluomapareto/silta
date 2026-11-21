@@ -122,7 +122,8 @@ extension AppTask {
       steps: MarkdownPlan.checkboxes(task.plan).map { AppPlanStep(title: $0.title, done: $0.done) },
       parent: task.parent, externalRef: task.externalRef, followUpAt: task.followUpAt,
       waiting: task.waiting.map {
-        AppWaiting(on: $0.on, ageDays: $0.ageDays, why: $0.why, ready: $0.ready, dropped: $0.dropped)
+        AppWaiting(
+          on: $0.on, ageDays: $0.ageDays, why: $0.why, ready: $0.ready, dropped: $0.dropped)
       },
       result: task.result, doneSHA: task.doneSHA, doneBranch: task.doneBranch,
       doneDirty: task.doneDirty, claimedBy: task.claimedBy, claimedAt: task.claimedAt,

@@ -85,7 +85,8 @@ public struct AppReader: Sendable {
       try checkSchema()
       let service = TaskService(environment: environment, workspace: workspace)
       let (task, resolved) = try service.showWithResolvedThreads(ref)
-      let wanted = Set([task.parent].compactMap { $0 } + (task.waiting?.on ?? []).compactMap(AppWaiting.taskRef))
+      let wanted = Set(
+        [task.parent].compactMap { $0 } + (task.waiting?.on ?? []).compactMap(AppWaiting.taskRef))
       var filter = TaskFilter()
       filter.proposed = true
       filter.archived = true

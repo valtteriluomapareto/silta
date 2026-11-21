@@ -8,6 +8,7 @@
     @Test func readyBlockerNamesTheDoneTaskAndOffersUnblock() throws {
       try fixture { reader, _ in
         let task = try reader.task("AC-17", workspace: "acme")
+        #expect(TaskFacts.otherLinks(task).isEmpty)
         let waiting = try #require(TaskFacts.waiting(task))
         #expect(
           waiting.blockers == [
@@ -27,7 +28,7 @@
         try AppTestCLI.run(
           [
             "--ws", "acme", "task", "block", "AC-16", "--on", "ext:design-team", "--on", "AC-18",
-            "--why", "Needs the final copy.",
+            "-m", "Needs the final copy.",
           ], home: home)
         let open = try #require(TaskFacts.waiting(try reader.task("AC-16", workspace: "acme")))
         #expect(open.blockers.map(\.ref) == ["ext:design-team", "AC-18"])
@@ -53,12 +54,15 @@
         #expect(result.body.hasPrefix("Order totals are stored"))
         #expect(!result.body.contains("Friction"))
         #expect(
-          result.friction == "the fixture had no multi-currency orders, so rounding was checked by hand.")
+          result.friction
+            == "The fixture had no multi-currency orders, so rounding was checked by hand.")
         #expect(TaskFacts.commit(task) == "1111111 · main")
         #expect(task.doneDirty == true)
         #expect(
           TaskFacts.pullRequests(task)
-            == [TaskFacts.PullRequest(title: "PR #38", url: "https://github.com/acme/example/pull/38")])
+            == [
+              TaskFacts.PullRequest(title: "PR #38", url: "https://github.com/acme/example/pull/38")
+            ])
         #expect(TaskFacts.otherLinks(task).isEmpty)
         #expect(TaskFacts.result(try reader.task("AC-15", workspace: "acme")) == nil)
       }
@@ -79,14 +83,13 @@
         #expect(TaskFacts.pullRequests(ordinary).isEmpty)
       }
       #expect(
-        TaskFacts.pullRequest(
-          AppTaskLink(rel: "about", target: "url:https://gitlab.example/acme/web/-/merge_requests/7"))
+        TaskFacts.pullRequest("url:https://gitlab.example/acme/web/-/merge_requests/7")
           == TaskFacts.PullRequest(
             title: "MR !7", url: "https://gitlab.example/acme/web/-/merge_requests/7"))
       #expect(
-        TaskFacts.pullRequest(AppTaskLink(rel: "cites", target: "url:https://acme.example/pull"))
+        TaskFacts.pullRequest("url:https://acme.example/pull")
           == nil)
-      #expect(TaskFacts.pullRequest(AppTaskLink(rel: "about", target: "doc:push")) == nil)
+      #expect(TaskFacts.pullRequest("doc:push") == nil)
     }
 
     @Test func createdLineNamesTheCreatorAndDay() throws {
@@ -103,9 +106,12 @@
           home: home)
         let parent = try reader.task("AC-15", workspace: "acme")
         #expect(
-          TaskFacts.subtasks(parent) == [TaskFacts.Related(ref: "AC-24", title: "Order history filters · todo")])
+          TaskFacts.subtasks(parent) == [
+            TaskFacts.Related(ref: "AC-24", title: "Order history filters · proposed")
+          ])
         let child = try reader.task("AC-24", workspace: "acme")
-        #expect(TaskFacts.parent(child) == TaskFacts.Related(ref: "AC-15", title: "Order history page"))
+        #expect(
+          TaskFacts.parent(child) == TaskFacts.Related(ref: "AC-15", title: "Order history page"))
         #expect(TaskFacts.handoff(child) == nil)
       }
     }
