@@ -5,13 +5,14 @@ struct WsRemoveCommand: WorkspaceArgumentCommand {
   static let configuration = CommandConfiguration(
     commandName: "rm", abstract: "Remove one workspace from a human terminal.",
     discussion: "Preview the removal without saving with --dry-run. The saved default and active "
-      + "clone registrations require --allow-active. A successful removal saves both a SQLite "
+      + "or uninspectable clone registrations require --allow-active. Removal saves a SQLite "
       + "backup and a workspace recovery tree.")
 
   static let dataShape = Shape.object([
     "workspace": .string, "name": .string, "dry_run": .bool, "saved_default": .bool,
     "counts": .array(.object(["kind": .string, "count": .int])),
-    "registered_clones": .array(.string), "backup": .optional(.string),
+    "registered_clones": .array(.string), "unresolved_clones": .optional(.array(.string)),
+    "backup": .optional(.string),
     "recovery": .optional(.string), "next": .optional(.array(.string)),
     "next_by": .optional(.string),
   ])
@@ -26,7 +27,7 @@ struct WsRemoveCommand: WorkspaceArgumentCommand {
   @Flag(help: "Preview owned rows and active selection without saving.")
   var dryRun = false
 
-  @Flag(help: "Allow removing the saved default or a live registered clone.")
+  @Flag(help: "Allow removing the saved default or unregistering live or uninspectable clones.")
   var allowActive = false
 
   var workspaceArgument: String? { workspace }
@@ -49,15 +50,25 @@ struct WsRemoveCommand: WorkspaceArgumentCommand {
       lines.append(
         report.dryRun ? "Saved default workspace." : "Cleared the saved default workspace.")
     }
-    if !report.registeredClones.isEmpty {
-      lines.append("Registered clones: \(report.registeredClones.count).")
-    }
-    if report.dryRun && (report.savedDefault || !report.registeredClones.isEmpty) {
-      lines.append("A human must use --allow-active to remove this workspace.")
+    let unresolved = report.unresolvedClones ?? []
+    if report.dryRun {
+      if !report.registeredClones.isEmpty {
+        lines.append("Registered clones: \(report.registeredClones.count).")
+      }
+      lines += unresolved.map { "Unresolved registered clone: " + $0 }
+      if report.nextBy == NextBy.human.rawValue {
+        lines.append("A human must use --allow-active to remove this workspace.")
+      }
+    } else {
+      let count = report.registeredClones.count + unresolved.count
+      if count > 0 {
+        lines.append("Unregistered \(count) clone(s). Their files remain on disk.")
+      }
     }
     if let backup = report.backup { lines.append("Backup: " + HumanText.line(backup)) }
     if let recovery = report.recovery { lines.append("Recovery tree: " + HumanText.line(recovery)) }
-    lines += (report.next ?? []).map { "next: " + $0 }
+    let next = report.nextBy == NextBy.human.rawValue ? "ask human: " : "next: "
+    lines += (report.next ?? []).map { next + $0 }
     return lines.joined(separator: "\n")
   }
 }
