@@ -5,18 +5,6 @@
   import Testing
 
   @MainActor struct ChromeContentTests {
-    @Test func proposedMenuTracksAppAndVisibility() throws {
-      try fixture { reader in
-        let board = try reader.snapshot(workspace: "acme").board
-        let apps = try reader.workspaceMap(workspace: "acme").apps
-        let all = BoardMenuContent(app: nil, apps: apps, proposals: board.proposals, showing: false)
-        #expect(all.title == "All apps" && all.proposedCount == 3)
-        let mobile = BoardMenuContent(
-          app: "acme-mobile", apps: apps, proposals: board.proposals, showing: true)
-        #expect(mobile.title == "acme-mobile · proposed" && mobile.proposedCount == 1)
-      }
-    }
-
     @Test func sidebarUsesRecordedActorsStepsColorsAndQualifiedDocCount() throws {
       try fixture { reader in
         let task = try reader.task("AC-12", workspace: "acme")

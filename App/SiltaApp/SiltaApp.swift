@@ -35,8 +35,10 @@ struct SiltaApp: App {
             Self.apply(Self.storedAppearance)
           }
           let fixture = control.fixture
+          // Automated runs start from default Board filters and never store them.
           let model = Self.makeReaderModel(
-            home: fixture.home, user: fixture.user, now: { fixture.now })
+            home: fixture.home, user: fixture.user, now: { fixture.now },
+            defaults: options.isAutomated ? nil : .standard)
           _model = State(initialValue: model)
           Task { await control.start(model: model) }
           return
@@ -75,11 +77,12 @@ struct SiltaApp: App {
       })
     }
     return makeReaderModel(
-      home: URL(filePath: path), user: environment["USER"] ?? NSUserName(), now: { Date() })
+      home: URL(filePath: path), user: environment["USER"] ?? NSUserName(), now: { Date() },
+      defaults: .standard)
   }
 
   private static func makeReaderModel(
-    home: URL, user: String, now: @escaping @Sendable () -> Date
+    home: URL, user: String, now: @escaping @Sendable () -> Date, defaults: UserDefaults?
   ) -> AppModel {
     do {
       let reader = try AppReader(home: home, user: user, now: now)
@@ -90,6 +93,7 @@ struct SiltaApp: App {
         writer: { write, workspace in
           try await Task.detached { try writer.perform(write, workspace: workspace) }.value
         },
+        defaults: defaults,
         load: { previous, workspace, force in
           try await Task.detached {
             try session.load(previous: previous, workspace: workspace, force: force)
@@ -161,6 +165,9 @@ struct SiltaApp: App {
           Button("Docs") { model.navigate(to: .docs) }.keyboardShortcut("4")
           Button("Toggle Inspector") { model.toggleInspector() }
             .keyboardShortcut("i", modifiers: [.command, .option])
+          Toggle("Show Blocked Tasks", isOn: $model.boardFilter.blocked)
+            .keyboardShortcut("b", modifiers: [.command, .shift])
+            .disabled(model.route != .board)
           Divider()
           Button("Refresh") { model.refresh(force: true) }.keyboardShortcut("r")
           Divider()

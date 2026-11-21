@@ -7,10 +7,11 @@
   @MainActor struct BoardContentTests {
     @Test func lanesFilterAppsAndKeepProposalsOptional() throws {
       try fixture { snapshot in
-        let ordinary = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+        let ordinary = BoardContent(snapshot: snapshot, apps: [], filter: BoardFilter(), search: "")
         #expect(ordinary.lanes.map { $0.tasks.count } == [4, 2, 1, 4])
         let mobile = BoardContent(
-          snapshot: snapshot, app: "acme-mobile", search: "", proposals: true)
+          snapshot: snapshot, apps: [], filter: BoardFilter(app: "acme-mobile", proposals: true),
+          search: "")
         #expect(mobile.lanes.map { $0.tasks.count } == [2, 2, 0, 2])
         #expect(mobile.lanes[0].tasks.contains { $0.ref == "AC-22" && $0.status == "proposed" })
         #expect(mobile.lanes.flatMap(\.tasks).allSatisfy { $0.app == "acme-mobile" })
@@ -19,13 +20,15 @@
 
     @Test func searchFindsCanonicalRefsAndTitlesAndQuestionMarkers() throws {
       try fixture { snapshot in
-        let content = BoardContent(snapshot: snapshot, app: nil, search: "ac-12", proposals: true)
+        let content = BoardContent(
+          snapshot: snapshot, apps: [], filter: BoardFilter(proposals: true), search: "ac-12")
         #expect(content.lanes.flatMap(\.tasks).map(\.ref) == ["AC-12"])
         #expect(content.questions == ["AC-12"])
-        let colliding = BoardContent(snapshot: snapshot, app: nil, search: "AC-1", proposals: true)
+        let colliding = BoardContent(
+          snapshot: snapshot, apps: [], filter: BoardFilter(proposals: true), search: "AC-1")
         #expect(colliding.lanes.flatMap(\.tasks).isEmpty)
         let title = BoardContent(
-          snapshot: snapshot, app: nil, search: "ORDER HISTORY", proposals: false)
+          snapshot: snapshot, apps: [], filter: BoardFilter(), search: "ORDER HISTORY")
         #expect(title.lanes.flatMap(\.tasks).map(\.ref) == ["AC-15"])
       }
     }
@@ -51,7 +54,7 @@
       let snapshot = try reader.snapshot(workspace: "acme")
       #expect(snapshot.work.items.count == 12 && snapshot.work.remaining > 0)
       #expect(!snapshot.work.items.contains { $0.task == "AC-14" })
-      let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+      let content = BoardContent(snapshot: snapshot, apps: [], filter: BoardFilter(), search: "")
       #expect(content.questions.contains("AC-14"))
       #expect(
         content.answers(for: "AC-14", reader: reader, workspace: "acme")

@@ -71,7 +71,7 @@
         #expect(
           content.appLabel(for: web) == BoardContent.AppLabel(name: "acme-web", color: "AppClay"))
         #expect(SidebarContent.appColor(slug: "acme-web", apps: map.apps) == "AppClay")
-        #expect(SidebarContent.appColor(slug: "acme-mobile", apps: map.apps) == "AppSlate")
+        #expect(SidebarContent.appColor(slug: "acme-mobile", apps: map.apps) == "AppViolet")
         #expect(SidebarContent.appColor(slug: "gone", apps: map.apps) == nil)
         #expect(BoardContent.appLabel(nil, apps: map.apps) == nil)
         #expect(BoardContent.appLabel("gone", apps: map.apps) == .init(name: "gone", color: nil))
@@ -100,7 +100,8 @@
         #expect(BoardFilter().title(apps: apps) == "Filter")
         #expect(BoardFilter(proposals: true).title(apps: apps) == "Filter")
         #expect(BoardFilter(app: "acme-mobile").title(apps: apps) == "acme-mobile")
-        #expect(BoardFilter(app: "acme-mobile", blocked: false).title(apps: apps) == "acme-mobile · 2")
+        #expect(
+          BoardFilter(app: "acme-mobile", blocked: false).title(apps: apps) == "acme-mobile · 2")
         #expect(BoardFilter(blocked: false, done: false).title(apps: apps) == "Filtered · 2")
         #expect(BoardFilter(app: "gone").title(apps: apps) == "gone")
       }

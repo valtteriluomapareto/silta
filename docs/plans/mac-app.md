@@ -36,7 +36,12 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   2026-11-16; Paper v2's “4 waiting” group count is not the acceptance value.
 - **Board:** blocked tasks stay in Todo with a blocked label; lanes show plan
   progress, and a task inspector shows the plan, claim,
-  properties and discussion.
+  properties and discussion. Paper "Board filters v1": cards start with their app's
+  sidebar square and name, and a Filter menu shows or hides blocked, proposed and
+  done-this-week tasks and picks an app. Hidden blocked tasks leave a "N blocked task
+  hidden · Show" line in Todo; a blocked task with an open question to the human stays.
+  The blocked and done toggles are remembered (⇧⌘B toggles blocked); automated control
+  runs start from the defaults and store nothing.
 - **Workspace:** apps and connections with a connection inspector, read from the
   workspace model rather than YAML. Paper "Map v2":
   - The map keeps app columns in call order. Services sit in one row under the apps,

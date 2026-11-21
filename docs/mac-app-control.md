@@ -31,7 +31,9 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
   whole-file guard, package boundary and hosted-test isolation checks.
 - A hand-launched fixture (`scripts/run-mac-fixture.sh`) shares the installed app's
   defaults: its inspector width and appearance are the human's, and changes made there
-  persist. Snapshot and driver runs pin both.
+  persist. Snapshot and driver runs pin both. Board filters work the same way: a
+  hand-launched fixture shares the human's stored blocked and done toggles, while
+  snapshot and driver runs start from the defaults (all lanes shown) and store nothing.
 - Interactive fixture launch prints its state.json path in the private run
   directory. Snapshot launch writes state.json next to the requested PNG, then
   exits. Use a separate output directory for each capture to retain matching

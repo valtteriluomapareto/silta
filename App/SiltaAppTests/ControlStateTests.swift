@@ -64,7 +64,7 @@
       #expect(first.counts.lanes == ["Todo": 4, "Doing": 2, "Review": 1, "Done this week": 4])
       #expect(first.counts.sidebar?.waiting == 9 && first.counts.sidebar?.claimed == 2)
       #expect(first.counts.sidebar?.apps == ["acme-mobile": 3, "acme-backend": 3, "acme-web": 1])
-      model.showProposed = true
+      model.boardFilter.proposals = true
       #expect(
         ControlState(model: model, run: "acme", revision: 3, dark: true).counts.lanes?["Todo"] == 7)
       model.navigate(to: .workspace)
