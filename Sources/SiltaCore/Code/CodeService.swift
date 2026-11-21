@@ -214,7 +214,7 @@ package struct CodeService {
         .init(
           arguments: ["--no-pager", "-c", "format.pretty=medium"] + arguments,
           directory: URL(filePath: selection.path, directoryHint: .isDirectory),
-          timeout: localOnly ? 0.25 : 10, lazyFetch: !localOnly, capture: capture))
+          timeout: localOnly ? 2 : 10, lazyFetch: !localOnly, capture: capture))
     } catch { throw failure(selection) }
     switch result.termination {
     case .exit: return result

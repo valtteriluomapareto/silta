@@ -24,14 +24,15 @@ struct BriefHookGitRunnerTests {
     #expect(notifications.withLock { $0 } == (termination == .timedOut ? 1 : 0))
   }
 
-  @Test(arguments: [750, 1000])
+  @Test(arguments: [0, 750, 1000])
   func optionalReadsUseRemainingBudgetWithoutMarkingTheHookTimedOut(elapsed: Int) async throws {
     let capture = GitCapture(byteLimit: 1024)
     let request = GitRequest(
       arguments: ["cat-file", "-t", "HEAD:README.md"], directory: URL(filePath: "/acme"),
-      timeout: 0.5, capture: capture)
+      timeout: 2, capture: capture)
     let bounded = GitRequest(
-      arguments: request.arguments, directory: request.directory, timeout: 0.25,
+      arguments: request.arguments, directory: request.directory,
+      timeout: Double(1000 - elapsed) / 1000,
       lazyFetch: false, capture: capture)
     let scripted = ScriptedGitRunner(
       script: elapsed == 1000 ? [] : [(bounded, .success(.init(termination: .timedOut)))])
