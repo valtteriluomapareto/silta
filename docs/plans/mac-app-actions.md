@@ -108,7 +108,8 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     of being cleared. Unblock has its own target, apart from the task's comment draft.
     Due and `replan` items get follow-up cards (see Out): "Unblock anyway" sends the open
     blockers the confirm step named and refuses as `conflict` when Core's open blockers
-    differ, so it never unlinks one the human didn't see. Snooze re-blocks with Core's
+    differ just before the write; a blocker added in the instant between that check and
+    the write would still be unlinked. Snooze re-blocks with Core's
     masked current reason, which keeps the blockers and the episode's age.
   - **Errors** show in the card or inspector with the code, the message and "Copy
     command".

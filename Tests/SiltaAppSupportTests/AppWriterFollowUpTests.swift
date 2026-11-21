@@ -91,6 +91,9 @@
         #expect(due.blocked.first?.followUpAt == "2026-11-23")
         #expect(due.blocked.first?.on == ["ext:design-team"])
         #expect(due.blocked.first?.open == ["ext:design-team"])
+        let full = try #require(
+          try later.fullInbox(workspace: "acme").first { $0.kind == "due" })
+        #expect(full.blocked.first?.open == ["ext:design-team"])
       }
     }
   }
