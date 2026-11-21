@@ -102,7 +102,7 @@ extension WorkspaceRemovalError: ErrorExamples {
   static var examples: [WorkspaceRemovalError] {
     [
       .directHuman("acme", allowActive: false), .directHuman("acme", allowActive: true),
-      .active("acme"), .changed("acme"), .registration("acme"),
+      .active("acme"), .changed("acme"), .registration("acme", paths: ["/acme/clone"]),
     ]
   }
 }
