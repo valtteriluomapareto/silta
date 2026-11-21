@@ -16,7 +16,8 @@
         #expect(
           SidebarContent.claimSubtitle(expired, now: AppV2Fixture.now)
             == "Codex · claim expired · idle 3 h")
-        #expect(TaskPresentation.claim(try reader.task("AC-15", workspace: "acme"), now: .now) == nil)
+        #expect(
+          TaskPresentation.claim(try reader.task("AC-15", workspace: "acme"), now: .now) == nil)
       }
     }
 
@@ -34,7 +35,8 @@
           TaskPresentation.cardMetadata(task, asked: false, now: at)
             == "Claude · claim expired · idle 2 h")
         #expect(
-          TaskPresentation.cardMetadata(task, asked: false, now: before) == "Claude · active 1 h ago")
+          TaskPresentation.cardMetadata(task, asked: false, now: before)
+            == "Claude · active 1 h ago")
       }
     }
 
@@ -48,27 +50,27 @@
             == "Codex last wrote 3 h ago (step 3 of 4). No handoff was written, so the next "
             + "agent starts from the plan.")
         #expect(
-          TaskPresentation.claimBanner(try reader.task("AC-12", workspace: "acme"), now: AppV2Fixture.now)
+          TaskPresentation.claimBanner(
+            try reader.task("AC-12", workspace: "acme"), now: AppV2Fixture.now)
             == nil)
       }
     }
 
     @Test func releasedClaimReadsAsHandedOff() throws {
       try fixture { reader, home in
-        try AppTestCLI.run(["--ws", "acme", "task", "start", "AC-16"], home: home)
         try AppTestCLI.run(
           [
-            "--ws", "acme", "comment", "AC-16", "--kind", "handoff", "-m",
-            "Pagination cursor done; next the page size limit.",
-          ], home: home, seed: 152)
+            "--ws", "acme", "comment", "AC-14", "--kind", "handoff", "-m",
+            "Retry queue done; next drop tokens older than an hour.",
+          ], home: home, actor: "agent:codex:fixture")
         let board = try reader.snapshot(workspace: "acme").board
-        let card = try #require(board.doing.first { $0.ref == "AC-16" })
+        let card = try #require(board.doing.first { $0.ref == "AC-14" })
         #expect(TaskPresentation.claim(card, now: AppV2Fixture.now) == .handedOff)
         #expect(
           TaskPresentation.cardMetadata(card, asked: false, now: AppV2Fixture.now)
             == "Handed off · ready to resume")
-        let detail = try reader.task("AC-16", workspace: "acme")
-        #expect(TaskFacts.handoff(detail)?.hasPrefix("Handed off in AC-16/") == true)
+        let detail = try reader.task("AC-14", workspace: "acme")
+        #expect(TaskFacts.handoff(detail)?.hasPrefix("Handed off in AC-14/") == true)
         #expect(TaskPresentation.claimBanner(detail, now: AppV2Fixture.now) == nil)
       }
     }
@@ -76,7 +78,8 @@
     @Test func expiredClaimsAreCountedForTheSidebar() throws {
       try fixture { reader, _ in
         let doing = try reader.snapshot(workspace: "acme").board.doing
-        #expect(SidebarContent.claimHeading(doing, now: AppV2Fixture.now) == "Claimed now · 1 expired")
+        #expect(
+          SidebarContent.claimHeading(doing, now: AppV2Fixture.now) == "Claimed now · 1 expired")
         #expect(
           SidebarContent.claimHeading(doing, now: AppV2Fixture.now.addingTimeInterval(-3 * 3600))
             == "Claimed now")

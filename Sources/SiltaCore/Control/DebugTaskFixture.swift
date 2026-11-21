@@ -93,7 +93,8 @@
     }
 
     /// Moves a fixture claim's heartbeat, so the claim reads as live or expired.
-    package static func claim(_ sequence: Int64, heartbeat: Date, in tx: StorageTransaction) throws {
+    package static func claim(_ sequence: Int64, heartbeat: Date, in tx: StorageTransaction) throws
+    {
       try tx.database.execute(
         sql: """
           UPDATE task SET claimed_at=? WHERE seq=? AND claimed_by IS NOT NULL

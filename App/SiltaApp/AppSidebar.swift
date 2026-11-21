@@ -74,14 +74,17 @@ struct AppSidebar: View {
 
   private var claimedCard: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Overline("Claimed now")
+      Overline(SidebarContent.claimHeading(claimed, now: model.now()))
       ForEach(claimed.prefix(SidebarContent.claimLimit), id: \.ref) { task in
+        let expired = task.claimExpired(at: model.now())
         Button {
           model.inspect(task: task.ref)
         } label: {
           HStack(spacing: 8) {
             ActorLabel(actor: task.claimedBy ?? "").labelStyle(.iconOnly)
-            Text(SidebarContent.claimTitle(task)).font(.system(size: 11, design: .monospaced))
+            Text(SidebarContent.claimTitle(task, now: model.now()))
+              .font(.system(size: 11, design: .monospaced))
+              .foregroundStyle(Color(expired ? "Warning" : "Ink"))
               .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             if let age = SidebarContent.claimAge(task, now: model.now()) {
               Text(age).font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
@@ -90,7 +93,7 @@ struct AppSidebar: View {
         }.buttonStyle(.plain)
           .help(SidebarContent.claimSubtitle(task, now: model.now()))
           .accessibilityLabel(
-            SidebarContent.claimTitle(task) + ", "
+            SidebarContent.claimTitle(task, now: model.now()) + ", "
               + SidebarContent.claimSubtitle(task, now: model.now()))
       }
       if claimed.count > SidebarContent.claimLimit {

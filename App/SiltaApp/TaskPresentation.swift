@@ -30,9 +30,61 @@ nonisolated enum TaskPresentation {
     }
     if task.status == "proposed" { return "Proposed by " + ActorPresentation(task.createdBy).name }
     guard task.status == "doing" else { return nil }
+    return claimLine(task, now: now)
+  }
+
+  /// A Doing task's claim: live, expired (another agent may start it), or released.
+  enum Claim: Equatable {
+    case live(age: String)
+    case expired(idle: String)
+    case handedOff
+  }
+
+  /// The claim state, aged from the claim heartbeat rather than the last task update.
+  static func claim(_ task: AppTask, now: Date) -> Claim? {
+    guard task.status == "doing" else { return nil }
+    guard task.claimedBy != nil else { return .handedOff }
+    if task.claimExpired(at: now) {
+      return .expired(idle: RelativeAge.text(task.claimedAt, now: now, short: true) ?? "")
+    }
+    return .live(age: RelativeAge.text(task.claimedAt, now: now) ?? "")
+  }
+
+  /// Who holds a Doing task and how fresh the claim is, such as `Codex · active 6 min ago`.
+  static func claimLine(_ task: AppTask, now: Date) -> String? {
     let actor = task.claimedBy.map { ActorPresentation($0).name }
-    let age = RelativeAge.text(task.updatedAt, now: now).map { "updated " + $0 }
-    return [actor, age].compactMap { $0 }.joined(separator: " · ")
+    switch claim(task, now: now) {
+    case .live(let age): return [actor, "active " + age].compactMap { $0 }.joined(separator: " · ")
+    case .expired(let idle):
+      return [actor, "claim expired", "idle " + idle].compactMap { $0 }.joined(separator: " · ")
+    case .handedOff: return "Handed off · ready to resume"
+    case nil: return nil
+    }
+  }
+
+  struct ClaimBanner: Equatable {
+    let title: String
+    let body: String
+  }
+
+  /// The inspector's warning for an expired claim: when it lapsed, the last sign of work and
+  /// where the next agent starts.
+  static func claimBanner(_ task: AppTask, now: Date) -> ClaimBanner? {
+    guard task.status == "doing", let holder = task.claimedBy, task.claimExpired(at: now),
+      let age = task.claimAge(at: now)
+    else { return nil }
+    let lapsed = now.addingTimeInterval(-(age - AppTask.claimDuration))
+    let stamp = lapsed.ISO8601Format(.init(includingFractionalSeconds: true))
+    let wrote = RelativeAge.text(task.claimedAt, now: now) ?? "a while ago"
+    let step =
+      task.steps.isEmpty ? "" : " (step \(task.steps.filter(\.done).count) of \(task.steps.count))"
+    let handoff = task.comments.last { $0.kind == "handoff" && !$0.deleted }
+    let next =
+      handoff.map { "The latest handoff is \($0.ref), so the next agent starts from it." }
+      ?? "No handoff was written, so the next agent starts from the plan."
+    return ClaimBanner(
+      title: "Claim expired " + (RelativeAge.text(stamp, now: now) ?? "just now"),
+      body: ActorPresentation(holder).name + " last wrote " + wrote + step + ". " + next)
   }
 
   /// A short status for a task row in the map inspector: who holds it and which step, or

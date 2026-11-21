@@ -1,3 +1,4 @@
+import AppKit
 import SiltaAppSupport
 import SwiftUI
 
@@ -88,12 +89,61 @@ struct ResultSection: View {
 /// A released claim, so the next agent resumes from the handoff.
 struct HandoffNote: View {
   let text: String
+  let prompt: String?
 
   var body: some View {
-    Label(text, systemImage: "arrow.uturn.forward.circle")
-      .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color("TideText"))
-      .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+    VStack(alignment: .leading, spacing: 8) {
+      Label(text, systemImage: "arrow.uturn.forward.circle")
+        .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color("TideText"))
+      if let prompt { CopyTextButton(title: "Copy resume prompt", value: prompt) }
+    }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
       .background(Color("TideText").opacity(0.07), in: .rect(cornerRadius: 12))
+  }
+}
+
+/// An expired claim: when it lapsed, the last sign of work and how to resume.
+struct ClaimBannerView: View {
+  let banner: TaskPresentation.ClaimBanner
+  let prompt: String?
+  let worktree: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label(banner.title, systemImage: "clock.badge.exclamationmark")
+        .font(.system(size: 13, weight: .semibold))
+      Text(banner.body).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
+      HStack(spacing: 14) {
+        if let prompt { CopyTextButton(title: "Copy resume prompt", value: prompt) }
+        if let worktree, worktree.hasPrefix("/"), FileManager.default.fileExists(atPath: worktree) {
+          Button("Reveal worktree") {
+            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: worktree)
+          }.buttonStyle(.plain).font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Color("TideText"))
+        }
+      }
+    }.foregroundStyle(Color("Warning")).padding(14)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color("Warning").opacity(0.12), in: .rect(cornerRadius: 12))
+      .accessibilityElement(children: .contain)
+  }
+}
+
+/// A text button that copies a value and says Copied for a moment.
+struct CopyTextButton: View {
+  let title: String
+  let value: String
+  @State private var copied = false
+
+  var body: some View {
+    Button(copied ? "Copied" : title) { copied = CopyValue.writeToPasteboard(value) }
+      .buttonStyle(.plain).font(.system(size: 12, weight: .semibold))
+      .foregroundStyle(Color(copied ? "Success" : "TideText"))
+      .help(value)
+      .task(id: copied) {
+        guard copied else { return }
+        do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
+        copied = false
+      }
   }
 }
 
