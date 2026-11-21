@@ -69,14 +69,16 @@
     /// Sets the facts a fixture task shows beyond its row defaults; nil leaves a column as is.
     package static func annotate(
       _ sequence: Int64, acceptance: String? = nil, result: String? = nil,
-      doneBranch: String? = nil, doneDirty: Bool? = nil, in tx: StorageTransaction
+      doneBranch: String? = nil, doneDirty: Bool? = nil, worktree: String? = nil,
+      in tx: StorageTransaction
     ) throws {
       try tx.database.execute(
         sql: """
           UPDATE task SET acceptance_md=coalesce(?,acceptance_md),result_md=coalesce(?,result_md),
-            done_branch=coalesce(?,done_branch),done_dirty=coalesce(?,done_dirty)
+            done_branch=coalesce(?,done_branch),done_dirty=coalesce(?,done_dirty),
+            worktree=coalesce(?,worktree)
           WHERE seq=? AND workspace_id=(SELECT id FROM workspace WHERE slug='acme')
-          """, arguments: [acceptance, result, doneBranch, doneDirty, sequence])
+          """, arguments: [acceptance, result, doneBranch, doneDirty, worktree, sequence])
       guard tx.database.changesCount == 1 else { throw StorageError.corrupt }
       try tx.recordChange(kind: "task", rowID: try id(sequence, in: tx))
     }

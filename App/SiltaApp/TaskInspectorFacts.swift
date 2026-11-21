@@ -1,4 +1,3 @@
-import AppKit
 import SiltaAppSupport
 import SwiftUI
 
@@ -105,7 +104,8 @@ struct HandoffNote: View {
 struct ClaimBannerView: View {
   let banner: TaskPresentation.ClaimBanner
   let prompt: String?
-  let worktree: String?
+  let reveal: TaskMenu.Availability
+  let run: (TaskMenu.Action) -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -114,11 +114,9 @@ struct ClaimBannerView: View {
       Text(banner.body).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
       HStack(spacing: 14) {
         if let prompt { CopyTextButton(title: "Copy resume prompt", value: prompt) }
-        if let worktree, worktree.hasPrefix("/"), FileManager.default.fileExists(atPath: worktree) {
-          Button("Reveal worktree") {
-            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: worktree)
-          }.buttonStyle(.plain).font(.system(size: 12, weight: .medium))
-            .foregroundStyle(Color("TideText"))
+        if case .available(let action) = reveal {
+          Button("Reveal worktree") { run(action) }.buttonStyle(.plain)
+            .font(.system(size: 12, weight: .medium)).foregroundStyle(Color("TideText"))
         }
       }
     }.foregroundStyle(Color("Warning")).padding(14)

@@ -30,7 +30,7 @@ struct AppSidebar: View {
                 )
                 .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
               }.padding(.horizontal, 8).padding(.vertical, 5).contentShape(.rect)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).taskMenu(TaskMenu.items(forApp: app.slug), model: model)
           }.listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         } header: {
           Overline("Apps").padding(.leading, 8)
@@ -92,6 +92,7 @@ struct AppSidebar: View {
             }
           }.contentShape(.rect)
         }.buttonStyle(.plain)
+          .taskMenu(model.menuItems(for: task), model: model)
           .help(SidebarContent.claimSubtitle(task, now: now))
           .accessibilityLabel(
             SidebarContent.claimTitle(task, now: now) + ", "

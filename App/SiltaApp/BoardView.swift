@@ -104,6 +104,7 @@ struct BoardView: View {
           }.buttonStyle(.plain).help(task.title)
             .accessibilityLabel(content.accessibilityLabel(for: task, asked: false))
             .accessibilityAddTraits(selected ? .isSelected : [])
+            .taskMenu(model.menuItems(for: task), model: model)
         }
       }.padding(.horizontal, 12).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading).seaPane(radius: 12)
@@ -159,6 +160,7 @@ struct BoardView: View {
     }.buttonStyle(.plain).accessibilityElement(children: .ignore)
       .accessibilityAddTraits(selected ? .isSelected : [])
       .accessibilityLabel(content.accessibilityLabel(for: task, asked: asked))
+      .taskMenu(model.menuItems(for: task), model: model)
   }
 
   /// The app's sidebar square; an app missing from the map draws none.
