@@ -126,8 +126,11 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   proposals moved in with Paper "App features v1": My work's proposal card offers "Drop
   N…", which asks for an optional one-line reason and sends one all-or-nothing triage,
   and each proposal row has "Open", which opens it in the Board inspector.
-- Unblocking `replan` items: Core suggests a re-plan, and the open blockers would be
-  unlinked.
+- Unblocking `replan` items moved in with Paper "App features v1": My work shows due and
+  re-plan items as follow-up cards with Snooze (3, 7, 14 or 30 days; `app block`, which
+  keeps the blockers and reason), "Unblock anyway…" after a confirm step that names the
+  open blockers it unlinks, "Open task" and "Drop…" with an optional reason (`app drop`).
+  A ready item keeps its plain Unblock.
 - An Unblock button on Board cards: the card is one button, and the inbox cap would
   make the button flicker.
 - Confirm sheets.

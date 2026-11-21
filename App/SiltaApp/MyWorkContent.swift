@@ -45,11 +45,12 @@ nonisolated struct MyWorkContent {
   let reviews: [Review]
   let documents: [Proposal]
   let tasks: [Proposal]
+  let followUps: [FollowUp]
   let other: [AppAttention]
   let remaining: Int
   var hasMatches: Bool {
     !questions.isEmpty || !answers.isEmpty || !reviews.isEmpty || !documents.isEmpty
-      || !tasks.isEmpty || !other.isEmpty
+      || !tasks.isEmpty || !followUps.isEmpty || !other.isEmpty
   }
 
   /// `all` replaces the capped inbox items when My work shows every waiting item.
@@ -81,8 +82,13 @@ nonisolated struct MyWorkContent {
     tasks = items.filter {
       $0.kind == "proposal" && matches($0, extra: [byRef[$0.ref ?? ""]?.app ?? ""])
     }.map { Self.proposal($0, task: byRef[$0.refs.first ?? $0.ref ?? ""]) }
+    followUps = items.filter { ["due", "replan"].contains($0.kind) }.flatMap { item in
+      item.blocked.filter { matches(item, extra: [$0.ref, $0.title, $0.why ?? ""] + $0.on) }
+        .map { FollowUp(item: item, task: $0, board: byRef[$0.ref], now: now) }
+    }
     other = items.filter {
-      !["question", "answer", "doc_proposal", "proposal"].contains($0.kind) && matches($0)
+      !["question", "answer", "doc_proposal", "proposal", "due", "replan"].contains($0.kind)
+        && matches($0)
     }
     remaining = all == nil ? snapshot.work.remaining : 0
   }
@@ -151,5 +157,51 @@ nonisolated struct MyWorkContent {
       item: item, title: item.title ?? task?.title ?? "Task proposal",
       metadata: [task?.app, author].compactMap { $0 }.joined(separator: " · "),
       ref: item.refs.first ?? item.ref ?? "")
+  }
+}
+
+/// A blocked task whose follow-up day came, or whose blocker was dropped.
+nonisolated struct FollowUp: Identifiable, Equatable {
+  let item: AppAttention
+  let task: AppBlockedTask
+  /// The board's row for the task, which carries Core's waiting state.
+  let board: AppTask?
+  let now: Date
+
+  var id: String { item.kind + ":" + task.ref }
+  var replan: Bool { item.kind == "replan" }
+
+  var title: String { (replan ? "Re-plan: " : "Follow up: ") + task.title }
+
+  var subtitle: String {
+    let waiting = board?.waiting
+    let age = waiting.map { $0.ageDays == 1 ? "blocked 1 day" : "blocked \($0.ageDays) days" }
+    let lead =
+      replan
+      ? "A blocker was dropped: " + dropped.joined(separator: ", ")
+      : "Follow-up was due " + (task.followUpAt ?? "")
+    return ([lead] + [age].compactMap { $0 }).joined(separator: " · ")
+  }
+
+  /// Dropped blocker tasks, as bare refs.
+  var dropped: [String] { (board?.waiting?.dropped ?? []).map(Self.bare) }
+
+  /// The blockers Unblock anyway unlinks: every current blocker but dropped tasks.
+  var openBlockers: [String] {
+    let dropped = Set(dropped)
+    return task.on.map(Self.bare).filter { !dropped.contains($0) }
+  }
+
+  private static func bare(_ blocker: String) -> String {
+    blocker.hasPrefix("task:") ? String(blocker.dropFirst("task:".count)) : blocker
+  }
+
+  /// The confirm step's sentence before Unblock anyway.
+  var unblockWarning: String {
+    let open = openBlockers
+    return open.isEmpty
+      ? "Unblocking returns it to Todo."
+      : "Unblocking returns it to Todo and unlinks its open "
+        + (open.count == 1 ? "blocker " : "blockers ") + open.joined(separator: ", ") + "."
   }
 }

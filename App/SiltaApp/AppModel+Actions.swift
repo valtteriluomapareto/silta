@@ -78,6 +78,37 @@ extension AppModel {
     perform(.unblock(ref: ref), for: Self.unblockTarget(ref))
   }
 
+  /// Moves a blocked task's follow-up ahead under its follow-up target.
+  @discardableResult func snooze(_ ref: String, days: Int) -> Task<Void, Never>? {
+    perform(.snooze(ref: ref, days: days), for: Self.followUpTarget(ref))
+  }
+
+  /// Returns a blocked task to todo even with open blockers; the view confirms first.
+  @discardableResult func unblockAnyway(_ ref: String) -> Task<Void, Never>? {
+    perform(.unblockAnyway(ref: ref), for: Self.followUpTarget(ref))
+  }
+
+  /// Drops a blocked task with its drop reason draft, which clears only on success.
+  @discardableResult func dropTask(_ ref: String) -> Task<Void, Never>? {
+    guard let reasonTarget = target(Self.dropTaskReasonTarget(ref)) else { return nil }
+    let reason = actions.draft(reasonTarget).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let running = perform(
+        .dropTask(ref: ref, why: reason.isEmpty ? nil : reason), for: Self.followUpTarget(ref))
+    else { return nil }
+    return Task {
+      await running.value
+      guard let followUp = target(Self.followUpTarget(ref)), actions.failures[followUp] == nil
+      else { return }
+      actions.setDraft("", for: reasonTarget)
+    }
+  }
+
+  /// One write at a time per blocked task: snooze, unblock anyway or drop.
+  static func followUpTarget(_ ref: String) -> String { "followup:" + ref }
+
+  static func dropTaskReasonTarget(_ ref: String) -> String { "drop-task:" + ref }
+
   /// The one target all proposal triage shares, so only one batch runs at a time.
   static let proposalsTarget = "proposals"
 

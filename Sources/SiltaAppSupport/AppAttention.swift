@@ -30,6 +30,22 @@ public struct AppAttention: Equatable, Sendable {
   public let sourceTask: String?
   /// Human-form core next commands; copy templates are a separate presentation concern.
   public let commands: [String]
+  /// The blocked tasks of a `due`, `ready` or `replan` entry, as Core lists them.
+  public internal(set) var blocked: [AppBlockedTask] = []
+}
+
+/// A blocked task in a follow-up entry.
+public struct AppBlockedTask: Equatable, Sendable {
+  /// Canonical task reference.
+  public let ref: String
+  /// Task title.
+  public let title: String
+  /// The latest block reason, masked.
+  public let why: String?
+  /// Current blockers, masked.
+  public let on: [String]
+  /// The stored UTC follow-up day.
+  public let followUpAt: String?
 }
 
 extension AppAttention {
@@ -42,6 +58,11 @@ extension AppAttention {
       author: item.author ?? item.docProposal?.author,
       body: item.body ?? item.tasks?.first?.why, createdAt: item.createdAt,
       documentRevision: item.docProposal?.revision, sourceTask: item.docProposal?.sourceTask,
-      commands: item.next)
+      commands: item.next,
+      blocked: ["due", "ready", "replan"].contains(item.kind)
+        ? (item.tasks ?? []).map {
+          AppBlockedTask(
+            ref: $0.ref, title: $0.title, why: $0.why, on: $0.on ?? [], followUpAt: $0.followUpAt)
+        } : [])
   }
 }

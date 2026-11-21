@@ -67,6 +67,10 @@ struct MyWorkView: View {
               proposalFooter(content.tasks)
             }.padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
+          ForEach(content.followUps) { followUp in
+            FollowUpCard(model: model, followUp: followUp).padding(.horizontal, 22)
+              .padding(.vertical, 16).seaPane()
+          }
           ForEach(content.other, id: \.stableID) { item in
             otherAttention(item).padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
