@@ -66,6 +66,20 @@
       try tx.recordChange(kind: "task", rowID: id)
     }
 
+    /// Sets the facts a fixture task shows beyond its row defaults; nil leaves a column as is.
+    package static func annotate(
+      _ sequence: Int64, acceptance: String? = nil, result: String? = nil,
+      doneBranch: String? = nil, doneDirty: Bool? = nil, in tx: StorageTransaction
+    ) throws {
+      try tx.database.execute(
+        sql: """
+          UPDATE task SET acceptance_md=coalesce(?,acceptance_md),result_md=coalesce(?,result_md),
+            done_branch=coalesce(?,done_branch),done_dirty=coalesce(?,done_dirty)
+          WHERE seq=? AND workspace_id=(SELECT id FROM workspace WHERE slug='acme')
+          """, arguments: [acceptance, result, doneBranch, doneDirty, sequence])
+      guard tx.database.changesCount == 1 else { throw StorageError.corrupt }
+    }
+
     /// Completes a fixture task that other fixture writes needed open, such as a blocker.
     package static func complete(_ sequence: Int64, in tx: StorageTransaction, at: Date) throws {
       let stamp = TaskService.timestamp(at)

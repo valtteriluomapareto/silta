@@ -78,15 +78,23 @@ public struct AppReader: Sendable {
     }
   }
 
-  /// Reads task properties, parsed plan and discussion through the core service.
+  /// Reads task properties, parsed plan and discussion through the core service, with the
+  /// parent, subtasks and task blockers it names.
   public func task(_ ref: String, workspace: String) throws -> AppTask {
     try Self.checked(home: environment.home.url) {
       try checkSchema()
       let service = TaskService(environment: environment, workspace: workspace)
       let (task, resolved) = try service.showWithResolvedThreads(ref)
+      let wanted = Set([task.parent].compactMap { $0 } + (task.waiting?.on ?? []).compactMap(AppWaiting.taskRef))
+      var filter = TaskFilter()
+      filter.proposed = true
+      filter.archived = true
+      let related = try service.list(filter).filter {
+        $0.ref != task.ref && (wanted.contains($0.ref) || $0.parent == task.ref)
+      }
       return AppTask(
         task, submission: task.status == "review" ? try service.reviewSubmission(ref) : nil,
-        resolved: resolved)
+        resolved: resolved, related: related)
     }
   }
 
