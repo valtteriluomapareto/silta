@@ -137,7 +137,7 @@ final class AppModel {
             data = result
             // A remembered or selected workspace that no longer exists falls back to the
             // loaded one, dropping what was selected in it.
-            if workspace == nil || !result.workspaces.contains(where: { $0.slug == workspace }) {
+            if workspace == nil || result.workspace != workspace {
               if workspace != nil { clearWorkspaceState() }
               workspace = result.workspace
               if let slug = result.workspace {
