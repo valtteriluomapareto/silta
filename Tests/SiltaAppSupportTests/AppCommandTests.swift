@@ -22,6 +22,42 @@
       }
     }
 
+    @Test func agentPromptNamesTheTaskCommandsAndPinsOnlyACustomHome() throws {
+      try withScratchDirectory { scratch in
+        let userHome = scratch.appending(path: "user")
+        let reader = try AppReader(
+          home: userHome.appending(path: ".silta"), user: "acme", userHome: userHome)
+        #expect(
+          reader.agentPrompt(task: "AC-14", workspace: "acme", name: "Acme")
+            == "Work on AC-14 in Acme. Run `silta --ws 'acme' task show 'AC-14'`, then "
+            + "`silta --ws 'acme' task start 'AC-14'`, and follow the brief.")
+        let custom = try AppReader(
+          home: scratch.appending(path: "custom data"), user: "acme", userHome: userHome)
+        let prompt = custom.agentPrompt(task: "AC-14", workspace: "acme", name: "Acme")
+        let pinned = "`SILTA_HOME='" + scratch.appending(path: "custom data").path + "' silta --ws"
+        #expect(prompt.components(separatedBy: pinned).count == 3)
+      }
+    }
+
+    @Test func claimExpiresAtCoresBoundary() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppReader(
+          home: scratch.appending(path: "silta-home"), user: AppV2Fixture.user,
+          now: { AppV2Fixture.now })
+        let task = try reader.task("AC-12", workspace: "acme")
+        let stamp = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(
+          try #require(task.claimedAt))
+        #expect(AppTask.claimDuration == TaskService.claimDuration)
+        #expect(!task.claimExpired(at: stamp.addingTimeInterval(AppTask.claimDuration - 0.001)))
+        #expect(task.claimExpired(at: stamp.addingTimeInterval(AppTask.claimDuration)))
+        #expect(task.claimAge(at: stamp.addingTimeInterval(-60)) == 0)
+        let unclaimed = try reader.task("AC-15", workspace: "acme")
+        #expect(unclaimed.claimAge(at: AppV2Fixture.now) == nil)
+        #expect(!unclaimed.claimExpired(at: AppV2Fixture.now))
+      }
+    }
+
     @Test(arguments: ["existing", "symlink", "var-alias", "trailing-slash"])
     func pastedCommandsPinExistingDefaultHome(alias: String) throws {
       try withScratchDirectory { scratch in

@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 import SiltaCore
 
 /// Task values shared by board cards, review attention and the inspector.
@@ -199,4 +199,25 @@ public struct AppTaskLink: Equatable, Sendable {
   public let rel: String
   /// Masked canonical target reference.
   public let target: String
+}
+
+extension AppTask {
+  /// How long a claim lasts without a heartbeat, as Core enforces it.
+  public static var claimDuration: TimeInterval { TaskService.claimDuration }
+
+  /// Seconds since the claim's last heartbeat; nil when unclaimed or unreadable.
+  public func claimAge(at now: Date) -> TimeInterval? {
+    guard claimedBy != nil, let claimedAt else { return nil }
+    do {
+      let date = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(claimedAt)
+      return max(0, now.timeIntervalSince(date))
+    } catch {
+      return nil
+    }
+  }
+
+  /// The claim outlived its heartbeat, so another agent can start the task without stealing.
+  public func claimExpired(at now: Date) -> Bool {
+    claimAge(at: now).map { $0 >= Self.claimDuration } ?? false
+  }
 }

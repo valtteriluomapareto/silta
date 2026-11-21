@@ -1,4 +1,4 @@
-import Foundation
+package import Foundation
 import GRDB
 
 /// Performs task writes through the shared transaction gate and reads without mutation.
@@ -81,7 +81,7 @@ package struct TaskService: Sendable {
   }
 
   /// Shared expiry boundary for claim ownership and diagnostics.
-  static let claimDuration: TimeInterval = 2 * 60 * 60
+  package static let claimDuration: TimeInterval = 2 * 60 * 60
 
   /// Another actor's claim under two hours old: the only claim `--steal` overrides.
   func foreignClaim(_ task: TaskDetails, at date: Date) throws -> (holder: String, minutes: Int)? {

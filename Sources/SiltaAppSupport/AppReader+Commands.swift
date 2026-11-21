@@ -39,6 +39,17 @@ extension AppReader {
     [taskCommand(task.ref, workspace: workspace)]
   }
 
+  /// What the human pastes into an agent session to start or resume a task. The app only
+  /// copies it and never launches an agent (D4). Only a custom data home is pinned, since an
+  /// agent's default home is the human's.
+  public func agentPrompt(task ref: String, workspace: String, name: String) -> String {
+    let home =
+      environment.home.isDefault ? "" : "SILTA_HOME=" + shellWord(environment.home.url.path) + " "
+    let silta = home + "silta --ws " + shellWord(workspace)
+    return "Work on \(ref) in \(name). Run `\(silta) task show \(shellWord(ref))`, then "
+      + "`\(silta) task start \(shellWord(ref))`, and follow the brief."
+  }
+
   /// Reads the full human inbox beyond the default cap.
   public func inboxCommand(workspace: String) -> AppCommand {
     command("Read full inbox", suffix: "inbox --for me --all", workspace: workspace)

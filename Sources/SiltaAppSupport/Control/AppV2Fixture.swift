@@ -47,6 +47,8 @@
       try store.write {
         try DebugTaskFixture.complete(19, in: $0, at: now.addingTimeInterval(-1800))
         try inspectorFacts(in: $0)
+        // Codex went quiet on AC-14 three hours ago, so its claim has expired.
+        try DebugTaskFixture.claim(14, heartbeat: now.addingTimeInterval(-3 * 3600), in: $0)
       }
       _ = try service.link(
         "AC-8", target: "url:https://github.com/acme/example/pull/38", relation: "about")
