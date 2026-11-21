@@ -58,7 +58,8 @@ nonisolated enum TaskMenu {
             ? .available(
               .copy(reader.agentPrompt(task: task.ref, workspace: workspace, name: name)))
             : .unavailable(
-              reason: "claimed by " + ActorPresentation(task.claimedBy ?? "").name)))
+              reason: task.claimedBy.map { "claimed by " + ActorPresentation($0).name }
+                ?? "not resumable")))
     }
     items.append(
       Item(

@@ -32,7 +32,7 @@ struct TaskInspector: View {
             {
               ClaimBannerView(
                 banner: banner, prompt: task.claimExpiresAt == nil ? nil : resumePrompt(task),
-                reveal: TaskMenu.reveal(task, existing: model.visibleData?.existingWorktrees ?? [])
+                reveal: TaskMenu.reveal(task, existing: model.inspectedWorktrees)
               ) { model.run($0) }
             }
             if let handoff = TaskFacts.handoff(task) {
@@ -218,7 +218,7 @@ struct TaskInspector: View {
   }
 
   @ViewBuilder private func worktreeButton(_ task: AppTask) -> some View {
-    let reveal = TaskMenu.reveal(task, existing: model.visibleData?.existingWorktrees ?? [])
+    let reveal = TaskMenu.reveal(task, existing: model.inspectedWorktrees)
     let action: TaskMenu.Action? = if case .available(let action) = reveal { action } else { nil }
     Button("Reveal worktree", systemImage: "folder") {
       if let action { model.run(action) }
@@ -226,7 +226,7 @@ struct TaskInspector: View {
       .help(
         {
           if case .unavailable(let reason) = reveal {
-            "Worktree " + reason
+            "Can't reveal the worktree: " + reason
           } else {
             "Reveal the recorded worktree"
           }
