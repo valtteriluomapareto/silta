@@ -1,0 +1,76 @@
+import Foundation
+import SiltaCore
+import SiltaTestSupport
+import Testing
+
+@Suite(.blockingTestWork, .timeLimit(.minutes(1)))
+struct DatabaseLocationCommandTests {
+  @Test(arguments: [true, false])
+  func danglingStoreNeverLooksLikeAnEmptyWorkspace(absolute: Bool) throws {
+    try withScratchDirectory { scratch in
+      let fm = FileManager.default
+      let repo = scratch.appending(path: "checkout")
+      try InitCommandTests.makeRepo(repo, in: scratch)
+      let home = scratch.appending(path: "silta-home")
+      try fm.createDirectory(at: home, withIntermediateDirectories: true)
+      let target = "Acme-private-target.db"
+      let link = home.appending(path: "silta.db")
+      let missing = home.appending(path: target)
+      let destination = absolute ? missing.path : target
+      try fm.createSymbolicLink(atPath: link.path, withDestinationPath: destination)
+
+      let hook = try SiltaBinary.run(
+        ["brief", "--hook"], in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
+      #expect(hook == CLIResult(termination: .exit(0), stdout: "", stderr: ""))
+      let daily = home.appending(path: "log/2023-11-14.jsonl")
+      let text = try String(contentsOf: daily, encoding: .utf8)
+      let lines = text.split(separator: "\n")
+      let row = try GuideContractTests.object(String(try #require(lines.first)))
+      #expect(lines.count == 1)
+      #expect(row["command"] as? String == "silta brief")
+      #expect(row["exit_code"] as? Int == 0)
+      #expect(!text.contains(target) && !text.contains("hook_failed"))
+      withKnownIssue("A dangling store currently produces the empty workspace hook result.") {
+        #expect(row["error_code"] as? String == "env")
+      }
+
+      let commands = [["where"], ["brief"], ["ws", "ls"], ["--ws", "acme", "ws", "show"]]
+      for args in commands {
+        let result = try SiltaBinary.run(
+          args + ["--json"], in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
+        let json = try GuideContractTests.object(result.stdout)
+        let error = json["error"] as? [String: Any]
+        #expect(!result.stdout.contains(target) && !result.stderr.contains(target))
+        withKnownIssue("A dangling store is currently treated as empty for \(args).") {
+          #expect(result.termination == .exit(9))
+          #expect(error?["code"] as? String == "env")
+          #expect(error?["next"] as? [String] == ["silta doctor"])
+        }
+      }
+      let diagnosis = try FirstWorkspaceCommandTests.replay(
+        "silta doctor", in: scratch, cwd: repo, json: true)
+      #expect(diagnosis.termination == .exit(9))
+      #expect(diagnosis.stdout.contains("database.writable"))
+      #expect(try fm.destinationOfSymbolicLink(atPath: link.path) == destination)
+      #expect(!fm.fileExists(atPath: missing.path))
+    }
+  }
+
+  @Test func workspaceListCanReadAnExistingLinkedStore() throws {
+    try withScratchDirectory { scratch in
+      let physical = scratch.appending(path: "physical")
+      let fm = FileManager.default
+      try fm.createDirectory(at: physical, withIntermediateDirectories: true)
+      let store = try TaskCommandTests.setup(physical)
+      let home = scratch.appending(path: "silta-home")
+      try fm.createDirectory(at: home, withIntermediateDirectories: true)
+      try fm.createSymbolicLink(
+        at: home.appending(path: "silta.db"), withDestinationURL: URL(filePath: store.path))
+      let listed = try SiltaBinary.run(["ws", "ls", "--json"], in: scratch)
+      #expect(listed.termination == .exit(0))
+      let rows = try TaskStateCommandTests.data(listed)["workspaces"] as? [[String: Any]]
+      #expect(rows?.count == 1)
+      #expect(rows?.first?["slug"] as? String == "acme")
+    }
+  }
+}
