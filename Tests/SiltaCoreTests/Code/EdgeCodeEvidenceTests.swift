@@ -19,10 +19,8 @@ struct EdgeCodeEvidenceTests {
       let expected =
         "Edge code reference \(Self.shown) could not be verified locally (Git timed out). "
         + "Inspect it with \(Self.inspect)."
-      withKnownIssue("SI-239: A Git timeout currently looks like definitive absence.") {
-        #expect(warnings.map(\.message) == [expected])
-        #expect(git.requests.map(\.timeout) == [2])
-      }
+      #expect(warnings.map(\.message) == [expected])
+      #expect(git.requests.map(\.timeout) == [2])
 
       let runner = ScriptedGitRunner(script: [
         (
@@ -66,7 +64,7 @@ struct EdgeCodeEvidenceTests {
         "acme-edge^{commit}:guide/Acme's guide.md",
       ],
       directory: URL(filePath: repo.path, directoryHint: .isDirectory),
-      timeout: 0.25, lazyFetch: false, capture: .init(byteLimit: 1024))
+      timeout: 2, lazyFetch: false, capture: .init(byteLimit: 1024))
   }
 
   private static func fixture(_ scratch: URL, termination: GitTermination)
@@ -76,6 +74,8 @@ struct EdgeCodeEvidenceTests {
     try FileManager.default.createDirectory(
       at: repo.appending(path: ".git"), withIntermediateDirectories: true)
     let store = try AcmeDocAttachments.make(in: scratch)
+    let encoded = try JSONEncoder().encode([target, target])
+    let references = try #require(String(data: encoded, encoding: .utf8))
     try store.write { tx in
       try tx.database.execute(
         sql: """
@@ -85,7 +85,7 @@ struct EdgeCodeEvidenceTests {
           """,
         arguments: [
           "path": repo.path,
-          "refs": String(decoding: try JSONEncoder().encode([target, target]), as: UTF8.self),
+          "refs": references,
         ])
     }
     let git = ScriptedGitRunner(script: [
