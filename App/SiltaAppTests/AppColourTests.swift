@@ -12,13 +12,14 @@
           "AppIndigo", "AppBlue", "AppViolet", "AppPlum", "AppRose", "AppClay", "AppBrown",
           "AppSlate",
         ])
-      #expect(AppPalette.colours.map(AppPalette.title) == [
-        "Indigo", "Blue", "Violet", "Plum", "Rose", "Clay", "Brown", "Slate",
-      ])
+      #expect(
+        AppPalette.colours.map(AppPalette.title) == [
+          "Indigo", "Blue", "Violet", "Plum", "Rose", "Clay", "Brown", "Slate",
+        ])
       for name in AppPalette.colours { #expect(NSColor(named: name) != nil, "\(name)") }
     }
 
-    @Test(arguments: ["aqua", "darkAqua"])
+    @Test(arguments: ["NSAppearanceNameAqua", "NSAppearanceNameDarkAqua"])
     func everyColourReadsAsTextOnACard(appearance: String) throws {
       let look = try #require(NSAppearance(named: NSAppearance.Name(appearance)))
       var card = NSColor.white
@@ -42,7 +43,10 @@
       let before = slugs.map(AppPalette.automatic)
       let after = (["acme-admin"] + slugs).map(AppPalette.automatic).dropFirst()
       #expect(Array(after) == before)
-      #expect(Set(slugs.map(AppPalette.automatic)).count == 3)
+      #expect(
+        (slugs + ["acme-admin"]).map { AppPalette.title(AppPalette.automatic($0)) } == [
+          "Slate", "Violet", "Blue", "Indigo",
+        ])
     }
 
     @Test func aChosenColourIsKeptPerWorkspaceAndAppOnThisMac() async throws {

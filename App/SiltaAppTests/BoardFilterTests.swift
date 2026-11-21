@@ -68,12 +68,16 @@
         let content = BoardContent(
           snapshot: snapshot, apps: map.apps, filter: BoardFilter(), search: "")
         #expect(
-          content.appLabel(for: web) == BoardContent.AppLabel(name: "acme-web", color: "AppClay"))
-        #expect(SidebarContent.appColor(slug: "acme-web", apps: map.apps) == "AppClay")
-        #expect(SidebarContent.appColor(slug: "acme-mobile", apps: map.apps) == "AppViolet")
-        #expect(SidebarContent.appColor(slug: "gone", apps: map.apps) == nil)
-        #expect(BoardContent.appLabel(nil, apps: map.apps) == nil)
-        #expect(BoardContent.appLabel("gone", apps: map.apps) == .init(name: "gone", color: nil))
+          content.appLabel(for: web) == BoardContent.AppLabel(name: "acme-web", color: "AppBlue"))
+        #expect(
+          SidebarContent.appColor(slug: "acme-web", apps: map.apps, chosen: [:])
+            == AppPalette.automatic("acme-web"))
+        #expect(
+          SidebarContent.appColor(slug: "acme-mobile", apps: map.apps, chosen: [:])
+            == AppPalette.automatic("acme-mobile"))
+        #expect(SidebarContent.appColor(slug: "gone", apps: map.apps, chosen: [:]) == nil)
+        #expect(BoardContent.appLabel(nil, apps: map.apps, colours: [:]) == nil)
+        #expect(BoardContent.appLabel("gone", apps: map.apps, colours: [:]) == .init(name: "gone", color: nil))
         let named = [
           AppMapApp(
             slug: "acme-web", name: "Acme web shop", repo: "web", ref: "origin/main",
@@ -83,7 +87,7 @@
         let renamed = BoardContent(
           snapshot: snapshot, apps: named, filter: BoardFilter(), search: "web shop")
         #expect(renamed.lanes.flatMap(\.tasks).map(\.ref) == ["AC-15"])
-        #expect(renamed.appLabel(for: web) == .init(name: "Acme web shop", color: "AppSlate"))
+        #expect(renamed.appLabel(for: web) == .init(name: "Acme web shop", color: "AppBlue"))
         #expect(
           renamed.accessibilityLabel(for: web, asked: false)
             == "AC-15: Order history page, Acme web shop, todo")

@@ -11,9 +11,6 @@
         #expect(SidebarContent.claimTitle(task, now: AppV2Fixture.now) == "AC-12 · step 2 of 4")
         #expect(
           SidebarContent.claimSubtitle(task, now: AppV2Fixture.now) == "Claude · active 6 min ago")
-        #expect(SidebarContent.appColor(index: 0) == "AppSlate")
-        #expect(SidebarContent.appColor(index: 1) == "AppViolet")
-        #expect(SidebarContent.appColor(index: 2) == "AppClay")
         #expect(SidebarContent.claimAge(task, now: AppV2Fixture.now) == "6 min")
         let docs = try reader.documents(workspace: "acme", archived: true)
         #expect(SidebarContent.documentCount(docs) == "6")

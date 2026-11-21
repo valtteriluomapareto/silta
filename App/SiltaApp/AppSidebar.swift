@@ -30,7 +30,11 @@ struct AppSidebar: View {
                 )
                 .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
               }.padding(.horizontal, 8).padding(.vertical, 5).contentShape(.rect)
-            }.buttonStyle(.plain).taskMenu(TaskMenu.items(forApp: app.slug), model: model)
+            }.buttonStyle(.plain)
+              .taskMenu(TaskMenu.items(forApp: app.slug), model: model) {
+                Divider()
+                AppColourMenu(model: model, slug: app.slug)
+              }
           }.listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         } header: {
           Overline("Apps").padding(.leading, 8)
@@ -177,9 +181,7 @@ struct AppSidebar: View {
   }
 
   private func appColor(_ slug: String) -> Color {
-    Color(
-      SidebarContent.appColor(slug: slug, apps: model.visibleData?.map?.apps ?? [])
-        ?? SidebarContent.appColor(index: 0))
+    Color(model.appColour(slug))
   }
 
   private var claimed: [AppTask] {

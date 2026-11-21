@@ -171,8 +171,13 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   system sidebar glass. Text sits on drawn panes and cards that are at least 85% opaque.
   Reduce Transparency makes them opaque and drops the gradient's glows; Increase
   Contrast adds borders. Colour roles: tide for selection, refs and actions; brass for
-  proposed or waiting on you; kelp for done; app identity uses violet, slate and clay,
-  never a status colour.
+  proposed or waiting on you; kelp for done. App identity uses eight hues (Paper "App
+  features v1": indigo, blue, violet, plum, rose, clay, brown, slate), never green, amber
+  or teal, so an app never reads as a status; each reads as text on a card in light and
+  dark. An app's colour is automatic from its slug, so adding an app never recolours
+  another, unless the human chooses one from the sidebar app menu or the map's app
+  inspector. The choice is stored only on this Mac, keyed by workspace and slug; automated
+  control runs store nothing.
 - **App icon:** `App/SiltaApp/AppIcon.icon`, an Icon Composer document with flat
   light and dark layers in tide. Its design, geometry and regeneration steps are in
   [`app-icon.md`](../app-icon.md).
