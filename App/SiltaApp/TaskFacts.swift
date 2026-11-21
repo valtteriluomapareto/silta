@@ -4,14 +4,12 @@ import SiltaAppSupport
 /// What the inspector says about a task beyond its plan: blockers, result, links and
 /// relations, as `task show` reports them.
 nonisolated enum TaskFacts {
-  enum BlockerState: Equatable { case done, open, dropped }
-
   struct Blocker: Equatable {
     /// The blocker as written: a bare task ref, an `ext:` party or a URL.
     let ref: String
     /// A task blocker's title and status, when the detail read found it.
     let detail: String?
-    let state: BlockerState
+    let state: AppBlocker.State
   }
 
   struct Waiting: Equatable {
@@ -34,25 +32,27 @@ nonisolated enum TaskFacts {
 
   static func waiting(_ task: AppTask) -> Waiting? {
     guard let waiting = task.waiting else { return nil }
-    let blockers = waiting.on.map { blocker -> Blocker in
-      guard let ref = AppWaiting.taskRef(blocker) else {
-        return Blocker(ref: blocker, detail: nil, state: .open)
-      }
-      let related = task.related(ref)
-      let state: BlockerState =
-        waiting.dropped.contains(blocker)
-        ? .dropped : related?.status == "done" || waiting.ready ? .done : .open
-      return Blocker(
-        ref: ref, detail: related.map { $0.title + " · " + $0.status }, state: state)
+    let blockers = (task.detail?.blockers ?? []).map { blocker in
+      Blocker(
+        ref: blocker.ref,
+        detail: blocker.task.map {
+          [$0.title, $0.status, $0.externalRef == nil ? nil : "promoted"].compactMap { $0 }
+            .joined(separator: " · ")
+        }, state: blocker.state)
     }
     let done = blockers.filter { $0.state == .done }.count
     let age = waiting.ageDays == 0 ? "Blocked today." : "Blocked \(days(waiting.ageDays))."
     let next =
       !waiting.dropped.isEmpty
       ? "A blocker was dropped: re-plan the task."
-      : waiting.ready ? "Ready to unblock." : "Unblock is offered when every blocker is done."
+      : waiting.ready
+        ? "Ready to unblock."
+        : waiting.on.isEmpty
+          ? "Unblock when the answer arrives." : "Unblock is offered when every blocker is done."
     return Waiting(
-      blockers: blockers, heading: "Waiting on · \(done) of \(blockers.count) done",
+      blockers: blockers,
+      heading: waiting.on.isEmpty
+        ? "Waiting on an answer" : "Waiting on · \(done) of \(blockers.count) done",
       why: waiting.why, footer: age + " " + next,
       followUp: task.followUpAt.flatMap { day($0) }.map { "Follow up " + $0 })
   }
@@ -63,19 +63,18 @@ nonisolated enum TaskFacts {
     return splitResult(result)
   }
 
+  /// Splits off the result's final `Friction:` line, the rule the dogfood report and
+  /// finish scripts use (D36).
   static func splitResult(_ text: String) -> (body: String, friction: String?) {
-    var friction: String?
-    var kept: [Substring] = []
-    for paragraph in text.split(separator: "\n\n", omittingEmptySubsequences: false) {
-      let line = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
-      if friction == nil, line.hasPrefix("Friction:"), !line.contains("\n") {
-        friction = line.dropFirst("Friction:".count).trimmingCharacters(in: .whitespaces)
-      } else {
-        kept.append(paragraph)
-      }
+    var lines = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+    while let last = lines.last, last.allSatisfy(\.isWhitespace) { lines.removeLast() }
+    guard let last = lines.last, last.hasPrefix("Friction:") else {
+      return (text.trimmingCharacters(in: .whitespacesAndNewlines), nil)
     }
+    lines.removeLast()
     return (
-      kept.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines), friction
+      lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines),
+      last.dropFirst("Friction:".count).trimmingCharacters(in: .whitespaces)
     )
   }
 
@@ -85,8 +84,11 @@ nonisolated enum TaskFacts {
     return ([String(sha.prefix(7))] + [task.doneBranch].compactMap { $0 }).joined(separator: " · ")
   }
 
+  /// The task's own pull requests, once each; a blocker PR stays a blocker.
   static func pullRequests(_ task: AppTask) -> [PullRequest] {
-    task.links.compactMap { pullRequest($0.target) }
+    var seen = Set<String>()
+    return task.links.filter { $0.rel != "blocked_by" }.compactMap { pullRequest($0.target) }
+      .filter { seen.insert($0.url).inserted }
   }
 
   /// Links other than pull requests and blockers, which have their own rows.
@@ -108,11 +110,16 @@ nonisolated enum TaskFacts {
   }
 
   static func parent(_ task: AppTask) -> Related? {
-    task.parent.map { Related(ref: $0, title: task.related($0)?.title ?? "") }
+    task.parent.map { Related(ref: $0, title: task.detail?.parent?.title ?? "") }
   }
 
   static func subtasks(_ task: AppTask) -> [Related] {
-    task.subtasks.map { Related(ref: $0.ref, title: $0.title + " · " + $0.status) }
+    (task.detail?.subtasks ?? []).map {
+      Related(
+        ref: $0.ref,
+        title: [$0.title, $0.status, $0.externalRef == nil ? nil : "promoted"].compactMap { $0 }
+          .joined(separator: " · "))
+    }
   }
 
   /// Who created the task and on which day, such as `Codex · 12 Nov`.

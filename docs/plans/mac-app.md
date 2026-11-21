@@ -36,7 +36,12 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   2026-11-16; Paper v2's “4 waiting” group count is not the acceptance value.
 - **Board:** blocked tasks stay in Todo with a blocked label; lanes show plan
   progress, and a task inspector shows the plan, claim,
-  properties and discussion. Paper "Board filters v1": cards start with their app's
+  properties and discussion. Paper "App features v1": it also shows what `task show`
+  returns: each blocker with Core's ready state, the reason and follow-up day; acceptance;
+  the result with its final `Friction:` line set apart; the completion commit, pull
+  request and a dirty-worktree warning; a handoff ready to resume; parent, subtasks,
+  links, tracker and creator. One Core read in one transaction supplies them.
+  Paper "Board filters v1": cards start with their app's
   sidebar square and name, and a Filter menu shows or hides blocked, proposed and
   done-this-week tasks and picks an app. Hidden blocked tasks leave a "N blocked task
   hidden · Show" line in Todo; a blocked task with an open question to the human stays.

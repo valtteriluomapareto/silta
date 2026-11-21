@@ -78,6 +78,18 @@
           WHERE seq=? AND workspace_id=(SELECT id FROM workspace WHERE slug='acme')
           """, arguments: [acceptance, result, doneBranch, doneDirty, sequence])
       guard tx.database.changesCount == 1 else { throw StorageError.corrupt }
+      try tx.recordChange(kind: "task", rowID: try id(sequence, in: tx))
+    }
+
+    private static func id(_ sequence: Int64, in tx: StorageTransaction) throws -> Int64 {
+      guard
+        let id = try Int64.fetchOne(
+          tx.database,
+          sql: "SELECT id FROM task WHERE seq=? AND workspace_id=(SELECT id FROM workspace "
+            + "WHERE slug='acme')",
+          arguments: [sequence])
+      else { throw StorageError.corrupt }
+      return id
     }
 
     /// Completes a fixture task that other fixture writes needed open, such as a blocker.

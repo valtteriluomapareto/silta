@@ -63,20 +63,14 @@ public struct AppTask: Equatable, Sendable {
   public let submission: AppSubmission?
   /// Masked task links retaining their relationship to the target.
   public let links: [AppTaskLink]
-  /// Related tasks resolved by a detail read: the parent, subtasks and task blockers.
-  /// Board reads leave it empty.
-  public let related: [AppTaskSummary]
+  /// What only the detail read resolves: related tasks and each blocker's state. Nil on
+  /// board reads, so "none" and "not loaded" stay distinct.
+  public let detail: AppTaskDetail?
   /// Discussion as Core's normal read shows it, roots before replies. It can include a
   /// resolved thread: Core keeps the newest handoff even when resolved.
   public let comments: [AppComment]
   /// Posts of the resolved threads Core's normal read hides, roots before replies.
   public let resolvedComments: [AppComment]
-
-  /// Subtasks among the related tasks, in reference order.
-  public var subtasks: [AppTaskSummary] { related.filter { $0.parent == ref } }
-
-  /// The related task with this reference, if the detail read found it.
-  public func related(_ ref: String) -> AppTaskSummary? { related.first { $0.ref == ref } }
 }
 
 /// What a blocked task waits on, as Core computes it at read time.
@@ -91,11 +85,36 @@ public struct AppWaiting: Equatable, Sendable {
   public let ready: Bool
   /// Dropped blocker tasks, which call for a re-plan.
   public let dropped: [String]
+}
 
-  /// The task reference a `task:` blocker names; nil for parties and URLs.
-  public static func taskRef(_ blocker: String) -> String? {
-    blocker.hasPrefix("task:") ? String(blocker.dropFirst("task:".count)) : nil
+/// What the detail read adds to a task: its relatives and its blockers' states.
+public struct AppTaskDetail: Equatable, Sendable {
+  /// The parent task, when the task is a subtask.
+  public let parent: AppTaskSummary?
+  /// Subtasks in sequence order, promoted and archived ones included.
+  public let subtasks: [AppTaskSummary]
+  /// Each current blocker with Core's ready rule applied; empty unless blocked.
+  public let blockers: [AppBlocker]
+}
+
+/// One blocker of a blocked task.
+public struct AppBlocker: Equatable, Sendable {
+  /// Whether the blocker counts towards being ready to unblock.
+  public enum State: String, Equatable, Sendable {
+    /// A completed, unpromoted task.
+    case done
+    /// A party, a URL or a task not done; a promoted task stays open.
+    case open
+    /// A dropped task, which calls for a re-plan.
+    case dropped
   }
+
+  /// A bare task reference, an `ext:` party or a masked URL.
+  public let ref: String
+  /// The blocker task, nil for a party or a URL.
+  public let task: AppTaskSummary?
+  /// Core's ready state for this blocker.
+  public let state: State
 }
 
 /// A related task's identity and state, for rows that name it.
@@ -106,14 +125,14 @@ public struct AppTaskSummary: Equatable, Sendable {
   public let title: String
   /// Stored task status.
   public let status: String
-  /// Parent task reference, if any.
-  public let parent: String?
+  /// Read-only external tracker reference, for a promoted task.
+  public let externalRef: String?
 }
 
 extension AppTask {
   init(
     _ task: TaskDetails, submission: TaskEvent? = nil, resolved: [CommentDetails] = [],
-    related: [TaskDetails] = []
+    detail: AppTaskDetail? = nil
   ) {
     self.init(
       ref: task.ref, title: task.title, status: task.status, app: task.app,
@@ -134,11 +153,33 @@ extension AppTask {
         AppSubmission(actor: SecretGuard.redacted($0.actor), at: SecretGuard.redacted($0.at))
       },
       links: task.links.map { AppTaskLink(rel: $0.rel, target: $0.displayTarget) },
-      related: related.map {
-        AppTaskSummary(ref: $0.ref, title: $0.title, status: $0.status, parent: $0.parent)
-      },
+      detail: detail,
       comments: (task.comments ?? []).map(AppComment.init),
       resolvedComments: resolved.map(AppComment.init))
+  }
+}
+
+extension AppTaskDetail {
+  init(_ inspection: TaskInspection) {
+    let task = inspection.task
+    func summary(_ ref: String) -> AppTaskSummary? {
+      inspection.related.first { $0.ref == ref }.map {
+        AppTaskSummary(ref: $0.ref, title: $0.title, status: $0.status, externalRef: $0.externalRef)
+      }
+    }
+    self.init(
+      parent: task.parent.flatMap(summary),
+      subtasks: inspection.related.filter { $0.parent == task.ref }.compactMap { summary($0.ref) },
+      blockers: (task.waiting?.on ?? []).map { blocker in
+        guard blocker.hasPrefix("task:") else {
+          return AppBlocker(ref: blocker, task: nil, state: .open)
+        }
+        let ref = String(blocker.dropFirst("task:".count))
+        let state: AppBlocker.State =
+          inspection.dropped.contains(ref)
+          ? .dropped : inspection.open.contains(ref) ? .open : .done
+        return AppBlocker(ref: ref, task: summary(ref), state: state)
+      })
   }
 }
 

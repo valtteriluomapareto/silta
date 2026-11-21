@@ -18,7 +18,7 @@
         #expect(waiting.heading == "Waiting on · 1 of 1 done")
         #expect(waiting.why == "Needs the rounded totals first.")
         #expect(waiting.footer == "Blocked today. Ready to unblock.")
-        #expect(waiting.followUp?.hasPrefix("Follow up ") == true)
+        #expect(waiting.followUp == "Follow up Mon 23 Nov")
         #expect(TaskFacts.waiting(try reader.task("AC-15", workspace: "acme")) == nil)
       }
     }
@@ -34,6 +34,7 @@
         #expect(open.blockers.map(\.ref) == ["ext:design-team", "AC-18"])
         #expect(open.blockers.map(\.state) == [.open, .open])
         #expect(open.blockers[1].detail == "Error code cleanup · todo")
+        #expect(open.why == "Needs the final copy.")
         #expect(open.blockers[0].detail == nil)
         #expect(open.heading == "Waiting on · 0 of 2 done")
         #expect(open.footer == "Blocked today. Unblock is offered when every blocker is done.")
@@ -44,6 +45,45 @@
           TaskFacts.waiting(try reader.task("AC-16", workspace: "acme")))
         #expect(dropped.blockers.map(\.state) == [.open, .dropped])
         #expect(dropped.footer == "Blocked today. A blocker was dropped: re-plan the task.")
+        let result = try #require(TaskFacts.result(try reader.task("AC-18", workspace: "acme")))
+        #expect(result.body == "Superseded." && result.friction == nil)
+      }
+    }
+
+    @Test func aBlockWithoutBlockersWaitsOnAnAnswerAndAgesInDays() throws {
+      try fixture { _, home in
+        try AppTestCLI.run(
+          ["--ws", "acme", "task", "block", "AC-16", "-m", "Which page size?"], home: home)
+        let later = try AppReader(
+          home: home, user: "acme", now: { AppV2Fixture.now.addingTimeInterval(3.5 * 86_400) })
+        let waiting = try #require(TaskFacts.waiting(try later.task("AC-16", workspace: "acme")))
+        #expect(waiting.blockers.isEmpty)
+        #expect(waiting.heading == "Waiting on an answer")
+        #expect(waiting.footer == "Blocked 3 days. Unblock when the answer arrives.")
+        let next = try AppReader(
+          home: home, user: "acme", now: { AppV2Fixture.now.addingTimeInterval(1.5 * 86_400) })
+        #expect(
+          TaskFacts.waiting(try next.task("AC-16", workspace: "acme"))?.footer
+            == "Blocked 1 day. Unblock when the answer arrives.")
+      }
+    }
+
+    @Test func aBlockerPullRequestIsNotTheTasksOwn() throws {
+      try fixture { reader, home in
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "task", "block", "AC-16", "--on",
+            "url:https://github.com/acme/web/pull/5", "-m", "Needs the web change.",
+          ], home: home)
+        let task = try reader.task("AC-16", workspace: "acme")
+        #expect(TaskFacts.pullRequests(task).isEmpty)
+        #expect(TaskFacts.otherLinks(task).isEmpty)
+        let waiting = try #require(TaskFacts.waiting(task))
+        #expect(
+          waiting.blockers == [
+            TaskFacts.Blocker(
+              ref: "url:https://github.com/acme/web/pull/5", detail: nil, state: .open)
+          ])
       }
     }
 
@@ -68,11 +108,19 @@
       }
     }
 
-    @Test func resultWithoutFrictionKeepsItsWholeBody() {
+    @Test func onlyTheFinalFrictionLineIsSplitOff() {
       #expect(TaskFacts.splitResult("Done.\n\nFriction: none") == ("Done.", "none"))
+      #expect(
+        TaskFacts.splitResult("Done.\nMerged in #4 (abc).\nFriction: none\n")
+          == ("Done.\nMerged in #4 (abc).", "none"))
+      #expect(TaskFacts.splitResult("Done.\r\nFriction: slow CI") == ("Done.", "slow CI"))
+      #expect(
+        TaskFacts.splitResult("Friction: early\nDone.\nFriction: late")
+          == ("Friction: early\nDone.", "late"))
       #expect(TaskFacts.splitResult("Done and verified.") == ("Done and verified.", nil))
       #expect(
-        TaskFacts.splitResult("A\n\nFriction: x\n\nMore text.") == ("A\n\nMore text.", "x"))
+        TaskFacts.splitResult("A\n\nFriction: x\n\nMore text.")
+          == ("A\n\nFriction: x\n\nMore text.", nil))
     }
 
     @Test func linksSeparatePullRequestsFromOtherTargets() throws {

@@ -19,7 +19,7 @@ struct WaitingSection: View {
           if index > 0 { Divider() }
           row(blocker)
         }
-        Divider()
+        if !waiting.blockers.isEmpty { Divider() }
         Text(waiting.why).font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
           .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
           .padding(.horizontal, 12).padding(.vertical, 9)
@@ -44,7 +44,7 @@ struct WaitingSection: View {
     }.padding(.horizontal, 12).padding(.vertical, 9).accessibilityElement(children: .combine)
   }
 
-  private func symbol(_ state: TaskFacts.BlockerState) -> String {
+  private func symbol(_ state: AppBlocker.State) -> String {
     switch state {
     case .done: "checkmark.circle.fill"
     case .open: "pause.circle"
@@ -52,11 +52,11 @@ struct WaitingSection: View {
     }
   }
 
-  private func tint(_ state: TaskFacts.BlockerState) -> Color {
+  private func tint(_ state: AppBlocker.State) -> Color {
     Color(state == .done ? "Success" : "Warning")
   }
 
-  private func label(_ state: TaskFacts.BlockerState) -> String {
+  private func label(_ state: AppBlocker.State) -> String {
     switch state {
     case .done: "Done"
     case .open: "Open"
