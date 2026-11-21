@@ -84,6 +84,34 @@ struct HumanRelayCommandTests {
     }
   }
 
+  @Test func humanAskerCanAcceptTheirOwnAnswer() throws {
+    try withScratchDirectory { scratch in
+      let store = try CommentHandoffTests.setup(scratch)
+      func human(_ args: [String]) throws -> CLIResult {
+        try EditorTerminalFixture.run(
+          ["--ws", "acme"] + args + ["--json"], in: scratch,
+          environment: ["SILTA_ACTOR": "human:acme", "USER": "acme"]
+        ).result
+      }
+      let question = try human([
+        "comment", "AC-1", "--kind", "question", "--to", "human:bob", "-m", "Which API?",
+      ])
+      try #require(question.termination == .exit(0))
+      let answer = try human([
+        "comment", "AC-1", "--kind", "answer", "--reply-to", "AC-1/1", "-m", "Use Acme v2.",
+      ])
+      try #require(answer.termination == .exit(0))
+      let action = try Self.nextFor("AC-1/2", in: human(["inbox"]))
+      let result = try human(["comment", "accept", "AC-1/2"])
+      let accepted = try Self.accepted(store)
+      withKnownIssue("The human asker is currently treated as an agent relaying to a human.") {
+        #expect(action == ["silta --ws 'acme' comment accept 'AC-1/2'"])
+        #expect(result.termination == .exit(0))
+        #expect(accepted)
+      }
+    }
+  }
+
   private static func targets(_ recipient: String, mode: String) -> [String] {
     var result = ["--to", recipient]
     if mode == "mixed" { result += ["--to", "agent:claude:acme-reviewer"] }

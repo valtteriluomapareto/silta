@@ -54,6 +54,27 @@ struct DatabaseLocationCommandTests {
     }
   }
 
+  @Test func workspaceRemovalDistinguishesDanglingStorageFromAMissingWorkspace() throws {
+    try withScratchDirectory { scratch in
+      let home = scratch.appending(path: "silta-home")
+      let fm = FileManager.default
+      try fm.createDirectory(at: home, withIntermediateDirectories: true)
+      let link = home.appending(path: "silta.db")
+      try fm.createSymbolicLink(atPath: link.path, withDestinationPath: "Acme-hidden-target.db")
+      let preview = try SiltaBinary.run(
+        ["ws", "rm", "acme", "--dry-run", "--json"], in: scratch,
+        environment: TaskCommandTests.fixed)
+      let error = try TaskStateCommandTests.error(preview)
+      withKnownIssue("Removal currently reports an unknown workspace instead of a broken store.") {
+        #expect(preview.termination == .exit(9))
+        #expect(error["code"] as? String == "env")
+        #expect(error["next"] as? [String] == ["silta doctor"])
+      }
+      #expect(!preview.stdout.contains("Acme-hidden-target"))
+      #expect(try fm.destinationOfSymbolicLink(atPath: link.path) == "Acme-hidden-target.db")
+    }
+  }
+
   @Test func workspaceListCanReadAnExistingLinkedStore() throws {
     try withScratchDirectory { scratch in
       let physical = scratch.appending(path: "physical")
