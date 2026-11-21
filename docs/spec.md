@@ -2412,11 +2412,13 @@ revision before the write. It checks only the fields a write changes, each chang
 field whole rather than its changed lines; an unchanged field is never rescanned, so
 text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
-  - private-key armour, including PGP and SSH2. An unfinished block starts with a
-    standalone opening marker, optionally inside a Markdown quote or list. Its
-    armour lines can carry Markdown prefixes. Inline mentions of an unmatched
-    marker stay readable. After a blank line, a quoted or listed block continues
-    only inside its Markdown container, preserving subsequent prose and spacing.
+  - private-key armour, including PGP and SSH2. An unfinished block can start on
+    its own line, or carry enough base64 evidence after an inline or annotated
+    opening marker. Literal escaped line breaks and flattened payloads count.
+    Format-specific preambles can precede the payload. Inline redaction stops at
+    the last payload character. The first payload line and a continuation after
+    a blank need enough base64 to distinguish them from short prose. A quote or
+    list continues across a blank only inside its Markdown container.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
