@@ -13,11 +13,13 @@ struct UnfinishedArmourCommandTests {
   @Test(arguments: [
     "escapedLF", "escapedCRLF", "escapedBlank", "escapedSlash", "escapedPGP", "annotated",
     "flat", "flatChunks", "nbsp", "bom", "prose", "hash", "sibling", "dedentedQuote",
+    "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA",
+    "doubleLF", "doubleCRLF", "wideSpace", "done", "verify", "listDone", "quotedDone",
   ])
   func unfinishedArmourStorageAndExport(form: String) throws {
     try withScratchDirectory { scratch in
       let store = try AcmeDocAttachments.make(in: scratch)
-      let (body, expected) = Self.example(form)
+      let (body, expected) = Self.followup(form) ?? Self.example(form)
       let input = try DocEditCommandTests.input(scratch, body)
       let file = ["-F", input.path]
       let task = try Self.run(["task", "add", "Acme test", "--app", "none"] + file, in: scratch)
@@ -37,16 +39,26 @@ struct UnfinishedArmourCommandTests {
       let result = try Self.run(["export"], in: scratch)
       try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
       let exported = try Self.exports(in: scratch)
-      #expect(warned == Array(repeating: body != expected, count: 3))
-      #expect(stored == [expected, expected, expected])
-      #expect(exported.task.contains("\n" + expected + "\n"))
-      #expect(exported.comment == expected)
-      #expect(exported.doc.contains("\n" + expected + "\n"))
-      let second = String(repeating: "Z", count: 64)
-      #expect(
-        ![exported.task, exported.comment, exported.doc].contains {
-          $0.contains(Self.token) || $0.contains(second)
-        })
+      func check() {
+        #expect(warned == Array(repeating: body != expected, count: 3))
+        #expect(stored == [expected, expected, expected])
+        #expect(exported.task.contains("\n" + expected + "\n"))
+        #expect(exported.comment == expected)
+        #expect(exported.doc.contains("\n" + expected + "\n"))
+        let second = String(repeating: "Z", count: 64)
+        #expect(
+          ![exported.task, exported.comment, exported.doc].contains {
+            $0.contains(Self.token) || $0.contains(second)
+          })
+      }
+      if Self.followup(form) != nil {
+        withKnownIssue(
+          "Unfinished armour overmatches prose or misses encoded payload.",
+          isIntermittent: true
+        ) { check() }
+      } else {
+        check()
+      }
     }
   }
 
@@ -65,6 +77,66 @@ struct UnfinishedArmourCommandTests {
         out.stdout.contains("Secret content detected:") && out.stdout.contains("private_key"))
       #expect(tasks == 0)
     }
+  }
+
+  @Test(arguments: [false, true])
+  func ordinaryInlineMarkerProseIsAcceptedForHumans(json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try AcmeDocAttachments.make(in: scratch)
+      let prose = try #require(Self.followup("inlinePath")?.0)
+      let file = try DocEditCommandTests.input(scratch, prose)
+      let args = ["--ws", "acme", "task", "add", "Acme note", "--app", "none", "-F", file.path]
+      let result = try EditorTerminalFixture.run(
+        args + (json ? ["--json"] : []), in: scratch,
+        environment: ["SILTA_ACTOR": "human:acme"]
+      ).result
+      let stored = try store.read {
+        try String.fetchOne($0, sql: "SELECT description_md FROM task")
+      }
+      withKnownIssue("A human currently cannot store an inline marker mention next to file prose.")
+      {
+        #expect(result.termination == .exit(0))
+        #expect(stored == prose)
+      }
+    }
+  }
+
+  private static func followup(_ form: String) -> (String, String)? {
+    switch form {
+    case "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA":
+      return unchangedMention(form)
+    case "doubleLF", "doubleCRLF":
+      let split = form == "doubleLF" ? #"\\n"# : #"\\r\\n"#
+      let prefix = #"Acme {"log":"{\"key\":\""#
+      let suffix = #"\",\"keep\":\"First\\nSecond\"}","more":true}"#
+      let tail = token + split + String(repeating: "Z", count: 64) + suffix
+      return (prefix + marker + split + tail, prefix + masked + suffix)
+    case "wideSpace":
+      let prefix = "\u{2003}"
+      return (prefix + marker + "\n" + token.prefix(24), prefix + masked)
+    case "done", "verify", "listDone", "quotedDone":
+      let prefix = form == "quotedDone" ? "> " : ""
+      let tail = ["done": "Done", "verify": "Verify", "listDone": "- Done"][form] ?? "> Done"
+      let suffix = "\n\n" + tail
+      return (prefix + marker + suffix, prefix + masked + suffix)
+    default:
+      return nil
+    }
+  }
+
+  private static func unchangedMention(_ form: String) -> (String, String) {
+    let source = "Sources/SiltaCore/Secrets/SecretGuardTests+ArmourAndMore.swift"
+    let sha = String(repeating: "abc123de", count: 5)
+    let tails = [
+      "inlinePath": " docs at " + source + ".",
+      "identifier": " case is pinned by privateArmourRedactsTheWholeRunAndKeepsFollowingProse.",
+      "adjacentPath": " " + source,
+      "adjacentJWT": " " + String(repeating: "Aa", count: 24) + ".example.signature",
+      "adjacentSHA": " " + sha,
+      "physicalSHA": " fixed in\n" + sha,
+    ]
+    let body = "See " + marker + (tails[form] ?? "")
+    return (body, body)
   }
 
   private static func example(_ form: String) -> (String, String) {
