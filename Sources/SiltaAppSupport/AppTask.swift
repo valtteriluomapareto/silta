@@ -205,19 +205,22 @@ extension AppTask {
   /// How long a claim lasts without a heartbeat, as Core enforces it.
   public static var claimDuration: TimeInterval { TaskService.claimDuration }
 
-  /// Seconds since the claim's last heartbeat; nil when unclaimed or unreadable.
-  public func claimAge(at now: Date) -> TimeInterval? {
+  /// When the claim stops protecting the task, by Core's rule; nil when unclaimed or the
+  /// heartbeat is unreadable.
+  public var claimExpiresAt: Date? {
     guard claimedBy != nil, let claimedAt else { return nil }
-    do {
-      let date = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(claimedAt)
-      return max(0, now.timeIntervalSince(date))
-    } catch {
-      return nil
-    }
+    return try? TaskService.claimExpiry(claimedAt)  // unreadable: Core says corrupt, shown stale
   }
 
-  /// The claim outlived its heartbeat, so another agent can start the task without stealing.
+  /// Seconds since the claim's last heartbeat; nil when unclaimed or unreadable.
+  public func claimAge(at now: Date) -> TimeInterval? {
+    claimExpiresAt.map { max(0, now.timeIntervalSince($0) + Self.claimDuration) }
+  }
+
+  /// The claim no longer protects the task, so another agent can start it without
+  /// stealing. An unreadable heartbeat counts as expired, as Doctor treats it as stale.
   public func claimExpired(at now: Date) -> Bool {
-    claimAge(at: now).map { $0 >= Self.claimDuration } ?? false
+    guard claimedBy != nil else { return false }
+    return claimExpiresAt.map { now >= $0 } ?? true
   }
 }

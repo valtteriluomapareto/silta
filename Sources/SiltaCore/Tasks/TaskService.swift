@@ -89,14 +89,20 @@ package struct TaskService: Sendable {
       return nil
     }
     guard let raw = task.claimedAt else { throw StorageError.corrupt }
-    let instant: Date
+    let expiry = try Self.claimExpiry(raw)
+    let age = max(0, date.timeIntervalSince(expiry) + Self.claimDuration)
+    return date < expiry ? (holder, Int(age / 60)) : nil
+  }
+
+  /// When a claim with this heartbeat stops protecting its task; an unreadable heartbeat
+  /// is corrupt storage.
+  package static func claimExpiry(_ claimedAt: String) throws -> Date {
     do {
-      instant = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(raw)
+      return try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(claimedAt)
+        .addingTimeInterval(claimDuration)
     } catch {
       throw StorageError.corrupt
     }
-    let age = max(0, date.timeIntervalSince(instant))
-    return age < Self.claimDuration ? (holder, Int(age / 60)) : nil
   }
 
   static func mutable(_ task: TaskDetails) throws {

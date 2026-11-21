@@ -22,39 +22,36 @@
       }
     }
 
-    @Test func agentPromptNamesTheTaskCommandsAndPinsOnlyACustomHome() throws {
+    @Test func agentPromptPinsTheHomeAndItsShowCommandRuns() throws {
       try withScratchDirectory { scratch in
-        let userHome = scratch.appending(path: "user")
-        let reader = try AppReader(
-          home: userHome.appending(path: ".silta"), user: "acme", userHome: userHome)
+        let userHome = scratch.appending(path: "home")
+        let home = userHome.appending(path: ".silta")
+        try FileManager.default.createDirectory(at: userHome, withIntermediateDirectories: true)
+        try AppV2Fixture.seed(home: home)
+        let reader = try AppReader(home: home, user: "acme", userHome: userHome)
+        let prompt = reader.agentPrompt(task: "AC-14", workspace: "acme", name: "Ac`me\nCo")
         #expect(
-          reader.agentPrompt(task: "AC-14", workspace: "acme", name: "Acme")
-            == "Work on AC-14 in Acme. Run `silta --ws 'acme' task show 'AC-14'`, then "
-            + "`silta --ws 'acme' task start 'AC-14'`, and follow the brief.")
+          prompt
+            == "Work on AC-14 in AcmeCo. Read it with `SILTA_HOME=~/.silta silta --ws 'acme' "
+            + "task show 'AC-14'`, then claim it with `SILTA_HOME=~/.silta silta --ws 'acme' "
+            + "task start 'AC-14'`.")
+        let show = try #require(prompt.split(separator: "`").dropFirst().first.map(String.init))
+        let binary = try SiltaBinary.url()
+        let result = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-c", show], in: scratch,
+          environment: [
+            "HOME": userHome.path, "SILTA_HOME": scratch.appending(path: "agent").path,
+            "USER": "acme", "SILTA_ACTOR": "agent:codex:other",
+            "PATH": binary.deletingLastPathComponent().path + ":/usr/bin:/bin",
+          ])
+        #expect(result.termination == .exit(0), "\(result)")
+        #expect(result.stdout.contains("Retry push registrations"))
         let custom = try AppReader(
           home: scratch.appending(path: "custom data"), user: "acme", userHome: userHome)
-        let prompt = custom.agentPrompt(task: "AC-14", workspace: "acme", name: "Acme")
-        let pinned = "`SILTA_HOME='" + scratch.appending(path: "custom data").path + "' silta --ws"
-        #expect(prompt.components(separatedBy: pinned).count == 3)
-      }
-    }
-
-    @Test func claimExpiresAtCoresBoundary() throws {
-      try withScratchDirectory { scratch in
-        try AppFixtures.seed(in: scratch)
-        let reader = try AppReader(
-          home: scratch.appending(path: "silta-home"), user: AppV2Fixture.user,
-          now: { AppV2Fixture.now })
-        let task = try reader.task("AC-12", workspace: "acme")
-        let stamp = try Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(
-          try #require(task.claimedAt))
-        #expect(AppTask.claimDuration == TaskService.claimDuration)
-        #expect(!task.claimExpired(at: stamp.addingTimeInterval(AppTask.claimDuration - 0.001)))
-        #expect(task.claimExpired(at: stamp.addingTimeInterval(AppTask.claimDuration)))
-        #expect(task.claimAge(at: stamp.addingTimeInterval(-60)) == 0)
-        let unclaimed = try reader.task("AC-15", workspace: "acme")
-        #expect(unclaimed.claimAge(at: AppV2Fixture.now) == nil)
-        #expect(!unclaimed.claimExpired(at: AppV2Fixture.now))
+        #expect(
+          custom.agentPrompt(task: "AC-14", workspace: "acme", name: "Acme").contains(
+            "`SILTA_HOME='" + scratch.appending(path: "custom data").path
+              + "' silta --ws 'acme' task start 'AC-14'`"))
       }
     }
 

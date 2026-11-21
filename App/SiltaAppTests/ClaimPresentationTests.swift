@@ -47,8 +47,12 @@
         #expect(banner.title == "Claim expired 1 h ago")
         #expect(
           banner.body
-            == "Codex last wrote 3 h ago (step 3 of 4). No handoff was written, so the next "
-            + "agent starts from the plan.")
+            == "Codex last wrote 3 h ago (step 3 of 4). Another agent can now start it without "
+            + "stealing the claim.")
+        let expiry = try #require(task.claimExpiresAt)
+        #expect(TaskPresentation.claimBanner(task, now: expiry)?.title == "Claim expired just now")
+        #expect(
+          TaskPresentation.claimBanner(task, now: expiry.addingTimeInterval(-1)) == nil)
         #expect(
           TaskPresentation.claimBanner(
             try reader.task("AC-12", workspace: "acme"), now: AppV2Fixture.now)
@@ -81,7 +85,7 @@
         #expect(
           SidebarContent.claimHeading(doing, now: AppV2Fixture.now) == "Claimed now · 1 expired")
         #expect(
-          SidebarContent.claimHeading(doing, now: AppV2Fixture.now.addingTimeInterval(-3 * 3600))
+          SidebarContent.claimHeading(doing, now: AppV2Fixture.now.addingTimeInterval(-1.5 * 3600))
             == "Claimed now")
       }
     }
