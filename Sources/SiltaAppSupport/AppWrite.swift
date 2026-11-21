@@ -8,6 +8,8 @@ public enum AppWrite: Equatable, Sendable {
   case acceptAnswer(ref: String)
   /// Accepts task proposals as todo work, all or none.
   case acceptProposals(refs: [String])
+  /// Drops task proposals, all or none, with an optional reason recorded as their result.
+  case dropProposals(refs: [String], why: String?)
   /// Returns a ready blocked task to todo; one that isn't ready refuses as `blocked`.
   case unblock(ref: String)
 
@@ -17,7 +19,7 @@ public enum AppWrite: Equatable, Sendable {
     case .answer: "app answer"
     case .comment: "app comment"
     case .acceptAnswer: "app accept-answer"
-    case .acceptProposals: "app triage"
+    case .acceptProposals, .dropProposals: "app triage"
     case .unblock: "app unblock"
     }
   }

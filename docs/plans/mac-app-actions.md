@@ -105,8 +105,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - §19 gains the `app …` commands.
 
 **Out:**
-- Doc triage, approve and done, archive, dropping proposals, editing plans, and
-  `--allow-secret`.
+- Doc triage, approve and done, archive, editing plans, and `--allow-secret`. Dropping
+  proposals moved in with Paper "App features v1": My work's proposal card offers "Drop
+  N…", which asks for an optional one-line reason and sends one all-or-nothing triage,
+  and each proposal row has "Open", which opens it in the Board inspector.
 - Unblocking `replan` items: Core suggests a re-plan, and the open blockers would be
   unlinked.
 - An Unblock button on Board cards: the card is one button, and the inbox cap would

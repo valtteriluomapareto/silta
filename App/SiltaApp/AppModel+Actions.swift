@@ -42,6 +42,18 @@ extension AppModel {
     return perform(.acceptProposals(refs: refs), for: Self.proposalsTarget)
   }
 
+  /// Drops the ticked proposals among `visible` as one all-or-nothing triage. A blank
+  /// reason records Core's default.
+  @discardableResult func dropSelectedProposals(among visible: [String], why: String)
+    -> Task<Void, Never>?
+  {
+    let refs = actions.selectedProposals.intersection(proposalRefs).intersection(visible).sorted()
+    guard !refs.isEmpty else { return nil }
+    let reason = why.trimmingCharacters(in: .whitespacesAndNewlines)
+    return perform(
+      .dropProposals(refs: refs, why: reason.isEmpty ? nil : reason), for: Self.proposalsTarget)
+  }
+
   /// Unblocks a ready task under its own target, apart from the task's comment draft.
   @discardableResult func unblock(_ ref: String) -> Task<Void, Never>? {
     perform(.unblock(ref: ref), for: Self.unblockTarget(ref))

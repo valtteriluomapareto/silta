@@ -157,12 +157,14 @@
         #expect(model.dropSelectedProposals(among: all, why: "x") == nil)
         model.actions.selectedProposals = ["AC-21", "AC-23"]
         await model.dropSelectedProposals(among: ["AC-21"], why: "  Not now.  ")?.value
-        #expect(try reader.task("AC-21", workspace: "acme").status == "dropped")
-        #expect(try reader.task("AC-21", workspace: "acme").result == "Not now.")
-        #expect(try reader.task("AC-23", workspace: "acme").status == "proposed")
+        let dropped = try reader.task("AC-21", workspace: "acme")
+        #expect(dropped.status == "dropped" && dropped.result == "Not now.")
+        let kept = try reader.task("AC-23", workspace: "acme")
+        #expect(kept.status == "proposed")
         #expect(model.actions.selectedProposals == ["AC-23"])
         await model.dropSelectedProposals(among: all, why: "   ")?.value
-        #expect(try reader.task("AC-23", workspace: "acme").result == "Dropped in triage.")
+        let defaulted = try reader.task("AC-23", workspace: "acme")
+        #expect(defaulted.result == "Dropped in triage.")
         #expect(model.proposalRefs == ["AC-22"])
       }
     }

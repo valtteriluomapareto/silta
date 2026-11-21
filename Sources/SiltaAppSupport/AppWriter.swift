@@ -38,6 +38,11 @@ public struct AppWriter: Sendable {
           var batch = TaskTriage()
           batch.accept = refs
           _ = try service.triage(batch)
+        case .dropProposals(let refs, let why):
+          var batch = TaskTriage()
+          batch.drop = refs
+          batch.why = why
+          _ = try service.triage(batch)
         case .unblock(let ref):
           _ = try service.unblock([ref], requireReady: true)
         }
