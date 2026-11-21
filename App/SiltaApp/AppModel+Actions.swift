@@ -90,7 +90,7 @@ extension AppModel {
   @discardableResult func comment(
     task: String, kind: CommentKind = .comment, to recipient: String? = nil
   ) -> Task<Void, Never>? {
-    if kind == .question, recipient == nil { return nil }
+    if kind == .question, recipient?.isEmpty != false { return nil }
     return send(draftOf: task) {
       .comment(
         task: task, body: $0, kind: kind.rawValue, to: kind == .question ? [recipient ?? ""] : [])

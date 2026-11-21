@@ -127,13 +127,19 @@ nonisolated enum TaskFacts {
     let label: String
   }
 
-  /// Agent sessions a question can go to: those that posted on the task, newest first,
-  /// then the claimant and the creator.
+  /// Agent sessions a question can go to: the claimant, then those that posted on the
+  /// task, resolved threads included, newest first, then the creator. Only complete
+  /// `agent:<tool>:<session>` actors, which Core accepts as recipients.
   static func agents(_ task: AppTask) -> [Recipient] {
-    let posters = task.comments.sorted { $0.createdAt > $1.createdAt }.map(\.actor)
+    let posters = (task.comments + task.resolvedComments).sorted { $0.createdAt > $1.createdAt }
+      .map(\.actor)
     var seen = Set<String>()
-    return (posters + [task.claimedBy, task.createdBy].compactMap { $0 })
-      .filter { $0.hasPrefix("agent:") && seen.insert($0).inserted }
+    return ([task.claimedBy].compactMap { $0 } + posters + [task.createdBy])
+      .filter { actor in
+        let parts = actor.split(separator: ":", omittingEmptySubsequences: false)
+        return parts.count == 3 && parts[0] == "agent" && parts.allSatisfy { !$0.isEmpty }
+          && seen.insert(actor).inserted
+      }
       .map { Recipient(actor: $0, label: TaskPresentation.claimant($0)) }
   }
 

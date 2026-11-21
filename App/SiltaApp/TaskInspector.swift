@@ -274,7 +274,7 @@ private struct TaskComposer: View {
         Text("Decision").tag(AppModel.CommentKind.decision)
         Text("Question").tag(AppModel.CommentKind.question).disabled(agents.isEmpty)
       }.pickerStyle(.segmented).labelsHidden().fixedSize()
-      if kind == .question {
+      if kind == .question, !agents.isEmpty {
         Picker("To", selection: chosen) {
           ForEach(agents, id: \.actor) { Text($0.label).tag(Optional($0.actor)) }
         }.font(.system(size: 12)).fixedSize()
@@ -282,11 +282,16 @@ private struct TaskComposer: View {
       ActionComposer(
         model: model, target: target, placeholder: placeholder, sendTitle: sendTitle,
         command: nil, caption: caption
-      ) { model.comment(task: task, kind: kind, to: kind == .question ? chosen.wrappedValue : nil) }
+      ) { model.comment(task: task, kind: effectiveKind, to: chosen.wrappedValue) }
     }
   }
 
-  /// The chosen question recipient, defaulting to the newest agent on the task.
+  /// A question needs an agent on the task; without one the box sends a plain comment.
+  private var effectiveKind: AppModel.CommentKind {
+    kind == .question && agents.isEmpty ? .comment : kind
+  }
+
+  /// The chosen question recipient, defaulting to the first agent on the task.
   private var chosen: Binding<String?> {
     Binding(
       get: {
@@ -297,7 +302,7 @@ private struct TaskComposer: View {
   }
 
   private var placeholder: String {
-    switch kind {
+    switch effectiveKind {
     case .comment: "Add a comment"
     case .decision: "Record a decision"
     case .question: "Ask a question"
@@ -305,7 +310,7 @@ private struct TaskComposer: View {
   }
 
   private var sendTitle: String {
-    switch kind {
+    switch effectiveKind {
     case .comment: "Comment"
     case .decision: "Decide"
     case .question: "Ask"
@@ -313,9 +318,9 @@ private struct TaskComposer: View {
   }
 
   private var caption: String? {
-    switch kind {
+    switch effectiveKind {
     case .comment: nil
-    case .decision: "Decisions show in agents' briefs."
+    case .decision: "Agents see decisions in the task's discussion."
     case .question:
       agents.first { $0.actor == chosen.wrappedValue }.map {
         "The question waits in \(ActorPresentation($0.actor).name)'s brief until it answers."

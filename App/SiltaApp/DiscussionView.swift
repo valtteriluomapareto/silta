@@ -96,10 +96,23 @@ struct DiscussionView: View {
           Button(answers ? "Answer" : "Reply") { replyingTo = thread.id }.buttonStyle(.plain)
             .foregroundStyle(Color("TideText"))
             .accessibilityLabel((answers ? "Answer " : "Reply to ") + thread.id)
+        }
+        // An open question to the human is answered, never closed without a word.
+        if model.writer != nil, !thread.resolved, !answers {
           resolveButton(thread, reopen: false)
         }
         Text(thread.state).foregroundStyle(Color("SecondaryInk"))
       }.font(.system(size: 12))
+      resolveFailure(thread)
+    }
+  }
+
+  /// A refused Resolve or Reopen, shown under the thread's footer.
+  @ViewBuilder private func resolveFailure(_ thread: DiscussionContent.Thread) -> some View {
+    if let failure = model.target(AppModel.resolveTarget(thread.id)).flatMap({
+      model.actions.failures[$0]
+    }) {
+      ActionFailureView(failure: failure)
     }
   }
 
@@ -114,9 +127,6 @@ struct DiscussionView: View {
     }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Color("TideText"))
       .disabled(sending)
       .accessibilityLabel((reopen ? "Reopen " : "Resolve ") + thread.id)
-    if let failure = target.flatMap({ model.actions.failures[$0] }) {
-      ActionFailureView(failure: failure)
-    }
   }
 
   @ViewBuilder private func resolvedView(_ thread: DiscussionContent.Thread) -> some View {
@@ -148,6 +158,7 @@ struct DiscussionView: View {
       if opened {
         threadView(thread).opacity(0.8)
         if model.writer != nil { resolveButton(thread, reopen: true).font(.system(size: 12)) }
+        resolveFailure(thread)
       }
     }
   }

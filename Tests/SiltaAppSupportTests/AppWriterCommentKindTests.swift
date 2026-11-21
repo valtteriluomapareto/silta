@@ -30,7 +30,9 @@
             kind: "question", to: ["agent:codex:fixture"]),
           workspace: "acme")
         let posted = try #require(try reader.task("AC-14", workspace: "acme").comments.last)
-        #expect(posted.kind == "question" && posted.mentions.contains("agent:codex:fixture"))
+        #expect(posted.kind == "question" && posted.mentions == ["agent:codex:fixture"])
+        #expect(
+          !(try reader.snapshot(workspace: "acme").work.items.contains { $0.ref == posted.ref }))
         let codex = AppWriterTests.agent(reader, .agent(tool: "codex", session: "fixture"))
         #expect(try codex.inbox().items.contains { $0.kind == "question" && $0.ref == posted.ref })
       }
@@ -45,6 +47,8 @@
         try AppWriter(reader: reader).perform(.resolveThreads(refs: [open.ref]), workspace: "acme")
         let resolved = try reader.task("AC-9", workspace: "acme")
         #expect(resolved.resolvedComments.contains { $0.ref == open.ref })
+        #expect(resolved.resolvedComments.first { $0.ref == open.ref }?.resolvedBy == "human:acme")
+        try AppWriter(reader: reader).perform(.resolveThreads(refs: [open.ref]), workspace: "acme")
         #expect(!resolved.comments.contains { $0.ref == open.ref && $0.resolvedAt == nil })
         try AppWriter(reader: reader).perform(.reopenThreads(refs: [open.ref]), workspace: "acme")
         let reopened = try reader.task("AC-9", workspace: "acme")

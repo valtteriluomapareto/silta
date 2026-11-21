@@ -10,9 +10,11 @@
         let task = try reader.task("AC-14", workspace: "acme")
         #expect(
           TaskFacts.agents(task) == [
-            TaskFacts.Recipient(actor: "agent:codex:review", label: "Codex · session review"),
             TaskFacts.Recipient(actor: "agent:codex:fixture", label: "Codex · session fixture"),
+            TaskFacts.Recipient(actor: "agent:codex:review", label: "Codex · session review"),
           ])
+        let review = try reader.task("AC-9", workspace: "acme")
+        #expect(TaskFacts.agents(review).map(\.actor).contains("agent:claude:review"))
         #expect(
           TaskFacts.agents(try reader.task("AC-15", workspace: "acme")).map(\.actor) == [
             "agent:codex:fixture"
@@ -60,7 +62,8 @@
         let reopen = model.reopen(thread: "AC-9/1")
         let again = await writes.next()
         #expect(again.write == .reopenThreads(refs: ["AC-9/1"]))
-        _ = reopen
+        again.continuation.resume()
+        await reopen?.value
       }
     }
 
