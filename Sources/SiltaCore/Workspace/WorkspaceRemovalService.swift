@@ -43,7 +43,7 @@ package struct WorkspaceRemovalService {
       throw WorkspaceRemovalError.directHuman(slug, allowActive: allowActive)
     }
     let store = environment.db
-    guard FileManager.default.fileExists(atPath: store.path) else {
+    guard !DatabaseFile.isMissing(store.path) else {
       throw WorkspaceError.unknown(slug)
     }
     let selected = try store.read { try capture(slug, in: $0) }
