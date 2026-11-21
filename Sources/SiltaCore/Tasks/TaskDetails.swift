@@ -8,7 +8,9 @@ package struct TaskDetails: Encodable, Sendable {
 
   let appID: Int64?
 
-  let repoPath: String?
+  /// The app's registered clone, where a completion's commit is checked when the
+  /// recorded worktree is gone.
+  package let repoPath: String?
 
   /// The workspace-prefixed task reference.
   package let ref: String

@@ -33,7 +33,7 @@
               ref: "AC-9", result: "Retries cap at five minutes.\nFriction: none", sha: nil))
         again.continuation.resume(returning: nil)
         await second?.value
-        #expect(model.actions.draft(result) == "")
+        #expect(model.actions.draft(result) == "" && model.actions.draft(sha) == "")
       }
     }
 

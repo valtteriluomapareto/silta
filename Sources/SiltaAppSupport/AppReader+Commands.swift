@@ -34,6 +34,14 @@ extension AppReader {
     return reads
   }
 
+  /// Completes a reviewed task past an unmet review gate, for the human to run in a
+  /// terminal; the empty result fails safe until they write one.
+  public func forceDoneCommand(task ref: String, workspace: String) -> AppCommand {
+    command(
+      "Mark done past the review gate",
+      suffix: "task done " + shellWord(ref) + " --force -m \"\"", workspace: workspace)
+  }
+
   /// Offers read-only detail for a task waiting for review.
   public func commands(forReview task: AppTask, workspace: String) -> [AppCommand] {
     [readCommand(task: task.ref, workspace: workspace)]

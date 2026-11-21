@@ -89,6 +89,14 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     parent creates a todo task as the human in one Core write (`app add`); the app never
     starts or claims it. "Copy agent prompt after creating" copies the prompt that hands
     it to an agent (Paper "App features v1"); the app launches nothing (D4).
+  - **My work review card:** Open task, the PR link, and Mark done / Request changes /
+    Drop. Mark done needs a nonblank result; an empty merge commit records none
+    (`--no-sha`), and a typed one is checked in the worktree or else the app's registered
+    clone. An unmet review gate shows the `task done --force` command to run in a
+    terminal, since the app passes no `--force`. Request changes posts a question to the
+    submitting agent session. Drafts clear only on success, and ⌘↩ sends only from a
+    focused field. The app doesn't post on or close a linked GitHub issue, which
+    `scripts/dogfood-finish.sh` does.
   - **Inspector:** one box under the discussion. If the task has an unanswered
     question to the human, an Answer/Comment switch appears; Answer targets the
     newest such question. Paper "App features v1": a new thread is a Comment, a

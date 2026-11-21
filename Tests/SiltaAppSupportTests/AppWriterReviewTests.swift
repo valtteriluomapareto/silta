@@ -24,7 +24,7 @@
       }
     }
 
-    @Test func aMergeCommitOutsideARegisteredCloneIsRefused() async throws {
+    @Test func aMergeCommitWithoutARegisteredCloneIsRefusedAsEnv() async throws {
       try await withScratchDirectory { scratch in
         try AppFixtures.seed(in: scratch)
         let reader = try AppWriterTests.reader(scratch)
@@ -35,7 +35,7 @@
         } catch let error as AppReadError {
           failure = error
         }
-        #expect(failure != nil)
+        #expect(failure?.code == .env)
         #expect(try reader.task("AC-9", workspace: "acme").status == "review")
       }
     }

@@ -50,9 +50,12 @@ public struct AppWriter: Sendable {
     do {
       do {
         let service = try openService(workspace)
+        // A merge commit is checked in the recorded worktree, else in the app's registered
+        // clone, as `task done` run from the main checkout would.
+        let clone = close.commit.sha == nil ? nil : try service.show(close.ref).repoPath
         _ = try await service.close(
           close.ref, result: close.result, dropped: close.dropped, commit: close.commit,
-          directory: base.home.url)
+          directory: clone.map { URL(filePath: $0, directoryHint: .isDirectory) } ?? base.home.url)
         return nil
       } catch {
         throw AppReadError(error).scoped(to: base.home.url)

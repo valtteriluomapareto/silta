@@ -639,6 +639,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - Open for M2: with nobody claiming a task in `review`, a `changes` verdict must
     reach the submitter (the actor of the `review` status event), and `start` on a
     task in review deserves a warning.
+  - ↳ update (2026-11-21): until a `changes` verdict exists, the Mac app's Request
+    changes posts a question to the submitting session, so it reaches that session's
+    inbox and brief; the task stays in `review`.
   - Why: the first DF0 slice (S8, SI-7) ran `done` and closed its issue while its PR
     waited for review. `done` is terminal, so review findings would have had nowhere
     to go. And with the author's claim kept through review, the merging session got

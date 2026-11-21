@@ -13,9 +13,13 @@ struct ReviewCard: View {
   @Bindable var model: AppModel
   let review: MyWorkContent.Review
   @State private var mode = Mode.done
+  @FocusState private var focused: Bool
 
   private var ref: String { review.task.ref }
-  private var submitter: String? { review.task.submission?.actor }
+  /// The agent session that submitted the task; a human submitter isn't asked.
+  private var submitter: String? {
+    review.task.submission?.actor.hasPrefix("agent:") == true ? review.task.submission?.actor : nil
+  }
   private var target: ActionTarget? { model.target(AppModel.followUpTarget(ref)) }
   private var changesTarget: ActionTarget? { model.target(AppModel.changesTarget(ref)) }
   private var sending: Bool {
@@ -45,10 +49,16 @@ struct ReviewCard: View {
         }.pickerStyle(.segmented).labelsHidden().fixedSize().padding(.leading, 32)
           .disabled(sending)
         editor.padding(.leading, 32)
-        if let failure = [target, changesTarget].compactMap({ $0 }).compactMap({
-          model.actions.failures[$0]
-        }).first {
+        if let failure = modeTarget.flatMap({ model.actions.failures[$0] }) {
           ActionFailureView(failure: failure).padding(.leading, 32)
+          if failure.code == "gate", mode == .done, let reader = model.reader,
+            let workspace = model.workspace
+          {
+            Text("The workspace's review gate needs a human approval the app can't record yet.")
+              .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk")).padding(.leading, 32)
+            CommandBlock(command: reader.forceDoneCommand(task: ref, workspace: workspace))
+              .padding(.leading, 32)
+          }
         }
         footer.padding(.leading, 32)
       } else if let command = model.reader?.commands(
@@ -59,13 +69,18 @@ struct ReviewCard: View {
     }
   }
 
+  /// The write target of the mode on screen, whose failure the card shows.
+  private var modeTarget: ActionTarget? { mode == .changes ? changesTarget : target }
+
   @ViewBuilder private var editor: some View {
     switch mode {
     case .done:
       VStack(alignment: .leading, spacing: 6) {
         draftEditor(AppModel.doneResultTarget(ref), placeholder: "Result, ending with Friction:")
-        draftField(AppModel.doneSHATarget(ref), placeholder: "Merge commit (optional)")
-          .font(.system(size: 12, design: .monospaced)).frame(maxWidth: 260)
+        if review.task.app != nil {
+          draftField(AppModel.doneSHATarget(ref), placeholder: "Merge commit (optional)")
+            .font(.system(size: 12, design: .monospaced)).frame(maxWidth: 260)
+        }
       }
     case .changes:
       draftEditor(AppModel.changesTarget(ref), placeholder: "What should change?")
@@ -81,17 +96,19 @@ struct ReviewCard: View {
       Button("Open task") { model.inspect(task: ref) }.buttonStyle(CompactActionStyle())
       Button(sending ? "Sending…" : mode.rawValue) { send() }
         .buttonStyle(ActionButtonStyle(prominent: mode == .done))
-        .keyboardShortcut(.return, modifiers: .command)
+        .keyboardShortcut(focused ? KeyboardShortcut(.return, modifiers: .command) : nil)
         .disabled(sending || !ready)
     }
   }
 
   private var caption: String {
     switch mode {
-    case .done: ReviewCard.doneCaption
+    case .done:
+      review.task.app == nil
+        ? "The result can't be empty." : ReviewCard.doneCaption
     case .changes:
       submitter.map { "Waits in \(ActorPresentation($0).name)'s brief until it answers." }
-        ?? "No submitter is recorded to ask."
+        ?? "No agent submission is recorded to ask."
     case .drop: "Dropping closes the task without a commit."
     }
   }
@@ -128,10 +145,11 @@ struct ReviewCard: View {
 
   private func draftEditor(_ ref: String, placeholder: String) -> some View {
     TextField(placeholder, text: binding(ref), axis: .vertical).lineLimit(3...8)
-      .textFieldStyle(.roundedBorder).disabled(sending)
+      .textFieldStyle(.roundedBorder).disabled(sending).focused($focused)
   }
 
   private func draftField(_ ref: String, placeholder: String) -> some View {
     TextField(placeholder, text: binding(ref)).textFieldStyle(.roundedBorder).disabled(sending)
+      .focused($focused)
   }
 }
