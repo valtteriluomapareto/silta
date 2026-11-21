@@ -93,11 +93,11 @@ private struct BoardFilterMenu: View {
         }.pickerStyle(.inline).labelsHidden()
       }
       Divider()
-      Button("Reset Filters") { model.boardFilter = BoardFilter() }.disabled(filter.isDefault)
+      Button("Reset Filters") { model.resetBoardFilter() }.disabled(filter.isDefault)
     } label: {
       Label(
         filter.title(apps: apps),
-        systemImage: filter.narrowingCount > 0
+        systemImage: !filter.isDefault
           ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
       ).labelStyle(.titleAndIcon)
     }.help("Filter the board by status and app")

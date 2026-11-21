@@ -65,23 +65,34 @@ nonisolated struct BoardContent {
             ])
       }
     }
+    func hideable(_ task: AppTask) -> Bool {
+      task.status == "blocked" && !questions.contains(task.ref)
+    }
     let todo = filtered(board.todo)
-    let hideable = todo.filter { $0.status == "blocked" && !questions.contains($0.ref) }
+    let hidden = todo.filter(hideable)
     let proposals = filtered(board.proposals)
     let done = filtered(board.doneThisWeek)
-    let shownTodo =
-      filter.blocked ? todo : todo.filter { task in !hideable.contains { $0.ref == task.ref } }
+    let shownTodo = filter.blocked ? todo : todo.filter { !hideable($0) }
     lanes =
       [
         Lane(title: "Todo", tasks: shownTodo + (filter.proposals ? proposals : [])),
         Lane(title: "Doing", tasks: filtered(board.doing)),
         Lane(title: "Review", tasks: filtered(board.review)),
       ] + (filter.done ? [Lane(title: "Done this week", tasks: done)] : [])
-    counts = Counts(blocked: hideable.count, proposed: proposals.count, done: done.count)
-    hiddenBlocked = filter.blocked ? 0 : hideable.count
+    counts = Counts(blocked: hidden.count, proposed: proposals.count, done: done.count)
+    hiddenBlocked = filter.blocked ? 0 : hidden.count
     attention = board.questions
     self.questions = questions
     self.apps = apps
+  }
+
+  /// The Todo footnote for hidden blocked tasks; nil when none are hidden.
+  var hiddenBlockedText: String? {
+    switch hiddenBlocked {
+    case 0: nil
+    case 1: "1 blocked task hidden"
+    default: "\(hiddenBlocked) blocked tasks hidden"
+    }
   }
 
   static func appLabel(_ slug: String?, apps: [AppMapApp]) -> AppLabel? {

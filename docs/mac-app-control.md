@@ -71,7 +71,10 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | `refresh` | `starting`, `loading`, `ready` or `failed`, plus the observed dataVersion |
 | `idle` | The current route and selected read have settled, and no product write is in flight |
 
-Lane keys use their displayed names: Todo, Doing, Review, Done this week. Failed
+Lane keys use their displayed names: Todo, Doing, Review, Done this week. Snapshot
+and driver runs always start with all four. A hand-launched fixture follows the
+human's stored Board toggles: Done this week is missing when done is hidden, and
+Todo leaves out hidden blocked tasks. Failed
 loads may be idle; also check refresh.phase. Idle does not prove painted pixels.
 Bodies, comments, filesystem paths and arbitrary error messages are excluded.
 The sequence gap `seq > settledSeq` indicates an action in progress.

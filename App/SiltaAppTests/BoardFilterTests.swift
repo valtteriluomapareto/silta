@@ -103,6 +103,14 @@
           BoardFilter(app: "acme-mobile", blocked: false).title(apps: apps) == "acme-mobile · 2")
         #expect(BoardFilter(blocked: false, done: false).title(apps: apps) == "Filtered · 2")
         #expect(BoardFilter(app: "gone").title(apps: apps) == "gone")
+        let named = [
+          AppMapApp(
+            slug: "acme-web", name: "Acme web shop", repo: "web", ref: "origin/main",
+            productionRef: nil, subpath: nil, summary: nil, lifecycle: "active",
+            attachment: "app:acme-web")
+        ]
+        #expect(
+          BoardFilter(app: "acme-web", done: false).title(apps: named) == "Acme web shop · 2")
       }
     }
 
@@ -121,11 +129,13 @@
       #expect(model.boardFilter == BoardFilter(proposals: true, blocked: false, done: false))
       let reopened = AppModel(defaults: defaults, load: { _, _, _ in nil })
       #expect(reopened.boardFilter == BoardFilter(blocked: false, done: false))
-      reopened.boardFilter = BoardFilter()
+      reopened.search = "push"
+      reopened.boardFilter.app = "acme-web"
+      reopened.resetBoardFilter()
+      #expect(reopened.boardFilter == BoardFilter() && reopened.search == "push")
       #expect(AppModel(defaults: defaults, load: { _, _, _ in nil }).boardFilter == BoardFilter())
-      let unsaved = AppModel(load: { _, _, _ in nil })
-      unsaved.boardFilter.blocked = false
-      #expect(AppModel(defaults: defaults, load: { _, _, _ in nil }).boardFilter.blocked)
+      #expect(AppModel.filterDefaults(automated: true) == nil)
+      #expect(AppModel.filterDefaults(automated: false) === UserDefaults.standard)
     }
 
     @Test func hiddenTaskKeepsItsInspectorAndTheHeaderCountsHiddenBlocked() async throws {
@@ -150,7 +160,35 @@
       #expect(model.boardSelection == BoardSelection(taskRef: "AC-17"))
       #expect(model.boardInspectorPresented)
       model.boardFilter.app = "acme-backend"
+      model.search = "order history"
       #expect(model.screenSummary == "7 open · 1 blocked hidden · 3 proposed · 4 done this week")
+    }
+
+    @Test func onlyQuestionsToTheHumanKeepBlockedTasksAndTheFootnoteCountsTheRest() throws {
+      let block: (URL) throws -> Void = { home in
+        for (index, ref) in ["AC-16", "AC-18"].enumerated() {
+          try AppTestCLI.run(
+            ["--ws", "acme", "task", "block", ref, "-m", "Waiting on the API."],
+            home: home, seed: 310 + index)
+        }
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "comment", "AC-18", "--kind", "question",
+            "--to", "agent:codex:fixture", "-m", "Which error codes stay?",
+          ], home: home, seed: 320)
+      }
+      try fixture(prepare: block) { snapshot, _ in
+        func content(_ filter: BoardFilter, search: String = "") -> BoardContent {
+          BoardContent(snapshot: snapshot, apps: [], filter: filter, search: search)
+        }
+        let hidden = content(BoardFilter(blocked: false))
+        #expect(hidden.lanes[0].tasks.map(\.ref) == ["AC-15"])
+        #expect(hidden.hiddenBlocked == 3 && hidden.counts.blocked == 3)
+        #expect(hidden.hiddenBlockedText == "3 blocked tasks hidden")
+        #expect(content(BoardFilter()).hiddenBlockedText == nil)
+        let one = content(BoardFilter(app: "acme-mobile", blocked: false), search: "offline")
+        #expect(one.lanes[0].tasks.isEmpty && one.hiddenBlockedText == "1 blocked task hidden")
+      }
     }
 
     private func fixture(

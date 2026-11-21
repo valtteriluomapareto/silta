@@ -31,8 +31,12 @@ final class AppModel {
   /// model has defaults; automated runs and tests pass none.
   var boardFilter = BoardFilter() {
     didSet {
-      defaults?.set(boardFilter.blocked, forKey: Self.showBlockedKey)
-      defaults?.set(boardFilter.done, forKey: Self.showDoneKey)
+      if boardFilter.blocked != oldValue.blocked {
+        defaults?.set(boardFilter.blocked, forKey: Self.showBlockedKey)
+      }
+      if boardFilter.done != oldValue.done {
+        defaults?.set(boardFilter.done, forKey: Self.showDoneKey)
+      }
     }
   }
   private(set) var boardSelection: BoardSelection?
@@ -52,6 +56,16 @@ final class AppModel {
   @ObservationIgnored private let defaults: UserDefaults?
   static let showBlockedKey = "boardShowBlocked"
   static let showDoneKey = "boardShowDone"
+
+  /// Where the Board's Show toggles are stored: automated control runs start from the
+  /// defaults and store nothing; real launches and hand-launched fixtures share the
+  /// human's toggles.
+  static func filterDefaults(automated: Bool) -> UserDefaults? {
+    automated ? nil : .standard
+  }
+
+  /// Back to the default Board: every lane, all apps, no proposals. Search stays.
+  func resetBoardFilter() { boardFilter = BoardFilter() }
 
   init(
     reader: AppReader? = nil, now: @escaping @Sendable () -> Date = { Date() },
@@ -329,13 +343,11 @@ extension AppModel {
       return
         "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"
     }
-    if route == .board, let board = data.snapshot?.board {
-      let hidden =
-        data.snapshot.map {
-          BoardContent(
-            snapshot: $0, apps: [], filter: BoardFilter(blocked: boardFilter.blocked), search: ""
-          ).hiddenBlocked
-        } ?? 0
+    if route == .board, let snapshot = data.snapshot {
+      let board = snapshot.board
+      let hidden = BoardContent(
+        snapshot: snapshot, apps: [], filter: BoardFilter(blocked: boardFilter.blocked), search: ""
+      ).hiddenBlocked
       return "\(board.todo.count + board.doing.count + board.review.count) open · "
         + (hidden > 0 ? "\(hidden) blocked hidden · " : "")
         + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"

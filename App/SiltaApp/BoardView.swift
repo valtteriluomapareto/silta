@@ -40,23 +40,23 @@ struct BoardView: View {
   private func laneView(_ lane: BoardContent.Lane, content: BoardContent) -> some View {
     LazyVStack(alignment: .leading, spacing: 10) {
       laneHeader(lane)
-      let hidden = lane.title == "Todo" ? content.hiddenBlocked : 0
-      if lane.tasks.isEmpty && hidden == 0 {
+      let hidden = lane.title == "Todo" ? content.hiddenBlockedText : nil
+      if lane.tasks.isEmpty && hidden == nil {
         Text(model.search.isEmpty ? "No tasks" : "No matches")
           .font(.system(size: 12)).foregroundStyle(Color("ShoreInk")).padding(.vertical)
       }
       ForEach(lane.tasks, id: \.ref) { task in
         card(task, content: content)
       }
-      if hidden > 0 { hiddenBlocked(hidden) }
+      if let hidden { hiddenBlocked(hidden) }
     }.padding(.bottom, 8)
   }
 
   /// Hidden blocked tasks leave a trace in Todo, with a way to bring them back.
-  private func hiddenBlocked(_ count: Int) -> some View {
+  private func hiddenBlocked(_ text: String) -> some View {
     HStack(spacing: 8) {
       Image(systemName: "pause.circle").font(.system(size: 12))
-      Text(count == 1 ? "1 blocked task hidden" : "\(count) blocked tasks hidden")
+      Text(text)
         .font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
       Button("Show") { model.boardFilter.blocked = true }.buttonStyle(.plain)
         .font(.system(size: 12, weight: .medium)).foregroundStyle(Color("TideText"))
