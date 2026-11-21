@@ -35,6 +35,7 @@ package struct BriefService {
     let command = "silta --ws " + shellWord(location.workspace)
     let characters = BriefBudget.characters(tokens: budget)
     let id = try TaskService.workspaceID(location.workspace, in: db)
+    let (selectedTopics, topicWarnings) = try topicSelection(topics, workspace: id, in: db)
     let settings = BriefSettings(
       try WorkspaceSettings.read(workspaceID: id, in: db), workspace: location.workspace)
     var selected = try location.currentTask.map {
@@ -51,10 +52,10 @@ package struct BriefService {
     let context = try BriefContext(
       db: db, location: location, actor: environment.actor, date: now,
       archiveDays: settings.archiveAfterDays ?? WorkspaceSettings.defaultArchiveAfterDays
-    ).sections(topics: topics, compact: compact)
+    ).sections(topics: selectedTopics, compact: compact)
     let selection =
-      (app.map { " --app " + shellWord($0) } ?? "")
-      + topics.map { " --topic " + shellWord($0) }.joined()
+      (app.flatMap { _ in location.app }.map { " --app " + shellWord($0) } ?? "")
+      + selectedTopics.map { " --topic " + shellWord($0) }.joined()
     let more =
       (selected.map {
         (budget < 2500 ? [command + " brief --task " + $0.ref + selection] : [])
@@ -66,10 +67,25 @@ package struct BriefService {
       location: BriefLocation(location), settings: settings,
       currentTask: selected?.ref,
       sections: sections(
-        location, current: selected, topics: topics,
+        location, current: selected, topics: selectedTopics,
         discussion: discussion.task, characters: characters)
         + discussion.inbox + context.sections,
-      more: more, warnings: location.warnings + settings.warnings + context.warnings)
+      more: more,
+      warnings: location.warnings + settings.warnings + context.warnings + topicWarnings)
+  }
+
+  private func topicSelection(_ words: [String], workspace: Int64, in db: Database) throws
+    -> (names: [String], warnings: [OutputWarning])
+  {
+    var warnings: [OutputWarning] = []
+    let names = try words.map { word in
+      guard let name = try WorkspaceSlugs.topic(word, workspace: workspace, in: db),
+        let warning = name.warning(for: word, kind: .topic)
+      else { return word }
+      warnings.append(warning)
+      return name.slug
+    }
+    return (names, warnings)
   }
 
   private func addEdgeCommands(to report: inout BriefReport, workspace: String) async {

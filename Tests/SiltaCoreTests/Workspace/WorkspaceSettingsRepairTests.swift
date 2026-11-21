@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkspaceSettingsRepairTests {
@@ -21,7 +22,7 @@ struct WorkspaceSettingsRepairTests {
         replacement, slug: "acme", store: store, actor: TaskServiceTests.agent,
         identity: (SeededIDGenerator(seed: 3), TaskServiceTests.now),
         approved: "Repair the Acme settings")
-      #expect(result == "acme")
+      #expect(result?.workspace == "acme")
       #expect(
         try store.read { try String.fetchOne($0, sql: "SELECT settings FROM workspace") }
           == "{\"review_gate\":\"none\"}")

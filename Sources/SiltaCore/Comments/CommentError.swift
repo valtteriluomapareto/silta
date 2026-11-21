@@ -20,6 +20,8 @@ package enum CommentError: CodedError {
   case unavailable(String, task: String, reopen: String?)
   /// The asker or current task claimer can select an answer.
   case wrongAsker(asker: String, actor: String, task: String, root: String?)
+  /// Accepting the asker's own answer cannot confirm a human's response.
+  case ownHumanAnswer(confirm: String?, inspect: String)
 
   /// These invalid inputs have a concrete retry instead of generic command help.
   package var hasConcreteInvalidNext: Bool {
@@ -33,7 +35,7 @@ package enum CommentError: CodedError {
   package var code: ErrorCode {
     switch self {
     case .invalid, .bodyRequired, .explanationEmpty, .answerRequired: .invalid
-    case .foreignHandoff, .wrongAuthor, .unavailable, .wrongAsker: .conflict
+    case .foreignHandoff, .wrongAuthor, .unavailable, .wrongAsker, .ownHumanAnswer: .conflict
     case .missing: .notFound
     }
   }
@@ -44,6 +46,9 @@ package enum CommentError: CodedError {
     case .unavailable(let why, _, _): why
     case .wrongAsker(let asker, let actor, _, _):
       "Only asker \(SecretGuard.redacted(asker)) or the current task claimer can accept an answer; current actor is \(SecretGuard.redacted(actor))."
+    case .ownHumanAnswer(let confirm, _):
+      "The asker cannot accept their own answer to a human-directed question."
+        + (confirm == nil ? "" : " Ask an addressed human to confirm it in chat before resolving.")
     case .bodyRequired: "Comment body required; use -m or -F."
     case .answerRequired:
       "Accept requires a live answer ref; inspect the task discussion to choose one."
@@ -64,6 +69,7 @@ package enum CommentError: CodedError {
         ?? ["silta task show " + shellWord(task) + " --timeline"]
     case .wrongAsker(_, _, let task, _):
       ["silta task show " + shellWord(task) + " --timeline"]
+    case .ownHumanAnswer(let confirm, let inspect): [confirm ?? inspect]
     case .missing(_, let task):
       ["silta task show " + shellWord(task) + " --timeline"]
     case .wrongAuthor(_, _, _, let task):
@@ -74,4 +80,10 @@ package enum CommentError: CodedError {
     case .foreignHandoff(let task): ["silta comment " + shellWord(task) + " --kind comment -F -"]
     }
   }
+
+  package var nextBy: NextBy {
+    if case .ownHumanAnswer(.some, _) = self { return .human }
+    return code.nextBy
+  }
+
 }

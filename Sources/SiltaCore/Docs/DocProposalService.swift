@@ -50,7 +50,8 @@ package struct DocProposalService {
         return DocProposalResult(
           ref: SecretGuard.redacted("doc:\(request.slug)@\(revision.revision)"),
           warnings: environment.actor.approvalWarnings(approved, used: false)
-            + (prepared.redacted || body.1 ? [SecretGuard.warning] : []), workspace: workspace)
+            + (prepared.redacted || body.1 ? [SecretGuard.warning] : [])
+            + prepared.metadata.targets.flatMap(\.warnings), workspace: workspace)
       }
     } catch let error as any CodedError {
       throw selected.recovery(error, request: request)

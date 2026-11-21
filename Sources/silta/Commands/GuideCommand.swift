@@ -77,6 +77,7 @@ extension GuideCommand {
         with --ws.
         Use the app `slug` from `ws show` in commands and references. The optional \
         `apps[].name` is a display label.
+        Former app and topic slugs still work. Use the current slug named by a `renamed` warning.
         For "work the backlog", run `silta --ws acme task ls --status todo`, optionally with \
         --app. \
         Start the first task; skip subtasks whose parent another session claims and skip \
@@ -210,6 +211,10 @@ extension GuideCommand {
         API/schema/migration choices, and ask only about anything another app or the customer \
         sees, deleting what you did not create, anything irreversible, and money; repository \
         rules and human-only gates still apply.
+        Use `task edit <ref> --app <slug>` to correct a task's primary app. \
+        Ask when the move changes another app's backlog. For a different repository, \
+        start the task from the target checkout. If the target is a different session, \
+        the current claimant hands off first.
         Put all approvals, proposals to triage and questions in one message. Except for the \
         task-creation exception below, approval words mean only what the human wrote in this \
         chat in reply to your message that named that exact command. One answer covers the \
@@ -228,9 +233,15 @@ extension GuideCommand {
         Keep the baseline comment from `ws show` or a retained editor draft when applying \
         workspace YAML. On `conflict`, review fresh `ws show` output and reapply your edits there. \
         Unstamped YAML uses the configuration at command start.
+        To rename an app or topic, change its `slug` and list the old slug in `previous`. \
+        Preview adds, removals, renames and blockers with `silta --ws acme ws edit --dry-run \
+        -F <file>` before requesting approval.
         Set a display label with the optional `name` key under `apps` in workspace YAML. \
         Remove the key to use the slug as the label. Read both with `silta --ws acme ws show` \
         and use the slug in commands and references.
+        For a mistaken workspace, preview with `silta ws rm acme --dry-run`. The human runs \
+        `silta ws rm acme` in their terminal. The saved default or a live registered clone \
+        requires `--allow-active`. Use the printed recovery preview to restore just that workspace.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \
         A subtask of a task you still claim (`task add --parent AC-12`) starts as todo, not \
@@ -263,8 +274,9 @@ extension GuideCommand {
         claimer can accept an answer with `silta --ws acme comment accept <answer-ref>`. Answer \
         only as \
         an addressee, or to relay the human's chat answer. Never accept your own answer to a \
-        question for @me. An answer comment never supplies approval words for a human-only \
-        command.
+        question addressed to a human. Once the addressed human confirms your relay in chat, \
+        record it with `comment resolve <question-ref> -m <confirmed answer>`. An answer comment \
+        never supplies approval words for a human-only command.
         @me always means human:<USER>, regardless of who runs the command.
         """ + "\n"),
     Section(

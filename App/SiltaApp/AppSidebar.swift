@@ -172,8 +172,9 @@ struct AppSidebar: View {
   }
 
   private func appColor(_ slug: String) -> Color {
-    let index = model.visibleData?.map?.apps.firstIndex { $0.slug == slug } ?? 0
-    return Color(SidebarContent.appColor(index: index))
+    Color(
+      SidebarContent.appColor(slug: slug, apps: model.visibleData?.map?.apps ?? [])
+        ?? SidebarContent.appColor(index: 0))
   }
 
   private var claimed: [AppTask] {

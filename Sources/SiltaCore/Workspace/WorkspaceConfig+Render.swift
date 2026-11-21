@@ -132,10 +132,14 @@ private struct WorkspaceRenderer {
       fields: [
         "slug": "slug", "name": "display_name", "repo": "repo_slug", "ref": "ref",
         "prod_ref": "prod_ref", "subpath": "subpath", "summary": "summary",
-        "lifecycle": "lifecycle",
-      ]
+        "lifecycle": "lifecycle", "previous": "previous_slugs",
+      ], arrays: ["previous"]
     ).map { row in
       let fields = row.keys.sorted().compactMap { key -> String? in
+        if let list = row[key] as? [String], !list.isEmpty {
+          return ExportFormat.quote(key) + ":["
+            + list.map(ExportFormat.quote).joined(separator: ",") + "]"
+        }
         guard let value = row[key] as? String, key != "lifecycle" || value != "active" else {
           return nil
         }
@@ -174,10 +178,13 @@ private struct WorkspaceRenderer {
   mutating func renderTopicsAndSources() throws {
     var topics = try query(
       """
-      SELECT slug,id FROM topic
+      SELECT slug,id,previous_slugs FROM topic
       WHERE workspace_id=?
       ORDER BY slug
-      """, fields: ["slug": "slug"])
+      """, fields: ["slug": "slug", "previous": "previous_slugs"], arrays: ["previous"])
+    for index in topics.indices where (topics[index]["previous"] as? [String])?.isEmpty == true {
+      topics[index].removeValue(forKey: "previous")
+    }
     for index in topics.indices {
       topics[index]["aliases"] = try String.fetchAll(
         db,

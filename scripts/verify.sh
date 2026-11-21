@@ -90,6 +90,10 @@ full_swift() {
   bash scripts/build-prior-writer.sh "$SILTA_HOME/prior" prior
   export SILTA_V6_BINARY="$SILTA_HOME/prior-v6/silta"
   bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v6" v6
+  export SILTA_V8_BINARY="$SILTA_HOME/prior-v8/silta"
+  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v8" v8
+  export SILTA_V9_BINARY="$SILTA_HOME/prior-v9/silta"
+  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v9" v9
   build --build-tests
 
   step "test (with slow tiers)"
@@ -114,7 +118,9 @@ full_swift() {
     actualMetadataWriterCannotWriteAfterNamespaceUpgrade \
     actualV6WriterKeepsPopulatedAuditFields \
     actualV6WriterRefusesTargetSnapshotFloorWithoutMutation \
-    actualV6ExporterRefusesUnknownCounterOnlySchema
+    actualV6ExporterRefusesUnknownCounterOnlySchema \
+    actualV8WriterRefusesSlugHistoryWithoutMutation \
+    actualV9SelectorRefusesWorkspaceRemovalFloor
 
   # Wall-clock deadline checks can't tell a slow process from a busy machine, so the
   # parallel suite skips them; they run here alone and one at a time.

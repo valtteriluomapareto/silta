@@ -872,9 +872,13 @@ def plan_path(value):
     path = Path(value.lower())
     if path.suffix == '.plan':
         return True
-    return path.suffix in ('', '.md', '.markdown', '.txt', '.rst', '.adoc', '.ipynb', '.yaml', '.yml') and (
-        bool({'plan', 'plans'} & set(path.parts[:-1]))
-        or bool({'plan', 'plans', 'todo', 'todos', 'roadmap'} & set(re.split(r'[-_. ]+', path.stem))))
+    if path.suffix not in ('', '.md', '.markdown', '.txt', '.rst', '.adoc', '.ipynb', '.yaml', '.yml'):
+        return False
+    words = re.split(r'[-_. ]+', path.stem)
+    names = {'plan', 'plans', 'todo', 'todos', 'roadmap', 'tasks', 'backlog', 'checklist', 'planning'}
+    return (bool({'plan', 'plans', 'roadmap'}.intersection(path.parts[:-1]))
+            or bool(names.intersection(words))
+            or ('next', 'steps') in zip(words, words[1:]))
 
 
 def native_plan_writes(phase):

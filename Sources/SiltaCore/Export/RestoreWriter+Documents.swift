@@ -2,22 +2,6 @@ import GRDB
 
 extension RestoreWriter {
   /// Removes owned document rows and their physical comment-counter scopes.
-  func deleteDocuments(workspace: Int64) throws {
-    let revisions = """
-      SELECT r.id FROM doc_rev r JOIN doc d ON d.id=r.doc_id WHERE d.workspace_id=:ws
-      """
-    try db.execute(
-      sql: """
-        DELETE FROM seq_counter WHERE scope IN (
-          SELECT 'comment:doc_rev:'||r.id FROM doc_rev r JOIN doc d ON d.id=r.doc_id
-          WHERE d.workspace_id=:ws);
-        DELETE FROM comment WHERE doc_rev_id IN (\(revisions));
-        DELETE FROM doc_verification WHERE doc_rev_id IN (\(revisions));
-        DELETE FROM doc_rev WHERE id IN (\(revisions));
-        DELETE FROM doc WHERE workspace_id=:ws;
-        """, arguments: ["ws": workspace])
-  }
-
   /// Inserts immutable document truth through the caller's UID map.
   mutating func insertDocuments(_ incoming: ExportDocumentSnapshot, workspace: Int64) throws {
     for document in incoming.documents {

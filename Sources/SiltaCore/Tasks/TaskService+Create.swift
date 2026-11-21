@@ -64,9 +64,9 @@ extension TaskService {
       throw TaskError.changed(parent.ref)
     }
     let app = try creation.app.map {
-      try Self.entity("app", slug: $0, workspace: ws, in: db)
+      try Self.namedSlug(.app, $0, workspace: ws, in: db)
     }
-    if let app, try Self.repoPath(app: app, in: db) != creation.path {
+    if let app, try Self.repoPath(app: app.id, in: db) != creation.path {
       throw TaskError.changed(nil)
     }
     var status = override ?? creationStatus(parent: parent, start: draft.start)
@@ -91,15 +91,17 @@ extension TaskService {
         """,
       arguments: [
         creation.uid, ws, seq, draft.title, status, draft.priority, draft.description, parent?.id,
-        app,
+        app?.id,
         draft.start ? environment.actor.description : nil, draft.start ? stamp : nil,
         creation.git.branch, creation.git.worktree, environment.actor.description, stamp, stamp,
       ])
     let id = db.lastInsertedRowID
-    try addLinks(draft, task: id, workspace: ws, at: creation.at, in: db)
+    let warnings = try addLinks(creation, task: id, workspace: ws, app: app, in: db)
     try changed(
       id, kind: "created", body: status, redacted: creation.redacted, at: creation.at, in: tx)
-    return (try created(creation, seq: seq, status: status, workspace: ws, in: db), consent)
+    var result = try created(creation, seq: seq, status: status, workspace: ws, in: db)
+    result.warnings += warnings
+    return (result, consent)
   }
 
   /// The created task's receipt; an inherited app is named in its text, not its data.
@@ -220,18 +222,28 @@ extension TaskService {
   }
 
   private func addLinks(
-    _ draft: TaskDraft, task: Int64, workspace: Int64, at date: Date, in db: Database
-  ) throws {
+    _ creation: TaskCreation, task: Int64, workspace: Int64,
+    app: WorkspaceSlugs.Resolved?, in db: Database
+  ) throws -> [OutputWarning] {
+    let draft = creation.draft
+    let date = creation.at
+    var warnings = [creation.app.flatMap { app?.warning(for: $0, kind: .app) }].compactMap { $0 }
+    var seen: Set<Int64> = []
     for topic in Set(draft.topics).sorted() {
-      let id = try Self.entity("topic", slug: topic, workspace: workspace, in: db)
-      try insertLink(
-        task: task, workspace: workspace, target: ("topic", id.databaseValue), at: date, in: db)
+      let named = try Self.namedSlug(.topic, topic, workspace: workspace, in: db)
+      if let warning = named.warning(for: topic, kind: .topic) { warnings.append(warning) }
+      if seen.insert(named.id).inserted {
+        try insertLink(
+          task: task, workspace: workspace, target: ("topic", named.id.databaseValue), at: date,
+          in: db)
+      }
     }
     if let source = draft.source {
       try insertLink(
         task: task, workspace: workspace,
         target: ("note", String(source.dropFirst(5)).databaseValue), at: date, in: db)
     }
+    return warnings
   }
 
   func insertLink(

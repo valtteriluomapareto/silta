@@ -271,7 +271,8 @@ struct WorkspaceList: View {
 
 extension WorkspaceList {
   fileprivate func appColor(_ slug: String) -> Color {
-    Color(SidebarContent.appColor(index: map.apps.firstIndex { $0.slug == slug } ?? 0))
+    Color(
+      SidebarContent.appColor(slug: slug, apps: map.apps) ?? SidebarContent.appColor(index: 0))
   }
 
   static func foldedTitle(_ rows: [WorkspaceContent.ServiceRow]) -> String {

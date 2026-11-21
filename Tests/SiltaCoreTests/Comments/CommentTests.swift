@@ -158,7 +158,9 @@ struct CommentTests {
       }
       _ = try service.comment("AC-1", CommentDraft(body: "Hidden if deleted"))
       _ = try service.updateComments(["AC-1/8"], action: .delete)
-      _ = try service.comment("AC-1", CommentDraft(body: "Stored question", kind: "question"))
+      var question = CommentDraft(body: "Stored question", kind: "question")
+      question.recipients = [env.actor.description]
+      _ = try service.comment("AC-1", question)
       var answer = CommentDraft(body: "Stored answer", kind: "answer")
       answer.replyTo = "AC-1/9"
       _ = try service.comment("AC-1", answer)

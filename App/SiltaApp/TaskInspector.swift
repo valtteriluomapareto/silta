@@ -131,7 +131,7 @@ struct TaskInspector: View {
     if let reader = model.reader, let workspace = model.workspace,
       let snapshot = model.visibleData?.snapshot
     {
-      let content = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+      let content = BoardContent(snapshot: snapshot, apps: [], filter: BoardFilter(), search: "")
       TaskComposer(
         model: model, task: task.ref,
         question: content.newestQuestion(for: task.ref, reader: reader, workspace: workspace)

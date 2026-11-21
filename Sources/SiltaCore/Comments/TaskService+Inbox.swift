@@ -52,12 +52,11 @@ extension TaskService {
   package func questionInbox() throws -> [InboxItem] {
     let actor = environment.human
     let slug = try selected()
-    let command = "silta --ws " + shellWord(slug)
     return try environment.db.read { db in
       let workspaceID = try Self.workspaceID(slug, in: db)
       return try Self.attention(for: actor, workspaceID: workspaceID, in: db)
         .filter { $0.kind == "question" }
-        .map { inboxItem($0, actor: actor, command: command) }
+        .map { inboxItem($0, actor: actor, workspace: slug) }
     }
   }
 
@@ -71,7 +70,7 @@ extension TaskService {
     let command = "silta --ws " + shellWord(slug)
     let workspaceID = try Self.workspaceID(slug, in: db)
     let discussion = try Self.attention(for: actor, workspaceID: workspaceID, in: db).map {
-      inboxItem($0, actor: actor, command: command)
+      inboxItem($0, actor: actor, workspace: slug)
     }
     guard actor.isHuman else { return (discussion, discussion.count) }
     let urgent = try inboxBlocks(workspaceID, at: at, command: command, in: db) + discussion
@@ -99,11 +98,12 @@ extension TaskService {
     )
   }
 
-  private func inboxItem(_ attention: DiscussionAttention, actor: ActorID, command: String)
+  private func inboxItem(_ attention: DiscussionAttention, actor: ActorID, workspace: String)
     -> InboxItem
   {
     let post = attention.post
     let task = attention.task
+    let command = "silta --ws " + shellWord(workspace)
     let read = command + " task show " + shellWord(task.ref) + " --timeline"
     let next: [String]
     if attention.kind == "question",
@@ -115,11 +115,11 @@ extension TaskService {
       ]
     } else if attention.kind == "answer", let question = attention.question,
       Self.canAcceptAnswer(
-        post.actor, asker: question.actor, claimer: task.claimedBy,
+        post.actor, question: question, claimer: task.claimedBy,
         caller: environment.actor.description)
     {
       next = [command + " comment accept " + shellWord(post.ref)]
-    } else if let confirmation = relayConfirmation(attention, actor: actor, command: command) {
+    } else if let confirmation = relayConfirmation(attention, actor: actor, workspace: workspace) {
       next = [confirmation, read]
     } else {
       next = [read]
@@ -136,15 +136,35 @@ extension TaskService {
   }
 
   private func relayConfirmation(
-    _ attention: DiscussionAttention, actor: ActorID, command: String
+    _ attention: DiscussionAttention, actor: ActorID, workspace: String
   ) -> String? {
-    guard actor.isHuman, !environment.actor.isHuman, let question = attention.question,
-      question.mentions.contains(actor.description),
-      !question.mentions.contains(environment.actor.description),
-      let own = attention.answers.first(where: { $0.actor == environment.actor.description })
+    let caller = environment.actor
+    guard let question = attention.question,
+      let resolve = Self.relayResolutionCommand(question, caller: caller, workspace: workspace)
     else { return nil }
-    return "ask human: Does " + own.ref + " relay your confirmed answer to " + question.ref
-      + "? Only if yes: " + command + " comment resolve " + shellWord(question.ref)
-      + " -m \"<confirmed answer>\""
+
+    if actor.isHuman, question.mentions.contains(actor.description),
+      let own = attention.answers.first(where: { $0.actor == caller.description })
+    {
+      return Self.confirmationHint(own.ref, question: question.ref, resolve: resolve)
+    }
+    let post = attention.post
+    guard actor == caller, attention.kind == "answer",
+      Self.isOwnHumanAnswer(post.actor, question: question, caller: caller.description)
+    else { return nil }
+    let recipients = question.humanRecipients
+    let recipientList = recipients.map { HumanText.line($0.description) }.joined(separator: ", ")
+    let addressing =
+      recipients.contains(environment.human)
+      ? "" : "Ask " + (recipients.count == 1 ? "" : "one of ") + recipientList + ". "
+    return Self.confirmationHint(
+      post.ref, question: question.ref, resolve: resolve, addressing: addressing)
+  }
+
+  private static func confirmationHint(
+    _ answer: String, question: String, resolve: String, addressing: String = ""
+  ) -> String {
+    "ask human: " + addressing + "Does " + answer + " relay your confirmed answer to " + question
+      + "? Only if yes: " + resolve
   }
 }

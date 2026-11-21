@@ -23,6 +23,7 @@ package enum WorkspaceError: CodedError {
 
   /// Removing a configured row would break an existing reference.
   case conflict
+  case removalBlockers(workspace: String, details: [String], hasDocuments: Bool)
 
   /// Removing a map item would detach current accepted knowledge.
   case docAttachments(
@@ -40,7 +41,7 @@ package enum WorkspaceError: CodedError {
     case .invalid, .setting, .unknownSetting: .invalid
     case .notFound, .unknown: .notFound
     case .ambiguous: .ambiguousLocation
-    case .conflict, .docAttachments: .conflict
+    case .conflict, .docAttachments, .removalBlockers: .conflict
     case .editor, .input: .env
     }
   }
@@ -60,6 +61,8 @@ package enum WorkspaceError: CodedError {
       "This repository belongs to several workspaces. "
         + "Retry the original command with --ws and a workspace from the candidates."
     case .conflict: "Configuration conflicts with an existing reference or unique value."
+    case .removalBlockers(_, let details, _):
+      "Workspace removal blocked by " + details.joined(separator: "; ") + "."
     case .docAttachments(_, let item, let docs, _, _):
       "Cannot remove \(TaskError.shown(DocService.about([item]))); attached docs: "
         + docs.map { TaskError.shown($0) }.joined(separator: ", ")
@@ -75,6 +78,10 @@ package enum WorkspaceError: CodedError {
     case .setting(let workspace, _, _), .unknownSetting(let workspace, _, _):
       ["silta --ws " + shellWord(workspace) + " ws show"]
     case .docAttachments(_, _, _, let commands, _): commands
+    case .removalBlockers(let workspace, _, let hasDocuments):
+      hasDocuments && RestoreService.canNameInRecovery(workspace)
+        ? [workspaceCommand("silta doc ls", workspace: workspace), workspaceEditRead(workspace)]
+        : [workspaceEditRead(workspace)]
     case .notFound, .unknown: ["silta ws ls"]
     case .ambiguous(let workspaces): workspaces.map { "silta --ws " + shellWord($0) + " ws show" }
     case .invalid(_, true): ["silta ws edit --help"]
@@ -86,6 +93,7 @@ package enum WorkspaceError: CodedError {
   /// Follows the prepared recovery action; protected read hubs remain agent-owned.
   package var nextBy: NextBy {
     if case .docAttachments(_, _, _, _, let owner) = self { return owner }
+    if case .removalBlockers = self { return .agent }
     return code.nextBy
   }
 

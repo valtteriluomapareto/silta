@@ -191,8 +191,10 @@
         let snapshot = try #require(model.visibleData?.snapshot)
         let question = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
           .questions.first?.item.ref
-        let inspector = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
-          .newestQuestion(for: "AC-12", reader: reader, workspace: "acme")?.question
+        let inspector = BoardContent(
+          snapshot: snapshot, apps: [], filter: BoardFilter(), search: ""
+        )
+        .newestQuestion(for: "AC-12", reader: reader, workspace: "acme")?.question
         #expect(question == "AC-12/1" && inspector == question)
         let fromMyWork = try #require(question.flatMap { model.target($0) })
         model.actions.setDraft("Other.", for: fromMyWork)

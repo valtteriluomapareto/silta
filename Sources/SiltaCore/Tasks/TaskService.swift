@@ -144,6 +144,9 @@ package struct TaskService: Sendable {
   static func entity(_ table: String, slug: String, workspace: Int64, in db: Database) throws
     -> Int64
   {
+    if let kind = WorkspaceSlugs.Kind(rawValue: table) {
+      return try namedSlug(kind, slug, workspace: workspace, in: db).id
+    }
     guard
       let id = try Int64.fetchOne(
         db,
@@ -154,4 +157,14 @@ package struct TaskService: Sendable {
     else { throw TaskError.notFound(table + " " + slug) }
     return id
   }
+  static func namedSlug(
+    _ kind: WorkspaceSlugs.Kind, _ slug: String, workspace: Int64, in db: Database
+  )
+    throws -> WorkspaceSlugs.Resolved
+  {
+    guard let selected = try WorkspaceSlugs.resolve(kind, slug, workspace: workspace, in: db)
+    else { throw TaskError.notFound(kind.rawValue + " " + slug) }
+    return selected
+  }
+
 }

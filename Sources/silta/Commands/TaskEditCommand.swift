@@ -15,6 +15,11 @@ struct TaskEditCommand: OutputCommand {
 
   static let dataShape = Shape.object([
     "ref": .string, "status": .string, "document": .optional(.string),
+    "app_change": .optional(
+      .object([
+        "from": .optional(.string), "to": .optional(.string),
+        "children_on_previous_app": .array(.string),
+      ])),
   ])
 
   static let workspaceSource = WorkspaceSource.option
@@ -36,6 +41,13 @@ struct TaskEditCommand: OutputCommand {
   @Flag(help: "Retain secrets with human approval.")
   var allowSecret = false
 
+  @Option(
+    help: .init(
+      "Set the primary app, or use none to clear it. Use app:none for a legacy app. "
+        + "Use without -F, --print or --allow-secret.")
+  )
+  var app: String?
+
   var missingTerminal: Bool { file == nil && !print && !TerminalEditor.hasTerminal }
 
   static let terminalUsage = UsageError.usage(
@@ -44,6 +56,7 @@ struct TaskEditCommand: OutputCommand {
     command: "silta task edit")
 
   func execute(_ context: CommandContext) throws -> CommandOutput {
+    if let app { return try move(to: app, context: context) }
     let service = TaskService(
       environment: context.environment, workspace: global.ws, approved: global.approved,
       bodyFlag: file.map { _ in "-F <file>" }, retryBodyFlag: file == "-" ? "-F -" : nil)
@@ -69,6 +82,27 @@ struct TaskEditCommand: OutputCommand {
         ? "unchanged" : "edited: " + result.result.changed.joined(separator: ", "),
       approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
+  }
+
+  private func move(to app: String, context: CommandContext) throws -> CommandOutput {
+    guard file == nil, !print, !allowSecret else {
+      throw TaskError.invalid("Use --app without -F, --print or --allow-secret.")
+    }
+    let workspace = try context.workspace(global.ws)
+    let service = TaskService(
+      environment: context.environment, workspace: workspace, approved: global.approved)
+    let edited = try service.editApp(ref, to: app)
+    var text = "unchanged"
+    if let change = edited.result.appChange {
+      text = HumanText.line(change.text)
+      if !change.childrenOnPreviousApp.isEmpty {
+        text +=
+          "\nChildren still on " + HumanText.line(change.previous) + ": "
+          + change.childrenOnPreviousApp.joined(separator: ", ")
+      }
+    }
+    return TaskOutput.receipt(edited.result, change: text, approvalUsed: edited.approvalUsed)
+      .reporting(workspace)
   }
 
   private func terminalFailure(_ service: TaskService) -> CommandFailure {

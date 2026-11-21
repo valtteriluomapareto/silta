@@ -9,8 +9,8 @@ struct BoardView: View {
     Group {
       if let snapshot = model.visibleData?.snapshot {
         let content = BoardContent(
-          snapshot: snapshot, app: model.appFilter, search: model.search,
-          proposals: model.showProposed)
+          snapshot: snapshot, apps: model.visibleData?.map?.apps ?? [],
+          filter: model.boardFilter, search: model.search)
         GeometryReader { geometry in
           let laneWidth = max(180, (geometry.size.width - 28) / 3)
           let open = content.lanes.filter { $0.title != "Done this week" }
@@ -23,7 +23,7 @@ struct BoardView: View {
               ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                   ForEach(open.dropFirst(2)) { laneView($0, content: content) }
-                  if let done { doneList(done) }
+                  if let done { doneList(done, content: content) }
                 }
               }.frame(width: laneWidth)
             }.padding(.horizontal, 2).padding(.top, 4)
@@ -40,14 +40,31 @@ struct BoardView: View {
   private func laneView(_ lane: BoardContent.Lane, content: BoardContent) -> some View {
     LazyVStack(alignment: .leading, spacing: 10) {
       laneHeader(lane)
-      if lane.tasks.isEmpty {
+      let hidden = lane.title == "Todo" ? content.hiddenBlockedText : nil
+      if lane.tasks.isEmpty && hidden == nil {
         Text(model.search.isEmpty ? "No tasks" : "No matches")
           .font(.system(size: 12)).foregroundStyle(Color("ShoreInk")).padding(.vertical)
       }
       ForEach(lane.tasks, id: \.ref) { task in
         card(task, content: content)
       }
+      if let hidden { hiddenBlocked(hidden) }
     }.padding(.bottom, 8)
+  }
+
+  /// Hidden blocked tasks leave a trace in Todo, with a way to bring them back.
+  private func hiddenBlocked(_ text: String) -> some View {
+    HStack(spacing: 8) {
+      Image(systemName: "pause.circle").font(.system(size: 12))
+      Text(text)
+        .font(.system(size: 12)).frame(maxWidth: .infinity, alignment: .leading)
+      Button("Show") { model.boardFilter.blocked = true }.buttonStyle(.plain)
+        .font(.system(size: 12, weight: .medium)).foregroundStyle(Color("TideText"))
+        .accessibilityLabel("Show blocked tasks")
+    }.foregroundStyle(Color("SecondaryInk")).padding(.horizontal, 14).padding(.vertical, 10)
+      .overlay(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .strokeBorder(Color("PaneBorder"), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
   }
 
   private func laneHeader(_ lane: BoardContent.Lane) -> some View {
@@ -66,7 +83,7 @@ struct BoardView: View {
   }
 
   /// Done tasks read as a compact list: they need a glance, not cards.
-  private func doneList(_ lane: BoardContent.Lane) -> some View {
+  private func doneList(_ lane: BoardContent.Lane, content: BoardContent) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       laneHeader(lane)
       VStack(alignment: .leading, spacing: 9) {
@@ -79,12 +96,13 @@ struct BoardView: View {
             model.inspect(task: task.ref)
           } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
+              appSquare(content.appLabel(for: task), size: 7)
               Text(task.ref).font(.system(size: 11, design: .monospaced))
               Text(task.title).font(.system(size: 13)).lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }.foregroundStyle(Color(selected ? "TideText" : "SecondaryInk")).contentShape(.rect)
           }.buttonStyle(.plain).help(task.title)
-            .accessibilityLabel(task.ref + ": " + task.title + ", done")
+            .accessibilityLabel(content.accessibilityLabel(for: task, asked: false))
             .accessibilityAddTraits(selected ? .isSelected : [])
         }
       }.padding(.horizontal, 12).padding(.vertical, 10)
@@ -100,11 +118,15 @@ struct BoardView: View {
       model.inspect(task: task.ref)
     } label: {
       VStack(alignment: .leading, spacing: 6) {
-        HStack(spacing: 4) {
-          Text([task.ref, task.app].compactMap { $0 }.joined(separator: " · "))
-            .font(.system(size: 10, design: .monospaced)).lineLimit(1)
+        HStack(spacing: 6) {
+          if let label = content.appLabel(for: task) {
+            appSquare(label, size: 8)
+            Text(label.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+              .foregroundStyle(Color(label.color ?? "SecondaryInk")).help(label.name)
+          }
+          Spacer(minLength: 0)
+          Text(task.ref).font(.system(size: 11, design: .monospaced)).lineLimit(1)
             .foregroundStyle(Color("SecondaryInk"))
-            .help([task.ref, task.app].compactMap { $0 }.joined(separator: " · "))
           if asked {
             Circle().fill(Color("AttentionMarker")).frame(width: 7, height: 7).help("Asked you")
           }
@@ -135,11 +157,17 @@ struct BoardView: View {
       .modifier(BoardCardSurface(task: task, selected: selected))
     }.buttonStyle(.plain).accessibilityElement(children: .ignore)
       .accessibilityAddTraits(selected ? .isSelected : [])
-      .accessibilityLabel(
-        task.ref + ": " + task.title + ", " + task.status
-          + (asked ? ", asked you" : "")
-          + (task.steps.isEmpty
-            ? "" : ", " + TaskPresentation.progress(task.steps, revision: task.planRevision)))
+      .accessibilityLabel(content.accessibilityLabel(for: task, asked: asked))
+  }
+
+  /// The app's sidebar square; an app missing from the map draws none.
+  @ViewBuilder private func appSquare(_ label: BoardContent.AppLabel?, size: CGFloat) -> some View {
+    if let color = label?.color {
+      RoundedRectangle(cornerRadius: size * 0.375).fill(Color(color)).frame(
+        width: size, height: size
+      )
+      .accessibilityHidden(true)
+    }
   }
 
   private func laneColor(_ title: String) -> Color {

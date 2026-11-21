@@ -41,20 +41,9 @@ package enum RestoreService {
     let directory = request.directory.standardizedFileURL
     try validateManifestPrefix(request.manifest, directory: directory)
     let files = try readTree(directory)
-    let tree = try ExportTree.parse(files)
-    let slug = tree.workspace.value("slug") ?? ""
-    if let field = tree.invalidIdentifier() {
-      throw ExportError.invalidRestoreIdentifier(field: field)
-    }
-    if let expected, expected != slug {
-      throw ExportError.otherWorkspace(tree: slug, given: expected, directory: directory.path)
-    }
-    try RestoreDocumentGraph(tree: tree, slug: slug).run()
-    let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
-    if let manifest = request.manifest, !digest.hasPrefix(manifest.lowercased()) {
-      throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
-    }
-    _ = try RestoreWriter.nextTaskSeq(stored: nil, tree: tree)
+    let admitted = try admit(
+      files, directory: directory, expected: expected, manifest: request.manifest)
+    let (tree, slug, digest) = (admitted.tree, admitted.slug, admitted.digest)
     let milliseconds = Int64(identity.date.timeIntervalSince1970 * 1000)
     let snapshot = "silta-\(utcDay(identity.date))-before-restore-\(milliseconds).db"
     return try store.write(rollingBack: dryRun, keepingBackup: \.snapshot) { tx in
@@ -75,6 +64,33 @@ package enum RestoreService {
         identity: identity, in: tx)
       return report
     }
+  }
+
+  struct Admission {
+    let tree: ExportSnapshot
+    let slug: String
+    let digest: String
+  }
+
+  /// Parses and validates the exact bytes this binary would be able to restore.
+  static func admit(
+    _ files: [String: Data], directory: URL, expected: String?, manifest: String? = nil
+  ) throws -> Admission {
+    let tree = try ExportTree.parse(files)
+    let slug = tree.workspace.value("slug") ?? ""
+    if let field = tree.invalidIdentifier() {
+      throw ExportError.invalidRestoreIdentifier(field: field)
+    }
+    if let expected, expected != slug {
+      throw ExportError.otherWorkspace(tree: slug, given: expected, directory: directory.path)
+    }
+    try RestoreDocumentGraph(tree: tree, slug: slug).run()
+    let digest = ExportFormat.sha256(files[ExportFormat.manifestFile] ?? Data())
+    if let manifest, !digest.hasPrefix(manifest.lowercased()) {
+      throw ExportError.manifestChanged(approved: manifest, directory: directory.path)
+    }
+    _ = try RestoreWriter.nextTaskSeq(stored: nil, tree: tree)
+    return Admission(tree: tree, slug: slug, digest: digest)
   }
 
   /// Checks an optional approval digest before reading a tree or asking for approval.
@@ -188,7 +204,8 @@ struct RestoreValidation {
     guard let object = parsed as? [String: Any] else {
       throw invalid("settings are not a JSON object")
     }
-    let known = Set(WorkspaceSettings.CodingKeys.allCases.map(\.rawValue))
+    let known = Set(
+      WorkspaceSettings.CodingKeys.allCases.map(\.rawValue) + [WorkspaceSlugs.retiredKey])
     if let unknown = Set(object.keys).subtracting(known).sorted().first {
       throw invalid("settings have the unknown key \(unknown)")
     }
@@ -199,9 +216,40 @@ struct RestoreValidation {
       _ = try settings.askAbout
       _ = try settings.archiveAfterDays
       _ = try settings.staleDays
+      try slugHistory(WorkspaceSlugs.retired(object))
     } catch let error as WorkspaceError {
       throw invalid("settings: \(error.message)")
     }
+  }
+
+  private func slugHistory(_ retired: [String: [String]]) throws {
+    var topicSpelling: [String: String] = [:]
+    var history: [(String?, String)] = []
+    for kind in WorkspaceSlugs.Kind.allCases {
+      let rows = tree.sections.first { $0.name == kind.section }?.rows ?? []
+      let items = try rows.enumerated().map { index, row in
+        let slug = row.value("slug") ?? ""
+        if kind == .topic, let uid = row.value("uid") { topicSpelling[uid] = slug }
+        return try WorkspaceSlugs.Item(
+          id: Int64(index) + 1, slug: slug,
+          previous: WorkspaceSlugs.previous(row.value("previous_slugs")))
+      }
+      let reserved = retired[kind.rawValue] ?? []
+      _ = try WorkspaceSlugs.ownership(kind, items: items, retired: reserved)
+      if kind == .topic {
+        history =
+          items.flatMap { item in item.previous.map { (item.slug, $0) } }
+          + reserved.map { (nil, $0) }
+      }
+    }
+    let rows = tree.sections.first { $0.name == "topic_aliases" }?.rows ?? []
+    let aliases = rows.compactMap { row -> (String, String)? in
+      guard let uid = row.value("topic"), let owner = topicSpelling[uid],
+        let alias = row.value("alias")
+      else { return nil }
+      return (owner, alias)
+    }
+    try WorkspaceSlugs.checkTopicAliases(aliases, history: history)
   }
 
   private func integers(_ row: ExportRow, in table: String) throws {

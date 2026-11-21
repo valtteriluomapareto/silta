@@ -1,8 +1,9 @@
 import Foundation
 import GRDB
-@testable import SiltaCore
 import SiltaTestSupport
 import Testing
+
+@testable import SiltaCore
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkspaceSettingValidationTests {
@@ -163,7 +164,7 @@ struct WorkspaceSettingValidationTests {
       let yaml = try store.read { try WorkspaceConfig.render(from: $0, slug: "acme") }
       let before = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM change_log") }
       let identity = (SeededIDGenerator(seed: 3) as any IDGenerator, TaskServiceTests.now)
-      let result: String?
+      let result: WorkspaceEditResult?
       if interactive {
         result = try WorkspaceEditor.edit(
           slug: "acme", store: store, actor: TaskServiceTests.agent, identity: identity,

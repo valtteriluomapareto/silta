@@ -590,6 +590,19 @@ Under `proposals: ask` without approval, they also preview `todo`, with a warnin
 that the real run needs the human's go-ahead in chat and creates `todo`. Split
 children preview the same status; refusals and consent warnings name the task count.
 
+Change a task's primary app with `task edit <ref> --app <slug>`. Use
+`--app none` for non-code work. The explicit `app:<slug>` form can select a legacy
+app named `none`. This mode takes neither an editor nor a body file. It cannot be
+combined with `-F`, `--print` or `--allow-secret`. Done, dropped and promoted
+tasks refuse. The regular edit gate applies, including a live foreign claim refusal.
+For a move that affects another app's backlog, follow the ask rules in §11.
+
+Changing between repositories clears the task's recorded branch and worktree.
+Start it from the target repository to record the task's new Git location.
+If the target has a different session, the current claimant hands off first.
+Children keep their app. The receipt names those still on the task's previous
+app, and the task timeline records the old and new app once.
+
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
 just created; `--status proposed` lists everyone's (it implies `--proposed`). Promoted
 tasks are left out unless `--promoted` is given. `task ls` sorts by priority (1–3, 1
@@ -804,12 +817,15 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   choice by the asker or current claimer. A claimer never accepts its own answer to
   another actor's question; target-authored answers are omitted from that actor's
   inbox unless the actor is also the asker. After confirming a human's answer in
-  chat, the asker or eligible claimer accepts a relay, or the relaying agent
-  explicitly resolves with `comment resolve <ref> -m <explanation>`. The inbox never
-  offers a bare resolve: only an agent with an existing outsider answer to the
-  queried human gets an `ask human:` confirmation instruction, alongside a safe read
-  command. Other callers without acceptance authority get only `task show`.
-  A non-addressee agent is not offered another answer action; the question names
+  chat, the asker or eligible claimer accepts another agent's relay. The relaying
+  agent can resolve the thread with `comment resolve <ref> -m <confirmed answer>`.
+  An asker cannot accept their own answer to a question with a human recipient.
+  An agent's inbox offers conditional confirmation on that answer if the agent is
+  outside the question's recipients. A human inbox keeps the same confirmation
+  instruction for an agent with a live outsider answer to that addressed human.
+  Both views include a timeline read, which is the only action if no confirmation
+  or acceptance is available. A non-addressee agent is not offered another answer
+  action; the question names
   existing outsider answer authors as awaiting confirmation, without treating their
   prose as proof of a human relay.
 - Questions and handoffs are roots. Answers require a live unresolved question;
@@ -819,7 +835,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   and a live answer/root.
   It sets the answer's `accepted` flag and the root's `resolved_at`/`resolved_by`
   to the accepter, recording `accepted <answer-ref>` in the attributed discussion event.
-  Repeating that same live acceptance writes nothing. A manually resolved question
+  An eligible caller repeating that same live acceptance writes nothing. A manually resolved question
   or a different answer selection requires reopen first; deleted posts refuse.
   JSON always includes `accepted`; text identifies accepted answers distinctly.
   Giving accept a question or non-answer ref points to the task's full discussion.
@@ -1344,7 +1360,8 @@ silta code ls   <app>[@<ref>] [<dir>]
   - Without `--approved`, an agent gets `human_only` (exit 3). The message says the
     command needs the human's go-ahead; `next` is the same command with
     `--approved "<the human's words>"`. If the retry uses `-F -`, supply the original body
-    again on stdin.
+    again on stdin. Workspace removal requires a human terminal (§15). Its retry
+    is for the human and takes no approval quote.
   - `--approved` on a command that doesn't need it warns `approval_unused` and stores
     nothing. A `--dry-run` records nothing, so it needs no approval, `--allow-secret`
     included, and its `--approved` warns `approval_unused`, saying a dry run records
@@ -1533,7 +1550,8 @@ workspace. A setting that changes the rules gets one conditional sentence, and
     triage, questions. Never drip them one at a time.
   - Human-only commands: name the exact commands in your message, and after the human
     says yes, run them with `--approved "<their words>"`. Their answer covers the
-    commands you named, and nothing else. Never write the words yourself.
+    commands you named, and nothing else. Never write the words yourself. The human
+    runs workspace removal directly in their terminal (§15).
   - When no answer can come (the human is away, or the harness runs without a human):
     don't wait. Leave a `question` for `@me` that lists the pending commands, write a
     handoff, and pick other work.
@@ -1555,7 +1573,9 @@ workspace. A setting that changes the rules gets one conditional sentence, and
 - **Questions:** ask in chat; record only when blocked beyond this session. Use
   `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
   current claimer can `comment accept` an answer. Answer only as an addressee or
-  to relay the human's chat answer; never accept your own answer to `@me`.
+  to relay the human's chat answer. For questions addressed to a human, record a
+  confirmed relay by resolving the question with an explanation. The asker cannot
+  accept their own answer to such a question.
 - **Blocked:** a question to the human doesn't block the task. If the human can
   answer, ask in chat, even about the customer. If only
   someone outside can (`ext:`) or another task must land first, keep doing what you
@@ -1647,6 +1667,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    edges with no code omit the pointer. Checks are bounded, use local Git objects,
    and reuse results for repeated references. Each command appears once. A
    successful `ws edit` warns if a saved edge's code cannot be verified locally.
+   A Git timeout is reported separately from unavailable code. These probes read local
+   Git objects with lazy fetching disabled. Brief hooks still apply their own deadline.
 6. **Open tasks** for this app and its topics (top 8), ordered by priority then
    task sequence ascending, after explicit-topic matches, which rank first. When
    the selection exceeds eight, an omitted count is followed by one `next:` line per
@@ -1991,6 +2013,24 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 - **Importers** (M4): `silta import --from dex|beads|backlog-md <path>`. Imported tasks
   become `proposed`, with a `source` link to the original id.
 
+### Remove a mistaken workspace
+
+`silta ws rm <slug> --dry-run` lists owned row counts, default selection and
+live registered clones without initializing or changing storage. The human
+runs `silta ws rm <slug>` directly in their terminal. Removing the saved
+default or a workspace with a live registered clone requires `--allow-active`.
+The command clears that selection or registration and leaves the Git clone on disk.
+
+The write rechecks the workspace and registrations. If an inactive path changes
+while removing without an override, preview again. Removal publishes a fresh SQLite
+backup and a validated recovery tree before deleting the owned graph in one
+transaction. Use the printed `restore --dry-run` to inspect the recovery tree,
+then run restore in the human's terminal to recover the workspace without
+replacing others. The whole database snapshot includes machine-local registrations
+and worktree information. The portable tree follows the export portability rules
+above. The v10 writer floor prevents older selectors from saving a workspace
+that was deleted before their write.
+
 ## 16. CLI
 
 **Conventions:**
@@ -2030,7 +2070,8 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   refuses embedded NUL bytes. These commands
   return `usage` and point to `-F` without a terminal or file input. A task edit also
   points to the scoped `--print` command when the task can be read, or to command help
-  when it cannot. Editor startup failures return `env` with help for the edit command.
+  when it cannot. The separate `task edit --app` mode needs no terminal or input file.
+  Editor startup failures return `env` with help for the edit command.
 - Refs follow §5.1.
 - Human-readable text and quiet views of stored content mask secrets before
   replacing terminal control characters with spaces. Multiline bodies preserve
@@ -2081,8 +2122,9 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
   shown to an agent is `human`, because its `next` is the human's triage. A code
   read's timeout or failed `--fetch` (§10) is `agent`, because narrowing the read or
   reading the cached ref comes first. The human works through an agent
-  (D38), so for `human` the agent asks the human in chat; for `human_only` it then
-  runs the printed command with `--approved "<their words>"`.
+  (D38), so for `human` the agent asks the human in chat. If a `human_only` retry
+  includes `--approved`, the agent runs it with the human's words after they say yes.
+  For workspace removal the human runs the retry directly.
 - `schema` is the envelope version. Before DF0, data shapes may narrow without a
   `schema` bump; from DF0 on they only gain fields, and any other change bumps
   `schema`.
@@ -2117,6 +2159,9 @@ selected when following a hint. Early human-only refusals preserve an explicit
 included, point to the failed command's help. A busy retry names only the parsed command path, without body-bearing
 arguments.
 
+- The `task edit --app` receipt includes `app_change` on change, with `from` and `to`
+  app slugs when set and `children_on_previous_app` listing the matching child refs.
+
 **Streams and global flags:**
 - Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on
   stderr.
@@ -2149,7 +2194,7 @@ run.
 | 0 | — | — |
 | 1 | `usage`, `invalid` | Read `silta <cmd> --help` and fix the call |
 | 2 | `not_found`, `unregistered` | Check the ref, or carry on without silta |
-| 3 | `human_only` | Stop and ask the human in chat; rerun with `--approved "<their words>"` after they say yes |
+| 3 | `human_only` | Ask the human in chat. They run `ws rm` directly. For other commands, rerun with `--approved "<their words>"` after they say yes. |
 | 3 | `read_only_promoted` | Leave it to its tracker and pick other work |
 | 4 | `ambiguous_location` | Retry with `--ws <slug>` for workspace ambiguity or `--app <slug>` for app ambiguity |
 | 5 | `busy` | Retry once after a few seconds |
@@ -2168,6 +2213,7 @@ silta ws edit
 silta ws show
 silta ws ls
 silta ws use
+silta ws rm
 silta repo fetch
 silta agents install
 silta agents uninstall
@@ -2257,6 +2303,13 @@ the `apps` slug array and includes optional `app_names` rows with `slug` and `na
 for the listed apps that have distinct names. Text tells a human how to open the
 workspace editor and tells agents to ask before editing. Text and JSON give one
 read-only, workspace-scoped `ws show` next.
+`ws edit --dry-run -F <file>` previews an edit to an existing workspace. Use
+`-F -` for stdin. It reads the same stamped snapshot as a save and reports the
+proposed adds, removals, renames and all blocking references. Preview needs no
+approval and writes no workspace state. When adding or removing map items,
+a successful save lists the affected references. A rename receipt additionally
+counts the attached docs, tasks, edges and environments that kept their identities.
+
 A scan with a missing root or no Git repositories returns `invalid` and creates
 no workspace. A bare `init` prepares the database and points to scan help.
 
@@ -2279,8 +2332,9 @@ Every CLI call is its own short-lived process, and several agents run at once.
 - **Claims and leases** are compare-and-set inside `BEGIN IMMEDIATE`.
 - **Workspace edits** capture the selected configuration before launching the editor
   or reading `-F`. The save verifies the baseline in its write transaction. Every
-  `ws show` projection carries a YAML comment tied to the workspace identity and
-  canonical configuration. Keep this comment when editing a file or pasting it
+  `ws show` projection carries a YAML comment tied to the workspace identity,
+  the canonical configuration, and the app and topic UIDs. An identically
+  configured replacement still invalidates a draft. Keep this comment when editing a file or pasting it
   into the interactive editor. A stale comment or a competing change returns `conflict`. Malformed or duplicate baseline
   comments return `invalid`. A stale interactive edit keeps its private YAML file
   with the original baseline. Review fresh `ws show` output and reapply your edits
@@ -2365,11 +2419,13 @@ revision before the write. It checks only the fields a write changes, each chang
 field whole rather than its changed lines; an unchanged field is never rescanned, so
 text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
-  - private-key armour, including PGP and SSH2. An unfinished block starts with a
-    standalone opening marker, optionally inside a Markdown quote or list. Its
-    armour lines can carry Markdown prefixes. Inline mentions of an unmatched
-    marker stay readable. After a blank line, a quoted or listed block continues
-    only inside its Markdown container, preserving subsequent prose and spacing.
+  - private-key armour, including PGP and SSH2. An unfinished block can start on
+    its own line, or carry enough base64 evidence after an inline or annotated
+    opening marker. Literal escaped line breaks and flattened payloads count.
+    Format-specific preambles can precede the payload. Inline redaction stops at
+    the last payload character. The first payload line and a continuation after
+    a blank need enough base64 to distinguish them from short prose. A quote or
+    list continues across a blank only inside its Markdown container.
   - Azure storage `AccountKey=` and SAS signatures
   - connection strings with `Password=` or `Pwd=`
   - AWS keys, and GitHub and Azure DevOps PATs
@@ -3044,7 +3100,17 @@ A fictional workspace that shows every section. The eval fixtures (§21) use the
 same shape. Slugs identify workspace, repo, app, service and topic rows. Environments
 match by app and name; edges by from, to and kind; sources by kind and root. Duplicate
 identities are invalid. Saving updates retained rows and removes omitted rows in one
-transaction; removing a referenced app or repo is a conflict. Renaming is not supported.
+transaction. A removal refusal names all blocked items and the references that
+pin them. Accepted docs, tasks, worktree overrides and retained source bindings
+can block removal.
+To rename an app or topic, set its new `slug` and list its old slug under `previous`.
+The edit retains the database identity, task and document links, edge endpoints and
+environments. Edge code references are saved with the current app slug, retaining
+their ref, path and line suffixes. An explicit former slug resolves to its current
+owner and warns with `renamed`. Historical slugs stay reserved in the workspace
+after the owning app or topic is removed. Export and restore carry the history in
+the selected snapshot. The metadata-only v9 migration raises the writer floor
+because earlier writers can reassign historical names (D32).
 Current accepted doc `about` attachments also protect apps, edges, services and
 topics, including items removed through an omitted parent. The conflict names the
 item and its docs. Proposal-only or archived docs and `cites` links do not pin map
@@ -3076,13 +3142,16 @@ names another; a message about a derived prefix names where it came from, the sl
 identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
 naming options can refresh an existing workspace of the same slug when the clones
 all match its registered repos, preserving its prefix. Slug and prefix clashes compare case-insensitively, as does `--ws`.
-An exact clone path binding takes priority. Other evidence includes an exact
-network or absolute local origin, equivalent HTTPS and Git SSH repository paths
-on github.com, gitlab.com and bitbucket.org, and a pathless repository with a
-matching slug and no configured origin. A possible alias on another host, a
-matching relative local origin or a workspace name alone calls for inspection
-before selecting a target. A scan checks all clone
-paths together before creating a workspace.
+An exact clone path binding takes priority. Other strong evidence includes an
+exact network or absolute local origin and standard hosted HTTPS and Git SSH
+aliases. GitHub, GitLab and Azure DevOps paths compare without case, and standard
+hosted paths can end in a slash. HTTPS, current Git SSH and legacy Visual Studio
+Git SSH spellings identify the same Azure DevOps repository. A network clone's
+slug alone is a possible match to a pathless declaration that has no origin.
+A possible alias on another host, a matching relative local origin or a workspace
+name alone calls for inspection before an automatic selection. An explicit new
+workspace may bypass slug-only candidates, subject to verified path and origin
+ownership. A scan checks all clone paths together before creating a workspace.
 A unique match to one workspace and one distinct repo per clone offers a scoped
 rescan when the repo paths agree or are unbound. If the scan includes competing
 registrations, a different bound clone, or a mix of registered and unfamiliar
@@ -3109,8 +3178,10 @@ or master provides a default app when its ref is not already represented. Stub
 slugs use repo normalization while refs keep their exact spelling. Reserved or
 duplicate generated slugs are skipped with a warning. Worktrees and path aliases
 resolve to one canonical main clone. Initial scans create configuration. A scoped
-rescan refreshes paths by exact binding, unique unbound origin, or registered repo
-slug and preserves edited configuration. Named scan roots must be readable
+rescan refreshes paths by exact binding, a unique compatible origin, or a
+same-slug declaration without contradictory origin evidence. A unique same-slug
+HTTPS and Git SSH alias on a generic host is compatible in this explicit scope.
+A different live checkout keeps its binding. Named scan roots must be readable
 directories. An unreadable descendant is skipped with a warning when other
 clones can be registered. If unreadable descendants leave no clones, the scan
 reports the first unreadable path.

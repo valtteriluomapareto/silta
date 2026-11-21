@@ -392,9 +392,11 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     [spec §8.1](spec.md#81-discussion-and-reviews) also treat unfinished fences as
     prose so incomplete examples cannot silently redirect questions, and count only
     hidden resolved history so a visible handoff does not imply missing work.
+  - For a human-directed question, the asker's own relay requires chat confirmation before explicit resolution.
 - **D38: The human works through agents.**
   - The human talks to an agent, which runs `silta` for them. They don't use the CLI
-    themselves. The Mac app (M5) is their own surface and counts as `human:*`.
+    themselves for routine work. The Mac app (M5) is their own surface and counts
+    as `human:*`.
   - `me` and `@me` mean the human, `human:<USER>`. An agent asked "what needs me?"
     runs `silta inbox --for me`.
   - Human-only commands stay gated. A human actor (a TTY or the app) runs them
@@ -405,6 +407,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     and flag names.
   - Without `--approved`, `human_only` (exit 3) tells the agent to ask in chat; `next`
     shows the command with the placeholder, which is itself refused as `invalid`.
+    Workspace removal is direct terminal only. Its retry is for the human and
+    takes no approval quote ([spec §15](spec.md#remove-a-mistaken-workspace)).
   - When no answer can come, the agent doesn't wait: it leaves a `question` for `@me`
     listing the pending commands, writes a handoff and picks other work.
   - Commands with an editor also read `-F <file>`: `ws edit` and `task edit`.

@@ -43,7 +43,8 @@ package struct CodeService {
     let immutable = [40, 64].contains(ref.count) && ref.allSatisfy(\.isHexDigit)
     return CodeResult(
       app: selection.app, ref: ref, sha: sha, output: output,
-      warnings: (fetch || immutable ? [] : stale(selection)) + warnings)
+      warnings: (fetch || immutable ? [] : stale(selection)) + warnings
+        + [selection.rename].compactMap { $0 })
   }
 
   /// Probes the same selected ref and literal path as code show without loading the blob.
@@ -64,7 +65,7 @@ package struct CodeService {
       throw RepoError.localPath(repo: repo, workspace: workspace)
     }
     let selection = Selection(
-      app: app, ref: ref, prod: nil, subpath: "", repo: repo, path: path, fetched: nil)
+      app: app, ref: ref, prod: nil, subpath: "", repo: repo, path: path, fetched: nil, rename: nil)
     return try await resolve(ref, selection: selection, operation: .list(nil))
   }
 
@@ -213,7 +214,7 @@ package struct CodeService {
         .init(
           arguments: ["--no-pager", "-c", "format.pretty=medium"] + arguments,
           directory: URL(filePath: selection.path, directoryHint: .isDirectory),
-          timeout: localOnly ? 0.25 : 10, lazyFetch: !localOnly, capture: capture))
+          timeout: localOnly ? 2 : 10, lazyFetch: !localOnly, capture: capture))
     } catch { throw failure(selection) }
     switch result.termination {
     case .exit: return result
@@ -226,15 +227,17 @@ package struct CodeService {
     -> Selection
   {
     try store.read { db in
+      let workspaceID = try TaskService.workspaceID(workspace, in: db)
       guard
+        let named = try WorkspaceSlugs.resolve(.app, app, workspace: workspaceID, in: db),
         let row = try Row.fetchOne(
           db,
           sql: """
             SELECT app.ref,app.prod_ref,app.subpath,repo.slug,repo_path.path,repo_path.fetched_at
-            FROM app JOIN workspace ON workspace.id=app.workspace_id
-            JOIN repo ON repo.id=app.repo_id LEFT JOIN repo_path ON repo_path.repo_id=repo.id
-            WHERE workspace.slug=? AND app.slug=?
-            """, arguments: [workspace, app])
+            FROM app JOIN repo ON repo.id=app.repo_id
+            LEFT JOIN repo_path ON repo_path.repo_id=repo.id
+            WHERE app.id=?
+            """, arguments: [named.id])
       else {
         throw CodeError.notFound(
           "App \(app.debugDescription) not found.",
@@ -246,8 +249,9 @@ package struct CodeService {
         throw RepoError.localPath(repo: repo, workspace: workspace)
       }
       return Selection(
-        app: app, ref: row["ref"], prod: row["prod_ref"], subpath: row["subpath"] ?? "", repo: repo,
-        path: path, fetched: row["fetched_at"])
+        app: named.slug, ref: row["ref"], prod: row["prod_ref"], subpath: row["subpath"] ?? "",
+        repo: repo,
+        path: path, fetched: row["fetched_at"], rename: named.warning(for: app, kind: .app))
     }
   }
 
@@ -273,6 +277,7 @@ private struct Selection {
   let repo: String
   let path: String
   let fetched: String?
+  let rename: OutputWarning?
 }
 
 extension CodeService {

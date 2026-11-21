@@ -86,7 +86,7 @@ extension ApprovalRecoveryCommandTests {
         (rename, Int32(1), formatRepair),
         (
           Data("workspace: {slug: acme, name: Changed, task_prefix: AC}".utf8), Int32(6),
-          formatRepair
+          ["silta --ws 'acme' ws show"]
         ),
         (Data([255]), Int32(1), inputHelp),
         (nil, Int32(1), inputHelp),

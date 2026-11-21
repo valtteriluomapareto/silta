@@ -306,9 +306,7 @@ extension DogfoodLogTests {
       (acme + ["code", "log", "api"], "acme"),
       (acme + ["code", "ls", "api"], "acme"),
       (["where", "--path", scratch.appending(path: "clone").path], "acme"),
-      (["ws", "show", "acme"], "acme"),
-      (["ws", "edit", "beta", "-F", yaml.path, "--approved", "Rename Acme Beta"], "beta"),
-      (["ws", "ls"], nil),
+    ] + workspaceCatalog(yaml) + [
       (["schema"], nil),
       (["doctor", "--ws", "absent"], nil),
       (acme + ["brief"], "acme"),
@@ -316,6 +314,15 @@ extension DogfoodLogTests {
       (["init"], nil),
       (["ws", "use", "acme"], "acme"), (acme + ["status"], "acme"),
     ] + integrationCatalog() + exportCatalog()
+  }
+
+  private static func workspaceCatalog(_ yaml: URL) -> [(args: [String], workspace: String?)] {
+    [
+      (["ws", "show", "acme"], "acme"),
+      (["ws", "rm", "acme", "--dry-run"], "acme"),
+      (["ws", "edit", "beta", "-F", yaml.path, "--approved", "Rename Acme Beta"], "beta"),
+      (["ws", "ls"], nil),
+    ]
   }
 
   static func documentCatalog(_ store: DatabaseStore) throws
@@ -372,7 +379,13 @@ extension DogfoodLogTests {
       (acme + ["comment", "resolve", "AC-1/1"], "acme"),
       (acme + ["comment", "reopen", "AC-1/1"], "acme"),
       (acme + ["comment", "delete", "AC-1/1"], "acme"),
-      (acme + ["comment", "AC-1", "--kind", "question", "-m", "Acme question"], "acme"),
+      (
+        acme + [
+          "comment", "AC-1", "--kind", "question", "--to", "agent:codex:other", "-m",
+          "Acme question",
+        ],
+        "acme"
+      ),
       (
         acme + [
           "comment", "AC-1", "--kind", "answer", "--reply-to", "AC-1/2", "-m", "Acme answer",
