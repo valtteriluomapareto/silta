@@ -62,7 +62,7 @@
         let reopen = model.reopen(thread: "AC-9/1")
         let again = await writes.next()
         #expect(again.write == .reopenThreads(refs: ["AC-9/1"]))
-        again.continuation.resume()
+        again.continuation.resume(returning: nil)
         await reopen?.value
       }
     }
