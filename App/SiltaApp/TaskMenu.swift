@@ -107,7 +107,9 @@ nonisolated enum TaskMenu {
     switch task.status {
     case "todo": return true
     case "doing":
-      return task.claimExpired(at: now) || (task.claimedBy == nil && task.resumeAvailable)
+      // An unreadable heartbeat reads expired, but Core refuses to start the task.
+      return (task.claimExpired(at: now) && task.claimExpiresAt != nil)
+        || (task.claimedBy == nil && task.resumeAvailable)
     default: return nil
     }
   }
