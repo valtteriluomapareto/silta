@@ -36,7 +36,23 @@ extension AppReader {
 
   /// Offers read-only detail for a task waiting for review.
   public func commands(forReview task: AppTask, workspace: String) -> [AppCommand] {
-    [taskCommand(task.ref, workspace: workspace)]
+    [readCommand(task: task.ref, workspace: workspace)]
+  }
+
+  /// Reads one task with its timeline.
+  public func readCommand(task ref: String, workspace: String) -> AppCommand {
+    taskCommand(ref, workspace: workspace)
+  }
+
+  /// What the human pastes into an agent session to start or resume a task. The app only
+  /// copies it and never launches an agent (D4). Like every copied command it pins the data
+  /// home, so an agent with another `SILTA_HOME` still acts on the human's store.
+  public func agentPrompt(task ref: String, workspace: String, name: String) -> String {
+    let silta = command("", suffix: "", workspace: workspace).text.trimmingCharacters(
+      in: .whitespaces)
+    let label = name.filter { $0 != "`" && !$0.isNewline }
+    return "Work on \(ref) in \(label). Read it with `\(silta) task show \(shellWord(ref))`, "
+      + "then claim it with `\(silta) task start \(shellWord(ref))`."
   }
 
   /// Reads the full human inbox beyond the default cap.

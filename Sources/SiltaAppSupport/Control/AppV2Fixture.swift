@@ -46,7 +46,28 @@
       _ = try service.block("AC-17", block)
       try store.write {
         try DebugTaskFixture.complete(19, in: $0, at: now.addingTimeInterval(-1800))
+        try inspectorFacts(in: $0)
+        // Codex went quiet on AC-14 three hours ago, so its claim has expired.
+        try DebugTaskFixture.claim(14, heartbeat: now.addingTimeInterval(-3 * 3600), in: $0)
       }
+      _ = try service.link(
+        "AC-8", target: "url:https://github.com/acme/example/pull/38", relation: "about")
+    }
+
+    /// The facts the inspector shows beyond the plan: acceptance on AC-14, and on AC-8 a
+    /// result with its Friction line, the completion branch and a dirty worktree.
+    private static func inspectorFacts(in tx: StorageTransaction) throws {
+      try DebugTaskFixture.annotate(
+        14,
+        acceptance: "- A failed registration retries with capped backoff.\n"
+          + "- Tokens older than an hour are dropped, not retried.\n",
+        worktree: "/Users/acme/worktrees/mobile-push", in: tx)
+      try DebugTaskFixture.annotate(
+        8,
+        result: "Order totals are stored and returned as integer cents. The API keeps a decimal "
+          + "field for one release. Verified with OrderTotalsTests.\nMerged in #38 (1111111).\n"
+          + "Friction: The fixture had no multi-currency orders, so rounding was checked by hand.",
+        doneBranch: "main", doneDirty: true, in: tx)
     }
 
     /// A review on AC-9: an open finding Codex replied to, and a finding Claude resolved

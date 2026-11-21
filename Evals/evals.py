@@ -455,15 +455,39 @@ def prepare(root, binary, harness, scenario, variant, profile=None, seed=None):
     gate = silta(control_env, cwd, ['ws', 'edit', '-F', str(root / 'workspace.yaml'), '--json'],
                  expected=3)
     (Path(env['HOME']) / '.claude').mkdir(exist_ok=True)
-    hook_env = dict(env, SILTA_ACTOR='agent:claude', SILTA_SESSION='eval-control',
-                    CLAUDE_ENV_FILE=str(Path(env['HOME']) / '.claude/control.env'))
-    hook = silta(hook_env, cwd, ['agents', 'session-start'],
-                 json.dumps({'session_id': 'eval-control'}))
+    hook = hook_control(env, cwd)
     controls = {'tiny': json.loads(tiny['stdout']), 'guide': guide,
                 'gate': json.loads(gate['stdout']), 'hook': hook['stdout'], 'guide_default': guide_default}
     if scenario in ('doc-context', 'doc-context-no-doc'):
         controls['doc_fixture'] = fixture
     return env, cwd, sha, controls
+
+
+HOOK_CONTROL_ATTEMPTS = 3
+
+
+def hook_timeouts(data):
+    return sum(entry.get('command') == 'silta agents session-start'
+               and 'hook_timeout' in entry.get('warnings', []) for entry in logs(data))
+
+
+def hook_control(env, cwd, run=None):
+    """Session-start output for the fixture's policy control.
+
+    Past its deadlines the hook exits 0 with no or degraded output (spec §12), so a loaded
+    machine can empty the control. Only an attempt the CLI logged as `hook_timeout` is
+    repeated; any output without that record stays the evidence."""
+    run = run or silta
+    hook_env = dict(env, SILTA_ACTOR='agent:claude', SILTA_SESSION='eval-control',
+                    CLAUDE_ENV_FILE=str(Path(env['HOME']) / '.claude/control.env'))
+    data = Path(env['SILTA_HOME'])
+    for _ in range(HOOK_CONTROL_ATTEMPTS):
+        before = hook_timeouts(data)
+        hook = run(hook_env, cwd, ['agents', 'session-start'],
+                   json.dumps({'session_id': 'eval-control'}))
+        if hook_timeouts(data) == before:
+            return hook
+    raise RuntimeError(f'fixture hook control: hook_timeout on all {HOOK_CONTROL_ATTEMPTS} attempts')
 
 
 def proposal_command(variant, root):

@@ -30,7 +30,7 @@ struct AppSidebar: View {
                 )
                 .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
               }.padding(.horizontal, 8).padding(.vertical, 5).contentShape(.rect)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).taskMenu(TaskMenu.items(forApp: app.slug), model: model)
           }.listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         } header: {
           Overline("Apps").padding(.leading, 8)
@@ -74,24 +74,29 @@ struct AppSidebar: View {
 
   private var claimedCard: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Overline("Claimed now")
+      let now = model.visibleData?.checkedAt ?? model.now()
+      Overline(SidebarContent.claimHeading(claimed, now: now))
       ForEach(claimed.prefix(SidebarContent.claimLimit), id: \.ref) { task in
+        let expired = task.claimExpired(at: now)
         Button {
           model.inspect(task: task.ref)
         } label: {
           HStack(spacing: 8) {
             ActorLabel(actor: task.claimedBy ?? "").labelStyle(.iconOnly)
-            Text(SidebarContent.claimTitle(task)).font(.system(size: 11, design: .monospaced))
+            Text(SidebarContent.claimTitle(task, now: now))
+              .font(.system(size: 11, design: .monospaced))
+              .foregroundStyle(Color(expired ? "Warning" : "Ink"))
               .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-            if let age = SidebarContent.claimAge(task, now: model.now()) {
+            if let age = SidebarContent.claimAge(task, now: now) {
               Text(age).font(.system(size: 11)).foregroundStyle(Color("SecondaryInk"))
             }
           }.contentShape(.rect)
         }.buttonStyle(.plain)
-          .help(SidebarContent.claimSubtitle(task, now: model.now()))
+          .taskMenu(model.menuItems(for: task), model: model)
+          .help(SidebarContent.claimSubtitle(task, now: now))
           .accessibilityLabel(
-            SidebarContent.claimTitle(task) + ", "
-              + SidebarContent.claimSubtitle(task, now: model.now()))
+            SidebarContent.claimTitle(task, now: now) + ", "
+              + SidebarContent.claimSubtitle(task, now: now))
       }
       if claimed.count > SidebarContent.claimLimit {
         Button("\(claimed.count - SidebarContent.claimLimit) more on the Board") {

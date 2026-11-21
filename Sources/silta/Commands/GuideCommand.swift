@@ -212,7 +212,8 @@ extension GuideCommand {
         sees, deleting what you did not create, anything irreversible, and money; repository \
         rules and human-only gates still apply.
         Use `task edit <ref> --app <slug>` to correct a task's primary app. \
-        Ask when the move changes another app's backlog. For a different repository, \
+        Ask before choosing the destination app unless the human already named it. \
+        For a different repository, \
         start the task from the target checkout. If the target is a different session, \
         the current claimant hands off first.
         Put all approvals, proposals to triage and questions in one message. Except for the \
@@ -240,7 +241,8 @@ extension GuideCommand {
         Remove the key to use the slug as the label. Read both with `silta --ws acme ws show` \
         and use the slug in commands and references.
         For a mistaken workspace, preview with `silta ws rm acme --dry-run`. The human runs \
-        `silta ws rm acme` in their terminal. The saved default or a live registered clone \
+        `silta ws rm acme` in their terminal. The saved default or a live or \
+        uninspectable registered clone \
         requires `--allow-active`. Use the printed recovery preview to restore just that workspace.
         Usually propose nothing; never more than two proposals per session, only ideas you \
         would bet the human wants. `task add --start` is only for work the human requested. \

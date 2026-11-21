@@ -588,6 +588,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - **`from-plan --split` children take the root's status**, decided once per import:
     `todo` under a `todo` or `doing` root, `proposed` under a `proposed` one.
     `--dry-run` shows the same.
+  - Ask before choosing a task's destination app unless the human already named it.
+    The standard task edit approval and claim rules apply to `task edit --app`.
   - **`task edit <ref> --print`** prints the exact edit document, a read with no
     approval. An agent's edit that blanks a stored Result or Plan is `invalid` and
     names the field; humans may clear them. An edit that changes nothing writes no

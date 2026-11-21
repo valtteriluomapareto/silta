@@ -10,10 +10,7 @@ extension TaskService {
     let at = environment.clock.now()
     let prepare: (Database) throws -> AppEdit = { [self] db in
       let task = try Self.lookup(ref, workspace: workspace, in: db)
-      try validateClaim(task, workspace: workspace, at: at)
-      guard task.status != "done", task.status != "dropped" else {
-        throw TaskError.transition(task.ref, status: task.status)
-      }
+      try ensureAppEditAllowed(task, workspace: workspace, at: at)
       let name = option.hasPrefix("app:") ? String(option.dropFirst(4)) : option
       let destination =
         option == TaskDraft.noneApp ? nil : try Self.appDestination(name, task: task, in: db)
@@ -41,6 +38,23 @@ extension TaskService {
         command: edit.command, workspace: workspace, identity: (environment.ids, at), in: tx)
       result.appChange = change
       return (result, edit.approval != nil)
+    }
+  }
+
+  private func ensureAppEditAllowed(_ task: TaskDetails, workspace: String, at: Date) throws {
+    if let external = task.externalRef {
+      let error = TaskError.promoted(task.ref, external: external)
+      throw CommandFailure(
+        error: error, next: error.next.map { scopedCommand($0, workspace: workspace) },
+        message: "\(task.ref) is promoted; its primary app cannot change. "
+          + "Work in tracker \(HumanText.line(external)).")
+    }
+    try validateClaim(task, workspace: workspace, at: at)
+    guard task.status != "done", task.status != "dropped" else {
+      let error = TaskError.transition(task.ref, status: task.status)
+      throw CommandFailure(
+        error: error, next: error.next.map { scopedCommand($0, workspace: workspace) },
+        message: "\(task.ref) is \(task.status); its primary app cannot change.")
     }
   }
 
@@ -98,7 +112,8 @@ extension TaskService {
     let children = try Int64.fetchAll(
       db,
       sql: """
-        SELECT seq FROM task WHERE workspace_id=? AND parent_id=? AND app_id IS ? ORDER BY seq
+        SELECT seq FROM task WHERE workspace_id=? AND parent_id=? AND app_id IS ?
+          AND external_ref IS NULL AND status IN ('todo','doing','blocked','review') ORDER BY seq
         """, arguments: [task.workspaceID, task.id, oldApp]
     ).map { "\(prefix)-\($0)" }
     let change = TaskAppChange(

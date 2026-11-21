@@ -29,14 +29,29 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
 
 **In:**
 - **Sidebar:** workspace switcher, My work, Board, Workspace and Docs, apps with open
-  counts, "Claimed now", and refresh status.
+  counts, "Claimed now", and refresh status. Paper "App features v1": claims age from
+  their heartbeat (`claimed_at`), not the last task update. A claim of two hours or more,
+  Core's expiry, reads "expired" in Claimed now and "claim expired · idle 3 h" on its
+  Doing card, and the inspector shows when it lapsed, the last sign of work, "Copy resume
+  prompt" and "Reveal worktree". Expiry and resumability come from Core: an unreadable
+  heartbeat reads as expired, as Doctor treats it, and a Doing task reads "Handed off ·
+  ready to resume" only when Core can resume it.
 - **My work:** the human's inbox, plus tasks in `review`. The waiting badge counts
   each actionable inbox entry and each distinct review task once;
   it does not count visual groups. The maintainer chose actionable-item counts on
   2026-11-16; Paper v2's “4 waiting” group count is not the acceptance value.
+  Paper "App features v1": a line under the items says how many more wait past the
+  inbox cap of twelve, and "Show all" reloads My work with the whole inbox
+  (`inbox --for me --all`, proposals older than 14 days included) until "Show fewer" or
+  a workspace switch. The badge keeps the capped count.
 - **Board:** blocked tasks stay in Todo with a blocked label; lanes show plan
   progress, and a task inspector shows the plan, claim,
-  properties and discussion. Paper "Board filters v1": cards start with their app's
+  properties and discussion. Paper "App features v1": it also shows what `task show`
+  returns: each blocker with Core's ready state, the reason and follow-up day; acceptance;
+  the result with its final `Friction:` line set apart; the completion commit, pull
+  request and a dirty-worktree warning; a handoff ready to resume; parent, subtasks,
+  links, tracker and creator. One Core read in one transaction supplies them.
+  Paper "Board filters v1": cards start with their app's
   sidebar square and name, and a Filter menu shows or hides blocked, proposed and
   done-this-week tasks and picks an app. Hidden blocked tasks leave a "N blocked task
   hidden · Show" line in Todo; a blocked task with an open question to the human stays.
@@ -71,6 +86,11 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
     remain outside this viewer;
   - a Copied state;
   - ⌘C and a context menu.
+  - Paper "App features v1": Board cards, done rows, review rows and Claimed now rows
+    have a context menu: Open in Inspector, Copy Ref, Copy Agent Prompt (todo and doing
+    tasks), Copy "task show" Command, Filter Board to the app, Show Docs About the app and
+    Reveal Worktree. Sidebar apps have the two app items. An unavailable item stays
+    visible, disabled, with its reason; the available ones are also VoiceOver actions.
 - **States:**
   - store missing, or a newer schema than the app;
   - first load, empty, long text and many items;
@@ -120,7 +140,11 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   Default-home identity follows Core's `SiltaHome`, including filesystem aliases. Use the inbox's
   human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
-  nothing is pre-filled for drop or reject, and there's no `-F -`.
+  nothing is pre-filled for drop or reject, and there's no `-F -`. An agent prompt
+  ("Work on AC-14 in Acme. Read it with `SILTA_HOME=~/.silta silta --ws 'acme' task show
+  'AC-14'`, then claim it with … `task start 'AC-14'`.") pins the home the same way, so an
+  agent with its own `SILTA_HOME` still acts on the human's store. The app copies it and
+  launches nothing (D4).
 - **Layout:** `NavigationSplitView`, with native search in the toolbar placed before the
   inspector toggle. The toolbar belongs to the detail column and starts with a flexible
   spacer, so its controls sit at the window's trailing edge. The inspector is a 340 pt
