@@ -21,7 +21,8 @@
       process.standardInput = FileHandle.nullDevice
       let output = Pipe()
       process.standardOutput = output
-      process.standardError = FileHandle.nullDevice
+      let errors = Pipe()
+      process.standardError = errors
       let finished = DispatchSemaphore(value: 0)
       process.terminationHandler = { _ in finished.signal() }
       try process.run()
@@ -31,7 +32,10 @@
       process.waitUntilExit()
       let text = try #require(
         String(bytes: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8))
-      try #require(process.terminationReason == .exit && process.terminationStatus == 0, "\(text)")
+      let stderr =
+        String(bytes: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+      try #require(
+        process.terminationReason == .exit && process.terminationStatus == 0, "\(text)\(stderr)")
       return text
     }
   }
