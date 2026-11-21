@@ -92,6 +92,17 @@
       return id
     }
 
+    /// Moves a fixture claim's heartbeat, so the claim reads as live or expired.
+    package static func claim(_ sequence: Int64, heartbeat: Date, in tx: StorageTransaction) throws
+    {
+      try tx.database.execute(
+        sql: """
+          UPDATE task SET claimed_at=? WHERE seq=? AND claimed_by IS NOT NULL
+            AND workspace_id=(SELECT id FROM workspace WHERE slug='acme')
+          """, arguments: [TaskService.timestamp(heartbeat), sequence])
+      guard tx.database.changesCount == 1 else { throw StorageError.corrupt }
+    }
+
     /// Completes a fixture task that other fixture writes needed open, such as a blocker.
     package static func complete(_ sequence: Int64, in tx: StorageTransaction, at: Date) throws {
       let stamp = TaskService.timestamp(at)
