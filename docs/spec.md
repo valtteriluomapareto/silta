@@ -595,13 +595,13 @@ Change a task's primary app with `task edit <ref> --app <slug>`. Use
 app named `none`. This mode takes neither an editor nor a body file. It cannot be
 combined with `-F`, `--print` or `--allow-secret`. Done, dropped and promoted
 tasks refuse. The regular edit gate applies, including a live foreign claim refusal.
-For a move that affects another app's backlog, follow the ask rules in §11.
+Ask before choosing the destination app unless the human already named it (§11).
 
 Changing between repositories clears the task's recorded branch and worktree.
 Start it from the target repository to record the task's new Git location.
 If the target has a different session, the current claimant hands off first.
-Children keep their app. The receipt names those still on the task's previous
-app, and the task timeline records the old and new app once.
+Children keep their app. The receipt names the movable children still on the task's
+previous app, and the task timeline records the old and new app once.
 
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
 just created; `--status proposed` lists everyone's (it implies `--proposed`). Promoted
@@ -2160,7 +2160,7 @@ included, point to the failed command's help. A busy retry names only the parsed
 arguments.
 
 - The `task edit --app` receipt includes `app_change` on change, with `from` and `to`
-  app slugs when set and `children_on_previous_app` listing the matching child refs.
+  app slugs when set and `children_on_previous_app` listing child refs that can still move.
 
 **Streams and global flags:**
 - Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on
