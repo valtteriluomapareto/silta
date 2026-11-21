@@ -314,3 +314,73 @@ extension WorkspaceRemovalCommandTests {
     }
   }
 }
+
+extension WorkspaceRemovalCommandTests {
+  @Test(arguments: [false, true])
+  func brokenGitRegistrationCanOnlyBeRemovedWithAHumanOverride(link: Bool) throws {
+    try withScratchDirectory { scratch in
+      let (store, _) = try Self.fixture(scratch)
+      let path = try Self.addBrokenCheckout(link: link, store: store, in: scratch)
+      let command = "silta ws rm 'acme' --allow-active"
+      let initial = try Self.export("acme", to: "before-broken", in: scratch)
+      try Self.checkBrokenRemovalPreview(path, hint: command, in: scratch)
+      #expect(try Self.export("acme", to: "after-refused-broken", in: scratch) == initial)
+      let denied = try Self.run(
+        ["ws", "rm", "acme", "--allow-active", "--approved", "Remove Acme.", "--json"],
+        in: scratch)
+      #expect(denied.termination == .exit(3))
+      let removed = try Self.human(["ws", "rm", "acme", "--allow-active", "--json"], in: scratch)
+      let receipt = try GuideContractTests.object(removed.stdout)["data"] as? [String: Any]
+      withKnownIssue(
+        "A dangling gitdir file currently blocks the direct human override.", isIntermittent: link
+      ) {
+        #expect(removed.termination == .exit(0))
+        #expect(receipt?["backup"] is String && receipt?["recovery"] is String)
+      }
+      #expect(FileManager.default.fileExists(atPath: path + "/acme-sentinel"))
+      if let receipt {
+        try Self.checkRemoval(store)
+        try Self.recover(receipt, target: initial, in: scratch)
+      }
+    }
+  }
+
+  private static func addBrokenCheckout(
+    link: Bool, store: DatabaseStore, in scratch: URL
+  ) throws -> String {
+    let path = scratch.appending(path: "Acme broken clone")
+    try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+    let marker = path.appending(path: ".git")
+    let missing = scratch.appending(path: "missing-gitdir")
+    if link {
+      try FileManager.default.createSymbolicLink(at: marker, withDestinationURL: missing)
+    } else {
+      try Data(("gitdir: " + missing.path + "\n").utf8).write(to: marker)
+    }
+    try Data("Acme file".utf8).write(to: path.appending(path: "acme-sentinel"))
+    try store.write { tx in
+      try tx.database.execute(sql: "UPDATE repo_path SET path=?", arguments: [path.path])
+    }
+    return path.path
+  }
+
+  private static func checkBrokenRemovalPreview(
+    _ path: String, hint: String, in scratch: URL
+  ) throws {
+    let preview = try Self.run(["ws", "rm", "acme", "--dry-run", "--json"], in: scratch)
+    let data = try GuideContractTests.object(preview.stdout)["data"] as? [String: Any]
+    let text = try Self.run(["ws", "rm", "acme", "--dry-run"], in: scratch)
+    let denied = try Self.human(["ws", "rm", "acme", "--json"], in: scratch)
+    let error = try TaskStateCommandTests.error(denied)
+    withKnownIssue("An unresolved clone currently prevents preview and gives no usable retry.") {
+      #expect(preview.termination == .exit(0))
+      #expect(data?["unresolved_clones"] as? [String] == [path])
+      #expect(data?["next_by"] as? String == "human" && data?["next"] as? [String] == [hint])
+      #expect(text.stdout.contains(path) && text.stdout.contains("ask human: " + hint))
+      #expect(denied.termination == .exit(9))
+      #expect(
+        (error["message"] as? String)?.contains(path) == true)
+      #expect(error["next_by"] as? String == "human" && error["next"] as? [String] == [hint])
+    }
+  }
+}
