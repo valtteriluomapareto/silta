@@ -12,12 +12,18 @@ extension AppModel {
   /// again, so a stale view (`conflict`, `not_found`, `claimed`) shows the current state
   /// and an answered question can't be answered twice from the old screen.
   @discardableResult func perform(_ write: AppWrite, for ref: String) -> Task<Void, Never>? {
+    guard let running = send(write, for: ref) else { return nil }
+    return Task { _ = await running.value }
+  }
+
+  /// `perform`, handing back what the writer returned: a created task's reference.
+  private func send(_ write: AppWrite, for ref: String) -> Task<String?, Never>? {
     guard let writer, let target = target(ref), actions.begin(target) else { return nil }
     return Task {
       var failure: ActionFailure?
+      var result: String?
       do {
-        let created = try await writer(write, target.workspace)
-        if case .createTask = write { createdTask = created }
+        result = try await writer(write, target.workspace)
       } catch {
         failure = ActionFailure(error)
       }
@@ -25,6 +31,7 @@ extension AppModel {
       await loadTaskDetail()
       if visibleData != nil { actions.selectedProposals.formIntersection(proposalRefs) }
       actions.finish(target, failure: failure)
+      return result
     }
   }
 
@@ -101,14 +108,18 @@ extension AppModel {
   /// Creates a todo task. With `copyPrompt`, copies the prompt that hands it to an agent once
   /// Core has created it; the app launches nothing.
   @discardableResult func createTask(_ task: AppNewTask, copyPrompt: Bool) -> Task<Void, Never>? {
-    createdTask = nil
-    guard let running = perform(.createTask(task), for: Self.newTaskTarget) else { return nil }
+    guard let workspace, let running = send(.createTask(task), for: Self.newTaskTarget)
+    else { return nil }
+    let name = workspaceName ?? workspace
     return Task {
-      await running.value
-      guard copyPrompt, let ref = createdTask, let reader, let workspace else { return }
-      createdPrompt = reader.agentPrompt(
-        task: ref, workspace: workspace, name: workspaceName ?? workspace)
-      if let createdPrompt { _ = CopyValue.writeToPasteboard(createdPrompt) }
+      guard let ref = await running.value else { return }
+      var prompt: String?
+      if copyPrompt, let reader {
+        let text = reader.agentPrompt(task: ref, workspace: workspace, name: name)
+        if pasteboard(text) { prompt = text }
+      }
+      createdPrompt = prompt
+      createdTask = ref
     }
   }
 

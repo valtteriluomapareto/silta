@@ -47,6 +47,30 @@
       }
     }
 
+    @Test func startingIsLeftToAnAgentSession() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppWriterTests.reader(scratch)
+        var draft = TaskDraft(title: "Claim it now")
+        draft.start = true
+        #expect(throws: TaskError.self) {
+          try AppWriterTests.agent(reader, .human(name: "acme")).addUnstarted(draft)
+        }
+      }
+    }
+
+    @Test func aSubtaskInheritsItsParentsApp() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppWriterTests.reader(scratch)
+        var new = AppNewTask(title: "Order history filters")
+        new.parent = "AC-15"
+        let ref = try #require(
+          try AppWriter(reader: reader).perform(.createTask(new), workspace: "acme"))
+        #expect(try reader.task(ref, workspace: "acme").app == "acme-web")
+      }
+    }
+
     @Test func anUnknownAppIsRefused() throws {
       try withScratchDirectory { scratch in
         try AppFixtures.seed(in: scratch)
@@ -56,7 +80,8 @@
         let refused = try AppWriterTests.failure {
           try AppWriter(reader: reader).perform(.createTask(new), workspace: "acme")
         }
-        #expect(refused.code != nil)
+        #expect(refused.code == .notFound || refused.code == .invalid)
+        #expect(try reader.snapshot(workspace: "acme").board.todo.count == 4)
       }
     }
   }

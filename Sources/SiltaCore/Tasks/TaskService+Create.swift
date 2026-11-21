@@ -11,9 +11,28 @@ extension TaskService {
     let slug = try selected()
     creation = try resolved(creation, workspace: slug)
     creation.git = try await inspected(creation, draft: draft, directory: directory)
-    let prepared = creation
+    return try commit(creation, approval: approval, workspace: slug)
+  }
+
+  /// Creates unstarted work without inspecting Git, for a front end that never claims,
+  /// such as the Mac app. It follows `add` in every other rule, in one transaction.
+  package func addUnstarted(_ draft: TaskDraft) throws -> TaskResult {
+    guard !draft.start else { throw TaskError.invalid("Start the task from an agent session.") }
+    let approval = try approval(
+      required: draft.allowSecret, command: draft.command + " '<title>' -F <file> --allow-secret")
+    var creation = try prepare(draft, command: draft.command + " '<title>' -F <file>")
+    let slug = try selected()
+    creation = try resolved(creation, workspace: slug)
+    return try commit(creation, approval: approval, workspace: slug)
+  }
+
+  /// Inserts prepared work and records the approval it used, in one transaction.
+  private func commit(_ prepared: TaskCreation, approval: HumanApproval?, workspace slug: String)
+    throws -> TaskResult
+  {
+    let draft = prepared.draft
     return try environment.db.write { tx in
-      let command = prepared.draft.command + (draft.allowSecret ? " --allow-secret" : "")
+      let command = draft.command + (draft.allowSecret ? " --allow-secret" : "")
       let retry =
         scopedCommand(command, workspace: slug)
         + (retryBodyFlag.map { " " + $0 } ?? "")
@@ -26,23 +45,6 @@ extension TaskService {
         command: audited(command) + " -> " + result.ref, workspace: slug,
         identity: (environment.ids, prepared.at), in: tx)
       return result
-    }
-  }
-
-  /// Creates unstarted work without inspecting Git, for a front end that never claims,
-  /// such as the Mac app. The task, its links and any consent land in one transaction.
-  package func addUnstarted(_ draft: TaskDraft) throws -> TaskResult {
-    guard !draft.start else { throw TaskError.invalid("Start the task from an agent session.") }
-    var creation = try prepare(draft, command: draft.command + " '<title>' -F <file>")
-    let slug = try selected()
-    creation = try resolved(creation, workspace: slug)
-    let prepared = creation
-    return try environment.db.write { tx in
-      let retry =
-        scopedCommand(prepared.draft.command, workspace: slug)
-        + (retryBodyFlag.map { " " + $0 } ?? "")
-      return try insert(prepared, workspace: slug, retry: (retry, prepared.draft.title), in: tx)
-        .task
     }
   }
 

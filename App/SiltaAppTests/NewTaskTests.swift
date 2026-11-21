@@ -12,11 +12,21 @@
         new.app = "acme-web"
         #expect(NewTaskForm.canCreate(new))
         #expect(!NewTaskForm.canCreate(AppNewTask(title: "   ")))
-        await model.createTask(NewTaskForm.trimmed(new), copyPrompt: false)?.value
+        var copied: [String] = []
+        model.pasteboard = {
+          copied.append($0)
+          return true
+        }
+        await model.createTask(NewTaskForm.trimmed(new), copyPrompt: true)?.value
         let ref = try #require(model.createdTask)
-        #expect(model.createdPrompt == nil)
+        #expect(copied == [try #require(model.createdPrompt)])
+        #expect(
+          model.createdPrompt
+            == reader.agentPrompt(task: ref, workspace: "acme", name: "Acme"))
+        await model.createTask(AppNewTask(title: "Second"), copyPrompt: false)?.value
+        #expect(model.createdPrompt == nil && copied.count == 1)
         let task = try reader.task(ref, workspace: "acme")
-        #expect(task.title == "Show delivery time" && task.acceptance == "- Shows the day.")
+        #expect(task.title == "Show delivery time" && task.acceptance == " - Shows the day.")
         #expect(task.status == "todo")
         #expect(model.visibleData?.snapshot?.board.todo.contains { $0.ref == ref } == true)
       }
@@ -26,7 +36,13 @@
       try await fixtureModel { model, _ in
         var new = AppNewTask(title: "Elsewhere")
         new.app = "acme-desktop"
+        model.pasteboard = { _ in
+          Issue.record("nothing to copy")
+          return true
+        }
+        let todo = model.visibleData?.snapshot?.board.todo.count
         await model.createTask(new, copyPrompt: true)?.value
+        #expect(model.visibleData?.snapshot?.board.todo.count == todo)
         #expect(model.createdTask == nil && model.createdPrompt == nil)
         let target = try #require(model.target(AppModel.newTaskTarget))
         #expect(model.actions.failures[target] != nil)

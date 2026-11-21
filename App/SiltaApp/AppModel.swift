@@ -67,6 +67,10 @@ final class AppModel {
   var createdPrompt: String?
   /// The New Task sheet is open (⌘N).
   var newTaskPresented = false
+  /// Writes copied text; tests replace it so they never touch the real pasteboard.
+  @ObservationIgnored var pasteboard: @MainActor (String) -> Bool = {
+    CopyValue.writeToPasteboard($0)
+  }
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
   private let load: Loader

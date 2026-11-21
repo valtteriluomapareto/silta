@@ -8,7 +8,7 @@ extension AppModel {
   func run(_ action: TaskMenu.Action) {
     switch action {
     case .inspect(let ref): inspect(task: ref)
-    case .copy(let value): _ = CopyValue.writeToPasteboard(value)
+    case .copy(let value): _ = pasteboard(value)
     case .filterBoard(let slug): showApp(slug)
     case .showDocs(let ref): openDocuments(about: ref)
     case .reveal(let path): NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)

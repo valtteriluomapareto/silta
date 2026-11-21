@@ -15,13 +15,20 @@ struct NewTaskSheet: View {
   private var apps: [AppMapApp] { model.visibleData?.map?.apps ?? [] }
   private var parents: [AppTask] {
     let board = model.visibleData?.snapshot?.board
-    return ((board?.todo ?? []) + (board?.doing ?? [])).sorted { $0.ref < $1.ref }
+    return ((board?.todo ?? []) + (board?.doing ?? []) + (board?.review ?? []))
+      .filter { $0.externalRef == nil }
+      .sorted { Self.sequence($0.ref) < Self.sequence($1.ref) }
+  }
+
+  private static func sequence(_ ref: String) -> Int {
+    Int(ref.split(separator: "-").last ?? "") ?? 0
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       VStack(alignment: .leading, spacing: 2) {
-        Text("New task in " + (model.workspaceName ?? "")).font(.system(size: 17, weight: .bold))
+        Text("New task in " + (model.workspaceName ?? model.workspace ?? ""))
+          .font(.system(size: 17, weight: .bold))
         Text("Your tasks go straight to Todo. An agent picks them up by priority.")
           .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
       }
@@ -32,7 +39,8 @@ struct NewTaskSheet: View {
       HStack(alignment: .top, spacing: 16) {
         field("App") {
           Picker("App", selection: $task.app) {
-            Text("None or the parent's").tag(String?.none)
+            Text(task.parent == nil ? "None" : "Parent's app").tag(String?.none)
+            if task.parent != nil { Text("None").tag(String?.some("none")) }
             ForEach(apps, id: \.slug) { app in
               Text(app.slug).tag(String?.some(app.slug))
             }
@@ -77,7 +85,11 @@ struct NewTaskSheet: View {
           .keyboardShortcut(.return, modifiers: .command).buttonStyle(.borderedProminent)
           .disabled(!NewTaskForm.canCreate(task) || sending)
       }
-    }.padding(22).frame(width: 560).onAppear { titleFocused = true }
+    }.padding(22).frame(width: 560)
+      .onAppear {
+        titleFocused = true
+        if let target { model.actions.clearFailure(target) }
+      }
   }
 
   private func field<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content)
@@ -107,9 +119,16 @@ nonisolated enum NewTaskForm {
   static func trimmed(_ task: AppNewTask) -> AppNewTask {
     var task = task
     task.title = task.title.trimmingCharacters(in: .whitespacesAndNewlines)
-    task.description = task.description.trimmingCharacters(in: .whitespacesAndNewlines)
-    task.acceptance = task.acceptance.trimmingCharacters(in: .whitespacesAndNewlines)
+    task.description = trailingTrimmed(task.description)
+    task.acceptance = trailingTrimmed(task.acceptance)
     return task
+  }
+
+  /// Keeps leading indentation, which Markdown gives meaning, and drops trailing space.
+  private static func trailingTrimmed(_ text: String) -> String {
+    var text = text
+    while let last = text.last, last.isWhitespace || last.isNewline { text.removeLast() }
+    return text
   }
 }
 
