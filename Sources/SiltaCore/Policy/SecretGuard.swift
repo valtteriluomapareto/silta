@@ -1,7 +1,7 @@
 /// Pure, pinned secret scanning and redaction. Callers decide whether a write is allowed.
 package enum SecretGuard {
   /// Rule-set version; changes deliberately with detection behavior.
-  package static let version = 6
+  package static let version = 7
 
   /// Body-free warning for a successful redacted write.
   package static let warning = OutputWarning(
@@ -157,11 +157,11 @@ extension SecretGuard {
   }
 
   private static var armourMarkdownPrefix: Regex<Substring> {
-    /[ \t\u{a0}\u{feff}]*(?:>[ \t\u{a0}\u{feff}]*|(?:[-+*]|[0-9]{1,9}[.)])[ \t\u{a0}\u{feff}]+)*/
+    /[\p{Zs}\t\u{feff}]*(?:>[\p{Zs}\t\u{feff}]*|(?:[-+*]|[0-9]{1,9}[.)])[\p{Zs}\t\u{feff}]+)*/
   }
 
   private static func armourSpace(_ character: Character) -> Bool {
-    character == " " || character == "\t" || character == "\u{a0}" || character == "\u{feff}"
+    character == "\u{feff}" || (character.isWhitespace && !character.isNewline)
   }
 
   private static func privateKeyMatches(in text: String, fieldStart: String.Index?) -> [SecretMatch]
@@ -229,23 +229,27 @@ extension SecretGuard {
   ) -> String.Index? {
     let boundary =
       suffix.prefixMatch(of: /(?:\\[^\r\n]|[^\\'"\x60\r\n])*/)?.output ?? suffix.prefix(0)
-    let body = boundary.drop(while: armourSpace)
-    let separator = /\\(?:r\\)?n/
-    if body.prefixMatch(of: separator) != nil {
-      return escapedArmourEnd(body, label: label)
+    var body = boundary.drop(while: armourSpace)
+    if let annotation = body.prefixMatch(of: /\((?i:truncated|incomplete|cut off)\)/) {
+      body = body[annotation.range.upperBound...].drop(while: armourSpace)
+    }
+    let single = /\\(?:r\\)?n/
+    let double = /\\\\(?:r\\\\)?n/
+    if body.prefixMatch(of: double) != nil {
+      return escapedArmourEnd(nestedField(body), label: label, separator: double)
+    }
+    if body.prefixMatch(of: single) != nil {
+      return escapedArmourEnd(body, label: label, separator: single)
     }
 
-    let chunks = /([A-Za-z0-9+\/]{40,})={0,2}/
-    guard
-      let first = body.matches(of: chunks).first(where: { match in
-        let precededByProse = match.range.lowerBound != body.startIndex
-        return !(precededByProse && isCommitSHA(match.1))
-          && !isWholeReferenceIdentifier(match.range, in: text)
-      })
+    guard let first = body.prefixMatch(of: /([A-Za-z0-9+\/]{40,})={0,2}/),
+      isPayloadBoundary(body[first.range.upperBound...]),
+      !isCommitSHA(first.1), !isWholeReferenceIdentifier(first.range, in: text)
     else { return nil }
     var end = first.range.upperBound
-    let continuation = /[ \t]+([A-Za-z0-9+\/]{16,})={0,2}/
+    let continuation = /[\p{Zs}\t]+([A-Za-z0-9+\/]{16,})={0,2}/
     while let chunk = body[end...].prefixMatch(of: continuation),
+      isPayloadBoundary(body[chunk.range.upperBound...]),
       !isWholeReferenceIdentifier(chunk.1.startIndex..<chunk.1.endIndex, in: text)
     {
       end = chunk.range.upperBound
@@ -253,13 +257,40 @@ extension SecretGuard {
     return end
   }
 
+  /// Keeps the encoded delimiter and following fields outside the nested payload.
+  private static func nestedField(_ body: Substring) -> Substring {
+    var backslashes = 0
+    var start = body.startIndex
+    for index in body.indices {
+      if body[index] == "\\" {
+        if backslashes == 0 { start = index }
+        backslashes += 1
+      } else {
+        if backslashes == 1, body[index] == "\"" || body[index] == "'" {
+          return body[..<start]
+        }
+        backslashes = 0
+      }
+    }
+    return body
+  }
+
+  private static func isPayloadBoundary(_ tail: Substring) -> Bool {
+    // Sentence punctuation can precede a delimiter. A joined extension or query still
+    // belongs to the surrounding token.
+    let remainder = tail.drop(while: { ".:!?…".contains($0) })
+    guard let first = remainder.first else { return true }
+    return armourSpace(first) || "),;]}>»”’".contains(first)
+  }
+
   private static func isCommitSHA(_ word: Substring) -> Bool {
     [40, 64].contains(word.utf8.count) && word.wholeMatch(of: /[A-Fa-f0-9]+/) != nil
   }
 
-  private static func escapedArmourEnd(_ body: Substring, label: Substring) -> String.Index? {
-    let separator = /\\(?:r\\)?n/
-    let payload = /((?:[A-Za-z0-9+\/]|\\\/)+)={0,2}/
+  private static func escapedArmourEnd(
+    _ body: Substring, label: Substring, separator: Regex<Substring>
+  ) -> String.Index? {
+    let payload = /((?:[A-Za-z0-9+\/]|\\{1,3}\/)+)={0,2}/
     var start = body.startIndex
     var end: String.Index?
     var afterBlank = false
@@ -289,7 +320,10 @@ extension SecretGuard {
       let minimum = end == nil || afterBlank ? 16 : 1
       guard let match = tail.prefixMatch(of: payload),
         match.1.utf8.lazy.filter({ $0 != 92 }).count >= minimum,
-        next == nil || tail[match.range.upperBound...].allSatisfy(armourSpace)
+        end != nil || !isCommitSHA(match.1),
+        next == nil
+          ? isPayloadBoundary(tail[match.range.upperBound...])
+          : tail[match.range.upperBound...].allSatisfy(armourSpace)
       else { break }
       end = match.range.upperBound
       afterBlank = false
@@ -340,6 +374,7 @@ extension SecretGuard {
         continue
       }
       let payload = line.wholeMatch(of: /([A-Za-z0-9+\/]+)={0,2}[ \t]*/)
+      if end == nil, let payload, isCommitSHA(payload.1) { break }
       let minimum = end == nil ? minimumFirst : (blankPrefix == nil ? 1 : 16)
       let checksum =
         end != nil && label.hasPrefix("PGP ")
