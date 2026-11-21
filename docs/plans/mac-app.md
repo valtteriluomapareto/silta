@@ -29,7 +29,12 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
 
 **In:**
 - **Sidebar:** workspace switcher, My work, Board, Workspace and Docs, apps with open
-  counts, "Claimed now", and refresh status.
+  counts, "Claimed now", and refresh status. Paper "App features v1": claims age from
+  their heartbeat (`claimed_at`), not the last task update. A claim of two hours or more,
+  Core's expiry, reads "expired" in Claimed now and "claim expired · idle 3 h" on its
+  Doing card, and the inspector shows when it lapsed, the last sign of work and a "Copy
+  resume prompt" button. A Doing task with no claimant reads "Handed off · ready to
+  resume".
 - **My work:** the human's inbox, plus tasks in `review`. The waiting badge counts
   each actionable inbox entry and each distinct review task once;
   it does not count visual groups. The maintainer chose actionable-item counts on
@@ -125,7 +130,10 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   Default-home identity follows Core's `SiltaHome`, including filesystem aliases. Use the inbox's
   human-form `next` where it is a runnable command,
   otherwise a template keyed by item kind. Placeholders never decide for the human:
-  nothing is pre-filled for drop or reject, and there's no `-F -`.
+  nothing is pre-filled for drop or reject, and there's no `-F -`. An agent prompt
+  ("Work on AC-14 in Acme. Run `silta --ws 'acme' task show 'AC-14'`, then …") is prose
+  for an agent session, not a runnable template: it pins only a custom home, since an
+  agent's default home is the human's. The app copies it and launches nothing (D4).
 - **Layout:** `NavigationSplitView`, with native search in the toolbar placed before the
   inspector toggle. The toolbar belongs to the detail column and starts with a flexible
   spacer, so its controls sit at the window's trailing edge. The inspector is a 340 pt
