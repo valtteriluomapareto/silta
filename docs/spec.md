@@ -2016,17 +2016,19 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 ### Remove a mistaken workspace
 
 `silta ws rm <slug> --dry-run` lists owned row counts, default selection and
-live registered clones without initializing or changing storage. The human
-runs `silta ws rm <slug>` directly in their terminal. Removing the saved
-default or a workspace with a live registered clone requires `--allow-active`.
-The command clears that selection or registration and leaves the Git clone on disk.
+live or uninspectable registered clones without initializing or changing storage.
+The human runs `silta ws rm <slug>` directly in their terminal. Removing the saved
+default or a workspace with a live or uninspectable clone requires `--allow-active`.
+The preview and uninspectable clone refusal identify affected paths and give the
+full human command. The removal clears those registrations and leaves the files
+on disk.
 
 The write rechecks the workspace and registrations. If an inactive path changes
 while removing without an override, preview again. Removal publishes a fresh SQLite
 backup and a validated recovery tree before deleting the owned graph in one
 transaction. Use the printed `restore --dry-run` to inspect the recovery tree,
-then run restore in the human's terminal to recover the workspace without
-replacing others. The whole database snapshot includes machine-local registrations
+then run restore directly or approve the agent's exact restore command in chat.
+The restore recovers the workspace without replacing others. The whole database snapshot includes machine-local registrations
 and worktree information. The portable tree follows the export portability rules
 above. The v10 writer floor prevents older selectors from saving a workspace
 that was deleted before their write.
