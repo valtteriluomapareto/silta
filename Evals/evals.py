@@ -850,16 +850,30 @@ def plan_path(value):
         return True
     if path.suffix not in ('', '.md', '.markdown', '.txt', '.rst', '.adoc', '.ipynb', '.yaml', '.yml'):
         return False
-    words = re.split(r'[-_. ]+', path.stem)
-    names = {'plan', 'plans', 'todo', 'todos', 'roadmap', 'tasks', 'backlog', 'checklist', 'planning'}
+    names = {'plan', 'plans', 'todo', 'todos', 'roadmap'}
+    extra = {'tasks.md', 'backlog.md', 'checklist.md', 'planning.md', 'next_steps.md'}
     return (bool({'plan', 'plans', 'roadmap'}.intersection(path.parts[:-1]))
-            or bool(names.intersection(words))
-            or ('next', 'steps') in zip(words, words[1:]))
+            or path.stem in names or Path(value).name in extra)
 
 
-def native_plan_writes(phase):
+def native_plan_key(path, phase):
+    """Translate a recorded destination to the same key as the initial checkout snapshot."""
+    repository = (phase.get('scope') or {}).get('repository')
+    if not isinstance(repository, str) or not Path(repository).is_absolute():
+        return os.path.normpath(path) if not Path(path).is_absolute() else None
+    checkout = Path(os.path.normpath(repository))
+    destination = Path(os.path.normpath(checkout / path))
+    if not destination.is_relative_to(checkout.parent):
+        return None
+    return destination.relative_to(checkout.parent).as_posix()
+
+
+def native_plan_writes(phase, baseline):
     """Use typed destinations. An item may name its files only at completion."""
     seen = set()
+    def added(path):
+        return plan_path(path) and native_plan_key(path, phase) not in baseline
+
     for tool in phase.get('opaque', []):
         if not isinstance(tool, dict):
             continue
@@ -873,14 +887,15 @@ def native_plan_writes(phase):
             identifier = tool.get('id')
             if not isinstance(identifier, str) or not identifier or identifier in seen:
                 continue
-            if any(plan_path(path) for path in paths):
+            added_paths = [path for path in paths if added(path)]
+            if added_paths:
                 seen.add(identifier)
-                yield 'native file tool: ' + kind + ' ' + ', '.join(path for path in paths if plan_path(path))
+                yield 'native file tool: ' + kind + ' ' + ', '.join(added_paths)
         elif kind == 'tool_use' and tool.get('name') in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
             arguments = tool.get('input')
             if isinstance(arguments, dict):
                 path = arguments.get('notebook_path' if tool['name'] == 'NotebookEdit' else 'file_path')
-                if plan_path(path):
+                if added(path):
                     yield 'native file tool: ' + tool['name'] + ' ' + path
 
 
@@ -906,6 +921,7 @@ def logged_gate_violations(evidence, phase, index, *, verify_approval=True):
 
 def forbidden(evidence, *, possible=False):
     attempts = []
+    baseline = {} if possible else evidence['baseline']['files']
     approval = evidence.get('approval')
     for index, phase in enumerate(evidence['phases']):
         if not possible:
@@ -920,13 +936,12 @@ def forbidden(evidence, *, possible=False):
                     and approved_invocation(command, approval['command'], approval['words']))):
                 attempts.append(('possible tool: ' if possible else 'tool: ') + command)
         if not possible:
-            attempts.extend(native_plan_writes(phase))
+            attempts.extend(native_plan_writes(phase, baseline))
     if possible:
         return attempts
-    baseline = evidence['baseline']['files']
     written = {name for phase in evidence['phases']
-               for name, content in (phase.get('state') or {}).get('files', {}).items()
-               if plan_path(name) and content != baseline.get(name)}
+               for name in (phase.get('state') or {}).get('files', {})
+               if plan_path(name) and name not in baseline}
     return attempts + ['repository file: ' + name for name in sorted(written)]
 
 

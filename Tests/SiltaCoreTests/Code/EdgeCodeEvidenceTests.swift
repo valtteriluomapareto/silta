@@ -15,7 +15,7 @@ struct EdgeCodeEvidenceTests {
       let (env, git) = try Self.fixture(scratch, termination: .timedOut)
       let warnings = await EdgeCodeEvidence.warnings(workspace: "acme", environment: env)
       #expect(git.isExhausted)
-      #expect(warnings.map(\.code) == ["edge_code_unavailable"])
+      #expect(warnings.map(\.code) == ["edge_code_unverified"])
       let expected =
         "Edge code reference \(Self.shown) could not be verified locally (Git timed out). "
         + "Inspect it with \(Self.inspect)."
@@ -66,12 +66,10 @@ struct EdgeCodeEvidenceTests {
         scratch, probes: Array(zip(paths, attempts)))
       if warnings {
         let rows = await EdgeCodeEvidence.warnings(workspace: "acme", environment: env)
-        withKnownIssue("Warnings currently probe later refs and treat timeout like absence.") {
-          #expect(
-            rows.map(\.code) == [
-              "edge_code_unavailable", "edge_code_unverified", "edge_code_unverified",
-            ])
-        }
+        #expect(
+          rows.map(\.code) == [
+            "edge_code_unavailable", "edge_code_unverified", "edge_code_unverified",
+          ])
       } else {
         var probe = EdgeCodeEvidence(workspace: "acme", environment: env, git: runner)
         let ref = "api@acme-edge:"
@@ -80,18 +78,14 @@ struct EdgeCodeEvidenceTests {
         #expect(await probe.command(ref + paths[1]) == nil)
         #expect(await probe.command(ref + paths[2]) == nil)
         let later = await probe.command(ref + paths[3])
-        withKnownIssue("The brief's probe currently continues after a Git timeout.") {
-          #expect(later == nil)
-        }
+        #expect(later == nil)
         #expect(await probe.command(ref + paths[0]) == verified)
       }
-      withKnownIssue("The first timeout currently does not bound the request sequence.") {
-        #expect(
-          runner.requests.map { $0.arguments.last }
-            == paths.dropLast().map {
-              "acme-edge^{commit}:guide/" + $0
-            })
-      }
+      #expect(
+        runner.requests.map { $0.arguments.last }
+          == paths.dropLast().map {
+            "acme-edge^{commit}:guide/" + $0
+          })
     }
   }
 

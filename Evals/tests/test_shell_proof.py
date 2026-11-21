@@ -19,7 +19,6 @@ class ShellProof(unittest.TestCase):
                    'notes.md', 'docs/spec.md']
         self.assertEqual([name for name in choices if evals.plan_path(name)], choices[:3])
 
-    @unittest.expectedFailure
     def test_common_plan_names_count_only_new_destinations(self):
         plans = [
             'docs/tasks.md', 'notes/backlog.md', 'checklist.md', 'notes/next_steps.md',

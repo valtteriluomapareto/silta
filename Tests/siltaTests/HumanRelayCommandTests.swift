@@ -104,11 +104,9 @@ struct HumanRelayCommandTests {
       let action = try Self.nextFor("AC-1/2", in: human(["inbox"]))
       let result = try human(["comment", "accept", "AC-1/2"])
       let accepted = try Self.accepted(store)
-      withKnownIssue("The human asker is currently treated as an agent relaying to a human.") {
-        #expect(action == ["silta --ws 'acme' comment accept 'AC-1/2'"])
-        #expect(result.termination == .exit(0))
-        #expect(accepted)
-      }
+      #expect(action == ["silta --ws 'acme' comment accept 'AC-1/2'"])
+      #expect(result.termination == .exit(0))
+      #expect(accepted)
     }
   }
 

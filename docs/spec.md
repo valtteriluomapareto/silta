@@ -819,7 +819,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   inbox unless the actor is also the asker. After confirming a human's answer in
   chat, the asker or eligible claimer accepts another agent's relay. The relaying
   agent can resolve the thread with `comment resolve <ref> -m <confirmed answer>`.
-  An asker cannot accept their own answer to a question with a human recipient.
+  An agent asker cannot accept their own answer to a question with a human recipient.
+  A human asker can accept their own answer.
   An agent's inbox offers conditional confirmation on that answer if the agent is
   outside the question's recipients. A human inbox keeps the same confirmation
   instruction for an agent with a live outsider answer to that addressed human.
@@ -1574,8 +1575,8 @@ workspace. A setting that changes the rules gets one conditional sentence, and
   `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
   current claimer can `comment accept` an answer. Answer only as an addressee or
   to relay the human's chat answer. For questions addressed to a human, record a
-  confirmed relay by resolving the question with an explanation. The asker cannot
-  accept their own answer to such a question.
+  confirmed relay by resolving the question with an explanation. An agent asker
+  cannot accept their own answer to such a question.
 - **Blocked:** a question to the human doesn't block the task. If the human can
   answer, ask in chat, even about the customer. If only
   someone outside can (`ext:`) or another task must land first, keep doing what you
@@ -1667,8 +1668,11 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    edges with no code omit the pointer. Checks are bounded, use local Git objects,
    and reuse results for repeated references. Each command appears once. A
    successful `ws edit` warns if a saved edge's code cannot be verified locally.
-   A Git timeout is reported separately from unavailable code. These probes read local
-   Git objects with lazy fetching disabled. Brief hooks still apply their own deadline.
+   After the first Git timeout, the command keeps verified evidence and skips further
+   probes. Workspace edits report timed-out or skipped references as
+   `edge_code_unverified` and unavailable references as `edge_code_unavailable`.
+   The probes use local objects with lazy fetching disabled, and brief hooks still
+   apply their own deadline.
 6. **Open tasks** for this app and its topics (top 8), ordered by priority then
    task sequence ascending, after explicit-topic matches, which rank first. When
    the selection exceeds eight, an omitted count is followed by one `next:` line per
