@@ -300,15 +300,21 @@ class CoreDeterminismTests(GuardTestCase):
             "let date = stale ? .now : recorded",
             "let dates: [Date] = [.now]",
             "let date: Date = recorded ?? .init()",
+            "func restore() -> Date { return recorded ?? .init() }",
+            "let date: Date =\n    recorded ?? .init()",
+            "let date: Date = read(offset: optionalOffset ?? 0) ?? .init()",
         ]
         good = [
             "let date = recorded ?? clock.now()",
             "let date: Date = recorded ?? .init(timeIntervalSince1970: 0)",
             "let output: String = value ?? .init()",
+            "let date: Date = timestamp(for: labels ?? .init())",
+            "let date: Date = epoch(offset: read(optionalOffset ?? .init()))",
+            "func restore() -> Date { return records[0 ?? .init()] }",
         ]
         self.tree.write("Sources/SiltaCore/A.swift", "\n".join(bad + good) + "\n")
         found = check_core_determinism.check(self.tree.root)
-        self.assertEqual([int(item.split(":")[1]) for item in found], [1, 2, 3, 4])
+        self.assertEqual([int(item.split(":")[1]) for item in found], [1, 2, 3, 4, 5, 6, 8])
 
     def test_fixed_constructors_and_injected_clock_chains_are_allowed(self) -> None:
         self.tree.write("Sources/SiltaCore/A.swift",
