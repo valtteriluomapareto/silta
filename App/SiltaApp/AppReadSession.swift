@@ -38,8 +38,20 @@ nonisolated final class AppReadSession: Sendable {
     let selected = workspace ?? workspaces.first?.slug
     let snapshot = try selected.map { try reader.snapshot(workspace: $0) }
     let map = try selected.map { try reader.workspaceMap(workspace: $0) }
-    return AppLoadedData(
+    var data = AppLoadedData(
       workspaces: workspaces, workspace: selected, snapshot: snapshot,
       map: map, version: version, checkedAt: now())
+    data.existingWorktrees = Self.existingWorktrees(snapshot)
+    return data
+  }
+
+  /// The board's recorded worktrees that exist here, so views never touch the disk.
+  static func existingWorktrees(_ snapshot: AppSnapshot?) -> Set<String> {
+    guard let board = snapshot?.board else { return [] }
+    let tasks = board.todo + board.doing + board.review + board.doneThisWeek + board.proposals
+    return Set(
+      tasks.compactMap(\.worktree).filter {
+        $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0)
+      })
   }
 }

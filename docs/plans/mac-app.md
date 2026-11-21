@@ -82,6 +82,11 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
     remain outside this viewer;
   - a Copied state;
   - ⌘C and a context menu.
+  - Paper "App features v1": Board cards, done rows, review rows and Claimed now rows
+    have a context menu: Open in Inspector, Copy Ref, Copy Agent Prompt (todo and doing
+    tasks), Copy "task show" Command, Filter Board to the app, Show Docs About the app and
+    Reveal Worktree. Sidebar apps have the two app items. An unavailable item stays
+    visible, disabled, with its reason; the available ones are also VoiceOver actions.
 - **States:**
   - store missing, or a newer schema than the app;
   - first load, empty, long text and many items;

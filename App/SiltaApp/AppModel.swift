@@ -15,6 +15,9 @@ final class AppModel {
   private var catalogWorkspace: String?
   private var catalogVersion: Int?
   let taskDetail = TaskDetailModel()
+  /// The inspected task's worktree when it exists here, checked off the main thread, so a
+  /// task outside the board can still be revealed.
+  private(set) var inspectedWorktrees: Set<String> = []
   let actions = ActionModel()
   /// Runs one write in a workspace; nil where the app can't write (no store, previews).
   let writer: Writer?
@@ -215,6 +218,14 @@ final class AppModel {
     await taskDetail.load(workspace: workspace, ref: ref, version: visibleData?.version) {
       try await Task.detached { try reader.task(ref, workspace: workspace) }.value
     }
+    let path = taskDetail.value?.worktree
+    let found = await Task.detached {
+      Set(
+        [path].compactMap { $0 }.filter {
+          $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0)
+        })
+    }.value
+    if taskDetail.value?.ref == ref { inspectedWorktrees = found }
   }
 
   func navigate(to route: AppRoute) {

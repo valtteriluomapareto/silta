@@ -123,7 +123,8 @@ struct MyWorkView: View {
       if let command = model.reader?.commands(forReview: review.task, workspace: workspace).first {
         CommandBlock(command: command).padding(.leading, 32)
       }
-    }
+    }.contentShape(.rect).accessibilityElement(children: .contain)
+      .taskMenu(model.menuItems(for: review.task), model: model)
   }
 
   private func proposalTitle(_ row: MyWorkContent.Proposal) -> some View {
