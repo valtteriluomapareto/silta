@@ -41,8 +41,9 @@ descriptions and may still need production refs. The workspace is selected from 
 registered repository you enter. Use `--ws acme` when working outside one.
 The scan lists the registered repo and app names and prints a command to inspect them.
 For a single clone, you can start with `silta ws ls` inside it and run the scan command
-it prints. If Silta finds a matching workspace with an unbound repo, follow its scoped
-rescan command. If it lists several candidates, inspect their configuration first.
+it prints. If Silta verifies the origin of an unbound repo, follow its scoped rescan
+command. If it suggests inspecting a workspace, check the repo declaration first,
+even if there is only one candidate.
 
 ## 4. Connect your agents
 
