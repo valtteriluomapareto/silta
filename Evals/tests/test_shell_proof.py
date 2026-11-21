@@ -19,7 +19,6 @@ class ShellProof(unittest.TestCase):
                    'notes.md', 'docs/spec.md']
         self.assertEqual([name for name in choices if evals.plan_path(name)], choices[:3])
 
-    @unittest.expectedFailure
     def test_common_plan_names_count_in_tool_writes_and_checkout_changes(self):
         plans = [
             'docs/tasks.md', 'notes/backlog.txt', 'acme-checklist.md', 'planning.yaml',

@@ -386,7 +386,7 @@ extension RepositoryScan {
   static func repair(
     _ root: URL, workspace: String?, store: DatabaseStore, git: any GitRunner
   ) async throws -> ScanError? {
-    guard FileManager.default.fileExists(atPath: store.path) else { return nil }
+    guard !DatabaseFile.isMissing(store.path) else { return nil }
     let hasPathless = try store.read {
       try Bool.fetchOne(
         $0,

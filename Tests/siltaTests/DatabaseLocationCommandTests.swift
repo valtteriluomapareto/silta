@@ -30,25 +30,23 @@ struct DatabaseLocationCommandTests {
       #expect(row["command"] as? String == "silta brief")
       #expect(row["exit_code"] as? Int == 0)
       #expect(!text.contains(target) && !text.contains("hook_failed"))
-      withKnownIssue("A dangling store currently produces the empty workspace hook result.") {
-        #expect(row["error_code"] as? String == "env")
-      }
+      #expect(row["error_code"] as? String == "env")
 
       let commands = [["where"], ["brief"], ["ws", "ls"], ["--ws", "acme", "ws", "show"]]
+      var next: [String] = []
       for args in commands {
         let result = try SiltaBinary.run(
           args + ["--json"], in: scratch, cwd: repo, environment: TaskCommandTests.fixed)
-        let json = try GuideContractTests.object(result.stdout)
-        let error = json["error"] as? [String: Any]
+        let error = try TaskStateCommandTests.error(result)
         #expect(!result.stdout.contains(target) && !result.stderr.contains(target))
-        withKnownIssue("A dangling store is currently treated as empty for \(args).") {
-          #expect(result.termination == .exit(9))
-          #expect(error?["code"] as? String == "env")
-          #expect(error?["next"] as? [String] == ["silta doctor"])
-        }
+        #expect(result.termination == .exit(9))
+        #expect(error["code"] as? String == "env")
+        next = try #require(error["next"] as? [String])
+        #expect(next == ["silta doctor"])
       }
+      let hint = try #require(next.first)
       let diagnosis = try FirstWorkspaceCommandTests.replay(
-        "silta doctor", in: scratch, cwd: repo, json: true)
+        hint, in: scratch, cwd: repo, json: true)
       #expect(diagnosis.termination == .exit(9))
       #expect(diagnosis.stdout.contains("database.writable"))
       #expect(try fm.destinationOfSymbolicLink(atPath: link.path) == destination)

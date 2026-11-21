@@ -18,7 +18,7 @@ def constructor(types: str, parameters: str) -> re.Pattern[str]:
     """Match explicit or contextually typed construction of a system value."""
     return re.compile(
         rf"\b(?:{types})\s*(?:\.\s*init\s*)?\(\s*{parameters}"
-        rf"|\b(?:{types})\s*\??\s*(?:=|\{{\s*(?:return\b)?)"
+        rf"|\b(?:{types})\s*\??\s*(?:=(?:[^\n;{{}}]+?\?\?)?|\{{\s*(?:return\b)?)"
         rf"\s*\.\s*init\s*\(\s*{parameters}"
     )
 
@@ -26,7 +26,7 @@ def constructor(types: str, parameters: str) -> re.Pattern[str]:
 PATTERNS = {
     "Date()": constructor("Date|NSDate", r"\)"),
     "Date.now": re.compile(
-        r"\bDate\s*\.\s*now\b|(?:[:={,(]|\breturn\b)\s*\.\s*now\b(?!\s*\()"
+        r"\bDate\s*\.\s*now\b|(?:[:={,(?\[]|\breturn\b)\s*\.\s*now\b(?!\s*\()"
     ),
     "Date(timeIntervalSinceNow:)": constructor("Date|NSDate", r"timeIntervalSinceNow:"),
     "UUID()": constructor("UUID|NSUUID", r"\)"),

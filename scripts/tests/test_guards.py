@@ -294,7 +294,6 @@ class CoreDeterminismTests(GuardTestCase):
         self.tree.write("Sources/SiltaCore/A.swift", "\n".join(spellings) + "\n")
         self.assertEqual(len(check_core_determinism.check(self.tree.root)), len(spellings))
 
-    @unittest.expectedFailure
     def test_contextual_fallback_and_collection_system_values_fail(self) -> None:
         bad = [
             "let date = recorded ?? .now",
