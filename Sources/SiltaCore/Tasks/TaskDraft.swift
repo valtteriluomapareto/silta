@@ -12,6 +12,9 @@ package struct TaskDraft: Sendable {
   /// The optional markdown description.
   package var description = ""
 
+  /// Optional markdown acceptance criteria; the CLI sets them later with `task edit`.
+  package var acceptance = ""
+
   /// Claims the newly authorized work immediately.
   package var start = false
 

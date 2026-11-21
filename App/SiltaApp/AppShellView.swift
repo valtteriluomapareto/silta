@@ -33,6 +33,8 @@ struct AppShellView: View {
             compactSearch: model.route == .docs && windowWidth < 1200)
         }
     }
+    .sheet(isPresented: $model.newTaskPresented) { NewTaskSheet(model: model) }
+    .overlay(alignment: .bottom) { CreatedTaskToast(model: model) }
     .navigationTitle(model.screenTitle)
     .toolbar(removing: .title)
     .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)

@@ -29,9 +29,27 @@ extension TaskService {
     }
   }
 
+  /// Creates unstarted work without inspecting Git, for a front end that never claims,
+  /// such as the Mac app. The task, its links and any consent land in one transaction.
+  package func addUnstarted(_ draft: TaskDraft) throws -> TaskResult {
+    guard !draft.start else { throw TaskError.invalid("Start the task from an agent session.") }
+    var creation = try prepare(draft, command: draft.command + " '<title>' -F <file>")
+    let slug = try selected()
+    creation = try resolved(creation, workspace: slug)
+    let prepared = creation
+    return try environment.db.write { tx in
+      let retry =
+        scopedCommand(prepared.draft.command, workspace: slug)
+        + (retryBodyFlag.map { " " + $0 } ?? "")
+      return try insert(prepared, workspace: slug, retry: (retry, prepared.draft.title), in: tx)
+        .task
+    }
+  }
+
   func prepare(_ draft: TaskDraft, command: String) throws -> TaskCreation {
     let title = try checked(draft.title, allow: draft.allowSecret, command: command)
     let body = try checked(draft.description, allow: draft.allowSecret, command: command)
+    let acceptance = try checked(draft.acceptance, allow: draft.allowSecret, command: command)
     let source = try draft.source.map {
       try checked($0, allow: draft.allowSecret, command: command)
     }
@@ -39,11 +57,12 @@ extension TaskService {
     var safe = draft
     safe.title = title.0
     safe.description = body.0
+    safe.acceptance = acceptance.0
     safe.source = source?.0
     let at = environment.clock.now()
     return TaskCreation(
       draft: safe, uid: try environment.ids.next(at: at), at: at,
-      redacted: title.1 || body.1 || source?.1 == true)
+      redacted: title.1 || body.1 || acceptance.1 || source?.1 == true)
   }
 
   /// Inserts prepared work and decides proposal consent in this transaction. Split
@@ -85,13 +104,13 @@ extension TaskService {
     let stamp = Self.timestamp(creation.at)
     try db.execute(
       sql: """
-        INSERT INTO task(uid,workspace_id,seq,title,status,priority,description_md,parent_id,app_id,
-          claimed_by,claimed_at,branch,worktree,created_by,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO task(uid,workspace_id,seq,title,status,priority,description_md,acceptance_md,
+          parent_id,app_id,claimed_by,claimed_at,branch,worktree,created_by,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
       arguments: [
-        creation.uid, ws, seq, draft.title, status, draft.priority, draft.description, parent?.id,
-        app?.id,
+        creation.uid, ws, seq, draft.title, status, draft.priority, draft.description,
+        draft.acceptance, parent?.id, app?.id,
         draft.start ? environment.actor.description : nil, draft.start ? stamp : nil,
         creation.git.branch, creation.git.worktree, environment.actor.description, stamp, stamp,
       ])

@@ -16,7 +16,8 @@ extension AppModel {
     return Task {
       var failure: ActionFailure?
       do {
-        try await writer(write, target.workspace)
+        let created = try await writer(write, target.workspace)
+        if case .createTask = write { createdTask = created }
       } catch {
         failure = ActionFailure(error)
       }
@@ -96,6 +97,23 @@ extension AppModel {
         task: task, body: $0, kind: kind.rawValue, to: kind == .question ? [recipient ?? ""] : [])
     }
   }
+
+  /// Creates a todo task. With `copyPrompt`, copies the prompt that hands it to an agent once
+  /// Core has created it; the app launches nothing.
+  @discardableResult func createTask(_ task: AppNewTask, copyPrompt: Bool) -> Task<Void, Never>? {
+    createdTask = nil
+    guard let running = perform(.createTask(task), for: Self.newTaskTarget) else { return nil }
+    return Task {
+      await running.value
+      guard copyPrompt, let ref = createdTask, let reader, let workspace else { return }
+      createdPrompt = reader.agentPrompt(
+        task: ref, workspace: workspace, name: workspaceName ?? workspace)
+      if let createdPrompt { _ = CopyValue.writeToPasteboard(createdPrompt) }
+    }
+  }
+
+  /// The New Task sheet's own target, so one create runs at a time.
+  static let newTaskTarget = "new-task"
 
   /// Resolves a thread under its own target.
   @discardableResult func resolve(thread ref: String) -> Task<Void, Never>? {

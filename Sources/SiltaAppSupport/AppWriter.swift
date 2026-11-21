@@ -13,12 +13,14 @@ public struct AppWriter: Sendable {
 
   /// Runs one write and logs one body-free line for it. Failures throw `AppReadError`;
   /// store refusals keep their kinds and everything else keeps Core's code.
-  public func perform(_ write: AppWrite, workspace: String) throws {
+  /// Returns the created task's reference for `createTask`, and nil for every other write.
+  @discardableResult
+  public func perform(_ write: AppWrite, workspace: String) throws -> String? {
     let started = base.clock.now()
     var failure: ErrorCode?
     defer { log(write, workspace: workspace, started: started, failure: failure) }
     do {
-      try AppReader.checked(home: base.home.url) {
+      return try AppReader.checked(home: base.home.url) { () throws -> String? in
         let environment = environment()
         // Opening first makes store refusals win over the service's workspace lookup.
         try environment.db.initialize()
@@ -50,7 +52,16 @@ public struct AppWriter: Sendable {
           _ = try service.triage(batch)
         case .unblock(let ref):
           _ = try service.unblock([ref], requireReady: true)
+        case .createTask(let task):
+          var draft = TaskDraft(title: task.title)
+          draft.description = task.description
+          draft.acceptance = task.acceptance
+          draft.app = task.app
+          draft.parent = task.parent
+          draft.priority = task.priority
+          return try service.addUnstarted(draft).ref
         }
+        return nil
       }
     } catch let error as AppReadError {
       failure = error.code

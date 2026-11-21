@@ -32,7 +32,7 @@
         #expect(
           first.write
             == .comment(task: "AC-14", body: "Keep the queue on logout.", kind: "decision"))
-        first.continuation.resume()
+        first.continuation.resume(returning: nil)
         await decision?.value
 
         model.actions.setDraft("Does it clear when off?", for: target)
@@ -44,7 +44,7 @@
             == .comment(
               task: "AC-14", body: "Does it clear when off?", kind: "question",
               to: ["agent:codex:fixture"]))
-        second.continuation.resume()
+        second.continuation.resume(returning: nil)
         await question?.value
       }
     }
@@ -57,7 +57,7 @@
         #expect(sent.write == .resolveThreads(refs: ["AC-9/1"]))
         let target = try #require(model.target(AppModel.resolveTarget("AC-9/1")))
         #expect(model.actions.isSending(target))
-        sent.continuation.resume()
+        sent.continuation.resume(returning: nil)
         await resolve?.value
         let reopen = model.reopen(thread: "AC-9/1")
         let again = await writes.next()

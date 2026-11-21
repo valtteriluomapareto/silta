@@ -43,7 +43,7 @@
       let write = try #require(model.perform(.acceptAnswer(ref: "AC-14/2"), for: "AC-14/2"))
       let pending = await writes.next()
       #expect(!ControlState.readiness(model).idle)
-      pending.continuation.resume()
+      pending.continuation.resume(returning: nil)
       var updates = refreshing.stream.makeAsyncIterator()
       _ = await updates.next()
       #expect(!ControlState.readiness(model).idle)

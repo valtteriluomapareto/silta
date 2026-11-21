@@ -161,6 +161,10 @@ struct SiltaApp: App {
     }.defaultSize(width: 1280, height: 840)
       .commands {
         FindCommands()
+        CommandGroup(replacing: .newItem) {
+          Button("New Task…") { model.newTaskPresented = true }.keyboardShortcut("n")
+            .disabled(model.writer == nil || model.workspace == nil)
+        }
         CommandGroup(after: .sidebar) {
           Button("My work") { model.navigate(to: .mywork) }.keyboardShortcut("1")
           Button("Board") { model.navigate(to: .board) }.keyboardShortcut("2")

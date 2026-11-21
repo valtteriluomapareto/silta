@@ -80,6 +80,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     empty, and "Copy command" kept.
   - **My work answer card:** the answer, its thread ref, "Accept answer", and "Open
     task", which opens the task in the Board inspector.
+  - **New Task (⌘N):** a sheet with title, app, priority, description, acceptance and
+    parent creates a todo task as the human in one Core write (`app add`); the app never
+    starts or claims it. "Copy agent prompt after creating" copies the prompt that hands
+    it to an agent (Paper "App features v1"); the app launches nothing (D4).
   - **Inspector:** one box under the discussion. If the task has an unanswered
     question to the human, an Answer/Comment switch appears; Answer targets the
     newest such question. Paper "App features v1": a new thread is a Comment, a

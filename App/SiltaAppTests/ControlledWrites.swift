@@ -8,12 +8,12 @@
     struct Request {
       let write: AppWrite
       let workspace: String
-      let continuation: CheckedContinuation<Void, any Error>
+      let continuation: CheckedContinuation<String?, any Error>
     }
     private var requests: [Request] = []
     private var waiting: CheckedContinuation<Request, Never>?
 
-    func write(_ write: AppWrite, _ workspace: String) async throws {
+    func write(_ write: AppWrite, _ workspace: String) async throws -> String? {
       try await withCheckedThrowingContinuation { continuation in
         let request = Request(write: write, workspace: workspace, continuation: continuation)
         if let waiting {
