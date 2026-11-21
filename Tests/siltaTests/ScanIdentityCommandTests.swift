@@ -278,24 +278,43 @@ extension ScanIdentityCommandTests {
       #expect(try Self.identity(store) == before)
       let human = try EditorTerminalFixture.run(
         args + (json ? ["--json"] : []), in: scratch, environment: ["SILTA_ACTOR": "human:acme"]
-      ).result
-      let output = human.stdout + human.stderr
-      withKnownIssue("The scoped scan currently refuses the human's explicit mismatched binding.") {
-        #expect(human.termination == .exit(0))
-        #expect(output.contains("origin_mismatch"))
-        #expect(output.contains("acme-fixture/web.git"))
-        #expect(
-          output.contains(origin.contains("github-work") ? "github-work" : "fork-fixture"))
-      }
+      )
+      let output = human.result.stdout + human.terminal
+      #expect(human.result.termination == .exit(0))
+      #expect(output.contains("origin_mismatch"))
+      #expect(output.contains("acme-fixture/web.git"))
+      #expect(
+        output.contains(origin.contains("github-work") ? "github-work" : "fork-fixture"))
       for token in ["testuser", "testpassword", "testquery", "testfragment"] {
         #expect(!output.contains(token))
       }
-      if human.termination == .exit(0) {
+      if human.result.termination == .exit(0) {
         let row = try #require(try Self.identity(store).first)
         #expect(row["remote_url"] == Self.acmeOrigin)
         let path: String? = row["path"]
         #expect(path != nil)
       }
+    }
+  }
+
+  @Test(arguments: [false, true])
+  func anExplicitHumanCannotReplaceABoundMismatchedOrigin(missing: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try Self.declare("web", origin: Self.acmeOrigin, in: store)
+      let held = try Self.clone("first/web", origin: Self.acmeOrigin, in: scratch)
+      try Self.bind(held, in: scratch)
+      if missing {
+        try FileManager.default.moveItem(at: held, to: scratch.appending(path: "moved"))
+      }
+      let repo = try Self.clone("second/web", origin: Self.otherOrigin, in: scratch)
+      let before = try Self.identity(store)
+      let human = try EditorTerminalFixture.run(
+        ["--ws", "acme", "init", "--scan", repo.path, "--json"], in: scratch,
+        environment: ["SILTA_ACTOR": "human:acme"]
+      )
+      #expect(human.result.termination == .exit(6))
+      #expect(try Self.identity(store) == before)
     }
   }
 
@@ -312,11 +331,9 @@ extension ScanIdentityCommandTests {
     let refusal = try scan.flatMap {
       try GuideContractTests.object($0.stdout)["error"] as? [String: Any]
     }
-    withKnownIssue("A differing unbound declaration currently gives no read-only discovery hint.") {
-      #expect(location?["next"] as? [String] == [Self.inspect])
-      #expect(brief.stdout.contains(Self.inspect))
-      #expect(scan?.termination == .exit(6) && refusal?["next"] as? [String] == [Self.inspect])
-    }
+    #expect(location?["next"] as? [String] == [Self.inspect])
+    #expect(brief.stdout.contains(Self.inspect))
+    #expect(scan?.termination == .exit(6) && refusal?["next"] as? [String] == [Self.inspect])
     #expect(
       try FirstWorkspaceCommandTests.replay(Self.inspect, in: scratch, cwd: repo).termination
         == .exit(0))
@@ -334,9 +351,22 @@ extension ScanIdentityCommandTests {
       let repo = try Self.clone("web", origin: origin, in: scratch)
       let result = try Self.run(["where"], repo, scratch)
       let error = try TaskStateCommandTests.error(result)
-      withKnownIssue("Unrecognized same-slug origins currently offer workspace creation.") {
-        #expect(error["next"] as? [String] == [Self.inspect])
-      }
+      #expect(error["next"] as? [String] == [Self.inspect])
+    }
+  }
+
+  @Test func aMismatchedSlugDoesNotBlockExplicitWorkspaceCreation() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try Self.declare("web", origin: Self.acmeOrigin, in: store)
+      let repo = try Self.clone("web", origin: Self.otherOrigin, in: scratch)
+      let scan = try Self.run(["init", "--scan", ".", "--slug", "separate"], repo, scratch)
+      #expect(scan.termination == .exit(0))
+      let rows = try Self.identity(store)
+      #expect(rows.count == 2)
+      let original = try #require(rows.first { ($0["remote_url"] as String) == Self.acmeOrigin })
+      let path: String? = original["path"]
+      #expect(path == nil)
     }
   }
 
@@ -375,9 +405,7 @@ extension ScanIdentityCommandTests {
       let location = try Self.run(["where"], repo, scratch)
       let error = try TaskStateCommandTests.error(location)
       let hint = try #require((error["next"] as? [String])?.first)
-      withKnownIssue("The portal form currently loses the declared Azure identity.") {
-        #expect(hint.hasPrefix("silta --ws 'acme' init --scan "))
-      }
+      #expect(hint.hasPrefix("silta --ws 'acme' init --scan "))
       if hint.hasPrefix("silta --ws 'acme' ") {
         #expect(
           try FirstWorkspaceCommandTests.replay(hint, in: scratch, cwd: repo).termination
