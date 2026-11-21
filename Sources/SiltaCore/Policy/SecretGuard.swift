@@ -1,7 +1,7 @@
 /// Pure, pinned secret scanning and redaction. Callers decide whether a write is allowed.
 package enum SecretGuard {
   /// Rule-set version; changes deliberately with detection behavior.
-  package static let version = 5
+  package static let version = 6
 
   /// Body-free warning for a successful redacted write.
   package static let warning = OutputWarning(
@@ -106,108 +106,6 @@ package enum SecretGuard {
     ]
   }
 
-  private struct ArmourOpening {
-    let label: Substring
-    let range: Range<String.Index>
-    let lineStart: String.Index
-  }
-
-  private static var armourMarkdownPrefix: Regex<Substring> {
-    /[ \t]*(?:>[ \t]*|(?:[-+*]|[0-9]{1,9}[.)])[ \t]+)*/
-  }
-
-  private static func privateKeyMatches(in text: String, fieldStart: String.Index?) -> [SecretMatch]
-  {
-    let boundary =
-      /(?:-----|---- )(BEGIN|END) ((?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?)(?:-----| ----)/
-    let prefix = armourMarkdownPrefix
-    var start: ArmourOpening?
-    var matches: [SecretMatch] = []
-    var cursor = text.startIndex
-    var lineStart = cursor
-
-    func appendUnfinished(_ opening: ArmourOpening, before limit: String.Index) {
-      let after = text[opening.range.upperBound..<limit]
-      let suffix = after.prefix(while: { !$0.isNewline })
-      let start =
-        if let fieldStart, (opening.lineStart...opening.range.lowerBound).contains(fieldStart) {
-          fieldStart
-        } else {
-          opening.lineStart
-        }
-      let openingPrefix = text[start..<opening.range.lowerBound]
-      guard openingPrefix.wholeMatch(of: prefix) != nil,
-        suffix.allSatisfy({ $0 == " " || $0 == "\t" }),
-        suffix.endIndex == text.endIndex || suffix.endIndex < limit
-      else { return }
-      let end = armourRunEnd(after, openingPrefix: openingPrefix)
-      matches.append(SecretMatch(rule: "private_key", range: opening.range.lowerBound..<end))
-    }
-
-    for marker in text.matches(of: boundary) {
-      if let newline = text[cursor..<marker.range.lowerBound].lastIndex(where: \.isNewline) {
-        lineStart = text.index(after: newline)
-      }
-      cursor = marker.range.upperBound
-      if marker.1 == "BEGIN" {
-        if let start { appendUnfinished(start, before: marker.range.lowerBound) }
-        start = ArmourOpening(label: marker.2, range: marker.range, lineStart: lineStart)
-      } else if let current = start, marker.2 == current.label {
-        matches.append(
-          SecretMatch(
-            rule: "private_key", range: current.range.lowerBound..<marker.range.upperBound))
-        start = nil
-      }
-    }
-    if let start { appendUnfinished(start, before: text.endIndex) }
-    return matches
-  }
-
-  /// Accepts armour and metadata after an unfinished opener, retaining original indices.
-  private static func armourRunEnd(_ body: Substring, openingPrefix: Substring) -> String.Index {
-    let content = /(?:[A-Za-z0-9+\/]+={0,2}|=[A-Za-z0-9+\/]{4})[ \t]*/
-    let header = /(?:Version|Comment|MessageID|Hash|Charset|Proc-Type|DEK-Info):/
-    let prefix = armourMarkdownPrefix
-    let quoted = openingPrefix.contains(">")
-    let listIndent =
-      openingPrefix.contains(where: { $0 != " " && $0 != "\t" })
-      ? openingPrefix.count : 0
-    var end = body.firstIndex(where: \.isNewline) ?? body.endIndex
-    var cursor = end
-    var continuedHeader = false
-    var sawPayload = false
-    var afterSeparator = false
-    while cursor < body.endIndex {
-      let next = body.index(after: cursor)
-      cursor = body[next...].firstIndex(where: \.isNewline) ?? body.endIndex
-      let original = body[next..<cursor]
-      let start = original.prefixMatch(of: prefix)?.range.upperBound ?? next
-      let line = original[start...]
-      if line.isEmpty {
-        // Keep interior separators with the armour and leave trailing spacing intact.
-        continuedHeader = false
-        afterSeparator = sawPayload
-        continue
-      }
-      if afterSeparator {
-        let continuationPrefix = original[..<start]
-        if quoted, !continuationPrefix.contains(">") { break }
-        if !quoted, continuationPrefix.count < listIndent,
-          continuationPrefix.allSatisfy({ $0 == " " || $0 == "\t" })
-        {
-          break
-        }
-      }
-      let isHeader = continuedHeader || line.prefixMatch(of: header) != nil
-      guard isHeader || line.wholeMatch(of: content) != nil else { break }
-      continuedHeader = isHeader && line.last == "\\"
-      sawPayload = sawPayload || !isHeader
-      afterSeparator = false
-      end = cursor
-    }
-    return end
-  }
-
   /// The ambiguous legacy token can be a complete typed identifier. Opaque paths, URLs,
   /// and longer encoded identifiers still go through the secret rules.
   private static func isWholeReferenceIdentifier(
@@ -248,5 +146,150 @@ package enum SecretGuard {
     let digits = value.prefix(6) + value.dropFirst(7).prefix(3)
     guard let number = Int(digits), let control = value.last else { return false }
     return Array("0123456789ABCDEFHJKLMNPRSTUVWXY")[number % 31] == control
+  }
+}
+
+extension SecretGuard {
+  private struct ArmourOpening {
+    let label: Substring
+    let range: Range<String.Index>
+    let lineStart: String.Index
+  }
+
+  private static var armourMarkdownPrefix: Regex<Substring> {
+    /[ \t\u{a0}\u{feff}]*(?:>[ \t\u{a0}\u{feff}]*|(?:[-+*]|[0-9]{1,9}[.)])[ \t\u{a0}\u{feff}]+)*/
+  }
+
+  private static func armourSpace(_ character: Character) -> Bool {
+    character == " " || character == "\t" || character == "\u{a0}" || character == "\u{feff}"
+  }
+
+  private static func privateKeyMatches(in text: String, fieldStart: String.Index?) -> [SecretMatch]
+  {
+    let boundary =
+      /(?:-----|---- )(BEGIN|END) ((?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?)(?:-----| ----)/
+    var start: ArmourOpening?
+    var matches: [SecretMatch] = []
+    var cursor = text.startIndex
+    var lineStart = cursor
+
+    func appendUnfinished(_ opening: ArmourOpening, before limit: String.Index) {
+      if let end = unfinishedEnd(opening, in: text, before: limit, fieldStart: fieldStart) {
+        matches.append(SecretMatch(rule: "private_key", range: opening.range.lowerBound..<end))
+      }
+    }
+
+    for marker in text.matches(of: boundary) {
+      if let newline = text[cursor..<marker.range.lowerBound].lastIndex(where: \.isNewline) {
+        lineStart = text.index(after: newline)
+      }
+      cursor = marker.range.upperBound
+      if marker.1 == "BEGIN" {
+        if let start { appendUnfinished(start, before: marker.range.lowerBound) }
+        start = ArmourOpening(label: marker.2, range: marker.range, lineStart: lineStart)
+      } else if let current = start, marker.2 == current.label {
+        matches.append(
+          SecretMatch(
+            rule: "private_key", range: current.range.lowerBound..<marker.range.upperBound))
+        start = nil
+      }
+    }
+    if let start { appendUnfinished(start, before: text.endIndex) }
+    return matches
+  }
+
+  private static func unfinishedEnd(
+    _ opening: ArmourOpening, in text: String, before limit: String.Index,
+    fieldStart: String.Index?
+  ) -> String.Index? {
+    let after = text[opening.range.upperBound..<limit]
+    let suffix = after.prefix(while: { !$0.isNewline })
+    let start =
+      if let fieldStart, (opening.lineStart...opening.range.lowerBound).contains(fieldStart) {
+        fieldStart
+      } else {
+        opening.lineStart
+      }
+    let before = text[start..<opening.range.lowerBound]
+    let prefix = before.prefixMatch(of: armourMarkdownPrefix)?.output ?? before.prefix(0)
+    let standalone =
+      prefix.endIndex == before.endIndex && suffix.allSatisfy(armourSpace)
+      && (suffix.endIndex == text.endIndex || suffix.endIndex < limit)
+    let inline = inlineArmourEnd(suffix, in: text)
+    if let inline, !suffix[inline...].allSatisfy(armourSpace) { return inline }
+    let end = armourRunEnd(
+      after, openingPrefix: prefix, label: opening.label,
+      minimumFirst: standalone ? 16 : 40, initialPayload: inline)
+    return end ?? inline ?? (standalone ? suffix.endIndex : nil)
+  }
+
+  /// Ends at payload bytes so an enclosing quote and subsequent fields survive.
+  private static func inlineArmourEnd(_ suffix: Substring, in text: String) -> String.Index? {
+    let boundary = suffix.prefix(while: { !$0.isNewline && !#"'"`"#.contains($0) })
+    var rest = boundary.drop(while: armourSpace)
+    var end: String.Index?
+    while let separator = rest.prefixMatch(of: /\\(?:r\\)?n/),
+      let payload = rest[separator.range.upperBound...].prefixMatch(of: /([A-Za-z0-9+\/]+)={0,2}/),
+      end != nil || payload.1.utf8.count >= 16
+    {
+      end = payload.range.upperBound
+      rest = rest[payload.range.upperBound...]
+    }
+    if let end { return end }
+    return boundary.matches(of: /[A-Za-z0-9+\/]{40,}={0,2}/).first {
+      !isWholeReferenceIdentifier($0.range, in: text)
+    }?.range.upperBound
+  }
+
+  /// Reads contiguous armour and its format-specific preamble, retaining original indices.
+  private static func armourRunEnd(
+    _ body: Substring, openingPrefix: Substring, label: Substring, minimumFirst: Int,
+    initialPayload: String.Index?
+  ) -> String.Index? {
+    let quoted = openingPrefix.contains(">")
+    let listIndent = openingPrefix.allSatisfy(armourSpace) ? 0 : openingPrefix.count
+    var end = initialPayload
+    var cursor = body.firstIndex(where: \.isNewline) ?? body.endIndex
+    var continuedHeader = false
+    var afterSeparator = false
+    while cursor < body.endIndex {
+      let next = body.index(after: cursor)
+      cursor = body[next...].firstIndex(where: \.isNewline) ?? body.endIndex
+      let original = body[next..<cursor]
+      let prefix = original.prefixMatch(of: armourMarkdownPrefix)?.output ?? original.prefix(0)
+      let line = original[prefix.endIndex...]
+      if line.isEmpty {
+        continuedHeader = false
+        afterSeparator = true
+        continue
+      }
+      if afterSeparator {
+        if quoted, !prefix.contains(">") { break }
+        if !quoted, prefix.count < listIndent, prefix.allSatisfy(armourSpace) { break }
+      }
+      if end == nil, continuedHeader || armourHeader(line, label: label) {
+        continuedHeader = label.hasPrefix("SSH2 ") && line.last == "\\"
+        continue
+      }
+      let payload = line.wholeMatch(of: /([A-Za-z0-9+\/]+)={0,2}[ \t]*/)
+      let minimum = end == nil ? minimumFirst : (afterSeparator ? 16 : 1)
+      let checksum =
+        end != nil && label.hasPrefix("PGP ")
+        && line.wholeMatch(of: /=[A-Za-z0-9+\/]{4}[ \t]*/) != nil
+      guard checksum || (payload?.1.utf8.count ?? 0) >= minimum else { break }
+      afterSeparator = false
+      end = cursor
+    }
+    return end
+  }
+
+  private static func armourHeader(_ line: Substring, label: Substring) -> Bool {
+    if label.hasPrefix("SSH2 ") {
+      return line.prefixMatch(of: /(?:Version|Comment|MessageID|Hash|Charset):/) != nil
+    }
+    if label.hasPrefix("PGP ") {
+      return line.prefixMatch(of: /(?:Version|MessageID|Hash|Charset):/) != nil
+    }
+    return line.prefixMatch(of: /(?:Proc-Type|DEK-Info):/) != nil
   }
 }

@@ -11,18 +11,14 @@ extension SecretGuardTests {
     let prefix = #"Acme 🦊 {"credential":""#
     let suffix = #"","keep":"Documentation."}"#
     let input = prefix + Self.opener + separator + Self.payload + separator + Self.payload + suffix
-    withKnownIssue("SI-237: Escaped unfinished armour currently stays readable.") {
-      #expect(SecretGuard.redacted(input) == prefix + Self.masked + suffix)
-    }
+    #expect(SecretGuard.redacted(input) == prefix + Self.masked + suffix)
   }
 
   @Test(arguments: ["annotated", "flat", "bom", "nbsp", "pem"])
   func unfinishedArmourNeedsActualPayloadEvidence(form: String) {
     let (input, expected) = Self.armourExample(form)
-    withKnownIssue("SI-237: This unfinished armour spelling currently leaks.") {
-      #expect(SecretGuard.redacted(input) == expected)
-      #expect(!HumanText.framed(input).contains(Self.payload))
-    }
+    #expect(SecretGuard.redacted(input) == expected)
+    #expect(!HumanText.framed(input).contains(Self.payload))
     #expect(HumanText.framed(input).utf8.count { $0 == 10 } == input.utf8.count { $0 == 10 })
   }
 
@@ -66,11 +62,9 @@ extension SecretGuardTests {
     let after = "\n\n" + bodyPrefix + first + "\n"
     let shortFirst = start + "\n" + bodyPrefix + first + "\n"
     let shortAfterBlank = start + "\n" + bodyPrefix + length16 + after
-    withKnownIssue("SI-237: Short initial and separated lines currently get swallowed.") {
-      let expected = prefix + Self.masked + "\n" + bodyPrefix + first + "\n"
-      #expect(SecretGuard.redacted(shortFirst) == expected)
-      #expect(SecretGuard.redacted(shortAfterBlank) == prefix + Self.masked + after)
-    }
+    let expected = prefix + Self.masked + "\n" + bodyPrefix + first + "\n"
+    #expect(SecretGuard.redacted(shortFirst) == expected)
+    #expect(SecretGuard.redacted(shortAfterBlank) == prefix + Self.masked + after)
     let continued = start + "\n" + bodyPrefix + length16 + "\n\n" + bodyPrefix + length16
     #expect(SecretGuard.redacted(continued) == prefix + Self.masked)
   }
@@ -79,15 +73,11 @@ extension SecretGuardTests {
   func aBlankBeforeTheFirstPayloadCanEndTheMarkdownContainer(prefix: String) {
     let tail = "\n\n" + Self.payload + "\nRead this."
     let input = prefix + Self.opener + tail
-    withKnownIssue("SI-237: Blank separators currently allow armour to leave its container.") {
-      #expect(SecretGuard.redacted(input) == prefix + Self.masked + tail)
-    }
+    #expect(SecretGuard.redacted(input) == prefix + Self.masked + tail)
   }
 
   @Test(arguments: ["\n\nDone", "\n\nVerify", "\n\n- Done", "\n\nComment: see the guide below"])
   func standaloneOpenerKeepsFollowingProse(tail: String) {
-    withKnownIssue("SI-237: Prose without payload evidence is currently swallowed.") {
-      #expect(SecretGuard.redacted(Self.opener + tail) == Self.masked + tail)
-    }
+    #expect(SecretGuard.redacted(Self.opener + tail) == Self.masked + tail)
   }
 }

@@ -34,15 +34,13 @@ struct UnfinishedArmourCommandTests {
       let result = try Self.run(["export"], in: scratch)
       try #require(result.termination == .exit(0), "\(result.stdout)\(result.stderr)")
       let exported = try Self.exports(in: scratch)
-      withKnownIssue("SI-237: Unfinished armour currently leaks or consumes safe prose.") {
-        #expect(warned == [true, true, true])
-        #expect(stored == [expected, expected, expected])
-        #expect(exported.task.contains("\n" + expected + "\n"))
-        #expect(exported.comment == expected)
-        #expect(exported.doc.contains("\n" + expected + "\n"))
-        #expect(
-          ![exported.task, exported.comment, exported.doc].contains { $0.contains(Self.token) })
-      }
+      #expect(warned == [true, true, true])
+      #expect(stored == [expected, expected, expected])
+      #expect(exported.task.contains("\n" + expected + "\n"))
+      #expect(exported.comment == expected)
+      #expect(exported.doc.contains("\n" + expected + "\n"))
+      #expect(
+        ![exported.task, exported.comment, exported.doc].contains { $0.contains(Self.token) })
     }
   }
 
@@ -56,12 +54,10 @@ struct UnfinishedArmourCommandTests {
       ).result
       #expect(!out.stdout.contains(Self.token) && !out.stderr.contains(Self.token))
       let tasks = try store.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") }
-      withKnownIssue("SI-237: Unfinished armour currently passes the human body gate.") {
-        #expect(out.termination == .exit(1))
-        #expect(
-          out.stdout.contains("Secret content detected:") && out.stdout.contains("private_key"))
-        #expect(tasks == 0)
-      }
+      #expect(out.termination == .exit(1))
+      #expect(
+        out.stdout.contains("Secret content detected:") && out.stdout.contains("private_key"))
+      #expect(tasks == 0)
     }
   }
 
@@ -79,7 +75,7 @@ struct UnfinishedArmourCommandTests {
       let suffix = "\n\nComment: see the guide below\n\nDone."
       return (marker + suffix, masked + suffix)
     case "nbsp", "bom":
-      let prefix = form == "bom" ? "\u{feff}" : "\u{00a0}"
+      let prefix = form == "bom" ? "Acme notes.\n\u{feff}" : "\u{00a0}"
       return (prefix + marker + "\n" + token, prefix + masked)
     default:
       return (marker + " (truncated)\n" + token, masked)
