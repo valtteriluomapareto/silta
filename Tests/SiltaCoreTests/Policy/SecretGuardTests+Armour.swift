@@ -19,9 +19,17 @@ extension SecretGuardTests {
 
   @Test(arguments: samples) func corpusFindsEveryRequiredRule(sample: Sample) throws {
     let suffix = sample.rule == "private_key" ? "\nEnd." : " end"
-    let separator = sample.rule == "private_key" && !sample.text.contains("END ") ? "\n" : " "
-    let prefix = "Acme 🦊" + separator
-    let input = prefix + sample.text + suffix
+    let input = "Acme 🦊 " + sample.text + suffix
+    if sample.rule == "private_key", !sample.text.contains("END ") {
+      withKnownIssue("SI-237: Inline unfinished armour currently leaks.") {
+        Self.checkCorpus(sample, input: input, suffix: suffix)
+      }
+    } else {
+      Self.checkCorpus(sample, input: input, suffix: suffix)
+    }
+  }
+
+  private static func checkCorpus(_ sample: Sample, input: String, suffix: String) {
     let matches = SecretGuard.matches(in: input)
     let detected = matches.contains { $0.rule == sample.rule }
     #expect(detected, "missing rule \(sample.rule)")
@@ -30,7 +38,7 @@ extension SecretGuardTests {
     #expect(!leaked, "unredacted \(sample.rule)")
     #expect(output.contains("[REDACTED:\(sample.rule)]"))
     if sample.rule == "private_key" {
-      #expect(output == prefix + "[REDACTED:private_key]" + suffix)
+      #expect(output == "Acme 🦊 [REDACTED:private_key]" + suffix)
     }
     for match in matches {
       let preview = match.preview(in: input)
@@ -44,8 +52,14 @@ extension SecretGuardTests {
   @Test(arguments: syntheticArmour)
   func privateArmourRedactsTheWholeRunAndKeepsFollowingProse(block: String) {
     let tail = "\nRead the Acme documentation."
-    let prefix = block.contains("END ") ? "Acme: " : "Acme:\n"
-    #expect(SecretGuard.redacted(prefix + block + tail) == prefix + "[REDACTED:private_key]" + tail)
+    let inline = SecretGuard.redacted("Acme: " + block + tail)
+    if block.contains("END ") {
+      #expect(inline == "Acme: [REDACTED:private_key]" + tail)
+    } else {
+      withKnownIssue("SI-237: Inline unfinished armour currently leaks.") {
+        #expect(inline == "Acme: [REDACTED:private_key]" + tail)
+      }
+    }
     #expect(SecretGuard.redacted(block) == "[REDACTED:private_key]")
   }
 
