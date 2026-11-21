@@ -39,6 +39,11 @@ extension AppReader {
     [taskCommand(task.ref, workspace: workspace)]
   }
 
+  /// Reads one task with its timeline.
+  public func readCommand(task ref: String, workspace: String) -> AppCommand {
+    taskCommand(ref, workspace: workspace)
+  }
+
   /// What the human pastes into an agent session to start or resume a task. The app only
   /// copies it and never launches an agent (D4). Like every copied command it pins the data
   /// home, so an agent with another `SILTA_HOME` still acts on the human's store.

@@ -39,6 +39,10 @@
           for: task, reader: reader, workspace: "acme", name: "Acme", exists: { _ in false })
         #expect(gone.last?.action == nil && gone.last?.reason == "not on this Mac")
         #expect(present.contains { $0.title == "Copy Agent Prompt" })
+        let claimedElsewhere = TaskMenu.items(
+          for: try reader.task("AC-12", workspace: "acme"), reader: reader, workspace: "acme",
+          name: "Acme", exists: { _ in true })
+        #expect(claimedElsewhere.last?.reason == "no worktree recorded")
       }
     }
 
