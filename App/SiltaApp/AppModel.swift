@@ -27,10 +27,20 @@ final class AppModel {
   }
   var search = ""
   private(set) var route: AppRoute = .mywork
-  var appFilter: String?
+  /// The Board's filters. The Show toggles for blocked and done tasks persist when the
+  /// model has defaults; automated runs and tests pass none.
+  var boardFilter = BoardFilter() {
+    didSet {
+      if boardFilter.blocked != oldValue.blocked {
+        defaults?.set(boardFilter.blocked, forKey: Self.showBlockedKey)
+      }
+      if boardFilter.done != oldValue.done {
+        defaults?.set(boardFilter.done, forKey: Self.showDoneKey)
+      }
+    }
+  }
   private(set) var boardSelection: BoardSelection?
   var boardInspectorPresented = false
-  var showProposed = false
   private(set) var workspaceSelection: ConnectionSelection?
   /// The selected app or service on the map (`app:<slug>` or `service:<slug>`). Exclusive
   /// with `workspaceSelection`.
@@ -43,13 +53,30 @@ final class AppModel {
   @ObservationIgnored private var flight: Task<Void, Never>?
   @ObservationIgnored private var queuedForce = false
   @ObservationIgnored private var generation = 0
+  @ObservationIgnored private let defaults: UserDefaults?
+  static let showBlockedKey = "boardShowBlocked"
+  static let showDoneKey = "boardShowDone"
+
+  /// Where the Board's Show toggles are stored: automated control runs start from the
+  /// defaults and store nothing; real launches and hand-launched fixtures share the
+  /// human's toggles.
+  static func filterDefaults(automated: Bool) -> UserDefaults? {
+    automated ? nil : .standard
+  }
+
+  /// Back to the default Board: every lane, all apps, no proposals. Search stays.
+  func resetBoardFilter() { boardFilter = BoardFilter() }
 
   init(
     reader: AppReader? = nil, now: @escaping @Sendable () -> Date = { Date() },
     documents: DocsModel = DocsModel(),
     workspaceDocuments: WorkspaceDocumentsModel = WorkspaceDocumentsModel(),
-    writer: Writer? = nil, load: @escaping Loader
+    writer: Writer? = nil, defaults: UserDefaults? = nil, load: @escaping Loader
   ) {
+    self.defaults = defaults
+    boardFilter = BoardFilter(
+      blocked: defaults?.object(forKey: Self.showBlockedKey) as? Bool ?? true,
+      done: defaults?.object(forKey: Self.showDoneKey) as? Bool ?? true)
     self.reader = reader
     self.writer = writer
     self.now = now
@@ -120,7 +147,7 @@ final class AppModel {
       workspaceSelection = nil
       workspaceNode = nil
       workspaceInspectorPresented = false
-      appFilter = nil
+      boardFilter.app = nil
     }
     return refresh(force: true)
   }
@@ -247,7 +274,7 @@ final class AppModel {
   }
 
   func showApp(_ slug: String) {
-    appFilter = slug
+    boardFilter.app = slug
     navigate(to: .board)
   }
 
@@ -316,8 +343,13 @@ extension AppModel {
       return
         "\(map.apps.count) apps · \(map.services.count) services · \(map.connections.count) connections"
     }
-    if route == .board, let board = data.snapshot?.board {
+    if route == .board, let snapshot = data.snapshot {
+      let board = snapshot.board
+      let hidden = BoardContent(
+        snapshot: snapshot, apps: [], filter: BoardFilter(blocked: boardFilter.blocked), search: ""
+      ).hiddenBlocked
       return "\(board.todo.count + board.doing.count + board.review.count) open · "
+        + (hidden > 0 ? "\(hidden) blocked hidden · " : "")
         + "\(board.proposals.count) proposed · \(board.doneThisWeek.count) done this week"
     }
     return "\(data.snapshot?.work.waitingCount ?? 0) waiting on you"

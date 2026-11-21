@@ -37,7 +37,7 @@
         #expect(answer.item.body?.hasPrefix("Yes. After an hour") == true)
         #expect(answer.canAccept(reader: reader, workspace: "acme"))
         #expect(!content.other.contains { $0.kind == "answer" })
-        let board = BoardContent(snapshot: snapshot, app: nil, search: "", proposals: false)
+        let board = BoardContent(snapshot: snapshot, apps: [], filter: BoardFilter(), search: "")
         #expect(
           board.newestQuestion(for: "AC-12", reader: reader, workspace: "acme")?.question
             == "AC-12/1")

@@ -75,8 +75,8 @@
         } ?? "")
       if let snapshot = model.visibleData?.snapshot {
         let content = BoardContent(
-          snapshot: snapshot, app: model.appFilter, search: model.search,
-          proposals: model.showProposed)
+          snapshot: snapshot, apps: model.visibleData?.map?.apps ?? [],
+          filter: model.boardFilter, search: model.search)
         counts = Counts(
           lanes: Dictionary(uniqueKeysWithValues: content.lanes.map { ($0.title, $0.tasks.count) }),
           sidebar: Sidebar(

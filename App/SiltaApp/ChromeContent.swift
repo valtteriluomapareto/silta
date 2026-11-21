@@ -1,20 +1,14 @@
 import Foundation
 import SiltaAppSupport
 
-nonisolated struct BoardMenuContent {
-  let title: String
-  let proposedCount: Int
-
-  init(app: String?, apps: [AppMapApp], proposals: [AppTask], showing: Bool) {
-    let name = app.map { slug in apps.first { $0.slug == slug }?.name ?? slug } ?? "All apps"
-    title = name + (showing ? " · proposed" : "")
-    proposedCount = proposals.filter { app == nil || $0.app == app }.count
-  }
-}
-
 nonisolated enum SidebarContent {
   static func appColor(index: Int) -> String {
     ["AppSlate", "AppViolet", "AppClay"][index % 3]
+  }
+
+  /// The colour of an app on the map, by its position there; nil when the map lacks it.
+  static func appColor(slug: String, apps: [AppMapApp]) -> String? {
+    apps.firstIndex { $0.slug == slug }.map { appColor(index: $0) }
   }
 
   static func claimTitle(_ task: AppTask) -> String {

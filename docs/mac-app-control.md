@@ -31,7 +31,9 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
   whole-file guard, package boundary and hosted-test isolation checks.
 - A hand-launched fixture (`scripts/run-mac-fixture.sh`) shares the installed app's
   defaults: its inspector width and appearance are the human's, and changes made there
-  persist. Snapshot and driver runs pin both.
+  persist. Snapshot and driver runs pin both. Board filters work the same way: a
+  hand-launched fixture shares the human's stored blocked and done toggles, while
+  snapshot and driver runs start from the defaults (all lanes shown) and store nothing.
 - Interactive fixture launch prints its state.json path in the private run
   directory. Snapshot launch writes state.json next to the requested PNG, then
   exits. Use a separate output directory for each capture to retain matching
@@ -69,7 +71,10 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
 | `refresh` | `starting`, `loading`, `ready` or `failed`, plus the observed dataVersion |
 | `idle` | The current route and selected read have settled, and no product write is in flight |
 
-Lane keys use their displayed names: Todo, Doing, Review, Done this week. Failed
+Lane keys use their displayed names: Todo, Doing, Review, Done this week. Snapshot
+and driver runs always start with all four. A hand-launched fixture follows the
+human's stored Board toggles: Done this week is missing when done is hidden, and
+Todo leaves out hidden blocked tasks. Failed
 loads may be idle; also check refresh.phase. Idle does not prove painted pixels.
 Bodies, comments, filesystem paths and arbitrary error messages are excluded.
 The sequence gap `seq > settledSeq` indicates an action in progress.

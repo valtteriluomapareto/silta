@@ -105,7 +105,7 @@
 
     @Test func boardNavigationRetainsSelectionFiltersAndInspector() async {
       let model = makeModel(ControlledLoads())
-      model.showProposed = true
+      model.boardFilter.proposals = true
       model.showApp("acme-mobile")
       model.inspect(task: "AC-12")
       #expect(model.route == .board && model.boardInspectorPresented)
@@ -113,15 +113,15 @@
       model.toggleInspector()
       model.navigate(to: .board)
       #expect(model.boardSelection == BoardSelection(taskRef: "AC-12"))
-      #expect(model.boardInspectorPresented && model.showProposed)
-      #expect(model.appFilter == "acme-mobile")
+      #expect(model.boardInspectorPresented && model.boardFilter.proposals)
+      #expect(model.boardFilter.app == "acme-mobile")
       model.toggleInspector()
       #expect(!model.boardInspectorPresented)
     }
 
     @Test func routeInspectorsAndTypedSelectionsRemainIndependent() async {
       let model = AppModel(load: { _, _, _ in nil })
-      model.showProposed = true
+      model.boardFilter.proposals = true
       model.inspect(task: "AC-12")
       model.navigate(to: .workspace)
       #expect(!model.workspaceInspectorPresented)
@@ -129,7 +129,7 @@
       #expect(model.workspaceInspectorPresented && model.boardInspectorPresented)
       model.toggleInspector()
       model.navigate(to: .board)
-      #expect(model.boardSelection?.taskRef == "AC-12" && model.showProposed)
+      #expect(model.boardSelection?.taskRef == "AC-12" && model.boardFilter.proposals)
       #expect(model.boardInspectorPresented)
       model.navigate(to: .workspace)
       #expect(model.workspaceSelection?.connectionRef == "conn:acme-mobile->acme-backend")
