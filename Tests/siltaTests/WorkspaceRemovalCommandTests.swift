@@ -331,12 +331,8 @@ extension WorkspaceRemovalCommandTests {
       #expect(denied.termination == .exit(3))
       let removed = try Self.human(["ws", "rm", "acme", "--allow-active", "--json"], in: scratch)
       let receipt = try GuideContractTests.object(removed.stdout)["data"] as? [String: Any]
-      withKnownIssue(
-        "A dangling gitdir file currently blocks the direct human override.", isIntermittent: link
-      ) {
-        #expect(removed.termination == .exit(0))
-        #expect(receipt?["backup"] is String && receipt?["recovery"] is String)
-      }
+      #expect(removed.termination == .exit(0))
+      #expect(receipt?["backup"] is String && receipt?["recovery"] is String)
       #expect(FileManager.default.fileExists(atPath: path + "/acme-sentinel"))
       if let receipt {
         try Self.checkRemoval(store)
@@ -372,15 +368,13 @@ extension WorkspaceRemovalCommandTests {
     let text = try Self.run(["ws", "rm", "acme", "--dry-run"], in: scratch)
     let denied = try Self.human(["ws", "rm", "acme", "--json"], in: scratch)
     let error = try TaskStateCommandTests.error(denied)
-    withKnownIssue("An unresolved clone currently prevents preview and gives no usable retry.") {
-      #expect(preview.termination == .exit(0))
-      #expect(data?["unresolved_clones"] as? [String] == [path])
-      #expect(data?["next_by"] as? String == "human" && data?["next"] as? [String] == [hint])
-      #expect(text.stdout.contains(path) && text.stdout.contains("ask human: " + hint))
-      #expect(denied.termination == .exit(9))
-      #expect(
-        (error["message"] as? String)?.contains(path) == true)
-      #expect(error["next_by"] as? String == "human" && error["next"] as? [String] == [hint])
-    }
+    #expect(preview.termination == .exit(0))
+    #expect(data?["unresolved_clones"] as? [String] == [path])
+    #expect(data?["next_by"] as? String == "human" && data?["next"] as? [String] == [hint])
+    #expect(text.stdout.contains(path) && text.stdout.contains("ask human: " + hint))
+    #expect(denied.termination == .exit(9))
+    #expect(
+      (error["message"] as? String)?.contains(path) == true)
+    #expect(error["next_by"] as? String == "human" && error["next"] as? [String] == [hint])
   }
 }

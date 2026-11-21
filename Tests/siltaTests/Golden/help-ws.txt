@@ -81,7 +81,7 @@ OPTIONS:
 OVERVIEW: Remove one workspace from a human terminal.
 
 Preview the removal without saving with --dry-run. The saved default and active
-clone registrations require --allow-active. A successful removal saves both a
+or uninspectable clone registrations require --allow-active. Removal saves a
 SQLite backup and a workspace recovery tree.
 
 USAGE: silta ws rm [--ws <ws>] [--approved <approved>] [--json] [--quiet] [--verbose] <workspace> [--dry-run] [--allow-active]
@@ -100,8 +100,8 @@ GLOBAL OPTIONS:
 OPTIONS:
   --dry-run               Preview owned rows and active selection without
                           saving.
-  --allow-active          Allow removing the saved default or a live registered
-                          clone.
+  --allow-active          Allow removing the saved default or unregistering
+                          live or uninspectable clones.
   --version               Show the version.
   -h, --help              Show help information.
 

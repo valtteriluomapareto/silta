@@ -66,6 +66,24 @@ silta --ws acme comment AC-1 --kind answer --reply-to AC-1/2 -m "Use the test AP
 The asker can accept a reply you post directly. If the asking agent records it
 for you, it can close the question after you confirm the recorded answer.
 
+## Remove a mistaken workspace
+
+Preview the owned rows and clone registrations before removing a workspace.
+
+```sh
+silta ws rm acme --dry-run
+silta ws rm acme
+```
+
+Use the printed `silta ws rm acme --allow-active` command if the preview lists
+the saved default or a live or uninspectable clone. Run the removal yourself in
+your terminal. Silta unregisters the clones and leaves their files on disk.
+
+The receipt names the backup and recovery tree. Follow its printed
+`silta --ws acme restore <recovery-tree> --dry-run` command. After reviewing the
+preview, run the restore without `--dry-run` or approve the agent's exact retry
+in chat.
+
 ## Approve a command
 
 Commands marked **human-only** in help can be run directly from your own terminal.
