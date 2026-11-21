@@ -66,6 +66,43 @@
       try tx.recordChange(kind: "task", rowID: id)
     }
 
+    /// Sets the facts a fixture task shows beyond its row defaults; nil leaves a column as is.
+    package static func annotate(
+      _ sequence: Int64, acceptance: String? = nil, result: String? = nil,
+      doneBranch: String? = nil, doneDirty: Bool? = nil, in tx: StorageTransaction
+    ) throws {
+      try tx.database.execute(
+        sql: """
+          UPDATE task SET acceptance_md=coalesce(?,acceptance_md),result_md=coalesce(?,result_md),
+            done_branch=coalesce(?,done_branch),done_dirty=coalesce(?,done_dirty)
+          WHERE seq=? AND workspace_id=(SELECT id FROM workspace WHERE slug='acme')
+          """, arguments: [acceptance, result, doneBranch, doneDirty, sequence])
+      guard tx.database.changesCount == 1 else { throw StorageError.corrupt }
+      try tx.recordChange(kind: "task", rowID: try id(sequence, in: tx))
+    }
+
+    private static func id(_ sequence: Int64, in tx: StorageTransaction) throws -> Int64 {
+      guard
+        let id = try Int64.fetchOne(
+          tx.database,
+          sql: "SELECT id FROM task WHERE seq=? AND workspace_id=(SELECT id FROM workspace "
+            + "WHERE slug='acme')",
+          arguments: [sequence])
+      else { throw StorageError.corrupt }
+      return id
+    }
+
+    /// Moves a fixture claim's heartbeat, so the claim reads as live or expired.
+    package static func claim(_ sequence: Int64, heartbeat: Date, in tx: StorageTransaction) throws
+    {
+      try tx.database.execute(
+        sql: """
+          UPDATE task SET claimed_at=? WHERE seq=? AND claimed_by IS NOT NULL
+            AND workspace_id=(SELECT id FROM workspace WHERE slug='acme')
+          """, arguments: [TaskService.timestamp(heartbeat), sequence])
+      guard tx.database.changesCount == 1 else { throw StorageError.corrupt }
+    }
+
     /// Completes a fixture task that other fixture writes needed open, such as a blocker.
     package static func complete(_ sequence: Int64, in tx: StorageTransaction, at: Date) throws {
       let stamp = TaskService.timestamp(at)

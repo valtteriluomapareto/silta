@@ -90,6 +90,55 @@ struct TaskAppEditCommandTests {
     }
   }
 
+  @Test func moveReceiptListsOnlyMovableChildrenOnThePreviousApp() throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.fixture(scratch)
+      try Self.addTasks(fixture, in: scratch)
+      try fixture.store.write { tx in
+        for (seq, status) in [
+          (4, "done"), (5, "dropped"), (6, "todo"),
+          (7, "blocked"), (8, "review"), (9, "doing"),
+        ] {
+          let external: String? = seq == 6 ? "ado:6" : nil
+          try tx.database.execute(
+            sql: """
+              INSERT INTO task(uid,workspace_id,seq,title,status,app_id,parent_id,
+                external_ref,created_by,created_at,updated_at)
+              SELECT 'acme-child-'||?,workspace_id,?,'Acme child',?,app_id,id,?,
+                created_by,created_at,updated_at FROM task WHERE seq=1
+              """, arguments: [seq, seq, status, external])
+        }
+      }
+      let moved = try Self.run(["task", "edit", "AC-1", "--app", "desk", "--json"], in: scratch)
+      let change = try #require(
+        try TaskStateCommandTests.data(moved)["app_change"] as? [String: Any])
+      #expect(
+        change["children_on_previous_app"] as? [String] == ["AC-2", "AC-7", "AC-8", "AC-9"])
+    }
+  }
+
+  @Test(arguments: ["blocked", "review"])
+  func ordinaryApprovalCanMoveAnUnclaimedTaskWithoutChangingItsState(status: String) throws {
+    try withScratchDirectory { scratch in
+      let fixture = try Self.fixture(scratch)
+      try Self.addTasks(fixture, in: scratch)
+      let command =
+        status == "review"
+        ? ["task", "submit", "AC-1"]
+        : ["task", "block", "AC-1", "--on", "ext:acme", "-m", "Acme response needed."]
+      let state = try Self.run(command, in: scratch)
+      try #require(state.termination == .exit(0), "\(state.stdout)\(state.stderr)")
+      let move = try Self.run(
+        ["task", "edit", "AC-1", "--app", "desk", "--approved", "Use Acme desk.", "--json"],
+        in: scratch)
+      try #require(move.termination == .exit(0), "\(move.stdout)\(move.stderr)")
+      let task = try Self.task("AC-1", in: scratch)
+      #expect(task["app"] as? String == "desk")
+      #expect(task["status"] as? String == status)
+      #expect(task["claimed_by"] == nil)
+    }
+  }
+
   @Test func rejectsForeignClaimsClosedTasksAndCombinedEditModes() throws {
     try withScratchDirectory { scratch in
       let fixture = try Self.fixture(scratch)
@@ -258,8 +307,12 @@ extension TaskAppEditCommandTests {
       let result = try run(
         ["task", "edit", "AC-1", "--app", "web", "--approved", "Retag Acme.", "--json"],
         in: scratch)
-      let code = try TaskStateCommandTests.error(result)["code"] as? String
+      let error = try TaskStateCommandTests.error(result)
+      let code = error["code"] as? String
       #expect(code == (status == "promoted" ? "read_only_promoted" : "conflict"))
+      let message = "AC-1 is \(status); its primary app cannot change."
+      let detail = status == "promoted" ? " Work in tracker ado:1." : ""
+      #expect(error["message"] as? String == message + detail)
       #expect(try auditSnapshot(store) == before)
     }
   }

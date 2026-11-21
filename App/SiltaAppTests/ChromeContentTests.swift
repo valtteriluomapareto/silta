@@ -8,9 +8,9 @@
     @Test func sidebarUsesRecordedActorsStepsColorsAndQualifiedDocCount() throws {
       try fixture { reader in
         let task = try reader.task("AC-12", workspace: "acme")
-        #expect(SidebarContent.claimTitle(task) == "AC-12 · step 2 of 4")
+        #expect(SidebarContent.claimTitle(task, now: AppV2Fixture.now) == "AC-12 · step 2 of 4")
         #expect(
-          SidebarContent.claimSubtitle(task, now: AppV2Fixture.now) == "Claude · updated 6 min ago")
+          SidebarContent.claimSubtitle(task, now: AppV2Fixture.now) == "Claude · active 6 min ago")
         #expect(SidebarContent.appColor(index: 0) == "AppSlate")
         #expect(SidebarContent.appColor(index: 1) == "AppViolet")
         #expect(SidebarContent.appColor(index: 2) == "AppClay")
@@ -202,10 +202,11 @@
     @Test func claimAgeIsShortAndQualified() throws {
       try fixture { reader in
         let codex = try reader.task("AC-14", workspace: "acme")
-        #expect(SidebarContent.claimAge(codex, now: AppV2Fixture.now) == "1 h")
+        #expect(SidebarContent.claimAge(codex, now: AppV2Fixture.now) == "3 h")
         let claude = try reader.task("AC-12", workspace: "acme")
         let date = try Date(
-          claude.updatedAt, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+          try #require(claude.claimedAt),
+          strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
         #expect(SidebarContent.claimAge(claude, now: date.addingTimeInterval(30)) == "just now")
         #expect(RelativeAge.text(nil, now: AppV2Fixture.now, short: true) == nil)
       }

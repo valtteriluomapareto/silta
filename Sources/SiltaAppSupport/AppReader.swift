@@ -44,7 +44,7 @@ public struct AppReader: Sendable {
       let service = TaskService(environment: environment, workspace: workspace)
       var filter = TaskFilter()
       filter.proposed = true
-      let tasks = try service.list(filter).map {
+      let tasks = try service.withResumeState(service.list(filter)).map {
         AppTask($0, submission: $0.status == "review" ? try service.reviewSubmission($0.ref) : nil)
       }
       let at = environment.clock.now()
@@ -78,15 +78,17 @@ public struct AppReader: Sendable {
     }
   }
 
-  /// Reads task properties, parsed plan and discussion through the core service.
+  /// Reads task properties, parsed plan, discussion, relatives and blocker states through
+  /// the core service in one read.
   public func task(_ ref: String, workspace: String) throws -> AppTask {
     try Self.checked(home: environment.home.url) {
       try checkSchema()
       let service = TaskService(environment: environment, workspace: workspace)
-      let (task, resolved) = try service.showWithResolvedThreads(ref)
+      let inspection = try service.inspect(ref)
+      let task = inspection.task
       return AppTask(
         task, submission: task.status == "review" ? try service.reviewSubmission(ref) : nil,
-        resolved: resolved)
+        resolved: inspection.resolved, detail: AppTaskDetail(inspection))
     }
   }
 
