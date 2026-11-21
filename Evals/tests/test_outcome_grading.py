@@ -34,17 +34,19 @@ def record(e, body, table='comments', **extra):
 
 
 class OutcomeGrading(unittest.TestCase):
-    def test_existing_plan_changes_and_phase_only_writes_are_observed(self):
+    def test_phase_only_new_plans_are_observed_and_existing_edits_are_exempt(self):
         e = evidence()
-        plan = 'acme-mobile/PLAN.txt'
-        e['baseline']['files'][plan] = 'old'
+        existing = 'acme-mobile/PLAN.txt'
+        transient = 'acme-mobile/plans/implementation.md'
+        e['baseline']['files'][existing] = 'old'
         early = e['phases'][0]
-        early['state']['files'][plan] = 'changed'
+        early['state']['files'][existing] = 'changed'
+        early['state']['files'][transient] = 'new'
         second = copy.deepcopy(early)
-        second['state']['files'][plan] = 'old'
+        del second['state']['files'][transient]
         second['state']['files']['acme-mobile/TODO'] = 'new'
         e['phases'].append(second)
-        self.assertCountEqual(evals.forbidden(e), ['repository file: ' + plan,
+        self.assertCountEqual(evals.forbidden(e), ['repository file: ' + transient,
                                                    'repository file: acme-mobile/TODO'])
 
     def test_context_metrics_use_observed_output_and_the_immediate_followup(self):
