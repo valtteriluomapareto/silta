@@ -243,7 +243,8 @@ struct ScanIdentityCommandTests {
       try Row.fetchAll(
         db,
         sql: """
-          SELECT workspace.uid, workspace.slug, repo.uid, repo.slug, repo.remote_url, repo_path.path
+          SELECT workspace.uid, workspace.slug, repo.uid,
+                 repo.slug AS repo_slug, repo.remote_url, repo_path.path
           FROM repo JOIN workspace ON workspace.id=repo.workspace_id
           LEFT JOIN repo_path ON repo_path.repo_id=repo.id
           ORDER BY workspace.slug, repo.slug
@@ -254,5 +255,137 @@ struct ScanIdentityCommandTests {
   private static func run(_ args: [String], _ cwd: URL, _ scratch: URL) throws -> CLIResult {
     try SiltaBinary.run(
       args + ["--json"], in: scratch, cwd: cwd, environment: TaskCommandTests.fixed)
+  }
+}
+
+extension ScanIdentityCommandTests {
+  @Test(
+    arguments: [
+      "git@github-work:acme-fixture/web.git",
+      "https://github.com/fork-fixture/web.git",
+      "https://testuser:testpassword@github.com/fork-fixture/web.git?token=testquery#testfragment",
+    ], [false, true])
+  func onlyAnExplicitHumanCanBindADifferentlySpelledOrigin(origin: String, json: Bool) throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try Self.declare("web", origin: Self.acmeOrigin, in: store)
+      let repo = try Self.clone("web", origin: origin, in: scratch)
+      let before = try Self.identity(store)
+      try Self.checkMismatchInspection(repo, in: scratch)
+      let args = ["--ws", "acme", "init", "--scan", repo.path]
+      let agent = try Self.run(args + ["--approved", "Use Acme clone."], repo, scratch)
+      #expect(agent.termination == .exit(6))
+      #expect(try Self.identity(store) == before)
+      let human = try EditorTerminalFixture.run(
+        args + (json ? ["--json"] : []), in: scratch, environment: ["SILTA_ACTOR": "human:acme"]
+      ).result
+      let output = human.stdout + human.stderr
+      withKnownIssue("The scoped scan currently refuses the human's explicit mismatched binding.") {
+        #expect(human.termination == .exit(0))
+        #expect(output.contains("origin_mismatch"))
+        #expect(output.contains("acme-fixture/web.git"))
+        #expect(
+          output.contains(origin.contains("github-work") ? "github-work" : "fork-fixture"))
+      }
+      for token in ["testuser", "testpassword", "testquery", "testfragment"] {
+        #expect(!output.contains(token))
+      }
+      if human.termination == .exit(0) {
+        let row = try #require(try Self.identity(store).first)
+        #expect(row["remote_url"] == Self.acmeOrigin)
+        let path: String? = row["path"]
+        #expect(path != nil)
+      }
+    }
+  }
+
+  private static func checkMismatchInspection(_ repo: URL, in scratch: URL) throws {
+    let whereResult = try Self.run(["where"], repo, scratch)
+    let brief = try Self.run(["brief"], repo, scratch)
+    let location = try GuideContractTests.object(whereResult.stdout)["error"] as? [String: Any]
+    let scan =
+      if location?["next"] as? [String] == [Self.inspect] {
+        try Self.run(["init", "--scan", "."], repo, scratch)
+      } else {
+        nil as CLIResult?
+      }
+    let refusal = try scan.flatMap {
+      try GuideContractTests.object($0.stdout)["error"] as? [String: Any]
+    }
+    withKnownIssue("A differing unbound declaration currently gives no read-only discovery hint.") {
+      #expect(location?["next"] as? [String] == [Self.inspect])
+      #expect(brief.stdout.contains(Self.inspect))
+      #expect(scan?.termination == .exit(6) && refusal?["next"] as? [String] == [Self.inspect])
+    }
+    #expect(
+      try FirstWorkspaceCommandTests.replay(Self.inspect, in: scratch, cwd: repo).termination
+        == .exit(0))
+  }
+
+  @Test(arguments: [
+    "https://wrong@dev.azure.com/acme/delivery/_git/web",
+    "https://acme:password@dev.azure.com/acme/delivery/_git/web",
+    "https://acme.visualstudio.com.invalid/delivery/_git/web",
+  ])
+  func malformedAzureAliasesGiveOnlyReadOnlyRecovery(origin: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try Self.declare("web", origin: "https://dev.azure.com/acme/delivery/_git/web", in: store)
+      let repo = try Self.clone("web", origin: origin, in: scratch)
+      let result = try Self.run(["where"], repo, scratch)
+      let error = try TaskStateCommandTests.error(result)
+      withKnownIssue("Unrecognized same-slug origins currently offer workspace creation.") {
+        #expect(error["next"] as? [String] == [Self.inspect])
+      }
+    }
+  }
+
+  @Test func exactOriginStillWinsOverAMismatchedSlug() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try Self.declare("web", origin: Self.acmeOrigin, in: store)
+      try Self.declare("verified", origin: Self.otherOrigin, in: store)
+      let repo = try Self.clone("web", origin: Self.otherOrigin, in: scratch)
+      let location = try Self.run(["where"], repo, scratch)
+      let hint = try #require(
+        (try TaskStateCommandTests.error(location)["next"] as? [String])?.first)
+      #expect(hint.hasPrefix("silta --ws 'acme' init --scan"))
+      #expect(
+        try FirstWorkspaceCommandTests.replay(hint, in: scratch, cwd: repo).termination == .exit(0))
+      let rows = try Self.identity(store)
+      let declared = try #require(rows.first { ($0["repo_slug"] as String) == "web" })
+      let verified = try #require(rows.first { ($0["repo_slug"] as String) == "verified" })
+      let declaredPath: String? = declared["path"]
+      let verifiedPath: String? = verified["path"]
+      #expect(declaredPath == nil)
+      #expect(verifiedPath != nil)
+    }
+  }
+
+  @Test(arguments: [
+    "https://acme@dev.azure.com/Acme/Delivery/_git/Web",
+    "https://acme.visualstudio.com/Delivery/_git/Web/",
+  ])
+  func azurePortalFormsRecoverTheDeclaredRepo(origin: String) throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      let configured = "https://dev.azure.com/acme/delivery/_git/web"
+      try Self.declare("declared", origin: configured, in: store)
+      let repo = try Self.clone("checkout", origin: origin, in: scratch)
+      let location = try Self.run(["where"], repo, scratch)
+      let error = try TaskStateCommandTests.error(location)
+      let hint = try #require((error["next"] as? [String])?.first)
+      withKnownIssue("The portal form currently loses the declared Azure identity.") {
+        #expect(hint.hasPrefix("silta --ws 'acme' init --scan "))
+      }
+      if hint.hasPrefix("silta --ws 'acme' ") {
+        #expect(
+          try FirstWorkspaceCommandTests.replay(hint, in: scratch, cwd: repo).termination
+            == .exit(0))
+        let rows = try Self.identity(store)
+        #expect(rows.count == 1)
+        #expect(rows.first?["remote_url"] == configured)
+      }
+    }
   }
 }
