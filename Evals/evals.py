@@ -872,7 +872,10 @@ def native_plan_writes(phase, baseline):
     """Use typed destinations. An item may name its files only at completion."""
     seen = set()
     def added(path):
-        return plan_path(path) and native_plan_key(path, phase) not in baseline
+        if not isinstance(path, str) or not path:
+            return False
+        key = native_plan_key(path, phase)
+        return key not in baseline and plan_path(key or path)
 
     for tool in phase.get('opaque', []):
         if not isinstance(tool, dict):

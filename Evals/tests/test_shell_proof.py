@@ -53,6 +53,25 @@ class ShellProof(unittest.TestCase):
                 'native file tool: file_change ' + path, 'repository file: ' + checkout + path)
         ] + ['native file tool: file_change TODO.md', 'native file tool: Write plan.md'])
 
+    def test_native_plan_names_are_classified_inside_the_checkout(self):
+        checkout = '/fixture/plans/repos/acme-mobile'
+        ordinary = [checkout + '/docs/release.md', 'roadmap/../docs/release.md']
+        plan = 'docs/../roadmap/followup.md'
+        current = phase({}, [], [])
+        current['scope'] = {'repository': checkout}
+        current['opaque'] = [
+            {'type': 'file_change', 'id': path, 'changes': [{'kind': 'add', 'path': path}]}
+            for path in ordinary + [plan]
+        ] + [
+            {'type': 'tool_use', 'name': 'Write', 'input': {'file_path': path}}
+            for path in ordinary + [plan]
+        ]
+        findings = evals.forbidden({'phases': [current], 'baseline': {'files': {}}})
+        self.assertCountEqual(findings, [
+            'native file tool: file_change ' + plan,
+            'native file tool: Write ' + plan,
+        ])
+
     def test_scoped_tracker_actions_and_graphql_mutations(self):
         writes = ['gh issue -R acme/board comment 1 -b fixture',
                   'gh pr comment 1 -b fixture', 'gh pr edit 1 --title fixture',

@@ -89,6 +89,29 @@ struct EdgeCodeEvidenceTests {
     }
   }
 
+  @Test func skippedReferencesStillUseTheSafeDisplayGate() async throws {
+    try await withScratchDirectory { scratch in
+      let owner = String(repeating: "ab", count: 26)
+      let sensitive = owner + ":Private.md"
+      let visible = "api@acme-edge:Later.md"
+      let (env, runner) = try Self.fixture(
+        scratch, probes: [("Slow.md", .timedOut)], additional: [sensitive, visible])
+      #expect(HumanText.line(sensitive) == sensitive)
+      #expect(!RestoreService.canNameInRecovery(owner))
+
+      let warnings = await EdgeCodeEvidence.warnings(workspace: "acme", environment: env)
+      #expect(warnings.map(\.code) == Array(repeating: "edge_code_unverified", count: 3))
+      let skipped = Array(warnings.dropFirst()).map(\.message)
+      #expect(
+        skipped.first
+          == "An edge code reference was not checked after a Git timeout. Inspect it with \(Self.inspect)."
+      )
+      #expect(skipped.last?.contains(visible) == true)
+      #expect(warnings.allSatisfy { !$0.message.contains(owner) })
+      #expect(runner.requests.count == 1 && runner.isExhausted)
+    }
+  }
+
   private static func request(in repo: URL, path: String = "Acme's guide.md") -> GitRequest {
     .init(
       arguments: [
@@ -105,7 +128,9 @@ struct EdgeCodeEvidenceTests {
     try fixture(scratch, probes: [("Acme's guide.md", termination)])
   }
 
-  private static func fixture(_ scratch: URL, probes: [(String, GitTermination)])
+  private static func fixture(
+    _ scratch: URL, probes: [(String, GitTermination)], additional: [String] = []
+  )
     throws -> (SiltaEnvironment, ScriptedGitRunner)
   {
     let repo = scratch.appending(path: "checkout")
@@ -113,7 +138,7 @@ struct EdgeCodeEvidenceTests {
       at: repo.appending(path: ".git"), withIntermediateDirectories: true)
     let store = try AcmeDocAttachments.make(in: scratch)
     let targets = probes.map { "api@acme-edge:" + $0.0 }
-    let encoded = try JSONEncoder().encode(targets + targets.prefix(1))
+    let encoded = try JSONEncoder().encode(targets + additional + targets.prefix(1))
     let references = try #require(String(data: encoded, encoding: .utf8))
     try store.write { tx in
       try tx.database.execute(

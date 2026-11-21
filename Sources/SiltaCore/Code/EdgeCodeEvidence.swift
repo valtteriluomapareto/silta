@@ -97,9 +97,14 @@ package struct EdgeCodeEvidence {
           probe.referenceWarning(
             reference, "could not be verified locally (Git timed out).", code: Self.unverified))
       case .skippedAfterTimeout:
-        warnings.append(
-          probe.referenceWarning(
-            reference, "was not checked after a Git timeout.", code: Self.unverified))
+        let detail = "was not checked after a Git timeout."
+        let skipped =
+          if Self.parse(reference) != nil {
+            probe.referenceWarning(reference, detail, code: Self.unverified)
+          } else {
+            probe.warning("An edge code reference " + detail, code: Self.unverified)
+          }
+        warnings.append(skipped)
       case .unavailable:
         warnings.append(probe.referenceWarning(reference, "is unavailable locally."))
       }
