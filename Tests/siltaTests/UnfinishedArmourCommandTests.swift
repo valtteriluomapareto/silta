@@ -15,6 +15,7 @@ struct UnfinishedArmourCommandTests {
     "flat", "flatChunks", "nbsp", "bom", "prose", "hash", "sibling", "dedentedQuote",
     "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA",
     "doubleLF", "doubleCRLF", "wideSpace", "done", "verify", "listDone", "quotedDone",
+    "inlineCode", "sri", "dataValue", "base64Hash",
   ])
   func unfinishedArmourStorageAndExport(form: String) throws {
     try withScratchDirectory { scratch in
@@ -51,14 +52,7 @@ struct UnfinishedArmourCommandTests {
             $0.contains(Self.token) || $0.contains(second)
           })
       }
-      if Self.followup(form) != nil {
-        withKnownIssue(
-          "Unfinished armour overmatches prose or misses encoded payload.",
-          isIntermittent: true
-        ) { check() }
-      } else {
-        check()
-      }
+      check()
     }
   }
 
@@ -93,17 +87,15 @@ struct UnfinishedArmourCommandTests {
       let stored = try store.read {
         try String.fetchOne($0, sql: "SELECT description_md FROM task")
       }
-      withKnownIssue("A human currently cannot store an inline marker mention next to file prose.")
-      {
-        #expect(result.termination == .exit(0))
-        #expect(stored == prose)
-      }
+      #expect(result.termination == .exit(0))
+      #expect(stored == prose)
     }
   }
 
   private static func followup(_ form: String) -> (String, String)? {
     switch form {
-    case "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA":
+    case "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA",
+      "inlineCode", "sri", "dataValue", "base64Hash":
       return unchangedMention(form)
     case "doubleLF", "doubleCRLF":
       let split = form == "doubleLF" ? #"\\n"# : #"\\r\\n"#
@@ -134,8 +126,12 @@ struct UnfinishedArmourCommandTests {
       "adjacentJWT": " " + String(repeating: "Aa", count: 24) + ".example.signature",
       "adjacentSHA": " " + sha,
       "physicalSHA": " fixed in\n" + sha,
+      "inlineCode": " docs at " + source + "`",
+      "sri": " sha384-" + String(repeating: "Aq", count: 32),
+      "dataValue": " data:image/png;base64," + String(repeating: "Aq", count: 32),
+      "base64Hash": " compare SHA-256 " + String(repeating: "Aq", count: 22) + "=",
     ]
-    let body = "See " + marker + (tails[form] ?? "")
+    let body = (form == "inlineCode" ? "`See " : "See ") + marker + (tails[form] ?? "")
     return (body, body)
   }
 
