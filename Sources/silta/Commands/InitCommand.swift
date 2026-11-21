@@ -67,7 +67,7 @@ struct InitCommand: OutputCommand {
         }
       outcome = try await RepositoryScan.scan(
         scan.map { URL(filePath: $0) }, target: target, store: env.db,
-        git: env.git, identity: (env.ids, env.clock.now()))
+        git: env.git, identity: (env.ids, env.clock.now()), human: env.actor.isHuman)
     }
     return receipt(outcome, actor: env.actor)
   }

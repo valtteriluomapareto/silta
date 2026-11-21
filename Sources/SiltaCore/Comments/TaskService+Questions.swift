@@ -67,10 +67,10 @@ extension TaskService {
     let author: String = answer["actor"]
     let actor = environment.actor
     let caller = actor.description
-    if Self.canAcceptAnswer(author, question: question, claimer: task.claimedBy, caller: caller) {
+    if Self.canAcceptAnswer(author, question: question, claimer: task.claimedBy, caller: actor) {
       return
     }
-    if Self.isOwnHumanAnswer(author, question: question, caller: caller) {
+    if Self.isOwnHumanAnswer(author, question: question, caller: actor) {
       try Self.liveThread(answer, root: root, task: task, allowResolved: true)
       let read = scopedCommand(
         "silta task show " + shellWord(task.ref) + " --timeline",
@@ -90,14 +90,17 @@ extension TaskService {
   }
 
   static func canAcceptAnswer(
-    _ author: String, question: CommentDetails, claimer: String?, caller: String
+    _ author: String, question: CommentDetails, claimer: String?, caller: ActorID
   ) -> Bool {
-    (question.actor == caller && !isOwnHumanAnswer(author, question: question, caller: caller))
-      || (claimer == caller && author != caller)
+    let name = caller.description
+    return (question.actor == name && !isOwnHumanAnswer(author, question: question, caller: caller))
+      || (claimer == name && author != name)
   }
 
-  static func isOwnHumanAnswer(_ author: String, question: CommentDetails, caller: String) -> Bool {
-    author == caller && question.actor == caller && !question.humanRecipients.isEmpty
+  static func isOwnHumanAnswer(_ author: String, question: CommentDetails, caller: ActorID) -> Bool
+  {
+    !caller.isHuman && author == caller.description && question.actor == author
+      && !question.humanRecipients.isEmpty
   }
 
   /// A live outsider relay can be recorded after chat confirmation from an addressed human.

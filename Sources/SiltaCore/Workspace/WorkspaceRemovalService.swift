@@ -14,6 +14,7 @@ package struct WorkspaceRemovalReport: Encodable, Sendable {
   package let counts: [Count]
   package let savedDefault: Bool
   package let registeredClones: [String]
+  package let unresolvedClones: [String]?
   package var backup: String?
   package var recovery: String?
   package var next: [String]?
@@ -24,6 +25,7 @@ package struct WorkspaceRemovalReport: Encodable, Sendable {
     case dryRun = "dry_run"
     case savedDefault = "saved_default"
     case registeredClones = "registered_clones"
+    case unresolvedClones = "unresolved_clones"
     case nextBy = "next_by"
   }
 }
@@ -41,7 +43,7 @@ package struct WorkspaceRemovalService {
       throw WorkspaceRemovalError.directHuman(slug, allowActive: allowActive)
     }
     let store = environment.db
-    guard FileManager.default.fileExists(atPath: store.path) else {
+    guard !DatabaseFile.isMissing(store.path) else {
       throw WorkspaceError.unknown(slug)
     }
     let selected = try store.read { try capture(slug, in: $0) }
@@ -51,14 +53,17 @@ package struct WorkspaceRemovalService {
       return try store.read { db in
         try check(selected, slug: slug, in: db)
         try clones.requireUnchanged(workspace: slug)
-        return try report(slug, selection: selected, clones: clones.active, dryRun: true, in: db)
+        return try report(slug, selection: selected, clones: clones, dryRun: true, in: db)
       }
     }
     return try store.write(keepingBackup: \.backup) { tx in
       try check(selected, slug: slug, in: tx.database)
       if !allowActive { try clones.requireUnchanged(workspace: slug) }
       var report = try self.report(
-        slug, selection: selected, clones: clones.active, dryRun: false, in: tx.database)
+        slug, selection: selected, clones: clones, dryRun: false, in: tx.database)
+      if !allowActive, !clones.unresolved.isEmpty {
+        throw WorkspaceRemovalError.registration(slug, paths: clones.unresolved)
+      }
       guard allowActive || (!report.savedDefault && clones.active.isEmpty) else {
         throw WorkspaceRemovalError.active(slug)
       }
@@ -135,7 +140,8 @@ package struct WorkspaceRemovalService {
   }
 
   private func report(
-    _ slug: String, selection: Selection, clones: [String], dryRun: Bool, in db: Database
+    _ slug: String, selection: Selection, clones: RegisteredCloneInspection,
+    dryRun: Bool, in db: Database
   ) throws -> WorkspaceRemovalReport {
     let isDefault =
       try Bool.fetchOne(
@@ -145,10 +151,17 @@ package struct WorkspaceRemovalService {
             WHERE key='current_workspace' AND value=CAST(? AS TEXT))
           """,
         arguments: [Data(slug.utf8)]) == true
-    return WorkspaceRemovalReport(
+    let unresolved = clones.unresolved.map(HumanText.line)
+    var report = WorkspaceRemovalReport(
       workspace: slug, name: HumanText.line(selection.name), dryRun: dryRun,
       counts: try WorkspaceOwnedRows.counts(selection.id, in: db),
-      savedDefault: isDefault, registeredClones: clones)
+      savedDefault: isDefault, registeredClones: clones.active.map(HumanText.line),
+      unresolvedClones: unresolved.isEmpty ? nil : unresolved)
+    if dryRun && (isDefault || !clones.active.isEmpty || !unresolved.isEmpty) {
+      report.next = WorkspaceRemovalError.directHuman(slug, allowActive: true).next
+      report.nextBy = NextBy.human.rawValue
+    }
+    return report
   }
 }
 
@@ -156,7 +169,7 @@ enum WorkspaceRemovalError: CodedError {
   case directHuman(String, allowActive: Bool)
   case active(String)
   case changed(String)
-  case registration(String)
+  case registration(String, paths: [String])
 
   var code: ErrorCode {
     switch self {
@@ -175,8 +188,9 @@ enum WorkspaceRemovalError: CodedError {
       "The workspace is the saved default or has a registered clone. "
         + "Preview it before choosing --allow-active."
     case .changed: "The workspace or its registrations changed before removal."
-    case .registration:
-      "Could not check a registered clone. Workspace removal requires known registrations."
+    case .registration(_, let paths):
+      "Could not inspect registered clones at "
+        + paths.map { HumanText.line($0).debugDescription }.joined(separator: ", ") + "."
     }
   }
 
@@ -196,8 +210,9 @@ enum WorkspaceRemovalError: CodedError {
     case .active(let slug), .changed(let slug):
       target = slug
       suffix = " --dry-run"
-    case .registration(let slug):
-      return [workspaceEditRead(slug)]
+    case .registration(let slug, _):
+      target = slug
+      suffix = " --allow-active"
     }
     guard WorkspaceConfig.isValidIdentifier(target), RestoreService.canNameInRecovery(target)
     else { return ["silta ws ls"] }

@@ -95,7 +95,9 @@ extension BriefCommandTests {
       let warnings = try #require(
         try TaskStateCommandTests.object(edit)["warnings"] as? [[String: String]])
       let inspect = "silta --ws 'acme' ws show"
-      let edgeWarnings = warnings.filter { $0["code"] == "edge_code_unavailable" }
+      let edgeWarnings = warnings.filter {
+        $0["code"] == "edge_code_unavailable" || $0["code"] == "edge_code_unverified"
+      }
       #expect(edgeWarnings.contains { $0["message"]?.contains("api:") == true })
       #expect(
         edgeWarnings.allSatisfy {

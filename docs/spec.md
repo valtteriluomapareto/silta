@@ -819,7 +819,8 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   inbox unless the actor is also the asker. After confirming a human's answer in
   chat, the asker or eligible claimer accepts another agent's relay. The relaying
   agent can resolve the thread with `comment resolve <ref> -m <confirmed answer>`.
-  An asker cannot accept their own answer to a question with a human recipient.
+  An agent asker cannot accept their own answer to a question with a human recipient.
+  A human asker can accept their own answer.
   An agent's inbox offers conditional confirmation on that answer if the agent is
   outside the question's recipients. A human inbox keeps the same confirmation
   instruction for an agent with a live outsider answer to that addressed human.
@@ -1574,8 +1575,8 @@ workspace. A setting that changes the rules gets one conditional sentence, and
   `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
   current claimer can `comment accept` an answer. Answer only as an addressee or
   to relay the human's chat answer. For questions addressed to a human, record a
-  confirmed relay by resolving the question with an explanation. The asker cannot
-  accept their own answer to such a question.
+  confirmed relay by resolving the question with an explanation. An agent asker
+  cannot accept their own answer to such a question.
 - **Blocked:** a question to the human doesn't block the task. If the human can
   answer, ask in chat, even about the customer. If only
   someone outside can (`ext:`) or another task must land first, keep doing what you
@@ -1667,8 +1668,11 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    edges with no code omit the pointer. Checks are bounded, use local Git objects,
    and reuse results for repeated references. Each command appears once. A
    successful `ws edit` warns if a saved edge's code cannot be verified locally.
-   A Git timeout is reported separately from unavailable code. These probes read local
-   Git objects with lazy fetching disabled. Brief hooks still apply their own deadline.
+   After the first Git timeout, the command keeps verified evidence and skips further
+   probes. Workspace edits report timed-out or skipped references as
+   `edge_code_unverified` and unavailable references as `edge_code_unavailable`.
+   The probes use local objects with lazy fetching disabled, and brief hooks still
+   apply their own deadline.
 6. **Open tasks** for this app and its topics (top 8), ordered by priority then
    task sequence ascending, after explicit-topic matches, which rank first. When
    the selection exceeds eight, an omitted count is followed by one `next:` line per
@@ -2016,17 +2020,19 @@ skip non-regular files; filesystem stalls cannot be absolutely bounded by `O_NON
 ### Remove a mistaken workspace
 
 `silta ws rm <slug> --dry-run` lists owned row counts, default selection and
-live registered clones without initializing or changing storage. The human
-runs `silta ws rm <slug>` directly in their terminal. Removing the saved
-default or a workspace with a live registered clone requires `--allow-active`.
-The command clears that selection or registration and leaves the Git clone on disk.
+live or uninspectable registered clones without initializing or changing storage.
+The human runs `silta ws rm <slug>` directly in their terminal. Removing the saved
+default or a workspace with a live or uninspectable clone requires `--allow-active`.
+The preview and uninspectable clone refusal identify affected paths and give the
+full human command. The removal clears those registrations and leaves the files
+on disk.
 
 The write rechecks the workspace and registrations. If an inactive path changes
 while removing without an override, preview again. Removal publishes a fresh SQLite
 backup and a validated recovery tree before deleting the owned graph in one
 transaction. Use the printed `restore --dry-run` to inspect the recovery tree,
-then run restore in the human's terminal to recover the workspace without
-replacing others. The whole database snapshot includes machine-local registrations
+then run restore directly or approve the agent's exact restore command in chat.
+The restore recovers the workspace without replacing others. The whole database snapshot includes machine-local registrations
 and worktree information. The portable tree follows the export portability rules
 above. The v10 writer floor prevents older selectors from saving a workspace
 that was deleted before their write.
@@ -2416,14 +2422,17 @@ alternatives considered are summarized in [D12](decisions.md#technology).
 
 **Secret guard (M1).** It scans every task text, comment, plan, result and doc
 revision before the write. It checks only the fields a write changes, each changed
-field whole rather than its changed lines; an unchanged field is never rescanned, so
+field whole rather than its changed lines. Rule updates do not rescan unchanged
+stored fields. Material missed by an older rule stays until the field is edited, and
 text a human kept with `--allow-secret` doesn't block their later writes.
 - **Rules:** a pinned, versioned regex set covering:
   - private-key armour, including PGP and SSH2. An unfinished block can start on
     its own line, or carry enough base64 evidence after an inline or annotated
-    opening marker. Literal escaped line breaks and flattened payloads count.
-    Format-specific preambles can precede the payload. Inline redaction stops at
-    the last payload character. The first payload line and a continuation after
+    opening marker. Flattened payloads start at the marker or its annotation.
+    Single and double escaped line breaks and payload slashes count, with the
+    enclosing field kept intact. Format-specific preambles can precede a payload.
+    Inline redaction ends at a whole payload token and retains trailing punctuation.
+    The first payload line and a continuation after
     a blank need enough base64 to distinguish them from short prose. A quote or
     list continues across a blank only inside its Markdown container.
   - Azure storage `AccountKey=` and SAS signatures
@@ -3145,9 +3154,11 @@ all match its registered repos, preserving its prefix. Slug and prefix clashes c
 An exact clone path binding takes priority. Other strong evidence includes an
 exact network or absolute local origin and standard hosted HTTPS and Git SSH
 aliases. GitHub, GitLab and Azure DevOps paths compare without case, and standard
-hosted paths can end in a slash. HTTPS, current Git SSH and legacy Visual Studio
-Git SSH spellings identify the same Azure DevOps repository. A network clone's
-slug alone is a possible match to a pathless declaration that has no origin.
+hosted paths can end in a slash. Azure DevOps supports HTTPS with or without the
+organization as the username, the legacy organization-specific Visual Studio
+HTTPS host, and current and legacy Git SSH spellings. A network clone's slug alone
+is a possible match to a pathless declaration. A same-slug declaration with a
+different origin offers read-only inspection if there is no stronger match.
 A possible alias on another host, a matching relative local origin or a workspace
 name alone calls for inspection before an automatic selection. An explicit new
 workspace may bypass slug-only candidates, subject to verified path and origin
@@ -3181,6 +3192,9 @@ resolve to one canonical main clone. Initial scans create configuration. A scope
 rescan refreshes paths by exact binding, a unique compatible origin, or a
 same-slug declaration without contradictory origin evidence. A unique same-slug
 HTTPS and Git SSH alias on a generic host is compatible in this explicit scope.
+A direct human who explicitly scopes the scan may bind a same-slug clone to an
+unbound declaration with a different origin. The receipt warns about the mismatch
+without showing credentials, and the declaration keeps its configured origin.
 A different live checkout keeps its binding. Named scan roots must be readable
 directories. An unreadable descendant is skipped with a warning when other
 clones can be registered. If unreadable descendants leave no clones, the scan

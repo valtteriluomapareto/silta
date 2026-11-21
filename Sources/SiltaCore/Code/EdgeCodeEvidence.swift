@@ -8,10 +8,14 @@ package struct EdgeCodeEvidence {
   private let reader: CodeService
   private let workspace: String
   private var outcomes: [Data: Outcome] = [:]
+  private var stoppedForTimeout = false
+
+  private static let unverified = "edge_code_unverified"
 
   private enum Outcome {
     case verified(String)
     case timedOut
+    case skippedAfterTimeout
     case unavailable
     case unsafe
   }
@@ -40,7 +44,8 @@ package struct EdgeCodeEvidence {
     let key = Data(raw.utf8)
     if let previous = outcomes[key] { return previous }
     guard outcomes.count < Self.limit, !Task.isCancelled else { return nil }
-    let result = await verify(raw)
+    let result = stoppedForTimeout ? .skippedAfterTimeout : await verify(raw)
+    if case .timedOut = result { stoppedForTimeout = true }
     outcomes[key] = result
     return result
   }
@@ -78,7 +83,8 @@ package struct EdgeCodeEvidence {
     var warnings: [OutputWarning] = []
     for reference in references where probe.outcomes[Data(reference.utf8)] == nil {
       guard let result = await probe.outcome(reference) else {
-        warnings.append(probe.warning("Some edge code references were not checked."))
+        let code = probe.stoppedForTimeout ? Self.unverified : "edge_code_unavailable"
+        warnings.append(probe.warning("Some edge code references were not checked.", code: code))
         break
       }
       switch result {
@@ -88,7 +94,17 @@ package struct EdgeCodeEvidence {
           probe.warning("An edge code reference could not be read or printed safely."))
       case .timedOut:
         warnings.append(
-          probe.referenceWarning(reference, "could not be verified locally (Git timed out)."))
+          probe.referenceWarning(
+            reference, "could not be verified locally (Git timed out).", code: Self.unverified))
+      case .skippedAfterTimeout:
+        let detail = "was not checked after a Git timeout."
+        let skipped =
+          if Self.parse(reference) != nil {
+            probe.referenceWarning(reference, detail, code: Self.unverified)
+          } else {
+            probe.warning("An edge code reference " + detail, code: Self.unverified)
+          }
+        warnings.append(skipped)
       case .unavailable:
         warnings.append(probe.referenceWarning(reference, "is unavailable locally."))
       }
@@ -96,13 +112,15 @@ package struct EdgeCodeEvidence {
     return warnings
   }
 
-  private func referenceWarning(_ reference: String, _ detail: String) -> OutputWarning {
+  private func referenceWarning(
+    _ reference: String, _ detail: String, code: String = "edge_code_unavailable"
+  ) -> OutputWarning {
     let name = String(HumanText.line(reference).prefix(160)).debugDescription
-    return warning("Edge code reference " + name + " " + detail)
+    return warning("Edge code reference " + name + " " + detail, code: code)
   }
 
-  private func warning(_ message: String) -> OutputWarning {
-    .init(code: "edge_code_unavailable", message: message + " Inspect it with " + inspect + ".")
+  private func warning(_ message: String, code: String = "edge_code_unavailable") -> OutputWarning {
+    .init(code: code, message: message + " Inspect it with " + inspect + ".")
   }
 
   private static func parse(_ raw: String) -> (String, CodeRead)? {

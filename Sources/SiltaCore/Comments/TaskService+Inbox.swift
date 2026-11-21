@@ -116,7 +116,7 @@ extension TaskService {
     } else if attention.kind == "answer", let question = attention.question,
       Self.canAcceptAnswer(
         post.actor, question: question, claimer: task.claimedBy,
-        caller: environment.actor.description)
+        caller: environment.actor)
     {
       next = [command + " comment accept " + shellWord(post.ref)]
     } else if let confirmation = relayConfirmation(attention, actor: actor, workspace: workspace) {
@@ -150,7 +150,7 @@ extension TaskService {
     }
     let post = attention.post
     guard actor == caller, attention.kind == "answer",
-      Self.isOwnHumanAnswer(post.actor, question: question, caller: caller.description)
+      Self.isOwnHumanAnswer(post.actor, question: question, caller: caller)
     else { return nil }
     let recipients = question.humanRecipients
     let recipientList = recipients.map { HumanText.line($0.description) }.joined(separator: ", ")
