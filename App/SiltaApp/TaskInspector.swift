@@ -30,7 +30,9 @@ struct TaskInspector: View {
             if let now = model.visibleData?.checkedAt,
               let banner = TaskPresentation.claimBanner(task, now: now)
             {
-              ClaimBannerView(banner: banner, prompt: resumePrompt(task), worktree: task.worktree)
+              ClaimBannerView(
+                banner: banner, prompt: task.claimExpiresAt == nil ? nil : resumePrompt(task),
+                worktree: task.worktree)
             }
             if let handoff = TaskFacts.handoff(task) {
               HandoffNote(text: handoff, prompt: resumePrompt(task))
