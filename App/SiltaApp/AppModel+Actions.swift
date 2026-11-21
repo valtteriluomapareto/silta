@@ -42,17 +42,28 @@ extension AppModel {
     return perform(.acceptProposals(refs: refs), for: Self.proposalsTarget)
   }
 
-  /// Drops the ticked proposals among `visible` as one all-or-nothing triage. A blank
-  /// reason records Core's default.
-  @discardableResult func dropSelectedProposals(among visible: [String], why: String)
-    -> Task<Void, Never>?
-  {
+  /// Drops the ticked proposals among `visible` as one all-or-nothing triage, with the
+  /// drop reason draft; a blank reason records Core's default. The reason clears, and the
+  /// reason field closes, only when the drop succeeds.
+  @discardableResult func dropSelectedProposals(among visible: [String]) -> Task<Void, Never>? {
     let refs = actions.selectedProposals.intersection(proposalRefs).intersection(visible).sorted()
-    guard !refs.isEmpty else { return nil }
-    let reason = why.trimmingCharacters(in: .whitespacesAndNewlines)
-    return perform(
-      .dropProposals(refs: refs, why: reason.isEmpty ? nil : reason), for: Self.proposalsTarget)
+    guard !refs.isEmpty, let reasonTarget = target(Self.dropReasonTarget) else { return nil }
+    let reason = actions.draft(reasonTarget).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard
+      let running = perform(
+        .dropProposals(refs: refs, why: reason.isEmpty ? nil : reason), for: Self.proposalsTarget)
+    else { return nil }
+    return Task {
+      await running.value
+      guard let proposals = target(Self.proposalsTarget), actions.failures[proposals] == nil
+      else { return }
+      actions.setDraft("", for: reasonTarget)
+      droppingProposals = false
+    }
   }
+
+  /// The drop reason's draft, apart from the proposals' shared write target.
+  static let dropReasonTarget = "drop-reason"
 
   /// Unblocks a ready task under its own target, apart from the task's comment draft.
   @discardableResult func unblock(_ ref: String) -> Task<Void, Never>? {

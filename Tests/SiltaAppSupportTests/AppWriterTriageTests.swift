@@ -41,10 +41,12 @@
         let log = try String(
           contentsOf: scratch.appending(path: "silta-home/log/2026-11-16.jsonl"), encoding: .utf8)
         #expect(!log.contains("Out of scope"))
+        #expect(log.components(separatedBy: "\"command\":\"app triage\"").count == 3)
+        #expect(log.contains("\"actor\":\"human:acme\""))
       }
     }
 
-    @Test func aProposalDroppedElsewhereFailsTheWholeDrop() throws {
+    @Test func aProposalDecidedElsewhereFailsTheWholeDrop() throws {
       try withScratchDirectory { scratch in
         try AppFixtures.seed(in: scratch)
         let reader = try AppWriterTests.reader(scratch)

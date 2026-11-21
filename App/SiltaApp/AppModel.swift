@@ -59,6 +59,8 @@ final class AppModel {
   /// Why the last full-inbox read failed; the previous list stays on screen.
   private(set) var allWaitingFailure: String?
   @ObservationIgnored private var allWaitingVersion: Int?
+  /// My work is asking for a reason to drop the ticked proposals.
+  var droppingProposals = false
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
   private let load: Loader

@@ -4,8 +4,6 @@ import SwiftUI
 
 struct MyWorkView: View {
   @Bindable var model: AppModel
-  /// The reason being typed for dropping the ticked proposals; nil when not asking.
-  @State var dropReason: String?
 
   var body: some View {
     ScrollView {

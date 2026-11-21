@@ -64,15 +64,22 @@ extension MyWorkView {
       if let failure = target.flatMap({ model.actions.failures[$0] }) {
         ActionFailureView(failure: failure)
       }
-      if let reason = dropReason, chosen > 0 {
+      if model.droppingProposals, chosen > 0,
+        let reasonTarget = model.target(AppModel.dropReasonTarget)
+      {
         HStack(spacing: 10) {
           TextField(
             "Why drop \(chosen == 1 ? "it" : "them")? Optional",
-            text: Binding(get: { reason }, set: { dropReason = $0 })
-          ).textFieldStyle(.roundedBorder).onSubmit { drop(visible) }
-          Button("Cancel") { dropReason = nil }.buttonStyle(CompactActionStyle())
-          Button(sending ? "Dropping…" : "Drop \(chosen)") { drop(visible) }
-            .buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
+            text: Binding(
+              get: { model.actions.draft(reasonTarget) },
+              set: { model.actions.setDraft($0, for: reasonTarget) })
+          ).textFieldStyle(.roundedBorder).disabled(sending)
+            .onSubmit { if !sending { model.dropSelectedProposals(among: visible) } }
+          Button("Cancel") { model.droppingProposals = false }.buttonStyle(CompactActionStyle())
+            .keyboardShortcut(.cancelAction).disabled(sending)
+          Button(sending ? "Dropping…" : "Drop \(chosen)") {
+            model.dropSelectedProposals(among: visible)
+          }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
         }
       } else {
         HStack(spacing: 12) {
@@ -85,21 +92,14 @@ extension MyWorkView {
           if let command {
             CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
           }
-          Button(chosen == 0 ? "Drop…" : "Drop \(chosen)…") { dropReason = "" }
-            .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(Color("TideText"))
-            .disabled(chosen == 0 || sending)
+          Button(chosen == 0 ? "Drop…" : "Drop \(chosen)…") { model.droppingProposals = true }
+            .buttonStyle(CompactActionStyle()).disabled(chosen == 0 || sending)
           Button(sending ? "Accepting…" : chosen == 0 ? "Accept" : "Accept \(chosen)") {
             model.acceptSelectedProposals(among: visible)
           }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(chosen == 0 || sending)
         }
       }
     }.padding(.leading, 32).padding(.top, 4)
-  }
-
-  private func drop(_ visible: [String]) {
-    let reason = dropReason ?? ""
-    dropReason = nil
-    model.dropSelectedProposals(among: visible, why: reason)
   }
 
   func unblockRow(_ ref: String) -> some View {
