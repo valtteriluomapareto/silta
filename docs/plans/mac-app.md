@@ -85,8 +85,10 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
     `REFS`, and question answers use `-m ""`, which Silta refuses as an empty body;
   - review items offer task-reading commands. Human completion permits an empty
     result, so a completion template cannot promise the same empty-message refusal.
-    The maintainer chose to preserve CLI behavior on 2026-11-17; completion commands
-    remain outside this viewer;
+    The maintainer chose to preserve CLI behavior on 2026-11-17. On 2026-11-21 they
+    chose review actions in the app instead (Paper "App features v1"): a review card
+    marks the task done only with a nonblank result and an optional merge commit
+    (`app done`), requests changes as a question to the submitter, or drops it;
   - a Copied state;
   - ⌘C and a context menu.
   - Paper "App features v1": Board cards, done rows, review rows and Claimed now rows

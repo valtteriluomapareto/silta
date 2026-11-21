@@ -126,7 +126,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - §19 gains the `app …` commands.
 
 **Out:**
-- Doc triage, approve and done, archive, editing plans, and `--allow-secret`. Dropping
+- Doc triage, archive, editing plans, and `--allow-secret`. Approving a review moved in
+  on 2026-11-21: My work's review card offers Mark done (a nonblank result, an optional
+  merge commit, no `--force` past an unmet review gate), Request changes (a question to
+  the submitter) and Drop, plus Open task and the PR link. Dropping
   proposals moved in with Paper "App features v1": My work's proposal card offers "Drop
   N…", which asks for an optional one-line reason and sends one all-or-nothing triage,
   and each proposal row has "Open", which opens it in the Board inspector.
