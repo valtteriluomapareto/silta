@@ -41,9 +41,11 @@ class Acceptance(unittest.TestCase):
     def failed_trials(cls):
         # The runner prints nothing for a failed trial; name each one from its files.
         # Diagnostic only, so any problem reading them must not hide the runner failure.
+        # The doc-context-no-doc scenario is expected to fail doc_context; say so.
         try:
             trials = json.loads((cls.output / 'report.json').read_text())['trials']
             return ''.join(f"\n{t.get('id')}: failed checks {sorted(k for k, v in t.get('checks', {}).items() if not v)}"
+                           + (' (diagnostic scenario)' if t.get('scenario') == 'doc-context-no-doc' else '')
                            + (f"; {t['error']}" if t.get('error') else '')
                            for t in trials if not t.get('passed'))
         except Exception as error:
