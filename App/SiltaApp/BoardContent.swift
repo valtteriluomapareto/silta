@@ -65,7 +65,8 @@ nonisolated struct BoardContent {
             search,
             values: [
               task.ref, task.title, task.description, task.app ?? "",
-              Self.appLabel(task.app, apps: apps, colours: colours)?.name ?? "", task.claimedBy ?? "", task.status,
+              Self.appLabel(task.app, apps: apps, colours: colours)?.name ?? "",
+              task.claimedBy ?? "", task.status,
             ])
       }
     }

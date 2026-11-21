@@ -77,7 +77,9 @@
             == AppPalette.automatic("acme-mobile"))
         #expect(SidebarContent.appColor(slug: "gone", apps: map.apps, chosen: [:]) == nil)
         #expect(BoardContent.appLabel(nil, apps: map.apps, colours: [:]) == nil)
-        #expect(BoardContent.appLabel("gone", apps: map.apps, colours: [:]) == .init(name: "gone", color: nil))
+        #expect(
+          BoardContent.appLabel("gone", apps: map.apps, colours: [:])
+            == .init(name: "gone", color: nil))
         let named = [
           AppMapApp(
             slug: "acme-web", name: "Acme web shop", repo: "web", ref: "origin/main",

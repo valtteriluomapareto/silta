@@ -173,11 +173,13 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   Contrast adds borders. Colour roles: tide for selection, refs and actions; brass for
   proposed or waiting on you; kelp for done. App identity uses eight hues (Paper "App
   features v1": indigo, blue, violet, plum, rose, clay, brown, slate), never green, amber
-  or teal, so an app never reads as a status; each reads as text on a card in light and
-  dark. An app's colour is automatic from its slug, so adding an app never recolours
-  another, unless the human chooses one from the sidebar app menu or the map's app
-  inspector. The choice is stored only on this Mac, keyed by workspace and slug; automated
-  control runs store nothing.
+  or teal. A test keeps every hue at least ΔE2000 10 from the status colours and the
+  secondary ink and 9 from each other, and at 4.5:1 as text on a card, in light and dark;
+  clay, brown and slate moved from the Paper values to pass. An app's colour is automatic
+  from its slug, so adding an app never recolours another; with eight hues two apps can
+  still share one, and the human then chooses from the sidebar app menu or the map's app
+  inspector. The choice is stored only on this Mac, by workspace and slug, so a renamed
+  app falls back to automatic; fixture runs store nothing.
 - **App icon:** `App/SiltaApp/AppIcon.icon`, an Icon Composer document with flat
   light and dark layers in tide. Its design, geometry and regeneration steps are in
   [`app-icon.md`](../app-icon.md).
