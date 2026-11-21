@@ -1661,7 +1661,7 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    neighbours with no configured code point to the workspace's `ws show`. Service
    edges with no code omit the pointer. Checks are bounded, use local Git objects,
    and reuse results for repeated references. Each command appears once. A
-   Successful `ws edit` warns if a saved edge's code cannot be verified locally.
+   successful `ws edit` warns if a saved edge's code cannot be verified locally.
    A Git timeout is reported separately from unavailable code. These probes read local
    Git objects with lazy fetching disabled. Brief hooks still apply their own deadline.
 6. **Open tasks** for this app and its topics (top 8), ordered by priority then
