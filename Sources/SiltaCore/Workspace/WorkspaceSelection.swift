@@ -8,7 +8,7 @@ package enum WorkspaceSelection {
   /// Ambiguous or broken location refuses; stale current refuses only when needed.
   package static func fallback(path: URL, environment: SiltaEnvironment) async throws -> String? {
     let store = environment.db
-    guard FileManager.default.fileExists(atPath: store.path) else { return nil }
+    guard !DatabaseFile.isMissing(store.path) else { return nil }
     let repositories = try LocationRepository.all(workspace: nil, in: store)
     if !repositories.isEmpty {
       let directory = try LocationPath.canonical(path)
@@ -54,7 +54,7 @@ package enum WorkspaceSelection {
       return try resolve(selected, in: store)
     }
     let missing = slug.map(WorkspaceError.unknown) ?? .notFound
-    guard FileManager.default.fileExists(atPath: store.path) else { throw missing }
+    guard !DatabaseFile.isMissing(store.path) else { throw missing }
     return try store.read { try resolve(slug, in: $0) }
   }
 
@@ -108,7 +108,7 @@ package enum WorkspaceSelection {
 
   /// Lists workspace display values without initializing a missing database.
   package static func list(in store: DatabaseStore) throws -> [WorkspaceSummary] {
-    guard FileManager.default.fileExists(atPath: store.path) else { return [] }
+    guard !DatabaseFile.isMissing(store.path) else { return [] }
     return try store.read {
       try Row.fetchAll($0, sql: "SELECT slug,name,task_prefix FROM workspace ORDER BY slug").map {
         WorkspaceSummary(slug: $0["slug"], name: $0["name"], taskPrefix: $0["task_prefix"])

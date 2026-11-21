@@ -7,8 +7,14 @@ package struct EdgeCodeEvidence {
   private static let limit = 16
   private let reader: CodeService
   private let workspace: String
-  private var attempted: Set<Data> = []
-  private var commands: [Data: String] = [:]
+  private var outcomes: [Data: Outcome] = [:]
+
+  private enum Outcome {
+    case verified(String)
+    case timedOut
+    case unavailable
+    case unsafe
+  }
 
   init(workspace: String, environment: SiltaEnvironment, git: any GitRunner) {
     self.workspace = workspace
@@ -26,16 +32,31 @@ package struct EdgeCodeEvidence {
   }
 
   mutating func command(_ raw: String) async -> String? {
-    let key = Data(raw.utf8)
-    if attempted.contains(key) { return commands[key] }
-    guard attempted.count < Self.limit, !Task.isCancelled else { return nil }
-    attempted.insert(key)
-    guard let (target, operation) = Self.parse(raw) else { return nil }
-    let available = try? await reader.validateEvidence(operation, target: target)  // Unavailable.
-    guard available == true else { return nil }
-    let command = operation.command(workspace: workspace, target: target, prod: false)
-    commands[key] = command
+    guard case .verified(let command) = await outcome(raw) else { return nil }
     return command
+  }
+
+  private mutating func outcome(_ raw: String) async -> Outcome? {
+    let key = Data(raw.utf8)
+    if let previous = outcomes[key] { return previous }
+    guard outcomes.count < Self.limit, !Task.isCancelled else { return nil }
+    let result = await verify(raw)
+    outcomes[key] = result
+    return result
+  }
+
+  private func verify(_ raw: String) async -> Outcome {
+    guard let (target, operation) = Self.parse(raw) else { return .unsafe }
+    do {
+      guard try await reader.validateEvidence(operation, target: target) else {
+        return .unavailable
+      }
+      return .verified(operation.command(workspace: workspace, target: target, prod: false))
+    } catch CodeError.timeout {
+      return .timedOut
+    } catch {
+      return .unavailable
+    }
   }
 
   /// Reports unresolved references after the workspace edit transaction commits.
@@ -55,24 +76,29 @@ package struct EdgeCodeEvidence {
       return [probe.warning("Could not inspect saved edge code references.")]
     }
     var warnings: [OutputWarning] = []
-    for reference in references where !probe.attempted.contains(Data(reference.utf8)) {
-      guard probe.attempted.count < Self.limit, !Task.isCancelled else {
+    for reference in references where probe.outcomes[Data(reference.utf8)] == nil {
+      guard let result = await probe.outcome(reference) else {
         warnings.append(probe.warning("Some edge code references were not checked."))
         break
       }
-      if await probe.command(reference) == nil {
-        let detail =
-          if Self.parse(reference) != nil {
-            "Edge code reference "
-              + String(HumanText.line(reference).prefix(160)).debugDescription
-              + " is unavailable locally."
-          } else {
-            "An edge code reference could not be read or printed safely."
-          }
-        warnings.append(probe.warning(detail))
+      switch result {
+      case .verified: break
+      case .unsafe:
+        warnings.append(
+          probe.warning("An edge code reference could not be read or printed safely."))
+      case .timedOut:
+        warnings.append(
+          probe.referenceWarning(reference, "could not be verified locally (Git timed out)."))
+      case .unavailable:
+        warnings.append(probe.referenceWarning(reference, "is unavailable locally."))
       }
     }
     return warnings
+  }
+
+  private func referenceWarning(_ reference: String, _ detail: String) -> OutputWarning {
+    let name = String(HumanText.line(reference).prefix(160)).debugDescription
+    return warning("Edge code reference " + name + " " + detail)
   }
 
   private func warning(_ message: String) -> OutputWarning {
