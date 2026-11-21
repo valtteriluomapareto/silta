@@ -2530,7 +2530,8 @@ text a human kept with `--allow-secret` doesn't block their later writes.
 
   The Mac app logs one line per write, never per read. Its command is `app answer`,
   `app comment`, `app accept-answer`, `app triage`, `app unblock`, `app resolve`,
-  `app reopen`, `app add`, `app block`, `app drop` or `app done`, with the human
+  `app reopen`, `app add`, `app block`, `app drop`, `app done` or `app doc-triage`, with
+  the human
   actor, the workspace, and the exit and error code the matching CLI failure gives
   (D50). Those writes open only an existing, current store: a missing one or one with
   pending migrations is refused as `env`, the latter with `next` `silta init`.

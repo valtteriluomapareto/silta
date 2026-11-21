@@ -29,7 +29,10 @@ extension AppModel {
       }
       await refresh(force: true).value
       await loadTaskDetail()
-      if visibleData != nil { actions.selectedProposals.formIntersection(proposalRefs) }
+      if visibleData != nil {
+        actions.selectedProposals.formIntersection(proposalRefs)
+        actions.selectedDocuments.formIntersection(documentRefs)
+      }
       actions.finish(target, failure: failure)
       return result
     }
@@ -72,6 +75,31 @@ extension AppModel {
 
   /// The drop reason's draft, apart from the proposals' shared write target.
   static let dropReasonTarget = "drop-reason"
+
+  /// The document revision proposals My work lists, which a selection may name.
+  var documentRefs: Set<String> {
+    let items = allWaiting ?? visibleData?.snapshot?.work.items ?? []
+    return Set(items.filter { $0.kind == "doc_proposal" }.flatMap(\.refs))
+  }
+
+  /// Accepts or rejects the ticked revisions among `visible` as one all-or-nothing triage.
+  @discardableResult func triageSelectedDocuments(accept: Bool, among visible: [String])
+    -> Task<Void, Never>?
+  {
+    let refs = actions.selectedDocuments.intersection(documentRefs).intersection(visible).sorted()
+    guard !refs.isEmpty else { return nil }
+    return triageDocuments(accept: accept ? refs : [], reject: accept ? [] : refs)
+  }
+
+  /// Accepts and rejects document revisions under the one target all document triage
+  /// shares, so only one batch runs at a time.
+  @discardableResult func triageDocuments(accept: [String], reject: [String])
+    -> Task<Void, Never>?
+  {
+    perform(.triageDocuments(accept: accept, reject: reject), for: Self.documentsTarget)
+  }
+
+  static let documentsTarget = "documents"
 
   /// Unblocks a ready task under its own target, apart from the task's comment draft.
   @discardableResult func unblock(_ ref: String) -> Task<Void, Never>? {

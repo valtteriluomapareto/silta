@@ -135,7 +135,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - §19 gains the `app …` commands.
 
 **Out:**
-- Doc triage, archive, editing plans, and `--allow-secret`. Approving a review moved in
+- Archive, editing plans, and `--allow-secret`. Doc triage moved in with Paper "App
+  features v1": My work's doc proposals have checkboxes with "Reject N" and "Accept N",
+  and the Docs Changes tab has "Reject @N" and "Accept @N" for the open revision. Each
+  sends one all-or-nothing Core triage as the human (`app doc-triage`). Approving a review moved in
   on 2026-11-21: My work's review card offers Mark done (a nonblank result, an optional
   merge commit, no `--force` past an unmet review gate), Request changes (a question to
   the submitter) and Drop, plus Open task and the PR link. Dropping

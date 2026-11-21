@@ -279,7 +279,26 @@ extension DocsView {
       if docs.view == .changes, let doc = docs.document, doc.state == "proposed",
         let reader = model.reader, let workspace = model.workspace
       {
-        CommandBlock(command: reader.documentTriageCommand(workspace: workspace))
+        if model.writer != nil {
+          let target = model.target(AppModel.documentsTarget)
+          let sending = target.map { model.actions.isSending($0) } ?? false
+          if let failure = target.flatMap({ model.actions.failures[$0] }) {
+            ActionFailureView(failure: failure)
+          }
+          HStack(spacing: 12) {
+            Text("Accepting makes @\(doc.revision) the current revision.")
+              .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+              .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Reject @\(doc.revision)") {
+              model.triageDocuments(accept: [], reject: [doc.ref])
+            }.buttonStyle(CompactActionStyle()).disabled(sending)
+            Button(sending ? "Sending…" : "Accept @\(doc.revision)") {
+              model.triageDocuments(accept: [doc.ref], reject: [])
+            }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
+          }
+        } else {
+          CommandBlock(command: reader.documentTriageCommand(workspace: workspace))
+        }
       }
 
     }
