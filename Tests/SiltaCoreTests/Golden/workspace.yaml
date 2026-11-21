@@ -6,7 +6,7 @@ repos:
   - {"remote":"git@example.com:acme/platform.git","slug":"platform"}
   - {"slug":"sales"}
 apps:
-  - {"ref":"origin/main","repo":"mobile","slug":"mobile","summary":"Flutter app."}
+  - {"name":"Acme Mobile","ref":"origin/main","repo":"mobile","slug":"mobile","summary":"Flutter app."}
   - {"ref":"origin/main","repo":"pdf-service","slug":"pdf-service","summary":"PDF rendering: POST /api/pdf/{configId}."}
   - {"prod_ref":"origin/api-prod","ref":"origin/api","repo":"platform","slug":"platform-api","summary":"API-only backend for the mobile app: token auth, handoff, well-known files."}
   - {"ref":"origin/portal","repo":"platform","slug":"platform-crm-ui","subpath":"crm-ui","summary":"Back-office UI embedded in the CRM."}
