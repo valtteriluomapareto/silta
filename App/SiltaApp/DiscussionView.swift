@@ -96,9 +96,26 @@ struct DiscussionView: View {
           Button(answers ? "Answer" : "Reply") { replyingTo = thread.id }.buttonStyle(.plain)
             .foregroundStyle(Color("TideText"))
             .accessibilityLabel((answers ? "Answer " : "Reply to ") + thread.id)
+          resolveButton(thread, reopen: false)
         }
         Text(thread.state).foregroundStyle(Color("SecondaryInk"))
       }.font(.system(size: 12))
+    }
+  }
+
+  /// Resolves an open thread or reopens a resolved one; a failure shows under it.
+  @ViewBuilder private func resolveButton(_ thread: DiscussionContent.Thread, reopen: Bool)
+    -> some View
+  {
+    let target = model.target(AppModel.resolveTarget(thread.id))
+    let sending = target.map { model.actions.isSending($0) } ?? false
+    Button(reopen ? "Reopen" : "Resolve") {
+      if reopen { model.reopen(thread: thread.id) } else { model.resolve(thread: thread.id) }
+    }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Color("TideText"))
+      .disabled(sending)
+      .accessibilityLabel((reopen ? "Reopen " : "Resolve ") + thread.id)
+    if let failure = target.flatMap({ model.actions.failures[$0] }) {
+      ActionFailureView(failure: failure)
     }
   }
 
@@ -128,7 +145,10 @@ struct DiscussionView: View {
       }.buttonStyle(.plain)
         .accessibilityLabel(opened ? resolvedBy(thread) : "Resolved thread, " + summary(thread))
         .accessibilityHint(opened ? "Folds the thread" : "Shows the thread")
-      if opened { threadView(thread).opacity(0.8) }
+      if opened {
+        threadView(thread).opacity(0.8)
+        if model.writer != nil { resolveButton(thread, reopen: true).font(.system(size: 12)) }
+      }
     }
   }
 

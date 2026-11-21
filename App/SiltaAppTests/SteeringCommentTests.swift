@@ -13,9 +13,10 @@
             TaskFacts.Recipient(actor: "agent:codex:review", label: "Codex · session review"),
             TaskFacts.Recipient(actor: "agent:codex:fixture", label: "Codex · session fixture"),
           ])
-        #expect(TaskFacts.agents(try reader.task("AC-15", workspace: "acme")).map(\.actor) == [
-          "agent:codex:fixture"
-        ])
+        #expect(
+          TaskFacts.agents(try reader.task("AC-15", workspace: "acme")).map(\.actor) == [
+            "agent:codex:fixture"
+          ])
       }
     }
 
@@ -52,11 +53,13 @@
         let resolve = model.resolve(thread: "AC-9/1")
         let sent = await writes.next()
         #expect(sent.write == .resolveThreads(refs: ["AC-9/1"]))
-        #expect(model.actions.isSending(try #require(model.target(AppModel.resolveTarget("AC-9/1")))))
+        let target = try #require(model.target(AppModel.resolveTarget("AC-9/1")))
+        #expect(model.actions.isSending(target))
         sent.continuation.resume()
         await resolve?.value
         let reopen = model.reopen(thread: "AC-9/1")
-        #expect((await writes.next()).write == .reopenThreads(refs: ["AC-9/1"]))
+        let again = await writes.next()
+        #expect(again.write == .reopenThreads(refs: ["AC-9/1"]))
         _ = reopen
       }
     }

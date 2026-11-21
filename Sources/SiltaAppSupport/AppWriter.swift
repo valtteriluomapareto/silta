@@ -28,10 +28,15 @@ public struct AppWriter: Sendable {
           var draft = CommentDraft(body: body, kind: "answer")
           draft.replyTo = question
           _ = try service.comment(task, draft)
-        case .comment(let task, let body, let replyTo):
-          var draft = CommentDraft(body: body)
+        case .comment(let task, let body, let replyTo, let kind, let recipients):
+          var draft = CommentDraft(body: body, kind: kind == "comment" ? nil : kind)
           draft.replyTo = replyTo
+          draft.recipients = recipients
           _ = try service.comment(task, draft)
+        case .resolveThreads(let refs):
+          _ = try service.updateComments(refs, action: .resolve)
+        case .reopenThreads(let refs):
+          _ = try service.updateComments(refs, action: .reopen)
         case .acceptAnswer(let ref):
           _ = try service.acceptComment(ref)
         case .acceptProposals(let refs):

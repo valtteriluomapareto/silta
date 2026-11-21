@@ -122,6 +122,21 @@ nonisolated enum TaskFacts {
     }
   }
 
+  struct Recipient: Equatable, Hashable {
+    let actor: String
+    let label: String
+  }
+
+  /// Agent sessions a question can go to: those that posted on the task, newest first,
+  /// then the claimant and the creator.
+  static func agents(_ task: AppTask) -> [Recipient] {
+    let posters = task.comments.sorted { $0.createdAt > $1.createdAt }.map(\.actor)
+    var seen = Set<String>()
+    return (posters + [task.claimedBy, task.createdBy].compactMap { $0 })
+      .filter { $0.hasPrefix("agent:") && seen.insert($0).inserted }
+      .map { Recipient(actor: $0, label: TaskPresentation.claimant($0)) }
+  }
+
   /// Who created the task and on which day, such as `Codex · 12 Nov`.
   static func created(_ task: AppTask) -> String {
     let name = ActorPresentation(task.createdBy).name
