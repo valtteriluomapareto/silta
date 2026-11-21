@@ -8,4 +8,6 @@ nonisolated struct AppLoadedData: Equatable, Sendable {
   let map: AppWorkspaceMap?
   let version: Int
   let checkedAt: Date
+  /// Recorded task worktrees that exist on this Mac, checked during the background load.
+  var existingWorktrees: Set<String> = []
 }

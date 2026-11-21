@@ -32,7 +32,8 @@ struct TaskInspector: View {
             {
               ClaimBannerView(
                 banner: banner, prompt: task.claimExpiresAt == nil ? nil : resumePrompt(task),
-                worktree: task.worktree)
+                reveal: TaskMenu.reveal(task, existing: model.visibleData?.existingWorktrees ?? [])
+              ) { model.run($0) }
             }
             if let handoff = TaskFacts.handoff(task) {
               HandoffNote(text: handoff, prompt: resumePrompt(task))
@@ -147,8 +148,8 @@ struct TaskInspector: View {
 
   private func resumePrompt(_ task: AppTask) -> String? {
     guard let reader = model.reader, let workspace = model.workspace else { return nil }
-    let name = model.visibleData?.workspaces.first { $0.slug == workspace }?.name ?? workspace
-    return reader.agentPrompt(task: task.ref, workspace: workspace, name: name)
+    return reader.agentPrompt(
+      task: task.ref, workspace: workspace, name: model.workspaceName ?? workspace)
   }
 
   private func properties(_ task: AppTask) -> some View {
@@ -217,13 +218,19 @@ struct TaskInspector: View {
   }
 
   @ViewBuilder private func worktreeButton(_ task: AppTask) -> some View {
-    let path = task.worktree
-    let available =
-      path.map { $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0) } ?? false
+    let reveal = TaskMenu.reveal(task, existing: model.visibleData?.existingWorktrees ?? [])
+    let action: TaskMenu.Action? = if case .available(let action) = reveal { action } else { nil }
     Button("Reveal worktree", systemImage: "folder") {
-      if let path { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
-    }.buttonStyle(CompactActionStyle()).disabled(!available).opacity(available ? 1 : 0.45)
-      .help(available ? "Reveal the recorded worktree" : "No existing worktree is recorded")
+      if let action { model.run(action) }
+    }.buttonStyle(CompactActionStyle()).disabled(action == nil).opacity(action == nil ? 0.45 : 1)
+      .help(
+        {
+          if case .unavailable(let reason) = reveal {
+            "Worktree " + reason
+          } else {
+            "Reveal the recorded worktree"
+          }
+        }())
   }
 }
 

@@ -36,7 +36,7 @@ extension AppReader {
 
   /// Offers read-only detail for a task waiting for review.
   public func commands(forReview task: AppTask, workspace: String) -> [AppCommand] {
-    [taskCommand(task.ref, workspace: workspace)]
+    [readCommand(task: task.ref, workspace: workspace)]
   }
 
   /// Reads one task with its timeline.
