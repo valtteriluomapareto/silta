@@ -40,6 +40,20 @@
       }
     }
 
+    @Test func forceDoneCommandRefusesUntilFilled() throws {
+      try withScratchDirectory { scratch in
+        try AppFixtures.seed(in: scratch)
+        let reader = try AppReader(
+          home: scratch.appending(path: "silta-home"), user: AppV2Fixture.user,
+          now: { AppV2Fixture.now })
+        let text = reader.forceDoneCommand(
+          task: try reader.task("AC-9", workspace: "acme"), workspace: "acme"
+        ).text
+        #expect(text.hasSuffix(" task done 'AC-9' --force --sha MERGE_SHA -F RESULT_FILE"))
+        #expect(!text.contains("-m"))
+      }
+    }
+
     @Test func requestingChangesWaitsInTheSubmittersInbox() throws {
       try withScratchDirectory { scratch in
         try AppFixtures.seed(in: scratch)

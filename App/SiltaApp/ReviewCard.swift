@@ -56,7 +56,7 @@ struct ReviewCard: View {
           {
             Text("The workspace's review gate needs a human approval the app can't record yet.")
               .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk")).padding(.leading, 32)
-            CommandBlock(command: reader.forceDoneCommand(task: ref, workspace: workspace))
+            CommandBlock(command: reader.forceDoneCommand(task: review.task, workspace: workspace))
               .padding(.leading, 32)
           }
         }

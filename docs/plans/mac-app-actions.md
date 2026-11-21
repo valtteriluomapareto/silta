@@ -93,7 +93,8 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     Drop. Mark done needs a nonblank result; an empty merge commit records none
     (`--no-sha`), and a typed one is checked in the worktree or else the app's registered
     clone. An unmet review gate shows the `task done --force` command to run in a
-    terminal, since the app passes no `--force`. Request changes posts a question to the
+    terminal, since the app passes no `--force`; its `RESULT_FILE` and `MERGE_SHA`
+    placeholders refuse until filled, because a human's completion allows an empty result. Request changes posts a question to the
     submitting agent session. Drafts clear only on success, and ⌘↩ sends only from a
     focused field. The app doesn't post on or close a linked GitHub issue, which
     `scripts/dogfood-finish.sh` does.
