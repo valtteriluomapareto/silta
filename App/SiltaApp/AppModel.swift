@@ -50,6 +50,11 @@ final class AppModel {
   private(set) var workspaceNode: String?
   var workspaceView: WorkspaceViewMode = .map
   var workspaceInspectorPresented = false
+  /// My work shows the whole inbox instead of the capped read; reset per workspace.
+  private(set) var showingAllWaiting = false
+  /// The whole inbox while `showingAllWaiting`, read after each load.
+  private(set) var allWaiting: [AppAttention]?
+  @ObservationIgnored private var allWaitingVersion: Int?
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
   private let load: Loader
@@ -116,10 +121,7 @@ final class AppModel {
             if workspace == nil { workspace = result.workspace }
           }
           failure = nil
-          await loadDocumentCatalog(force: forced)
-          guard token == generation else { continue }
-          if route == .docs { await loadDocuments(force: forced) }
-          if route == .workspace { await loadWorkspaceDocuments(force: forced) }
+          await loadExtras(force: forced, token: token)
         }
       } catch {
         if token == generation {
@@ -151,6 +153,9 @@ final class AppModel {
       workspaceNode = nil
       workspaceInspectorPresented = false
       boardFilter.app = nil
+      showingAllWaiting = false
+      allWaiting = nil
+      allWaitingVersion = nil
     }
     return refresh(force: true)
   }
@@ -335,6 +340,47 @@ extension AppModel {
         catalogFailure = AppLoadFailure(error).message
       }
     }
+  }
+
+  /// Shows every waiting item in My work, past the inbox cap.
+  @discardableResult func showAllWaiting() -> Task<Void, Never> {
+    showingAllWaiting = true
+    return Task { await loadAllWaiting(force: true) }
+  }
+
+  /// Back to the capped inbox.
+  func showFewerWaiting() {
+    showingAllWaiting = false
+    allWaiting = nil
+    allWaitingVersion = nil
+  }
+
+  private func loadAllWaiting(force: Bool) async {
+    guard let reader, let workspace, let version = visibleData?.version else { return }
+    if !force, allWaiting != nil, allWaitingVersion == version { return }
+    let token = generation
+    do {
+      let items = try await Task.detached { try reader.fullInbox(workspace: workspace) }.value
+      guard token == generation, showingAllWaiting, self.workspace == workspace else { return }
+      allWaiting = items
+      allWaitingVersion = version
+    } catch {
+      // The capped read stays on screen; the next refresh tries again.
+      guard token == generation else { return }
+      allWaiting = nil
+      allWaitingVersion = nil
+    }
+  }
+
+  /// The reads that follow a load: the document catalog, the full inbox when shown, and
+  /// the current route's documents. A workspace switch midway stops them.
+  private func loadExtras(force: Bool, token: Int) async {
+    await loadDocumentCatalog(force: force)
+    guard token == generation else { return }
+    if showingAllWaiting { await loadAllWaiting(force: force) }
+    guard token == generation else { return }
+    if route == .docs { await loadDocuments(force: force) }
+    if route == .workspace { await loadWorkspaceDocuments(force: force) }
   }
 
   var screenTitle: String {

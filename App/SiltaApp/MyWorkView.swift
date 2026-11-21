@@ -8,7 +8,8 @@ struct MyWorkView: View {
   var body: some View {
     ScrollView {
       if let data = model.visibleData, let snapshot = data.snapshot {
-        let content = MyWorkContent(snapshot: snapshot, search: model.search, now: data.checkedAt)
+        let content = MyWorkContent(
+          snapshot: snapshot, all: model.allWaiting, search: model.search, now: data.checkedAt)
         LazyVStack(alignment: .leading, spacing: 10) {
           if snapshot.work.waitingCount == 0 && model.search.isEmpty {
             ContentUnavailableView(
@@ -66,13 +67,19 @@ struct MyWorkView: View {
           ForEach(content.other, id: \.stableID) { item in
             otherAttention(item).padding(.horizontal, 22).padding(.vertical, 16).seaPane()
           }
-          if content.remaining > 0 {
-            Text("\(content.remaining) more waiting items").font(
-              .system(size: 14, weight: .semibold))
-            if let command = model.reader?.inboxCommand(workspace: workspace) {
-              CommandBlock(command: command)
-            }
-          }
+          HStack(spacing: 6) {
+            Text(
+              MyWorkContent.footer(
+                remaining: content.remaining, showingAll: model.allWaiting != nil)
+            ).foregroundStyle(Color("SecondaryInk"))
+            Button(model.showingAllWaiting ? "Show fewer" : "Show all") {
+              if model.showingAllWaiting {
+                model.showFewerWaiting()
+              } else {
+                model.showAllWaiting()
+              }
+            }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Color("TideText"))
+          }.font(.system(size: 13)).padding(.horizontal, 22)
         }.padding(.bottom, 24)
           .frame(maxWidth: .infinity, alignment: .leading)
       }

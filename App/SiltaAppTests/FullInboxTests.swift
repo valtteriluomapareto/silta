@@ -28,7 +28,10 @@
         let all = MyWorkContent(
           snapshot: snapshot, all: model.allWaiting, search: "", now: AppV2Fixture.now)
         #expect(all.remaining == 0)
-        #expect(all.questions.count == capped.questions.count + capped.remaining)
+        #expect(all.questions.count == 14 && capped.questions.count < 14)
+        #expect(
+          all.questions.count + all.answers.count + all.tasks.count + all.documents.count
+            + all.other.count >= capped.questions.count + capped.remaining)
         #expect(model.visibleData?.snapshot?.work.waitingCount == badge)
         #expect(model.screenSummary == "\(badge) waiting on you")
         #expect(
