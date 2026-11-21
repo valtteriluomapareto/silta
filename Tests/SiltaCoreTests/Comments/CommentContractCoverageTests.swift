@@ -40,7 +40,7 @@ struct CommentContractCoverageTests {
       let clock = FakeClock(now: TaskServiceTests.now)
       let env = try await CommentTests.setup(home, clock: clock),
         service = TaskService(environment: env)
-      _ = try CommentQuestionTests.post(service, kind: "question")
+      _ = try CommentQuestionTests.post(service, kind: "question", to: [env.actor.description])
       _ = try CommentQuestionTests.post(service, kind: "answer", reply: "AC-1/1")
       func changes() throws -> [Int64] {
         try env.db.read {

@@ -526,8 +526,11 @@ extension HelpCommandTests {
     for example in examples {
       let arguments = resolvedArguments(example, placeholders: placeholders, scratch: scratch)
       try checkExampleValues(arguments, route: example.route)
+      let actor =
+        example.route == "silta comment" && arguments.contains("answer")
+        ? ["SILTA_ACTOR": "agent:codex:s"] : TaskCommandTests.actor
       let result = try SiltaBinary.run(
-        arguments + ["--json"], in: scratch, cwd: repo, environment: TaskCommandTests.actor)
+        arguments + ["--json"], in: scratch, cwd: repo, environment: actor)
       let error = try Self.errorCode(result.stdout)
       if example.line.contains("(human):") {
         #expect(error == "human_only", "\(example.line): \(result.stdout)")
