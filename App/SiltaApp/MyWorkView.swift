@@ -71,7 +71,7 @@ struct MyWorkView: View {
             Text(
               MyWorkContent.footer(
                 remaining: content.remaining, showingAll: model.showingAllWaiting,
-                loaded: model.allWaiting != nil)
+                loaded: model.allWaiting != nil || model.allWaitingFailure != nil)
             ).foregroundStyle(Color("SecondaryInk"))
             Button(model.showingAllWaiting ? "Show fewer" : "Show all") {
               if model.showingAllWaiting {
