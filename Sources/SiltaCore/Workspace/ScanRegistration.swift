@@ -10,11 +10,16 @@ struct ScanRegistration {
   private let evidence: Evidence
 
   var isIdentity: Bool { evidence == .identity }
-  var permitsSlugFallback: Bool { evidence == .relativeOrigin }
+  var isWeakSlug: Bool { evidence == .slugOnly }
+  var permitsSelectedSlug: Bool {
+    evidence == .relativeOrigin || evidence == .slugOnly || evidence == .scopedAlias
+  }
 
   private enum Evidence {
     case identity
     case relativeOrigin
+    case slugOnly
+    case scopedAlias
     case possibleAlias
   }
 
@@ -43,6 +48,7 @@ struct ScanRegistration {
       arguments: [path])
     if !bound.isEmpty { return bound.map { Self($0, evidence: .identity) } }
     let stableOrigin = origin.map(identifiableOrigin) ?? false
+    let network = origin.map(networkOrigin) ?? false
     let normalizedOrigin = origin.flatMap(hostedOrigin)
     return try Row.fetchAll(
       db,
@@ -60,14 +66,16 @@ struct ScanRegistration {
       let alias = normalizedOrigin != nil && remote.flatMap(hostedOrigin) == normalizedOrigin
       let pathless = binding == nil && repo == slug && (remote == nil || remote == "")
       let evidence: Evidence
-      if pathless || (exactOrigin && stableOrigin)
-        || (alias && normalizedOrigin?.hasStandardHosting == true)
-      {
+      if (exactOrigin && stableOrigin) || (alias && normalizedOrigin?.hasStandardHosting == true) {
         evidence = .identity
+      } else if pathless {
+        evidence = network ? .slugOnly : .identity
       } else if exactOrigin {
         evidence = .relativeOrigin
       } else if alias {
-        evidence = .possibleAlias
+        let https = origin?.lowercased().hasPrefix("https://") == true
+        let remoteHTTPS = remote?.lowercased().hasPrefix("https://") == true
+        evidence = https != remoteHTTPS ? .scopedAlias : .possibleAlias
       } else {
         return nil
       }
@@ -77,11 +85,10 @@ struct ScanRegistration {
 
   private struct HostedOrigin: Equatable {
     let host: String
-    let path: Substring
+    let path: String
 
-    /// These services address repositories by the same path in their standard clone URLs.
     var hasStandardHosting: Bool {
-      host == "github.com" || host == "gitlab.com" || host == "bitbucket.org"
+      ["github.com", "gitlab.com", "bitbucket.org", "dev.azure.com"].contains(host)
     }
   }
 
@@ -89,10 +96,12 @@ struct ScanRegistration {
   private static func hostedOrigin(_ origin: String) -> HostedOrigin? {
     let host: String
     let path: Substring
-    if let scp = origin.wholeMatch(of: #/git@([a-zA-Z0-9.-]+):([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_./-]+)/#)
-    {
-      host = String(scp.1)
-      path = scp.2
+    let scpUser: Substring?
+    if let scp = origin.wholeMatch(of: #/([a-zA-Z0-9_.-]+)@([a-zA-Z0-9.-]+):(.+)/#) {
+      host = scp.2.lowercased()
+      guard host == "vs-ssh.visualstudio.com" || scp.1 == "git" else { return nil }
+      scpUser = scp.1
+      path = scp.3
     } else {
       guard let url = URLComponents(string: origin),
         let hostname = url.host, hostname.wholeMatch(of: /[a-zA-Z0-9.-]+/) != nil,
@@ -105,14 +114,40 @@ struct ScanRegistration {
         guard url.user == "git", url.port == nil || url.port == 22 else { return nil }
       default: return nil
       }
-      host = hostname
+      host = hostname.lowercased()
+      scpUser = nil
       path = url.percentEncodedPath.dropFirst()
     }
-    guard path.wholeMatch(of: /[a-zA-Z0-9_.-]+(\/[a-zA-Z0-9_.-]+)+/) != nil,
-      !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." || $0 == ".git" })
+    let trimmed = path.hasSuffix("/") ? path.dropLast() : path
+    guard trimmed.wholeMatch(of: /[a-zA-Z0-9_.-]+(\/[a-zA-Z0-9_.-]+)+/) != nil,
+      !trimmed.split(separator: "/").contains(where: { $0 == "." || $0 == ".." || $0 == ".git" })
     else { return nil }
-    let repository = path.hasSuffix(".git") ? path.dropLast(4) : path
-    return HostedOrigin(host: host.lowercased(), path: repository)
+
+    if ["dev.azure.com", "ssh.dev.azure.com", "vs-ssh.visualstudio.com"].contains(host) {
+      return azureOrigin(
+        host, path: trimmed, scpUser: scpUser, https: origin.lowercased().hasPrefix("https://"))
+    }
+    let caseIndependent = host == "github.com" || host == "gitlab.com"
+    let name = caseIndependent ? trimmed.lowercased() : String(trimmed)
+    return HostedOrigin(host: host, path: name.hasSuffix(".git") ? String(name.dropLast(4)) : name)
+  }
+
+  private static func azureOrigin(
+    _ host: String, path: Substring, scpUser: Substring?, https: Bool
+  ) -> HostedOrigin? {
+    let parts = path.lowercased().split(separator: "/")
+    guard parts.count == 4 else { return nil }
+    if host == "dev.azure.com", https, parts[2] == "_git" {
+      return HostedOrigin(
+        host: "dev.azure.com", path: [parts[0], parts[1], parts[3]].joined(separator: "/"))
+    }
+    guard !https, parts[0] == "v3", host != "dev.azure.com" else { return nil }
+    if host == "vs-ssh.visualstudio.com", scpUser?.lowercased() != String(parts[1]) { return nil }
+    return HostedOrigin(host: "dev.azure.com", path: parts.dropFirst().joined(separator: "/"))
+  }
+
+  private static func networkOrigin(_ origin: String) -> Bool {
+    !origin.hasPrefix("/") && !origin.lowercased().hasPrefix("file:") && identifiableOrigin(origin)
   }
 
   /// Git treats paths without a scheme or an scp-style host as local paths.

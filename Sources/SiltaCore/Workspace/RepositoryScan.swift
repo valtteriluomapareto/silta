@@ -115,6 +115,9 @@ package enum RepositoryScan {
     let matches = try request.repos.map {
       try ScanRegistration.matching(path: $0.path.path, slug: $0.slug, origin: $0.remote, in: db)
     }
+    if case .named = request.target, !matches.joined().contains(where: { !$0.isWeakSlug }) {
+      return [:]
+    }
     let recovery = ScanRegistration.recovery(matches, paths: paths, roots: request.roots)
     if case .derived = request.target, let workspace, !paths.isEmpty {
       if let bindings = derivedBindings(matches, paths: paths, workspace: workspace) {
@@ -187,11 +190,20 @@ package enum RepositoryScan {
       let row = try Row.fetchOne(
         db,
         sql: """
-          SELECT repo.id, repo.slug
+          SELECT repo.id, repo.slug, repo.remote_url, repo_path.path
           FROM repo JOIN workspace ON workspace.id=repo.workspace_id
+          LEFT JOIN repo_path ON repo_path.repo_id=repo.id
           WHERE workspace.slug=? AND repo.slug=?
           """, arguments: [workspace, repo.slug])
     else { throw RepoError.configuration(repo: repo.slug, workspace: workspace) }
+    if !created {
+      let configured: String? = row["remote_url"]
+      let bound: String? = row["path"]
+      let contradicts = configured.map { !$0.isEmpty } == true && repo.remote != nil
+      guard !contradicts, canBind(repo.path.path, insteadOf: bound) else {
+        throw ScanError.registeredWorkspaces([workspace], roots: nil)
+      }
+    }
     return (row["id"], row["slug"])
   }
 
@@ -204,17 +216,21 @@ package enum RepositoryScan {
       path: path, slug: repo.slug, origin: repo.remote, in: db
     )
     .filter { $0.workspace == workspace }
-    if matches.count == 1, let match = matches.first, match.isIdentity,
-      match.path == nil || match.path == path
-        || match.path.map({ !FileManager.default.fileExists(atPath: $0 + "/.git") }) == true
+    if matches.count == 1, let match = matches.first,
+      match.isIdentity || (match.repo == repo.slug && match.permitsSelectedSlug),
+      canBind(path, insteadOf: match.path)
     {
       return match
     }
-    if matches.count > 1 || matches.contains(where: { !$0.permitsSlugFallback }) {
-      throw ScanError.registeredWorkspaces([workspace], roots: nil)
-    }
+    if !matches.isEmpty { throw ScanError.registeredWorkspaces([workspace], roots: nil) }
     return nil
   }
+
+  private static func canBind(_ path: String, insteadOf recorded: String?) -> Bool {
+    guard let recorded, recorded != path else { return true }
+    return !FileManager.default.fileExists(atPath: recorded + "/.git")
+  }
+
 }
 
 extension RepositoryScan {
@@ -387,17 +403,17 @@ extension RepositoryScan {
     _ root: URL, workspace: String?, store: DatabaseStore, git: any GitRunner
   ) async throws -> ScanError? {
     guard FileManager.default.fileExists(atPath: store.path) else { return nil }
-    let hasPathless = try store.read {
+    let hasCandidates = try store.read {
       try Bool.fetchOne(
         $0,
         sql: """
           SELECT EXISTS(
             SELECT 1 FROM repo LEFT JOIN repo_path ON repo_path.repo_id=repo.id
-            WHERE repo_path.repo_id IS NULL
+            WHERE repo_path.repo_id IS NULL OR repo.remote_url<>''
           )
           """) ?? false
     }
-    guard hasPathless else { return nil }
+    guard hasCandidates else { return nil }
     let main: URL
     let origin: String?
     do {
@@ -413,7 +429,6 @@ extension RepositoryScan {
         workspace == nil || $0.workspace == workspace
       }
     }
-    guard found.contains(where: { $0.path == nil }) else { return nil }
     return ScanRegistration.recovery([found], paths: [main.path], roots: [main.path])
   }
 

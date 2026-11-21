@@ -21,10 +21,8 @@ struct ScanIdentityCommandTests {
       let created = try Self.run(
         ["init", "--scan", ".", "--slug", "beta", "--prefix", "BE"], repo, scratch)
       let after = try Self.identity(store)
-      withKnownIssue("SI-238: A weak slug currently blocks explicit workspace creation.") {
-        #expect(created.termination == .exit(0), "\(created.stdout)")
-        #expect(after.count == 2)
-      }
+      #expect(created.termination == .exit(0), "\(created.stdout)")
+      #expect(after.count == 2)
       #expect(after.first == before.first)
     }
   }
@@ -34,15 +32,11 @@ struct ScanIdentityCommandTests {
       let result = try run(args, repo, scratch)
       let error = try TaskStateCommandTests.error(result)
       let next = try #require(error["next"] as? [String])
-      withKnownIssue("SI-238: A weak slug currently offers a scoped write.") {
-        #expect(next == [inspect])
-        #expect((error["message"] as? String ?? "").localizedCaseInsensitiveContains("possible"))
-      }
+      #expect(next == [inspect])
+      #expect((error["message"] as? String ?? "").localizedCaseInsensitiveContains("possible"))
     }
     let brief = try run(["brief"], repo, scratch)
-    withKnownIssue("SI-238: Brief currently offers a weak write.") {
-      #expect(brief.stdout.contains(inspect))
-    }
+    #expect(brief.stdout.contains(inspect))
     #expect(
       try FirstWorkspaceCommandTests.replay(inspect, in: scratch, cwd: repo).termination == .exit(0)
     )
@@ -62,9 +56,7 @@ struct ScanIdentityCommandTests {
         ["init", "--scan", "bundle", "--slug", "beta", "--prefix", "BE"], scratch, scratch)
       #expect(scan.termination == .exit(6))
       let next = try #require(try TaskStateCommandTests.error(scan)["next"] as? [String])
-      withKnownIssue("SI-238: A weak row currently makes the mixed named repair writable.") {
-        #expect(next == [Self.inspect])
-      }
+      #expect(next == [Self.inspect])
       #expect(try Self.identity(store) == before)
     }
   }
@@ -90,10 +82,20 @@ struct ScanIdentityCommandTests {
       let whereResult = try Self.run(["where"], repo, scratch)
       let next = try #require(
         try TaskStateCommandTests.error(whereResult)["next"] as? [String])
-      withKnownIssue("SI-238: This hosted spelling currently looks unrelated.") {
-        #expect(next.first?.hasPrefix("silta --ws 'acme' init --scan ") == true)
-      }
+      let hint = try #require(next.first)
+      #expect(hint.hasPrefix("silta --ws 'acme' init --scan "))
       #expect(try Self.identity(store) == before)
+      let replay = try FirstWorkspaceCommandTests.replay(hint, in: scratch, cwd: repo)
+      #expect(replay.termination == .exit(0))
+      let row = try #require(try Self.identity(store).first)
+      let boundPath: String = row["path"]
+      let key: Set<URLResourceKey> = [.fileResourceIdentifierKey]
+      let boundFile = try URL(filePath: boundPath).resourceValues(forKeys: key)
+      let checkout = try repo.resourceValues(forKeys: key)
+      #expect(
+        try #require(boundFile.fileResourceIdentifier as? NSObject)
+          == (checkout.fileResourceIdentifier as? NSObject))
+      #expect(row["remote_url"] == origins[0])
     }
   }
 
@@ -111,10 +113,8 @@ struct ScanIdentityCommandTests {
       #expect(scan.termination == .exit(6))
       #expect(try TaskStateCommandTests.error(scan)["next"] as? [String] == [Self.inspect])
       let foundNext = try TaskStateCommandTests.error(found)["next"] as? [String]
-      withKnownIssue("SI-238: Discovery currently ignores already-bound origin matches.") {
-        #expect(foundNext == [Self.inspect])
-        #expect(brief.stdout.contains(Self.inspect))
-      }
+      #expect(foundNext == [Self.inspect])
+      #expect(brief.stdout.contains(Self.inspect))
       #expect(
         try FirstWorkspaceCommandTests.replay(Self.inspect, in: scratch, cwd: other).termination
           == .exit(0))
@@ -135,10 +135,8 @@ struct ScanIdentityCommandTests {
       let before = try Self.identity(store)
       let result = try Self.run(["--ws", "acme", "init", "--scan", "."], repo, scratch)
       let after = try Self.identity(store)
-      withKnownIssue("SI-238: Fallback currently binds a matching slug with a mismatched origin.") {
-        #expect(result.termination == .exit(6))
-        #expect(after == before)
-      }
+      #expect(result.termination == .exit(6))
+      #expect(after == before)
     }
   }
 
@@ -161,10 +159,21 @@ struct ScanIdentityCommandTests {
         #expect(try TaskStateCommandTests.error(result)["next"] as? [String] == [Self.inspect])
         #expect(try Self.identity(store) == before)
       } else {
-        withKnownIssue("SI-238: An explicit scope currently refuses a compatible alias.") {
-          #expect(result.termination == .exit(0))
-        }
+        #expect(result.termination == .exit(0))
       }
+    }
+  }
+
+  @Test func genericAliasesDoNotFoldRepositoryPathCase() throws {
+    try withScratchDirectory { scratch in
+      let store = try TaskCommandTests.setup(scratch)
+      try Self.declare("web", origin: "https://git.acme.invalid/acme/Web.git", in: store)
+      let repo = try Self.clone(
+        "web", origin: "ssh://git@git.acme.invalid/acme/web.git", in: scratch)
+      let before = try Self.identity(store)
+      let result = try Self.run(["--ws", "acme", "init", "--scan", "."], repo, scratch)
+      #expect(result.termination == .exit(6))
+      #expect(try Self.identity(store) == before)
     }
   }
 

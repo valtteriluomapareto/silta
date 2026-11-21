@@ -3133,13 +3133,16 @@ names another; a message about a derived prefix names where it came from, the sl
 identifier shape `ws edit` accepts; `--prefix` works without `--slug`. A scan without
 naming options can refresh an existing workspace of the same slug when the clones
 all match its registered repos, preserving its prefix. Slug and prefix clashes compare case-insensitively, as does `--ws`.
-An exact clone path binding takes priority. Other evidence includes an exact
-network or absolute local origin, equivalent HTTPS and Git SSH repository paths
-on github.com, gitlab.com and bitbucket.org, and a pathless repository with a
-matching slug and no configured origin. A possible alias on another host, a
-matching relative local origin or a workspace name alone calls for inspection
-before selecting a target. A scan checks all clone
-paths together before creating a workspace.
+An exact clone path binding takes priority. Other strong evidence includes an
+exact network or absolute local origin and standard hosted HTTPS and Git SSH
+aliases. GitHub, GitLab and Azure DevOps paths compare without case, and standard
+hosted paths can end in a slash. HTTPS, current Git SSH and legacy Visual Studio
+Git SSH spellings identify the same Azure DevOps repository. A network clone's
+slug alone is a possible match to a pathless declaration that has no origin.
+A possible alias on another host, a matching relative local origin or a workspace
+name alone calls for inspection before an automatic selection. An explicit new
+workspace may bypass slug-only candidates, subject to verified path and origin
+ownership. A scan checks all clone paths together before creating a workspace.
 A unique match to one workspace and one distinct repo per clone offers a scoped
 rescan when the repo paths agree or are unbound. If the scan includes competing
 registrations, a different bound clone, or a mix of registered and unfamiliar
@@ -3166,8 +3169,10 @@ or master provides a default app when its ref is not already represented. Stub
 slugs use repo normalization while refs keep their exact spelling. Reserved or
 duplicate generated slugs are skipped with a warning. Worktrees and path aliases
 resolve to one canonical main clone. Initial scans create configuration. A scoped
-rescan refreshes paths by exact binding, unique unbound origin, or registered repo
-slug and preserves edited configuration. Named scan roots must be readable
+rescan refreshes paths by exact binding, a unique compatible origin, or a
+same-slug declaration without contradictory origin evidence. A unique same-slug
+HTTPS and Git SSH alias on a generic host is compatible in this explicit scope.
+A different live checkout keeps its binding. Named scan roots must be readable
 directories. An unreadable descendant is skipped with a warning when other
 clones can be registered. If unreadable descendants leave no clones, the scan
 reports the first unreadable path.

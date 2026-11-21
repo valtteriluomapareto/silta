@@ -124,10 +124,10 @@ package enum ScanError: CodedError, Equatable {
     case .prefixTaken(let prefix, let derived, let workspace):
       return derived
         ? "Task prefix \(prefix.debugDescription) is already used by workspace "
-          + "\(workspace.debugDescription); it was derived from the workspace name, so pass "
-          + "--prefix."
+          + "\(workspace.debugDescription). It was derived from the workspace name. "
+          + "Inspect that workspace before choosing a different --prefix."
         : "Task prefix \(prefix.debugDescription) is already used by workspace "
-          + "\(workspace.debugDescription); pass a different --prefix."
+          + "\(workspace.debugDescription). Inspect that workspace before choosing a different --prefix."
     case .repoPathTaken(let repo, _, let workspace):
       return "Repo \(repo.debugDescription) is already registered to workspace "
         + "\(workspace.debugDescription); scan a clone that belongs to this workspace, or rescan "
@@ -135,7 +135,7 @@ package enum ScanError: CodedError, Equatable {
     case .registeredWorkspaces(let workspaces, let roots):
       let names = workspaces.map(\.debugDescription).joined(separator: ", ")
       return roots == nil
-        ? "Existing registrations in \(names) overlap this scan. Inspect them and ask the human to choose."
+        ? "Possible workspace matches: \(names). Inspect their configuration and ask the human to choose."
         : "The clones match workspace \(names). Scan them in that workspace."
     case .unverifiedWorkspace(let workspace):
       return "Workspace \(workspace.debugDescription) already exists. Inspect its "
