@@ -37,22 +37,7 @@ extension TaskService {
       guard answer["kind"] as String == "answer", answer["thread_id"] as Int64? != nil,
         root["kind"] as String == "question"
       else { throw CommentError.answerRequired(task.ref) }
-      guard
-        Self.canAcceptAnswer(
-          answer["actor"], asker: root["actor"], claimer: task.claimedBy,
-          caller: environment.actor.description)
-      else {
-        if answer["actor"] as String == environment.actor.description,
-          task.claimedBy == environment.actor.description
-        {
-          throw CommentError.unavailable(
-            "A claimer cannot accept its own answer to another actor's question.",
-            task: task.ref, reopen: nil)
-        }
-        throw CommentError.wrongAsker(
-          asker: root["actor"], actor: environment.actor.description, task: task.ref,
-          root: root["resolved_at"] as String? == nil ? "\(task.ref)/\(root["seq"] as Int)" : nil)
-      }
+      try authorizeAcceptance(answer, root: root, task: task, workspace: workspace)
       try Self.liveThread(answer, root: root, task: task, allowResolved: true)
       let answerRef = "\(task.ref)/\(answer["seq"] as Int)"
       var result = CommentMutationResult(action: "accepted", refs: [answerRef])
@@ -75,10 +60,56 @@ extension TaskService {
     }
   }
 
-  static func canAcceptAnswer(_ author: String, asker: String, claimer: String?, caller: String)
-    -> Bool
+  private func authorizeAcceptance(_ answer: Row, root: Row, task: TaskDetails, workspace: String)
+    throws
   {
-    asker == caller || (claimer == caller && author != caller)
+    let question = CommentDetails(row: root, task: task.ref)
+    let author: String = answer["actor"]
+    let actor = environment.actor
+    let caller = actor.description
+    if Self.canAcceptAnswer(author, question: question, claimer: task.claimedBy, caller: caller) {
+      return
+    }
+    if Self.isOwnHumanAnswer(author, question: question, caller: caller) {
+      try Self.liveThread(answer, root: root, task: task, allowResolved: true)
+      let read = scopedCommand(
+        "silta task show " + shellWord(task.ref) + " --timeline",
+        workspace: workspace)
+      throw CommentError.ownHumanAnswer(
+        confirm: Self.relayResolutionCommand(question, caller: actor, workspace: workspace),
+        inspect: read)
+    }
+    if author == caller, task.claimedBy == caller {
+      throw CommentError.unavailable(
+        "A claimer cannot accept its own answer to another actor's question.",
+        task: task.ref, reopen: nil)
+    }
+    throw CommentError.wrongAsker(
+      asker: question.actor, actor: caller, task: task.ref,
+      root: question.resolvedAt == nil ? question.ref : nil)
+  }
+
+  static func canAcceptAnswer(
+    _ author: String, question: CommentDetails, claimer: String?, caller: String
+  ) -> Bool {
+    (question.actor == caller && !isOwnHumanAnswer(author, question: question, caller: caller))
+      || (claimer == caller && author != caller)
+  }
+
+  static func isOwnHumanAnswer(_ author: String, question: CommentDetails, caller: String) -> Bool {
+    author == caller && question.actor == caller && !question.humanRecipients.isEmpty
+  }
+
+  /// A live outsider relay can be recorded after chat confirmation from an addressed human.
+  static func relayResolutionCommand(
+    _ question: CommentDetails, caller: ActorID, workspace: String
+  ) -> String? {
+    guard question.kind == "question", !question.deleted, question.resolvedAt == nil,
+      !caller.isHuman, !question.mentions.contains(caller.description),
+      !question.humanRecipients.isEmpty
+    else { return nil }
+    let command = "silta comment resolve " + shellWord(question.ref) + " -m \"<confirmed answer>\""
+    return workspaceCommand(command, workspace: workspace)
   }
 
   private static func threadRoot(_ post: Row, task: TaskDetails, in db: Database) throws -> Row {

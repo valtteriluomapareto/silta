@@ -146,7 +146,7 @@ struct CommentQuestionTests {
   @Test func acceptanceStateMatrixAndLateFailuresAreAtomic() async throws {
     try await withScratchDirectory { home in
       let env = try await CommentTests.setup(home), service = TaskService(environment: env)
-      _ = try Self.post(service, kind: "question")
+      _ = try Self.post(service, kind: "question", to: [env.actor.description])
       for _ in 0..<2 { _ = try Self.post(service, kind: "answer", reply: "AC-1/1") }
       #expect(throws: CommentError.self) { _ = try service.acceptComment("AC-1/1") }
       _ = try service.updateComments(["AC-1/1"], action: .resolve)
@@ -190,7 +190,7 @@ extension CommentQuestionTests {
   func producerAndAcceptRespectTaskState(state: String) async throws {
     try await withScratchDirectory { home in
       let env = try await CommentTests.setup(home), service = TaskService(environment: env)
-      _ = try Self.post(service, kind: "question")
+      _ = try Self.post(service, kind: "question", to: [env.actor.description])
       _ = try Self.post(service, kind: "answer", reply: "AC-1/1")
       try env.db.write {
         try $0.database.execute(

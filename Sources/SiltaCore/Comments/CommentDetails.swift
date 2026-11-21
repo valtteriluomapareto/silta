@@ -37,6 +37,8 @@ package struct CommentDetails: Encodable, Sendable {
     case createdAt = "created_at"
   }
 
+  var humanRecipients: [ActorID] { mentions.compactMap(ActorID.parse).filter(\.isHuman) }
+
   func isAnswered(by posts: [CommentDetails]) -> Bool {
     !deleted
       && posts.contains {

@@ -817,12 +817,15 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   choice by the asker or current claimer. A claimer never accepts its own answer to
   another actor's question; target-authored answers are omitted from that actor's
   inbox unless the actor is also the asker. After confirming a human's answer in
-  chat, the asker or eligible claimer accepts a relay, or the relaying agent
-  explicitly resolves with `comment resolve <ref> -m <explanation>`. The inbox never
-  offers a bare resolve: only an agent with an existing outsider answer to the
-  queried human gets an `ask human:` confirmation instruction, alongside a safe read
-  command. Other callers without acceptance authority get only `task show`.
-  A non-addressee agent is not offered another answer action; the question names
+  chat, the asker or eligible claimer accepts another agent's relay. The relaying
+  agent can resolve the thread with `comment resolve <ref> -m <confirmed answer>`.
+  An asker cannot accept their own answer to a question with a human recipient.
+  An agent's inbox offers conditional confirmation on that answer if the agent is
+  outside the question's recipients. A human inbox keeps the same confirmation
+  instruction for an agent with a live outsider answer to that addressed human.
+  Both views include a timeline read, which is the only action if no confirmation
+  or acceptance is available. A non-addressee agent is not offered another answer
+  action; the question names
   existing outsider answer authors as awaiting confirmation, without treating their
   prose as proof of a human relay.
 - Questions and handoffs are roots. Answers require a live unresolved question;
@@ -832,7 +835,7 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   and a live answer/root.
   It sets the answer's `accepted` flag and the root's `resolved_at`/`resolved_by`
   to the accepter, recording `accepted <answer-ref>` in the attributed discussion event.
-  Repeating that same live acceptance writes nothing. A manually resolved question
+  An eligible caller repeating that same live acceptance writes nothing. A manually resolved question
   or a different answer selection requires reopen first; deleted posts refuse.
   JSON always includes `accepted`; text identifies accepted answers distinctly.
   Giving accept a question or non-answer ref points to the task's full discussion.
@@ -1570,7 +1573,9 @@ workspace. A setting that changes the rules gets one conditional sentence, and
 - **Questions:** ask in chat; record only when blocked beyond this session. Use
   `--to` for recipients and `--kind answer --reply-to` for answers; the asker or
   current claimer can `comment accept` an answer. Answer only as an addressee or
-  to relay the human's chat answer; never accept your own answer to `@me`.
+  to relay the human's chat answer. For questions addressed to a human, record a
+  confirmed relay by resolving the question with an explanation. The asker cannot
+  accept their own answer to such a question.
 - **Blocked:** a question to the human doesn't block the task. If the human can
   answer, ask in chat, even about the customer. If only
   someone outside can (`ext:`) or another task must land first, keep doing what you
