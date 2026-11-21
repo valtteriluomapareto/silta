@@ -27,10 +27,11 @@ extension AppModel {
     }
   }
 
-  /// The task proposals My work lists, which a selection may name.
+  /// The task proposals My work lists, which a selection may name: the whole inbox's while
+  /// it is shown, else the capped read's.
   var proposalRefs: Set<String> {
-    Set(
-      visibleData?.snapshot?.work.items.filter { $0.kind == "proposal" }.flatMap(\.refs) ?? [])
+    let items = allWaiting ?? visibleData?.snapshot?.work.items ?? []
+    return Set(items.filter { $0.kind == "proposal" }.flatMap(\.refs))
   }
 
   /// Accepts the ticked proposals among `visible` as one all-or-nothing triage, so a
