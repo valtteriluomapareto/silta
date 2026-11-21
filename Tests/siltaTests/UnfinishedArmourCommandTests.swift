@@ -15,7 +15,10 @@ struct UnfinishedArmourCommandTests {
     "flat", "flatChunks", "nbsp", "bom", "prose", "hash", "sibling", "dedentedQuote",
     "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA",
     "doubleLF", "doubleCRLF", "wideSpace", "done", "verify", "listDone", "quotedDone",
-    "inlineCode", "sri", "dataValue", "base64Hash",
+    "inlineCode", "sri", "dataValue", "base64Hash", "flatPunctuation", "escapedPath",
+    "doubleEscapedPath", "escapedReference", "escapedTailPath", "doubleSlashFirst",
+    "doubleSlashLast",
+    "tripleSlash",
   ])
   func unfinishedArmourStorageAndExport(form: String) throws {
     try withScratchDirectory { scratch in
@@ -97,12 +100,21 @@ struct UnfinishedArmourCommandTests {
     case "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA",
       "inlineCode", "sri", "dataValue", "base64Hash":
       return unchangedMention(form)
-    case "doubleLF", "doubleCRLF":
+    case "doubleLF", "doubleCRLF", "doubleSlashFirst", "doubleSlashLast", "tripleSlash":
       let split = form == "doubleLF" ? #"\\n"# : #"\\r\\n"#
       let prefix = #"Acme {"log":"{\"key\":\""#
       let suffix = #"\",\"keep\":\"First\\nSecond\"}","more":true}"#
-      let tail = token + split + String(repeating: "Z", count: 64) + suffix
-      return (prefix + marker + split + tail, prefix + masked + suffix)
+      let second = String(repeating: "Z", count: 64)
+      let slash = form == "tripleSlash" ? #"\\\/"# : #"\\/"#
+      let tail =
+        switch form {
+        case "doubleSlashFirst", "tripleSlash": token + slash + second + split + second
+        case "doubleSlashLast": token + split + token + slash + second
+        default: token + split + second
+        }
+      return (prefix + marker + split + tail + suffix, prefix + masked + suffix)
+    case "escapedPath", "doubleEscapedPath", "escapedReference", "escapedTailPath":
+      return escapedMention(form)
     case "wideSpace":
       let prefix = "\u{2003}"
       return (prefix + marker + "\n" + token.prefix(24), prefix + masked)
@@ -114,6 +126,20 @@ struct UnfinishedArmourCommandTests {
     default:
       return nil
     }
+  }
+
+  private static func escapedMention(_ form: String) -> (String, String) {
+    let separator = form == "doubleEscapedPath" ? #"\\n"# : #"\n"#
+    let example =
+      if form == "escapedReference" { String(repeating: "abc123de", count: 5) } else {
+        "Sources/SiltaCore/Secrets/SecretGuardTests+ArmourAndMore.swift"
+      }
+    let suffix = separator + example
+    if form == "escapedTailPath" {
+      return ("See " + marker + separator + token + suffix, "See " + masked + suffix)
+    }
+    let body = "See " + marker + suffix
+    return (body, body)
   }
 
   private static func unchangedMention(_ form: String) -> (String, String) {
@@ -140,6 +166,8 @@ struct UnfinishedArmourCommandTests {
     switch form {
     case "escapedLF", "escapedCRLF", "escapedBlank", "escapedSlash", "escapedPGP":
       return escapedExample(form)
+    case "flatPunctuation":
+      return (marker + " " + token + "! The next sentence.", masked + "! The next sentence.")
     case "flat", "flatChunks":
       let suffix = "\" Acme safe tail."
       let body = form == "flatChunks" ? token + " " + second : token

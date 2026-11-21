@@ -2423,9 +2423,10 @@ text a human kept with `--allow-secret` doesn't block their later writes.
   - private-key armour, including PGP and SSH2. An unfinished block can start on
     its own line, or carry enough base64 evidence after an inline or annotated
     opening marker. Flattened payloads start at the marker or its annotation.
-    Single and double escaped line breaks count, with the enclosing field kept intact.
-    Format-specific preambles can precede a payload. Inline redaction stops at
-    the last payload character. The first payload line and a continuation after
+    Single and double escaped line breaks and payload slashes count, with the
+    enclosing field kept intact. Format-specific preambles can precede a payload.
+    Inline redaction ends at a whole payload token and retains trailing punctuation.
+    The first payload line and a continuation after
     a blank need enough base64 to distinguish them from short prose. A quote or
     list continues across a blank only inside its Markdown container.
   - Azure storage `AccountKey=` and SAS signatures

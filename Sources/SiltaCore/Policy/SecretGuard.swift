@@ -280,7 +280,7 @@ extension SecretGuard {
     if first == "." {
       return tail.dropFirst().first.map(armourSpace) ?? true
     }
-    return armourSpace(first) || "),;]}".contains(first)
+    return armourSpace(first) || "),;]}!?".contains(first)
   }
 
   private static func isCommitSHA(_ word: Substring) -> Bool {
@@ -290,7 +290,7 @@ extension SecretGuard {
   private static func escapedArmourEnd(
     _ body: Substring, label: Substring, separator: Regex<Substring>
   ) -> String.Index? {
-    let payload = /((?:[A-Za-z0-9+\/]|\\\/)+)={0,2}/
+    let payload = /((?:[A-Za-z0-9+\/]|\\{1,3}\/)+)={0,2}/
     var start = body.startIndex
     var end: String.Index?
     var afterBlank = false
@@ -320,7 +320,10 @@ extension SecretGuard {
       let minimum = end == nil || afterBlank ? 16 : 1
       guard let match = tail.prefixMatch(of: payload),
         match.1.utf8.lazy.filter({ $0 != 92 }).count >= minimum,
-        next == nil || tail[match.range.upperBound...].allSatisfy(armourSpace)
+        end != nil || !isCommitSHA(match.1),
+        next == nil
+          ? isPayloadBoundary(tail[match.range.upperBound...])
+          : tail[match.range.upperBound...].allSatisfy(armourSpace)
       else { break }
       end = match.range.upperBound
       afterBlank = false
