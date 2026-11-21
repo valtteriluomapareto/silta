@@ -40,6 +40,10 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   each actionable inbox entry and each distinct review task once;
   it does not count visual groups. The maintainer chose actionable-item counts on
   2026-11-16; Paper v2's “4 waiting” group count is not the acceptance value.
+  Paper "App features v1": a line under the items says how many more wait past the
+  inbox cap of twelve, and "Show all" reloads My work with the whole inbox
+  (`inbox --for me --all`, proposals older than 14 days included) until "Show fewer" or
+  a workspace switch. The badge keeps the capped count.
 - **Board:** blocked tasks stay in Todo with a blocked label; lanes show plan
   progress, and a task inspector shows the plan, claim,
   properties and discussion. Paper "App features v1": it also shows what `task show`
