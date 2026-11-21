@@ -92,7 +92,7 @@
             == "Claude · asked you")
         #expect(
           TaskPresentation.cardMetadata(other, asked: false, now: AppV2Fixture.now)
-            == "Codex · updated 1 h ago")
+            == "Codex · claim expired · idle 3 h")
         #expect(
           TaskPresentation.cardMetadata(review, asked: false, now: AppV2Fixture.now)
             == "Codex · waiting for your review")

@@ -22,6 +22,39 @@
       }
     }
 
+    @Test func agentPromptPinsTheHomeAndItsShowCommandRuns() throws {
+      try withScratchDirectory { scratch in
+        let userHome = scratch.appending(path: "home")
+        let home = userHome.appending(path: ".silta")
+        try FileManager.default.createDirectory(at: userHome, withIntermediateDirectories: true)
+        try AppV2Fixture.seed(home: home)
+        let reader = try AppReader(home: home, user: "acme", userHome: userHome)
+        let prompt = reader.agentPrompt(task: "AC-14", workspace: "acme", name: "Ac`me\nCo")
+        #expect(
+          prompt
+            == "Work on AC-14 in AcmeCo. Read it with `SILTA_HOME=~/.silta silta --ws 'acme' "
+            + "task show 'AC-14'`, then claim it with `SILTA_HOME=~/.silta silta --ws 'acme' "
+            + "task start 'AC-14'`.")
+        let show = try #require(prompt.split(separator: "`").dropFirst().first.map(String.init))
+        let binary = try SiltaBinary.url()
+        let result = try SiltaBinary.runProcess(
+          URL(filePath: "/bin/sh"), ["-c", show], in: scratch,
+          environment: [
+            "HOME": userHome.path, "SILTA_HOME": scratch.appending(path: "agent").path,
+            "USER": "acme", "SILTA_ACTOR": "agent:codex:other",
+            "PATH": binary.deletingLastPathComponent().path + ":/usr/bin:/bin",
+          ])
+        #expect(result.termination == .exit(0), "\(result)")
+        #expect(result.stdout.contains("Retry push registrations"))
+        let custom = try AppReader(
+          home: scratch.appending(path: "custom data"), user: "acme", userHome: userHome)
+        #expect(
+          custom.agentPrompt(task: "AC-14", workspace: "acme", name: "Acme").contains(
+            "`SILTA_HOME='" + scratch.appending(path: "custom data").path
+              + "' silta --ws 'acme' task start 'AC-14'`"))
+      }
+    }
+
     @Test(arguments: ["existing", "symlink", "var-alias", "trailing-slash"])
     func pastedCommandsPinExistingDefaultHome(alias: String) throws {
       try withScratchDirectory { scratch in

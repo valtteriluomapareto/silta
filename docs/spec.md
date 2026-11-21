@@ -595,13 +595,13 @@ Change a task's primary app with `task edit <ref> --app <slug>`. Use
 app named `none`. This mode takes neither an editor nor a body file. It cannot be
 combined with `-F`, `--print` or `--allow-secret`. Done, dropped and promoted
 tasks refuse. The regular edit gate applies, including a live foreign claim refusal.
-For a move that affects another app's backlog, follow the ask rules in §11.
+Ask before choosing the destination app unless the human already named it (§11).
 
 Changing between repositories clears the task's recorded branch and worktree.
 Start it from the target repository to record the task's new Git location.
 If the target has a different session, the current claimant hands off first.
-Children keep their app. The receipt names those still on the task's previous
-app, and the task timeline records the old and new app once.
+Children keep their app. The receipt names the movable children still on the task's
+previous app, and the task timeline records the old and new app once.
 
 `task ls` always shows the caller's own `proposed` tasks, so an agent can see what it
 just created; `--status proposed` lists everyone's (it implies `--proposed`). Promoted
@@ -2160,7 +2160,7 @@ included, point to the failed command's help. A busy retry names only the parsed
 arguments.
 
 - The `task edit --app` receipt includes `app_change` on change, with `from` and `to`
-  app slugs when set and `children_on_previous_app` listing the matching child refs.
+  app slugs when set and `children_on_previous_app` listing child refs that can still move.
 
 **Streams and global flags:**
 - Text mode: data on stdout; errors and warnings (`warning: <message> [<code>]`) on
@@ -3148,9 +3148,11 @@ all match its registered repos, preserving its prefix. Slug and prefix clashes c
 An exact clone path binding takes priority. Other strong evidence includes an
 exact network or absolute local origin and standard hosted HTTPS and Git SSH
 aliases. GitHub, GitLab and Azure DevOps paths compare without case, and standard
-hosted paths can end in a slash. HTTPS, current Git SSH and legacy Visual Studio
-Git SSH spellings identify the same Azure DevOps repository. A network clone's
-slug alone is a possible match to a pathless declaration that has no origin.
+hosted paths can end in a slash. Azure DevOps supports HTTPS with or without the
+organization as the username, the legacy organization-specific Visual Studio
+HTTPS host, and current and legacy Git SSH spellings. A network clone's slug alone
+is a possible match to a pathless declaration. A same-slug declaration with a
+different origin offers read-only inspection if there is no stronger match.
 A possible alias on another host, a matching relative local origin or a workspace
 name alone calls for inspection before an automatic selection. An explicit new
 workspace may bypass slug-only candidates, subject to verified path and origin
@@ -3184,6 +3186,9 @@ resolve to one canonical main clone. Initial scans create configuration. A scope
 rescan refreshes paths by exact binding, a unique compatible origin, or a
 same-slug declaration without contradictory origin evidence. A unique same-slug
 HTTPS and Git SSH alias on a generic host is compatible in this explicit scope.
+A direct human who explicitly scopes the scan may bind a same-slug clone to an
+unbound declaration with a different origin. The receipt warns about the mismatch
+without showing credentials, and the declaration keeps its configured origin.
 A different live checkout keeps its binding. Named scan roots must be readable
 directories. An unreadable descendant is skipped with a warning when other
 clones can be registered. If unreadable descendants leave no clones, the scan

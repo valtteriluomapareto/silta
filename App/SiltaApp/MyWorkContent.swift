@@ -52,12 +52,13 @@ nonisolated struct MyWorkContent {
       || !tasks.isEmpty || !other.isEmpty
   }
 
-  init(snapshot: AppSnapshot, search: String, now: Date) {
+  /// `all` replaces the capped inbox items when My work shows every waiting item.
+  init(snapshot: AppSnapshot, all: [AppAttention]? = nil, search: String, now: Date) {
     let board = snapshot.board
     let byRef = Dictionary(
       uniqueKeysWithValues: (board.todo + board.doing + board.review + board.doneThisWeek
         + board.proposals).map { ($0.ref, $0) })
-    let items = snapshot.work.items
+    let items = all ?? snapshot.work.items
     func matches(_ item: AppAttention, extra: [String] = []) -> Bool {
       AppSearch.matches(
         search,
@@ -83,7 +84,16 @@ nonisolated struct MyWorkContent {
     other = items.filter {
       !["question", "answer", "doc_proposal", "proposal"].contains($0.kind) && matches($0)
     }
-    remaining = snapshot.work.remaining
+    remaining = all == nil ? snapshot.work.remaining : 0
+  }
+
+  /// The line under My work's items, beside its Show all or Show fewer button.
+  static func footer(remaining: Int, showingAll: Bool, loaded: Bool = true) -> String {
+    if showingAll, !loaded { return "Reading every waiting item…" }
+    if showingAll { return "Showing everything waiting, including proposals older than 14 days." }
+    guard remaining > 0 else { return "Proposals older than 14 days are hidden." }
+    return "\(remaining) more waiting \(remaining == 1 ? "item" : "items"), plus any proposals "
+      + "older than 14 days."
   }
 
   private static func question(_ item: AppAttention, task: AppTask?, now: Date) -> Question {

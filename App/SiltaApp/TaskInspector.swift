@@ -27,17 +27,27 @@ struct TaskInspector: View {
             }
             Text(task.title).font(.system(size: 20, weight: .bold)).tracking(-0.2)
               .textSelection(.enabled)
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-              property("App", task.app)
-              property("Priority", String(task.priority))
-              property("Branch", task.branch, monospaced: true)
-              property("Claimed by", TaskPresentation.claimant(task.claimedBy))
-              property("Claimed", age(task.claimedAt))
-              property("Updated", age(task.updatedAt))
-            }.font(.system(size: 12)).textSelection(.enabled)
-              .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-              .background(Color("Ink").opacity(0.03), in: .rect(cornerRadius: 12))
+            if let now = model.visibleData?.checkedAt,
+              let banner = TaskPresentation.claimBanner(task, now: now)
+            {
+              ClaimBannerView(
+                banner: banner, prompt: task.claimExpiresAt == nil ? nil : resumePrompt(task),
+                reveal: TaskMenu.reveal(task, existing: model.inspectedWorktrees)
+              ) { model.run($0) }
+            }
+            if let handoff = TaskFacts.handoff(task) {
+              HandoffNote(text: handoff, prompt: resumePrompt(task))
+            }
+            if let waiting = TaskFacts.waiting(task) { WaitingSection(waiting: waiting) }
+            properties(task)
             if !task.description.isEmpty { DocumentMarkdown(task.description) }
+            if !task.acceptance.isEmpty {
+              VStack(alignment: .leading, spacing: 6) {
+                Overline("Acceptance")
+                DocumentMarkdown(task.acceptance)
+              }
+            }
+            if let result = TaskFacts.result(task) { ResultSection(result: result) }
             if !task.plan.isEmpty {
               VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -66,6 +76,23 @@ struct TaskInspector: View {
                 DisclosureGroup("Full plan") { Text(task.plan).textSelection(.enabled) }
                   .font(.system(size: 12))
               }
+            }
+            let subtasks = TaskFacts.subtasks(task)
+            if !subtasks.isEmpty {
+              ReferenceList(
+                title: "Subtasks",
+                rows: subtasks.map { ReferenceList.Row(ref: $0.ref, text: $0.title) })
+            }
+            let links = TaskFacts.otherLinks(task)
+            if !links.isEmpty {
+              ReferenceList(
+                title: "Links",
+                rows: links.map {
+                  ReferenceList.Row(
+                    ref: $0.rel, text: $0.target,
+                    url: $0.target.hasPrefix("url:")
+                      ? URL(string: String($0.target.dropFirst("url:".count))) : nil)
+                })
             }
             DiscussionView(model: model, task: task).id(task.ref)
             actions(task)
@@ -119,6 +146,52 @@ struct TaskInspector: View {
     .joined(separator: ":")
   }
 
+  private func resumePrompt(_ task: AppTask) -> String? {
+    guard let reader = model.reader, let workspace = model.workspace else { return nil }
+    return reader.agentPrompt(
+      task: task.ref, workspace: workspace, name: model.workspaceName ?? workspace)
+  }
+
+  private func properties(_ task: AppTask) -> some View {
+    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+      property("App", task.app)
+      property("Priority", String(task.priority))
+      property("Branch", task.branch, monospaced: true)
+      property("Claimed by", TaskPresentation.claimant(task.claimedBy))
+      property("Claimed", age(task.claimedAt))
+      property("Updated", age(task.updatedAt))
+      if task.status == "done" || task.status == "dropped" {
+        property(task.status == "done" ? "Done" : "Dropped", age(task.closedAt))
+      }
+      if let commit = TaskFacts.commit(task) { property("Commit", commit, monospaced: true) }
+      ForEach(TaskFacts.pullRequests(task), id: \.url) { pull in
+        GridRow {
+          Text("Pull request").foregroundStyle(Color("SecondaryInk"))
+          if let url = URL(string: pull.url) {
+            Link(pull.title, destination: url).foregroundStyle(Color("TideText"))
+          } else {
+            Text(pull.title)
+          }
+        }
+      }
+      if task.doneDirty == true {
+        GridRow {
+          Text("Worktree").foregroundStyle(Color("SecondaryInk"))
+          Text("Had uncommitted changes when done").foregroundStyle(Color("Warning"))
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      if let parent = TaskFacts.parent(task) {
+        property(
+          "Parent", [parent.ref, parent.title].filter { !$0.isEmpty }.joined(separator: " "))
+      }
+      if let external = task.externalRef { property("Tracker", external, monospaced: true) }
+      property("Created", TaskFacts.created(task))
+    }.font(.system(size: 12)).textSelection(.enabled)
+      .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color("Ink").opacity(0.03), in: .rect(cornerRadius: 12))
+  }
+
   private func property(_ title: String, _ value: String?, monospaced: Bool = false) -> some View {
     GridRow {
       Text(title).foregroundStyle(Color("SecondaryInk"))
@@ -145,13 +218,19 @@ struct TaskInspector: View {
   }
 
   @ViewBuilder private func worktreeButton(_ task: AppTask) -> some View {
-    let path = task.worktree
-    let available =
-      path.map { $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0) } ?? false
+    let reveal = TaskMenu.reveal(task, existing: model.inspectedWorktrees)
+    let action: TaskMenu.Action? = if case .available(let action) = reveal { action } else { nil }
     Button("Reveal worktree", systemImage: "folder") {
-      if let path { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path) }
-    }.buttonStyle(CompactActionStyle()).disabled(!available).opacity(available ? 1 : 0.45)
-      .help(available ? "Reveal the recorded worktree" : "No existing worktree is recorded")
+      if let action { model.run(action) }
+    }.buttonStyle(CompactActionStyle()).disabled(action == nil).opacity(action == nil ? 0.45 : 1)
+      .help(
+        {
+          if case .unavailable(let reason) = reveal {
+            "Can't reveal the worktree: " + reason
+          } else {
+            "Reveal the recorded worktree"
+          }
+        }())
   }
 }
 

@@ -11,23 +11,29 @@ nonisolated enum SidebarContent {
     apps.firstIndex { $0.slug == slug }.map { appColor(index: $0) }
   }
 
-  static func claimTitle(_ task: AppTask) -> String {
-    task.ref
+  static func claimTitle(_ task: AppTask, now: Date) -> String {
+    if task.claimExpired(at: now) { return task.ref + " · expired" }
+    return task.ref
       + (task.steps.isEmpty
         ? "" : " · step \(task.steps.filter(\.done).count) of \(task.steps.count)")
   }
 
   static func claimSubtitle(_ task: AppTask, now: Date) -> String {
-    let actor = task.claimedBy.map { ActorPresentation($0).name } ?? "Unknown actor"
-    return actor + (RelativeAge.text(task.updatedAt, now: now).map { " · updated " + $0 } ?? "")
+    TaskPresentation.claimLine(task, now: now) ?? task.ref
+  }
+
+  /// The Claimed now heading, counting claims another agent may now take over.
+  static func claimHeading(_ doing: [AppTask], now: Date) -> String {
+    let expired = doing.filter { $0.claimExpired(at: now) }.count
+    return "Claimed now" + (expired > 0 ? " · \(expired) expired" : "")
   }
 
   /// The Claimed now card shows at most this many claims so the navigation keeps its room.
   static let claimLimit = 3
 
-  /// A short age for the Claimed now card, such as "6 min".
+  /// A short claim heartbeat age for the Claimed now card, such as "6 min".
   static func claimAge(_ task: AppTask, now: Date) -> String? {
-    RelativeAge.text(task.updatedAt, now: now, short: true)
+    RelativeAge.text(task.claimedAt, now: now, short: true)
   }
 
   static func documentCount(_ page: AppDocumentList?, stale: Bool = false) -> String {
