@@ -151,6 +151,22 @@
       }
     }
 
+    @Test func droppingSendsTheVisibleTickedProposalsWithAnOptionalReason() async throws {
+      try await fixtureModel { model, reader in
+        let all = ["AC-21", "AC-22", "AC-23"]
+        #expect(model.dropSelectedProposals(among: all, why: "x") == nil)
+        model.actions.selectedProposals = ["AC-21", "AC-23"]
+        await model.dropSelectedProposals(among: ["AC-21"], why: "  Not now.  ")?.value
+        #expect(try reader.task("AC-21", workspace: "acme").status == "dropped")
+        #expect(try reader.task("AC-21", workspace: "acme").result == "Not now.")
+        #expect(try reader.task("AC-23", workspace: "acme").status == "proposed")
+        #expect(model.actions.selectedProposals == ["AC-23"])
+        await model.dropSelectedProposals(among: all, why: "   ")?.value
+        #expect(try reader.task("AC-23", workspace: "acme").result == "Dropped in triage.")
+        #expect(model.proposalRefs == ["AC-22"])
+      }
+    }
+
     @Test func aSearchNeverSendsAHiddenTickedProposal() async throws {
       try await fixtureModel { model, _ in
         model.actions.selectedProposals = ["AC-21", "AC-23"]
