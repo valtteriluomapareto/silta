@@ -56,10 +56,12 @@ final class ActionModel {
       })
   }
 
+  /// Stores the drafts, leaving out any that look like a secret: Core refuses those on
+  /// send, and they shouldn't outlive the app in a preferences file.
   private func store() {
     guard let defaults else { return }
     let stored = Dictionary(
-      uniqueKeysWithValues: drafts.map {
+      uniqueKeysWithValues: drafts.filter { !AppSecrets.contains($0.value) }.map {
         ($0.key.workspace + String(Self.separator) + $0.key.ref, $0.value)
       })
     if stored.isEmpty {
@@ -72,7 +74,7 @@ final class ActionModel {
   func draft(_ target: ActionTarget) -> String { drafts[target] ?? "" }
 
   func setDraft(_ text: String, for target: ActionTarget) {
-    drafts[target] = text.isEmpty ? nil : text
+    drafts[target] = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
   }
 
   func isSending(_ target: ActionTarget) -> Bool { sending.contains(target) }

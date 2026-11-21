@@ -34,7 +34,8 @@ SiltaApp -SiltaSnapshot out.png [-SiltaRoute board:AC-12] [-SiltaDark] [-SiltaSi
   persist. Snapshot and driver runs pin both. Board filters work the same way: a
   hand-launched fixture shares the human's stored blocked and done toggles, while
   snapshot and driver runs start from the defaults (all lanes shown) and store nothing.
-  The last workspace and screen and unsent drafts follow the same rule.
+  The last workspace and screen and unsent drafts belong to the human's store, so every
+  fixture run, hand-launched included, neither reads nor stores them.
 - Interactive fixture launch prints its state.json path in the private run
   directory. Snapshot launch writes state.json next to the requested PNG, then
   exits. Use a separate output directory for each capture to retain matching

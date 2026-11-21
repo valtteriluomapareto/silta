@@ -38,7 +38,8 @@ struct SiltaApp: App {
           // Automated runs start from default Board filters and never store them.
           let model = Self.makeReaderModel(
             home: fixture.home, user: fixture.user, now: { fixture.now },
-            defaults: AppModel.filterDefaults(automated: options.isAutomated))
+            defaults: AppModel.filterDefaults(automated: options.isAutomated),
+            stateDefaults: AppModel.stateDefaults(fixture: true))
           _model = State(initialValue: model)
           Task { await control.start(model: model) }
           return
@@ -78,11 +79,13 @@ struct SiltaApp: App {
     }
     return makeReaderModel(
       home: URL(filePath: path), user: environment["USER"] ?? NSUserName(), now: { Date() },
-      defaults: AppModel.filterDefaults(automated: false))
+      defaults: AppModel.filterDefaults(automated: false),
+      stateDefaults: AppModel.stateDefaults(fixture: false))
   }
 
   private static func makeReaderModel(
-    home: URL, user: String, now: @escaping @Sendable () -> Date, defaults: UserDefaults?
+    home: URL, user: String, now: @escaping @Sendable () -> Date, defaults: UserDefaults?,
+    stateDefaults: UserDefaults?
   ) -> AppModel {
     do {
       let reader = try AppReader(home: home, user: user, now: now)
@@ -93,7 +96,7 @@ struct SiltaApp: App {
         writer: { write, workspace in
           try await Task.detached { try writer.perform(write, workspace: workspace) }.value
         },
-        defaults: defaults,
+        defaults: defaults, stateDefaults: stateDefaults,
         load: { previous, workspace, force in
           try await Task.detached {
             try session.load(previous: previous, workspace: workspace, force: force)

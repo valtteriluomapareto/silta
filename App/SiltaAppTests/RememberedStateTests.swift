@@ -12,12 +12,35 @@
         first.navigate(to: .docs)
         await first.selectWorkspace("acme").value
 
-        let next = model(reader, session, defaults)
+        let requested = Requests()
+        let next = AppModel(
+          reader: reader, now: { AppV2Fixture.now }, stateDefaults: defaults,
+          load: { previous, workspace, force in
+            await requested.add(workspace)
+            return try session.load(previous: previous, workspace: workspace, force: force)
+          })
         #expect(next.route == .docs)
-        #expect(next.workspace == "acme")
         await next.refresh().value
+        #expect(await requested.all.first == "acme")
         #expect(next.visibleData?.workspace == "acme")
       }
+    }
+
+    @Test func fixtureRunsNeverTouchTheHumansRememberedState() {
+      #expect(AppModel.stateDefaults(fixture: true) == nil)
+      #expect(AppModel.stateDefaults(fixture: false) == .standard)
+    }
+
+    @Test func aDraftThatLooksLikeASecretStaysInMemory() {
+      let defaults = Self.defaults()
+      let target = ActionTarget(workspace: "acme", ref: "AC-14")
+      let actions = ActionModel(defaults: defaults)
+      let token = "ghp_" + String(repeating: "a1B2", count: 9)
+      actions.setDraft("Use " + token, for: target)
+      #expect(actions.draft(target) == "Use " + token)
+      #expect(ActionModel(defaults: defaults).draft(target) == "")
+      actions.setDraft("   \n", for: target)
+      #expect(actions.draft(target) == "")
     }
 
     @Test func aRemovedWorkspaceFallsBackToTheFirst() async throws {
@@ -26,10 +49,13 @@
         defaults.set("not-a-route", forKey: AppModel.lastRouteKey)
         let model = model(reader, session, defaults)
         #expect(model.route == .mywork)
+        model.inspect(task: "AC-15")
         await model.refresh().value
         #expect(model.workspace == "acme")
         #expect(model.visibleData?.workspace == "acme")
         #expect(model.failure == nil)
+        #expect(model.boardSelection == nil)
+        #expect(defaults.string(forKey: AppModel.lastWorkspaceKey) == "acme")
       }
     }
 
@@ -40,7 +66,7 @@
         #expect(automated.route == .mywork)
         automated.navigate(to: .workspace)
         #expect(defaults.string(forKey: AppModel.lastRouteKey) == "board")
-        #expect(AppModel.filterDefaults(automated: true) == nil)
+        #expect(AppModel.stateDefaults(fixture: true) == nil)
       }
     }
 
@@ -80,10 +106,15 @@
       -> AppModel
     {
       AppModel(
-        reader: reader, now: { AppV2Fixture.now }, defaults: defaults,
+        reader: reader, now: { AppV2Fixture.now }, stateDefaults: defaults,
         load: { previous, workspace, force in
           try session.load(previous: previous, workspace: workspace, force: force)
         })
+    }
+
+    private actor Requests {
+      private(set) var all: [String?] = []
+      func add(_ workspace: String?) { all.append(workspace) }
     }
 
     private static func defaults() -> UserDefaults {

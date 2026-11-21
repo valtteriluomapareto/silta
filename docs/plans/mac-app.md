@@ -58,7 +58,8 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   The blocked and done toggles are remembered (⇧⌘B toggles blocked); automated control
   runs start from the defaults and store nothing. Paper "App features v1": the app also
   reopens on the last workspace (falling back to the first when it is gone) and the
-  last screen, and unsent answer and comment drafts outlast a quit, under the same rule.
+  last screen, and unsent answer and comment drafts outlast a quit. Only a real launch
+  remembers these; fixture runs neither read nor store them.
 - **Workspace:** apps and connections with a connection inspector, read from the
   workspace model rather than YAML. Paper "Map v2":
   - The map keeps app columns in call order. Services sit in one row under the apps,
