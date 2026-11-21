@@ -112,10 +112,8 @@ struct TaskAppEditCommandTests {
       let moved = try Self.run(["task", "edit", "AC-1", "--app", "desk", "--json"], in: scratch)
       let change = try #require(
         try TaskStateCommandTests.data(moved)["app_change"] as? [String: Any])
-      withKnownIssue("The app-change receipt currently lists closed and promoted children.") {
-        #expect(
-          change["children_on_previous_app"] as? [String] == ["AC-2", "AC-7", "AC-8", "AC-9"])
-      }
+      #expect(
+        change["children_on_previous_app"] as? [String] == ["AC-2", "AC-7", "AC-8", "AC-9"])
     }
   }
 
@@ -312,11 +310,9 @@ extension TaskAppEditCommandTests {
       let error = try TaskStateCommandTests.error(result)
       let code = error["code"] as? String
       #expect(code == (status == "promoted" ? "read_only_promoted" : "conflict"))
-      withKnownIssue("Closed app edits use a generic task refusal.") {
-        let message = "AC-1 is \(status); its primary app cannot change."
-        let detail = status == "promoted" ? " Work in tracker ado:1." : ""
-        #expect(error["message"] as? String == message + detail)
-      }
+      let message = "AC-1 is \(status); its primary app cannot change."
+      let detail = status == "promoted" ? " Work in tracker ado:1." : ""
+      #expect(error["message"] as? String == message + detail)
       #expect(try auditSnapshot(store) == before)
     }
   }
