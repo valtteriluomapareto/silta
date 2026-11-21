@@ -35,7 +35,10 @@ nonisolated final class AppReadSession: Sendable {
       return nil
     }
     let workspaces = try reader.workspaces()
-    let selected = workspace ?? workspaces.first?.slug
+    // A requested workspace that no longer exists, such as a remembered one, falls back.
+    let selected =
+      workspace.flatMap { slug in workspaces.contains { $0.slug == slug } ? slug : nil }
+      ?? workspaces.first?.slug
     let snapshot = try selected.map { try reader.snapshot(workspace: $0) }
     let map = try selected.map { try reader.workspaceMap(workspace: $0) }
     var data = AppLoadedData(

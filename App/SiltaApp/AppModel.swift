@@ -18,7 +18,7 @@ final class AppModel {
   /// The inspected task's worktree when it exists here, checked off the main thread, so a
   /// task outside the board can still be revealed.
   private(set) var inspectedWorktrees: Set<String> = []
-  let actions = ActionModel()
+  let actions: ActionModel
   /// Runs one write in a workspace; nil where the app can't write (no store, previews).
   let writer: Writer?
   let documents: DocsModel
@@ -64,12 +64,14 @@ final class AppModel {
   @ObservationIgnored private var queuedForce = false
   @ObservationIgnored private var generation = 0
   @ObservationIgnored private let defaults: UserDefaults?
+  static let lastWorkspaceKey = "lastWorkspace"
+  static let lastRouteKey = "lastScreen"
   static let showBlockedKey = "boardShowBlocked"
   static let showDoneKey = "boardShowDone"
 
-  /// Where the Board's Show toggles are stored: automated control runs start from the
-  /// defaults and store nothing; real launches and hand-launched fixtures share the
-  /// human's toggles.
+  /// Where the Board's Show toggles, the last workspace and screen and unsent drafts are
+  /// stored: automated control runs start from the defaults and store nothing; real
+  /// launches and hand-launched fixtures share the human's.
   static func filterDefaults(automated: Bool) -> UserDefaults? {
     automated ? nil : .standard
   }
@@ -84,6 +86,9 @@ final class AppModel {
     writer: Writer? = nil, defaults: UserDefaults? = nil, load: @escaping Loader
   ) {
     self.defaults = defaults
+    actions = ActionModel(defaults: defaults)
+    workspace = defaults?.string(forKey: Self.lastWorkspaceKey)
+    route = defaults?.string(forKey: Self.lastRouteKey).flatMap(AppRoute.init) ?? .mywork
     boardFilter = BoardFilter(
       blocked: defaults?.object(forKey: Self.showBlockedKey) as? Bool ?? true,
       done: defaults?.object(forKey: Self.showDoneKey) as? Bool ?? true)
@@ -120,7 +125,10 @@ final class AppModel {
         if token == generation {
           if let result {
             data = result
-            if workspace == nil { workspace = result.workspace }
+            // A remembered workspace that no longer exists falls back to the loaded one.
+            if workspace == nil || !result.workspaces.contains(where: { $0.slug == workspace }) {
+              workspace = result.workspace
+            }
           }
           failure = nil
           await loadExtras(force: forced, token: token)
@@ -137,6 +145,7 @@ final class AppModel {
   }
 
   @discardableResult func selectWorkspace(_ slug: String) -> Task<Void, Never> {
+    defaults?.set(slug, forKey: Self.lastWorkspaceKey)
     if workspace != slug {
       generation += 1
       workspace = slug
@@ -238,6 +247,7 @@ final class AppModel {
 
   func navigate(to route: AppRoute) {
     self.route = route
+    defaults?.set(route.rawValue, forKey: Self.lastRouteKey)
   }
 
   func inspect(task ref: String) {
@@ -265,23 +275,6 @@ final class AppModel {
   func clearWorkspaceSelection() {
     workspaceNode = nil
     workspaceSelection = nil
-  }
-
-  /// Moves the map selection with an arrow key. A selected connection starts from its
-  /// source going left and its target going right.
-  func moveMapSelection(_ direction: AppMapLayout.Direction) {
-    guard let map = visibleData?.map else { return }
-    let layout = AppMapLayout(map: map)
-    var start = workspaceNode
-    if start == nil, let ref = workspaceSelection?.connectionRef,
-      let edge = map.connections.first(where: { $0.attachment == ref })
-    {
-      start = layout.node(direction == .left ? edge.source : edge.target)?.attachment
-      if let start { return select(node: start) }
-    }
-    if let next = layout.neighbour(of: start, direction, connections: map.connections) {
-      select(node: next)
-    }
   }
 
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
@@ -387,6 +380,23 @@ extension AppModel {
   func showApp(_ slug: String) {
     boardFilter.app = slug
     navigate(to: .board)
+  }
+
+  /// Moves the map selection with an arrow key. A selected connection starts from its
+  /// source going left and its target going right.
+  func moveMapSelection(_ direction: AppMapLayout.Direction) {
+    guard let map = visibleData?.map else { return }
+    let layout = AppMapLayout(map: map)
+    var start = workspaceNode
+    if start == nil, let ref = workspaceSelection?.connectionRef,
+      let edge = map.connections.first(where: { $0.attachment == ref })
+    {
+      start = layout.node(direction == .left ? edge.source : edge.target)?.attachment
+      if let start { return select(node: start) }
+    }
+    if let next = layout.neighbour(of: start, direction, connections: map.connections) {
+      select(node: next)
+    }
   }
 
   var screenTitle: String {
