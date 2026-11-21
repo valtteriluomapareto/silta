@@ -58,10 +58,13 @@ struct RegisteredCloneInspection {
 
   /// The registration and Git discovery markers on its resolved ancestor chain.
   private static func stamp(_ path: String, workspace: String) throws -> RegistrationStamp? {
-    guard let entry = try fileStamp(path, workspace: workspace, followLink: true) else {
+    guard let registration = try fileStamp(path, workspace: workspace, followLink: false) else {
       return nil
     }
-    var stamps: [FileStamp?] = [entry]
+    guard let entry = try fileStamp(path, workspace: workspace, followLink: true) else {
+      throw WorkspaceRemovalError.changed(workspace)
+    }
+    var stamps: [FileStamp?] = [registration, entry]
     var hasMarker = false
     var ancestor = URL(filePath: path).resolvingSymlinksInPath()
     while true {

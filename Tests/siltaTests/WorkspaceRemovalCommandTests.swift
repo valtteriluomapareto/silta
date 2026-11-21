@@ -341,6 +341,39 @@ extension WorkspaceRemovalCommandTests {
     }
   }
 
+  @Test(arguments: [false, true])
+  func danglingRegisteredPathRequiresOverride(dangling: Bool) throws {
+    try withScratchDirectory { scratch in
+      let (store, registered) = try Self.fixture(scratch)
+      let moved = scratch.appending(path: "moved-checkout")
+      let absent = scratch.appending(path: "missing-checkout")
+      let files = FileManager.default
+      try files.moveItem(at: registered, to: moved)
+      try store.write {
+        try $0.database.execute(sql: "DELETE FROM meta WHERE key='current_workspace'")
+      }
+
+      if dangling {
+        try files.createSymbolicLink(at: registered, withDestinationURL: absent)
+        try Self.checkBrokenRemovalPreview(
+          registered.path, hint: "silta ws rm 'acme' --allow-active", in: scratch)
+      } else {
+        let preview = try Self.run(["ws", "rm", "acme", "--dry-run", "--json"], in: scratch)
+        let data = try TaskStateCommandTests.data(preview)
+        #expect(data["unresolved_clones"] == nil && data["next"] == nil)
+      }
+
+      let arguments = ["ws", "rm", "acme", "--json"] + (dangling ? ["--allow-active"] : [])
+      let removed = try Self.human(arguments, in: scratch)
+      #expect(removed.termination == .exit(0))
+      #expect(files.fileExists(atPath: moved.appending(path: ".git").path))
+      if dangling {
+        #expect(try files.destinationOfSymbolicLink(atPath: registered.path) == absent.path)
+      }
+      try Self.checkRemoval(store)
+    }
+  }
+
   private static func addBrokenCheckout(
     link: Bool, store: DatabaseStore, in scratch: URL
   ) throws -> String {
