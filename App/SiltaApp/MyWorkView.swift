@@ -70,7 +70,8 @@ struct MyWorkView: View {
           HStack(spacing: 6) {
             Text(
               MyWorkContent.footer(
-                remaining: content.remaining, showingAll: model.allWaiting != nil)
+                remaining: content.remaining, showingAll: model.showingAllWaiting,
+                loaded: model.allWaiting != nil)
             ).foregroundStyle(Color("SecondaryInk"))
             Button(model.showingAllWaiting ? "Show fewer" : "Show all") {
               if model.showingAllWaiting {
@@ -80,6 +81,13 @@ struct MyWorkView: View {
               }
             }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Color("TideText"))
           }.font(.system(size: 13)).padding(.horizontal, 22)
+          if let failure = model.allWaitingFailure {
+            Label(
+              "Couldn't read the whole inbox: " + failure, systemImage: "exclamationmark.triangle"
+            )
+            .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
+            .padding(.horizontal, 22)
+          }
         }.padding(.bottom, 24)
           .frame(maxWidth: .infinity, alignment: .leading)
       }

@@ -54,6 +54,8 @@ final class AppModel {
   private(set) var showingAllWaiting = false
   /// The whole inbox while `showingAllWaiting`, read after each load.
   private(set) var allWaiting: [AppAttention]?
+  /// Why the last full-inbox read failed; the previous list stays on screen.
+  private(set) var allWaitingFailure: String?
   @ObservationIgnored private var allWaitingVersion: Int?
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
@@ -155,6 +157,7 @@ final class AppModel {
       boardFilter.app = nil
       showingAllWaiting = false
       allWaiting = nil
+      allWaitingFailure = nil
       allWaitingVersion = nil
     }
     return refresh(force: true)
@@ -281,19 +284,6 @@ final class AppModel {
     }
   }
 
-  func toggleInspector() {
-    switch route {
-    case .board: boardInspectorPresented.toggle()
-    case .workspace: workspaceInspectorPresented.toggle()
-    case .mywork, .docs: break
-    }
-  }
-
-  func showApp(_ slug: String) {
-    boardFilter.app = slug
-    navigate(to: .board)
-  }
-
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
     frontmost ? refresh() : nil
   }
@@ -352,6 +342,7 @@ extension AppModel {
   func showFewerWaiting() {
     showingAllWaiting = false
     allWaiting = nil
+    allWaitingFailure = nil
     allWaitingVersion = nil
   }
 
@@ -361,14 +352,16 @@ extension AppModel {
     let token = generation
     do {
       let items = try await Task.detached { try reader.fullInbox(workspace: workspace) }.value
-      guard token == generation, showingAllWaiting, self.workspace == workspace else { return }
+      guard token == generation, showingAllWaiting, self.workspace == workspace,
+        visibleData?.version == version
+      else { return }
       allWaiting = items
+      allWaitingFailure = nil
       allWaitingVersion = version
     } catch {
-      // The capped read stays on screen; the next refresh tries again.
-      guard token == generation else { return }
-      allWaiting = nil
-      allWaitingVersion = nil
+      // The last list stays on screen; the next refresh tries again.
+      guard token == generation, showingAllWaiting else { return }
+      allWaitingFailure = AppLoadFailure(error).message
     }
   }
 
@@ -381,6 +374,19 @@ extension AppModel {
     guard token == generation else { return }
     if route == .docs { await loadDocuments(force: force) }
     if route == .workspace { await loadWorkspaceDocuments(force: force) }
+  }
+
+  func toggleInspector() {
+    switch route {
+    case .board: boardInspectorPresented.toggle()
+    case .workspace: workspaceInspectorPresented.toggle()
+    case .mywork, .docs: break
+    }
+  }
+
+  func showApp(_ slug: String) {
+    boardFilter.app = slug
+    navigate(to: .board)
   }
 
   var screenTitle: String {

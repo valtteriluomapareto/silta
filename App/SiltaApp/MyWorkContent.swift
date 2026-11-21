@@ -88,7 +88,8 @@ nonisolated struct MyWorkContent {
   }
 
   /// The line under My work's items, beside its Show all or Show fewer button.
-  static func footer(remaining: Int, showingAll: Bool) -> String {
+  static func footer(remaining: Int, showingAll: Bool, loaded: Bool = true) -> String {
+    if showingAll, !loaded { return "Reading every waiting item…" }
     if showingAll { return "Showing everything waiting, including proposals older than 14 days." }
     guard remaining > 0 else { return "Proposals older than 14 days are hidden." }
     return "\(remaining) more waiting \(remaining == 1 ? "item" : "items"), plus any proposals "
