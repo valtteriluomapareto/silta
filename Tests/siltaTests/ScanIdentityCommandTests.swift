@@ -177,6 +177,44 @@ struct ScanIdentityCommandTests {
     }
   }
 
+  @Test(arguments: ["explicit", "derived", "slugFallback"], [false, true])
+  func onlyAnAbsentCheckoutAllowsRebinding(mode: String, inaccessible: Bool) throws {
+    try withScratchDirectory { scratch in
+      let fm = FileManager.default
+      let slug = mode == "derived" ? "acme" : "web"
+      let store = try TaskCommandTests.setup(scratch)
+      let origin = mode == "slugFallback" ? nil : Self.acmeOrigin
+      try Self.declare(slug, origin: origin, in: store)
+      let oldParent = scratch.appending(path: "old")
+      let old = try Self.clone("old/" + slug, origin: Self.acmeOrigin, in: scratch)
+      try Self.bind(old, in: scratch)
+      let repo = try Self.clone("new/" + slug, origin: Self.acmeOrigin, in: scratch)
+      let before = try Self.identity(store)
+      defer {
+        if inaccessible {
+          // Restore the private fixture for cleanup.
+          try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: oldParent.path)
+        }
+      }
+      if inaccessible {
+        try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: oldParent.path)
+      } else {
+        try fm.moveItem(at: oldParent, to: scratch.appending(path: "moved"))
+      }
+      let scope = mode == "derived" ? [] : ["--ws", "acme"]
+      let rescan = try Self.run(scope + ["init", "--scan", "."], repo, scratch)
+      if inaccessible {
+        #expect(rescan.termination == .exit(6))
+        #expect(try Self.identity(store) == before)
+        let error = try GuideContractTests.object(rescan.stdout)["error"] as? [String: Any]
+        #expect(error?["next"] as? [String] == [Self.inspect])
+      } else {
+        #expect(rescan.termination == .exit(0))
+        #expect(try Self.identity(store) != before)
+      }
+    }
+  }
+
   private static func declare(_ slug: String, origin: String? = nil, in store: DatabaseStore) throws
   {
     try store.write { tx in

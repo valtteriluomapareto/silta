@@ -140,9 +140,8 @@ package enum RepositoryScan {
   ) -> [String: ScanRegistration]? {
     guard let rows = ScanRegistration.identities(matches),
       zip(rows, paths).allSatisfy({ binding, path in
-        binding.workspace == workspace
-          && (binding.path == path
-            || binding.path.map { !FileManager.default.fileExists(atPath: $0 + "/.git") } == true)
+        binding.workspace == workspace && binding.path != nil
+          && canBind(path, insteadOf: binding.path)
       })
     else { return nil }
     return Dictionary(uniqueKeysWithValues: zip(paths, rows))
@@ -228,7 +227,9 @@ package enum RepositoryScan {
 
   private static func canBind(_ path: String, insteadOf recorded: String?) -> Bool {
     guard let recorded, recorded != path else { return true }
-    return !FileManager.default.fileExists(atPath: recorded + "/.git")
+    // Refuse to replace a registration when its old checkout cannot be inspected.
+    var marker = stat()
+    return lstat(recorded + "/.git", &marker) != 0 && errno == ENOENT
   }
 
 }
