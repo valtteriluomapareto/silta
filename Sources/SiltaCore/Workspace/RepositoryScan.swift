@@ -38,7 +38,7 @@ package enum RepositoryScan {
   /// existing workspaces retain their configuration and only refresh registered paths.
   package static func scan(
     _ roots: [URL], target: ScanTarget, store: DatabaseStore, git: any GitRunner,
-    identity: (ids: any IDGenerator, date: Date)
+    identity: (ids: any IDGenerator, date: Date), human: Bool = false
   ) async throws -> ScanOutcome {
     guard let first = roots.first else { throw RepoError.scan }
     let paths = roots.map(\.path)
@@ -53,7 +53,7 @@ package enum RepositoryScan {
     let request = ScanRequest(
       target: target, choice: ScanChoice(target), slug: naming.slug,
       chosenPrefix: naming.prefix, directory: directory, roots: paths, repos: repos,
-      skipped: skipped, identity: identity)
+      skipped: skipped, identity: identity, human: human)
     return try store.write { tx in
       try apply(tx, request: request)
     }
@@ -91,11 +91,12 @@ package enum RepositoryScan {
           repos: repos, apps: apps)
         try config.apply(in: tx, ids: request.identity.ids, at: request.identity.date)
       }
-      let (registered, apps) = try registerPaths(
-        repos, workspace: workspace, bindings: bindings, created: existing == nil, in: db)
+      let registration = try registerPaths(
+        request, workspace: workspace, bindings: bindings, created: existing == nil, in: db)
       if let existing { try tx.recordChange(kind: "workspace", rowID: existing["id"] as Int64) }
       return ScanOutcome(
-        workspace: workspace, repositories: registered, apps: apps, warnings: warnings)
+        workspace: workspace, repositories: registration.repositories, apps: registration.apps,
+        warnings: warnings + registration.warnings)
     } catch let error as DatabaseError where error.resultCode == .SQLITE_CONSTRAINT {
       throw WorkspaceError.conflict
     }
@@ -149,16 +150,19 @@ package enum RepositoryScan {
 
   /// Binds each clone to its repo row, after refusing a path another workspace holds.
   private static func registerPaths(
-    _ repos: [DiscoveredRepo], workspace: String, bindings: [String: ScanRegistration],
+    _ request: ScanRequest, workspace: String, bindings: [String: ScanRegistration],
     created: Bool, in db: Database
-  ) throws -> (repositories: [String], apps: [ScanOutcome.App]) {
-    let matches = try repos.map { repo in
+  ) throws -> ScanOutcome {
+    let repos = request.repos
+    let matches = try repos.map { repo -> Binding in
       let path = repo.path.path
       if let holder = try pathHolder(path, excluding: workspace, in: db) {
         throw ScanError.repoPathTaken(repo: holder.repo, path: path, workspace: holder.workspace)
       }
-      if let binding = bindings[path] { return (id: binding.id, slug: binding.repo) }
-      return try registeredRepo(repo, workspace: workspace, created: created, in: db)
+      if let binding = bindings[path] { return Binding(id: binding.id, slug: binding.repo) }
+      return try registeredRepo(
+        repo, workspace: workspace, created: created,
+        permitMismatch: request.permitsMismatchedOrigin, in: db)
     }
     guard Set(matches.map(\.id)).count == matches.count else {
       throw ScanError.registeredWorkspaces([workspace], roots: nil)
@@ -176,14 +180,22 @@ package enum RepositoryScan {
           ON CONFLICT(repo_id) DO UPDATE SET path=excluded.path
           """, arguments: [match.id, repo.path.path])
     }
-    return (matches.map(\.slug).sorted(), apps.sorted { $0.slug < $1.slug })
+    return ScanOutcome(
+      workspace: workspace, repositories: matches.map(\.slug).sorted(),
+      apps: apps.sorted { $0.slug < $1.slug }, warnings: matches.compactMap(\.warning))
+  }
+
+  private struct Binding {
+    let id: Int64
+    let slug: String
+    var warning: OutputWarning?
   }
 
   private static func registeredRepo(
-    _ repo: DiscoveredRepo, workspace: String, created: Bool, in db: Database
-  ) throws -> (id: Int64, slug: String) {
+    _ repo: DiscoveredRepo, workspace: String, created: Bool, permitMismatch: Bool, in db: Database
+  ) throws -> Binding {
     if !created, let match = try existingBinding(repo, workspace: workspace, in: db) {
-      return (match.id, match.repo)
+      return Binding(id: match.id, slug: match.repo)
     }
     guard
       let row = try Row.fetchOne(
@@ -195,15 +207,20 @@ package enum RepositoryScan {
           WHERE workspace.slug=? AND repo.slug=?
           """, arguments: [workspace, repo.slug])
     else { throw RepoError.configuration(repo: repo.slug, workspace: workspace) }
-    if !created {
-      let configured: String? = row["remote_url"]
-      let bound: String? = row["path"]
-      let contradicts = configured.map { !$0.isEmpty } == true && repo.remote != nil
-      guard !contradicts, canBind(repo.path.path, insteadOf: bound) else {
+    var binding = Binding(id: row["id"], slug: row["slug"])
+    guard !created else { return binding }
+    let bound: String? = row["path"]
+    guard canBind(repo.path.path, insteadOf: bound) else {
+      throw ScanError.registeredWorkspaces([workspace], roots: nil)
+    }
+    if let configured = row["remote_url"] as String?, !configured.isEmpty, let origin = repo.remote
+    {
+      guard permitMismatch, bound == nil else {
         throw ScanError.registeredWorkspaces([workspace], roots: nil)
       }
+      binding.warning = ScanRegistration.mismatchWarning(declared: configured, checkout: origin)
     }
-    return (row["id"], row["slug"])
+    return binding
   }
 
   /// Resolves existing registration evidence before a scoped rescan can use a repo's slug.
@@ -214,7 +231,7 @@ package enum RepositoryScan {
     let matches = try ScanRegistration.matching(
       path: path, slug: repo.slug, origin: repo.remote, in: db
     )
-    .filter { $0.workspace == workspace }
+    .filter { $0.workspace == workspace && !$0.isMismatchedSlug }
     if matches.count == 1, let match = matches.first,
       match.isIdentity || (match.repo == repo.slug && match.permitsSelectedSlug),
       canBind(path, insteadOf: match.path)
@@ -548,6 +565,12 @@ private struct ScanRequest: Sendable {
   let skipped: [String]
 
   let identity: (ids: any IDGenerator, date: Date)
+  let human: Bool
+
+  var permitsMismatchedOrigin: Bool {
+    if case .rescan = target { return human }
+    return false
+  }
 }
 
 private struct DiscoveredRepo: Sendable {

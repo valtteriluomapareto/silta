@@ -3147,9 +3147,11 @@ all match its registered repos, preserving its prefix. Slug and prefix clashes c
 An exact clone path binding takes priority. Other strong evidence includes an
 exact network or absolute local origin and standard hosted HTTPS and Git SSH
 aliases. GitHub, GitLab and Azure DevOps paths compare without case, and standard
-hosted paths can end in a slash. HTTPS, current Git SSH and legacy Visual Studio
-Git SSH spellings identify the same Azure DevOps repository. A network clone's
-slug alone is a possible match to a pathless declaration that has no origin.
+hosted paths can end in a slash. Azure DevOps supports HTTPS with or without the
+organization as the username, the legacy organization-specific Visual Studio
+HTTPS host, and current and legacy Git SSH spellings. A network clone's slug alone
+is a possible match to a pathless declaration. A same-slug declaration with a
+different origin offers read-only inspection if there is no stronger match.
 A possible alias on another host, a matching relative local origin or a workspace
 name alone calls for inspection before an automatic selection. An explicit new
 workspace may bypass slug-only candidates, subject to verified path and origin
@@ -3183,6 +3185,9 @@ resolve to one canonical main clone. Initial scans create configuration. A scope
 rescan refreshes paths by exact binding, a unique compatible origin, or a
 same-slug declaration without contradictory origin evidence. A unique same-slug
 HTTPS and Git SSH alias on a generic host is compatible in this explicit scope.
+A direct human who explicitly scopes the scan may bind a same-slug clone to an
+unbound declaration with a different origin. The receipt warns about the mismatch
+without showing credentials, and the declaration keeps its configured origin.
 A different live checkout keeps its binding. Named scan roots must be readable
 directories. An unreadable descendant is skipped with a warning when other
 clones can be registered. If unreadable descendants leave no clones, the scan
