@@ -276,11 +276,11 @@ extension SecretGuard {
   }
 
   private static func isPayloadBoundary(_ tail: Substring) -> Bool {
-    guard let first = tail.first else { return true }
-    if first == "." {
-      return tail.dropFirst().first.map(armourSpace) ?? true
-    }
-    return armourSpace(first) || "),;]}!?".contains(first)
+    // Sentence punctuation can precede a delimiter. A joined extension or query still
+    // belongs to the surrounding token.
+    let remainder = tail.drop(while: { ".:!?…".contains($0) })
+    guard let first = remainder.first else { return true }
+    return armourSpace(first) || "),;]}>»”’".contains(first)
   }
 
   private static func isCommitSHA(_ word: Substring) -> Bool {

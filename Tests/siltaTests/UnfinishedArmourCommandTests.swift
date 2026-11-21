@@ -18,7 +18,8 @@ struct UnfinishedArmourCommandTests {
     "inlineCode", "sri", "dataValue", "base64Hash", "flatPunctuation", "escapedPath",
     "doubleEscapedPath", "escapedReference", "escapedTailPath", "doubleSlashFirst",
     "doubleSlashLast",
-    "tripleSlash",
+    "tripleSlash", "flatColon", "flatParentheses", "flatEllipsis", "escapedColon", "joinedColon",
+    "joinedQuery",
   ])
   func unfinishedArmourStorageAndExport(form: String) throws {
     try withScratchDirectory { scratch in
@@ -98,7 +99,7 @@ struct UnfinishedArmourCommandTests {
   private static func followup(_ form: String) -> (String, String)? {
     switch form {
     case "inlinePath", "identifier", "adjacentPath", "adjacentJWT", "adjacentSHA", "physicalSHA",
-      "inlineCode", "sri", "dataValue", "base64Hash":
+      "inlineCode", "sri", "dataValue", "base64Hash", "joinedColon", "joinedQuery":
       return unchangedMention(form)
     case "doubleLF", "doubleCRLF", "doubleSlashFirst", "doubleSlashLast", "tripleSlash":
       let split = form == "doubleLF" ? #"\\n"# : #"\\r\\n"#
@@ -156,6 +157,8 @@ struct UnfinishedArmourCommandTests {
       "sri": " sha384-" + String(repeating: "Aq", count: 32),
       "dataValue": " data:image/png;base64," + String(repeating: "Aq", count: 32),
       "base64Hash": " compare SHA-256 " + String(repeating: "Aq", count: 22) + "=",
+      "joinedColon": " " + String(repeating: "Aq", count: 32) + ":README.md",
+      "joinedQuery": " " + String(repeating: "Aq", count: 32) + "?tab=readme",
     ]
     let body = (form == "inlineCode" ? "`See " : "See ") + marker + (tails[form] ?? "")
     return (body, body)
@@ -166,8 +169,14 @@ struct UnfinishedArmourCommandTests {
     switch form {
     case "escapedLF", "escapedCRLF", "escapedBlank", "escapedSlash", "escapedPGP":
       return escapedExample(form)
-    case "flatPunctuation":
-      return (marker + " " + token + "! The next sentence.", masked + "! The next sentence.")
+    case "flatPunctuation", "flatColon", "flatParentheses", "flatEllipsis", "escapedColon":
+      let punctuation = [
+        "flatColon": ":", "flatParentheses": ".)", "flatEllipsis": "...",
+        "escapedColon": ":",
+      ]
+      let tail = (punctuation[form] ?? "!") + " The next sentence."
+      let separator = form == "escapedColon" ? #"\n"# : " "
+      return (marker + separator + token + tail, masked + tail)
     case "flat", "flatChunks":
       let suffix = "\" Acme safe tail."
       let body = form == "flatChunks" ? token + " " + second : token
