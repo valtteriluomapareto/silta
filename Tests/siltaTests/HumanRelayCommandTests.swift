@@ -48,19 +48,17 @@ struct HumanRelayCommandTests {
       let wasAccepted = try Self.accepted(store)
       let next = error?["next"] as? [String] ?? []
 
-      withKnownIssue("An asker can accept their own relay to a human today.") {
-        #expect(own == expected)
-        #expect(
-          text.stdout.contains(Self.answerRow + "\n> " + Self.body + "\nnext: " + expected[0]))
-        #expect(refused.termination == .exit(6))
-        #expect(error?["code"] as? String == "conflict")
-        #expect(error?["next_by"] as? String == (selfAddressed ? "agent" : "human"))
-        #expect(next == (selfAddressed ? [Self.read] : [Self.resolve]))
-        #expect(wasResolved == nil)
-        #expect(!wasAccepted)
-      }
+      #expect(own == expected)
+      #expect(
+        text.stdout.contains(Self.answerRow + "\n> " + Self.body + "\nnext: " + expected[0]))
+      #expect(refused.termination == .exit(6))
+      #expect(error?["code"] as? String == "conflict")
+      #expect(error?["next_by"] as? String == (selfAddressed ? "agent" : "human"))
+      #expect(next == (selfAddressed ? [Self.read] : [Self.resolve]))
+      #expect(wasResolved == nil)
+      #expect(!wasAccepted)
 
-      guard !selfAddressed, refused.termination == .exit(6) else { return }
+      guard !selfAddressed else { return }
       try Self.replayConfirmation(next, as: actor, in: scratch)
       #expect(try Self.resolved(store) == "agent:codex:acme")
       #expect(try !Self.accepted(store))
