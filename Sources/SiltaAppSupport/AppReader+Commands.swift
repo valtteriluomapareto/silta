@@ -36,7 +36,12 @@ extension AppReader {
 
   /// Offers read-only detail for a task waiting for review.
   public func commands(forReview task: AppTask, workspace: String) -> [AppCommand] {
-    [taskCommand(task.ref, workspace: workspace)]
+    [readCommand(task: task.ref, workspace: workspace)]
+  }
+
+  /// Reads one task with its timeline.
+  public func readCommand(task ref: String, workspace: String) -> AppCommand {
+    taskCommand(ref, workspace: workspace)
   }
 
   /// What the human pastes into an agent session to start or resume a task. The app only

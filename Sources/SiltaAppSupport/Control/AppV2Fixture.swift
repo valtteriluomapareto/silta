@@ -60,7 +60,8 @@
       try DebugTaskFixture.annotate(
         14,
         acceptance: "- A failed registration retries with capped backoff.\n"
-          + "- Tokens older than an hour are dropped, not retried.\n", in: tx)
+          + "- Tokens older than an hour are dropped, not retried.\n",
+        worktree: "/Users/acme/worktrees/mobile-push", in: tx)
       try DebugTaskFixture.annotate(
         8,
         result: "Order totals are stored and returned as integer cents. The API keeps a decimal "
