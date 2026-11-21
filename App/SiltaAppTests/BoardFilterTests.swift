@@ -25,15 +25,14 @@
     }
 
     @Test func aBlockedTaskThatAsksYouStaysOnTheBoard() throws {
-      try fixture(
-        prepare: { home in
-          try AppTestCLI.run(
-            [
-              "--ws", "acme", "comment", "AC-17", "--kind", "question",
-              "--to", "human:acme", "-m", "Ship the banner before the totals land?",
-            ], home: home, seed: 300)
-        }
-      ) { snapshot, _ in
+      let ask: (URL) throws -> Void = { home in
+        try AppTestCLI.run(
+          [
+            "--ws", "acme", "comment", "AC-17", "--kind", "question",
+            "--to", "human:acme", "-m", "Ship the banner before the totals land?",
+          ], home: home, seed: 300)
+      }
+      try fixture(prepare: ask) { snapshot, _ in
         let content = BoardContent(
           snapshot: snapshot, apps: [], filter: BoardFilter(blocked: false), search: "")
         #expect(content.lanes[0].tasks.map(\.ref).contains("AC-17"))
