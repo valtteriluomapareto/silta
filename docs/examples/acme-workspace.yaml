@@ -28,7 +28,7 @@ apps:
       summary: "Back-office UI embedded in the CRM." }
   - { slug: "platform-api", repo: "platform", ref: "origin/api", prod_ref: "origin/api-prod",
       summary: "API-only backend for the mobile app: token auth, handoff, well-known files." }
-  - { slug: "mobile", repo: "mobile", ref: "origin/main", summary: "Flutter app." }
+  - { slug: "mobile", name: "Acme Mobile", repo: "mobile", ref: "origin/main", summary: "Flutter app." }
   - { slug: "sales", repo: "sales", ref: "origin/main", summary: "New sales portal; replaces platform-legacy." }
   - { slug: "pdf-service", repo: "pdf-service", ref: "origin/main", summary: "PDF rendering: POST /api/pdf/{configId}." }
 

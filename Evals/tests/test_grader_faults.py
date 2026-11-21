@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SHELL = 'test_shell_proof.ShellProof.'
 OUTCOME = 'test_outcome_grading.OutcomeGrading.'
 FAULTS = [
-    ('plan_directory', "bool({'plan', 'plans'} & set(path.parts[:-1]))", 'False',
+    ('plan_directory', "bool({'plan', 'plans', 'roadmap'}.intersection(path.parts[:-1]))", 'False',
      SHELL + 'test_alternate_plan_destinations'),
     ('graphql_write', "if route == 'graphql':", 'if False:',
      SHELL + 'test_scoped_tracker_actions_and_graphql_mutations'),
