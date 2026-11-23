@@ -113,7 +113,7 @@ struct NodeInspector: View {
             Image(systemName: inbound ? "arrow.left" : "arrow.right").font(.system(size: 11))
               .foregroundStyle(Color("TideText")).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
-              Text(inbound ? edge.source : edge.target).font(.system(size: 13))
+              Text(map.endpointName(inbound ? edge.source : edge.target)).font(.system(size: 13))
               Text(
                 WorkspaceMapContent.labelText(
                   kind: edge.kind, docs: model.workspaceDocuments.countText(for: edge.attachment))
@@ -124,8 +124,9 @@ struct NodeInspector: View {
         }.buttonStyle(.plain)
           .accessibilityLabel(
             inbound
-              ? "\(edge.source) calls \(edge.target) over \(edge.kind)"
-              : "Calls \(edge.target) over \(edge.kind)")
+              ? "\(map.endpointName(edge.source)) calls \(map.endpointName(edge.target)) over "
+                + edge.kind
+              : "Calls \(map.endpointName(edge.target)) over \(edge.kind)")
       }
     }
   }

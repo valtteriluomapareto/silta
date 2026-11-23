@@ -23,7 +23,7 @@ struct AppSidebar: View {
                   width: 8, height: 8
                 )
                 .frame(width: 16).accessibilityHidden(true)
-                Text(app.slug).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).help(
+                Text(app.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading).help(
                   app.slug)
                 Text(
                   model.visibleData?.snapshot?.board.appOpenCounts[app.slug] ?? 0, format: .number
@@ -31,7 +31,7 @@ struct AppSidebar: View {
                 .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
               }.padding(.horizontal, 8).padding(.vertical, 5).contentShape(.rect)
             }.buttonStyle(.plain)
-              .taskMenu(TaskMenu.items(forApp: app.slug), model: model) {
+              .taskMenu(TaskMenu.items(forApp: app.slug, in: [app]), model: model) {
                 Divider()
                 AppColourMenu(model: model, slug: app.slug)
               }

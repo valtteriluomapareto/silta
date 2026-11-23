@@ -8,7 +8,7 @@
     @Test func groupsQuestionsReviewsAndEachProposalOnce() throws {
       try fixture { reader, _ in
         let snapshot = try reader.snapshot(workspace: "acme")
-        let content = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
+        let content = MyWorkContent(snapshot: snapshot, apps: [], search: "", now: AppV2Fixture.now)
         #expect(content.questions.count == 1 && content.reviews.count == 1)
         #expect(content.documents.count == 2 && content.tasks.count == 3)
         #expect(Set(content.tasks.map(\.ref)) == ["AC-21", "AC-22", "AC-23"])
@@ -30,7 +30,7 @@
     @Test func answersToTheHumanGetTheirOwnAcceptableCard() throws {
       try fixture { reader, _ in
         let snapshot = try reader.snapshot(workspace: "acme")
-        let content = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
+        let content = MyWorkContent(snapshot: snapshot, apps: [], search: "", now: AppV2Fixture.now)
         let answer = try #require(content.answers.first)
         #expect(content.answers.count == 1 && answer.item.ref == "AC-14/2")
         #expect(answer.metadata.hasPrefix("Codex answered you · Retry push registrations · "))
@@ -61,11 +61,12 @@
       try fixture { reader, _ in
         let snapshot = try reader.snapshot(workspace: "acme")
         let selected = MyWorkContent(
-          snapshot: snapshot, search: "doc:order-contract@3", now: AppV2Fixture.now)
+          snapshot: snapshot, apps: [], search: "doc:order-contract@3", now: AppV2Fixture.now)
         #expect(selected.documents.map(\.ref) == ["doc:order-contract@3"])
         #expect(selected.questions.isEmpty && selected.reviews.isEmpty && selected.tasks.isEmpty)
         #expect(
-          !MyWorkContent(snapshot: snapshot, search: "AC-1", now: AppV2Fixture.now).hasMatches)
+          !MyWorkContent(snapshot: snapshot, apps: [], search: "AC-1", now: AppV2Fixture.now)
+            .hasMatches)
         #expect(snapshot.work.waitingCount == 9)
       }
     }
@@ -96,7 +97,8 @@
     @Test func genericAboutLinksDoNotProvePullRequestOwnership() throws {
       try fixture { reader, _ in
         let content = MyWorkContent(
-          snapshot: try reader.snapshot(workspace: "acme"), search: "", now: AppV2Fixture.now)
+          snapshot: try reader.snapshot(workspace: "acme"), apps: [], search: "",
+          now: AppV2Fixture.now)
         let review = try #require(content.reviews.first)
         #expect(review.task.links.contains { $0.rel == "about" })
         #expect(!review.metadata.contains("PR #"))
@@ -111,7 +113,8 @@
             "url:https://github.com/acme/example/pull/99", "--rel", "cites",
           ], home: home, seed: 401)
         let content = MyWorkContent(
-          snapshot: try reader.snapshot(workspace: "acme"), search: "", now: AppV2Fixture.now)
+          snapshot: try reader.snapshot(workspace: "acme"), apps: [], search: "",
+          now: AppV2Fixture.now)
         let review = try #require(content.reviews.first)
         #expect(review.task.links.contains { $0.rel == "cites" && $0.target.hasSuffix("/pull/99") })
         #expect(!review.metadata.contains("PR #"))
@@ -128,7 +131,7 @@
             ], home: home, seed: 300 + index)
         }
         let snapshot = try reader.snapshot(workspace: "acme")
-        let content = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
+        let content = MyWorkContent(snapshot: snapshot, apps: [], search: "", now: AppV2Fixture.now)
         #expect(content.questions.count == 11 && content.remaining == 9)
         #expect(snapshot.work.items.count == 12 && snapshot.work.items.first?.kind == "ready")
         #expect(reader.inboxCommand(workspace: "acme").text.hasSuffix("inbox --for me --all"))

@@ -128,7 +128,7 @@
       let data = try #require(model.visibleData)
       let snapshot = try #require(data.snapshot)
       func content() -> MyWorkContent {
-        MyWorkContent(snapshot: snapshot, search: model.search, now: data.checkedAt)
+        MyWorkContent(snapshot: snapshot, apps: [], search: model.search, now: data.checkedAt)
       }
       #expect(content().tasks.count == 3)
       model.search = "unrelated search"

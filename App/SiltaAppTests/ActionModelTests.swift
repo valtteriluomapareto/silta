@@ -189,8 +189,10 @@
     @Test func coreRefusalsShowTheirCodeAndShareOneDraftAcrossScreens() async throws {
       try await fixtureModel { model, reader in
         let snapshot = try #require(model.visibleData?.snapshot)
-        let question = MyWorkContent(snapshot: snapshot, search: "", now: AppV2Fixture.now)
-          .questions.first?.item.ref
+        let question = MyWorkContent(
+          snapshot: snapshot, apps: [], search: "", now: AppV2Fixture.now
+        )
+        .questions.first?.item.ref
         let inspector = BoardContent(
           snapshot: snapshot, apps: [], filter: BoardFilter(), search: ""
         )

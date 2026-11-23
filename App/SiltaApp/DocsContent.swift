@@ -68,27 +68,32 @@ import SiltaAppSupport
   }
 
   /// What the document is about, then its revision state, for the list row.
-  static func subtitle(_ group: DocsModel.Group) -> String {
+  static func subtitle(_ group: DocsModel.Group, map: AppWorkspaceMap?) -> String {
     guard let document = group.preferred else { return "" }
-    return ([about(document.about)] + revisionParts(group)).joined(separator: " · ")
+    return ([about(document.about, map: map)] + revisionParts(group)).joined(separator: " · ")
   }
 
-  static func about(_ refs: [String]?) -> String {
+  /// What the refs are about, with the map's names for apps and services it knows.
+  static func about(_ refs: [String]?, map: AppWorkspaceMap?) -> String {
+    func endpoint(_ part: String) -> String {
+      guard let map else { return name(part) }
+      return map.endpointName(part.removingPercentEncoding ?? part)
+    }
     guard let refs else { return "Attachments not recorded" }
     if refs.isEmpty { return "Whole workspace" }
     let edges = refs.compactMap(edge)
     if refs.count == 1, let edge = edges.first {
-      return name(edge.source) + " → " + name(edge.target)
+      return endpoint(edge.source) + " → " + endpoint(edge.target)
     }
     var apps: [String] = []
     var others: [String] = []
     for ref in refs {
       if let edge = edge(ref) {
-        apps += [edge.source, edge.target].filter { !$0.hasPrefix("service:") }.map(name)
+        apps += [edge.source, edge.target].filter { !$0.hasPrefix("service:") }.map(endpoint)
       } else if ref.hasPrefix("app:") {
-        apps.append(name(ref))
+        apps.append(aboutLabel(ref, map: map))
       } else {
-        others.append(name(ref))
+        others.append(aboutLabel(ref, map: map))
       }
     }
     apps = apps.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }

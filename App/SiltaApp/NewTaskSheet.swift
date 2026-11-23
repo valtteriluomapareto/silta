@@ -42,7 +42,7 @@ struct NewTaskSheet: View {
             Text(task.parent == nil ? "None" : "Parent's app").tag(String?.none)
             if task.parent != nil { Text("None").tag(String?.some("none")) }
             ForEach(apps, id: \.slug) { app in
-              Text(app.slug).tag(String?.some(app.slug))
+              Text(app.name).tag(String?.some(app.slug))
             }
           }.labelsHidden()
         }

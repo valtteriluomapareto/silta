@@ -68,7 +68,8 @@
 
     @Test func subtitlesSummariseWhatADocumentIsAbout() {
       func subtitle(_ entries: [AppDocument]) -> String {
-        DocsContent.subtitle(DocsModel.Group(id: entries[0].slug, entries: entries))
+        DocsContent.subtitle(
+          DocsModel.Group(id: entries[0].slug, entries: entries), map: nil)
       }
       #expect(
         subtitle([doc("a", about: ["edge:acme-portal/acme-pdf/http-api"])])

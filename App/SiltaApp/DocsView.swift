@@ -148,7 +148,8 @@ extension DocsView {
           .font(.system(size: 13, weight: selected ? .semibold : .medium))
           .foregroundStyle(
             Color(preferred.archived ? "SecondaryInk" : selected ? "TideText" : "Ink"))
-        Text(DocsContent.subtitle(group)).font(.system(size: 11)).lineLimit(2)
+        Text(DocsContent.subtitle(group, map: model.visibleData?.map)).font(.system(size: 11))
+          .lineLimit(2)
           .foregroundStyle(Color(pending ? "Warning" : "SecondaryInk"))
       }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 5).contentShape(.rect)
     }.buttonStyle(.plain)

@@ -40,13 +40,17 @@ struct ConnectionInspector: View {
   let connection: AppConnection?
   @Bindable var model: AppModel
 
+  private func endpoint(_ key: String) -> String {
+    model.visibleData?.map?.endpointName(key) ?? key
+  }
+
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 16) {
         if let connection {
           VStack(alignment: .leading, spacing: 6) {
             Overline("Connection")
-            Text(connection.source + " → " + connection.target)
+            Text(endpoint(connection.source) + " → " + endpoint(connection.target))
               .font(.system(size: 20, weight: .bold)).tracking(-0.2).textSelection(.enabled)
             CopyValue(value: connection.attachment, title: "Copy connection reference")
           }

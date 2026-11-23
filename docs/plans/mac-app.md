@@ -183,6 +183,10 @@ The [Mac app actions plan](mac-app-actions.md) covers in-app writes.
   still share one, and the human then chooses from the sidebar app menu or the map's app
   inspector. The choice is stored only on this Mac, by workspace and slug, so a renamed
   app falls back to automatic; fixture runs store nothing.
+- **App names:** where the app names an app or a connection's end to the human (sidebar,
+  board, New Task, menus, inspectors, My work, Workspace and Docs), it shows the map's
+  display name and falls back to the slug. Filters, `app:` refs, picker tags and help
+  keep the slug.
 - **App icon:** `App/SiltaApp/AppIcon.icon`, an Icon Composer document with flat
   light and dark layers in tide. Its design, geometry and regeneration steps are in
   [`app-icon.md`](../app-icon.md).

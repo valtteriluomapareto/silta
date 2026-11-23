@@ -81,13 +81,14 @@
         let items = TaskMenu.items(
           for: card,
           in: TaskMenu.Context(
-            reader: reader, workspace: "acme", name: "Acme", existing: [], now: AppV2Fixture.now))
+            reader: reader, workspace: "acme", name: "Acme", apps: [], existing: [],
+            now: AppV2Fixture.now))
         #expect(items.contains { $0.label == "Copy Agent Prompt" && $0.action != nil })
       }
     }
 
     @Test func appMenuFiltersTheBoardAndShowsItsDocs() {
-      let items = TaskMenu.items(forApp: "acme-mobile")
+      let items = TaskMenu.items(forApp: "acme-mobile", in: [])
       #expect(items.map(\.title) == ["Filter Board to acme-mobile", "Show Docs About acme-mobile"])
       #expect(items.map(\.action) == [.filterBoard("acme-mobile"), .showDocs("app:acme-mobile")])
     }
@@ -120,7 +121,7 @@
       TaskMenu.items(
         for: try reader.task(ref, workspace: "acme"),
         in: TaskMenu.Context(
-          reader: reader, workspace: "acme", name: "Acme", existing: existing,
+          reader: reader, workspace: "acme", name: "Acme", apps: [], existing: existing,
           now: AppV2Fixture.now))
     }
 
