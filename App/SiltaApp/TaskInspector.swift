@@ -155,7 +155,7 @@ struct TaskInspector: View {
 
   private func properties(_ task: AppTask) -> some View {
     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-      property("App", task.app.map(model.appName)).help(task.app ?? "")
+      property("App", task.app.map(model.appName), help: task.app)
       property("Priority", String(task.priority))
       property("Branch", task.branch, monospaced: true)
       property("Claimed by", TaskPresentation.claimant(task.claimedBy))
@@ -193,11 +193,13 @@ struct TaskInspector: View {
       .background(Color("Ink").opacity(0.03), in: .rect(cornerRadius: 12))
   }
 
-  private func property(_ title: String, _ value: String?, monospaced: Bool = false) -> some View {
+  private func property(
+    _ title: String, _ value: String?, monospaced: Bool = false, help: String? = nil
+  ) -> some View {
     GridRow {
       Text(title).foregroundStyle(Color("SecondaryInk"))
       Text(value ?? "—").font(.system(size: 12, design: monospaced ? .monospaced : .default))
-        .fixedSize(horizontal: false, vertical: true)
+        .fixedSize(horizontal: false, vertical: true).help(help ?? "")
     }
   }
 
