@@ -50,8 +50,12 @@ nonisolated struct BoardContent {
   let hiddenBlocked: Int
   private let attention: [AppAttention]
   private let apps: [AppMapApp]
+  private let colours: [String: String]
 
-  init(snapshot: AppSnapshot, apps: [AppMapApp], filter: BoardFilter, search: String) {
+  init(
+    snapshot: AppSnapshot, apps: [AppMapApp], filter: BoardFilter, search: String,
+    colours: [String: String] = [:]
+  ) {
     let board = snapshot.board
     let questions = Set(board.questions.compactMap(\.task))
     func filtered(_ tasks: [AppTask]) -> [AppTask] {
@@ -61,7 +65,8 @@ nonisolated struct BoardContent {
             search,
             values: [
               task.ref, task.title, task.description, task.app ?? "",
-              Self.appLabel(task.app, apps: apps)?.name ?? "", task.claimedBy ?? "", task.status,
+              Self.appLabel(task.app, apps: apps, colours: colours)?.name ?? "",
+              task.claimedBy ?? "", task.status,
             ])
       }
     }
@@ -84,6 +89,7 @@ nonisolated struct BoardContent {
     attention = board.questions
     self.questions = questions
     self.apps = apps
+    self.colours = colours
   }
 
   /// The Todo footnote for hidden blocked tasks; nil when none are hidden.
@@ -95,14 +101,18 @@ nonisolated struct BoardContent {
     }
   }
 
-  static func appLabel(_ slug: String?, apps: [AppMapApp]) -> AppLabel? {
+  static func appLabel(_ slug: String?, apps: [AppMapApp], colours: [String: String])
+    -> AppLabel?
+  {
     guard let slug else { return nil }
     return AppLabel(
       name: apps.first { $0.slug == slug }?.name ?? slug,
-      color: SidebarContent.appColor(slug: slug, apps: apps))
+      color: SidebarContent.appColor(slug: slug, apps: apps, chosen: colours))
   }
 
-  func appLabel(for task: AppTask) -> AppLabel? { Self.appLabel(task.app, apps: apps) }
+  func appLabel(for task: AppTask) -> AppLabel? {
+    Self.appLabel(task.app, apps: apps, colours: colours)
+  }
 
   func accessibilityLabel(for task: AppTask, asked: Bool) -> String {
     task.ref + ": " + task.title + (appLabel(for: task).map { ", " + $0.name } ?? "") + ", "

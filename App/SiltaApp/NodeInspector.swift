@@ -32,6 +32,11 @@ struct NodeInspector: View {
 
   @ViewBuilder private func appDetail(_ app: AppMapApp) -> some View {
     header("App", title: app.name, ref: app.attachment)
+    HStack(spacing: 8) {
+      RoundedRectangle(cornerRadius: 3).fill(Color(model.appColour(app.slug)))
+        .frame(width: 10, height: 10).accessibilityHidden(true)
+      AppColourMenu(model: model, slug: app.slug).fixedSize().font(.system(size: 12))
+    }
     Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
       fact("Repo", app.repo, monospaced: true)
       fact("Ref", app.ref, monospaced: true)

@@ -2,13 +2,11 @@ import Foundation
 import SiltaAppSupport
 
 nonisolated enum SidebarContent {
-  static func appColor(index: Int) -> String {
-    ["AppSlate", "AppViolet", "AppClay"][index % 3]
-  }
-
-  /// The colour of an app on the map, by its position there; nil when the map lacks it.
-  static func appColor(slug: String, apps: [AppMapApp]) -> String? {
-    apps.firstIndex { $0.slug == slug }.map { appColor(index: $0) }
+  /// An app's colour: the one chosen on this Mac, else its automatic colour; nil when the
+  /// map lacks the app.
+  static func appColor(slug: String, apps: [AppMapApp], chosen: [String: String]) -> String? {
+    guard apps.contains(where: { $0.slug == slug }) else { return nil }
+    return chosen[slug] ?? AppPalette.automatic(slug)
   }
 
   static func claimTitle(_ task: AppTask, now: Date) -> String {

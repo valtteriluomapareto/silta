@@ -32,14 +32,18 @@ extension AppModel {
 }
 
 extension View {
-  /// Adds the items as a context menu and the available ones as VoiceOver actions.
-  func taskMenu(_ items: [TaskMenu.Item], model: AppModel) -> some View {
+  /// Adds the items as a context menu, followed by `extra`, and the available items as
+  /// VoiceOver actions.
+  func taskMenu<Extra: View>(
+    _ items: [TaskMenu.Item], model: AppModel, @ViewBuilder extra: () -> Extra = { EmptyView() }
+  ) -> some View {
     contextMenu {
       ForEach(Array(items.enumerated()), id: \.offset) { _, item in
         if item.separatorBefore { Divider() }
         Button(item.label) { if let action = item.action { model.run(action) } }
           .disabled(item.action == nil)
       }
+      extra()
     }
     .accessibilityActions {
       ForEach(Array(TaskMenu.accessibilityActions(items).enumerated()), id: \.offset) { _, item in

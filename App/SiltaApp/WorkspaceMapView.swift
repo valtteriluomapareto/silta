@@ -220,8 +220,7 @@ struct WorkspaceMapView: View {
   }
 
   private func appColor(_ slug: String) -> Color {
-    Color(
-      SidebarContent.appColor(slug: slug, apps: map.apps) ?? SidebarContent.appColor(index: 0))
+    Color(model.appColour(slug))
   }
 }
 

@@ -50,6 +50,8 @@ final class AppModel {
   private(set) var workspaceNode: String?
   var workspaceView: WorkspaceViewMode = .map
   var workspaceInspectorPresented = false
+  /// App colours chosen on this Mac, by workspace and then app slug.
+  private var appColourChoices: [String: [String: String]] = [:]
   /// My work shows the whole inbox instead of the capped read; reset per workspace.
   private(set) var showingAllWaiting = false
   /// The whole inbox while `showingAllWaiting`, read after each load.
@@ -65,6 +67,7 @@ final class AppModel {
   @ObservationIgnored private var generation = 0
   @ObservationIgnored private let defaults: UserDefaults?
   @ObservationIgnored private let stateDefaults: UserDefaults?
+  static let appColoursKey = "appColours"
   static let lastWorkspaceKey = "lastWorkspace"
   static let lastRouteKey = "lastScreen"
   static let showBlockedKey = "boardShowBlocked"
@@ -97,6 +100,7 @@ final class AppModel {
     self.defaults = defaults
     self.stateDefaults = stateDefaults
     actions = ActionModel(defaults: stateDefaults)
+    appColourChoices = Self.storedColours(stateDefaults)
     workspace = stateDefaults?.string(forKey: Self.lastWorkspaceKey)
     route = stateDefaults?.string(forKey: Self.lastRouteKey).flatMap(AppRoute.init) ?? .mywork
     boardFilter = BoardFilter(
@@ -418,6 +422,34 @@ extension AppModel {
     allWaiting = nil
     allWaitingFailure = nil
     allWaitingVersion = nil
+  }
+
+  /// The current workspace's chosen app colours, by slug.
+  var chosenAppColours: [String: String] { appColourChoices[workspace ?? ""] ?? [:] }
+
+  /// An app's colour in the current workspace: chosen here, else automatic.
+  func appColour(_ slug: String) -> String {
+    chosenAppColours[slug] ?? AppPalette.automatic(slug)
+  }
+
+  /// Chooses an app's colour in the current workspace; nil goes back to automatic. Only a
+  /// real launch stores the choice.
+  func setAppColour(_ colour: String?, for slug: String) {
+    guard let workspace else { return }
+    var chosen = appColourChoices[workspace] ?? [:]
+    chosen[slug] = colour.flatMap { AppPalette.colours.contains($0) ? $0 : nil }
+    appColourChoices[workspace] = chosen.isEmpty ? nil : chosen
+    stateDefaults?.set(appColourChoices, forKey: Self.appColoursKey)
+  }
+
+  /// Stored choices, keeping only palette colours, so an unknown name never draws nothing.
+  private static func storedColours(_ defaults: UserDefaults?) -> [String: [String: String]] {
+    let stored = defaults?.dictionary(forKey: appColoursKey) ?? [:]
+    return stored.reduce(into: [:]) { result, entry in
+      guard let apps = entry.value as? [String: String] else { return }
+      let valid = apps.filter { AppPalette.colours.contains($0.value) }
+      if !valid.isEmpty { result[entry.key] = valid }
+    }
   }
 
   var screenTitle: String {

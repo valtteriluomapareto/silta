@@ -190,7 +190,9 @@ extension DocsView {
       model.filterDocuments(about: ref)
     } label: {
       HStack(spacing: 6) {
-        if let color = DocsAboutMenu.color(ref, map: model.visibleData?.map) {
+        if let color = DocsAboutMenu.color(
+          ref, map: model.visibleData?.map, chosen: model.chosenAppColours)
+        {
           Circle().fill(color).frame(width: 7, height: 7)
         }
         Text(DocsContent.aboutLabel(ref, map: model.visibleData?.map)).font(.system(size: 12))

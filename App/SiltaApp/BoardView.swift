@@ -10,7 +10,7 @@ struct BoardView: View {
       if let snapshot = model.visibleData?.snapshot {
         let content = BoardContent(
           snapshot: snapshot, apps: model.visibleData?.map?.apps ?? [],
-          filter: model.boardFilter, search: model.search)
+          filter: model.boardFilter, search: model.search, colours: model.chosenAppColours)
         GeometryReader { geometry in
           let laneWidth = max(180, (geometry.size.width - 28) / 3)
           let open = content.lanes.filter { $0.title != "Done this week" }

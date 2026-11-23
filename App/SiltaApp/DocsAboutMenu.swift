@@ -59,12 +59,12 @@ struct DocsAboutMenu: View {
   }
 
   /// The map colour of an app ref, or a quiet colour for a service, or nil for other refs.
-  static func color(_ ref: String, map: AppWorkspaceMap?) -> Color? {
+  static func color(_ ref: String, map: AppWorkspaceMap?, chosen: [String: String]) -> Color? {
     if ref.hasPrefix("service:") { return Color("SecondaryInk") }
     guard ref.hasPrefix("app:") else { return nil }
-    guard let index = map?.apps.firstIndex(where: { $0.attachment == ref }) else {
+    guard let app = map?.apps.first(where: { $0.attachment == ref }) else {
       return Color("SecondaryInk")
     }
-    return Color(SidebarContent.appColor(index: index))
+    return Color(chosen[app.slug] ?? AppPalette.automatic(app.slug))
   }
 }
