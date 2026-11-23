@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import SiltaAppSupport
 
@@ -29,19 +30,51 @@ nonisolated struct ActionFailure: Equatable, Sendable {
 }
 
 /// Drafts, in-flight writes and failures, keyed by target. A draft clears only when
-/// its write succeeds.
+/// its write succeeds. With defaults, drafts outlast a quit; automated runs pass none.
 @MainActor @Observable
 final class ActionModel {
-  private var drafts: [ActionTarget: String] = [:]
+  private var drafts: [ActionTarget: String] = [:] {
+    didSet { store() }
+  }
   private(set) var sending: Set<ActionTarget> = []
   private(set) var failures: [ActionTarget: ActionFailure] = [:]
   /// Task proposals ticked in My work; none at first.
   var selectedProposals: Set<String> = []
 
+  @ObservationIgnored private let defaults: UserDefaults?
+  static let draftsKey = "unsentDrafts"
+  /// Separates the workspace and the ref in a stored key; neither can contain it.
+  private static let separator: Character = "\u{1F}"
+
+  init(defaults: UserDefaults? = nil) {
+    self.defaults = defaults
+    let stored = defaults?.dictionary(forKey: Self.draftsKey) as? [String: String] ?? [:]
+    drafts = Dictionary(
+      uniqueKeysWithValues: stored.compactMap { key, text in
+        let parts = key.split(separator: Self.separator, maxSplits: 1).map(String.init)
+        return parts.count == 2 ? (ActionTarget(workspace: parts[0], ref: parts[1]), text) : nil
+      })
+  }
+
+  /// Stores the drafts, leaving out any that look like a secret: Core refuses those on
+  /// send, and they shouldn't outlive the app in a preferences file.
+  private func store() {
+    guard let defaults else { return }
+    let stored = Dictionary(
+      uniqueKeysWithValues: drafts.filter { !AppSecrets.contains($0.value) }.map {
+        ($0.key.workspace + String(Self.separator) + $0.key.ref, $0.value)
+      })
+    if stored.isEmpty {
+      defaults.removeObject(forKey: Self.draftsKey)
+    } else {
+      defaults.set(stored, forKey: Self.draftsKey)
+    }
+  }
+
   func draft(_ target: ActionTarget) -> String { drafts[target] ?? "" }
 
   func setDraft(_ text: String, for target: ActionTarget) {
-    drafts[target] = text.isEmpty ? nil : text
+    drafts[target] = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
   }
 
   func isSending(_ target: ActionTarget) -> Bool { sending.contains(target) }

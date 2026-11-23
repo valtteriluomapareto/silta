@@ -18,7 +18,7 @@ final class AppModel {
   /// The inspected task's worktree when it exists here, checked off the main thread, so a
   /// task outside the board can still be revealed.
   private(set) var inspectedWorktrees: Set<String> = []
-  let actions = ActionModel()
+  let actions: ActionModel
   /// Runs one write in a workspace; nil where the app can't write (no store, previews).
   let writer: Writer?
   let documents: DocsModel
@@ -64,6 +64,9 @@ final class AppModel {
   @ObservationIgnored private var queuedForce = false
   @ObservationIgnored private var generation = 0
   @ObservationIgnored private let defaults: UserDefaults?
+  @ObservationIgnored private let stateDefaults: UserDefaults?
+  static let lastWorkspaceKey = "lastWorkspace"
+  static let lastRouteKey = "lastScreen"
   static let showBlockedKey = "boardShowBlocked"
   static let showDoneKey = "boardShowDone"
 
@@ -74,6 +77,13 @@ final class AppModel {
     automated ? nil : .standard
   }
 
+  /// Where the last workspace and screen and unsent drafts are stored. They belong to the
+  /// human's store, so only a real launch reads or writes them; every fixture run starts
+  /// fresh and leaves the human's untouched.
+  static func stateDefaults(fixture: Bool) -> UserDefaults? {
+    fixture ? nil : .standard
+  }
+
   /// Back to the default Board: every lane, all apps, no proposals. Search stays.
   func resetBoardFilter() { boardFilter = BoardFilter() }
 
@@ -81,9 +91,14 @@ final class AppModel {
     reader: AppReader? = nil, now: @escaping @Sendable () -> Date = { Date() },
     documents: DocsModel = DocsModel(),
     workspaceDocuments: WorkspaceDocumentsModel = WorkspaceDocumentsModel(),
-    writer: Writer? = nil, defaults: UserDefaults? = nil, load: @escaping Loader
+    writer: Writer? = nil, defaults: UserDefaults? = nil, stateDefaults: UserDefaults? = nil,
+    load: @escaping Loader
   ) {
     self.defaults = defaults
+    self.stateDefaults = stateDefaults
+    actions = ActionModel(defaults: stateDefaults)
+    workspace = stateDefaults?.string(forKey: Self.lastWorkspaceKey)
+    route = stateDefaults?.string(forKey: Self.lastRouteKey).flatMap(AppRoute.init) ?? .mywork
     boardFilter = BoardFilter(
       blocked: defaults?.object(forKey: Self.showBlockedKey) as? Bool ?? true,
       done: defaults?.object(forKey: Self.showDoneKey) as? Bool ?? true)
@@ -120,7 +135,15 @@ final class AppModel {
         if token == generation {
           if let result {
             data = result
-            if workspace == nil { workspace = result.workspace }
+            // A remembered or selected workspace that no longer exists falls back to the
+            // loaded one, dropping what was selected in it.
+            if workspace == nil || result.workspace != workspace {
+              if workspace != nil { clearWorkspaceState() }
+              workspace = result.workspace
+              if let slug = result.workspace {
+                stateDefaults?.set(slug, forKey: Self.lastWorkspaceKey)
+              }
+            }
           }
           failure = nil
           await loadExtras(force: forced, token: token)
@@ -137,28 +160,11 @@ final class AppModel {
   }
 
   @discardableResult func selectWorkspace(_ slug: String) -> Task<Void, Never> {
+    stateDefaults?.set(slug, forKey: Self.lastWorkspaceKey)
     if workspace != slug {
       generation += 1
       workspace = slug
-      documents.clear()
-      documentCatalog = nil
-      catalogFailure = nil
-      catalogWorkspace = nil
-      catalogVersion = nil
-      workspaceDocuments.clear()
-      docsAbout = nil
-      taskDetail.clear()
-      actions.selectedProposals = []
-      boardSelection = nil
-      boardInspectorPresented = false
-      workspaceSelection = nil
-      workspaceNode = nil
-      workspaceInspectorPresented = false
-      boardFilter.app = nil
-      showingAllWaiting = false
-      allWaiting = nil
-      allWaitingFailure = nil
-      allWaitingVersion = nil
+      clearWorkspaceState()
     }
     return refresh(force: true)
   }
@@ -238,6 +244,7 @@ final class AppModel {
 
   func navigate(to route: AppRoute) {
     self.route = route
+    stateDefaults?.set(route.rawValue, forKey: Self.lastRouteKey)
   }
 
   func inspect(task ref: String) {
@@ -265,23 +272,6 @@ final class AppModel {
   func clearWorkspaceSelection() {
     workspaceNode = nil
     workspaceSelection = nil
-  }
-
-  /// Moves the map selection with an arrow key. A selected connection starts from its
-  /// source going left and its target going right.
-  func moveMapSelection(_ direction: AppMapLayout.Direction) {
-    guard let map = visibleData?.map else { return }
-    let layout = AppMapLayout(map: map)
-    var start = workspaceNode
-    if start == nil, let ref = workspaceSelection?.connectionRef,
-      let edge = map.connections.first(where: { $0.attachment == ref })
-    {
-      start = layout.node(direction == .left ? edge.source : edge.target)?.attachment
-      if let start { return select(node: start) }
-    }
-    if let next = layout.neighbour(of: start, direction, connections: map.connections) {
-      select(node: next)
-    }
   }
 
   @discardableResult func tick(frontmost: Bool) -> Task<Void, Never>? {
@@ -387,6 +377,47 @@ extension AppModel {
   func showApp(_ slug: String) {
     boardFilter.app = slug
     navigate(to: .board)
+  }
+
+  /// Moves the map selection with an arrow key. A selected connection starts from its
+  /// source going left and its target going right.
+  func moveMapSelection(_ direction: AppMapLayout.Direction) {
+    guard let map = visibleData?.map else { return }
+    let layout = AppMapLayout(map: map)
+    var start = workspaceNode
+    if start == nil, let ref = workspaceSelection?.connectionRef,
+      let edge = map.connections.first(where: { $0.attachment == ref })
+    {
+      start = layout.node(direction == .left ? edge.source : edge.target)?.attachment
+      if let start { return select(node: start) }
+    }
+    if let next = layout.neighbour(of: start, direction, connections: map.connections) {
+      select(node: next)
+    }
+  }
+
+  /// Drops what belongs to the previous workspace: documents, selections, filters by app
+  /// and the full inbox.
+  private func clearWorkspaceState() {
+    documents.clear()
+    documentCatalog = nil
+    catalogFailure = nil
+    catalogWorkspace = nil
+    catalogVersion = nil
+    workspaceDocuments.clear()
+    docsAbout = nil
+    taskDetail.clear()
+    actions.selectedProposals = []
+    boardSelection = nil
+    boardInspectorPresented = false
+    workspaceSelection = nil
+    workspaceNode = nil
+    workspaceInspectorPresented = false
+    boardFilter.app = nil
+    showingAllWaiting = false
+    allWaiting = nil
+    allWaitingFailure = nil
+    allWaitingVersion = nil
   }
 
   var screenTitle: String {

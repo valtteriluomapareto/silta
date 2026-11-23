@@ -68,7 +68,8 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - One write per target at a time; the field and button are disabled while it runs.
     A failure is stored per target with the error.
   - Drafts clear only on success. A draft whose target has gone is simply never shown
-    again; drafts last until the app quits.
+    again. Unsent drafts are kept in the app's defaults, so they outlast a quit; a draft
+    that looks like a secret, and every draft in a fixture run, stays in memory only.
   - Every write, success or failure, forces a refresh and reloads the open task
     detail. That also covers stale views: `conflict`, `not_found` or `claimed`.
   - A slow write (busy retries) shows "Sending…" until Core returns or gives up. Core
