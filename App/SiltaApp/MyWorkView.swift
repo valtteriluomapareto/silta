@@ -55,8 +55,11 @@ struct MyWorkView: View {
               ForEach(content.tasks) { row in
                 HStack(spacing: 10) {
                   Toggle(isOn: selection(row.ref)) { proposalTitle(row) }
-                    .toggleStyle(.checkbox).accessibilityLabel("Accept \(row.ref)")
+                    .toggleStyle(.checkbox).accessibilityLabel("Select \(row.ref)")
                     .frame(maxWidth: .infinity, alignment: .leading)
+                  Button("Open") { model.inspect(task: row.ref) }.buttonStyle(.plain)
+                    .font(.system(size: 12)).foregroundStyle(Color("TideText"))
+                    .accessibilityLabel("Open \(row.ref) in the inspector")
                   CopyValue(value: row.ref, title: "Copy task reference", warning: true)
                     .fixedSize()
                 }.padding(.leading, 32).frame(minHeight: 28)

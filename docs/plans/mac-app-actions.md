@@ -5,7 +5,8 @@ Status: active
 ## Goal
 
 The human clears what waits on them in My work without a terminal. They can answer a
-question, accept an answer, comment, accept task proposals and unblock a ready task.
+question, accept an answer, comment, accept or drop task proposals and unblock a ready
+task.
 Each action is one SiltaCore service call made by the app as `human:<USER>` (D38, D50).
 
 ## Inputs
@@ -32,7 +33,7 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
 **In:**
 - **`AppWriter` in `SiltaAppSupport`**, built from an `AppReader` and sharing its home,
   user and clock. One entry point, `perform(_ write: AppWrite, workspace:)`. `AppWrite`
-  is an enum: answer, comment, accept answer, accept proposals, unblock.
+  is an enum: answer, comment, accept answer, accept proposals, drop proposals, unblock.
   - It acts as `human:<USER>` and calls the existing services (`TaskService.comment`,
     `acceptComment`, `triage`, `unblock`) with their current arguments; `unblock` gains
     a package `requireReady` option that the CLI doesn't use.
@@ -82,9 +83,11 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - **Inspector:** one box under the discussion. If the task has an unanswered
     question to the human, an Answer/Comment switch appears; Answer targets the
     newest such question. Otherwise the box is Comment only.
-  - **My work proposal card:** checkboxes, none ticked at first, and "Accept N". It
-    sends one all-or-nothing `triage` with no sheet. The selection is dropped for
-    refs that leave the list.
+  - **My work proposal card:** checkboxes, none ticked at first, "Open" on each row
+    (the Board inspector), "Drop N…" and "Accept N". Each sends one all-or-nothing
+    `triage` with no sheet; Drop first asks for an optional one-line reason, kept as a
+    draft that clears only when the drop succeeds. The selection is dropped for refs that
+    leave the list.
   - **My work `ready` item:** "Unblock". Core unblocks a human's task even with an open
     blocker, so the app offers it only on `ready` items. `replan` items keep their
     read command. The write passes Core's `requireReady`, so a blocker added since the
@@ -105,8 +108,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - §19 gains the `app …` commands.
 
 **Out:**
-- Doc triage, approve and done, archive, dropping proposals, editing plans, and
-  `--allow-secret`.
+- Doc triage, approve and done, archive, editing plans, and `--allow-secret`. Dropping
+  proposals moved in with Paper "App features v1": My work's proposal card offers "Drop
+  N…", which asks for an optional one-line reason and sends one all-or-nothing triage,
+  and each proposal row has "Open", which opens it in the Board inspector.
 - Unblocking `replan` items: Core suggests a re-plan, and the open blockers would be
   unlinked.
 - An Unblock button on Board cards: the card is one button, and the inbox cap would

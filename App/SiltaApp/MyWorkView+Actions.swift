@@ -64,16 +64,40 @@ extension MyWorkView {
       if let failure = target.flatMap({ model.actions.failures[$0] }) {
         ActionFailureView(failure: failure)
       }
-      HStack(spacing: 12) {
-        Text("\(chosen) of \(rows.count) selected · accepted tasks go to Todo")
+      if model.droppingProposals, chosen > 0,
+        let reasonTarget = model.target(AppModel.dropReasonTarget)
+      {
+        HStack(spacing: 10) {
+          TextField(
+            "Why drop \(chosen == 1 ? "it" : "them")? Optional",
+            text: Binding(
+              get: { model.actions.draft(reasonTarget) },
+              set: { model.actions.setDraft($0, for: reasonTarget) })
+          ).textFieldStyle(.roundedBorder).disabled(sending)
+            .onSubmit { if !sending { model.dropSelectedProposals(among: visible) } }
+          Button("Cancel") { model.droppingProposals = false }.buttonStyle(CompactActionStyle())
+            .keyboardShortcut(.cancelAction).disabled(sending)
+          Button(sending ? "Dropping…" : "Drop \(chosen)") {
+            model.dropSelectedProposals(among: visible)
+          }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(sending)
+        }
+      } else {
+        HStack(spacing: 12) {
+          Text(
+            "\(chosen) of \(rows.count) selected · accepted tasks go to Todo; dropping asks for a "
+              + "reason"
+          )
           .font(.system(size: 12)).foregroundStyle(Color("SecondaryInk"))
           .frame(maxWidth: .infinity, alignment: .leading)
-        if let command {
-          CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
+          if let command {
+            CopyValue(value: command.text, title: "Copy command: " + command.title, pill: true)
+          }
+          Button(chosen == 0 ? "Drop…" : "Drop \(chosen)…") { model.droppingProposals = true }
+            .buttonStyle(CompactActionStyle()).disabled(chosen == 0 || sending)
+          Button(sending ? "Accepting…" : chosen == 0 ? "Accept" : "Accept \(chosen)") {
+            model.acceptSelectedProposals(among: visible)
+          }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(chosen == 0 || sending)
         }
-        Button(sending ? "Accepting…" : chosen == 0 ? "Accept" : "Accept \(chosen)") {
-          model.acceptSelectedProposals(among: visible)
-        }.buttonStyle(ActionButtonStyle(prominent: false)).disabled(chosen == 0 || sending)
       }
     }.padding(.leading, 32).padding(.top, 4)
   }
