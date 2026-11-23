@@ -89,6 +89,11 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     parent creates a todo task as the human in one Core write (`app add`); the app never
     starts or claims it. "Copy agent prompt after creating" copies the prompt that hands
     it to an agent (Paper "App features v1"); the app launches nothing (D4).
+  - **Doc proposals:** My work's rows have checkboxes, none ticked at first, with "Reject
+    N" and "Accept N"; the Docs Changes tab has "Reject @N" and "Accept @N" for the open
+    revision. A row triages the newest proposed revision of its document. The selection
+    is pruned after each write and cleared on a workspace switch, and follows the whole
+    inbox while Show all is on. No confirm step, as for task proposals.
   - **My work review card:** Open task, the PR link, and Mark done / Request changes /
     Drop. Mark done needs a nonblank result; an empty merge commit records none
     (`--no-sha`), and a typed one is checked in the worktree or else the app's registered
@@ -135,7 +140,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - §19 gains the `app …` commands.
 
 **Out:**
-- Doc triage, archive, editing plans, and `--allow-secret`. Approving a review moved in
+- Archive, editing plans, and `--allow-secret`. Doc triage moved in with Paper "App
+  features v1": My work's doc proposals have checkboxes with "Reject N" and "Accept N",
+  and the Docs Changes tab has "Reject @N" and "Accept @N" for the open revision. Each
+  sends one all-or-nothing Core triage as the human (`app doc-triage`). Approving a review moved in
   on 2026-11-21: My work's review card offers Mark done (a nonblank result, an optional
   merge commit, no `--force` past an unmet review gate), Request changes (a question to
   the submitter) and Drop, plus Open task and the PR link. Dropping

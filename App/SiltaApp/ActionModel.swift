@@ -40,6 +40,8 @@ final class ActionModel {
   private(set) var failures: [ActionTarget: ActionFailure] = [:]
   /// Task proposals ticked in My work; none at first.
   var selectedProposals: Set<String> = []
+  /// Document revision proposals ticked in My work; none at first.
+  var selectedDocuments: Set<String> = []
 
   @ObservationIgnored private let defaults: UserDefaults?
   static let draftsKey = "unsentDrafts"

@@ -33,6 +33,16 @@ public struct AppWriter: Sendable {
   /// Runs any write, including those that close a task, which Core runs asynchronously.
   @discardableResult
   public func send(_ write: AppWrite, workspace: String) async throws -> String? {
+    if case .triageDocuments(let accept, let reject) = write {
+      return try await logged(write, workspace: workspace) {
+        let environment = environment()
+        try environment.db.initialize()
+        let service = DocTriageService(environment: environment, workspace: workspace)
+        let batch = DocTriage(accept: accept, reject: reject)
+        _ = try service.authorize(batch)
+        _ = try await service.triage(batch)
+      }
+    }
     let close: Close
     switch write {
     case .dropTask(let ref, let why):
@@ -66,6 +76,26 @@ public struct AppWriter: Sendable {
     }
   }
 
+  /// Runs an asynchronous write with one body-free log line and the viewer's error mapping.
+  private func logged(_ write: AppWrite, workspace: String, _ body: () async throws -> Void)
+    async throws -> String?
+  {
+    let started = base.clock.now()
+    var failure: ErrorCode?
+    defer { log(write, workspace: workspace, started: started, failure: failure) }
+    do {
+      do {
+        try await body()
+        return nil
+      } catch {
+        throw AppReadError(error).scoped(to: base.home.url)
+      }
+    } catch let error as AppReadError {
+      failure = error.code
+      throw error
+    }
+  }
+
   /// A write that closes a task through Core's asynchronous close.
   private struct Close {
     let ref: String
@@ -88,7 +118,7 @@ public struct AppWriter: Sendable {
       try discuss(write, service: service)
     case .acceptProposals, .dropProposals, .unblock, .unblockAnyway, .snooze:
       try organize(write, service: service)
-    case .dropTask, .markDone:
+    case .dropTask, .markDone, .triageDocuments:
       throw StorageError.internalMisuse
     case .createTask(let task):
       var draft = TaskDraft(title: task.title)
