@@ -34,6 +34,17 @@ extension AppReader {
     return reads
   }
 
+  /// Completes a reviewed task past an unmet review gate, for the human to run in a
+  /// terminal. Its placeholders fail safe until filled: `RESULT_FILE` is an unreadable
+  /// file, and `MERGE_SHA` (app tasks) is no commit.
+  public func forceDoneCommand(task: AppTask, workspace: String) -> AppCommand {
+    command(
+      "Mark done past the review gate",
+      suffix: "task done " + shellWord(task.ref) + " --force"
+        + (task.app == nil ? "" : " --sha MERGE_SHA") + " -F RESULT_FILE",
+      workspace: workspace)
+  }
+
   /// Offers read-only detail for a task waiting for review.
   public func commands(forReview task: AppTask, workspace: String) -> [AppCommand] {
     [readCommand(task: task.ref, workspace: workspace)]

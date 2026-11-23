@@ -14,6 +14,9 @@ public enum AppWrite: Equatable, Sendable {
   case unblockAnyway(ref: String, confirmed: [String])
   /// Drops a task, with an optional reason recorded as its result. Only `send` runs it.
   case dropTask(ref: String, why: String?)
+  /// Completes a task with its result and merge commit; nil records no commit. The app
+  /// sends a nonblank result. Only `send` runs it.
+  case markDone(ref: String, result: String, sha: String?)
   /// Creates a todo task as the human; the app never starts or claims it.
   case createTask(AppNewTask)
   /// Resolves discussion threads by their root or any post in them.
@@ -39,6 +42,7 @@ public enum AppWrite: Equatable, Sendable {
     case .unblock, .unblockAnyway: "app unblock"
     case .snooze: "app block"
     case .dropTask: "app drop"
+    case .markDone: "app done"
     case .createTask: "app add"
     case .resolveThreads: "app resolve"
     case .reopenThreads: "app reopen"

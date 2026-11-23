@@ -106,6 +106,42 @@ extension AppModel {
     }
   }
 
+  /// Marks a reviewed task done with its result draft and optional merge commit draft;
+  /// both clear only on success. A blank result sends nothing.
+  @discardableResult func markDone(_ ref: String) -> Task<Void, Never>? {
+    guard let resultTarget = target(Self.doneResultTarget(ref)),
+      let shaTarget = target(Self.doneSHATarget(ref))
+    else { return nil }
+    let result = actions.draft(resultTarget).trimmingCharacters(in: .whitespacesAndNewlines)
+    let sha = actions.draft(shaTarget).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !result.isEmpty,
+      let running = perform(
+        .markDone(ref: ref, result: result, sha: sha.isEmpty ? nil : sha),
+        for: Self.followUpTarget(ref))
+    else { return nil }
+    return Task {
+      await running.value
+      guard let task = target(Self.followUpTarget(ref)), actions.failures[task] == nil
+      else { return }
+      actions.setDraft("", for: resultTarget)
+      actions.setDraft("", for: shaTarget)
+    }
+  }
+
+  /// Sends the changes draft as a question to the submitter, so it waits in that
+  /// session's inbox and brief until it answers.
+  @discardableResult func requestChanges(_ ref: String, from submitter: String)
+    -> Task<Void, Never>?
+  {
+    send(draftOf: Self.changesTarget(ref)) {
+      .comment(task: ref, body: $0, kind: CommentKind.question.rawValue, to: [submitter])
+    }
+  }
+
+  static func doneResultTarget(_ ref: String) -> String { "done-result:" + ref }
+  static func doneSHATarget(_ ref: String) -> String { "done-sha:" + ref }
+  static func changesTarget(_ ref: String) -> String { "changes:" + ref }
+
   /// One write at a time per blocked task: snooze, unblock anyway or drop.
   static func followUpTarget(_ ref: String) -> String { "followup:" + ref }
 
