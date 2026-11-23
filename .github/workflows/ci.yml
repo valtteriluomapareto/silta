@@ -57,7 +57,9 @@ jobs:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27   # GitHub public-preview image with Xcode 27.1 (D18)
-    timeout-minutes: 35
+    # About 16 minutes with cached prior writers; the weekly run and a run that changes
+    # build-prior-writer.sh build every writer from source, about 3.5 minutes each.
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,8 +73,9 @@ jobs:
         run: bash scripts/ci/install-swift-tools.sh
 
       # build-prior-writer.sh pins the commits and checks each cached binary's stamp
-      # (commit, Swift toolchain, SHA-256). A bad entry is rebuilt but not saved again until
-      # the key changes. The weekly run builds them from source.
+      # (commit, Swift toolchain, SHA-256). On an exact hit, a writer missing from the cache
+      # fails the job: the hit is never saved again, so it would be rebuilt on every PR.
+      # The weekly run builds them from source.
       - name: Name the prior-writer cache
         if: github.event_name != 'schedule'
         id: prior-writers
@@ -80,6 +83,7 @@ jobs:
 
       - name: Restore prior writers
         if: github.event_name != 'schedule'
+        id: restore-writers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/prior-writers
@@ -88,6 +92,7 @@ jobs:
       - name: Verify (Swift, slow tiers, wall-clock)
         env:
           SILTA_PRIOR_WRITER_CACHE: ${{ github.event_name != 'schedule' && format('{0}/prior-writers', runner.temp) || '' }}
+          SILTA_PRIOR_WRITER_CACHE_HIT: ${{ steps.restore-writers.outputs.cache-hit }}
         run: scripts/verify.sh full-swift
 
       - name: Upload scenario evidence on failure
@@ -172,7 +177,7 @@ jobs:
       github.event_name == 'schedule'
       || (github.event_name == 'push' && needs.changes.outputs.code == 'true')
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 45   # a miss builds every pinned writer, about 3.5 minutes each
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -198,10 +203,8 @@ jobs:
         if: steps.lookup.outputs.cache-hit != 'true'
         env:
           SILTA_PRIOR_WRITER_CACHE: ${{ runner.temp }}/prior-writers
-        run: |
-          out="$(mktemp -d)"
-          bash scripts/build-prior-writer.sh "$out/prior" prior
-          bash scripts/build-prior-writer.sh "$out/v6" v6
+        # Every writer the script pins, so the saved entry can't miss one.
+        run: bash scripts/build-prior-writer.sh --all "$(mktemp -d)"
 
       - name: Save prior writers
         if: steps.lookup.outputs.cache-hit != 'true'

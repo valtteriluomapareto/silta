@@ -86,14 +86,12 @@ require_passed() {
 full_swift() {
   guards_and_lint
   step "build prior writers (isolated compatibility test)"
-  export SILTA_PRIOR_BINARY="$SILTA_HOME/prior/silta"
-  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior" prior
-  export SILTA_V6_BINARY="$SILTA_HOME/prior-v6/silta"
-  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v6" v6
-  export SILTA_V8_BINARY="$SILTA_HOME/prior-v8/silta"
-  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v8" v8
-  export SILTA_V9_BINARY="$SILTA_HOME/prior-v9/silta"
-  bash scripts/build-prior-writer.sh "$SILTA_HOME/prior-v9" v9
+  # Every pinned writer, exported as SILTA_<WRITER>_BINARY (prior, v6 -> SILTA_V6_BINARY, ...).
+  bash scripts/build-prior-writer.sh --all "$SILTA_HOME/writers"
+  local name _
+  while read -r name _; do
+    export "SILTA_$(printf '%s' "$name" | tr '[:lower:]' '[:upper:]')_BINARY=$SILTA_HOME/writers/$name/silta"
+  done < <(bash scripts/build-prior-writer.sh --list)
   build --build-tests
 
   step "test (with slow tiers)"

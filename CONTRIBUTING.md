@@ -58,9 +58,13 @@ self-tests). The weekly and manual runs run everything. The
 
 The `swift` job reuses the prior-writer binaries from the Actions cache, keyed by
 `scripts/ci/prior-writer-cache-key.sh` on the Swift toolchain and
-`scripts/build-prior-writer.sh`; the weekly scheduled run builds them from source. In CI, a push
-to `main` runs only `changes` and `warm-caches`, which fills that cache in `main`'s scope
-where every PR can read it; a website-only merge skips `warm-caches`. The push verifies
+`scripts/build-prior-writer.sh`; the weekly scheduled run builds them from source. That
+script's table is the only list of pinned writers: `verify.sh` and `warm-caches` both build
+them with `--all`, and adding one changes the cache key. In CI, a push to `main` runs only
+`changes` and `warm-caches`, which fills that cache with every writer in `main`'s scope
+where every PR can read it; a website-only merge skips `warm-caches`. If a restored exact
+hit lacks a writer, the `swift` job fails instead of rebuilding it on every PR; changing the
+script refills the cache. The push verifies
 nothing, because the PR already verified the same tree. That holds only while the `main` ruleset has no
 bypass actors; if one is added, restore the full push run (D19).
 
