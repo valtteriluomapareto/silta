@@ -17,7 +17,8 @@
 # that would have to be built fails instead: the saved cache is missing it, and an exact
 # hit is never saved again, so every later run would rebuild it silently.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+cd "$(dirname "$self")/.."
 
 # writer  commit                                    the last writer before
 writers='
@@ -37,10 +38,10 @@ case "${1:-}" in
     exit 0
     ;;
   --all)
-    [[ $# -eq 2 ]] || usage
+    [[ $# -eq 2 && -n "$2" ]] || usage
     list | while read -r name _; do
       # Its stdin is not the list, so a build step can't swallow the remaining writers.
-      bash "${BASH_SOURCE[0]}" "$2/$name" "$name" < /dev/null
+      bash "$self" "$2/$name" "$name" < /dev/null
     done
     exit 0
     ;;
@@ -75,7 +76,7 @@ else
 fi
 if [[ -n "$entry" && "${SILTA_PRIOR_WRITER_CACHE_HIT:-}" == true ]]; then
   echo "::error::build-prior-writer: the restored cache was an exact hit, but writer ${2:-prior} (${prior_commit}) ${problem}." \
-    "Change scripts/build-prior-writer.sh (for example this comment) so the key changes and main's warm-caches job saves every writer." >&2
+    "To refill it, merge any change to scripts/build-prior-writer.sh: that changes the cache key, and main's warm-caches job then builds and saves every writer." >&2
   exit 1
 fi
 if [[ -n "$entry" && "$problem" != "is missing" ]]; then

@@ -58,7 +58,7 @@ jobs:
     if: github.event_name != 'push' && needs.changes.outputs.code == 'true'
     runs-on: xcode-27   # GitHub public-preview image with Xcode 27.1 (D18)
     # About 16 minutes with cached prior writers; the weekly run and a run that changes
-    # build-prior-writer.sh build every writer from source, about 3.5 minutes each.
+    # build-prior-writer.sh build every writer from source, about 4 minutes each.
     timeout-minutes: 45
     steps:
       - name: Check out repository
@@ -177,7 +177,7 @@ jobs:
       github.event_name == 'schedule'
       || (github.event_name == 'push' && needs.changes.outputs.code == 'true')
     runs-on: xcode-27
-    timeout-minutes: 45   # a miss builds every pinned writer, about 3.5 minutes each
+    timeout-minutes: 45   # a miss builds every pinned writer, about 4 minutes each
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
