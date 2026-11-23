@@ -65,6 +65,7 @@ public struct AppReader: Sendable {
       }
       let reviews = tasks.filter { $0.status == "review" }
       let inbox = try service.inbox(for: "me")
+      let items = try Self.attention(inbox.items, service: service)
       let questions = try service.questionInbox().map(AppAttention.init)
       return AppSnapshot(
         board: AppBoard(
@@ -73,7 +74,8 @@ public struct AppReader: Sendable {
           doneThisWeek: completed, proposals: tasks.filter { $0.status == "proposed" },
           questions: questions, appOpenCounts: counts),
         work: AppWork(
-          items: inbox.items.map(AppAttention.init), remaining: inbox.remaining,
+          items: items,
+          remaining: inbox.remaining,
           moreCommand: inbox.more, reviews: reviews))
     }
   }
@@ -85,7 +87,7 @@ public struct AppReader: Sendable {
     try Self.checked(home: environment.home.url) {
       try checkSchema()
       let service = TaskService(environment: environment, workspace: workspace)
-      return try service.inbox(for: "me", all: true).items.map(AppAttention.init)
+      return try Self.attention(service.inbox(for: "me", all: true).items, service: service)
     }
   }
 
@@ -136,6 +138,15 @@ public struct AppReader: Sendable {
       if try core.sample().needsMigration { throw AppReadError.migrationRequired }
       return AppChangeProbe(core: core, home: environment.home.url)
     }
+  }
+
+  /// Inbox entries for the viewer, with each due or re-plan task's open and dropped
+  /// blockers filled in from Core.
+  static func attention(_ items: [InboxItem], service: TaskService) throws -> [AppAttention] {
+    let blocked = items.filter { ["due", "replan"].contains($0.kind) }
+      .flatMap { $0.tasks ?? [] }.map(\.ref)
+    let unmet = try service.unmetBlockers(Array(Set(blocked)))
+    return items.map { AppAttention($0).withUnmet(unmet) }
   }
 
   func checkSchema() throws {

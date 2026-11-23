@@ -103,10 +103,14 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     draft that clears only when the drop succeeds. The selection is dropped for refs that
     leave the list.
   - **My work `ready` item:** "Unblock". Core unblocks a human's task even with an open
-    blocker, so the app offers it only on `ready` items. `replan` items keep their
-    read command. The write passes Core's `requireReady`, so a blocker added since the
-    read refuses as `blocked` instead of being cleared. Unblock has its own target, apart
-    from the task's comment draft.
+    blocker, so the plain Unblock is offered only on `ready` items. The write passes
+    Core's `requireReady`, so a blocker added since the read refuses as `blocked` instead
+    of being cleared. Unblock has its own target, apart from the task's comment draft.
+    Due and `replan` items get follow-up cards (see Out): "Unblock anyway" sends the open
+    blockers the confirm step named and refuses as `conflict` when Core's open blockers
+    differ just before the write; a blocker added in the instant between that check and
+    the write would still be unlinked. Snooze re-blocks with Core's
+    masked current reason, which keeps the blockers and the episode's age.
   - **Errors** show in the card or inspector with the code, the message and "Copy
     command".
 - **Fixture:**
@@ -126,8 +130,11 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   proposals moved in with Paper "App features v1": My work's proposal card offers "Drop
   N…", which asks for an optional one-line reason and sends one all-or-nothing triage,
   and each proposal row has "Open", which opens it in the Board inspector.
-- Unblocking `replan` items: Core suggests a re-plan, and the open blockers would be
-  unlinked.
+- Unblocking `replan` items moved in with Paper "App features v1": My work shows due and
+  re-plan items as follow-up cards with Snooze (3, 7, 14 or 30 days; `app block`, which
+  keeps the blockers and reason), "Unblock anyway…" after a confirm step that names the
+  open blockers it unlinks, "Open task" and "Drop…" with an optional reason (`app drop`).
+  A ready item keeps its plain Unblock.
 - An Unblock button on Board cards: the card is one button, and the inbox cap would
   make the button flicker.
 - Confirm sheets.

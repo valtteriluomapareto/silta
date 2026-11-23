@@ -45,11 +45,12 @@ nonisolated struct MyWorkContent {
   let reviews: [Review]
   let documents: [Proposal]
   let tasks: [Proposal]
+  let followUps: [FollowUp]
   let other: [AppAttention]
   let remaining: Int
   var hasMatches: Bool {
     !questions.isEmpty || !answers.isEmpty || !reviews.isEmpty || !documents.isEmpty
-      || !tasks.isEmpty || !other.isEmpty
+      || !tasks.isEmpty || !followUps.isEmpty || !other.isEmpty
   }
 
   /// `all` replaces the capped inbox items when My work shows every waiting item.
@@ -81,8 +82,19 @@ nonisolated struct MyWorkContent {
     tasks = items.filter {
       $0.kind == "proposal" && matches($0, extra: [byRef[$0.ref ?? ""]?.app ?? ""])
     }.map { Self.proposal($0, task: byRef[$0.refs.first ?? $0.ref ?? ""]) }
+    // Core lists a due task once per external blocker; one card per task is enough.
+    var seen = Set<String>()
+    followUps = items.filter { ["due", "replan"].contains($0.kind) }.flatMap { item in
+      item.blocked.filter { task in
+        seen.insert(task.ref).inserted
+          && AppSearch.matches(
+            search,
+            values: [item.kind, item.target ?? "", task.ref, task.title, task.why ?? ""] + task.on)
+      }.map { FollowUp(item: item, task: $0, board: byRef[$0.ref], now: now) }
+    }
     other = items.filter {
-      !["question", "answer", "doc_proposal", "proposal"].contains($0.kind) && matches($0)
+      !["question", "answer", "doc_proposal", "proposal", "due", "replan"].contains($0.kind)
+        && matches($0)
     }
     remaining = all == nil ? snapshot.work.remaining : 0
   }
@@ -151,5 +163,76 @@ nonisolated struct MyWorkContent {
       item: item, title: item.title ?? task?.title ?? "Task proposal",
       metadata: [task?.app, author].compactMap { $0 }.joined(separator: " · "),
       ref: item.refs.first ?? item.ref ?? "")
+  }
+}
+
+/// A blocked task whose follow-up day came, or whose blocker was dropped.
+nonisolated struct FollowUp: Identifiable, Equatable {
+  let item: AppAttention
+  let task: AppBlockedTask
+  /// The board's row for the task, which carries Core's waiting state.
+  let board: AppTask?
+  let now: Date
+
+  var id: String { item.kind + ":" + task.ref }
+  var replan: Bool { item.kind == "replan" }
+
+  var title: String { (replan ? "Re-plan: " : "Follow up: ") + task.title }
+
+  var subtitle: String {
+    let waiting = board?.waiting
+    let age = waiting.map { $0.ageDays == 1 ? "blocked 1 day" : "blocked \($0.ageDays) days" }
+    let lead =
+      replan
+      ? "A blocker was dropped: " + task.dropped.joined(separator: ", ")
+      : "Follow-up was due " + Self.dueDay(task.followUpAt, now: now)
+    return ([lead] + [age].compactMap { $0 }).joined(separator: " · ")
+  }
+
+  /// The blockers Unblock anyway unlinks: Core's open ones, done tasks left out.
+  var openBlockers: [String] { task.open }
+
+  /// How many blockers are done, such as `AC-19 is done; 1 of 2 blockers still open.`
+  var progress: String? {
+    let done = task.on.map(Self.bare).filter {
+      !task.open.contains($0) && !task.dropped.contains($0)
+    }
+    guard !done.isEmpty else { return nil }
+    return done.joined(separator: ", ") + (done.count == 1 ? " is" : " are") + " done; "
+      + "\(task.open.count) of \(task.on.count) blockers still open."
+  }
+
+  /// The confirm step's sentence before Unblock anyway.
+  var unblockWarning: String {
+    let open = openBlockers
+    return open.isEmpty
+      ? "Unblocking returns it to Todo."
+      : "Unblocking returns it to Todo and unlinks its open "
+        + (open.count == 1 ? "blocker " : "blockers ") + open.joined(separator: ", ") + "."
+  }
+
+  private static func bare(_ blocker: String) -> String {
+    blocker.hasPrefix("task:") ? String(blocker.dropFirst("task:".count)) : blocker
+  }
+
+  /// A follow-up day relative to now: `today`, `yesterday`, `3 days ago`, or the day.
+  static func dueDay(_ day: String?, now: Date) -> String {
+    guard let day else { return "" }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = .gmt
+    formatter.dateFormat = "yyyy-MM-dd"
+    guard let date = formatter.date(from: day) else { return day }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .gmt
+    let days =
+      calendar.dateComponents([.day], from: date, to: calendar.startOfDay(for: now))
+      .day ?? 0
+    switch days {
+    case 0: return "today"
+    case 1: return "yesterday"
+    case 2...: return "\(days) days ago"
+    default: return day
+    }
   }
 }

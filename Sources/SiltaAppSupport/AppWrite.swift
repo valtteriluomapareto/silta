@@ -7,6 +7,13 @@ public enum AppWrite: Equatable, Sendable {
   case comment(
     task: String, body: String, replyTo: String? = nil, kind: String = "comment",
     to: [String] = [])
+  /// Moves a blocked task's follow-up `days` ahead, keeping its blockers and reason.
+  case snooze(ref: String, days: Int)
+  /// Returns a blocked task to todo even with open blockers, which are unlinked. Refuses as
+  /// `conflict` when the open blockers are no longer the `confirmed` ones.
+  case unblockAnyway(ref: String, confirmed: [String])
+  /// Drops a task, with an optional reason recorded as its result. Only `send` runs it.
+  case dropTask(ref: String, why: String?)
   /// Creates a todo task as the human; the app never starts or claims it.
   case createTask(AppNewTask)
   /// Resolves discussion threads by their root or any post in them.
@@ -29,7 +36,9 @@ public enum AppWrite: Equatable, Sendable {
     case .comment: "app comment"
     case .acceptAnswer: "app accept-answer"
     case .acceptProposals, .dropProposals: "app triage"
-    case .unblock: "app unblock"
+    case .unblock, .unblockAnyway: "app unblock"
+    case .snooze: "app block"
+    case .dropTask: "app drop"
     case .createTask: "app add"
     case .resolveThreads: "app resolve"
     case .reopenThreads: "app reopen"

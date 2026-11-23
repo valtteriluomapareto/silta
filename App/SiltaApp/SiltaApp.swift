@@ -94,7 +94,7 @@ struct SiltaApp: App {
       return AppModel(
         reader: reader, now: now,
         writer: { write, workspace in
-          try await Task.detached { try writer.perform(write, workspace: workspace) }.value
+          try await Task.detached { try await writer.send(write, workspace: workspace) }.value
         },
         defaults: defaults, stateDefaults: stateDefaults,
         load: { previous, workspace, force in
