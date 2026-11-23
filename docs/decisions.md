@@ -829,8 +829,8 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   Corrupt-data handling waits for observed DF3 cases; schema and writer floors stay.
 - **D50: The Mac app writes through SiltaCore as the human.** On 2026-11-18 the
   maintainer asked for the app's first actions (answer, accept answer, comment,
-  accept proposals, unblock); on 2026-11-21 the app-features tasks added more through
-  the same path (drop proposals and others in `mac-app-actions.md`). The app calls Core services in process as
+  accept proposals, unblock). On 2026-11-21 the app-features tasks added more writes
+  through the same path; `mac-app-actions.md` lists them. The app calls Core services in process as
   `human:<USER>` (§4.1, D38). It can't spawn the CLI, because the CLI treats only a
   terminal as human. Each app write opens the existing store only: a missing store or
   a pending migration is refused, rechecked under the migration lock, so the app

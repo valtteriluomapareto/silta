@@ -414,6 +414,7 @@ extension AppModel {
     docsAbout = nil
     taskDetail.clear()
     actions.selectedProposals = []
+    droppingProposals = false
     boardSelection = nil
     boardInspectorPresented = false
     workspaceSelection = nil
