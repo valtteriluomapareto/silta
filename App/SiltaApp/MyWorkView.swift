@@ -9,7 +9,8 @@ struct MyWorkView: View {
     ScrollView {
       if let data = model.visibleData, let snapshot = data.snapshot {
         let content = MyWorkContent(
-          snapshot: snapshot, all: model.allWaiting, search: model.search, now: data.checkedAt)
+          snapshot: snapshot, all: model.allWaiting, apps: data.map?.apps ?? [],
+          search: model.search, now: data.checkedAt)
         LazyVStack(alignment: .leading, spacing: 10) {
           if snapshot.work.waitingCount == 0 && model.search.isEmpty {
             ContentUnavailableView(

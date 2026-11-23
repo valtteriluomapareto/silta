@@ -20,6 +20,9 @@ extension AppModel {
     workspace.map { slug in visibleData?.workspaces.first { $0.slug == slug }?.name ?? slug }
   }
 
+  /// The display name of an app in the current workspace, or its slug.
+  func appName(_ slug: String) -> String { (visibleData?.map?.apps ?? []).name(of: slug) }
+
   /// The menu for a task card or row in the current workspace.
   func menuItems(for task: AppTask) -> [TaskMenu.Item] {
     guard let reader, let workspace, let data = visibleData else { return [] }
@@ -27,7 +30,7 @@ extension AppModel {
       for: task,
       in: TaskMenu.Context(
         reader: reader, workspace: workspace, name: workspaceName ?? workspace,
-        existing: data.existingWorktrees, now: data.checkedAt))
+        apps: data.map?.apps ?? [], existing: data.existingWorktrees, now: data.checkedAt))
   }
 }
 

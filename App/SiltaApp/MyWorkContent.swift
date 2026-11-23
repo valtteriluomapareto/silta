@@ -54,7 +54,11 @@ nonisolated struct MyWorkContent {
   }
 
   /// `all` replaces the capped inbox items when My work shows every waiting item.
-  init(snapshot: AppSnapshot, all: [AppAttention]? = nil, search: String, now: Date) {
+  /// `apps` names a proposal's app; a slug the map lacks stays as it is.
+  init(
+    snapshot: AppSnapshot, all: [AppAttention]? = nil, apps: [AppMapApp] = [], search: String,
+    now: Date
+  ) {
     let board = snapshot.board
     let byRef = Dictionary(
       uniqueKeysWithValues: (board.todo + board.doing + board.review + board.doneThisWeek
@@ -79,9 +83,12 @@ nonisolated struct MyWorkContent {
         search, values: [$0.task.ref, $0.task.title, $0.task.description, $0.metadata])
     }
     documents = items.filter { $0.kind == "doc_proposal" && matches($0) }.map(Self.document)
-    tasks = items.filter {
-      $0.kind == "proposal" && matches($0, extra: [byRef[$0.ref ?? ""]?.app ?? ""])
-    }.map { Self.proposal($0, task: byRef[$0.refs.first ?? $0.ref ?? ""]) }
+    tasks = items.filter { $0.kind == "proposal" }.compactMap { item in
+      let task = byRef[item.refs.first ?? item.ref ?? ""]
+      let app = task?.app.map(apps.name(of:))
+      return matches(item, extra: [task?.app, app].compactMap { $0 })
+        ? Self.proposal(item, task: task, app: app) : nil
+    }
     // Core lists a due task once per external blocker; one card per task is enough.
     var seen = Set<String>()
     followUps = items.filter { ["due", "replan"].contains($0.kind) }.flatMap { item in
@@ -157,11 +164,11 @@ nonisolated struct MyWorkContent {
       ref: item.refs.first ?? item.ref ?? "")
   }
 
-  private static func proposal(_ item: AppAttention, task: AppTask?) -> Proposal {
+  private static func proposal(_ item: AppAttention, task: AppTask?, app: String?) -> Proposal {
     let author = item.author.map { "by " + ActorPresentation($0).name }
     return Proposal(
       item: item, title: item.title ?? task?.title ?? "Task proposal",
-      metadata: [task?.app, author].compactMap { $0 }.joined(separator: " · "),
+      metadata: [app, author].compactMap { $0 }.joined(separator: " · "),
       ref: item.refs.first ?? item.ref ?? "")
   }
 }
