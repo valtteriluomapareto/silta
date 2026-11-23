@@ -44,7 +44,45 @@
         let found = MyWorkContent(
           snapshot: snapshot, apps: apps, search: "web shop", now: AppV2Fixture.now)
         #expect(found.tasks.map(\.ref) == ["AC-23"])
+        let bySlug = MyWorkContent(
+          snapshot: snapshot, apps: apps, search: "acme-web", now: AppV2Fixture.now)
+        #expect(bySlug.tasks.map(\.ref) == ["AC-23"])
       }
+    }
+
+    @Test func connectionEndpointsUseTheMapsNames() throws {
+      let map = AppWorkspaceMap(
+        apps: apps,
+        services: [
+          AppMapService(
+            slug: "push", name: "Push service", summary: nil, attachment: "service:push")
+        ],
+        connections: [
+          AppConnection(
+            attachment: "edge:acme-web/service:push/sdk", source: "acme-web",
+            target: "service:push", kind: "sdk", summary: "", codeReferences: [])
+        ])
+      #expect(map.endpointName("acme-web") == "Acme web shop")
+      #expect(map.endpointName("service:push") == "Push service")
+      #expect(map.endpointName("service:mail") == "mail")
+      #expect(map.endpointName("acme-pdf") == "acme-pdf")
+      let layout = AppMapLayout(map: map)
+      let content = WorkspaceMapContent(
+        map: map, layout: layout, node: nil, connection: nil, search: "")
+      let web = try #require(layout.nodes.first { $0.key == "acme-web" })
+      #expect(content.description(web) == "Acme web shop, app, calls Push service over sdk")
+      let edge = try #require(content.edges.first)
+      #expect(
+        content.description(edge, docs: "1") == "Acme web shop calls Push service over sdk, 1 doc")
+      func subtitle(_ about: [String]) -> String {
+        let document = AppDocument(
+          ref: "doc:a@1", slug: "a", revision: 1, title: nil, kind: "reference", about: about,
+          state: "accepted", archived: false)
+        return DocsContent.subtitle(DocsModel.Group(id: "a", entries: [document]), map: map)
+      }
+      #expect(
+        subtitle(["edge:acme-web/service:push/sdk"]).hasPrefix("Acme web shop → Push service"))
+      #expect(subtitle(["app:acme-web"]).hasPrefix("Acme web shop · "))
     }
 
     private func fixture(_ body: (AppReader, URL) throws -> Void) throws {

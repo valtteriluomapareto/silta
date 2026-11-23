@@ -144,7 +144,7 @@
         let mobile = try #require(layout.node("acme-mobile"))
         #expect(
           selected.description(mobile)
-            == "acme-mobile, app, calls acme-backend over http-api, calls service:push over sdk")
+            == "acme-mobile, app, calls acme-backend over http-api, calls push over sdk")
         let edge = try #require(selected.edges.first { $0.connection.source == "acme-web" })
         #expect(
           selected.description(edge, docs: "0")

@@ -56,7 +56,7 @@ nonisolated struct MyWorkContent {
   /// `all` replaces the capped inbox items when My work shows every waiting item.
   /// `apps` names a proposal's app; a slug the map lacks stays as it is.
   init(
-    snapshot: AppSnapshot, all: [AppAttention]? = nil, apps: [AppMapApp] = [], search: String,
+    snapshot: AppSnapshot, all: [AppAttention]? = nil, apps: [AppMapApp], search: String,
     now: Date
   ) {
     let board = snapshot.board

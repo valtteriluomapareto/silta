@@ -155,7 +155,7 @@ struct TaskInspector: View {
 
   private func properties(_ task: AppTask) -> some View {
     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-      property("App", task.app.map(model.appName))
+      property("App", task.app.map(model.appName)).help(task.app ?? "")
       property("Priority", String(task.priority))
       property("Branch", task.branch, monospaced: true)
       property("Claimed by", TaskPresentation.claimant(task.claimedBy))

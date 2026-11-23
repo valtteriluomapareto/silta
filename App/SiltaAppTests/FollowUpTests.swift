@@ -18,7 +18,8 @@
           home: home, user: "acme", now: { AppV2Fixture.now.addingTimeInterval(8.5 * 86_400) })
         let snapshot = try later.snapshot(workspace: "acme")
         let content = MyWorkContent(
-          snapshot: snapshot, search: "", now: AppV2Fixture.now.addingTimeInterval(8.5 * 86_400))
+          snapshot: snapshot, apps: [], search: "",
+          now: AppV2Fixture.now.addingTimeInterval(8.5 * 86_400))
         let replan = try #require(content.followUps.first { $0.task.ref == "AC-16" })
         #expect(replan.replan)
         #expect(replan.title == "Re-plan: Paginate the orders endpoint")
@@ -42,7 +43,7 @@
         let now = AppV2Fixture.now.addingTimeInterval(8.5 * 86_400)
         let later = try AppReader(home: home, user: "acme", now: { now })
         let content = MyWorkContent(
-          snapshot: try later.snapshot(workspace: "acme"), search: "", now: now)
+          snapshot: try later.snapshot(workspace: "acme"), apps: [], search: "", now: now)
         let due = try #require(content.followUps.first)
         #expect(!due.replan && due.title == "Follow up: Paginate the orders endpoint")
         #expect(due.subtitle == "Follow-up was due 2 days ago · blocked 8 days")
@@ -51,7 +52,7 @@
         #expect(FollowUp.dueDay("2026-11-26", now: now) == "2026-11-26")
         #expect(
           MyWorkContent(
-            snapshot: try later.snapshot(workspace: "acme"), search: "design",
+            snapshot: try later.snapshot(workspace: "acme"), apps: [], search: "design",
             now: now
           ).followUps.count == 1)
       }
@@ -70,7 +71,7 @@
         let now = AppV2Fixture.now.addingTimeInterval(8.5 * 86_400)
         let later = try AppReader(home: home, user: "acme", now: { now })
         let content = MyWorkContent(
-          snapshot: try later.snapshot(workspace: "acme"), search: "", now: now)
+          snapshot: try later.snapshot(workspace: "acme"), apps: [], search: "", now: now)
         let cards = content.followUps.filter { $0.task.ref == "AC-16" }
         #expect(cards.count == 1)
         let card = try #require(cards.first)

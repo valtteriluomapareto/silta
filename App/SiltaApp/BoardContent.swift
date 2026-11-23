@@ -26,11 +26,6 @@ nonisolated struct BoardFilter: Equatable {
   }
 }
 
-extension [AppMapApp] {
-  /// The display name of the app with this slug, or the slug when the map lacks the app.
-  nonisolated func name(of slug: String) -> String { first { $0.slug == slug }?.name ?? slug }
-}
-
 nonisolated struct BoardContent {
   struct Lane: Identifiable {
     let title: String
