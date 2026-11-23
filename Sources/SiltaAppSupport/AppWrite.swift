@@ -2,8 +2,15 @@
 public enum AppWrite: Equatable, Sendable {
   /// Answers a question on a task, in the question's thread.
   case answer(task: String, question: String, body: String)
-  /// Posts a plain comment on a task, as a new thread or as a reply in `replyTo`'s thread.
-  case comment(task: String, body: String, replyTo: String? = nil)
+  /// Posts a comment on a task, as a new thread or as a reply in `replyTo`'s thread. `kind`
+  /// is `comment`, `decision` or `question` to the actors in `to`.
+  case comment(
+    task: String, body: String, replyTo: String? = nil, kind: String = "comment",
+    to: [String] = [])
+  /// Resolves discussion threads by their root or any post in them.
+  case resolveThreads(refs: [String])
+  /// Reopens resolved discussion threads.
+  case reopenThreads(refs: [String])
   /// Accepts an answer to the human's question, resolving its thread.
   case acceptAnswer(ref: String)
   /// Accepts task proposals as todo work, all or none.
@@ -21,6 +28,8 @@ public enum AppWrite: Equatable, Sendable {
     case .acceptAnswer: "app accept-answer"
     case .acceptProposals, .dropProposals: "app triage"
     case .unblock: "app unblock"
+    case .resolveThreads: "app resolve"
+    case .reopenThreads: "app reopen"
     }
   }
 }

@@ -206,7 +206,7 @@ struct TaskInspector: View {
     {
       let content = BoardContent(snapshot: snapshot, apps: [], filter: BoardFilter(), search: "")
       TaskComposer(
-        model: model, task: task.ref,
+        model: model, task: task.ref, agents: TaskFacts.agents(task),
         question: content.newestQuestion(for: task.ref, reader: reader, workspace: workspace)
       ).id(task.ref)
       if task.status == "review" {
@@ -238,8 +238,11 @@ struct TaskInspector: View {
 private struct TaskComposer: View {
   @Bindable var model: AppModel
   let task: String
+  let agents: [TaskFacts.Recipient]
   let question: BoardContent.Answer?
   @State private var commenting = false
+  @State private var kind = AppModel.CommentKind.comment
+  @State private var recipient: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -266,10 +269,62 @@ private struct TaskComposer: View {
 
   @ViewBuilder private var comment: some View {
     if let target = model.target(task) {
+      Picker("Kind", selection: $kind) {
+        Text("Comment").tag(AppModel.CommentKind.comment)
+        Text("Decision").tag(AppModel.CommentKind.decision)
+        Text("Question").tag(AppModel.CommentKind.question).disabled(agents.isEmpty)
+      }.pickerStyle(.segmented).labelsHidden().fixedSize()
+      if kind == .question, !agents.isEmpty {
+        Picker("To", selection: chosen) {
+          ForEach(agents, id: \.actor) { Text($0.label).tag(Optional($0.actor)) }
+        }.font(.system(size: 12)).fixedSize()
+      }
       ActionComposer(
-        model: model, target: target, placeholder: "Add a comment", sendTitle: "Comment",
-        command: nil
-      ) { model.comment(task: task) }
+        model: model, target: target, placeholder: placeholder, sendTitle: sendTitle,
+        command: nil, caption: caption
+      ) { model.comment(task: task, kind: effectiveKind, to: chosen.wrappedValue) }
+    }
+  }
+
+  /// A question needs an agent on the task; without one the box sends a plain comment.
+  private var effectiveKind: AppModel.CommentKind {
+    kind == .question && agents.isEmpty ? .comment : kind
+  }
+
+  /// The chosen question recipient, defaulting to the first agent on the task.
+  private var chosen: Binding<String?> {
+    Binding(
+      get: {
+        recipient.flatMap { r in agents.contains { $0.actor == r } ? r : nil }
+          ?? agents.first?.actor
+      },
+      set: { recipient = $0 })
+  }
+
+  private var placeholder: String {
+    switch effectiveKind {
+    case .comment: "Add a comment"
+    case .decision: "Record a decision"
+    case .question: "Ask a question"
+    }
+  }
+
+  private var sendTitle: String {
+    switch effectiveKind {
+    case .comment: "Comment"
+    case .decision: "Decide"
+    case .question: "Ask"
+    }
+  }
+
+  private var caption: String? {
+    switch effectiveKind {
+    case .comment: nil
+    case .decision: "Agents see decisions in the task's discussion."
+    case .question:
+      agents.first { $0.actor == chosen.wrappedValue }.map {
+        "The question waits in \(ActorPresentation($0.actor).name)'s brief until it answers."
+      }
     }
   }
 }

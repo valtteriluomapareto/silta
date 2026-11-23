@@ -122,6 +122,27 @@ nonisolated enum TaskFacts {
     }
   }
 
+  struct Recipient: Equatable, Hashable {
+    let actor: String
+    let label: String
+  }
+
+  /// Agent sessions a question can go to: the claimant, then those that posted on the
+  /// task, resolved threads included, newest first, then the creator. Only complete
+  /// `agent:<tool>:<session>` actors, which Core accepts as recipients.
+  static func agents(_ task: AppTask) -> [Recipient] {
+    let posters = (task.comments + task.resolvedComments).sorted { $0.createdAt > $1.createdAt }
+      .map(\.actor)
+    var seen = Set<String>()
+    return ([task.claimedBy].compactMap { $0 } + posters + [task.createdBy])
+      .filter { actor in
+        let parts = actor.split(separator: ":", omittingEmptySubsequences: false)
+        return parts.count == 3 && parts[0] == "agent" && parts.allSatisfy { !$0.isEmpty }
+          && seen.insert(actor).inserted
+      }
+      .map { Recipient(actor: $0, label: TaskPresentation.claimant($0)) }
+  }
+
   /// Who created the task and on which day, such as `Codex · 12 Nov`.
   static func created(_ task: AppTask) -> String {
     let name = ActorPresentation(task.createdBy).name

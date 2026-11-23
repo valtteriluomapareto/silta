@@ -82,7 +82,12 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     task", which opens the task in the Board inspector.
   - **Inspector:** one box under the discussion. If the task has an unanswered
     question to the human, an Answer/Comment switch appears; Answer targets the
-    newest such question. Otherwise the box is Comment only.
+    newest such question. Paper "App features v1": a new thread is a Comment, a
+    Decision or a Question to one agent session on the task: the claimant first, then
+    those that posted, newest first, then the creator. Agents see decisions in the task's
+    discussion; briefs don't show decisions yet (spec §12). Open threads offer Resolve,
+    except an open question to the human, which is answered; resolved threads offer
+    Reopen. Each is logged as `app resolve` or `app reopen`.
   - **My work proposal card:** checkboxes, none ticked at first, "Open" on each row
     (the Board inspector), "Drop N…" and "Accept N". Each sends one all-or-nothing
     `triage` with no sheet; Drop first asks for an optional one-line reason, kept as a

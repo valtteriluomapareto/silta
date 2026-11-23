@@ -80,10 +80,34 @@ extension AppModel {
     send(draftOf: question) { .answer(task: task, question: question, body: $0) }
   }
 
-  /// Sends the task's comment draft.
-  @discardableResult func comment(task: String) -> Task<Void, Never>? {
-    send(draftOf: task) { .comment(task: task, body: $0) }
+  /// What a new thread on a task is: a plain comment, a decision agents see in their
+  /// briefs, or a question to one agent session.
+  enum CommentKind: String, CaseIterable {
+    case comment, decision, question
   }
+
+  /// Sends the task's comment draft as `kind`; a question needs its recipient.
+  @discardableResult func comment(
+    task: String, kind: CommentKind = .comment, to recipient: String? = nil
+  ) -> Task<Void, Never>? {
+    if kind == .question, recipient?.isEmpty != false { return nil }
+    return send(draftOf: task) {
+      .comment(
+        task: task, body: $0, kind: kind.rawValue, to: kind == .question ? [recipient ?? ""] : [])
+    }
+  }
+
+  /// Resolves a thread under its own target.
+  @discardableResult func resolve(thread ref: String) -> Task<Void, Never>? {
+    perform(.resolveThreads(refs: [ref]), for: Self.resolveTarget(ref))
+  }
+
+  /// Reopens a resolved thread under the same target as resolving it.
+  @discardableResult func reopen(thread ref: String) -> Task<Void, Never>? {
+    perform(.reopenThreads(refs: [ref]), for: Self.resolveTarget(ref))
+  }
+
+  static func resolveTarget(_ ref: String) -> String { "resolve:" + ref }
 
   /// Sends the reply draft for a thread, posted into that thread.
   @discardableResult func reply(to root: String, task: String) -> Task<Void, Never>? {

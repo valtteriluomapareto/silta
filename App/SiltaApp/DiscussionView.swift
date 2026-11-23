@@ -97,9 +97,36 @@ struct DiscussionView: View {
             .foregroundStyle(Color("TideText"))
             .accessibilityLabel((answers ? "Answer " : "Reply to ") + thread.id)
         }
+        // An open question to the human is answered, never closed without a word.
+        if model.writer != nil, !thread.resolved, !answers {
+          resolveButton(thread, reopen: false)
+        }
         Text(thread.state).foregroundStyle(Color("SecondaryInk"))
       }.font(.system(size: 12))
+      resolveFailure(thread)
     }
+  }
+
+  /// A refused Resolve or Reopen, shown under the thread's footer.
+  @ViewBuilder private func resolveFailure(_ thread: DiscussionContent.Thread) -> some View {
+    if let failure = model.target(AppModel.resolveTarget(thread.id)).flatMap({
+      model.actions.failures[$0]
+    }) {
+      ActionFailureView(failure: failure)
+    }
+  }
+
+  /// Resolves an open thread or reopens a resolved one; a failure shows under it.
+  @ViewBuilder private func resolveButton(_ thread: DiscussionContent.Thread, reopen: Bool)
+    -> some View
+  {
+    let target = model.target(AppModel.resolveTarget(thread.id))
+    let sending = target.map { model.actions.isSending($0) } ?? false
+    Button(reopen ? "Reopen" : "Resolve") {
+      if reopen { model.reopen(thread: thread.id) } else { model.resolve(thread: thread.id) }
+    }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Color("TideText"))
+      .disabled(sending)
+      .accessibilityLabel((reopen ? "Reopen " : "Resolve ") + thread.id)
   }
 
   @ViewBuilder private func resolvedView(_ thread: DiscussionContent.Thread) -> some View {
@@ -128,7 +155,11 @@ struct DiscussionView: View {
       }.buttonStyle(.plain)
         .accessibilityLabel(opened ? resolvedBy(thread) : "Resolved thread, " + summary(thread))
         .accessibilityHint(opened ? "Folds the thread" : "Shows the thread")
-      if opened { threadView(thread).opacity(0.8) }
+      if opened {
+        threadView(thread).opacity(0.8)
+        if model.writer != nil { resolveButton(thread, reopen: true).font(.system(size: 12)) }
+        resolveFailure(thread)
+      }
     }
   }
 
