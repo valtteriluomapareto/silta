@@ -47,7 +47,7 @@
       #expect(!model.actions.isSending(target))
       let second = try #require(model.answer(question: "AC-12/1", task: "AC-12"))
       #expect(model.actions.failures[target] == nil)
-      (await writes.next()).continuation.resume()
+      (await writes.next()).continuation.resume(returning: nil)
       await second.value
       #expect(model.actions.draft(target) == "")
       #expect(model.actions.failures[target] == nil)
@@ -66,7 +66,7 @@
       let accept = try #require(model.perform(.acceptAnswer(ref: "AC-14/2"), for: "AC-14/2"))
       let second = await writes.next()
       #expect(second.write == .acceptAnswer(ref: "AC-14/2"))
-      request.continuation.resume()
+      request.continuation.resume(returning: nil)
       await first.value
       #expect(loads.forced.withLock { $0 } == 1)
       second.continuation.resume(throwing: Refused())
@@ -218,7 +218,7 @@
       let sent = try #require(model.comment(task: "AC-15"))
       let request = await writes.next()
       #expect(request.write == .comment(task: "AC-15", body: "Start with the empty state."))
-      request.continuation.resume()
+      request.continuation.resume(returning: nil)
       await sent.value
       #expect(model.actions.draft(task) == "")
       #expect(loads.forced.withLock { $0 } == 1)
@@ -241,7 +241,7 @@
       #expect(model.actions.draft(reply) == "Thanks, merging.")
       #expect(model.actions.failures[reply] != nil)
       let second = try #require(model.reply(to: "AC-9/1", task: "AC-9"))
-      (await writes.next()).continuation.resume()
+      (await writes.next()).continuation.resume(returning: nil)
       await second.value
       #expect(model.actions.draft(reply) == "")
       #expect(model.actions.draft(comment) == "New thread draft")

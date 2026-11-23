@@ -5,7 +5,8 @@ import SiltaAppSupport
 @MainActor @Observable
 final class AppModel {
   typealias Loader = @Sendable (AppLoadedData?, String?, Bool) async throws -> AppLoadedData?
-  typealias Writer = @Sendable (AppWrite, String) async throws -> Void
+  /// Runs one write; returns the created task's reference for `createTask`, else nil.
+  typealias Writer = @Sendable (AppWrite, String) async throws -> String?
   private(set) var data: AppLoadedData?
   private(set) var workspace: String?
   let reader: AppReader?
@@ -61,6 +62,15 @@ final class AppModel {
   @ObservationIgnored private var allWaitingVersion: Int?
   /// My work is asking for a reason to drop the ticked proposals.
   var droppingProposals = false
+  /// The task the New Task sheet created last, and the agent prompt copied for it.
+  var createdTask: String?
+  var createdPrompt: String?
+  /// The New Task sheet is open (⌘N).
+  var newTaskPresented = false
+  /// Writes copied text; tests replace it so they never touch the real pasteboard.
+  @ObservationIgnored var pasteboard: @MainActor (String) -> Bool = {
+    CopyValue.writeToPasteboard($0)
+  }
   private(set) var isLoading = false
   private(set) var failure: AppLoadFailure?
   private let load: Loader

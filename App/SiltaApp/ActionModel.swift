@@ -87,6 +87,9 @@ final class ActionModel {
     return true
   }
 
+  /// Forgets a shown failure, such as when a sheet opens fresh.
+  func clearFailure(_ target: ActionTarget) { failures[target] = nil }
+
   func finish(_ target: ActionTarget, failure: ActionFailure?) {
     sending.remove(target)
     failures[target] = failure

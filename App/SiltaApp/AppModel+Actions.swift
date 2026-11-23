@@ -12,11 +12,18 @@ extension AppModel {
   /// again, so a stale view (`conflict`, `not_found`, `claimed`) shows the current state
   /// and an answered question can't be answered twice from the old screen.
   @discardableResult func perform(_ write: AppWrite, for ref: String) -> Task<Void, Never>? {
+    guard let running = send(write, for: ref) else { return nil }
+    return Task { _ = await running.value }
+  }
+
+  /// `perform`, handing back what the writer returned: a created task's reference.
+  private func send(_ write: AppWrite, for ref: String) -> Task<String?, Never>? {
     guard let writer, let target = target(ref), actions.begin(target) else { return nil }
     return Task {
       var failure: ActionFailure?
+      var result: String?
       do {
-        try await writer(write, target.workspace)
+        result = try await writer(write, target.workspace)
       } catch {
         failure = ActionFailure(error)
       }
@@ -24,6 +31,7 @@ extension AppModel {
       await loadTaskDetail()
       if visibleData != nil { actions.selectedProposals.formIntersection(proposalRefs) }
       actions.finish(target, failure: failure)
+      return result
     }
   }
 
@@ -96,6 +104,27 @@ extension AppModel {
         task: task, body: $0, kind: kind.rawValue, to: kind == .question ? [recipient ?? ""] : [])
     }
   }
+
+  /// Creates a todo task. With `copyPrompt`, copies the prompt that hands it to an agent once
+  /// Core has created it; the app launches nothing.
+  @discardableResult func createTask(_ task: AppNewTask, copyPrompt: Bool) -> Task<Void, Never>? {
+    guard let workspace, let running = send(.createTask(task), for: Self.newTaskTarget)
+    else { return nil }
+    let name = workspaceName ?? workspace
+    return Task {
+      guard let ref = await running.value else { return }
+      var prompt: String?
+      if copyPrompt, let reader {
+        let text = reader.agentPrompt(task: ref, workspace: workspace, name: name)
+        if pasteboard(text) { prompt = text }
+      }
+      createdPrompt = prompt
+      createdTask = ref
+    }
+  }
+
+  /// The New Task sheet's own target, so one create runs at a time.
+  static let newTaskTarget = "new-task"
 
   /// Resolves a thread under its own target.
   @discardableResult func resolve(thread ref: String) -> Task<Void, Never>? {

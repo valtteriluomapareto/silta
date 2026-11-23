@@ -7,6 +7,8 @@ public enum AppWrite: Equatable, Sendable {
   case comment(
     task: String, body: String, replyTo: String? = nil, kind: String = "comment",
     to: [String] = [])
+  /// Creates a todo task as the human; the app never starts or claims it.
+  case createTask(AppNewTask)
   /// Resolves discussion threads by their root or any post in them.
   case resolveThreads(refs: [String])
   /// Reopens resolved discussion threads.
@@ -28,6 +30,7 @@ public enum AppWrite: Equatable, Sendable {
     case .acceptAnswer: "app accept-answer"
     case .acceptProposals, .dropProposals: "app triage"
     case .unblock: "app unblock"
+    case .createTask: "app add"
     case .resolveThreads: "app resolve"
     case .reopenThreads: "app reopen"
     }

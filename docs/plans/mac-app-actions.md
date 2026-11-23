@@ -33,7 +33,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
 **In:**
 - **`AppWriter` in `SiltaAppSupport`**, built from an `AppReader` and sharing its home,
   user and clock. One entry point, `perform(_ write: AppWrite, workspace:)`. `AppWrite`
-  is an enum: answer, comment, accept answer, accept proposals, drop proposals, unblock.
+  is an enum: answer, comment (plain, decision or question), accept answer, accept or
+  drop proposals, unblock, resolve and reopen threads, and create a task. Creating uses
+  Core's `addUnstarted`, the `task add` rules without Git inspection, which also takes
+  acceptance criteria.
   - It acts as `human:<USER>` and calls the existing services (`TaskService.comment`,
     `acceptComment`, `triage`, `unblock`) with their current arguments; `unblock` gains
     a package `requireReady` option that the CLI doesn't use.
@@ -56,12 +59,14 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
   - Accepting an already-accepted answer returns Core's `unchanged` and counts as
     success.
   - **Log line:** each write appends one body-free line to the §19 log. The command is
-    `app answer`, `app comment`, `app accept-answer`, `app triage` or `app unblock`,
+    one of the `app …` commands in spec §19 (`app answer`, `app comment`, `app triage`,
+    `app add` and the rest),
     with the actor, workspace, milliseconds, and the exit code and error code a CLI
     failure of the same kind would give. So DF3 can tell app use from terminal use.
 - **App model.**
   - `AppModel` takes a `Writer` closure beside its `Loader`:
-    `(AppWrite, workspace) async throws -> Void`. Tests inject a controlled writer,
+    `(AppWrite, workspace) async throws -> String?`, which returns a created task's
+    reference and nil otherwise. Tests inject a controlled writer,
     as `ControlledLoads` does for reads.
   - A draft is keyed by its domain target: the question ref for an answer, the task
     ref for a comment, plus the workspace. So the My work card and the inspector share
@@ -80,6 +85,10 @@ Each action is one SiltaCore service call made by the app as `human:<USER>` (D38
     empty, and "Copy command" kept.
   - **My work answer card:** the answer, its thread ref, "Accept answer", and "Open
     task", which opens the task in the Board inspector.
+  - **New Task (⌘N):** a sheet with title, app, priority, description, acceptance and
+    parent creates a todo task as the human in one Core write (`app add`); the app never
+    starts or claims it. "Copy agent prompt after creating" copies the prompt that hands
+    it to an agent (Paper "App features v1"); the app launches nothing (D4).
   - **Inspector:** one box under the discussion. If the task has an unanswered
     question to the human, an Answer/Comment switch appears; Answer targets the
     newest such question. Paper "App features v1": a new thread is a Comment, a
