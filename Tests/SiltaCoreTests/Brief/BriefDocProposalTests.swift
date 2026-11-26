@@ -220,7 +220,7 @@ struct BriefDocProposalTests {
       head: "a", confidence: "high", reason: "single", candidates: [])
     location.currentTask = current
     var report = try BriefService(environment: service.environment).report(
-      location, budget: budget, at: AcmeDocAttachments.instant, in: db)
+      BriefLocation(location), budget: budget, at: AcmeDocAttachments.instant, in: db)
     report.trim(tokens: budget)
     report.insertDocuments(tokens: budget)
     return report

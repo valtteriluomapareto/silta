@@ -141,7 +141,7 @@ struct TaskGitTests {
       draft.app = "api"
       let service = TaskService(environment: env)
       _ = try await service.add(draft, directory: home)
-      await #expect(throws: TaskError.foreignRepo) {
+      await #expect(throws: CommandFailure.self) {
         _ = try await service.start("AC-1", directory: cwd)
       }
       #expect(try service.show("AC-1").status == "todo")
@@ -187,6 +187,35 @@ struct TaskGitTests {
         _ = try await TaskService(environment: env).add(draft, directory: repo)
       }
       #expect(try env.db.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM task") } == 0)
+    }
+  }
+
+  @Test func startDoesNotTreatAGitTimeoutAsAnOutsideDirectory() async throws {
+    try await withScratchDirectory { home in
+      let repo = home.appending(path: "repo", directoryHint: .isDirectory)
+      let args = ["rev-parse", "--path-format=absolute", "--git-common-dir"]
+      let git = ScriptedGitRunner(script: [
+        (
+          .init(arguments: args, directory: repo),
+          .success(.init(termination: .exit(0), stdout: Data((repo.path + "/.git\n").utf8)))
+        ),
+        (
+          .init(arguments: args, directory: home),
+          .success(.init(termination: .timedOut, stderr: Data("not a git repository".utf8)))
+        ),
+      ])
+      let env = try TaskServiceTests.environment(
+        home.appending(path: "db"), actor: TaskServiceTests.human(), git: git)
+      try Self.configure(env, repo: repo)
+      let service = TaskService(environment: env)
+      var draft = TaskDraft(title: "Acme work")
+      draft.app = "api"
+      _ = try await service.add(draft, directory: home)
+      await #expect(throws: TaskError.git) {
+        _ = try await service.start("AC-1", directory: home)
+      }
+      #expect(try service.show("AC-1").claimedBy == nil)
+      #expect(git.isExhausted)
     }
   }
 }

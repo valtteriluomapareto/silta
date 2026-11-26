@@ -505,10 +505,11 @@ symlinks resolved, case-folded on case-insensitive volumes.
   `explicit`, `single`, `override`, `task`, `exact_ref`, `upstream`, `reflog`,
   `distance`, `non_app_ref`, `shallow` or `unresolved`.
 - Ref comparisons strip only `origin/`; other remote prefixes are not normalized.
-- Outside Git, `where` returns `unregistered` with carry-on guidance and harmless
-  help, without suggesting a scan of the input directory. An unregistered Git
-  repository gets a scan command for its canonical toplevel. With an explicit
-  existing workspace, the unregistered result points to that workspace's YAML.
+- Outside Git, `where` returns `unregistered`. If workspaces exist it prints
+  scoped `brief` retries, preserving the inspected directory when `--path` was
+  supplied. With no workspaces it points to help. An unregistered Git repository
+  gets a scan command for its canonical toplevel. With an explicit existing
+  workspace, the unregistered result points to that workspace's YAML.
 - Commands that need an app fail with exit 4 when confidence is `low` and no
   `--app` was given. The error lists `--app <slug>` retries.
 - `brief` and `task` commands carry on with `low` and show the candidates.
@@ -630,6 +631,11 @@ going until the list is empty or the human stops it.
   `doing`, `claimed_by`, `claimed_at`, `branch` and `worktree` in one
   `BEGIN IMMEDIATE` compare-and-set; `branch` and `worktree` only when the task has an
   app.
+- For an app task started outside Git or from an unrelated repository, `invalid`
+  gives a workspace-scoped retry from the registered clone. Run later task commands
+  from the same worktree so they use the same session. Check any recorded worktree
+  before resuming. The retry preserves an explicit `--steal` and uses a placeholder
+  for approval words when needed. A failed Git probe or broken clone stays `env`.
 - Another session's claim with `claimed_at` under 2 h old → exit 6 `claimed`, naming
   the holder and the age. For an agent, `next` is `silta task ls --status todo`, to
   pick other work, and the message names the exact `silta --ws <workspace> task start
@@ -1304,12 +1310,16 @@ silta code ls   <app>[@<ref>] [<dir>]
   temporary disk.
 - A git call over its 10 s timeout is `env` with `next_by: agent`: narrow the read
   (a path, pathspec, pattern or `--lines`) and retry.
-- When the repo hasn't been fetched for 24 h, output warns (`ref_stale`): "fetched N h
-  ago; run `silta --ws <ws> repo fetch platform` (needs network)". A full commit SHA
-  given as `@ref` never warns, since a commit can't move. `--fetch` fetches first.
+- When the repo hasn't been fetched for 24 h, `ref_stale` gives the age and the
+  workspace-scoped `repo fetch` command. If current remote code matters, run that
+  command once per repository per session, then read the remote-tracking ref. A full commit SHA
+  given as `@ref` never warns, since a commit can't move. Use `--fetch` on a first
+  read to refresh the remote-tracking ref before reading it. Fetch advances
+  remote-tracking refs. A local branch still points to its local commit.
   Inside a sandbox without network the fetch fails fast with exit 9, never a
-  credential prompt. The error names the repo, and its `next` (`next_by: agent`)
-  repeats the read without `--fetch`, which reads the cached ref.
+  credential prompt. For `code … --fetch`, the error names the repo and its
+  `next` (`next_by: agent`) repeats the read without `--fetch`. Report the cached SHA
+  and say that freshness is unverified.
 - A clone with no recorded fetch warns that it has never been fetched, with the
   same fetch hint. Reads never update the timestamp; a successful `--fetch` does.
 
@@ -1541,7 +1551,8 @@ workspace. A setting that changes the rules gets one conditional sentence, and
   Inference never persists selection. Recipes carry the brief workspace explicitly. Workspace ambiguity uses
   `--ws`; app ambiguity uses `--app`.
 - **Recipes**, copy-paste ready:
-  - `code grep/show` for other apps
+  - `code grep --fetch` for the first read of another app's current remote-tracking
+    ref, then `code show` against the same ref, with the cached retry on fetch failure
   - `task add --start`
   - `task plan` with a quoted heredoc (`<<'EOF'`)
   - `--step N --done`
@@ -1609,6 +1620,15 @@ workspace. A setting that changes the rules gets one conditional sentence, and
 ```
 silta brief [--task AC-12] [--app <slug>] [--topic <slug>…] [--budget 2500] [--short] [--hook] [--json]
 ```
+
+Outside Git, `brief` uses an explicit `--ws` or the workspace saved by `ws use`.
+It shows workspace settings, inbox and backlog. `--task` and `--topic` select
+workspace context. `--app` requires a repository candidate. With no workspace
+selection, `brief` gives scoped retry commands when workspaces are available.
+The JSON location has reason `workspace_only`, low app confidence, an empty
+string for `repo` and null `app` and `branch`. The installed SessionStart hook
+stays silent outside Git. An explicit `silta --ws acme brief --hook` can request
+the bounded workspace brief.
 
 The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
 `--hook` use about 800. Sections come in this order, each trimmed to fit:
@@ -1691,6 +1711,8 @@ The default budget is **2 500 tokens** (estimated as chars / 4). `--short` and
    aliases. Their matching tasks may belong to other apps; duplicates appear once,
    and topics do not expand recursively. An unknown topic returns `not_found` with
    a workspace-qualified `ws show` command. The current task may also appear here.
+   A workspace-only brief includes tasks across the workspace, filtered by
+   `--topic` when supplied.
 7. **Recently done**: the first line of each result, with the first 12 characters of `done_sha` when set, for the last 5
    matching tasks, ordered by completion instant then task sequence descending.
    Empty result text is omitted. Cross-app open rows name their app.
