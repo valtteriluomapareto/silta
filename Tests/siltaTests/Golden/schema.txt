@@ -20,6 +20,7 @@ silta task triage  Accept or drop proposals in one approved batch (human-only).
 silta task archive  Hide a task from the default backlog.
 silta task keep  Keep a task visible regardless of its closed age.
 silta task link  Link a task to a reference in this workspace or an external URL.
+silta task unlink  Remove one task link to a workspace map item.
 silta task promote  Record an external tracker and make the task read-only (human-only).
 silta task block  Record blockers; Silta sends nothing.
 silta task unblock  Return blocked tasks to todo (human-only unless every task is ready).

@@ -26,7 +26,7 @@ struct BriefVisibilityTests {
         let listed = try TaskService(environment: env).list().map(\.ref)
         let sections = try env.db.read {
           try BriefBacklog(
-            db: $0, location: location, actor: actor, date: TaskServiceTests.now,
+            db: $0, location: BriefLocation(location), actor: actor, date: TaskServiceTests.now,
             archiveDays: WorkspaceSettings.defaultArchiveAfterDays
           ).sections(topics: []).sections
         }
@@ -45,7 +45,7 @@ struct BriefVisibilityTests {
       #expect(throws: StorageError.corrupt) { _ = try TaskService(environment: base).list() }
       let skipped = try base.db.read {
         try BriefBacklog(
-          db: $0, location: location, actor: TaskServiceTests.agent,
+          db: $0, location: BriefLocation(location), actor: TaskServiceTests.agent,
           date: TaskServiceTests.now, archiveDays: 14
         ).sections(topics: [])
       }
@@ -132,7 +132,7 @@ extension BriefVisibilityTests {
         reason: "single", candidates: [])
       let sections = try env.db.read {
         try BriefBacklog(
-          db: $0, location: location, actor: env.actor,
+          db: $0, location: BriefLocation(location), actor: env.actor,
           date: TaskServiceTests.now, archiveDays: 14
         ).sections(topics: []).sections
       }

@@ -1,0 +1,1 @@
+{"error":{"code":"invalid","message":"AC-1 requires its registered repository. Run task start and subsequent task commands from that clone or a linked worktree.","next":["cd '<scratch>/Acme'\\''s clone' && silta --ws 'acme' task start 'AC-1'"],"next_by":"agent"},"ok":false,"schema":1,"warnings":[]}

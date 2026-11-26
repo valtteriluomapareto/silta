@@ -10,13 +10,13 @@ struct BriefDocs {
   let compact: Bool
   let counts: [String: Int]
 
-  init(db: Database, location: LocationResult, topics: Set<Int64>, compact: Bool) throws {
+  init(db: Database, location: BriefLocation, topics: Set<Int64>, compact: Bool) throws {
     self.db = db
     workspace = location.workspace
     workspaceID = try TaskService.workspaceID(workspace, in: db)
     self.compact = compact
-    let current = try location.currentTask.map {
-      try TaskService.lookup($0.ref, workspace: location.workspace, in: db).id
+    let current = try location.taskRef.map {
+      try TaskService.lookup($0, workspace: location.workspace, in: db).id
     }
     let taskTopics = try Int64.fetchAll(
       db,
