@@ -4,7 +4,7 @@ import GRDB
 /// Local app context and backlog selection within the brief's read transaction.
 struct BriefContext {
   let db: Database
-  let location: LocationResult
+  let location: BriefLocation
   let actor: ActorID
   let date: Date
   let archiveDays: Int
@@ -31,7 +31,7 @@ struct BriefContext {
   }
 
   private func appSections(documents: BriefDocs) throws -> [BriefSection] {
-    guard let app = location.app,
+    guard let git = location.git, let app = git.app,
       let row = try Row.fetchOne(
         db,
         sql: """
@@ -62,14 +62,14 @@ struct BriefContext {
     }
     var isDirectory: ObjCBool = false
     if FileManager.default.fileExists(
-      atPath: location.worktree + "/AGENTS.md", isDirectory: &isDirectory),
+      atPath: git.worktree + "/AGENTS.md", isDirectory: &isDirectory),
       !isDirectory.boolValue
     {
       sections.append(
         BriefSection(
           id: "agents",
           text:
-            "AGENTS.md: \(TaskError.shown((location.displayWorktree ?? location.worktree) + "/AGENTS.md"))\n"
+            "AGENTS.md: \(TaskError.shown((git.displayWorktree ?? git.worktree) + "/AGENTS.md"))\n"
         ))
     }
     if let group = try documents.group(kind: "app", id: id) {

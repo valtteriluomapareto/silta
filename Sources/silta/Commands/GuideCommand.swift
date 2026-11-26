@@ -75,6 +75,7 @@ extension GuideCommand {
         in `brief`; use --ws for intentional cross-workspace work. Inference never saves a \
         selection. For several matching workspaces, inspect the scoped candidates and retry \
         with --ws.
+        Outside Git, run `silta --ws acme brief` for workspace context or use the saved default.
         Use the app `slug` from `ws show` in commands and references. The optional \
         `apps[].name` is a display label.
         Former app and topic slugs still work. Use the current slug named by a `renamed` warning.
