@@ -1296,12 +1296,16 @@ silta code ls   <app>[@<ref>] [<dir>]
   temporary disk.
 - A git call over its 10 s timeout is `env` with `next_by: agent`: narrow the read
   (a path, pathspec, pattern or `--lines`) and retry.
-- When the repo hasn't been fetched for 24 h, output warns (`ref_stale`): "fetched N h
-  ago; run `silta --ws <ws> repo fetch platform` (needs network)". A full commit SHA
-  given as `@ref` never warns, since a commit can't move. `--fetch` fetches first.
+- When the repo hasn't been fetched for 24 h, `ref_stale` gives the age and the
+  workspace-scoped `repo fetch` command. If current remote code matters, run that
+  command once per repository per session, then read the remote-tracking ref. A full commit SHA
+  given as `@ref` never warns, since a commit can't move. Use `--fetch` on a first
+  read to refresh the remote-tracking ref before reading it. Fetch advances
+  remote-tracking refs. A local branch still points to its local commit.
   Inside a sandbox without network the fetch fails fast with exit 9, never a
-  credential prompt. The error names the repo, and its `next` (`next_by: agent`)
-  repeats the read without `--fetch`, which reads the cached ref.
+  credential prompt. For `code … --fetch`, the error names the repo and its
+  `next` (`next_by: agent`) repeats the read without `--fetch`. Report the cached SHA
+  and say that freshness is unverified.
 - A clone with no recorded fetch warns that it has never been fetched, with the
   same fetch hint. Reads never update the timestamp; a successful `--fetch` does.
 
@@ -1533,7 +1537,8 @@ workspace. A setting that changes the rules gets one conditional sentence, and
   Inference never persists selection. Recipes carry the brief workspace explicitly. Workspace ambiguity uses
   `--ws`; app ambiguity uses `--app`.
 - **Recipes**, copy-paste ready:
-  - `code grep/show` for other apps
+  - `code grep --fetch` for the first read of another app's current remote-tracking
+    ref, then `code show` against the same ref, with the cached retry on fetch failure
   - `task add --start`
   - `task plan` with a quoted heredoc (`<<'EOF'`)
   - `--step N --done`
