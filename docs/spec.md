@@ -631,6 +631,11 @@ going until the list is empty or the human stops it.
   `doing`, `claimed_by`, `claimed_at`, `branch` and `worktree` in one
   `BEGIN IMMEDIATE` compare-and-set; `branch` and `worktree` only when the task has an
   app.
+- For an app task started outside Git or from an unrelated repository, `invalid`
+  gives a workspace-scoped retry from the registered clone. Run later task commands
+  from the same worktree so they use the same session. Check any recorded worktree
+  before resuming. The retry preserves an explicit `--steal` and uses a placeholder
+  for approval words when needed. A failed Git probe or broken clone stays `env`.
 - Another session's claim with `claimed_at` under 2 h old → exit 6 `claimed`, naming
   the holder and the age. For an agent, `next` is `silta task ls --status todo`, to
   pick other work, and the message names the exact `silta --ws <workspace> task start

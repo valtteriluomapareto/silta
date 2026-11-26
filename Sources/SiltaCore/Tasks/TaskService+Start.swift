@@ -14,10 +14,17 @@ extension TaskService {
     let slug = try selected()
     try validateClaim(before, workspace: slug, at: at, steal: steal)
     try canStart(before)
-    _ = try approval(required: steal && foreignClaim(before, at: at) != nil, command: command)
-    let git = try await TaskGit.inspect(
-      repo: before.repoPath, directory: directory, runner: environment.git,
-      enabled: before.appID != nil, completion: false)
+    let preparedApproval = try approval(
+      required: steal && foreignClaim(before, at: at) != nil, command: command)
+    let git: TaskGit
+    do {
+      git = try await TaskGit.inspect(
+        repo: before.repoPath, directory: directory, runner: environment.git,
+        enabled: before.appID != nil, completion: false, classifyOutsideRepository: true)
+    } catch TaskError.foreignRepo {
+      throw Self.startDirectoryFailure(
+        before, workspace: slug, steal: steal, needsApproval: preparedApproval != nil)
+    }
     return try environment.db.write { tx in
       let task = try Self.decorate(
         Self.lookup(ref, workspace: slug, in: tx.database),
@@ -42,6 +49,37 @@ extension TaskService {
         command: command, workspace: slug, identity: (environment.ids, at), in: tx)
       return (receipt(try Self.lookup(ref, workspace: slug, in: tx.database)), approval != nil)
     }
+  }
+
+  private static func startDirectoryFailure(
+    _ task: TaskDetails, workspace: String, steal: Bool, needsApproval: Bool
+  ) -> CommandFailure {
+    var message =
+      "\(TaskError.shown(task.ref)) requires its registered repository. "
+      + "Run task start and subsequent task commands from that clone or a linked worktree."
+    if needsApproval { message += " Reuse the original approval when you retry." }
+    guard RestoreService.canNameInRecovery(workspace) else {
+      return CommandFailure(error: TaskError.foreignRepo, next: ["silta ws ls"], message: message)
+    }
+    guard let path = task.repoPath, RestoreService.canNameInRecovery(path),
+      RestoreService.canNameInRecovery(task.ref)
+    else {
+      return CommandFailure(
+        error: TaskError.foreignRepo,
+        next: [workspaceCommand("silta ws show", workspace: workspace)], message: message)
+    }
+    let start =
+      "silta task start " + shellWord(task.ref)
+      + (steal ? " --steal" : "")
+      + (needsApproval ? " --approved \"<the human's words>\"" : "")
+    let retry = "cd " + shellWord(path) + " && " + workspaceCommand(start, workspace: workspace)
+    var next = [retry]
+    if task.worktree != nil {
+      message += " Before resuming, check the worktree recorded by task show."
+      next.insert(
+        workspaceCommand("silta task show " + shellWord(task.ref), workspace: workspace), at: 0)
+    }
+    return CommandFailure(error: TaskError.foreignRepo, next: next, message: message)
   }
 
   private func canStart(_ task: TaskDetails) throws {
