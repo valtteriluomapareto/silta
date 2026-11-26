@@ -315,6 +315,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
   - `task block --on <ref> -m <why>` links a task to what it waits on (`blocked_by`):
     another task, an external party (`ext:acme`, `ext:app-store`) or a `url:`. For a
     party, `-m` is the ask; Silta sends nothing.
+  - `task block --off <ref>` removes a named blocker from an already blocked task.
+    It can add the replacement with `--on` in the same write. Becoming ready
+    requires human approval under D40.
   - An external party is a plain name, not an actor and not a YAML entity: it is
     waited on but never writes, claims or passes a human-only check, and it is never
     renamed. A `new_party` warning catches typos.
@@ -585,6 +588,9 @@ The rules themselves are in [`coding-guidelines.md`](coding-guidelines.md).
     `done` or `drop` of a blocked task, which §8 allows outright: they end the work
     rather than resume it while it still waits, and each records a result saying
     why.
+  - A `task block --off` edit that leaves an unready task ready also needs the
+    human's go-ahead. Evaluate the final set inside the write. The task stays
+    blocked until explicitly unblocked.
   - **`from-plan --split` children take the root's status**, decided once per import:
     `todo` under a `todo` or `doing` root, `proposed` under a `proposed` one.
     `--dry-run` shows the same.

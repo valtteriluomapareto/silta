@@ -5,16 +5,11 @@ extension TaskService {
   /// Records what would unblock open work, releases its claim, and sends nothing.
   package func block(_ ref: String, _ input: TaskBlock) throws -> TaskBlockResult {
     let command = input.command(ref)
-    let approval = try approval(
+    let secretApproval = try approval(
       required: input.allowSecret, command: command + " -F <file> --allow-secret")
     let content = try blockContent(input, command: command + " -F <file>")
-    var redacted = content.1
-    let refs = try input.on.map { raw in
-      if TaskBlock.party(raw) != nil { return raw }
-      let checked = try checked(raw, allow: input.allowSecret, command: command + " -F <file>")
-      redacted = redacted || checked.1
-      return checked.0
-    }
+    let (refs, refsRedacted) = try blockReferences(input, command: command + " -F <file>")
+    let redacted = content.1 || refsRedacted
     let at = environment.clock.now()
     let day = try TaskFollowUp.day(input.followUp, at: at)
     let slug = try selected()
@@ -30,7 +25,12 @@ extension TaskService {
       let known = try Self.knownParties(workspace: task.workspaceID, in: tx.database)
       let newParties = Set(targets.filter { $0.kind == "ext" }.compactMap(\.external)).subtracting(
         known)
-      for target in targets { try insertBlock(target, task: task, at: at, in: tx) }
+      let before = try editBlockers(input.off, adding: targets, scope: (task, slug), at: at, in: tx)
+      let allowFlag = input.allowSecret ? " --allow-secret" : ""
+      let used =
+        try secretApproval
+        ?? authorizeReadyBlock(
+          before, command: command + allowFlag, workspace: slug)
       let on = try Self.blockIdentities(task, in: tx.database)
       try tx.database.execute(
         sql: """
@@ -42,8 +42,8 @@ extension TaskService {
         task.id, kind: "block",
         body: TaskBlockEvent(on: on, followUp: day, why: content.0).encoded(),
         redacted: redacted, at: at, in: tx)
-      try approval?.record(
-        command: audited(command + " --allow-secret"), workspace: slug,
+      try used?.record(
+        command: audited(command + allowFlag), workspace: slug,
         identity: (environment.ids, at),
         in: tx)
       let after = try Self.decorate(
@@ -52,7 +52,100 @@ extension TaskService {
         Self.partyWarnings(newParties, known: known) + (redacted ? [SecretGuard.warning] : [])
       return TaskBlockResult(
         ref: after.ref, status: after.status, followUpAt: after.followUpAt,
-        waiting: after.waiting, warnings: warnings)
+        waiting: after.waiting, warnings: warnings, approvalUsed: used != nil)
+    }
+  }
+
+  private func blockReferences(_ input: TaskBlock, command: String) throws -> ([String], Bool) {
+    var redacted = false
+    let refs = try input.on.map { raw in
+      if TaskBlock.party(raw) != nil { return raw }
+      let checked = try checked(raw, allow: input.allowSecret, command: command)
+      redacted = redacted || checked.1
+      return checked.0
+    }
+    return (refs, redacted)
+  }
+
+  private func editBlockers(
+    _ removals: [String], adding targets: [TaskLinkTarget],
+    scope: (task: TaskDetails, workspace: String), at: Date, in tx: StorageTransaction
+  ) throws -> ActorError.Wait? {
+    let (task, workspace) = scope
+    var before: ActorError.Wait?
+    if !removals.isEmpty {
+      guard task.status == "blocked" else {
+        throw TaskError.invalid("--off requires a blocked task.")
+      }
+      let ids = try removalIDs(
+        removals, adding: targets, to: task, workspace: workspace, in: tx.database)
+      let unmet = try Self.unmet(task, in: tx.database)
+      if !unmet.open.isEmpty || !unmet.dropped.isEmpty {
+        before = ActorError.Wait(ref: task.ref, open: unmet.open, dropped: unmet.dropped)
+      }
+      for id in ids.sorted() {
+        try tx.database.execute(sql: "DELETE FROM link WHERE id=?", arguments: [id])
+      }
+    }
+    for target in targets { try insertBlock(target, task: task, at: at, in: tx) }
+    guard let before, try Self.waiting(task, at: at, in: tx.database)?.ready == true
+    else { return nil }
+    return before
+  }
+
+  private func removalIDs(
+    _ refs: [String], adding targets: [TaskLinkTarget], to task: TaskDetails, workspace: String,
+    in db: Database
+  ) throws -> Set<Int64> {
+    let links = try Self.blockLinks(task, in: db)
+    let ids: [Int64] = try refs.map { raw in
+      let target: TaskLinkTarget
+      do {
+        target = try Self.blocker(raw, workspace: workspace, in: db)
+      } catch let error as any CodedError where error.code == .notFound {
+        throw try missingBlocker(task, links: links, workspace: workspace, in: db)
+      }
+      guard let link = links.first(where: { Self.matches(target, blocker: $0) }) else {
+        throw try missingBlocker(task, links: links, workspace: workspace, in: db)
+      }
+      guard !targets.contains(where: { Self.matches($0, blocker: link) }) else {
+        throw TaskError.invalid("A blocker cannot appear in both --off and --on.")
+      }
+      return link["id"]
+    }
+    return Set(ids)
+  }
+
+  private static func matches(_ target: TaskLinkTarget, blocker: Row) -> Bool {
+    let external: String? = blocker["to_ext"]
+    return target.kind == (blocker["to_kind"] as String)
+      && target.id == (blocker["to_id"] as Int64?)
+      && target.external.map { Data($0.utf8) } == external.map { Data($0.utf8) }
+  }
+
+  private func missingBlocker(
+    _ task: TaskDetails, links: [Row], workspace: String, in db: Database
+  ) throws -> CommandFailure {
+    let current = try links.map { HumanText.line(try TaskLinkTarget.render($0, in: db)) }
+    let list = current.isEmpty ? "none" : current.joined(separator: ", ")
+    return CommandFailure(
+      error: TaskError.invalid("A requested blocker is absent. Current blockers are \(list)."),
+      next: [scopedCommand("silta task show " + shellWord(task.ref), workspace: workspace)])
+  }
+
+  private func authorizeReadyBlock(
+    _ before: ActorError.Wait?, command: String, workspace: String
+  ) throws -> HumanApproval? {
+    guard let before else { return nil }
+    let retry = scopedCommand(command, workspace: workspace) + " " + (retryBodyFlag ?? "-F <file>")
+    do {
+      return try approval(required: true, command: retry)
+    } catch let error as ActorError {
+      guard case .humanOnly = error else { throw error }
+      throw CommandFailure(
+        error: error, next: error.next,
+        message: before.text + ". This edit would make \(before.ref) ready to unblock. "
+          + "Supply the original reason with the retry. " + error.message)
     }
   }
 

@@ -14,18 +14,19 @@ struct TaskBlockReplacementCommandTests {
           "task", "block", "AC-1", "--off", "ext:old", "--on", "ext:new",
           "--follow-up", "3d", "-m", "Ask the new Acme party",
         ], scratch)
-      withKnownIssue("SI-261: block cannot replace an external blocker") {
-        let data = try TaskStateCommandTests.data(result)
-        let waiting = try #require(data["waiting"] as? [String: Any])
-        #expect(waiting["on"] as? [String] == ["ext:new", "task:AC-2"])
-        #expect(waiting["ready"] as? Bool == false)
-        #expect(waiting["why"] as? String == "Ask the new Acme party")
-        #expect(data["follow_up_at"] as? String == "2023-11-17")
-        #expect(result.stdout.contains("new_party"))
-        #expect(try approvals(store).isEmpty)
-        let shown = try run(["task", "show", "AC-1", "--timeline"], scratch)
-        #expect(shown.stdout.contains(#""on":["ext:new","task:AC-2"]"#))
-      }
+      let data = try TaskStateCommandTests.data(result)
+      let waiting = try #require(data["waiting"] as? [String: Any])
+      #expect(waiting["on"] as? [String] == ["ext:new", "task:AC-2"])
+      #expect(waiting["ready"] as? Bool == false)
+      #expect(waiting["why"] as? String == "Ask the new Acme party")
+      #expect(data["follow_up_at"] as? String == "2023-11-17")
+      #expect(result.stdout.contains("new_party"))
+      #expect(try approvals(store).isEmpty)
+      let shown = try run(["task", "show", "AC-1", "--timeline"], scratch)
+      let detail = try TaskStateCommandTests.data(shown)
+      let events = try #require(detail["timeline"] as? [[String: Any]])
+      let event = try #require(events.last(where: { $0["kind"] as? String == "block" }))
+      #expect((event["body"] as? String)?.contains(#""on":["ext:new","task:AC-2"]"#) == true)
     }
   }
 
@@ -38,32 +39,30 @@ struct TaskBlockReplacementCommandTests {
       let refused = try run(
         ["task", "block", "AC-1", "--off", "ext:old", "--follow-up", "3d", "-m", reason],
         scratch)
-      withKnownIssue("SI-261: removal can neither gate readiness nor generate its retry") {
-        let error = try TaskStateCommandTests.error(refused)
-        #expect(refused.termination == .exit(3))
-        #expect(error["code"] as? String == "human_only")
-        #expect(error["next_by"] as? String == "human")
-        #expect((error["message"] as? String)?.contains("ext:old") == true)
-        #expect((error["message"] as? String)?.contains("ready") == true)
-        #expect(!refused.stdout.contains(reason))
-        #expect(try run(show, scratch) == before)
-        #expect(try approvals(store).isEmpty)
-        let next = try #require(error["next"] as? [String])
-        let command = try #require(next.first)
-        #expect(command.hasPrefix("silta --ws 'acme' task block 'AC-1' --off 'ext:old'"))
-        #expect(command.contains("--follow-up '3d' -F - "))
+      let error = try TaskStateCommandTests.error(refused)
+      #expect(refused.termination == .exit(3))
+      #expect(error["code"] as? String == "human_only")
+      #expect(error["next_by"] as? String == "human")
+      #expect((error["message"] as? String)?.contains("ext:old") == true)
+      #expect((error["message"] as? String)?.contains("ready") == true)
+      #expect(!refused.stdout.contains(reason))
+      #expect(try run(show, scratch) == before)
+      #expect(try approvals(store).isEmpty)
+      let next = try #require(error["next"] as? [String])
+      let command = try #require(next.first)
+      #expect(command.hasPrefix("silta --ws 'acme' task block 'AC-1' --off 'ext:old'"))
+      #expect(command.contains("--follow-up '3d' -F - "))
 
-        let retry = try approvedRetry(command, reason: reason, scratch: scratch)
-        let data = try TaskStateCommandTests.data(retry)
-        let waiting = try #require(data["waiting"] as? [String: Any])
-        #expect(data["status"] as? String == "blocked")
-        #expect(waiting["ready"] as? Bool == true)
-        #expect(waiting["on"] as? [String] == ["task:AC-2"])
-        #expect(!retry.stdout.contains("approval_unused"))
-        let audit = try approvals(store)
-        #expect(audit.count == 1 && audit.first?.contains("--off 'ext:old'") == true)
-        #expect(audit.first?.contains(reason) == false)
-      }
+      let retry = try approvedRetry(command, reason: reason, scratch: scratch)
+      let data = try TaskStateCommandTests.data(retry)
+      let waiting = try #require(data["waiting"] as? [String: Any])
+      #expect(data["status"] as? String == "blocked")
+      #expect(waiting["ready"] as? Bool == true)
+      #expect(waiting["on"] as? [String] == ["task:AC-2"])
+      #expect(!retry.stdout.contains("approval_unused"))
+      let audit = try approvals(store)
+      #expect(audit.count == 1 && audit.first?.contains("--off 'ext:old'") == true)
+      #expect(audit.first?.contains(reason) == false)
     }
   }
 
@@ -76,15 +75,17 @@ struct TaskBlockReplacementCommandTests {
           "task", "block", "AC-1", "--off", "ext:old", "AC-2", "--off", "task:AC-2",
           "--follow-up", "3d", "-m", "Wait for the Acme answer",
         ], scratch)
-      withKnownIssue("SI-261: named links cannot be removed to leave an answer-only block") {
-        let data = try TaskStateCommandTests.data(result)
-        let waiting = try #require(data["waiting"] as? [String: Any])
-        #expect(waiting["on"] as? [String] == [])
-        #expect(waiting["ready"] as? Bool == false)
-        #expect(data["status"] as? String == "blocked")
-        let unblock = try run(["task", "unblock", "AC-1"], scratch)
-        #expect(try TaskStateCommandTests.error(unblock)["code"] as? String == "human_only")
-      }
+      let data = try TaskStateCommandTests.data(result)
+      let waiting = try #require(data["waiting"] as? [String: Any])
+      #expect(waiting["on"] as? [String] == [])
+      #expect(waiting["ready"] as? Bool == false)
+      #expect(data["status"] as? String == "blocked")
+      let unblock = try run(["task", "unblock", "AC-1"], scratch)
+      #expect(try TaskStateCommandTests.error(unblock)["code"] as? String == "human_only")
+      let before = try inbox(at: "2023-11-16T23:59:59.998Z", scratch: scratch)
+      let due = try inbox(at: "2023-11-17T00:00:00.000Z", scratch: scratch)
+      #expect(before.isEmpty)
+      #expect(due.first?["kind"] as? String == "due")
     }
   }
 
@@ -97,15 +98,13 @@ struct TaskBlockReplacementCommandTests {
           "--approved", "Accept the Acme correction.", "-m", "Pwd=acme-synthetic-value",
         ],
         scratch)
-      withKnownIssue("SI-261: the combined readiness and secret approval is unavailable") {
-        let data = try TaskStateCommandTests.data(result)
-        #expect((data["waiting"] as? [String: Any])?["ready"] as? Bool == true)
-        #expect(!result.stdout.contains("approval_unused"))
-        #expect(!result.stdout.contains("acme-synthetic-value"))
-        let audit = try approvals(store)
-        #expect(audit.count == 1 && audit.first?.contains("--allow-secret") == true)
-        #expect(audit.first?.contains("acme-synthetic-value") == false)
-      }
+      let data = try TaskStateCommandTests.data(result)
+      #expect((data["waiting"] as? [String: Any])?["ready"] as? Bool == true)
+      #expect(!result.stdout.contains("approval_unused"))
+      #expect(!result.stdout.contains("acme-synthetic-value"))
+      let audit = try approvals(store)
+      #expect(audit.count == 1 && audit.first?.contains("--allow-secret") == true)
+      #expect(audit.first?.contains("acme-synthetic-value") == false)
     }
   }
 
@@ -113,21 +112,21 @@ struct TaskBlockReplacementCommandTests {
     try withScratchDirectory { scratch in
       let store = try setup(scratch)
       try success(["task", "add", "Acme active", "--start"], scratch)
+      try success(["task", "block", "AC-1", "--on", "AC-3", "-m", "Another blocker"], scratch)
       let show = ["task", "show", "AC-1", "--timeline"]
       let before = try run(show, scratch)
       for args in [
         ["AC-1", "--off", "ext:old", "ext:absent"],
         ["AC-1", "--off", "ext:old", "--on", "ext:old"],
+        ["AC-1", "--off", "AC-3", "--on", "task:AC-3"],
         ["AC-3", "--off", "ext:old"],
       ] {
         let result = try run(["task", "block"] + args + ["-m", "Acme correction"], scratch)
-        withKnownIssue("SI-261: unsupported --off cannot validate a blocker correction") {
-          let error = try TaskStateCommandTests.error(result)
-          #expect(error["code"] as? String == "invalid")
-          if args.contains("ext:absent") {
-            #expect((error["message"] as? String)?.contains("ext:old") == true)
-            #expect(error["next"] as? [String] == ["silta --ws 'acme' task show 'AC-1'"])
-          }
+        let error = try TaskStateCommandTests.error(result)
+        #expect(error["code"] as? String == "invalid")
+        if args.contains("ext:absent") {
+          #expect((error["message"] as? String)?.contains("ext:old") == true)
+          #expect(error["next"] as? [String] == ["silta --ws 'acme' task show 'AC-1'"])
         }
       }
       #expect(try run(show, scratch) == before)
@@ -149,6 +148,15 @@ struct TaskBlockReplacementCommandTests {
 
   private func approvals(_ store: DatabaseStore) throws -> [String] {
     try store.read { try String.fetchAll($0, sql: "SELECT command FROM approval ORDER BY id") }
+  }
+
+  private func inbox(at time: String, scratch: URL) throws -> [[String: Any]] {
+    let result = try SiltaBinary.run(
+      ["inbox", "--for", "me", "--json"], in: scratch,
+      environment: TaskBlockCommandTests.environment.merging(["USER": "acme", "SILTA_NOW": time]) {
+        $1
+      })
+    return try #require(TaskStateCommandTests.data(result)["items"] as? [[String: Any]])
   }
 
   private func run(_ args: [String], _ scratch: URL) throws -> CLIResult {

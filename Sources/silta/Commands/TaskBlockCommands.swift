@@ -21,8 +21,11 @@ struct TaskBlockCommand: OutputCommand {
 
   @Option(
     parsing: .upToNextOption,
-    help: "Task, ext:party or url:http(s) blockers; default is none. Silta sends nothing.")
+    help: "Blockers to add. Silta sends nothing.")
   var on: [String] = []
+
+  @Option(parsing: .upToNextOption, help: "Current blockers to remove.")
+  var off: [String] = []
 
   @Option(help: "UTC YYYY-MM-DD or Nd, default 7d; today/0d is allowed.")
   var followUp: String?
@@ -30,6 +33,7 @@ struct TaskBlockCommand: OutputCommand {
   func execute(_ context: CommandContext) throws -> CommandOutput {
     var input = TaskBlock(why: "")
     input.on = on
+    input.off = off
     input.followUp = followUp
     input.allowSecret = body.allowSecret
     input.why =
@@ -38,7 +42,7 @@ struct TaskBlockCommand: OutputCommand {
         command: input.command(ref), approved: global.approved) ?? ""
     let result = try TaskService(
       environment: context.environment, workspace: global.ws,
-      approved: global.approved, bodyFlag: body.flag
+      approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
     ).block(ref, input)
     var lines = ["\(result.ref) \(result.status)"]
     if let waiting = result.waiting { lines += TaskOutput.waitingLines(waiting) }
@@ -52,7 +56,7 @@ struct TaskBlockCommand: OutputCommand {
     }
     return CommandOutput(
       text: lines.joined(separator: "\n"), data: result,
-      warnings: result.warnings, approvalUsed: body.allowSecret
+      warnings: result.warnings, approvalUsed: result.approvalUsed
     ).reporting(context.taskWorkspace(global.ws))
   }
 }

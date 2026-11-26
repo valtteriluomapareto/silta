@@ -5,6 +5,9 @@ package struct TaskBlock: Sendable {
   /// Task, ext:party or url:http(s) references to add to the current blockers.
   package var on: [String] = []
 
+  /// Exact references to remove from the current blocker set.
+  package var off: [String] = []
+
   /// A UTC YYYY-MM-DD day or nonnegative Nd interval; nil means seven days.
   package var followUp: String?
 
@@ -23,9 +26,11 @@ package struct TaskBlock: Sendable {
   /// Credential-bearing targets require manual replacement, never a changed URL identity.
   package func command(_ ref: String) -> String {
     var value = "silta task block " + shellWord(SecretGuard.redacted(ref))
-    for raw in on {
-      let safe = Self.party(raw) != nil || SecretGuard.matches(in: raw).isEmpty
-      value += " --on " + shellWord(safe ? raw : "<blocker-ref>")
+    for (flag, refs) in [("--off", off), ("--on", on)] {
+      for raw in refs {
+        let safe = Self.party(raw) != nil || RestoreService.canNameInRecovery(raw)
+        value += " " + flag + " " + shellWord(safe ? raw : "<blocker-ref>")
+      }
     }
     if let followUp { value += " --follow-up " + shellWord(SecretGuard.redacted(followUp)) }
     return value

@@ -701,7 +701,7 @@ subtask of an app task non-code, and no app slug may be `none`.
 
 **Blockers and dependencies (D35).** A task can wait on another task, on an outside
 party (a customer, an app store), or on something at a URL such as a tracker item.
-- `task block AC-12 [--on <ref>…] [--follow-up <date>|<n>d] -m <why>`:
+- `task block AC-12 [--on <ref>…] [--off <ref>…] [--follow-up <date>|<n>d] -m <why>`:
   - Allowed from `todo`, `doing` and `review`. It sets `blocked` and releases the
     claim.
   - Each `--on` records a `blocked_by` link to an open task in the same workspace
@@ -713,8 +713,14 @@ party (a customer, an app store), or on something at a URL such as a tracker ite
   - `--follow-up` is the day to look again, as a UTC day (not the local one), and
     never in the past; it defaults to 7 days. So nothing stays blocked unnoticed,
     cycles included.
-  - On a task that is already blocked, `block` adds blockers and replaces the
-    follow-up day and the reason, which is how a chase is snoozed.
+  - On a task that is already blocked, `--on` adds blockers and `--off` removes
+    named current blockers. A completed or dropped task can be removed. A
+    replacement uses both options in one write. An identity listed in both is
+    invalid, and a missing current blocker leaves the whole edit unapplied.
+    The command replaces the reason and follow-up day with the supplied values.
+  - Turning an unready block into a ready one requires the human's go-ahead.
+    Readiness uses the final set. The task stays blocked. An empty set waits for
+    an answer and comes due on its follow-up day.
   - Each `block` writes a `block` event whose body is JSON:
     `{"on":[…],"follow_up":"<day>","why":"<-m>"}`, where `on` holds task uids and
     `ext:`/`url:` strings. `ls` and `show` print the latest `why`; `show --timeline`
