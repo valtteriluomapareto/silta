@@ -301,7 +301,7 @@ extension GuideCommand {
         URL.'
         ```
         Use --off <ref> to remove a current blocker. Add its replacement with --on in the same \
-        command. Making the resulting block ready requires the human's approval.
+        command. Making an unready block ready requires the human's approval.
         Silta sends nothing: tell the human exactly what to ask whom, then pick other work. \
         Never unblock with open blockers without the human's approval, and never put "waiting \
         for" into repo files or plans.

@@ -108,6 +108,31 @@ struct TaskBlockReplacementCommandTests {
     }
   }
 
+  @Test func namedFileApprovalRetriesKeepTheCapturedWorkspaceAndHideInput() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let body = scratch.appending(path: "private-reason.txt")
+      let reason = "Acme private correction"
+      try reason.write(to: body, atomically: true, encoding: .utf8)
+      let arguments = ["task", "block", "AC-1", "--off", "ext:old"]
+      let readiness = try run(arguments + ["-F", body.path], scratch)
+      let secret = try run(
+        arguments + ["--allow-secret", "-F", body.path + ".missing"], scratch)
+      for (result, allowFlag) in [(readiness, ""), (secret, " --allow-secret")] {
+        let error = try TaskStateCommandTests.error(result)
+        #expect(result.termination == .exit(3))
+        #expect(error["next_by"] as? String == "human")
+        #expect(
+          error["next"] as? [String] == [
+            "silta --ws 'acme' task block 'AC-1' --off 'ext:old'\(allowFlag) -F <file>"
+              + " --approved \"<the human's words>\""
+          ])
+        #expect(!result.stdout.contains(body.path) && !result.stdout.contains(reason))
+      }
+      #expect(try approvals(store).isEmpty)
+    }
+  }
+
   @Test func invalidRemovalLeavesTheOriginalBlock() throws {
     try withScratchDirectory { scratch in
       let store = try setup(scratch)
@@ -131,6 +156,84 @@ struct TaskBlockReplacementCommandTests {
       }
       #expect(try run(show, scratch) == before)
       #expect(try approvals(store).isEmpty)
+    }
+  }
+
+}
+
+extension TaskBlockReplacementCommandTests {
+  @Test func removingAnUnanchoredBlockerPreservesAnImportedAnchoredTwin() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      try store.write {
+        try $0.database.execute(
+          sql: """
+            UPDATE link SET anchor='#legacy' WHERE rel='blocked_by' AND to_kind='ext';
+            INSERT INTO link(
+              uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,created_by,created_at)
+            SELECT 'acme-unanchored',workspace_id,from_kind,from_id,rel,to_kind,to_ext,
+              created_by,created_at FROM link WHERE rel='blocked_by' AND to_kind='ext';
+            """)
+      }
+      let remove = ["task", "block", "AC-1", "--off", "ext:old", "-m", "Acme correction"]
+      try success(remove, scratch)
+      #expect(
+        try store.read {
+          try String.fetchAll(
+            $0, sql: "SELECT anchor FROM link WHERE rel='blocked_by' AND to_kind='ext'")
+        } == ["#legacy"])
+      let repeatRemoval = try run(remove, scratch)
+      #expect(try TaskStateCommandTests.error(repeatRemoval)["code"] as? String == "invalid")
+    }
+  }
+
+  @Test func urlRemovalUsesExactStoredBytes() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let prefix = "url:https://example.invalid/"
+      let composed = prefix + "\u{e9}"
+      let decomposed = prefix + "e\u{301}"
+      try store.write {
+        for (index, reference) in [composed, decomposed].enumerated() {
+          try $0.database.execute(
+            sql: """
+              INSERT INTO link(
+                uid,workspace_id,from_kind,from_id,rel,to_kind,to_ext,created_by,created_at)
+              SELECT ?,workspace_id,from_kind,from_id,rel,'url',CAST(? AS TEXT),
+                created_by,created_at
+              FROM link WHERE rel='blocked_by' AND to_kind='ext';
+              """, arguments: ["acme-url-\(index)", Data(reference.dropFirst(4).utf8)])
+        }
+      }
+      try success(["task", "block", "AC-1", "--off", decomposed, "-m", "Remove one URL."], scratch)
+      let urls = try store.read {
+        try Data.fetchAll($0, sql: "SELECT CAST(to_ext AS BLOB) FROM link WHERE to_kind='url'")
+      }
+      #expect(urls == [Data(composed.dropFirst(4).utf8)])
+    }
+  }
+
+  @Test func retainedSecretBlockerStaysOutOfRecoveryAndAudit() throws {
+    try withScratchDirectory { scratch in
+      let store = try setup(scratch)
+      let secret = "url:https://example.invalid/?pwd=acme-synthetic-value"
+      let block = ["task", "block", "AC-1"]
+      try success(
+        block + [
+          "--off", "ext:old", "--on", secret, "--allow-secret",
+          "--approved", "Record the Acme URL.", "-m", "Waiting on Acme.",
+        ], scratch)
+      let remove = block + ["--off", secret, "-m", "Acme resolved the URL."]
+      let refusal = try run(remove, scratch)
+      let message = try TaskStateCommandTests.error(refusal)
+      let commands = try #require(message["next"] as? [String])
+      #expect(refusal.termination == .exit(3))
+      #expect(commands.first?.contains("--off '<blocker-ref>'") == true)
+      #expect(!refusal.stdout.contains("acme-synthetic-value"))
+      try success(remove + ["--approved", "Remove the Acme URLs."], scratch)
+      let audit = try approvals(store)
+      #expect(audit.count == 2 && audit.last?.contains("--off '<blocker-ref>'") == true)
+      #expect(audit.allSatisfy { !$0.contains("acme-synthetic-value") })
     }
   }
 

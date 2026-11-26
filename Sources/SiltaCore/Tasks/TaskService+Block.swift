@@ -120,6 +120,7 @@ extension TaskService {
     let external: String? = blocker["to_ext"]
     return target.kind == (blocker["to_kind"] as String)
       && target.id == (blocker["to_id"] as Int64?)
+      && target.anchor == (blocker["anchor"] as String?)
       && target.external.map { Data($0.utf8) } == external.map { Data($0.utf8) }
   }
 

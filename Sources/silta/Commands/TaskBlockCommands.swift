@@ -36,10 +36,19 @@ struct TaskBlockCommand: OutputCommand {
     input.off = off
     input.followUp = followUp
     input.allowSecret = body.allowSecret
+    let command = input.command(ref)
+    let bodyCommand =
+      if body.allowSecret, !off.isEmpty, let workspace = global.ws,
+        WorkspaceConfig.isValidIdentifier(workspace), RestoreService.canNameInRecovery(workspace)
+      {
+        workspaceCommand(command, workspace: workspace)
+      } else {
+        command
+      }
     input.why =
       try body.read(
         actor: context.environment.actor,
-        command: input.command(ref), approved: global.approved) ?? ""
+        command: bodyCommand, approved: global.approved) ?? ""
     let result = try TaskService(
       environment: context.environment, workspace: global.ws,
       approved: global.approved, bodyFlag: body.flag, retryBodyFlag: body.retryFlag
